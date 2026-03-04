@@ -86,7 +86,7 @@ function WishlistScreen() {
       } else {
         formData.append("photo", { uri, name: filename, type } as any);
       }
-      const res = await fetch(url.toString(), { method: "POST", body: formData, credentials: "include" });
+      const res = await globalThis.fetch(url.toString(), { method: "POST", body: formData, credentials: "include" });
       if (!res.ok) throw new Error("Errore upload foto");
       return res.json();
     },
@@ -503,7 +503,7 @@ function GarageContent() {
         formData.append("photo", { uri, name: filename, type } as any);
       }
 
-      const res = await fetch(url.toString(), {
+      const res = await globalThis.fetch(url.toString(), {
         method: "POST",
         body: formData,
         credentials: "include",
