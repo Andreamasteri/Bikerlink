@@ -1,71 +1,77 @@
-// template
-import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
-import { NativeTabs, Icon, Label } from "expo-router/unstable-native-tabs";
-import { BlurView } from "expo-blur";
-import { SymbolView } from "expo-symbols";
-import { Platform, StyleSheet, useColorScheme } from "react-native";
-import React from "react";
-
+import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { Platform } from "react-native";
 
-//IMPORTANT: iOS 26 Exists, feel free to use NativeTabs for native tabs with liquid glass support.
-function NativeTabLayout() {
-  return (
-    <NativeTabs>
-      <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: "house", selected: "house.fill" }} />
-        <Label>Home</Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
-  );
-}
-
-function ClassicTabLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-
+export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors.light.tint,
-        tabBarInactiveTintColor: Colors.light.tabIconDefault,
-        headerShown: true,
+        tabBarActiveTintColor: Colors.accent,
+        tabBarInactiveTintColor: Colors.textSecondary,
         tabBarStyle: {
-          position: "absolute",
-          backgroundColor: Platform.select({
-            ios: "transparent",
-            android: isDark ? "#000" : "#fff",
-          }),
-          borderTopWidth: 0,
-          elevation: 0,
+          backgroundColor: Colors.surface,
+          borderTopColor: Colors.border,
+          height: Platform.OS === "web" ? 84 : 50,
+          paddingBottom: Platform.OS === "web" ? 34 : 0,
         },
-        tabBarBackground: () =>
-          Platform.OS === "ios" ? (
-            <BlurView
-              intensity={100}
-              tint={isDark ? "dark" : "light"}
-              style={StyleSheet.absoluteFill}
-            />
-          ) : null,
+        headerStyle: {
+          backgroundColor: Colors.surface,
+        },
+        headerTintColor: Colors.text,
+        headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
-          tabBarIcon: ({ color }) => (
-            <SymbolView name="house" tintColor={color} size={24} />
+          title: "Mappa",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="map" size={size} color={color} />
           ),
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="proposals"
+        options={{
+          title: "Proposte",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="megaphone" size={size} color={color} />
+          ),
+          headerTitle: "Proposte e Richieste",
+        }}
+      />
+      <Tabs.Screen
+        name="tracking"
+        options={{
+          title: "Tracking",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="navigate" size={size} color={color} />
+          ),
+          headerTitle: "GPS Tracking",
+        }}
+      />
+      <Tabs.Screen
+        name="contest"
+        options={{
+          title: "Concorso",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="camera" size={size} color={color} />
+          ),
+          headerTitle: "Concorso Foto",
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profilo",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person" size={size} color={color} />
+          ),
+          headerTitle: "Il Mio Profilo",
         }}
       />
     </Tabs>
   );
-}
-
-export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
-  }
-  return <ClassicTabLayout />;
 }
