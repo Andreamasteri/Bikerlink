@@ -80,7 +80,12 @@ function WishlistScreen() {
       const filename = uri.split("/").pop() || "photo.jpg";
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : "image/jpeg";
-      formData.append("photo", { uri, name: filename, type } as any);
+      if (Platform.OS === "web") {
+        const blob = await (await globalThis.fetch(uri)).blob();
+        formData.append("photo", blob, filename);
+      } else {
+        formData.append("photo", { uri, name: filename, type } as any);
+      }
       const res = await fetch(url.toString(), { method: "POST", body: formData, credentials: "include" });
       if (!res.ok) throw new Error("Errore upload foto");
       return res.json();
@@ -491,11 +496,12 @@ function GarageContent() {
       const filename = uri.split("/").pop() || "photo.jpg";
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : "image/jpeg";
-      formData.append("photo", {
-        uri,
-        name: filename,
-        type,
-      } as any);
+      if (Platform.OS === "web") {
+        const blob = await (await globalThis.fetch(uri)).blob();
+        formData.append("photo", blob, filename);
+      } else {
+        formData.append("photo", { uri, name: filename, type } as any);
+      }
 
       const res = await fetch(url.toString(), {
         method: "POST",
