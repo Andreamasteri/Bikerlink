@@ -47,8 +47,15 @@ trackingRouter.post("/:id/stop", requireAuth, async (req, res) => {
 
     const points = await storage.getRoutePoints(routeId);
     if (points.length < 2) {
-      await storage.updateRoute(routeId, { endTime: new Date() });
-      return res.json({ route: { ...route, endTime: new Date(), totalDistanceKm: 0, maxSpeedKmh: 0, totalDurationMinutes: 0 } });
+      const updated = await storage.updateRoute(routeId, {
+        endTime: new Date(),
+        totalDistanceKm: 0,
+        maxSpeedKmh: 0,
+        minAltitudeM: points.length === 1 && points[0].altitude != null ? Math.round(points[0].altitude) : null,
+        maxAltitudeM: points.length === 1 && points[0].altitude != null ? Math.round(points[0].altitude) : null,
+        totalDurationMinutes: 0,
+      });
+      return res.json({ route: updated, pointCount: points.length });
     }
 
     let totalDistanceKm = 0;
@@ -56,11 +63,13 @@ trackingRouter.post("/:id/stop", requireAuth, async (req, res) => {
     let minAltitudeM: number | null = null;
     let maxAltitudeM: number | null = null;
 
-    for (let i = 1; i < points.length; i++) {
-      const prev = points[i - 1];
+    for (let i = 0; i < points.length; i++) {
       const curr = points[i];
 
-      totalDistanceKm += haversineDistance(prev.latitude, prev.longitude, curr.latitude, curr.longitude);
+      if (i > 0) {
+        const prev = points[i - 1];
+        totalDistanceKm += haversineDistance(prev.latitude, prev.longitude, curr.latitude, curr.longitude);
+      }
 
       if (curr.speed !== null && curr.speed !== undefined) {
         const speedKmh = curr.speed * 3.6;

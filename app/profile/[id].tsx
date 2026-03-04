@@ -15,7 +15,7 @@ export default function UserProfileScreen() {
   const insets = useSafeAreaInsets();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["/api/users", id],
+    queryKey: [`/api/users/${id}`],
   });
 
   const profileUser = (data as any)?.user;

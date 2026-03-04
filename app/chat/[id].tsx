@@ -17,7 +17,7 @@ export default function ChatScreen() {
   const [message, setMessage] = useState("");
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["/api/conversations", id, "/messages"],
+    queryKey: [`/api/conversations/${id}/messages`],
     refetchInterval: 3000,
   });
 
@@ -34,7 +34,7 @@ export default function ChatScreen() {
       await apiRequest("POST", `/api/conversations/${id}/messages`, { content, messageType: "text" });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/conversations", id, "/messages"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/conversations/${id}/messages`] });
       queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
     },
   });

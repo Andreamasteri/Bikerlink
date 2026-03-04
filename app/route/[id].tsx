@@ -11,7 +11,7 @@ export default function RouteDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
 
-  const { data, isLoading } = useQuery({ queryKey: ["/api/routes", id] });
+  const { data, isLoading } = useQuery({ queryKey: [`/api/routes/${id}`] });
 
   const route = (data as any)?.route;
   const points = (data as any)?.points || [];
@@ -26,7 +26,7 @@ export default function RouteDetailScreen() {
         await apiRequest("POST", `/api/routes/${id}/like`);
       }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/routes", id] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/routes/${id}`] }),
   });
 
   if (isLoading) {

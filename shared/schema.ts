@@ -525,7 +525,10 @@ export const registerSchema = z.object({
   userType: z.enum(userTypeEnum),
   coupleSexConfig: z.enum(coupleSexConfigEnum).optional(),
   eulaAccepted: z.literal(true),
-});
+}).refine(
+  (data) => data.userType !== "coppia" || !!data.coupleSexConfig,
+  { message: "La configurazione della coppia è obbligatoria per il tipo 'coppia'", path: ["coupleSexConfig"] }
+);
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;

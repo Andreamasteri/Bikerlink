@@ -62,7 +62,7 @@ export default function MapScreen() {
   }, []);
 
   const { data: nearbyData } = useQuery({
-    queryKey: ["/api/users/nearby", `?lat=${location?.latitude || 45.4642}&lng=${location?.longitude || 9.19}&radius=50`],
+    queryKey: [`/api/users/nearby?lat=${location?.latitude || 45.4642}&lng=${location?.longitude || 9.19}&radius=50`],
     enabled: !!location && isAuthenticated,
   });
 
@@ -72,7 +72,7 @@ export default function MapScreen() {
   });
 
   const { data: adsData } = useQuery({
-    queryKey: ["/api/ads", "?displayMode=banner"],
+    queryKey: ["/api/ads?displayMode=banner"],
     enabled: isAuthenticated,
   });
 
