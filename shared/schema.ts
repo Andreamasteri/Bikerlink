@@ -30,6 +30,7 @@ export const users = pgTable("users", {
   birthYear: integer("birth_year"),
   region: varchar("region", { length: 100 }),
   avatarUrl: text("avatar_url"),
+  emailVerified: boolean("email_verified").notNull().default(false),
   eulaAccepted: boolean("eula_accepted").notNull().default(false),
   invitationCode: varchar("invitation_code", { length: 50 }),
   lastLoginAt: timestamp("last_login_at"),
@@ -87,6 +88,7 @@ export const userProfiles = pgTable("user_profiles", {
   totalKm: doublePrecision("total_km").notNull().default(0),
   totalRides: integer("total_rides").notNull().default(0),
   easterEggsCollected: integer("easter_eggs_collected").notNull().default(0),
+  searchPreference: varchar("search_preference", { length: 20 }).notNull().default("both"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   index("user_profiles_user_id_idx").on(table.userId),
@@ -508,6 +510,93 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const motorcyclePhotos = pgTable("motorcycle_photos", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  motorcycleId: varchar("motorcycle_id", { length: 36 })
+    .notNull()
+    .references(() => userMotorcycles.id, { onDelete: "cascade" }),
+  photoUrl: text("photo_url").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("motorcycle_photos_motorcycle_id_idx").on(table.motorcycleId),
+]);
+
+export const zavarrinaWishlists = pgTable("zavarina_wishlists", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const zavarrinaWishlistPhotos = pgTable("zavarina_wishlist_photos", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  wishlistId: varchar("wishlist_id", { length: 36 })
+    .notNull()
+    .references(() => zavarrinaWishlists.id, { onDelete: "cascade" }),
+  photoUrl: text("photo_url").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const zavarrinaWishlistMotos = pgTable("zavarina_wishlist_motos", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  wishlistId: varchar("wishlist_id", { length: 36 })
+    .notNull()
+    .references(() => zavarrinaWishlists.id, { onDelete: "cascade" }),
+  brand: varchar("brand", { length: 100 }).notNull(),
+  model: varchar("model", { length: 100 }).notNull(),
+  ridingStyle: varchar("riding_style", { length: 50 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const bikerZavarrinaMatches = pgTable("biker_zavarina_matches", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  bikerId: varchar("biker_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  zavarrinaId: varchar("zavarina_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  bikerMotorcycleId: varchar("biker_motorcycle_id", { length: 36 })
+    .notNull()
+    .references(() => userMotorcycles.id, { onDelete: "cascade" }),
+  wishlistMotoId: varchar("wishlist_moto_id", { length: 36 })
+    .notNull()
+    .references(() => zavarrinaWishlistMotos.id, { onDelete: "cascade" }),
+  status: varchar("status", { length: 20 }).notNull().default("new"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("matches_biker_id_idx").on(table.bikerId),
+  index("matches_zavarina_id_idx").on(table.zavarrinaId),
+]);
+
+export const emailVerificationTokens = pgTable("email_verification_tokens", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const phoneSharingTracker = pgTable("phone_sharing_tracker", {
   id: varchar("id", { length: 36 })
     .primaryKey()
@@ -606,6 +695,18 @@ export type PhoneSharingTracker = typeof phoneSharingTracker.$inferSelect;
 export type InsertPhoneSharingTracker = typeof phoneSharingTracker.$inferInsert;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;
+export type MotorcyclePhoto = typeof motorcyclePhotos.$inferSelect;
+export type InsertMotorcyclePhoto = typeof motorcyclePhotos.$inferInsert;
+export type ZavarrinaWishlist = typeof zavarrinaWishlists.$inferSelect;
+export type InsertZavarrinaWishlist = typeof zavarrinaWishlists.$inferInsert;
+export type ZavarrinaWishlistPhoto = typeof zavarrinaWishlistPhotos.$inferSelect;
+export type InsertZavarrinaWishlistPhoto = typeof zavarrinaWishlistPhotos.$inferInsert;
+export type ZavarrinaWishlistMoto = typeof zavarrinaWishlistMotos.$inferSelect;
+export type InsertZavarrinaWishlistMoto = typeof zavarrinaWishlistMotos.$inferInsert;
+export type BikerZavarrinaMatch = typeof bikerZavarrinaMatches.$inferSelect;
+export type InsertBikerZavarrinaMatch = typeof bikerZavarrinaMatches.$inferInsert;
+export type EmailVerificationToken = typeof emailVerificationTokens.$inferSelect;
+export type InsertEmailVerificationToken = typeof emailVerificationTokens.$inferInsert;
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

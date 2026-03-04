@@ -9,6 +9,7 @@ import userRoutes from "./routes/users";
 import motorcycleRoutes from "./routes/motorcycles";
 import proposalRoutes from "./routes/proposals";
 import trackingRoutes from "./routes/tracking";
+import wishlistRoutes from "./routes/wishlist";
 import feedbackRoutes from "./routes/feedback";
 import invitationRoutes from "./routes/invitations";
 import contestRoutes from "./routes/contest";
@@ -54,11 +55,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/easter-eggs", easterEggRoutes);
   app.use("/api/ads", adsRoutes);
   app.use("/api/contest", contestRoutes);
+  app.use("/api/wishlist", wishlistRoutes);
   app.use("/api/feedback", feedbackRoutes);
   app.use("/api/invitations", invitationRoutes);
   app.use("/api/routes", trackingRoutes);
   app.use("/api/admin", adminRoutes);
   app.use("/api/moderator", moderatorRoutes);
+
+  app.get("/api/settings/email-verification", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("email_verification_enabled");
+      const enabled = setting?.value === "true";
+      res.json({ enabled });
+    } catch {
+      res.json({ enabled: false });
+    }
+  });
 
   app.get("/api/settings/syneco-branding", async (_req, res) => {
     try {

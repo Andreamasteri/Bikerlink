@@ -22,8 +22,7 @@ export default function ReadyToRideScreen() {
     queryKey: ["/api/users/profile"],
   });
 
-  const profile = (data as any)?.profile;
-  const isAvailable = profile?.isAvailable || false;
+  const isAvailable = (data as any)?.isAvailable || false;
 
   const toggleMutation = useMutation({
     mutationFn: async (newVal: boolean) => {

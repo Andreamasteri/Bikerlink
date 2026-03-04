@@ -31,6 +31,12 @@ import {
   verificationCodes,
   passwordResetTokens,
   phoneSharingTracker,
+  motorcyclePhotos,
+  zavarrinaWishlists,
+  zavarrinaWishlistPhotos,
+  zavarrinaWishlistMotos,
+  bikerZavarrinaMatches,
+  emailVerificationTokens,
   type User,
   type InsertUser,
   type UserPhoto,
@@ -89,6 +95,18 @@ import {
   type InsertVerificationCode,
   type PhoneSharingTracker,
   type InsertPhoneSharingTracker,
+  type MotorcyclePhoto,
+  type InsertMotorcyclePhoto,
+  type ZavarrinaWishlist,
+  type InsertZavarrinaWishlist,
+  type ZavarrinaWishlistPhoto,
+  type InsertZavarrinaWishlistPhoto,
+  type ZavarrinaWishlistMoto,
+  type InsertZavarrinaWishlistMoto,
+  type BikerZavarrinaMatch,
+  type InsertBikerZavarrinaMatch,
+  type EmailVerificationToken,
+  type InsertEmailVerificationToken,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -740,6 +758,135 @@ export class DatabaseStorage implements IStorage {
 
   async markPasswordResetTokenUsed(token: string): Promise<void> {
     await db.update(passwordResetTokens).set({ used: true }).where(eq(passwordResetTokens.token, token));
+  }
+
+  async getMotorcyclePhotos(motorcycleId: string): Promise<MotorcyclePhoto[]> {
+    return db.select().from(motorcyclePhotos).where(eq(motorcyclePhotos.motorcycleId, motorcycleId)).orderBy(asc(motorcyclePhotos.sortOrder));
+  }
+
+  async addMotorcyclePhoto(data: InsertMotorcyclePhoto): Promise<MotorcyclePhoto> {
+    const [photo] = await db.insert(motorcyclePhotos).values(data).returning();
+    return photo;
+  }
+
+  async deleteMotorcyclePhoto(id: string): Promise<void> {
+    await db.delete(motorcyclePhotos).where(eq(motorcyclePhotos.id, id));
+  }
+
+  async getMotorcyclePhotoCount(motorcycleId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(motorcyclePhotos).where(eq(motorcyclePhotos.motorcycleId, motorcycleId));
+    return Number(result[0]?.count ?? 0);
+  }
+
+  async getWishlist(userId: string): Promise<ZavarrinaWishlist | undefined> {
+    const [wl] = await db.select().from(zavarrinaWishlists).where(eq(zavarrinaWishlists.userId, userId)).limit(1);
+    return wl;
+  }
+
+  async createOrUpdateWishlist(userId: string, description: string): Promise<ZavarrinaWishlist> {
+    const existing = await this.getWishlist(userId);
+    if (existing) {
+      const [wl] = await db.update(zavarrinaWishlists).set({ description, updatedAt: new Date() }).where(eq(zavarrinaWishlists.id, existing.id)).returning();
+      return wl;
+    }
+    const [wl] = await db.insert(zavarrinaWishlists).values({ userId, description }).returning();
+    return wl;
+  }
+
+  async getWishlistPhotos(wishlistId: string): Promise<ZavarrinaWishlistPhoto[]> {
+    return db.select().from(zavarrinaWishlistPhotos).where(eq(zavarrinaWishlistPhotos.wishlistId, wishlistId)).orderBy(asc(zavarrinaWishlistPhotos.sortOrder));
+  }
+
+  async addWishlistPhoto(data: InsertZavarrinaWishlistPhoto): Promise<ZavarrinaWishlistPhoto> {
+    const [photo] = await db.insert(zavarrinaWishlistPhotos).values(data).returning();
+    return photo;
+  }
+
+  async deleteWishlistPhoto(id: string): Promise<void> {
+    await db.delete(zavarrinaWishlistPhotos).where(eq(zavarrinaWishlistPhotos.id, id));
+  }
+
+  async getWishlistPhotoCount(wishlistId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(zavarrinaWishlistPhotos).where(eq(zavarrinaWishlistPhotos.wishlistId, wishlistId));
+    return Number(result[0]?.count ?? 0);
+  }
+
+  async getWishlistMotos(wishlistId: string): Promise<ZavarrinaWishlistMoto[]> {
+    return db.select().from(zavarrinaWishlistMotos).where(eq(zavarrinaWishlistMotos.wishlistId, wishlistId));
+  }
+
+  async addWishlistMoto(data: InsertZavarrinaWishlistMoto): Promise<ZavarrinaWishlistMoto> {
+    const [moto] = await db.insert(zavarrinaWishlistMotos).values(data).returning();
+    return moto;
+  }
+
+  async updateWishlistMoto(id: string, data: Partial<InsertZavarrinaWishlistMoto>): Promise<ZavarrinaWishlistMoto | undefined> {
+    const [moto] = await db.update(zavarrinaWishlistMotos).set(data).where(eq(zavarrinaWishlistMotos.id, id)).returning();
+    return moto;
+  }
+
+  async deleteWishlistMoto(id: string): Promise<void> {
+    await db.delete(zavarrinaWishlistMotos).where(eq(zavarrinaWishlistMotos.id, id));
+  }
+
+  async getWishlistMotoCount(wishlistId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(zavarrinaWishlistMotos).where(eq(zavarrinaWishlistMotos.wishlistId, wishlistId));
+    return Number(result[0]?.count ?? 0);
+  }
+
+  async findMatchingWishlistMotos(brand: string, model: string, ridingStyle: string): Promise<Array<ZavarrinaWishlistMoto & { userId: string }>> {
+    const results = await db.select({
+      id: zavarrinaWishlistMotos.id,
+      wishlistId: zavarrinaWishlistMotos.wishlistId,
+      brand: zavarrinaWishlistMotos.brand,
+      model: zavarrinaWishlistMotos.model,
+      ridingStyle: zavarrinaWishlistMotos.ridingStyle,
+      createdAt: zavarrinaWishlistMotos.createdAt,
+      userId: zavarrinaWishlists.userId,
+    }).from(zavarrinaWishlistMotos)
+      .innerJoin(zavarrinaWishlists, eq(zavarrinaWishlistMotos.wishlistId, zavarrinaWishlists.id))
+      .where(and(
+        sql`LOWER(${zavarrinaWishlistMotos.brand}) = LOWER(${brand})`,
+        sql`LOWER(${zavarrinaWishlistMotos.model}) = LOWER(${model})`,
+        sql`LOWER(${zavarrinaWishlistMotos.ridingStyle}) = LOWER(${ridingStyle})`,
+      ));
+    return results;
+  }
+
+  async findMatchingBikerMotos(brand: string, model: string, ridingStyle: string): Promise<UserMotorcycle[]> {
+    return db.select().from(userMotorcycles).where(and(
+      sql`LOWER(${userMotorcycles.brand}) = LOWER(${brand})`,
+      sql`LOWER(${userMotorcycles.model}) = LOWER(${model})`,
+      sql`LOWER(${userMotorcycles.ridingStyle}) = LOWER(${ridingStyle})`,
+    ));
+  }
+
+  async createMatch(data: InsertBikerZavarrinaMatch): Promise<BikerZavarrinaMatch> {
+    const [match] = await db.insert(bikerZavarrinaMatches).values(data).returning();
+    return match;
+  }
+
+  async getMatchesForUser(userId: string): Promise<BikerZavarrinaMatch[]> {
+    return db.select().from(bikerZavarrinaMatches).where(
+      or(eq(bikerZavarrinaMatches.bikerId, userId), eq(bikerZavarrinaMatches.zavarrinaId, userId))
+    ).orderBy(desc(bikerZavarrinaMatches.createdAt));
+  }
+
+  async createEmailVerificationToken(userId: string, token: string, expiresAt: Date): Promise<void> {
+    await db.insert(emailVerificationTokens).values({ userId, token, expiresAt });
+  }
+
+  async getEmailVerificationToken(token: string): Promise<EmailVerificationToken | undefined> {
+    const [row] = await db.select().from(emailVerificationTokens).where(eq(emailVerificationTokens.token, token)).limit(1);
+    return row;
+  }
+
+  async deleteEmailVerificationTokens(userId: string): Promise<void> {
+    await db.delete(emailVerificationTokens).where(eq(emailVerificationTokens.userId, userId));
+  }
+
+  async markUserEmailVerified(userId: string): Promise<void> {
+    await db.update(users).set({ emailVerified: true }).where(eq(users.id, userId));
   }
 }
 

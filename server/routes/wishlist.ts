@@ -1,0 +1,192 @@
+import { Router, type Request, type Response } from "express";
+import multer from "multer";
+import path from "path";
+import { storage } from "../storage";
+
+const router = Router();
+
+function requireAuth(req: Request, res: Response, next: () => void) {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: "Non autenticato" });
+  }
+  next();
+}
+
+const upload = multer({
+  dest: path.join(process.cwd(), "uploads", "wishlist"),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Solo immagini permesse"));
+    }
+  },
+});
+
+router.get("/", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const user = await storage.getUser(userId);
+    if (!user || user.userType !== "zavorrina") {
+      return res.status(403).json({ message: "Solo le zavorrine possono accedere alla wishlist" });
+    }
+
+    let wishlist = await storage.getWishlist(userId);
+    if (!wishlist) {
+      wishlist = await storage.createOrUpdateWishlist(userId, "");
+    }
+
+    const photos = await storage.getWishlistPhotos(wishlist.id);
+    const motos = await storage.getWishlistMotos(wishlist.id);
+
+    return res.json({ wishlist, photos, motos });
+  } catch (error) {
+    console.error("Get wishlist error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.put("/", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const { description } = req.body;
+    const wishlist = await storage.createOrUpdateWishlist(userId, description || "");
+    return res.json(wishlist);
+  } catch (error) {
+    console.error("Update wishlist error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/photos", requireAuth, upload.single("photo"), async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    let wishlist = await storage.getWishlist(userId);
+    if (!wishlist) {
+      wishlist = await storage.createOrUpdateWishlist(userId, "");
+    }
+
+    const count = await storage.getWishlistPhotoCount(wishlist.id);
+    if (count >= 3) {
+      return res.status(400).json({ message: "Massimo 3 foto permesse" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: "Nessun file caricato" });
+    }
+
+    const photoUrl = `/uploads/wishlist/${req.file.filename}`;
+    const photo = await storage.addWishlistPhoto({
+      wishlistId: wishlist.id,
+      photoUrl,
+      sortOrder: count,
+    });
+
+    return res.status(201).json(photo);
+  } catch (error) {
+    console.error("Upload wishlist photo error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/photos/:photoId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const photoId = req.params.photoId as string;
+    await storage.deleteWishlistPhoto(photoId);
+    return res.json({ message: "Foto eliminata" });
+  } catch (error) {
+    console.error("Delete wishlist photo error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/motos", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    let wishlist = await storage.getWishlist(userId);
+    if (!wishlist) {
+      wishlist = await storage.createOrUpdateWishlist(userId, "");
+    }
+
+    const count = await storage.getWishlistMotoCount(wishlist.id);
+    if (count >= 5) {
+      return res.status(400).json({ message: "Massimo 5 moto nella wishlist" });
+    }
+
+    const { brand, model, ridingStyle } = req.body;
+    if (!brand || !model) {
+      return res.status(400).json({ message: "Marca e modello sono obbligatori" });
+    }
+
+    const moto = await storage.addWishlistMoto({
+      wishlistId: wishlist.id,
+      brand,
+      model,
+      ridingStyle: ridingStyle || null,
+    });
+
+    let matches: any[] = [];
+    if (brand && model && ridingStyle) {
+      const bikerMotos = await storage.findMatchingBikerMotos(brand, model, ridingStyle);
+      for (const bikerMoto of bikerMotos) {
+        if (bikerMoto.userId === userId) continue;
+        await storage.createMatch({
+          bikerId: bikerMoto.userId,
+          zavarrinaId: userId,
+          bikerMotorcycleId: bikerMoto.id,
+          wishlistMotoId: moto.id,
+          status: "new",
+        });
+        const bikerUser = await storage.getUser(bikerMoto.userId);
+        await storage.createNotification({
+          userId: bikerMoto.userId,
+          title: "Here Comes Your Chance!!",
+          body: `Una zavorrina cerca proprio la tua moto: ${brand} ${model}!`,
+          notificationType: "match",
+          referenceType: "match",
+          referenceId: moto.id,
+        });
+        await storage.createNotification({
+          userId,
+          title: "Here Comes Your Chance!!",
+          body: `Un biker ha la moto che cerchi: ${brand} ${model}! (${bikerUser?.nickname || "Biker"})`,
+          notificationType: "match",
+          referenceType: "match",
+          referenceId: bikerMoto.id,
+        });
+        matches.push({ bikerNickname: bikerUser?.nickname, brand, model, ridingStyle });
+      }
+    }
+
+    return res.status(201).json({ moto, matches });
+  } catch (error) {
+    console.error("Add wishlist moto error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.put("/motos/:motoId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const motoId = req.params.motoId as string;
+    const { brand, model, ridingStyle } = req.body;
+    const moto = await storage.updateWishlistMoto(motoId, { brand, model, ridingStyle });
+    return res.json(moto);
+  } catch (error) {
+    console.error("Update wishlist moto error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/motos/:motoId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const motoId = req.params.motoId as string;
+    await storage.deleteWishlistMoto(motoId);
+    return res.json({ message: "Moto eliminata dalla wishlist" });
+  } catch (error) {
+    console.error("Delete wishlist moto error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+export default router;

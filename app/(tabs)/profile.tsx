@@ -44,6 +44,7 @@ interface ProfileData {
     totalRides: number;
     easterEggsCollected: number;
     maxPickupDistance?: number;
+    searchPreference?: string;
   };
   photos?: Array<{
     id: string;
@@ -65,11 +66,12 @@ interface ProfileData {
 
 function getUserTypeColor(userType: string, sex?: string, coupleSexConfig?: string): string {
   if (userType === "coppia") {
-    if (coupleSexConfig === "mm") return Colors.maleIcon;
-    if (coupleSexConfig === "ff") return Colors.femaleIcon;
-    return Colors.accent;
+    return Colors.coupleIcon;
   }
-  return sex === "male" ? Colors.maleIcon : Colors.femaleIcon;
+  if (sex === "M") return Colors.maleIcon;
+  if (sex === "F") return Colors.femaleIcon;
+  if (userType === "zavorrina") return Colors.femaleIcon;
+  return Colors.maleIcon;
 }
 
 function getUserTypeIcon(userType: string): keyof typeof Ionicons.glyphMap {
@@ -140,6 +142,17 @@ export default function ProfileScreen() {
   const deletePhotoMutation = useMutation({
     mutationFn: async (photoId: string) => {
       await apiRequest("DELETE", `/api/users/me/photos/${photoId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+    },
+  });
+
+  const searchPreference = profile?.profile?.searchPreference ?? "both";
+
+  const searchPreferenceMutation = useMutation({
+    mutationFn: async (value: "bikers" | "zavorrine" | "both") => {
+      await apiRequest("PUT", "/api/users/profile/dynamic", { searchPreference: value });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
@@ -459,6 +472,45 @@ export default function ProfileScreen() {
           )}
         </View>
       </View>
+
+      {currentUserType === "biker" && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Cerco</Text>
+          <View style={styles.searchPrefRow}>
+            {([
+              { value: "bikers" as const, label: "Solo Biker", icon: "bicycle" as keyof typeof Ionicons.glyphMap },
+              { value: "zavorrine" as const, label: "Solo Zavorrine", icon: "person" as keyof typeof Ionicons.glyphMap },
+              { value: "both" as const, label: "Entrambi", icon: "people" as keyof typeof Ionicons.glyphMap },
+            ]).map((opt) => {
+              const isSelected = searchPreference === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  style={[
+                    styles.searchPrefBtn,
+                    isSelected && styles.searchPrefBtnActive,
+                  ]}
+                  onPress={() => searchPreferenceMutation.mutate(opt.value)}
+                >
+                  <Ionicons
+                    name={opt.icon}
+                    size={20}
+                    color={isSelected ? Colors.background : Colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.searchPrefLabel,
+                      isSelected && styles.searchPrefLabelActive,
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Menu</Text>
@@ -795,6 +847,32 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     color: Colors.text,
     textAlign: "right",
+  },
+  searchPrefRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  searchPrefBtn: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+  },
+  searchPrefBtnActive: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
+  searchPrefLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary,
+  },
+  searchPrefLabelActive: {
+    color: Colors.background,
   },
   modalOverlay: {
     flex: 1,

@@ -175,6 +175,12 @@ export default function ChatConversationScreen() {
 
   const getTitle = (): string => {
     if (conversation?.title) return conversation.title;
+    if (conversation?.conversationType === "contact") {
+      const others = conversation.participants.filter((p) => p.id !== userId);
+      if (others.length === 0) return "Chat di contatto";
+      if (others.length === 1) return `Contatto - ${others[0].nickname}`;
+      return `Contatto (${conversation.participants.length})`;
+    }
     if (conversation?.conversationType === "group") return t("chat.group");
     const other = conversation?.participants.find((p) => p.id !== userId);
     return other?.nickname ?? t("chat.title");
@@ -201,7 +207,7 @@ export default function ChatConversationScreen() {
         </TouchableOpacity>
         <View style={styles.topBarInfo}>
           <Text style={styles.topBarTitle} numberOfLines={1}>{getTitle()}</Text>
-          {conversation?.conversationType === "group" && (
+          {(conversation?.conversationType === "group" || conversation?.conversationType === "contact") && (
             <Text style={styles.topBarSubtitle}>
               {conversation.participants.length} partecipanti
             </Text>

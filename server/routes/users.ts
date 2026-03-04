@@ -41,6 +41,24 @@ function requireAuth(req: Request, res: Response, next: () => void) {
   next();
 }
 
+router.get("/", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const allUsers = await storage.getAllUsers();
+    const results = allUsers
+      .filter((u) => u.id !== req.session.userId)
+      .map((u) => ({
+        id: u.id,
+        nickname: u.nickname,
+        avatarUrl: u.avatarUrl,
+        userType: u.userType,
+      }));
+    return res.json(results);
+  } catch (error) {
+    console.error("Get users error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.get("/me", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
@@ -148,12 +166,13 @@ router.get("/profile", requireAuth, async (req: Request, res: Response) => {
 router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const { isAvailable, latitude, longitude } = req.body;
+    const { isAvailable, latitude, longitude, searchPreference } = req.body;
     const existingProfile = await storage.getUserProfile(userId);
     const updateData: Record<string, unknown> = {};
     if (typeof isAvailable === "boolean") updateData.isAvailable = isAvailable;
     if (latitude !== undefined) updateData.latitude = latitude;
     if (longitude !== undefined) updateData.longitude = longitude;
+    if (searchPreference !== undefined) updateData.searchPreference = searchPreference;
 
     if (existingProfile) {
       const profile = await storage.updateUserProfile(userId, updateData as any);

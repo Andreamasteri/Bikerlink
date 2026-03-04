@@ -38,6 +38,30 @@ export default function AdminSettings() {
   });
   const synecoVisible = synecoData?.visible === true;
 
+  const { data: emailVerifData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/email-verification"],
+  });
+  const emailVerifEnabled = emailVerifData?.enabled === true;
+
+  const emailVerifMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/email_verification_enabled", baseUrl);
+      const res = await fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/email-verification"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
   const synecoBrandingMutation = useMutation({
     mutationFn: async (visible: boolean) => {
       const baseUrl = getApiUrl();
@@ -170,6 +194,25 @@ export default function AdminSettings() {
         </Text>
       </View>
 
+      <View style={styles.emailVerifCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="mail" size={20} color={Colors.accent} />
+            <Text style={styles.synecoLabel}>Verifica Email</Text>
+          </View>
+          <Switch
+            value={emailVerifEnabled}
+            onValueChange={(val) => emailVerifMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: Colors.accent }}
+            thumbColor={emailVerifEnabled ? Colors.text : Colors.textSecondary}
+            disabled={emailVerifMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {emailVerifEnabled ? "Attiva la verifica email per le nuove registrazioni" : "La verifica email è disattivata"}
+        </Text>
+      </View>
+
       {isLoading ? (
         <Text style={styles.loadingText}>Caricamento...</Text>
       ) : (
@@ -246,6 +289,10 @@ const styles = StyleSheet.create({
   synecoLabel: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.text },
   synecoDesc: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, marginTop: 8 },
   loadingText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", marginTop: 40 },
+  emailVerifCard: {
+    backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 16,
+    borderWidth: 1, borderColor: Colors.accent,
+  },
   settingCard: {
     backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 12,
     borderWidth: 1, borderColor: Colors.border,

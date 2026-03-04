@@ -83,6 +83,41 @@ router.post("/conversations", async (req: Request, res: Response) => {
 
     const { conversationType, title, proposalId, participantIds } = req.body;
 
+    if (conversationType === "contact" && participantIds?.length === 1) {
+      const targetUserId = participantIds[0];
+      const targetConvs = await storage.getConversations(targetUserId);
+      const existingContactConv = targetConvs.find((c) => c.conversationType === "contact");
+
+      if (existingContactConv) {
+        const parts = await storage.getConversationParticipants(existingContactConv.id);
+        const alreadyParticipant = parts.some((p) => p.userId === userId);
+        if (!alreadyParticipant) {
+          await storage.addConversationParticipant({
+            conversationId: existingContactConv.id,
+            userId,
+          });
+        }
+        return res.json(existingContactConv);
+      }
+
+      const conv = await storage.createConversation({
+        conversationType: "contact",
+        title: title || null,
+        proposalId: proposalId || null,
+      });
+
+      await storage.addConversationParticipant({
+        conversationId: conv.id,
+        userId: targetUserId,
+      });
+      await storage.addConversationParticipant({
+        conversationId: conv.id,
+        userId,
+      });
+
+      return res.status(201).json(conv);
+    }
+
     if (conversationType === "private" && participantIds?.length === 1) {
       const otherUserId = participantIds[0];
       const existingConvs = await storage.getConversations(userId);

@@ -204,8 +204,12 @@ export default function RegisterScreen() {
     if (region) data.region = region;
 
     registerMutation.mutate(data, {
-      onSuccess: () => {
-        router.replace("/(tabs)");
+      onSuccess: (response: any) => {
+        if (response?.requiresEmailVerification) {
+          router.replace({ pathname: "/(auth)/verify-email", params: { email: data.email } });
+        } else {
+          router.replace("/(tabs)");
+        }
       },
       onError: (err: any) => {
         const msg = err?.message || "Errore durante la registrazione";

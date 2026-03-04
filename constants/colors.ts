@@ -4,6 +4,7 @@ const Colors = {
   accentRed: '#E63946',
   maleIcon: '#4A90D9',
   femaleIcon: '#E91E8C',
+  coupleIcon: '#FFD700',
   background: '#0D0D0D',
   surface: '#1E1E1E',
   surfaceLight: '#2A2A2A',

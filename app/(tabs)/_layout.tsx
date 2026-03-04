@@ -18,7 +18,7 @@ export default function TabLayout() {
     enabled: !!user,
   });
 
-  const isAvailable = (profileData as any)?.profile?.isAvailable || false;
+  const isAvailable = (profileData as any)?.isAvailable || false;
 
   useEffect(() => {
     if (Platform.OS !== "android") return;
@@ -42,7 +42,7 @@ export default function TabLayout() {
           paddingBottom: tabBarPaddingBottom,
         },
         tabBarLabelStyle: {
-          fontSize: 9,
+          fontSize: 11,
           fontFamily: "Inter_500Medium",
         },
         headerStyle: {
@@ -86,11 +86,11 @@ export default function TabLayout() {
           headerTitle: "Ready to Ride",
           tabBarLabel: ({ focused }) => (
             <Text style={{
-              fontSize: 9,
+              fontSize: 11,
               fontFamily: "Inter_500Medium",
               color: focused ? Colors.accent : Colors.textSecondary,
               textAlign: "center",
-              lineHeight: 11,
+              lineHeight: 13,
             }}>
               {"Ready\nto Ride"}
             </Text>
@@ -107,25 +107,16 @@ export default function TabLayout() {
           headerTitle: "GPS Tracking",
         }}
       />
-      {isBikerOrCoppia ? (
-        <Tabs.Screen
-          name="garage"
-          options={{
-            title: "Garage",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="build" size={size} color={color} />
-            ),
-            headerTitle: "Il Mio Garage",
-          }}
-        />
-      ) : (
-        <Tabs.Screen
-          name="garage"
-          options={{
-            href: null,
-          }}
-        />
-      )}
+      <Tabs.Screen
+        name="garage"
+        options={{
+          title: isBikerOrCoppia ? "Garage" : "Wishlist",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name={isBikerOrCoppia ? "build" : "heart"} size={size} color={color} />
+          ),
+          headerTitle: isBikerOrCoppia ? "Il Mio Garage" : "La Mia Wishlist",
+        }}
+      />
       <Tabs.Screen
         name="contest"
         options={{

@@ -112,6 +112,28 @@ constants/
 
 Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 
+## Funzionalità Recenti
+
+- **Garage (Biker/Coppia)**: form con Marca, Modello, Cilindrata, Tipo Moto, Stile Guida + max 3 foto per moto. API: `/api/motorcycles`
+- **Wishlist (Zavorrine)**: descrizione personale, max 3 foto, max 5 moto desiderate (marca, modello, stile guida). API: `/api/wishlist`
+- **Match automatico**: confronto ESATTO case-insensitive (marca+modello+stile) tra moto biker e wishlist zavorrina → notifica "Here Comes Your Chance!!" a entrambi. Non filtra visibilità.
+- **Chat di contatto**: unica chat di gruppo dove tutti i contatti di un utente vedono i messaggi. Chat privata disponibile ma scoraggiata.
+- **Verifica email**: attivabile/disattivabile dall'admin (default OFF). Token stampato in console. Schermata `verify-email.tsx`.
+- **Selettore preferenza biker**: nel profilo, sceglie chi cercare (Solo Biker / Solo Zavorrine / Entrambi). Campo `searchPreference` in `user_profiles`.
+- **Colori icona profilo**: azzurro maschi, rosa donne, giallo oro coppie. `Colors.coupleIcon: '#FFD700'`
+- **Ready to Ride**: fix bug accesso dati (`.isAvailable` flat, non `.profile.isAvailable`)
+- **Tab labels**: fontSize aumentato a 11
+
+## Tabelle DB Aggiuntive
+
+- `motorcycle_photos`: foto moto (max 3 per moto)
+- `zavorrina_wishlists`: wishlist zavorrina (1 per utente)
+- `zavorrina_wishlist_photos`: foto personali wishlist (max 3)
+- `zavorrina_wishlist_motos`: moto desiderate wishlist (max 5)
+- `biker_zavorrina_matches`: match tra biker e zavorrine
+- `email_verification_tokens`: token verifica email
+- Colonna `emailVerified` in `users`, `searchPreference` in `user_profiles`
+
 ## Note Importanti
 
 - react-native-maps: usare componenti con pattern `.web.tsx` per compatibilità web

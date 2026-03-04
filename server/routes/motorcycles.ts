@@ -1,4 +1,6 @@
 import { Router, type Request, type Response } from "express";
+import multer from "multer";
+import path from "path";
 import { storage } from "../storage";
 
 const router = Router();
@@ -10,11 +12,27 @@ function requireAuth(req: Request, res: Response, next: () => void) {
   next();
 }
 
+const upload = multer({
+  dest: path.join(process.cwd(), "uploads", "motorcycles"),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Solo immagini permesse"));
+    }
+  },
+});
+
 router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
     const motorcycles = await storage.getUserMotorcycles(userId);
-    return res.json(motorcycles);
+    const result = await Promise.all(motorcycles.map(async (m) => {
+      const photos = await storage.getMotorcyclePhotos(m.id);
+      return { ...m, photos };
+    }));
+    return res.json(result);
   } catch (error) {
     console.error("Get motorcycles error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -51,7 +69,40 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       photoUrl: photoUrl || null,
     });
 
-    return res.status(201).json(motorcycle);
+    let matches: any[] = [];
+    if (brand && model && ridingStyle) {
+      const wishlistMotos = await storage.findMatchingWishlistMotos(brand, model, ridingStyle);
+      for (const wm of wishlistMotos) {
+        if (wm.userId === userId) continue;
+        await storage.createMatch({
+          bikerId: userId,
+          zavarrinaId: wm.userId,
+          bikerMotorcycleId: motorcycle.id,
+          wishlistMotoId: wm.id,
+          status: "new",
+        });
+        const zavarrinaUser = await storage.getUser(wm.userId);
+        await storage.createNotification({
+          userId,
+          title: "Here Comes Your Chance!!",
+          body: `Una zavorrina cerca proprio la tua moto: ${brand} ${model}! (${zavarrinaUser?.nickname || "Zavorrina"})`,
+          notificationType: "match",
+          referenceType: "match",
+          referenceId: wm.id,
+        });
+        await storage.createNotification({
+          userId: wm.userId,
+          title: "Here Comes Your Chance!!",
+          body: `Un biker ha la moto che cerchi: ${brand} ${model}!`,
+          notificationType: "match",
+          referenceType: "match",
+          referenceId: motorcycle.id,
+        });
+        matches.push({ zavarrinaNickname: zavarrinaUser?.nickname, brand, model, ridingStyle });
+      }
+    }
+
+    return res.status(201).json({ motorcycle, matches });
   } catch (error) {
     console.error("Create motorcycle error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -107,6 +158,61 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
     return res.json({ message: "Moto eliminata" });
   } catch (error) {
     console.error("Delete motorcycle error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/:id/photos", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const motoId = req.params.id as string;
+    const photos = await storage.getMotorcyclePhotos(motoId);
+    return res.json(photos);
+  } catch (error) {
+    console.error("Get motorcycle photos error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/:id/photos", requireAuth, upload.single("photo"), async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const motoId = req.params.id as string;
+
+    const existing = await storage.getUserMotorcycle(motoId);
+    if (!existing || existing.userId !== userId) {
+      return res.status(403).json({ message: "Non autorizzato" });
+    }
+
+    const count = await storage.getMotorcyclePhotoCount(motoId);
+    if (count >= 3) {
+      return res.status(400).json({ message: "Massimo 3 foto per moto" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: "Nessun file caricato" });
+    }
+
+    const photoUrl = `/uploads/motorcycles/${req.file.filename}`;
+    const photo = await storage.addMotorcyclePhoto({
+      motorcycleId: motoId,
+      photoUrl,
+      sortOrder: count,
+    });
+
+    return res.status(201).json(photo);
+  } catch (error) {
+    console.error("Upload motorcycle photo error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/:id/photos/:photoId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const photoId = req.params.photoId as string;
+    await storage.deleteMotorcyclePhoto(photoId);
+    return res.json({ message: "Foto eliminata" });
+  } catch (error) {
+    console.error("Delete motorcycle photo error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

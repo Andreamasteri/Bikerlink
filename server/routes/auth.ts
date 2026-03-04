@@ -60,6 +60,18 @@ router.post("/register", async (req: Request, res: Response) => {
 
     await storage.createUserProfile({ userId: user.id });
 
+    const emailVerifSetting = await storage.getAppSetting("email_verification_enabled");
+    const emailVerificationEnabled = emailVerifSetting?.value === "true";
+
+    if (emailVerificationEnabled) {
+      const token = crypto.randomBytes(3).toString("hex").toUpperCase();
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+      await storage.createEmailVerificationToken(user.id, token, expiresAt);
+      console.log(`[EMAIL VERIFICATION] User: ${user.email}, Token: ${token}`);
+      const { password: _, ...safeUser } = user;
+      return res.status(201).json({ ...safeUser, requiresEmailVerification: true });
+    }
+
     req.session.userId = user.id;
 
     const { password: _, ...safeUser } = user;
@@ -195,6 +207,68 @@ router.post("/reset-password", async (req: Request, res: Response) => {
     return res.json({ message: "Password aggiornata con successo" });
   } catch (error) {
     console.error("Reset password error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/verify-email", async (req: Request, res: Response) => {
+  try {
+    const { email, token } = req.body;
+    if (!email || !token) {
+      return res.status(400).json({ message: "Email e codice richiesti" });
+    }
+
+    const user = await storage.getUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+
+    const verif = await storage.getEmailVerificationToken(token.toUpperCase());
+    if (!verif || verif.userId !== user.id) {
+      return res.status(400).json({ message: "Codice non valido" });
+    }
+
+    if (new Date(verif.expiresAt) < new Date()) {
+      return res.status(400).json({ message: "Codice scaduto. Richiedi un nuovo codice." });
+    }
+
+    await storage.markUserEmailVerified(user.id);
+    await storage.deleteEmailVerificationTokens(user.id);
+
+    req.session.userId = user.id;
+    const { password: _, ...safeUser } = user;
+    return res.json({ ...safeUser, emailVerified: true });
+  } catch (error) {
+    console.error("Verify email error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/resend-verification", async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Email richiesta" });
+    }
+
+    const user = await storage.getUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+
+    if (user.emailVerified) {
+      return res.status(400).json({ message: "Email già verificata" });
+    }
+
+    await storage.deleteEmailVerificationTokens(user.id);
+    const token = crypto.randomBytes(3).toString("hex").toUpperCase();
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    await storage.createEmailVerificationToken(user.id, token, expiresAt);
+    console.log(`[EMAIL VERIFICATION] User: ${user.email}, Token: ${token}`);
+
+    return res.json({ message: "Nuovo codice inviato" });
+  } catch (error) {
+    console.error("Resend verification error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
