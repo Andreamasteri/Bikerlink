@@ -30,6 +30,7 @@ export const storage = {
     userType: (typeof schema.userTypeEnum)[number];
     coupleSexConfig?: (typeof schema.coupleSexConfigEnum)[number];
     eulaAccepted: boolean;
+    invitationCode?: string;
   }) {
     const [user] = await db.insert(schema.users).values(data).returning();
     await db.insert(schema.userProfiles).values({ userId: user.id });
@@ -640,6 +641,62 @@ export const storage = {
       .innerJoin(schema.users, eq(schema.photoContestEntries.userId, schema.users.id))
       .where(eq(schema.photoContestEntries.isRemoved, false))
       .orderBy(desc(schema.photoContestEntries.createdAt));
+  },
+
+  async getAllInvitationCodes() {
+    return db.select().from(schema.invitationCodes).orderBy(desc(schema.invitationCodes.createdAt));
+  },
+
+  async getInvitationCode(id: string) {
+    const [code] = await db.select().from(schema.invitationCodes).where(eq(schema.invitationCodes.id, id));
+    return code;
+  },
+
+  async getInvitationCodeByCode(code: string) {
+    const [result] = await db.select().from(schema.invitationCodes).where(eq(schema.invitationCodes.code, code));
+    return result;
+  },
+
+  async createInvitationCode(data: { code: string; description?: string; maxUses?: number; isActive?: boolean; expiresAt?: Date | null }) {
+    const [code] = await db.insert(schema.invitationCodes).values({
+      code: data.code,
+      description: data.description,
+      maxUses: data.maxUses ?? 1,
+      isActive: data.isActive !== false,
+      expiresAt: data.expiresAt,
+    }).returning();
+    return code;
+  },
+
+  async updateInvitationCode(id: string, data: Partial<schema.InvitationCode>) {
+    const [code] = await db.update(schema.invitationCodes).set(data).where(eq(schema.invitationCodes.id, id)).returning();
+    return code;
+  },
+
+  async deleteInvitationCode(id: string) {
+    await db.delete(schema.invitationCodes).where(eq(schema.invitationCodes.id, id));
+  },
+
+  async useInvitationCode(code: string) {
+    const invitation = await this.getInvitationCodeByCode(code);
+    if (!invitation) return { valid: false, error: "Codice invito non trovato" };
+    if (!invitation.isActive) return { valid: false, error: "Codice invito non attivo" };
+    if (invitation.expiresAt && new Date(invitation.expiresAt) < new Date()) return { valid: false, error: "Codice invito scaduto" };
+    if (invitation.currentUses >= invitation.maxUses) return { valid: false, error: "Codice invito esaurito" };
+
+    await db.update(schema.invitationCodes)
+      .set({ currentUses: invitation.currentUses + 1 })
+      .where(eq(schema.invitationCodes.id, invitation.id));
+    return { valid: true };
+  },
+
+  async validateInvitationCode(code: string) {
+    const invitation = await this.getInvitationCodeByCode(code);
+    if (!invitation) return { valid: false, error: "Codice invito non trovato" };
+    if (!invitation.isActive) return { valid: false, error: "Codice invito non attivo" };
+    if (invitation.expiresAt && new Date(invitation.expiresAt) < new Date()) return { valid: false, error: "Codice invito scaduto" };
+    if (invitation.currentUses >= invitation.maxUses) return { valid: false, error: "Codice invito esaurito" };
+    return { valid: true };
   },
 
   async seedDefaultSettings() {

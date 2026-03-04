@@ -91,6 +91,7 @@ export const users = pgTable("users", {
     .default("active"),
   suspendedUntil: timestamp("suspended_until"),
   eulaAccepted: boolean("eula_accepted").notNull().default(false),
+  invitationCode: text("invitation_code"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -488,6 +489,19 @@ export const verificationCodes = pgTable("verification_codes", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const invitationCodes = pgTable("invitation_codes", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  description: text("description"),
+  maxUses: integer("max_uses").notNull().default(1),
+  currentUses: integer("current_uses").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const notifications = pgTable("notifications", {
   id: varchar("id")
     .primaryKey()
@@ -511,19 +525,23 @@ export const insertUserSchema = createInsertSchema(users).omit({
 
 export const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(1),
 });
 
 export const registerSchema = z.object({
   email: z.string().email(),
   phone: z.string().optional(),
-  password: z.string().min(6),
+  password: z.string().min(8, "La password deve avere almeno 8 caratteri")
+    .regex(/[A-Z]/, "La password deve contenere almeno una lettera maiuscola")
+    .regex(/[a-z]/, "La password deve contenere almeno una lettera minuscola")
+    .regex(/[0-9]/, "La password deve contenere almeno un numero"),
   nickname: z.string().min(2).max(30),
   sex: z.enum(sexEnum),
   birthYear: z.number().min(1940).max(2010),
   region: z.string().min(2),
   userType: z.enum(userTypeEnum),
   coupleSexConfig: z.enum(coupleSexConfigEnum).optional(),
+  invitationCode: z.string().optional(),
   eulaAccepted: z.literal(true),
 }).refine(
   (data) => data.userType !== "coppia" || !!data.coupleSexConfig,
@@ -546,3 +564,4 @@ export type PhotoContestEntry = typeof photoContestEntries.$inferSelect;
 export type PhotoWinner = typeof photoWinners.$inferSelect;
 export type ModeratorLog = typeof moderatorLogs.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
+export type InvitationCode = typeof invitationCodes.$inferSelect;

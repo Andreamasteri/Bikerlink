@@ -303,6 +303,74 @@ adminRouter.get("/export/syneco", requireAuth, requireAdmin, async (req, res) =>
   }
 });
 
+adminRouter.get("/invitation-codes", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const codes = await storage.getAllInvitationCodes();
+    res.json({ codes });
+  } catch (err) {
+    res.status(500).json({ message: "Errore nel caricamento codici invito" });
+  }
+});
+
+adminRouter.post("/invitation-codes", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { code, description, maxUses, isActive, expiresAt } = req.body;
+    if (!code) {
+      return res.status(400).json({ message: "Codice obbligatorio" });
+    }
+    const existing = await storage.getInvitationCodeByCode(code);
+    if (existing) {
+      return res.status(409).json({ message: "Codice già esistente" });
+    }
+    const invitation = await storage.createInvitationCode({
+      code,
+      description,
+      maxUses: maxUses || 1,
+      isActive: isActive !== false,
+      expiresAt: expiresAt ? new Date(expiresAt) : null,
+    });
+    res.status(201).json({ code: invitation });
+  } catch (err) {
+    res.status(500).json({ message: "Errore nella creazione codice invito" });
+  }
+});
+
+adminRouter.put("/invitation-codes/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { description, maxUses, isActive, expiresAt } = req.body;
+    const updateData: any = {};
+    if (description !== undefined) updateData.description = description;
+    if (maxUses !== undefined) updateData.maxUses = maxUses;
+    if (isActive !== undefined) updateData.isActive = isActive;
+    if (expiresAt !== undefined) updateData.expiresAt = expiresAt ? new Date(expiresAt) : null;
+    const code = await storage.updateInvitationCode(req.params.id, updateData);
+    if (!code) return res.status(404).json({ message: "Codice invito non trovato" });
+    res.json({ code });
+  } catch (err) {
+    res.status(500).json({ message: "Errore nell'aggiornamento codice invito" });
+  }
+});
+
+adminRouter.delete("/invitation-codes/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    await storage.deleteInvitationCode(req.params.id);
+    res.json({ message: "Codice invito eliminato" });
+  } catch (err) {
+    res.status(500).json({ message: "Errore nell'eliminazione codice invito" });
+  }
+});
+
+adminRouter.post("/invitation-codes/validate", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ message: "Codice obbligatorio" });
+    const result = await storage.validateInvitationCode(code);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ message: "Errore nella validazione codice invito" });
+  }
+});
+
 adminRouter.get("/settings/backup", requireAuth, requireAdmin, async (req, res) => {
   const enabled = await storage.getSetting("gdrive_backup_enabled");
   res.json({ enabled: enabled === "true", status: "coming_soon" });

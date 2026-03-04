@@ -121,10 +121,11 @@ trackingRouter.put("/:id/publish", requireAuth, async (req, res) => {
     if (!route) return res.status(404).json({ message: "Percorso non trovato" });
     if (route.userId !== user.id) return res.status(403).json({ message: "Non autorizzato" });
 
-    const { title } = req.body;
-    const updated = await storage.updateRoute(req.params.id, { isPublished: true, title: title || null });
+    const title = req.body?.title;
+    const updated = await storage.updateRoute(req.params.id, { isPublished: true, ...(title ? { title } : {}) });
     res.json({ route: updated });
-  } catch (err) {
+  } catch (err: any) {
+    console.error("Errore pubblicazione route:", err?.message || err);
     res.status(500).json({ message: "Errore nella pubblicazione" });
   }
 });

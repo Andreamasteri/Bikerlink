@@ -23,6 +23,7 @@ import { notificationsRouter } from "./routes/notifications";
 import { adsRouter } from "./routes/ads";
 import { setupWebSocket } from "./websocket";
 import { storage } from "./storage";
+import { uploadRateLimit, messageRateLimit } from "./middleware/security";
 
 const PgStore = connectPgSimple(session);
 
@@ -38,8 +39,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       resave: false,
       saveUninitialized: false,
       cookie: {
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-        secure: false,
+        maxAge: 24 * 60 * 60 * 1000,
+        secure: process.env.NODE_ENV === "production",
         httpOnly: true,
         sameSite: "lax",
       },
@@ -49,10 +50,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 
   app.use("/api/auth", authRouter);
-  app.use("/api/upload", uploadRouter);
+  app.use("/api/upload", uploadRateLimit, uploadRouter);
   app.use("/api/users", usersRouter);
   app.use("/api/proposals", proposalsRouter);
-  app.use("/api/conversations", chatRouter);
+  app.use("/api/conversations", messageRateLimit, chatRouter);
   app.use("/api/routes", trackingRouter);
   app.use("/api/contest", contestRouter);
   app.use("/api/workshops", workshopsRouter);
@@ -73,9 +74,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 async function seedAdminAndDefaults() {
   try {
+    const adminPassword = "admin2025!";
     const admin = await storage.getUserByEmail("admin@bikerlink.it");
     if (!admin) {
-      const passwordHash = await bcrypt.hash("BikerLink2024!", 10);
+      const passwordHash = await bcrypt.hash(adminPassword, 10);
       await storage.createUser({
         email: "admin@bikerlink.it",
         nickname: "AdminBikerLink",
@@ -92,7 +94,11 @@ async function seedAdminAndDefaults() {
         await storage.updateUser(newAdmin.id, { role: "admin" });
       }
 
-      console.log("[SEED] Admin creato: admin@bikerlink.it / BikerLink2024!");
+      console.log("[SEED] Admin creato: admin@bikerlink.it / admin2025!");
+    } else {
+      const passwordHash = await bcrypt.hash(adminPassword, 10);
+      await storage.updateUser(admin.id, { passwordHash });
+      console.log("[SEED] Admin password aggiornata: admin@bikerlink.it / admin2025!");
     }
 
     await storage.seedDefaultSettings();

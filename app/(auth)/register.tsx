@@ -51,6 +51,7 @@ export default function RegisterScreen() {
     coupleSexConfig: "" as "mm" | "mf" | "ff" | "",
     birthYear: "",
     region: "",
+    invitationCode: "",
     eulaAccepted: false,
   });
   const [loading, setLoading] = useState(false);
@@ -69,8 +70,12 @@ export default function RegisterScreen() {
       Alert.alert("Errore", "Le password non coincidono");
       return;
     }
-    if (form.password.length < 6) {
-      Alert.alert("Errore", "La password deve avere almeno 6 caratteri");
+    if (form.password.length < 8) {
+      Alert.alert("Errore", "La password deve avere almeno 8 caratteri");
+      return;
+    }
+    if (!/[A-Z]/.test(form.password) || !/[a-z]/.test(form.password) || !/[0-9]/.test(form.password)) {
+      Alert.alert("Errore", "La password deve contenere almeno una maiuscola, una minuscola e un numero");
       return;
     }
     if (form.userType === "coppia" && !form.coupleSexConfig) {
@@ -94,6 +99,7 @@ export default function RegisterScreen() {
         coupleSexConfig: form.userType === "coppia" ? form.coupleSexConfig : undefined,
         birthYear: parseInt(form.birthYear),
         region: form.region,
+        invitationCode: form.invitationCode.trim() || undefined,
         eulaAccepted: true,
       });
       router.replace("/(tabs)");
@@ -138,7 +144,7 @@ export default function RegisterScreen() {
       <TextInput style={styles.input} placeholder="+39 123 456 7890" placeholderTextColor={Colors.textSecondary} value={form.phone} onChangeText={(v) => updateForm("phone", v)} keyboardType="phone-pad" />
 
       <Text style={styles.label}>Password *</Text>
-      <TextInput style={styles.input} placeholder="Minimo 6 caratteri" placeholderTextColor={Colors.textSecondary} value={form.password} onChangeText={(v) => updateForm("password", v)} secureTextEntry />
+      <TextInput style={styles.input} placeholder="Min 8 caratteri, 1 maiuscola, 1 minuscola, 1 numero" placeholderTextColor={Colors.textSecondary} value={form.password} onChangeText={(v) => updateForm("password", v)} secureTextEntry />
 
       <Text style={styles.label}>Conferma Password *</Text>
       <TextInput style={styles.input} placeholder="Ripeti la password" placeholderTextColor={Colors.textSecondary} value={form.confirmPassword} onChangeText={(v) => updateForm("confirmPassword", v)} secureTextEntry />
@@ -187,6 +193,9 @@ export default function RegisterScreen() {
           ))}
         </View>
       )}
+
+      <Text style={styles.label}>Codice Invito (opzionale)</Text>
+      <TextInput style={styles.input} placeholder="Inserisci codice invito" placeholderTextColor={Colors.textSecondary} value={form.invitationCode} onChangeText={(v) => updateForm("invitationCode", v)} autoCapitalize="none" />
 
       <Pressable
         style={styles.eulaRow}

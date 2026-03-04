@@ -15,6 +15,7 @@ const ADMIN_SECTIONS = [
   { icon: "flag" as const, label: "Segnalazioni", route: "/admin/reports", color: Colors.accentRed },
   { icon: "eye" as const, label: "Log Moderatori", route: "/admin/moderator-logs", color: Colors.textSecondary },
   { icon: "bar-chart" as const, label: "Analytics & Export", route: "/admin/analytics", color: Colors.success },
+  { icon: "key" as const, label: "Codici Invito", route: "/admin/invitation-codes", color: Colors.accent },
 ];
 
 export default function AdminIndexScreen() {

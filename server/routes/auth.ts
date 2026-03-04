@@ -3,20 +3,28 @@ import bcrypt from "bcryptjs";
 import { storage } from "../storage";
 import { registerSchema, loginSchema } from "@shared/schema";
 import { requireAuth } from "../middleware/auth";
+import { authRateLimit, checkAccountLockout, recordFailedLogin, clearLoginAttempts } from "../middleware/security";
 
 export const authRouter = Router();
 
-authRouter.post("/register", async (req, res) => {
+authRouter.post("/register", authRateLimit, async (req, res) => {
   try {
     const parsed = registerSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: "Dati non validi", errors: parsed.error.flatten() });
     }
 
-    const { email, phone, password, nickname, sex, birthYear, region, userType, coupleSexConfig, eulaAccepted } = parsed.data;
+    const { email, phone, password, nickname, sex, birthYear, region, userType, coupleSexConfig, eulaAccepted, invitationCode } = parsed.data;
 
     if (!eulaAccepted) {
       return res.status(400).json({ message: "Devi accettare i termini e le condizioni" });
+    }
+
+    if (invitationCode && invitationCode.trim()) {
+      const validation = await storage.validateInvitationCode(invitationCode.trim());
+      if (!validation.valid) {
+        return res.status(400).json({ message: validation.error });
+      }
     }
 
     const existingEmail = await storage.getUserByEmail(email);
@@ -31,6 +39,10 @@ authRouter.post("/register", async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
+    if (invitationCode && invitationCode.trim()) {
+      await storage.useInvitationCode(invitationCode.trim());
+    }
+
     const user = await storage.createUser({
       email,
       phone,
@@ -42,6 +54,7 @@ authRouter.post("/register", async (req, res) => {
       userType,
       coupleSexConfig,
       eulaAccepted,
+      invitationCode: invitationCode?.trim() || undefined,
     });
 
     req.session.userId = user.id;
@@ -54,7 +67,7 @@ authRouter.post("/register", async (req, res) => {
   }
 });
 
-authRouter.post("/login", async (req, res) => {
+authRouter.post("/login", authRateLimit, checkAccountLockout, async (req, res) => {
   try {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -64,6 +77,7 @@ authRouter.post("/login", async (req, res) => {
     const { email, password } = parsed.data;
     const user = await storage.getUserByEmail(email);
     if (!user) {
+      recordFailedLogin(req);
       return res.status(401).json({ message: "Credenziali non valide" });
     }
 
@@ -73,6 +87,7 @@ authRouter.post("/login", async (req, res) => {
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
+      recordFailedLogin(req);
       return res.status(401).json({ message: "Credenziali non valide" });
     }
 
@@ -84,10 +99,17 @@ authRouter.post("/login", async (req, res) => {
       await storage.updateUser(user.id, { status: "active", suspendedUntil: null });
     }
 
-    req.session.userId = user.id;
+    clearLoginAttempts(req);
 
-    const { passwordHash: _, ...safeUser } = user;
-    res.json({ user: safeUser });
+    req.session.userId = user.id;
+    req.session.save((err) => {
+      if (err) {
+        console.error("Errore salvataggio sessione:", err);
+        return res.status(500).json({ message: "Errore durante il login" });
+      }
+      const { passwordHash: _, ...safeUser } = user;
+      res.json({ user: safeUser });
+    });
   } catch (err: any) {
     console.error("Errore login:", err);
     res.status(500).json({ message: "Errore durante il login" });

@@ -39,7 +39,8 @@ easterEggsRouter.post("/:id/collect", requireAuth, async (req, res) => {
   try {
     const user = (req as any).user;
     const eggId = req.params.id;
-    const { lat, lng } = req.body;
+    const lat = req.body?.lat ?? (req.query.lat ? Number(req.query.lat) : undefined);
+    const lng = req.body?.lng ?? (req.query.lng ? Number(req.query.lng) : undefined);
 
     const egg = await storage.getEasterEgg(eggId);
     if (!egg) return res.status(404).json({ message: "Easter egg non trovato" });
@@ -70,7 +71,8 @@ easterEggsRouter.post("/:id/collect", requireAuth, async (req, res) => {
       easterEgg: egg,
       message: `Complimenti! Hai collezionato "${egg.name}"!`,
     });
-  } catch (err) {
+  } catch (err: any) {
+    console.error("Errore raccolta easter egg:", err?.message || err);
     res.status(500).json({ message: "Errore nella raccolta easter egg" });
   }
 });
