@@ -15,7 +15,7 @@ export const storage = {
   },
 
   async getUserByNickname(nickname: string) {
-    const [user] = await db.select().from(schema.users).where(eq(schema.users.nickname, nickname));
+    const [user] = await db.select().from(schema.users).where(sql`lower(${schema.users.nickname}) = ${nickname.toLowerCase()}`);
     return user;
   },
 
@@ -754,6 +754,7 @@ export const storage = {
       paypal_enabled: "false",
       syneco_default_products: "olio_motore,lubrificante_catena",
       gdrive_backup_enabled: "false",
+      syneco_branding_visible: "false",
     };
 
     for (const [key, value] of Object.entries(defaults)) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -10,14 +10,20 @@ import {
   StatusBar,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import Colors from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const loginBg = require("@/assets/images/login-bg.jpg");
 
 export default function WelcomeScreen() {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
   const insets = useSafeAreaInsets();
+
+  const { data: brandingData } = useQuery({ queryKey: ["/api/settings/syneco-branding"] });
+  const showSyneco = (brandingData as any)?.visible === true;
 
   const titleOpacity = useRef(new Animated.Value(0)).current;
   const taglineOpacity = useRef(new Animated.Value(0)).current;
@@ -66,7 +72,7 @@ export default function WelcomeScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ImageBackground source={loginBg} style={styles.container} resizeMode="cover">
       <StatusBar barStyle="light-content" />
       <View style={[styles.overlay, { paddingTop: Platform.OS === "web" ? 67 : insets.top, paddingBottom: Platform.OS === "web" ? 34 : insets.bottom }]}>
         <View style={styles.content}>
@@ -99,10 +105,12 @@ export default function WelcomeScreen() {
           >
             <Text style={styles.registerText}>Registrati</Text>
           </Pressable>
-          <Text style={styles.sponsorText}>Powered by Syneco Lubricants</Text>
+          {showSyneco && (
+            <Text style={styles.sponsorText}>by Syneco Lubrificanti</Text>
+          )}
         </Animated.View>
       </View>
-    </View>
+    </ImageBackground>
   );
 }
 
@@ -113,7 +121,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(13, 13, 13, 0.7)",
+    backgroundColor: "rgba(13, 13, 13, 0.6)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -127,6 +135,9 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     color: Colors.accent,
     textAlign: "center",
+    textShadowColor: "rgba(0,0,0,0.8)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   tagline: {
     fontSize: 18,
@@ -135,6 +146,9 @@ const styles = StyleSheet.create({
     color: Colors.text,
     marginTop: 8,
     textAlign: "center",
+    textShadowColor: "rgba(0,0,0,0.8)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   buttons: {
     width: "100%",
@@ -154,7 +168,7 @@ const styles = StyleSheet.create({
     color: Colors.background,
   },
   registerButton: {
-    backgroundColor: "transparent",
+    backgroundColor: "rgba(0,0,0,0.5)",
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",

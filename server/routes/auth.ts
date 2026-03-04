@@ -74,8 +74,11 @@ authRouter.post("/login", authRateLimit, checkAccountLockout, async (req, res) =
       return res.status(400).json({ message: "Dati non validi" });
     }
 
-    const { email, password } = parsed.data;
-    const user = await storage.getUserByEmail(email);
+    const { identifier, password } = parsed.data;
+    const isEmail = identifier.includes("@");
+    const user = isEmail
+      ? await storage.getUserByEmail(identifier)
+      : await storage.getUserByNickname(identifier);
     if (!user) {
       recordFailedLogin(req);
       return res.status(401).json({ message: "Credenziali non valide" });

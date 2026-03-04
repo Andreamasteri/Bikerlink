@@ -18,20 +18,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const insets = useSafeAreaInsets();
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Errore", "Inserisci email e password");
+    if (!identifier || !password) {
+      Alert.alert("Errore", "Inserisci email/username e password");
       return;
     }
 
     setLoading(true);
     try {
-      await login(email.trim().toLowerCase(), password);
+      await login(identifier.trim().toLowerCase(), password);
       router.replace("/(tabs)");
     } catch (err: any) {
       const msg = err.message || "Errore nel login";
@@ -57,16 +57,14 @@ export default function LoginScreen() {
       <Text style={styles.subtitle}>Accedi al tuo account</Text>
 
       <View style={styles.form}>
-        <Text style={styles.label}>Email</Text>
+        <Text style={styles.label}>Email o Username</Text>
         <TextInput
           style={styles.input}
-          placeholder="la-tua@email.it"
+          placeholder="email o username"
           placeholderTextColor={Colors.textSecondary}
-          value={email}
-          onChangeText={setEmail}
+          value={identifier}
+          onChangeText={setIdentifier}
           autoCapitalize="none"
-          keyboardType="email-address"
-          textContentType="emailAddress"
         />
 
         <Text style={styles.label}>Password</Text>

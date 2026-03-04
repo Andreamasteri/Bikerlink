@@ -66,6 +66,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/ads", adsRouter);
   app.use("/api/feedback", feedbackRouter);
 
+  app.get("/api/settings/syneco-branding", async (_req, res) => {
+    try {
+      const val = await storage.getSetting("syneco_branding_visible");
+      res.json({ visible: val === "true" });
+    } catch {
+      res.json({ visible: false });
+    }
+  });
+
   await seedAdminAndDefaults();
 
   const httpServer = createServer(app);
