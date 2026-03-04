@@ -7,10 +7,8 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const ADMIN_SECTIONS = [
+const BASE_SECTIONS = [
   { icon: "people" as const, label: "Gestione Utenti", route: "/admin/users", color: Colors.maleIcon },
-  { icon: "megaphone" as const, label: "Annunci Syneco", route: "/admin/ads", color: Colors.accent },
-  { icon: "construct" as const, label: "Officine & Rivenditori", route: "/admin/workshops", color: Colors.syneco },
   { icon: "settings" as const, label: "Impostazioni App", route: "/admin/settings", color: Colors.text },
   { icon: "gift" as const, label: "Easter Eggs", route: "/admin/easter-eggs", color: Colors.warning },
   { icon: "flag" as const, label: "Segnalazioni", route: "/admin/reports", color: Colors.accentRed },
@@ -20,12 +18,20 @@ const ADMIN_SECTIONS = [
   { icon: "key" as const, label: "Codici Invito", route: "/admin/invitation-codes", color: Colors.accent },
 ];
 
+const SYNECO_SECTIONS = [
+  { icon: "megaphone" as const, label: "Annunci Syneco", route: "/admin/ads", color: Colors.accent },
+  { icon: "construct" as const, label: "Officine Syneco", route: "/admin/workshops", color: Colors.syneco },
+];
+
 export default function AdminIndexScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const { data: feedbackCountData } = useQuery({ queryKey: ["/api/admin/feedback/count"] });
   const feedbackCount = (feedbackCountData as any)?.count || 0;
+  const { data: synecoData } = useQuery({ queryKey: ["/api/settings/syneco-branding"] });
+  const synecoEnabled = (synecoData as any)?.visible === true;
+  const ADMIN_SECTIONS = synecoEnabled ? [...BASE_SECTIONS.slice(0, 1), ...SYNECO_SECTIONS, ...BASE_SECTIONS.slice(1)] : BASE_SECTIONS;
 
   if (user?.role !== "admin") {
     return <View style={styles.loading}><Text style={styles.errorText}>Accesso non autorizzato</Text></View>;

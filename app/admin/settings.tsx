@@ -43,13 +43,13 @@ export default function AdminSettingsScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16 }]} keyboardShouldPersistTaps="handled">
-      <Text style={styles.sectionTitle}>Branding Syneco</Text>
+      <Text style={styles.sectionTitle}>Sponsorizzazione Syneco</Text>
       <View style={styles.toggleRow}>
         <View style={styles.toggleInfo}>
-          <Ionicons name="pricetag" size={20} color={Colors.syneco} />
+          <Ionicons name="pricetag" size={20} color={synecoVisible ? Colors.syneco : Colors.textSecondary} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.toggleLabel}>Mostra scritta Syneco</Text>
-            <Text style={styles.toggleDesc}>Mostra "by Syneco Lubrificanti" nella schermata di benvenuto</Text>
+            <Text style={styles.toggleLabel}>Attiva contenuti Syneco</Text>
+            <Text style={styles.toggleDesc}>Mostra tutti i riferimenti a Syneco nell'app (branding, annunci, officine, export)</Text>
           </View>
         </View>
         <Switch

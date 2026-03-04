@@ -6,11 +6,13 @@ import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
 import * as Linking from "expo-linking";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSynecoVisible } from "@/lib/syneco-context";
 
 export default function AdminAnalyticsScreen() {
   const insets = useSafeAreaInsets();
   const { data, isLoading } = useQuery({ queryKey: ["/api/admin/analytics"] });
   const analytics = (data as any)?.analytics;
+  const synecoVisible = useSynecoVisible();
 
   const downloadCSV = () => {
     const url = new URL("/api/admin/export/syneco", getApiUrl());
@@ -48,11 +50,15 @@ export default function AdminAnalyticsScreen() {
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>Export Syneco</Text>
-      <Pressable style={styles.exportBtn} onPress={downloadCSV}>
-        <Ionicons name="download" size={20} color={Colors.background} />
-        <Text style={styles.exportBtnText}>Scarica Report CSV</Text>
-      </Pressable>
+      {synecoVisible && (
+        <>
+          <Text style={styles.sectionTitle}>Export Syneco</Text>
+          <Pressable style={styles.exportBtn} onPress={downloadCSV}>
+            <Ionicons name="download" size={20} color={Colors.background} />
+            <Text style={styles.exportBtnText}>Scarica Report CSV</Text>
+          </Pressable>
+        </>
+      )}
     </ScrollView>
   );
 }

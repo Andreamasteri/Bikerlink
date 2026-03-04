@@ -35,7 +35,7 @@ export default function AdminWorkshopsScreen() {
           renderItem={({ item }) => (
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <Ionicons name="construct" size={20} color={Colors.syneco} />
+                <Ionicons name="construct" size={20} color={Colors.accent} />
                 <Text style={styles.title}>{item.name}</Text>
                 <View style={[styles.badge, { backgroundColor: item.isApproved ? Colors.success + "30" : Colors.warning + "30" }]}>
                   <Text style={[styles.badgeText, { color: item.isApproved ? Colors.success : Colors.warning }]}>{item.isApproved ? "Approvata" : "In Attesa"}</Text>

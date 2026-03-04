@@ -16,11 +16,13 @@ import Colors from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import { apiRequest } from "@/lib/query-client";
+import { useSynecoVisible } from "@/lib/syneco-context";
 
 export default function MapScreen() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const insets = useSafeAreaInsets();
+  const synecoVisible = useSynecoVisible();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
 
@@ -129,7 +131,7 @@ export default function MapScreen() {
           <Text style={styles.statLabel}>Vicini</Text>
         </View>
         <View style={styles.statCard}>
-          <Ionicons name="construct" size={20} color={Colors.syneco} />
+          <Ionicons name="construct" size={20} color={synecoVisible ? Colors.syneco : Colors.textSecondary} />
           <Text style={styles.statNumber}>{workshops.length}</Text>
           <Text style={styles.statLabel}>Officine</Text>
         </View>
@@ -158,9 +160,9 @@ export default function MapScreen() {
         </View>
       )}
 
-      {ads.length > 0 && (
+      {synecoVisible && ads.length > 0 && (
         <View style={styles.adBanner}>
-          <Text style={styles.adText}>Syneco: {ads[0].title}</Text>
+          <Text style={styles.adText}>{ads[0].title}</Text>
         </View>
       )}
     </View>
