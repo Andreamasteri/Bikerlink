@@ -6,7 +6,7 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
-  FlatList,
+  ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
@@ -117,6 +117,12 @@ export default function MapScreen() {
     return "Coppia";
   };
 
+  const getUserIcon = (u: any): keyof typeof Ionicons.glyphMap => {
+    if (u.userType === "coppia") return "people";
+    if (u.userType === "zavorrina") return "person";
+    return "bicycle";
+  };
+
   const getMarkerColor = (u: any) => {
     if (u.userType === "biker") return Colors.maleIcon;
     if (u.userType === "zavorrina") return Colors.femaleIcon;
@@ -147,7 +153,10 @@ export default function MapScreen() {
   ];
 
   return (
-    <View style={[styles.container, { paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingTop: Platform.OS === "web" ? 67 : insets.top, paddingBottom: 16 }}
+    >
       <View style={styles.header}>
         <Text style={styles.title}>BikerLink</Text>
         <Pressable onPress={() => router.push("/chat" as any)}>
@@ -161,42 +170,41 @@ export default function MapScreen() {
           longitude={lng}
           markers={markers}
         />
+      </View>
 
-        <View style={styles.mapOverlay}>
-          <View style={styles.statsChip}>
-            <Ionicons name="people" size={14} color={Colors.maleIcon} />
-            <Text style={styles.statsChipText}>{nearbyUsers.length} vicini</Text>
-          </View>
-          {workshops.length > 0 && (
-            <View style={styles.statsChip}>
-              <Ionicons name="construct" size={14} color={synecoVisible ? Colors.syneco : Colors.textSecondary} />
-              <Text style={styles.statsChipText}>{workshops.length} officine</Text>
-            </View>
-          )}
+      <View style={styles.statsRow}>
+        <View style={styles.statCard}>
+          <Ionicons name="people" size={20} color={Colors.maleIcon} />
+          <Text style={styles.statNumber}>{nearbyUsers.length}</Text>
+          <Text style={styles.statLabel}>Vicini</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Ionicons name="construct" size={20} color={synecoVisible ? Colors.syneco : Colors.textSecondary} />
+          <Text style={styles.statNumber}>{workshops.length}</Text>
+          <Text style={styles.statLabel}>Officine</Text>
         </View>
       </View>
 
       {nearbyUsers.length > 0 && (
         <View style={styles.nearbySection}>
           <Text style={styles.sectionTitle}>Utenti Disponibili</Text>
-          <FlatList
-            data={nearbyUsers.slice(0, 10)}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(item: any) => item.user.id}
-            contentContainerStyle={{ gap: 10, paddingHorizontal: 4 }}
-            scrollEnabled={nearbyUsers.length > 0}
-            renderItem={({ item }: { item: any }) => (
-              <Pressable
-                style={styles.userChip}
-                onPress={() => router.push(`/profile/${item.user.id}` as any)}
-              >
-                <View style={[styles.userDot, { backgroundColor: getUserColor(item.user) }]} />
-                <Text style={styles.userChipName}>{item.user.nickname}</Text>
-                <Text style={styles.userChipType}>{getUserTypeLabel(item.user)}</Text>
-              </Pressable>
-            )}
-          />
+          {nearbyUsers.slice(0, 10).map((item: any) => (
+            <Pressable
+              key={item.user.id}
+              style={styles.userCard}
+              onPress={() => router.push(`/profile/${item.user.id}` as any)}
+            >
+              <Ionicons name={getUserIcon(item.user)} size={24} color={getUserColor(item.user)} />
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>{item.user.nickname}</Text>
+                <Text style={styles.userType}>
+                  {getUserTypeLabel(item.user)}
+                  {item.profile?.ridingStyle ? ` · ${item.profile.ridingStyle}` : ""}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+            </Pressable>
+          ))}
         </View>
       )}
 
@@ -212,7 +220,7 @@ export default function MapScreen() {
           <Text style={styles.adText}>{ads[0].title}</Text>
         </View>
       )}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -228,44 +236,44 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   title: { fontSize: 24, fontFamily: "Inter_700Bold", color: Colors.accent },
-  mapContainer: { flex: 1, marginHorizontal: 16, borderRadius: 16, overflow: "hidden", position: "relative" },
-  mapOverlay: {
-    position: "absolute",
-    top: 12,
-    left: 12,
-    flexDirection: "row",
-    gap: 8,
+  mapContainer: {
+    height: 280,
+    marginHorizontal: 16,
+    borderRadius: 16,
+    overflow: "hidden",
   },
-  statsChip: {
-    flexDirection: "row",
+  statsRow: { flexDirection: "row", paddingHorizontal: 16, gap: 12, marginTop: 16 },
+  statCard: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 16,
     alignItems: "center",
     gap: 4,
-    backgroundColor: Colors.surface + "E6",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
   },
-  statsChipText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.text },
-  nearbySection: { paddingVertical: 12, paddingLeft: 16 },
-  sectionTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.text, marginBottom: 8 },
-  userChip: {
+  statNumber: { fontSize: 24, fontFamily: "Inter_700Bold", color: Colors.text },
+  statLabel: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  nearbySection: { marginTop: 16, paddingHorizontal: 16 },
+  sectionTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold", color: Colors.text, marginBottom: 8 },
+  userCard: {
     backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 12,
+    flexDirection: "row",
     alignItems: "center",
-    minWidth: 90,
-    gap: 4,
+    gap: 12,
+    marginBottom: 8,
   },
-  userDot: { width: 10, height: 10, borderRadius: 5 },
-  userChipName: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.text },
-  userChipType: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
-  emptyState: { alignItems: "center", padding: 20, gap: 8 },
+  userInfo: { flex: 1 },
+  userName: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.text },
+  userType: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  emptyState: { alignItems: "center", padding: 24, gap: 8 },
   emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
   adBanner: {
     backgroundColor: Colors.accent + "20",
     padding: 12,
     marginHorizontal: 16,
-    marginBottom: 8,
+    marginTop: 12,
     borderRadius: 8,
     alignItems: "center",
   },

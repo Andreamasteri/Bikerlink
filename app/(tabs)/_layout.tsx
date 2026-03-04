@@ -1,9 +1,23 @@
+import React, { useEffect, useCallback } from "react";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { Platform } from "react-native";
+import { Platform, BackHandler } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const handler = () => true;
+    const sub = BackHandler.addEventListener("hardwareBackPress", handler);
+    return () => sub.remove();
+  }, []);
+
+  const tabBarHeight = Platform.OS === "web" ? 84 : 56 + insets.bottom;
+  const tabBarPaddingBottom = Platform.OS === "web" ? 34 : insets.bottom;
+
   return (
     <Tabs
       screenOptions={{
@@ -12,8 +26,8 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: Colors.surface,
           borderTopColor: Colors.border,
-          height: Platform.OS === "web" ? 84 : 50,
-          paddingBottom: Platform.OS === "web" ? 34 : 0,
+          height: tabBarHeight,
+          paddingBottom: tabBarPaddingBottom,
         },
         headerStyle: {
           backgroundColor: Colors.surface,
