@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import * as Location from "expo-location";
 import { apiRequest } from "@/lib/query-client";
 import { useSynecoVisible } from "@/lib/syneco-context";
 import InteractiveMap from "@/components/InteractiveMap";
+import { getRegionCoordinates } from "@/constants/regions";
 
 export default function MapScreen() {
   const router = useRouter();
@@ -35,50 +36,63 @@ export default function MapScreen() {
     }
   }, [authLoading, isAuthenticated]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        if (Platform.OS === "web") {
+  const getRegionFallback = useCallback(() => {
+    if (user?.region) {
+      return getRegionCoordinates(user.region);
+    }
+    return { latitude: 41.9028, longitude: 12.4964 };
+  }, [user?.region]);
+
+  const fetchGPSLocation = useCallback(async (): Promise<{ latitude: number; longitude: number } | null> => {
+    try {
+      if (Platform.OS === "web") {
+        return new Promise((resolve) => {
           if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
-              (pos) => {
-                setLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
-                setLocationLoading(false);
-              },
-              () => {
-                setLocation({ latitude: 45.4642, longitude: 9.19 });
-                setLocationLoading(false);
-              },
+              (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+              () => resolve(null),
               { timeout: 5000 }
             );
           } else {
-            setLocation({ latitude: 45.4642, longitude: 9.19 });
-            setLocationLoading(false);
+            resolve(null);
           }
-          return;
-        }
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
-          setLocation({ latitude: 45.4642, longitude: 9.19 });
-          setLocationLoading(false);
-          return;
-        }
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        setLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-
-        try {
-          await apiRequest("PUT", "/api/users/location", {
-            latitude: loc.coords.latitude,
-            longitude: loc.coords.longitude,
-          });
-        } catch (e) {}
-      } catch (e) {
-        setLocation({ latitude: 45.4642, longitude: 9.19 });
-      } finally {
-        setLocationLoading(false);
+        });
       }
-    })();
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return null;
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      try {
+        await apiRequest("PUT", "/api/users/location", {
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+        });
+      } catch (e) {}
+      return { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+    } catch {
+      return null;
+    }
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      const gps = await fetchGPSLocation();
+      if (gps) {
+        setLocation(gps);
+      } else {
+        setLocation(getRegionFallback());
+      }
+      setLocationLoading(false);
+    })();
+  }, [fetchGPSLocation, getRegionFallback]);
+
+  const handleCenterPosition = useCallback(async () => {
+    const gps = await fetchGPSLocation();
+    if (gps) {
+      setLocation(gps);
+    } else {
+      setLocation(getRegionFallback());
+    }
+  }, [fetchGPSLocation, getRegionFallback]);
 
   const { data: nearbyData } = useQuery({
     queryKey: [`/api/users/nearby?lat=${location?.latitude || 45.4642}&lng=${location?.longitude || 9.19}&radius=50`],
@@ -171,6 +185,8 @@ export default function MapScreen() {
           latitude={lat}
           longitude={lng}
           markers={markers}
+          showCenterButton
+          onCenterPress={handleCenterPosition}
         />
         <View style={styles.expandHint}>
           <Ionicons name="expand" size={16} color={Colors.text} />
@@ -183,6 +199,8 @@ export default function MapScreen() {
             latitude={lat}
             longitude={lng}
             markers={markers}
+            showCenterButton
+            onCenterPress={handleCenterPosition}
           />
           <Pressable style={[styles.closeBtn, { top: Platform.OS === "web" ? 20 : insets.top + 8 }]} onPress={() => setMapFullscreen(false)}>
             <Ionicons name="close" size={28} color="#fff" />

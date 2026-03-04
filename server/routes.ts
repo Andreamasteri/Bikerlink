@@ -22,6 +22,7 @@ import { reportsRouter } from "./routes/reports";
 import { notificationsRouter } from "./routes/notifications";
 import { adsRouter } from "./routes/ads";
 import { feedbackRouter } from "./routes/feedback";
+import { garageRouter } from "./routes/garage";
 import { setupWebSocket } from "./websocket";
 import { storage } from "./storage";
 import { uploadRateLimit, messageRateLimit } from "./middleware/security";
@@ -65,6 +66,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/notifications", notificationsRouter);
   app.use("/api/ads", adsRouter);
   app.use("/api/feedback", feedbackRouter);
+  app.use("/api/garage", garageRouter);
 
   app.get("/api/settings/syneco-branding", async (_req, res) => {
     try {

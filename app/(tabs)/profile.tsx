@@ -14,12 +14,15 @@ import { useAuth } from "@/lib/auth-context";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import RegionPicker from "@/components/RegionPicker";
+import { apiRequest, queryClient } from "@/lib/query-client";
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, profile, logout } = useAuth();
+  const { user, profile, logout, refreshUser } = useAuth();
   const insets = useSafeAreaInsets();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showRegionPicker, setShowRegionPicker] = useState(false);
 
   if (!user) return null;
 
@@ -60,6 +63,16 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleRegionChange = async (region: string) => {
+    try {
+      await apiRequest("PUT", "/api/users/profile", { region });
+      if (refreshUser) await refreshUser();
+      queryClient.invalidateQueries({ queryKey: ["/api/users/profile"] });
+    } catch {
+      Alert.alert("Errore", "Errore nel cambio regione");
+    }
+  };
+
   const MenuItem = ({ icon, label, onPress, color }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; color?: string }) => (
     <Pressable style={styles.menuItem} onPress={onPress}>
       <Ionicons name={icon} size={22} color={color || Colors.text} />
@@ -82,37 +95,14 @@ export default function ProfileScreen() {
           <View style={[styles.badge, { backgroundColor: getUserColor() + "20" }]}>
             <Text style={[styles.badgeText, { color: getUserColor() }]}>{getUserTypeLabel()}</Text>
           </View>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{user.region}</Text>
-          </View>
+          <Pressable style={styles.badge} onPress={() => setShowRegionPicker(true)}>
+            <View style={styles.regionBadge}>
+              <Text style={styles.badgeText}>{user.region}</Text>
+              <Ionicons name="chevron-down" size={12} color={Colors.textSecondary} />
+            </View>
+          </Pressable>
         </View>
       </View>
-
-      {profile && (user.userType === "biker" || user.userType === "coppia") && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Moto & Stile</Text>
-          <View style={styles.infoGrid}>
-            {profile.motorcycleType && (
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Tipo Moto</Text>
-                <Text style={styles.infoValue}>{profile.motorcycleType}</Text>
-              </View>
-            )}
-            {profile.ridingStyle && (
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Stile Guida</Text>
-                <Text style={styles.infoValue}>{profile.ridingStyle}</Text>
-              </View>
-            )}
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Disponibile</Text>
-              <Text style={[styles.infoValue, { color: profile.isAvailable ? Colors.success : Colors.textSecondary }]}>
-                {profile.isAvailable ? "Sì" : "No"}
-              </Text>
-            </View>
-          </View>
-        </View>
-      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Menu</Text>
@@ -147,6 +137,16 @@ export default function ProfileScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      <RegionPicker
+        visible={showRegionPicker}
+        selectedRegion={user.region}
+        onSelect={(region) => {
+          setShowRegionPicker(false);
+          handleRegionChange(region);
+        }}
+        onClose={() => setShowRegionPicker(false)}
+      />
     </ScrollView>
   );
 }
@@ -159,12 +159,9 @@ const styles = StyleSheet.create({
   badges: { flexDirection: "row", gap: 8, marginTop: 8 },
   badge: { backgroundColor: Colors.surface, paddingVertical: 4, paddingHorizontal: 12, borderRadius: 12 },
   badgeText: { fontSize: 13, fontFamily: "Inter_500Medium", color: Colors.textSecondary },
+  regionBadge: { flexDirection: "row", alignItems: "center", gap: 4 },
   section: { paddingHorizontal: 16, marginTop: 8 },
   sectionTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold", color: Colors.text, marginBottom: 12 },
-  infoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 16 },
-  infoItem: { backgroundColor: Colors.surface, borderRadius: 12, padding: 12, minWidth: "30%", flex: 1 },
-  infoLabel: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
-  infoValue: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.text, marginTop: 2 },
   menuItem: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: Colors.surface, borderRadius: 12, padding: 14, marginBottom: 8 },
   menuLabel: { flex: 1, fontSize: 16, fontFamily: "Inter_500Medium", color: Colors.text },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },

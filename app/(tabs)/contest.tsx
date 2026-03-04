@@ -25,6 +25,7 @@ export default function ContestScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const [submitting, setSubmitting] = useState(false);
+  const [cameraPermission, requestCameraPermission] = ImagePicker.useCameraPermissions();
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["/api/contest/current"],
@@ -55,12 +56,30 @@ export default function ContestScreen() {
 
   const handleSubmitPhoto = async () => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
+      let result: ImagePicker.ImagePickerResult;
+
+      if (Platform.OS === "web") {
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 0.8,
+        });
+      } else {
+        if (!cameraPermission?.granted) {
+          const perm = await requestCameraPermission();
+          if (!perm.granted) {
+            Alert.alert("Permesso necessario", "Consenti l'accesso alla fotocamera per partecipare al concorso.");
+            return;
+          }
+        }
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 0.8,
+        });
+      }
 
       if (result.canceled) return;
 
@@ -91,7 +110,7 @@ export default function ContestScreen() {
         ]
       );
     } catch (err) {
-      Alert.alert("Errore", "Impossibile selezionare la foto");
+      Alert.alert("Errore", "Impossibile scattare la foto");
     }
   };
 

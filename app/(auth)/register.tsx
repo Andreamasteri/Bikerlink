@@ -15,13 +15,7 @@ import { useAuth } from "@/lib/auth-context";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-const REGIONS = [
-  "Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna",
-  "Friuli Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche",
-  "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia", "Toscana",
-  "Trentino-Alto Adige", "Umbria", "Valle d'Aosta", "Veneto",
-];
+import RegionPicker from "@/components/RegionPicker";
 
 const USER_TYPES = [
   { value: "biker", label: "Biker" },
@@ -179,20 +173,17 @@ export default function RegisterScreen() {
       <TextInput style={styles.input} placeholder="es. 1985" placeholderTextColor={Colors.textSecondary} value={form.birthYear} onChangeText={(v) => updateForm("birthYear", v)} keyboardType="numeric" maxLength={4} />
 
       <Text style={styles.label}>Regione *</Text>
-      <Pressable style={styles.input} onPress={() => setShowRegions(!showRegions)}>
+      <Pressable style={styles.input} onPress={() => setShowRegions(true)}>
         <Text style={form.region ? styles.inputText : styles.placeholderText}>
           {form.region || "Seleziona regione"}
         </Text>
       </Pressable>
-      {showRegions && (
-        <View style={styles.regionList}>
-          {REGIONS.map((r) => (
-            <Pressable key={r} style={styles.regionItem} onPress={() => { updateForm("region", r); setShowRegions(false); }}>
-              <Text style={[styles.regionText, form.region === r && { color: Colors.accent }]}>{r}</Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
+      <RegionPicker
+        visible={showRegions}
+        selectedRegion={form.region}
+        onSelect={(r) => updateForm("region", r)}
+        onClose={() => setShowRegions(false)}
+      />
 
       <Text style={styles.label}>Codice Invito (opzionale)</Text>
       <TextInput style={styles.input} placeholder="Inserisci codice invito" placeholderTextColor={Colors.textSecondary} value={form.invitationCode} onChangeText={(v) => updateForm("invitationCode", v)} autoCapitalize="none" />
@@ -259,9 +250,6 @@ const styles = StyleSheet.create({
   optionBtnSelected: { borderColor: Colors.accent, backgroundColor: Colors.accent + "20" },
   optionText: { fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.textSecondary },
   optionTextSelected: { color: Colors.accent },
-  regionList: { backgroundColor: Colors.surface, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, maxHeight: 200 },
-  regionItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  regionText: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.text },
   eulaRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12 },
   checkbox: { width: 24, height: 24, borderWidth: 2, borderColor: Colors.border, borderRadius: 6, alignItems: "center", justifyContent: "center" },
   checkboxChecked: { borderColor: Colors.accent, backgroundColor: Colors.accent + "20" },

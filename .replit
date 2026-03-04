@@ -9,18 +9,6 @@ deploymentTarget = "cloudrun"
 build = ["sh", "-c", "npm run expo:static:build && npm run server:build"]
 run = ["npm", "run", "server:prod"]
 
-[[ports]]
-localPort = 5000
-externalPort = 5000
-
-[[ports]]
-localPort = 8081
-externalPort = 80
-
-[[ports]]
-localPort = 8082
-externalPort = 3001
-
 [env]
 PORT = "5000"
 
@@ -73,3 +61,7 @@ task = "shell.exec"
 args = "npm run expo:dev"
 waitForPort = 8081
 ensurePreviewReachable = "/status"
+
+[[ports]]
+localPort = 8082
+externalPort = 80

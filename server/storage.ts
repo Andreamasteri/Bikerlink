@@ -100,6 +100,46 @@ export const storage = {
     return profiles;
   },
 
+  async getUserMotorcycles(userId: string) {
+    return db.select().from(schema.userMotorcycles)
+      .where(eq(schema.userMotorcycles.userId, userId))
+      .orderBy(desc(schema.userMotorcycles.createdAt));
+  },
+
+  async addMotorcycle(userId: string, data: { name: string; motorcycleType: string; ridingStyle: string; isDefault?: boolean }) {
+    if (data.isDefault) {
+      await db.update(schema.userMotorcycles)
+        .set({ isDefault: false })
+        .where(eq(schema.userMotorcycles.userId, userId));
+    }
+    const [moto] = await db.insert(schema.userMotorcycles).values({
+      userId,
+      name: data.name,
+      motorcycleType: data.motorcycleType as any,
+      ridingStyle: data.ridingStyle as any,
+      isDefault: data.isDefault || false,
+    }).returning();
+    return moto;
+  },
+
+  async updateMotorcycle(id: string, userId: string, data: { name?: string; motorcycleType?: string; ridingStyle?: string; isDefault?: boolean }) {
+    if (data.isDefault) {
+      await db.update(schema.userMotorcycles)
+        .set({ isDefault: false })
+        .where(eq(schema.userMotorcycles.userId, userId));
+    }
+    const [moto] = await db.update(schema.userMotorcycles)
+      .set(data as any)
+      .where(and(eq(schema.userMotorcycles.id, id), eq(schema.userMotorcycles.userId, userId)))
+      .returning();
+    return moto;
+  },
+
+  async deleteMotorcycle(id: string, userId: string) {
+    await db.delete(schema.userMotorcycles)
+      .where(and(eq(schema.userMotorcycles.id, id), eq(schema.userMotorcycles.userId, userId)));
+  },
+
   async createProposal(data: Omit<schema.Proposal, "id" | "createdAt" | "isActive">) {
     const [proposal] = await db.insert(schema.proposals).values(data).returning();
     return proposal;

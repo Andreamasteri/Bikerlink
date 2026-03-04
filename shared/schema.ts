@@ -108,6 +108,20 @@ export const userPhotos = pgTable("user_photos", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const userMotorcycles = pgTable("user_motorcycles", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  motorcycleType: text("motorcycle_type", { enum: motorcycleTypeEnum }).notNull(),
+  ridingStyle: text("riding_style", { enum: ridingStyleEnum }).notNull(),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const userProfiles = pgTable("user_profiles", {
   id: varchar("id")
     .primaryKey()
@@ -147,6 +161,8 @@ export const proposals = pgTable("proposals", {
   departureTime: timestamp("departure_time"),
   departureLat: doublePrecision("departure_lat"),
   departureLng: doublePrecision("departure_lng"),
+  motorcycleId: varchar("motorcycle_id").references(() => userMotorcycles.id, { onDelete: "set null" }),
+  maxPickupDistanceKm: integer("max_pickup_distance_km"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -574,6 +590,7 @@ export const registerSchema = z.object({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type UserProfile = typeof userProfiles.$inferSelect;
+export type UserMotorcycle = typeof userMotorcycles.$inferSelect;
 export type Proposal = typeof proposals.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Conversation = typeof conversations.$inferSelect;

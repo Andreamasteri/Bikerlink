@@ -7,7 +7,7 @@ export const proposalsRouter = Router();
 proposalsRouter.post("/", requireAuth, async (req, res) => {
   try {
     const user = (req as any).user;
-    const { type, description, departureLocation, departureTime, departureLat, departureLng } = req.body;
+    const { type, description, departureLocation, departureTime, departureLat, departureLng, motorcycleId, maxPickupDistanceKm } = req.body;
 
     if (!type || !description) {
       return res.status(400).json({ message: "Tipo e descrizione obbligatori" });
@@ -21,6 +21,8 @@ proposalsRouter.post("/", requireAuth, async (req, res) => {
       departureTime: departureTime ? new Date(departureTime) : undefined,
       departureLat,
       departureLng,
+      motorcycleId: motorcycleId || null,
+      maxPickupDistanceKm: maxPickupDistanceKm || null,
     } as any);
 
     const conv = await storage.createConversation("group", proposal.id);
