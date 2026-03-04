@@ -133,6 +133,16 @@ router.post("/conversations", async (req: Request, res: Response) => {
       }
     }
 
+    if (conversationType === "group" && proposalId) {
+      const existingConvs = await storage.getConversations(userId);
+      const existingGroupConv = existingConvs.find(
+        (c) => c.conversationType === "group" && c.proposalId === proposalId
+      );
+      if (existingGroupConv) {
+        return res.json(existingGroupConv);
+      }
+    }
+
     const conv = await storage.createConversation({
       conversationType: conversationType || "private",
       title: title || null,

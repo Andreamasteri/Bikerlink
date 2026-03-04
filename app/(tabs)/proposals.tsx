@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
+  ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -175,7 +176,7 @@ export default function ProposalsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.filterRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
         {FILTER_TYPES.map((f) => (
           <Pressable
             key={f.key}
@@ -187,7 +188,7 @@ export default function ProposalsScreen() {
             </Text>
           </Pressable>
         ))}
-      </View>
+      </ScrollView>
 
       {isLoading ? (
         <View style={styles.loading}>

@@ -322,6 +322,31 @@ export default function ProposalDetailScreen() {
             <Text style={styles.joinedText}>Sei il creatore di questa proposta</Text>
           </View>
         )}
+
+        {(isParticipant || isCreator) && (
+          <TouchableOpacity
+            style={styles.groupChatButton}
+            onPress={async () => {
+              try {
+                const participantUserIds = proposal.participants.map((p) => p.userId);
+                const res = await apiRequest("POST", "/api/chat/conversations", {
+                  conversationType: "group",
+                  title: proposal.title,
+                  proposalId: proposal.id,
+                  participantIds: participantUserIds,
+                });
+                const conv = await res.json();
+                router.push(`/chat/${conv.id}` as any);
+              } catch (e: any) {
+                Alert.alert("Errore", e.message || "Impossibile aprire la chat");
+              }
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="chatbubbles" size={22} color={Colors.background} />
+            <Text style={styles.groupChatText}>Chat del Gruppo</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </>
   );
@@ -486,5 +511,20 @@ const styles = StyleSheet.create({
   joinedText: {
     color: Colors.textSecondary,
     fontSize: 14,
+  },
+  groupChatButton: {
+    backgroundColor: Colors.accent,
+    borderRadius: 14,
+    paddingVertical: 16,
+    flexDirection: "row" as const,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    marginTop: 12,
+  },
+  groupChatText: {
+    color: Colors.background,
+    fontSize: 16,
+    fontWeight: "700" as const,
   },
 });

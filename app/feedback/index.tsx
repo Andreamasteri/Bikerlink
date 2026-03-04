@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/query-client";
 import Colors from "@/constants/colors";
@@ -28,7 +28,8 @@ const TICKET_TYPES = [
 export default function FeedbackScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [ticketType, setTicketType] = useState("feedback");
+  const { type: initialType } = useLocalSearchParams<{ type?: string }>();
+  const [ticketType, setTicketType] = useState(initialType || "feedback");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
 

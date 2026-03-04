@@ -236,6 +236,17 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+router.get("/online-count", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const count = await storage.countActiveUsers(fifteenMinutesAgo);
+    return res.json({ count });
+  } catch (error) {
+    console.error("Online count error:", error);
+    return res.json({ count: 0 });
+  }
+});
+
 router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
   try {
     const lat = parseFloat(req.query.lat as string);

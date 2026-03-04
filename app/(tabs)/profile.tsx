@@ -184,15 +184,6 @@ export default function ProfileScreen() {
     },
   });
 
-  const deleteMotoMutation = useMutation({
-    mutationFn: async (motoId: string) => {
-      await apiRequest("DELETE", `/api/motorcycles/${motoId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
-    },
-  });
-
   const pickImage = useCallback(async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -212,17 +203,6 @@ export default function ProfileScreen() {
         text: t("common.delete"),
         style: "destructive",
         onPress: () => deletePhotoMutation.mutate(photoId),
-      },
-    ]);
-  }, []);
-
-  const handleDeleteMoto = useCallback((motoId: string) => {
-    Alert.alert("Elimina moto", "Sei sicuro di voler eliminare questa moto?", [
-      { text: t("common.cancel"), style: "cancel" },
-      {
-        text: t("common.delete"),
-        style: "destructive",
-        onPress: () => deleteMotoMutation.mutate(motoId),
       },
     ]);
   }, []);
@@ -390,61 +370,6 @@ export default function ProfileScreen() {
         </View>
       ) : null}
 
-      {isBikerOrCoppia && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{t("profile.motorcycles")}</Text>
-            <TouchableOpacity
-              onPress={() => router.push("/profile/edit?addMoto=true" as any)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="add-circle-outline" size={24} color={Colors.accent} />
-            </TouchableOpacity>
-          </View>
-          {profile?.motorcycles && profile.motorcycles.length > 0 ? (
-            profile.motorcycles.map((moto) => (
-              <View key={moto.id} style={styles.motoCard}>
-                <View style={styles.motoIconContainer}>
-                  <Ionicons name="bicycle" size={28} color={Colors.accent} />
-                </View>
-                <View style={styles.motoInfo}>
-                  <Text style={styles.motoName}>
-                    {moto.brand} {moto.model}
-                  </Text>
-                  <View style={styles.motoDetails}>
-                    {moto.year && (
-                      <Text style={styles.motoDetail}>{moto.year}</Text>
-                    )}
-                    {moto.displacement && (
-                      <Text style={styles.motoDetail}>{moto.displacement}cc</Text>
-                    )}
-                    {moto.motorcycleType && (
-                      <View style={styles.motoTag}>
-                        <Text style={styles.motoTagText}>{moto.motorcycleType}</Text>
-                      </View>
-                    )}
-                  </View>
-                  {moto.ridingStyle && (
-                    <Text style={styles.motoRidingStyle}>{moto.ridingStyle}</Text>
-                  )}
-                </View>
-                <TouchableOpacity
-                  onPress={() => handleDeleteMoto(moto.id)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons name="trash-outline" size={18} color={Colors.error} />
-                </TouchableOpacity>
-              </View>
-            ))
-          ) : (
-            <View style={styles.emptySection}>
-              <Ionicons name="bicycle" size={32} color={Colors.textSecondary} />
-              <Text style={styles.emptyText}>{t("profile.addMoto")}</Text>
-            </View>
-          )}
-        </View>
-      )}
-
       {isZavorrina && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -610,7 +535,8 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Menu</Text>
         <MenuItem icon="create" label="Modifica Profilo" onPress={() => router.push("/profile/edit" as any)} />
-        <MenuItem icon="chatbox-ellipses" label={t("feedback.title")} onPress={() => router.push("/feedback" as any)} color={Colors.warning} />
+        <MenuItem icon="bug" label="Segnala un Bug" onPress={() => router.push("/feedback?type=bug" as any)} color={Colors.accentRed} />
+        <MenuItem icon="bulb" label="Richiedi Funzione" onPress={() => router.push("/feedback?type=feedback" as any)} color={Colors.accent} />
 
         {(profile?.role === "admin" || (user as any)?.role === "admin") && (
           <MenuItem icon="shield" label="Pannello Admin" onPress={() => router.push("/admin" as any)} color={Colors.accent} />

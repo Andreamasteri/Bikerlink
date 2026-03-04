@@ -138,6 +138,12 @@ export default function MapScreen() {
     enabled: isAuthenticated,
   });
 
+  const onlineCountQuery = useQuery<{ count: number }>({
+    queryKey: ["/api/users/online-count"],
+    staleTime: 30000,
+    enabled: isAuthenticated,
+  });
+
   const profileQuery = useQuery({
     queryKey: ["/api/users/profile"],
     enabled: isAuthenticated,
@@ -191,6 +197,7 @@ export default function MapScreen() {
   const nearbyUsers = (nearbyUsersQuery.data as any) || [];
   const workshops = (workshopsQuery.data as any) || [];
   const ads = (adsData as any)?.ads || [];
+  const onlineCount = onlineCountQuery.data?.count ?? 0;
 
   if (authLoading || locationLoading) {
     return (
@@ -288,6 +295,11 @@ export default function MapScreen() {
       </Modal>
 
       <View style={styles.statsRow}>
+        <View style={styles.statCard}>
+          <Ionicons name="radio-button-on" size={20} color={Colors.success} />
+          <Text style={styles.statNumber}>{onlineCount}</Text>
+          <Text style={styles.statLabel}>Online</Text>
+        </View>
         <View style={styles.statCard}>
           <Ionicons name="people" size={20} color={Colors.maleIcon} />
           <Text style={styles.statNumber}>{nearbyUsersList.length}</Text>
@@ -407,12 +419,33 @@ export default function MapScreen() {
                   </View>
                 )}
 
-                <Pressable
-                  style={styles.detailProfileBtn}
-                  onPress={() => { setSelectedUser(null); router.push(`/profile/${selectedUser?.id}` as any); }}
-                >
-                  <Text style={styles.detailProfileBtnText}>Vai al Profilo</Text>
-                </Pressable>
+                <View style={styles.detailBtnRow}>
+                  <Pressable
+                    style={styles.detailChatBtn}
+                    onPress={async () => {
+                      try {
+                        const res = await apiRequest("POST", "/api/chat/conversations", {
+                          conversationType: "private",
+                          participantIds: [selectedUser?.id],
+                        });
+                        const conv = await res.json();
+                        setSelectedUser(null);
+                        router.push(`/chat/${conv.id}` as any);
+                      } catch (e: any) {
+                        Alert.alert("Errore", e.message || "Impossibile aprire la chat");
+                      }
+                    }}
+                  >
+                    <Ionicons name="chatbubble" size={20} color={Colors.background} />
+                    <Text style={styles.detailChatBtnText}>Messaggio</Text>
+                  </Pressable>
+                  <Pressable
+                    style={styles.detailProfileBtn}
+                    onPress={() => { setSelectedUser(null); router.push(`/profile/${selectedUser?.id}` as any); }}
+                  >
+                    <Text style={styles.detailProfileBtnText}>Vai al Profilo</Text>
+                  </Pressable>
+                </View>
               </ScrollView>
             )}
           </Pressable>
@@ -601,15 +634,33 @@ const styles = StyleSheet.create({
   },
   detailProposalTitle: { fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.text },
   detailProposalSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
-  detailProfileBtn: {
+  detailBtnRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  detailChatBtn: {
+    flex: 1,
     backgroundColor: Colors.accent,
     padding: 14,
     borderRadius: 12,
     alignItems: "center",
-    marginTop: 8,
-    marginBottom: 8,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
   },
-  detailProfileBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.background },
+  detailChatBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.background },
+  detailProfileBtn: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    padding: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  detailProfileBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.text },
   eggSheet: {
     backgroundColor: Colors.surface,
     marginHorizontal: 32,
