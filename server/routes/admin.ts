@@ -1,4 +1,7 @@
 import { Router, type Request, type Response } from "express";
+import multer from "multer";
+import fs from "fs";
+import path from "path";
 import { storage } from "../storage";
 
 const router = Router();
@@ -428,6 +431,48 @@ router.put("/settings/:key", async (req: Request, res: Response) => {
     return res.json(setting);
   } catch (error) {
     console.error("Admin update setting error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+const eulaUpload = multer({
+  dest: path.join(process.cwd(), "uploads", "tmp"),
+  limits: { fileSize: 1 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === "text/plain") {
+      cb(null, true);
+    } else {
+      cb(new Error("Solo file .txt (text/plain) sono accettati"));
+    }
+  },
+});
+
+router.post("/settings/eula/upload", eulaUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "Nessun file caricato" });
+    }
+
+    const content = fs.readFileSync(req.file.path, "utf-8");
+
+    fs.unlinkSync(req.file.path);
+
+    const setting = await storage.upsertAppSetting("eula_text", content);
+
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "upload_eula",
+      targetType: "app_setting",
+      targetId: "eula_text",
+      details: "EULA caricato da file .txt",
+    });
+
+    return res.json({ message: "EULA caricato con successo", value: content, setting });
+  } catch (error) {
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    console.error("Admin upload EULA error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

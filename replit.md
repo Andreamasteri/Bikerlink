@@ -102,9 +102,22 @@ constants/
 - `Start Backend` → `npm run server:dev` (porta 5000)
 - `Start Frontend` → `npm run expo:dev` (porta 8081)
 
+## Utenti Seed
+
+| Nickname | Email | Ruolo | Password |
+|----------|-------|-------|----------|
+| admin | admin@bikerlink.it | admin | admin2025! |
+| moderatore | mod@bikerlink.it | moderator | mod2025! |
+| user1 | user1@bikerlink.it | user | test |
+
+Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
+
 ## Note Importanti
 
 - react-native-maps: usare componenti con pattern `.web.tsx` per compatibilità web
 - KeyboardProvider: escluso su web (causa errore hooks)
 - react-native-maps pinnato a 1.18.0 per compatibilità Expo Go
 - Schema DB: non modificare tipi colonne ID (varchar UUID)
+- Filtro telefono chat: persistente su DB (tabella `phone_sharing_tracker`)
+- EULA: caricabile come file .txt dall'admin panel (sezione Impostazioni)
+- expo-document-picker: usato per upload EULA nell'admin

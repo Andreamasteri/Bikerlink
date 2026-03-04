@@ -1,10 +1,12 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as DocumentPicker from "expo-document-picker";
 import { Colors } from "@/constants/colors";
-import { apiRequest, queryClient } from "@/lib/query-client";
+import { getApiUrl, queryClient } from "@/lib/query-client";
+import { fetch } from "expo/fetch";
 
 interface AppSetting {
   id: string;
@@ -31,9 +33,19 @@ export default function AdminSettings() {
     queryKey: ["/api/admin/settings"],
   });
 
+  const [isUploadingEula, setIsUploadingEula] = useState(false);
+
   const updateMutation = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
-      const res = await apiRequest("PUT", `/api/admin/settings/${key}`, { value });
+      const baseUrl = getApiUrl();
+      const url = new URL(`/api/admin/settings/${key}`, baseUrl);
+      const res = await fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
     onSuccess: () => {
@@ -42,6 +54,58 @@ export default function AdminSettings() {
       setEditValue("");
     },
   });
+
+  async function handleUploadEula() {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "text/plain",
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+
+      setIsUploadingEula(true);
+
+      const formData = new FormData();
+      formData.append("file", {
+        uri: asset.uri,
+        name: asset.name || "eula.txt",
+        type: "text/plain",
+      } as any);
+
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/eula/upload", baseUrl);
+
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: "Errore durante l'upload" }));
+        Alert.alert("Errore", errorData.message || "Errore durante l'upload");
+        return;
+      }
+
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+
+      if (editingKey === "eula_text" && data.value) {
+        setEditValue(data.value);
+      }
+
+      Alert.alert("Successo", "EULA caricato con successo");
+    } catch (error: any) {
+      Alert.alert("Errore", error.message || "Errore durante l'upload del file");
+    } finally {
+      setIsUploadingEula(false);
+    }
+  }
 
   function getSettingValue(key: string): string {
     const setting = settings.find((s) => s.key === key);
@@ -70,11 +134,26 @@ export default function AdminSettings() {
           <View key={setting.key} style={styles.settingCard}>
             <View style={styles.settingHeader}>
               <Text style={styles.settingLabel}>{setting.label}</Text>
-              {editingKey !== setting.key && (
-                <TouchableOpacity onPress={() => startEditing(setting.key)}>
-                  <MaterialIcons name="edit" size={20} color={Colors.dark.accent} />
-                </TouchableOpacity>
-              )}
+              <View style={styles.settingActions}>
+                {setting.key === "eula_text" && editingKey !== setting.key && (
+                  <TouchableOpacity
+                    style={styles.uploadBtn}
+                    onPress={handleUploadEula}
+                    disabled={isUploadingEula}
+                  >
+                    {isUploadingEula ? (
+                      <ActivityIndicator size="small" color={Colors.dark.accent} />
+                    ) : (
+                      <MaterialIcons name="upload-file" size={20} color={Colors.dark.accent} />
+                    )}
+                  </TouchableOpacity>
+                )}
+                {editingKey !== setting.key && (
+                  <TouchableOpacity onPress={() => startEditing(setting.key)}>
+                    <MaterialIcons name="edit" size={20} color={Colors.dark.accent} />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
             {editingKey === setting.key ? (
               <View>
@@ -121,6 +200,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.dark.border,
   },
   settingHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  settingActions: { flexDirection: "row", alignItems: "center", gap: 12 },
+  uploadBtn: { padding: 4 },
   settingLabel: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: Colors.dark.text },
   settingValue: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.dark.textSecondary },
   input: {

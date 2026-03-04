@@ -497,6 +497,17 @@ export const verificationCodes = pgTable("verification_codes", {
   index("verification_codes_target_idx").on(table.target),
 ]);
 
+export const phoneSharingTracker = pgTable("phone_sharing_tracker", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id", { length: 36 }).notNull(),
+  userId: varchar("user_id", { length: 36 }).notNull(),
+  sharedCount: integer("shared_count").notNull().default(0),
+}, (table) => [
+  uniqueIndex("phone_sharing_tracker_unique_idx").on(table.conversationId, table.userId),
+]);
+
 export const registerSchema = z.object({
   nickname: z.string().min(3).max(50),
   email: z.string().email(),
@@ -579,6 +590,9 @@ export type AppSetting = typeof appSettings.$inferSelect;
 export type InsertAppSetting = typeof appSettings.$inferInsert;
 export type VerificationCode = typeof verificationCodes.$inferSelect;
 export type InsertVerificationCode = typeof verificationCodes.$inferInsert;
+
+export type PhoneSharingTracker = typeof phoneSharingTracker.$inferSelect;
+export type InsertPhoneSharingTracker = typeof phoneSharingTracker.$inferInsert;
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

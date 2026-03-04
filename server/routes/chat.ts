@@ -13,17 +13,16 @@ function requireAuth(req: Request, res: Response): string | null {
 
 const PHONE_REGEX = /(?:\+?\d[\d\s\-().]{6,}\d|\b\d{3}[\s\-.]?\d{3}[\s\-.]?\d{4}\b)/g;
 
-function filterPhoneNumbers(content: string, conversationPhoneCount: Map<string, number>, conversationId: string, senderId: string): { filtered: string; wasFiltered: boolean } {
-  const key = `${conversationId}:${senderId}`;
+async function filterPhoneNumbers(content: string, conversationId: string, senderId: string): Promise<{ filtered: string; wasFiltered: boolean }> {
   const matches = content.match(PHONE_REGEX);
   if (!matches || matches.length === 0) {
     return { filtered: content, wasFiltered: false };
   }
 
-  const currentCount = conversationPhoneCount.get(key) || 0;
+  const currentCount = await storage.getPhoneSharedCount(conversationId, senderId);
 
   if (currentCount === 0) {
-    conversationPhoneCount.set(key, currentCount + 1);
+    await storage.incrementPhoneSharedCount(conversationId, senderId);
     return { filtered: content, wasFiltered: false };
   }
 
@@ -33,8 +32,6 @@ function filterPhoneNumbers(content: string, conversationPhoneCount: Map<string,
     wasFiltered: true,
   };
 }
-
-const phoneCountTracker = new Map<string, number>();
 
 router.get("/conversations", async (req: Request, res: Response) => {
   try {
@@ -184,7 +181,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     let isFiltered = false;
 
     if (messageType === "text" && content) {
-      const result = filterPhoneNumbers(content, phoneCountTracker, id, userId);
+      const result = await filterPhoneNumbers(content, id, userId);
       finalContent = result.filtered;
       isFiltered = result.wasFiltered;
     }

@@ -29,6 +29,7 @@ import {
   feedbackTickets,
   appSettings,
   verificationCodes,
+  phoneSharingTracker,
   type User,
   type InsertUser,
   type UserPhoto,
@@ -85,6 +86,8 @@ import {
   type InsertAppSetting,
   type VerificationCode,
   type InsertVerificationCode,
+  type PhoneSharingTracker,
+  type InsertPhoneSharingTracker,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -210,6 +213,9 @@ export interface IStorage {
   getUnapprovedContestEntries(): Promise<PhotoContestEntry[]>;
   updateContestEntryApproval(id: string, approved: boolean): Promise<PhotoContestEntry | undefined>;
   getPhotoContestEntry(id: string): Promise<PhotoContestEntry | undefined>;
+
+  getPhoneSharedCount(conversationId: string, userId: string): Promise<number>;
+  incrementPhoneSharedCount(conversationId: string, userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -709,6 +715,17 @@ export class DatabaseStorage implements IStorage {
   async getPhotoContestEntry(id: string): Promise<PhotoContestEntry | undefined> {
     const [entry] = await db.select().from(photoContestEntries).where(eq(photoContestEntries.id, id)).limit(1);
     return entry;
+  }
+  async getPhoneSharedCount(conversationId: string, userId: string): Promise<number> {
+    const [row] = await db.select().from(phoneSharingTracker).where(and(eq(phoneSharingTracker.conversationId, conversationId), eq(phoneSharingTracker.userId, userId))).limit(1);
+    return row?.sharedCount ?? 0;
+  }
+
+  async incrementPhoneSharedCount(conversationId: string, userId: string): Promise<void> {
+    await db.insert(phoneSharingTracker).values({ conversationId, userId, sharedCount: 1 }).onConflictDoUpdate({
+      target: [phoneSharingTracker.conversationId, phoneSharingTracker.userId],
+      set: { sharedCount: sql`${phoneSharingTracker.sharedCount} + 1` },
+    });
   }
 }
 
