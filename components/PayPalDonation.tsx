@@ -26,6 +26,9 @@ export default function PayPalDonation() {
         <Text style={styles.donateLabel}>Sostienici</Text>
         <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
       </Pressable>
+      <Text style={styles.donateMessage}>
+        Non sono un programmatore professionista. Lo sviluppo di quest'app è pensato da uno di noi, per tutti noi. Oltre al tempo dedicato, ci sono le immancabili risorse utilizzate per poterla sviluppare, modificare e stoccare sui server, e pubblicare sugli store Apple/Google. Un contributo, per quanto piccolo, significa tanto: sia per recuperare il denaro investito, sia per permettere all'app di venire pubblicata, e mantenuta sui server. Grazie a tutti.
+      </Text>
 
       <Modal visible={visible} transparent animationType="fade" onRequestClose={() => setVisible(false)}>
         <Pressable style={styles.overlay} onPress={() => setVisible(false)}>
@@ -67,6 +70,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Inter_500Medium",
     color: Colors.text,
+  },
+  donateMessage: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    lineHeight: 20,
+    paddingHorizontal: 4,
+    marginBottom: 8,
   },
   overlay: {
     flex: 1,
