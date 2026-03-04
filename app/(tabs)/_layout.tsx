@@ -1,151 +1,71 @@
-import React, { useEffect } from "react";
+// template
+import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { NativeTabs, Icon, Label } from "expo-router/unstable-native-tabs";
+import { BlurView } from "expo-blur";
+import { SymbolView } from "expo-symbols";
+import { Platform, StyleSheet, useColorScheme } from "react-native";
+import React from "react";
+
 import Colors from "@/constants/colors";
-import { Platform, BackHandler, Text } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAuth } from "@/lib/auth-context";
-import { useQuery } from "@tanstack/react-query";
 
-export default function TabLayout() {
-  const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+//IMPORTANT: iOS 26 Exists, feel free to use NativeTabs for native tabs with liquid glass support.
+function NativeTabLayout() {
+  return (
+    <NativeTabs>
+      <NativeTabs.Trigger name="index">
+        <Icon sf={{ default: "house", selected: "house.fill" }} />
+        <Label>Home</Label>
+      </NativeTabs.Trigger>
+    </NativeTabs>
+  );
+}
 
-  const isBikerOrCoppia = user?.userType === "biker" || user?.userType === "coppia";
-
-  const { data: profileData } = useQuery({
-    queryKey: ["/api/users/profile"],
-    enabled: !!user,
-  });
-
-  const isAvailable = (profileData as any)?.profile?.isAvailable || false;
-
-  useEffect(() => {
-    if (Platform.OS !== "android") return;
-    const handler = () => true;
-    const sub = BackHandler.addEventListener("hardwareBackPress", handler);
-    return () => sub.remove();
-  }, []);
-
-  const tabBarHeight = Platform.OS === "web" ? 84 : 60 + insets.bottom;
-  const tabBarPaddingBottom = Platform.OS === "web" ? 34 : insets.bottom;
+function ClassicTabLayout() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors.accent,
-        tabBarInactiveTintColor: Colors.textSecondary,
+        tabBarActiveTintColor: Colors.light.tint,
+        tabBarInactiveTintColor: Colors.light.tabIconDefault,
+        headerShown: true,
         tabBarStyle: {
-          backgroundColor: Colors.surface,
-          borderTopColor: Colors.border,
-          height: tabBarHeight,
-          paddingBottom: tabBarPaddingBottom,
+          position: "absolute",
+          backgroundColor: Platform.select({
+            ios: "transparent",
+            android: isDark ? "#000" : "#fff",
+          }),
+          borderTopWidth: 0,
+          elevation: 0,
         },
-        tabBarLabelStyle: {
-          fontSize: 9,
-          fontFamily: "Inter_500Medium",
-        },
-        headerStyle: {
-          backgroundColor: Colors.surface,
-        },
-        headerTintColor: Colors.text,
-        headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
+        tabBarBackground: () =>
+          Platform.OS === "ios" ? (
+            <BlurView
+              intensity={100}
+              tint={isDark ? "dark" : "light"}
+              style={StyleSheet.absoluteFill}
+            />
+          ) : null,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: "Mappa",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="map" size={size} color={color} />
+          title: "Home",
+          tabBarIcon: ({ color }) => (
+            <SymbolView name="house" tintColor={color} size={24} />
           ),
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
-        name="proposals"
-        options={{
-          title: "Proposte",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="megaphone" size={size} color={color} />
-          ),
-          headerTitle: "Proposte e Richieste",
-        }}
-      />
-      <Tabs.Screen
-        name="ready"
-        options={{
-          title: "Ready\nto Ride",
-          tabBarIcon: ({ focused }) => (
-            <Ionicons
-              name="bicycle"
-              size={22}
-              color={isAvailable ? Colors.success : Colors.accentRed}
-            />
-          ),
-          headerTitle: "Ready to Ride",
-          tabBarLabel: ({ focused }) => (
-            <Text style={{
-              fontSize: 9,
-              fontFamily: "Inter_500Medium",
-              color: focused ? Colors.accent : Colors.textSecondary,
-              textAlign: "center",
-              lineHeight: 11,
-            }}>
-              {"Ready\nto Ride"}
-            </Text>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="tracking"
-        options={{
-          title: "Tracking",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="navigate" size={size} color={color} />
-          ),
-          headerTitle: "GPS Tracking",
-        }}
-      />
-      {isBikerOrCoppia ? (
-        <Tabs.Screen
-          name="garage"
-          options={{
-            title: "Garage",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="build" size={size} color={color} />
-            ),
-            headerTitle: "Il Mio Garage",
-          }}
-        />
-      ) : (
-        <Tabs.Screen
-          name="garage"
-          options={{
-            href: null,
-          }}
-        />
-      )}
-      <Tabs.Screen
-        name="contest"
-        options={{
-          title: "Concorso",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="camera" size={size} color={color} />
-          ),
-          headerTitle: "Concorso Foto",
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profilo",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
-          ),
-          headerTitle: "Il Mio Profilo",
         }}
       />
     </Tabs>
   );
+}
+
+export default function TabLayout() {
+  if (isLiquidGlassAvailable()) {
+    return <NativeTabLayout />;
+  }
+  return <ClassicTabLayout />;
 }
