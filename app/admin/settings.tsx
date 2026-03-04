@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { getApiUrl, queryClient } from "@/lib/query-client";
 import { fetch } from "expo/fetch";
 
@@ -142,15 +142,15 @@ export default function AdminSettings() {
                     disabled={isUploadingEula}
                   >
                     {isUploadingEula ? (
-                      <ActivityIndicator size="small" color={Colors.dark.accent} />
+                      <ActivityIndicator size="small" color={Colors.accent} />
                     ) : (
-                      <MaterialIcons name="upload-file" size={20} color={Colors.dark.accent} />
+                      <MaterialIcons name="upload-file" size={20} color={Colors.accent} />
                     )}
                   </TouchableOpacity>
                 )}
                 {editingKey !== setting.key && (
                   <TouchableOpacity onPress={() => startEditing(setting.key)}>
-                    <MaterialIcons name="edit" size={20} color={Colors.dark.accent} />
+                    <MaterialIcons name="edit" size={20} color={Colors.accent} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -160,7 +160,7 @@ export default function AdminSettings() {
                 <TextInput
                   style={styles.input}
                   placeholder={setting.placeholder}
-                  placeholderTextColor={Colors.dark.textMuted}
+                  placeholderTextColor={Colors.textSecondary}
                   value={editValue}
                   onChangeText={setEditValue}
                   multiline={setting.key === "eula_text"}
@@ -192,26 +192,26 @@ export default function AdminSettings() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.dark.background },
+  container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 16 },
-  loadingText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.dark.textSecondary, textAlign: "center", marginTop: 40 },
+  loadingText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", marginTop: 40 },
   settingCard: {
-    backgroundColor: Colors.dark.surface, borderRadius: 12, padding: 16, marginBottom: 12,
-    borderWidth: 1, borderColor: Colors.dark.border,
+    backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 12,
+    borderWidth: 1, borderColor: Colors.border,
   },
   settingHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
   settingActions: { flexDirection: "row", alignItems: "center", gap: 12 },
   uploadBtn: { padding: 4 },
-  settingLabel: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: Colors.dark.text },
-  settingValue: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.dark.textSecondary },
+  settingLabel: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: Colors.text },
+  settingValue: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary },
   input: {
-    backgroundColor: Colors.dark.background, borderRadius: 10, padding: 12,
-    fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.dark.text,
-    borderWidth: 1, borderColor: Colors.dark.border, textAlignVertical: "top" as const,
+    backgroundColor: Colors.background, borderRadius: 10, padding: 12,
+    fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.text,
+    borderWidth: 1, borderColor: Colors.border, textAlignVertical: "top" as const,
   },
   editActions: { flexDirection: "row", gap: 12, marginTop: 12, justifyContent: "flex-end" },
-  cancelBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: Colors.dark.surfaceLight },
-  cancelBtnText: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.dark.textSecondary },
-  saveBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: Colors.dark.accent },
-  saveBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.dark.background },
+  cancelBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: Colors.surfaceLight },
+  cancelBtnText: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.textSecondary },
+  saveBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: Colors.accent },
+  saveBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.background },
 });

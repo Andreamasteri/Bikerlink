@@ -1,14 +1,14 @@
 import { Stack } from "expo-router";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 
 export default function RouteLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: Colors.dark.surface },
-        headerTintColor: Colors.dark.accent,
-        headerTitleStyle: { color: Colors.dark.text },
-        contentStyle: { backgroundColor: Colors.dark.background },
+        headerStyle: { backgroundColor: Colors.surface },
+        headerTintColor: Colors.accent,
+        headerTitleStyle: { color: Colors.text },
+        contentStyle: { backgroundColor: Colors.background },
       }}
     >
       <Stack.Screen name="tracking" options={{ title: "Tracking GPS", headerShown: true }} />

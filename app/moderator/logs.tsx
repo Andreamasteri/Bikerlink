@@ -12,7 +12,7 @@ import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 
 interface ModeratorLogEntry {
   id: string;
@@ -25,9 +25,9 @@ interface ModeratorLogEntry {
 }
 
 function getActionIcon(action: string): { name: keyof typeof Ionicons.glyphMap; color: string } {
-  if (action.includes("approve")) return { name: "checkmark-circle", color: Colors.dark.success };
-  if (action.includes("reject")) return { name: "close-circle", color: Colors.dark.error };
-  return { name: "document-text", color: Colors.dark.accent };
+  if (action.includes("approve")) return { name: "checkmark-circle", color: Colors.success };
+  if (action.includes("reject")) return { name: "close-circle", color: Colors.error };
+  return { name: "document-text", color: Colors.accent };
 }
 
 function getActionLabel(action: string): string {
@@ -72,7 +72,7 @@ export default function ModeratorLogsScreen() {
     <View style={[styles.container, { paddingTop: Math.max(insets.top, webTopInset) }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.dark.text} />
+          <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Log Moderazione</Text>
         <View style={{ width: 24 }} />
@@ -80,11 +80,11 @@ export default function ModeratorLogsScreen() {
 
       {isLoading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={Colors.dark.accent} />
+          <ActivityIndicator size="large" color={Colors.accent} />
         </View>
       ) : !logs || logs.length === 0 ? (
         <View style={styles.center}>
-          <MaterialCommunityIcons name="clipboard-text-outline" size={64} color={Colors.dark.textMuted} />
+          <MaterialCommunityIcons name="clipboard-text-outline" size={64} color={Colors.textSecondary} />
           <Text style={styles.emptyText}>Nessun log di moderazione</Text>
         </View>
       ) : (
@@ -103,7 +103,7 @@ export default function ModeratorLogsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: "row",
@@ -112,12 +112,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: Colors.border,
   },
   headerTitle: {
     fontSize: 18,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.dark.text,
+    color: Colors.text,
   },
   center: {
     flex: 1,
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontFamily: "Inter_500Medium",
   },
   list: {
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   },
   logItem: {
     flexDirection: "row",
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,
@@ -156,16 +156,16 @@ const styles = StyleSheet.create({
   logAction: {
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.dark.text,
+    color: Colors.text,
   },
   logDetails: {
     fontSize: 13,
     fontFamily: "Inter_400Regular",
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
   },
   logMeta: {
     fontSize: 11,
     fontFamily: "Inter_400Regular",
-    color: Colors.dark.textMuted,
+    color: Colors.textSecondary,
   },
 });

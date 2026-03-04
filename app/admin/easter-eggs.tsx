@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, TextInput, M
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
 interface EasterEgg {
@@ -76,18 +76,18 @@ export default function AdminEasterEggs() {
           <Text style={styles.name}>{item.name}</Text>
           {item.description && <Text style={styles.detail}>{item.description}</Text>}
           <Text style={styles.coords}>{item.latitude.toFixed(4)}, {item.longitude.toFixed(4)} | r:{item.radius}m | pts:{item.points}</Text>
-          <View style={[styles.badge, { backgroundColor: item.isActive ? Colors.dark.success + "33" : Colors.dark.error + "33" }]}>
-            <Text style={[styles.badgeText, { color: item.isActive ? Colors.dark.success : Colors.dark.error }]}>
+          <View style={[styles.badge, { backgroundColor: item.isActive ? Colors.success + "33" : Colors.error + "33" }]}>
+            <Text style={[styles.badgeText, { color: item.isActive ? Colors.success : Colors.error }]}>
               {item.isActive ? "Attivo" : "Disattivo"}
             </Text>
           </View>
         </View>
         <View style={styles.actions}>
           <TouchableOpacity onPress={() => toggleMutation.mutate({ id: item.id, isActive: !item.isActive })}>
-            <MaterialIcons name={item.isActive ? "visibility-off" : "visibility"} size={22} color={Colors.dark.textSecondary} />
+            <MaterialIcons name={item.isActive ? "visibility-off" : "visibility"} size={22} color={Colors.textSecondary} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => handleDelete(item)}>
-            <MaterialIcons name="delete" size={22} color={Colors.dark.error} />
+            <MaterialIcons name="delete" size={22} color={Colors.error} />
           </TouchableOpacity>
         </View>
       </View>
@@ -109,7 +109,7 @@ export default function AdminEasterEggs() {
       />
 
       <TouchableOpacity style={styles.fab} onPress={() => setShowModal(true)}>
-        <MaterialIcons name="add" size={28} color={Colors.dark.background} />
+        <MaterialIcons name="add" size={28} color={Colors.background} />
       </TouchableOpacity>
 
       <Modal visible={showModal} animationType="slide" transparent>
@@ -118,19 +118,19 @@ export default function AdminEasterEggs() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Nuovo Easter Egg</Text>
               <TouchableOpacity onPress={() => setShowModal(false)}>
-                <MaterialIcons name="close" size={24} color={Colors.dark.textSecondary} />
+                <MaterialIcons name="close" size={24} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
             <ScrollView>
-              <TextInput style={styles.input} placeholder="Nome *" placeholderTextColor={Colors.dark.textMuted} value={formName} onChangeText={setFormName} />
-              <TextInput style={styles.input} placeholder="Descrizione" placeholderTextColor={Colors.dark.textMuted} value={formDescription} onChangeText={setFormDescription} multiline />
+              <TextInput style={styles.input} placeholder="Nome *" placeholderTextColor={Colors.textSecondary} value={formName} onChangeText={setFormName} />
+              <TextInput style={styles.input} placeholder="Descrizione" placeholderTextColor={Colors.textSecondary} value={formDescription} onChangeText={setFormDescription} multiline />
               <View style={styles.row}>
-                <TextInput style={[styles.input, styles.halfInput]} placeholder="Latitudine *" placeholderTextColor={Colors.dark.textMuted} value={formLat} onChangeText={setFormLat} keyboardType="decimal-pad" />
-                <TextInput style={[styles.input, styles.halfInput]} placeholder="Longitudine *" placeholderTextColor={Colors.dark.textMuted} value={formLng} onChangeText={setFormLng} keyboardType="decimal-pad" />
+                <TextInput style={[styles.input, styles.halfInput]} placeholder="Latitudine *" placeholderTextColor={Colors.textSecondary} value={formLat} onChangeText={setFormLat} keyboardType="decimal-pad" />
+                <TextInput style={[styles.input, styles.halfInput]} placeholder="Longitudine *" placeholderTextColor={Colors.textSecondary} value={formLng} onChangeText={setFormLng} keyboardType="decimal-pad" />
               </View>
               <View style={styles.row}>
-                <TextInput style={[styles.input, styles.halfInput]} placeholder="Raggio (m)" placeholderTextColor={Colors.dark.textMuted} value={formRadius} onChangeText={setFormRadius} keyboardType="numeric" />
-                <TextInput style={[styles.input, styles.halfInput]} placeholder="Punti" placeholderTextColor={Colors.dark.textMuted} value={formPoints} onChangeText={setFormPoints} keyboardType="numeric" />
+                <TextInput style={[styles.input, styles.halfInput]} placeholder="Raggio (m)" placeholderTextColor={Colors.textSecondary} value={formRadius} onChangeText={setFormRadius} keyboardType="numeric" />
+                <TextInput style={[styles.input, styles.halfInput]} placeholder="Punti" placeholderTextColor={Colors.textSecondary} value={formPoints} onChangeText={setFormPoints} keyboardType="numeric" />
               </View>
               <TouchableOpacity
                 style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
@@ -152,35 +152,35 @@ export default function AdminEasterEggs() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.dark.background },
+  container: { flex: 1, backgroundColor: Colors.background },
   card: {
-    backgroundColor: Colors.dark.surface, borderRadius: 12, padding: 16, marginBottom: 12,
-    flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: Colors.dark.border,
+    backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 12,
+    flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: Colors.border,
   },
   info: { flex: 1 },
-  name: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.dark.text },
-  detail: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.dark.textSecondary, marginTop: 2 },
-  coords: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.dark.textMuted, marginTop: 4 },
+  name: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.text },
+  detail: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  coords: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 4 },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, alignSelf: "flex-start", marginTop: 6 },
   badgeText: { fontFamily: "Inter_500Medium", fontSize: 11 },
   actions: { flexDirection: "row", gap: 12 },
-  emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.dark.textSecondary, textAlign: "center", marginTop: 40 },
+  emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", marginTop: 40 },
   fab: {
     position: "absolute", bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28,
-    backgroundColor: Colors.dark.accent, alignItems: "center", justifyContent: "center",
+    backgroundColor: Colors.accent, alignItems: "center", justifyContent: "center",
     shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5,
   },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
-  modalContent: { backgroundColor: Colors.dark.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "80%" },
+  modalContent: { backgroundColor: Colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "80%" },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
-  modalTitle: { fontFamily: "Inter_600SemiBold", fontSize: 18, color: Colors.dark.text },
+  modalTitle: { fontFamily: "Inter_600SemiBold", fontSize: 18, color: Colors.text },
   input: {
-    backgroundColor: Colors.dark.background, borderRadius: 12, padding: 14, marginBottom: 12,
-    fontFamily: "Inter_400Regular", fontSize: 15, color: Colors.dark.text, borderWidth: 1, borderColor: Colors.dark.border,
+    backgroundColor: Colors.background, borderRadius: 12, padding: 14, marginBottom: 12,
+    fontFamily: "Inter_400Regular", fontSize: 15, color: Colors.text, borderWidth: 1, borderColor: Colors.border,
   },
   row: { flexDirection: "row", gap: 12 },
   halfInput: { flex: 1 },
-  submitBtn: { backgroundColor: Colors.dark.accent, borderRadius: 12, padding: 16, alignItems: "center", marginTop: 8 },
+  submitBtn: { backgroundColor: Colors.accent, borderRadius: 12, padding: 16, alignItems: "center", marginTop: 8 },
   submitBtnDisabled: { opacity: 0.5 },
-  submitBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.dark.background },
+  submitBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.background },
 });

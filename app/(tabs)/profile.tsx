@@ -9,16 +9,17 @@ import {
   Image,
   Alert,
   ActivityIndicator,
-  FlatList,
   Dimensions,
   RefreshControl,
+  Pressable,
+  Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { MaterialCommunityIcons, Feather, Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
@@ -62,17 +63,19 @@ interface ProfileData {
   }>;
 }
 
-function getUserTypeColor(userType: string): string {
-  switch (userType) {
-    case "biker":
-      return Colors.dark.bikerColor;
-    case "zavorrina":
-      return Colors.dark.zavorrinaColor;
-    case "coppia":
-      return Colors.dark.coppiaColor;
-    default:
-      return Colors.dark.accent;
+function getUserTypeColor(userType: string, sex?: string, coupleSexConfig?: string): string {
+  if (userType === "coppia") {
+    if (coupleSexConfig === "mm") return Colors.maleIcon;
+    if (coupleSexConfig === "ff") return Colors.femaleIcon;
+    return Colors.accent;
   }
+  return sex === "male" ? Colors.maleIcon : Colors.femaleIcon;
+}
+
+function getUserTypeIcon(userType: string): keyof typeof Ionicons.glyphMap {
+  if (userType === "coppia") return "people";
+  if (userType === "zavorrina") return "person";
+  return "bicycle";
 }
 
 function getUserTypeLabel(userType: string): string {
@@ -80,7 +83,7 @@ function getUserTypeLabel(userType: string): string {
     case "biker":
       return "Biker";
     case "zavorrina":
-      return "Zavorrina";
+      return "Zavorrina/o";
     case "coppia":
       return "Coppia";
     default:
@@ -92,6 +95,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, logoutMutation } = useAuth();
   const router = useRouter();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -99,7 +103,10 @@ export default function ProfileScreen() {
   });
 
   const profile = profileQuery.data;
-  const typeColor = getUserTypeColor(profile?.userType ?? user?.userType ?? "biker");
+  const currentUserType = profile?.userType ?? user?.userType ?? "biker";
+  const currentSex = profile?.sex ?? (user as any)?.sex;
+  const currentCoupleSexConfig = profile?.coupleSexConfig ?? (user as any)?.coupleSexConfig;
+  const typeColor = getUserTypeColor(currentUserType, currentSex, currentCoupleSexConfig);
 
   const uploadAvatarMutation = useMutation({
     mutationFn: async (uri: string) => {
@@ -182,15 +189,23 @@ export default function ProfileScreen() {
     ]);
   }, []);
 
+  const doLogout = async () => {
+    logoutMutation.mutate();
+  };
+
   const handleLogout = useCallback(() => {
-    Alert.alert(t("auth.logout"), "Sei sicuro di voler uscire?", [
-      { text: t("common.cancel"), style: "cancel" },
-      {
-        text: t("auth.logout"),
-        style: "destructive",
-        onPress: () => logoutMutation.mutate(),
-      },
-    ]);
+    if (Platform.OS === "web") {
+      setShowLogoutModal(true);
+    } else {
+      Alert.alert("Logout", "Sei sicuro di voler uscire?", [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Esci",
+          style: "destructive",
+          onPress: doLogout,
+        },
+      ]);
+    }
   }, []);
 
   const avatarSource = profile?.avatarUrl
@@ -202,78 +217,71 @@ export default function ProfileScreen() {
   const totalRides = profile?.profile?.totalRides ?? 0;
   const totalKm = profile?.profile?.totalKm ?? 0;
   const easterEggs = profile?.profile?.easterEggsCollected ?? 0;
-  const isZavorrina = (profile?.userType ?? user?.userType) === "zavorrina";
-  const isBikerOrCoppia = (profile?.userType ?? user?.userType) === "biker" || (profile?.userType ?? user?.userType) === "coppia";
+  const isZavorrina = currentUserType === "zavorrina";
+  const isBikerOrCoppia = currentUserType === "biker" || currentUserType === "coppia";
+
+  const MenuItem = ({ icon, label, onPress, color }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; color?: string }) => (
+    <Pressable style={styles.menuItem} onPress={onPress}>
+      <Ionicons name={icon} size={22} color={color || Colors.text} />
+      <Text style={[styles.menuLabel, color ? { color } : {}]}>{label}</Text>
+      <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
+    </Pressable>
+  );
 
   return (
-    <View
+    <ScrollView
       style={[
         styles.container,
         { paddingTop: Platform.OS === "web" ? 67 : insets.top },
       ]}
+      contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16 }}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={profileQuery.isRefetching}
+          onRefresh={() => profileQuery.refetch()}
+          tintColor={Colors.accent}
+        />
+      }
     >
-      <View style={styles.header}>
-        <View style={{ width: 40 }} />
-        <Text style={styles.headerTitle}>{t("profile.title")}</Text>
-        <TouchableOpacity
-          onPress={() => router.push("/profile/edit" as any)}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Feather name="edit-2" size={22} color={Colors.dark.accent} />
+      <View style={styles.profileHeader}>
+        <TouchableOpacity onPress={pickImage} activeOpacity={0.8}>
+          <View style={[styles.avatar, { borderColor: typeColor }]}>
+            {avatarSource ? (
+              <Image source={avatarSource} style={styles.avatarImage} />
+            ) : (
+              <Ionicons name={getUserTypeIcon(currentUserType)} size={48} color={typeColor} />
+            )}
+          </View>
         </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={profileQuery.isRefetching}
-            onRefresh={() => profileQuery.refetch()}
-            tintColor={Colors.dark.accent}
+        {uploadAvatarMutation.isPending && (
+          <ActivityIndicator
+            size="small"
+            color={Colors.accent}
+            style={{ marginTop: 8 }}
           />
-        }
-      >
-        <View style={styles.avatarContainer}>
-          <TouchableOpacity onPress={pickImage} activeOpacity={0.8}>
-            <View style={[styles.avatarCircle, { borderColor: typeColor }]}>
-              {avatarSource ? (
-                <Image source={avatarSource} style={styles.avatarImage} />
-              ) : (
-                <MaterialCommunityIcons
-                  name="account"
-                  size={48}
-                  color={Colors.dark.textMuted}
-                />
-              )}
-              <View style={[styles.cameraBadge, { backgroundColor: typeColor }]}>
-                <Feather name="camera" size={14} color="#FFFFFF" />
-              </View>
-            </View>
-          </TouchableOpacity>
-          {uploadAvatarMutation.isPending && (
-            <ActivityIndicator
-              size="small"
-              color={Colors.dark.accent}
-              style={{ marginTop: 8 }}
-            />
-          )}
-          <Text style={styles.nickname}>
-            {profile?.nickname ?? user?.nickname ?? ""}
-          </Text>
-          <View style={[styles.typeBadge, { backgroundColor: typeColor + "22" }]}>
-            <Text style={[styles.typeLabel, { color: typeColor }]}>
-              {getUserTypeLabel(profile?.userType ?? user?.userType ?? "")}
+        )}
+        <Text style={styles.nickname}>
+          {profile?.nickname ?? user?.nickname ?? ""}
+        </Text>
+        <View style={styles.badges}>
+          <View style={[styles.badge, { backgroundColor: typeColor + "20" }]}>
+            <Text style={[styles.badgeText, { color: typeColor }]}>
+              {getUserTypeLabel(currentUserType)}
             </Text>
           </View>
           {profile?.region && (
-            <View style={styles.regionRow}>
-              <Ionicons name="location-outline" size={14} color={Colors.dark.textSecondary} />
-              <Text style={styles.regionText}>{profile.region}</Text>
+            <View style={styles.badge}>
+              <View style={styles.regionBadge}>
+                <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
+                <Text style={styles.badgeText}>{profile.region}</Text>
+              </View>
             </View>
           )}
         </View>
+      </View>
 
+      <View style={styles.section}>
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{totalRides}</Text>
@@ -292,197 +300,200 @@ export default function ProfileScreen() {
             <Text style={styles.statLabel}>{t("profile.easterEggs")}</Text>
           </View>
         </View>
+      </View>
 
-        {profile?.profile?.bio ? (
-          <View style={styles.bioSection}>
+      {profile?.profile?.bio ? (
+        <View style={styles.section}>
+          <View style={styles.bioCard}>
             <Text style={styles.bioText}>{profile.profile.bio}</Text>
           </View>
-        ) : null}
+        </View>
+      ) : null}
 
-        {isBikerOrCoppia && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{t("profile.motorcycles")}</Text>
-              <TouchableOpacity
-                onPress={() => router.push("/profile/edit?addMoto=true" as any)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons name="add-circle-outline" size={24} color={Colors.dark.accent} />
-              </TouchableOpacity>
-            </View>
-            {profile?.motorcycles && profile.motorcycles.length > 0 ? (
-              profile.motorcycles.map((moto) => (
-                <View key={moto.id} style={styles.motoCard}>
-                  <View style={styles.motoIconContainer}>
-                    <MaterialCommunityIcons
-                      name="motorbike"
-                      size={28}
-                      color={Colors.dark.accent}
-                    />
-                  </View>
-                  <View style={styles.motoInfo}>
-                    <Text style={styles.motoName}>
-                      {moto.brand} {moto.model}
-                    </Text>
-                    <View style={styles.motoDetails}>
-                      {moto.year && (
-                        <Text style={styles.motoDetail}>{moto.year}</Text>
-                      )}
-                      {moto.displacement && (
-                        <Text style={styles.motoDetail}>{moto.displacement}cc</Text>
-                      )}
-                      {moto.motorcycleType && (
-                        <View style={styles.motoTag}>
-                          <Text style={styles.motoTagText}>{moto.motorcycleType}</Text>
-                        </View>
-                      )}
-                    </View>
-                    {moto.ridingStyle && (
-                      <Text style={styles.motoRidingStyle}>{moto.ridingStyle}</Text>
+      {isBikerOrCoppia && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{t("profile.motorcycles")}</Text>
+            <TouchableOpacity
+              onPress={() => router.push("/profile/edit?addMoto=true" as any)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="add-circle-outline" size={24} color={Colors.accent} />
+            </TouchableOpacity>
+          </View>
+          {profile?.motorcycles && profile.motorcycles.length > 0 ? (
+            profile.motorcycles.map((moto) => (
+              <View key={moto.id} style={styles.motoCard}>
+                <View style={styles.motoIconContainer}>
+                  <Ionicons name="bicycle" size={28} color={Colors.accent} />
+                </View>
+                <View style={styles.motoInfo}>
+                  <Text style={styles.motoName}>
+                    {moto.brand} {moto.model}
+                  </Text>
+                  <View style={styles.motoDetails}>
+                    {moto.year && (
+                      <Text style={styles.motoDetail}>{moto.year}</Text>
+                    )}
+                    {moto.displacement && (
+                      <Text style={styles.motoDetail}>{moto.displacement}cc</Text>
+                    )}
+                    {moto.motorcycleType && (
+                      <View style={styles.motoTag}>
+                        <Text style={styles.motoTagText}>{moto.motorcycleType}</Text>
+                      </View>
                     )}
                   </View>
-                  <TouchableOpacity
-                    onPress={() => handleDeleteMoto(moto.id)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Feather name="trash-2" size={18} color={Colors.dark.error} />
-                  </TouchableOpacity>
+                  {moto.ridingStyle && (
+                    <Text style={styles.motoRidingStyle}>{moto.ridingStyle}</Text>
+                  )}
                 </View>
-              ))
-            ) : (
-              <View style={styles.emptySection}>
-                <MaterialCommunityIcons
-                  name="motorbike"
-                  size={32}
-                  color={Colors.dark.textMuted}
-                />
-                <Text style={styles.emptyText}>{t("profile.addMoto")}</Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {isZavorrina && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{t("profile.photos")}</Text>
-              {(profile?.photos?.length ?? 0) < 3 && (
                 <TouchableOpacity
-                  onPress={pickImage}
+                  onPress={() => handleDeleteMoto(moto.id)}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Ionicons name="add-circle-outline" size={24} color={Colors.dark.accent} />
+                  <Ionicons name="trash-outline" size={18} color={Colors.error} />
+                </TouchableOpacity>
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptySection}>
+              <Ionicons name="bicycle" size={32} color={Colors.textSecondary} />
+              <Text style={styles.emptyText}>{t("profile.addMoto")}</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {isZavorrina && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{t("profile.photos")}</Text>
+            {(profile?.photos?.length ?? 0) < 3 && (
+              <TouchableOpacity
+                onPress={pickImage}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="add-circle-outline" size={24} color={Colors.accent} />
+              </TouchableOpacity>
+            )}
+          </View>
+          {profile?.photos && profile.photos.length > 0 ? (
+            <View style={styles.photoGrid}>
+              {profile.photos.map((photo) => {
+                const photoUri = photo.photoUrl.startsWith("http")
+                  ? photo.photoUrl
+                  : `${getApiUrl()}${photo.photoUrl}`;
+                return (
+                  <View key={photo.id} style={styles.photoItem}>
+                    <Image source={{ uri: photoUri }} style={styles.photoImage} />
+                    <TouchableOpacity
+                      style={styles.photoDeleteBtn}
+                      onPress={() => handleDeletePhoto(photo.id)}
+                    >
+                      <Ionicons name="close" size={14} color="#FFFFFF" />
+                    </TouchableOpacity>
+                    {!photo.isApproved && (
+                      <View style={styles.pendingBadge}>
+                        <Text style={styles.pendingText}>In attesa</Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+              {profile.photos.length < 3 && (
+                <TouchableOpacity
+                  style={styles.addPhotoSlot}
+                  onPress={pickImage}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="add" size={32} color={Colors.textSecondary} />
+                  <Text style={styles.addPhotoText}>
+                    {3 - profile.photos.length} rimaste
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
-            {profile?.photos && profile.photos.length > 0 ? (
-              <View style={styles.photoGrid}>
-                {profile.photos.map((photo) => {
-                  const photoUri = photo.photoUrl.startsWith("http")
-                    ? photo.photoUrl
-                    : `${getApiUrl()}${photo.photoUrl}`;
-                  return (
-                    <View key={photo.id} style={styles.photoItem}>
-                      <Image source={{ uri: photoUri }} style={styles.photoImage} />
-                      <TouchableOpacity
-                        style={styles.photoDeleteBtn}
-                        onPress={() => handleDeletePhoto(photo.id)}
-                      >
-                        <Feather name="x" size={14} color="#FFFFFF" />
-                      </TouchableOpacity>
-                      {!photo.isApproved && (
-                        <View style={styles.pendingBadge}>
-                          <Text style={styles.pendingText}>In attesa</Text>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
-                {profile.photos.length < 3 && (
-                  <TouchableOpacity
-                    style={styles.addPhotoSlot}
-                    onPress={pickImage}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="add" size={32} color={Colors.dark.textMuted} />
-                    <Text style={styles.addPhotoText}>
-                      {3 - profile.photos.length} rimaste
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.emptySection}
-                onPress={pickImage}
-                activeOpacity={0.7}
-              >
-                <Feather name="image" size={32} color={Colors.dark.textMuted} />
-                <Text style={styles.emptyText}>{t("profile.addPhoto")}</Text>
-                <Text style={styles.emptySubtext}>Max 3 foto</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.emptySection}
+              onPress={pickImage}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="image-outline" size={32} color={Colors.textSecondary} />
+              <Text style={styles.emptyText}>{t("profile.addPhoto")}</Text>
+              <Text style={styles.emptySubtext}>Max 3 foto</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Info</Text>
+        <View style={styles.infoCard}>
+          <InfoRow
+            icon="mail-outline"
+            label="Email"
+            value={profile?.email ?? user?.email ?? ""}
+          />
+          {(profile?.phone || user?.phone) && (
+            <InfoRow
+              icon="call-outline"
+              label={t("auth.phone")}
+              value={profile?.phone ?? user?.phone ?? ""}
+            />
+          )}
+          {(profile?.birthYear || user?.birthYear) && (
+            <InfoRow
+              icon="calendar-outline"
+              label={t("auth.birthYear")}
+              value={String(profile?.birthYear ?? user?.birthYear ?? "")}
+            />
+          )}
+          {profile?.coupleSexConfig && (
+            <InfoRow
+              icon="people-outline"
+              label={t("register.step2.coupleConfig")}
+              value={profile.coupleSexConfig}
+            />
+          )}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Menu</Text>
+        <MenuItem icon="create" label="Modifica Profilo" onPress={() => router.push("/profile/edit" as any)} />
+        <MenuItem icon="chatbox-ellipses" label={t("feedback.title")} onPress={() => router.push("/feedback" as any)} color={Colors.warning} />
+
+        {(profile?.role === "admin" || (user as any)?.role === "admin") && (
+          <MenuItem icon="shield" label="Pannello Admin" onPress={() => router.push("/admin" as any)} color={Colors.accent} />
+        )}
+        {((profile?.role === "moderator" || (user as any)?.role === "moderator") || (profile?.role === "admin" || (user as any)?.role === "admin")) && (
+          <MenuItem icon="eye" label="Pannello Moderatore" onPress={() => router.push("/moderator" as any)} color={Colors.warning} />
         )}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Info</Text>
-          <View style={styles.infoCard}>
-            <InfoRow
-              icon="mail"
-              label="Email"
-              value={profile?.email ?? user?.email ?? ""}
-            />
-            {(profile?.phone || user?.phone) && (
-              <InfoRow
-                icon="phone"
-                label={t("auth.phone")}
-                value={profile?.phone ?? user?.phone ?? ""}
-              />
-            )}
-            {(profile?.birthYear || user?.birthYear) && (
-              <InfoRow
-                icon="calendar"
-                label={t("auth.birthYear")}
-                value={String(profile?.birthYear ?? user?.birthYear ?? "")}
-              />
-            )}
-            {profile?.coupleSexConfig && (
-              <InfoRow
-                icon="users"
-                label={t("register.step2.coupleConfig")}
-                value={profile.coupleSexConfig}
-              />
-            )}
+        <MenuItem icon="log-out" label="Logout" onPress={handleLogout} color={Colors.accentRed} />
+      </View>
+
+      <Modal visible={showLogoutModal} transparent animationType="fade" onRequestClose={() => setShowLogoutModal(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setShowLogoutModal(false)}>
+          <View style={styles.modalContent}>
+            <Ionicons name="log-out" size={32} color={Colors.accentRed} />
+            <Text style={styles.modalTitle}>Sei sicuro di voler uscire?</Text>
+            <View style={styles.modalButtons}>
+              <Pressable style={styles.modalBtnCancel} onPress={() => setShowLogoutModal(false)}>
+                <Text style={styles.modalBtnCancelText}>Annulla</Text>
+              </Pressable>
+              <Pressable style={styles.modalBtnConfirm} onPress={() => { setShowLogoutModal(false); doLogout(); }}>
+                <Text style={styles.modalBtnConfirmText}>Esci</Text>
+              </Pressable>
+            </View>
           </View>
-        </View>
+        </Pressable>
+      </Modal>
 
-        <TouchableOpacity
-          style={styles.feedbackButton}
-          onPress={() => router.push("/feedback" as any)}
-          activeOpacity={0.7}
-        >
-          <Feather name="message-circle" size={20} color={Colors.dark.accent} />
-          <Text style={styles.feedbackText}>{t("feedback.title")}</Text>
-          <Feather name="chevron-right" size={18} color={Colors.dark.textMuted} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={handleLogout}
-          activeOpacity={0.7}
-        >
-          <MaterialCommunityIcons
-            name="logout"
-            size={20}
-            color={Colors.dark.error}
-          />
-          <Text style={styles.logoutText}>{t("auth.logout")}</Text>
-        </TouchableOpacity>
-
-        <View style={{ height: 40 }} />
-      </ScrollView>
-    </View>
+      <View style={{ height: 40 }} />
+    </ScrollView>
   );
 }
 
@@ -491,13 +502,13 @@ function InfoRow({
   label,
   value,
 }: {
-  icon: string;
+  icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
 }) {
   return (
     <View style={styles.infoRow}>
-      <Feather name={icon as any} size={16} color={Colors.dark.textMuted} />
+      <Ionicons name={icon} size={16} color={Colors.textSecondary} />
       <Text style={styles.infoLabel}>{label}</Text>
       <Text style={styles.infoValue} numberOfLines={1}>
         {value}
@@ -512,37 +523,21 @@ const photoSize = (screenWidth - 32 - 16) / 3;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
   },
-  header: {
-    flexDirection: "row",
+  profileHeader: {
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    padding: 24,
+    paddingTop: 12,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700" as const,
-    color: Colors.dark.text,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 100,
-  },
-  avatarContainer: {
-    alignItems: "center",
-    paddingVertical: 16,
-    gap: 6,
-  },
-  avatarCircle: {
+  avatar: {
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: Colors.dark.surface,
+    borderWidth: 3,
+    backgroundColor: Colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 3,
     overflow: "hidden",
   },
   avatarImage: {
@@ -550,86 +545,36 @@ const styles = StyleSheet.create({
     height: 96,
     borderRadius: 48,
   },
-  cameraBadge: {
-    position: "absolute",
-    bottom: 2,
-    right: 2,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: Colors.dark.background,
-  },
   nickname: {
     fontSize: 24,
-    fontWeight: "700" as const,
-    color: Colors.dark.text,
-    marginTop: 4,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+    marginTop: 12,
   },
-  typeBadge: {
-    paddingHorizontal: 14,
+  badges: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 8,
+  },
+  badge: {
+    backgroundColor: Colors.surface,
     paddingVertical: 4,
+    paddingHorizontal: 12,
     borderRadius: 12,
   },
-  typeLabel: {
+  badgeText: {
     fontSize: 13,
-    fontWeight: "700" as const,
-    textTransform: "uppercase" as const,
-    letterSpacing: 1,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
   },
-  regionRow: {
+  regionBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    marginTop: 2,
-  },
-  regionText: {
-    fontSize: 13,
-    color: Colors.dark.textSecondary,
-  },
-  statsRow: {
-    flexDirection: "row",
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 16,
-    paddingVertical: 18,
-    marginBottom: 20,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: "center",
-    gap: 4,
-  },
-  statValue: {
-    fontSize: 22,
-    fontWeight: "700" as const,
-    color: Colors.dark.text,
-  },
-  statLabel: {
-    fontSize: 11,
-    color: Colors.dark.textSecondary,
-    textTransform: "uppercase" as const,
-    letterSpacing: 0.5,
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: Colors.dark.border,
-  },
-  bioSection: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 20,
-  },
-  bioText: {
-    fontSize: 14,
-    color: Colors.dark.textSecondary,
-    lineHeight: 20,
   },
   section: {
-    marginBottom: 20,
+    paddingHorizontal: 16,
+    marginTop: 8,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -638,30 +583,87 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 17,
-    fontWeight: "700" as const,
-    color: Colors.dark.text,
+    fontSize: 18,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+    marginBottom: 12,
+  },
+  statsRow: {
+    flexDirection: "row",
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    paddingVertical: 18,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: "center",
+    gap: 4,
+  },
+  statValue: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+  },
+  statLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.5,
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: Colors.border,
+  },
+  bioCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  bioText: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+    lineHeight: 20,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+  },
+  menuLabel: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: "Inter_500Medium",
+    color: Colors.text,
   },
   emptySection: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     paddingVertical: 32,
     alignItems: "center",
     gap: 8,
   },
   emptyText: {
-    color: Colors.dark.textMuted,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
     fontSize: 14,
   },
   emptySubtext: {
-    color: Colors.dark.textMuted,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
     fontSize: 12,
   },
   motoCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 14,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
     padding: 14,
     marginBottom: 8,
   },
@@ -669,7 +671,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: Colors.dark.accent + "18",
+    backgroundColor: Colors.accent + "18",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
@@ -679,8 +681,8 @@ const styles = StyleSheet.create({
   },
   motoName: {
     fontSize: 16,
-    fontWeight: "600" as const,
-    color: Colors.dark.text,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
   },
   motoDetails: {
     flexDirection: "row",
@@ -690,22 +692,24 @@ const styles = StyleSheet.create({
   },
   motoDetail: {
     fontSize: 13,
-    color: Colors.dark.textSecondary,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
   },
   motoTag: {
-    backgroundColor: Colors.dark.accent + "22",
+    backgroundColor: Colors.accent + "22",
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
   },
   motoTagText: {
     fontSize: 11,
-    color: Colors.dark.accent,
-    fontWeight: "600" as const,
+    color: Colors.accent,
+    fontFamily: "Inter_600SemiBold",
   },
   motoRidingStyle: {
     fontSize: 12,
-    color: Colors.dark.textMuted,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
     marginTop: 2,
     fontStyle: "italic" as const,
   },
@@ -746,15 +750,15 @@ const styles = StyleSheet.create({
   },
   pendingText: {
     fontSize: 10,
-    color: Colors.dark.warning,
-    fontWeight: "600" as const,
+    color: Colors.warning,
+    fontFamily: "Inter_600SemiBold",
   },
   addPhotoSlot: {
     width: photoSize,
     height: photoSize,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
     borderStyle: "dashed",
     alignItems: "center",
     justifyContent: "center",
@@ -762,11 +766,12 @@ const styles = StyleSheet.create({
   },
   addPhotoText: {
     fontSize: 11,
-    color: Colors.dark.textMuted,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
   },
   infoCard: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 14,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
     paddingVertical: 4,
     paddingHorizontal: 16,
   },
@@ -775,48 +780,69 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border + "44",
+    borderBottomColor: Colors.border + "44",
     gap: 10,
   },
   infoLabel: {
     fontSize: 13,
-    color: Colors.dark.textMuted,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
     width: 80,
   },
   infoValue: {
     flex: 1,
     fontSize: 14,
-    color: Colors.dark.text,
+    fontFamily: "Inter_500Medium",
+    color: Colors.text,
     textAlign: "right",
   },
-  feedbackButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-    gap: 10,
-  },
-  feedbackText: {
+  modalOverlay: {
     flex: 1,
-    color: Colors.dark.text,
-    fontSize: 15,
-    fontWeight: "500" as const,
-  },
-  logoutButton: {
-    flexDirection: "row",
-    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.6)",
     justifyContent: "center",
-    gap: 8,
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    paddingVertical: 14,
+    alignItems: "center",
   },
-  logoutText: {
-    color: Colors.dark.error,
+  modalContent: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: "center",
+    width: 300,
+    gap: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+    textAlign: "center",
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: 12,
+    width: "100%",
+  },
+  modalBtnCancel: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    borderRadius: 10,
+    padding: 12,
+    alignItems: "center",
+  },
+  modalBtnCancelText: {
     fontSize: 16,
-    fontWeight: "600" as const,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary,
+  },
+  modalBtnConfirm: {
+    flex: 1,
+    backgroundColor: Colors.accentRed,
+    borderRadius: 10,
+    padding: 12,
+    alignItems: "center",
+  },
+  modalBtnConfirmText: {
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
   },
 });

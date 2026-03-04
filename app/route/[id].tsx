@@ -14,7 +14,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import RouteMap from "@/components/RouteMap";
 import { apiRequest, getQueryFn } from "@/lib/query-client";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 
 interface RouteDetail {
@@ -84,7 +84,7 @@ export default function RouteDetailScreen() {
   if (isLoading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={Colors.dark.accent} />
+        <ActivityIndicator size="large" color={Colors.accent} />
       </View>
     );
   }
@@ -95,7 +95,7 @@ export default function RouteDetailScreen() {
         <MaterialCommunityIcons
           name="map-marker-off"
           size={64}
-          color={Colors.dark.textMuted}
+          color={Colors.textSecondary}
         />
         <Text style={styles.emptyText}>Percorso non trovato</Text>
       </View>
@@ -136,8 +136,8 @@ export default function RouteDetailScreen() {
               {
                 backgroundColor:
                   route.status === "completed"
-                    ? Colors.dark.success
-                    : Colors.dark.warning,
+                    ? Colors.success
+                    : Colors.warning,
               },
             ]}
           >
@@ -191,7 +191,7 @@ export default function RouteDetailScreen() {
           <MaterialCommunityIcons
             name="heart"
             size={22}
-            color={Colors.dark.rosa}
+            color={Colors.femaleIcon}
           />
           <Text style={styles.likeText}>{route.likes}</Text>
         </TouchableOpacity>
@@ -214,7 +214,7 @@ function StatCard({
       <MaterialCommunityIcons
         name={icon as any}
         size={22}
-        color={Colors.dark.accent}
+        color={Colors.accent}
       />
       <Text style={styles.statLabel}>{label}</Text>
       <Text style={styles.statValue}>{value}</Text>
@@ -225,16 +225,16 @@ function StatCard({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
   },
   center: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
     justifyContent: "center",
     alignItems: "center",
   },
   emptyText: {
-    color: Colors.dark.textMuted,
+    color: Colors.textSecondary,
     fontSize: 16,
     marginTop: 12,
   },
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   title: {
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 22,
     fontWeight: "700" as const,
   },
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
     fontWeight: "600" as const,
   },
   dateText: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 13,
   },
   statsGrid: {
@@ -282,20 +282,20 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: "31%" as any,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 14,
     padding: 14,
     alignItems: "center",
     marginBottom: 4,
   },
   statLabel: {
-    color: Colors.dark.textMuted,
+    color: Colors.textSecondary,
     fontSize: 11,
     marginTop: 6,
     textAlign: "center",
   },
   statValue: {
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 16,
     fontWeight: "700" as const,
     marginTop: 2,
@@ -308,14 +308,14 @@ const styles = StyleSheet.create({
   likeButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 20,
     gap: 8,
   },
   likeText: {
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 16,
     fontWeight: "600" as const,
   },

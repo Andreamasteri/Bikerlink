@@ -14,7 +14,7 @@ import {
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 
@@ -66,7 +66,7 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.logoContainer}>
-          <Ionicons name="bicycle" size={64} color={Colors.dark.accent} />
+          <Ionicons name="bicycle" size={64} color={Colors.accent} />
           <Text style={styles.appName}>{t("app.name")}</Text>
           <Text style={styles.tagline}>{t("app.tagline")}</Text>
         </View>
@@ -74,17 +74,17 @@ export default function LoginScreen() {
         <View style={styles.formContainer}>
           {error ? (
             <View style={styles.errorBanner}>
-              <Ionicons name="alert-circle" size={18} color={Colors.dark.error} />
+              <Ionicons name="alert-circle" size={18} color={Colors.error} />
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
 
           <View style={styles.inputWrapper}>
-            <Ionicons name="person-outline" size={20} color={Colors.dark.textMuted} style={styles.inputIcon} />
+            <Ionicons name="person-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
               placeholder={t("auth.emailOrNickname")}
-              placeholderTextColor={Colors.dark.textMuted}
+              placeholderTextColor={Colors.textSecondary}
               value={identifier}
               onChangeText={setIdentifier}
               autoCapitalize="none"
@@ -95,11 +95,11 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.inputWrapper}>
-            <Ionicons name="lock-closed-outline" size={20} color={Colors.dark.textMuted} style={styles.inputIcon} />
+            <Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
             <TextInput
               style={[styles.input, styles.passwordInput]}
               placeholder={t("auth.password")}
-              placeholderTextColor={Colors.dark.textMuted}
+              placeholderTextColor={Colors.textSecondary}
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
@@ -114,7 +114,7 @@ export default function LoginScreen() {
               <Ionicons
                 name={showPassword ? "eye-off-outline" : "eye-outline"}
                 size={22}
-                color={Colors.dark.textMuted}
+                color={Colors.textSecondary}
               />
             </TouchableOpacity>
           </View>
@@ -126,7 +126,7 @@ export default function LoginScreen() {
             testID="login-submit"
           >
             {loginMutation.isPending ? (
-              <ActivityIndicator color={Colors.dark.background} />
+              <ActivityIndicator color={Colors.background} />
             ) : (
               <Text style={styles.loginButtonText}>{t("auth.login")}</Text>
             )}
@@ -147,7 +147,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
   },
   container: {
     flexGrow: 1,
@@ -161,14 +161,14 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 36,
     fontWeight: "bold" as const,
-    color: Colors.dark.accent,
+    color: Colors.accent,
     marginTop: 12,
     letterSpacing: 2,
   },
   tagline: {
     fontSize: 15,
     fontStyle: "italic" as const,
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     marginTop: 6,
     fontWeight: "600" as const,
   },
@@ -185,17 +185,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   errorText: {
-    color: Colors.dark.error,
+    color: Colors.error,
     fontSize: 13,
     flex: 1,
   },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
     paddingHorizontal: 14,
     height: 52,
   },
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 15,
     height: "100%",
   },
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   loginButton: {
-    backgroundColor: Colors.dark.accent,
+    backgroundColor: Colors.accent,
     borderRadius: 12,
     height: 52,
     alignItems: "center",
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   loginButtonText: {
-    color: Colors.dark.background,
+    color: Colors.background,
     fontSize: 17,
     fontWeight: "700" as const,
     letterSpacing: 0.5,
@@ -242,11 +242,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   registerPrompt: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 14,
   },
   registerLink: {
-    color: Colors.dark.accent,
+    color: Colors.accent,
     fontSize: 14,
     fontWeight: "600" as const,
   },

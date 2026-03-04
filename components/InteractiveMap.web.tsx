@@ -7,7 +7,7 @@ import {
   ScrollView,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 
 interface MapUser {
@@ -51,13 +51,13 @@ interface InteractiveMapProps {
 function getUserMarkerColor(userType: string): string {
   switch (userType) {
     case "biker":
-      return Colors.dark.bikerColor;
+      return Colors.maleIcon;
     case "zavorrina":
-      return Colors.dark.zavorrinaColor;
+      return Colors.femaleIcon;
     case "coppia":
-      return Colors.dark.coppiaColor;
+      return Colors.accent;
     default:
-      return Colors.dark.accent;
+      return Colors.accent;
   }
 }
 
@@ -98,21 +98,21 @@ export default function InteractiveMap({
     <View style={styles.container}>
       <View style={styles.filterRow}>
         <TouchableOpacity
-          style={[styles.filterChip, filterBiker && { backgroundColor: Colors.dark.bikerColor }]}
+          style={[styles.filterChip, filterBiker && { backgroundColor: Colors.maleIcon }]}
           onPress={onToggleFilterBiker}
         >
           <MaterialCommunityIcons name="motorbike" size={16} color="#fff" />
           <Text style={styles.filterText}>Biker</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.filterChip, filterZavorrina && { backgroundColor: Colors.dark.zavorrinaColor }]}
+          style={[styles.filterChip, filterZavorrina && { backgroundColor: Colors.femaleIcon }]}
           onPress={onToggleFilterZavorrina}
         >
           <MaterialCommunityIcons name="seat-passenger" size={16} color="#fff" />
           <Text style={styles.filterText}>Zavorrine</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.filterChip, filterCoppia && { backgroundColor: Colors.dark.coppiaColor }]}
+          style={[styles.filterChip, filterCoppia && { backgroundColor: Colors.accent }]}
           onPress={onToggleFilterCoppia}
         >
           <MaterialCommunityIcons name="heart-multiple" size={16} color="#fff" />
@@ -121,7 +121,7 @@ export default function InteractiveMap({
       </View>
 
       <View style={styles.mapPlaceholder}>
-        <MaterialCommunityIcons name="map-outline" size={64} color={Colors.dark.textSecondary} />
+        <MaterialCommunityIcons name="map-outline" size={64} color={Colors.textSecondary} />
         <Text style={styles.mapPlaceholderText}>{t("map.title")}</Text>
         <Text style={styles.mapSubtext}>
           La mappa interattiva è disponibile su dispositivo mobile tramite Expo Go
@@ -175,7 +175,7 @@ export default function InteractiveMap({
             </Text>
             {easterEggs.map((e) => (
               <View key={e.id} style={styles.listItem}>
-                <View style={[styles.userDot, { backgroundColor: Colors.dark.accent }]}>
+                <View style={[styles.userDot, { backgroundColor: Colors.accent }]}>
                   <MaterialCommunityIcons name="egg-easter" size={14} color="#fff" />
                 </View>
                 <Text style={styles.listItemText}>{e.name}</Text>
@@ -203,7 +203,7 @@ export default function InteractiveMap({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.dark.background },
+  container: { flex: 1, backgroundColor: Colors.background },
   filterRow: {
     flexDirection: "row",
     paddingHorizontal: 16,
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
   },
   filterText: { color: "#fff", fontSize: 13, fontFamily: "Inter_500Medium" },
   mapPlaceholder: {
@@ -226,16 +226,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 40,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: Colors.border,
   },
   mapPlaceholderText: {
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 18,
     fontFamily: "Inter_600SemiBold",
     marginTop: 12,
   },
   mapSubtext: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 13,
     textAlign: "center",
     marginTop: 8,
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   listContainer: { flex: 1, paddingHorizontal: 16 },
   section: { marginTop: 16 },
   sectionTitle: {
-    color: Colors.dark.accent,
+    color: Colors.accent,
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
     marginBottom: 8,
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: Colors.border,
   },
   userDot: {
     width: 28,
@@ -264,8 +264,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  listItemText: { color: Colors.dark.text, fontSize: 14, fontFamily: "Inter_500Medium", flex: 1 },
-  listItemSub: { color: Colors.dark.textSecondary, fontSize: 12 },
+  listItemText: { color: Colors.text, fontSize: 14, fontFamily: "Inter_500Medium", flex: 1 },
+  listItemSub: { color: Colors.textSecondary, fontSize: 12 },
   availabilityBtn: {
     position: "absolute",
     bottom: 34 + 16,
@@ -273,16 +273,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
   },
   availabilityBtnActive: {
-    backgroundColor: Colors.dark.success,
-    borderColor: Colors.dark.success,
+    backgroundColor: Colors.success,
+    borderColor: Colors.success,
   },
   availabilityText: { color: "#fff", fontSize: 14, fontFamily: "Inter_500Medium" },
 });

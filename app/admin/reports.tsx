@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from "react
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
 interface Report {
@@ -53,10 +53,10 @@ export default function AdminReports() {
 
   function getStatusColor(status: string) {
     switch (status) {
-      case "pending": return Colors.dark.warning;
-      case "resolved": return Colors.dark.success;
-      case "dismissed": return Colors.dark.textMuted;
-      default: return Colors.dark.textSecondary;
+      case "pending": return Colors.warning;
+      case "resolved": return Colors.success;
+      case "dismissed": return Colors.textSecondary;
+      default: return Colors.textSecondary;
     }
   }
 
@@ -76,7 +76,7 @@ export default function AdminReports() {
         </View>
         {item.status === "pending" && (
           <TouchableOpacity onPress={() => handleResolve(item)}>
-            <MaterialIcons name="gavel" size={24} color={Colors.dark.accent} />
+            <MaterialIcons name="gavel" size={24} color={Colors.accent} />
           </TouchableOpacity>
         )}
       </View>
@@ -115,22 +115,22 @@ export default function AdminReports() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.dark.background },
+  container: { flex: 1, backgroundColor: Colors.background },
   filterRow: { flexDirection: "row", gap: 8, padding: 16, paddingBottom: 8 },
-  filterBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: Colors.dark.surface, borderWidth: 1, borderColor: Colors.dark.border },
-  filterBtnActive: { borderColor: Colors.dark.accent, backgroundColor: Colors.dark.accent + "22" },
-  filterText: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.dark.textSecondary },
-  filterTextActive: { color: Colors.dark.accent },
+  filterBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
+  filterBtnActive: { borderColor: Colors.accent, backgroundColor: Colors.accent + "22" },
+  filterText: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.textSecondary },
+  filterTextActive: { color: Colors.accent },
   card: {
-    backgroundColor: Colors.dark.surface, borderRadius: 12, padding: 16, marginBottom: 12,
-    flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: Colors.dark.border,
+    backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 12,
+    flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: Colors.border,
   },
   info: { flex: 1 },
-  reason: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.dark.text },
-  description: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.dark.textSecondary, marginTop: 4 },
-  meta: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.dark.textMuted, marginTop: 6 },
-  date: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.dark.textMuted, marginTop: 2 },
+  reason: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.text },
+  description: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, marginTop: 4 },
+  meta: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 6 },
+  date: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, alignSelf: "flex-start", marginTop: 6 },
   badgeText: { fontFamily: "Inter_500Medium", fontSize: 11 },
-  emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.dark.textSecondary, textAlign: "center", marginTop: 40 },
+  emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", marginTop: 40 },
 });

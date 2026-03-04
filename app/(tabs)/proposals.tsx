@@ -4,16 +4,16 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  TouchableOpacity,
+  Pressable,
   ActivityIndicator,
   RefreshControl,
   Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { queryClient } from "@/lib/query-client";
 
@@ -43,18 +43,18 @@ const FILTER_TYPES = [
   { key: "richiesta", label: "Richiesta" },
 ];
 
-function getTypeIcon(type: string): { name: string; color: string } {
+function getTypeIcon(type: string): { name: keyof typeof Ionicons.glyphMap; color: string } {
   switch (type) {
     case "giro":
-      return { name: "motorbike", color: Colors.dark.azzurro };
+      return { name: "bicycle", color: Colors.maleIcon };
     case "raduno":
-      return { name: "account-group", color: Colors.dark.accent };
+      return { name: "people", color: Colors.accent };
     case "con_zavorrina":
-      return { name: "seat-passenger", color: Colors.dark.rosa };
+      return { name: "person-add", color: Colors.femaleIcon };
     case "richiesta":
-      return { name: "hand-wave", color: Colors.dark.rosa };
+      return { name: "hand-left", color: Colors.femaleIcon };
     default:
-      return { name: "clipboard-text", color: Colors.dark.textSecondary };
+      return { name: "document-text", color: Colors.textSecondary };
   }
 }
 
@@ -81,29 +81,28 @@ function ProposalCard({ item, onPress }: { item: ProposalItem; onPress: () => vo
 
   const creatorColor =
     item.creatorUserType === "biker"
-      ? Colors.dark.bikerColor
+      ? Colors.maleIcon
       : item.creatorUserType === "zavorrina"
-      ? Colors.dark.zavorrinaColor
-      : Colors.dark.coppiaColor;
+      ? Colors.femaleIcon
+      : Colors.accent;
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
+    <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.cardHeader}>
-        <View style={[styles.typeBadge, { backgroundColor: typeInfo.color + "22" }]}>
-          <MaterialCommunityIcons
-            name={typeInfo.name as any}
-            size={18}
-            color={typeInfo.color}
-          />
-          <Text style={[styles.typeLabel, { color: typeInfo.color }]}>
+        <Ionicons
+          name={typeInfo.name}
+          size={24}
+          color={typeInfo.color}
+        />
+        <View style={styles.cardHeaderInfo}>
+          <Text style={styles.nickname}>{item.creatorNickname}</Text>
+          <Text style={styles.type}>{getTypeLabel(item.proposalType)}</Text>
+        </View>
+        <View style={[styles.badge, { backgroundColor: typeInfo.color + "30" }]}>
+          <Text style={[styles.badgeText, { color: typeInfo.color }]}>
             {getTypeLabel(item.proposalType)}
           </Text>
         </View>
-        {item.status !== "active" && (
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>{item.status}</Text>
-          </View>
-        )}
       </View>
 
       <Text style={styles.cardTitle} numberOfLines={2}>
@@ -111,46 +110,41 @@ function ProposalCard({ item, onPress }: { item: ProposalItem; onPress: () => vo
       </Text>
 
       {item.description && (
-        <Text style={styles.cardDesc} numberOfLines={2}>
+        <Text style={styles.description} numberOfLines={2}>
           {item.description}
         </Text>
       )}
 
-      <View style={styles.cardMeta}>
-        <View style={styles.metaRow}>
-          <Ionicons name="person" size={14} color={creatorColor} />
-          <Text style={[styles.metaText, { color: creatorColor }]}>
-            {item.creatorNickname}
+      {item.departureAddress && (
+        <View style={styles.infoRow}>
+          <Ionicons name="location" size={14} color={Colors.textSecondary} />
+          <Text style={styles.infoText} numberOfLines={1}>
+            {item.departureAddress}
           </Text>
         </View>
+      )}
 
-        {scheduledDate && (
-          <View style={styles.metaRow}>
-            <Ionicons name="calendar" size={14} color={Colors.dark.textSecondary} />
-            <Text style={styles.metaText}>{scheduledDate}</Text>
-          </View>
-        )}
-
-        {item.departureAddress && (
-          <View style={styles.metaRow}>
-            <Ionicons name="location" size={14} color={Colors.dark.textSecondary} />
-            <Text style={styles.metaText} numberOfLines={1}>
-              {item.departureAddress}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.cardFooter}>
-        <View style={styles.participantsRow}>
-          <Ionicons name="people" size={16} color={Colors.dark.accent} />
-          <Text style={styles.participantCount}>
-            {item.participantCount}
-            {item.maxParticipants ? `/${item.maxParticipants}` : ""}
-          </Text>
+      {scheduledDate && (
+        <View style={styles.infoRow}>
+          <Ionicons name="time" size={14} color={Colors.textSecondary} />
+          <Text style={styles.infoText}>{scheduledDate}</Text>
         </View>
+      )}
+
+      <View style={styles.infoRow}>
+        <Ionicons name="people" size={14} color={Colors.accent} />
+        <Text style={[styles.infoText, { color: Colors.accent }]}>
+          {item.participantCount}
+          {item.maxParticipants ? `/${item.maxParticipants}` : ""}
+        </Text>
       </View>
-    </TouchableOpacity>
+
+      {item.status !== "active" && (
+        <View style={[styles.badge, { backgroundColor: Colors.warning + "30", marginTop: 6, alignSelf: "flex-start" }]}>
+          <Text style={[styles.badgeText, { color: Colors.warning }]}>{item.status}</Text>
+        </View>
+      )}
+    </Pressable>
   );
 }
 
@@ -179,55 +173,36 @@ export default function ProposalsScreen() {
     [router]
   );
 
-  const webTopInset = Platform.OS === "web" ? 67 : 0;
-
   return (
-    <View style={[styles.container, { paddingTop: webTopInset }]}>
+    <View style={styles.container}>
       <View style={styles.filterRow}>
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={FILTER_TYPES}
-          keyExtractor={(item) => item.key}
-          contentContainerStyle={styles.filterList}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[
-                styles.filterChip,
-                activeFilter === item.key && styles.filterChipActive,
-              ]}
-              onPress={() => setActiveFilter(item.key)}
-            >
-              <Text
-                style={[
-                  styles.filterText,
-                  activeFilter === item.key && styles.filterTextActive,
-                ]}
-              >
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
+        {FILTER_TYPES.map((f) => (
+          <Pressable
+            key={f.key}
+            style={[styles.filterBtn, activeFilter === f.key && styles.filterBtnActive]}
+            onPress={() => setActiveFilter(f.key)}
+          >
+            <Text style={[styles.filterText, activeFilter === f.key && styles.filterTextActive]}>
+              {f.label}
+            </Text>
+          </Pressable>
+        ))}
       </View>
 
       {isLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={Colors.dark.accent} />
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={Colors.accent} />
         </View>
       ) : (
         <FlatList
           data={proposals ?? []}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={[
-            styles.listContent,
-            { paddingBottom: Platform.OS === "web" ? 34 : 100 },
-          ]}
+          contentContainerStyle={styles.list}
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
               onRefresh={refetch}
-              tintColor={Colors.dark.accent}
+              tintColor={Colors.accent}
             />
           }
           scrollEnabled={!!(proposals && proposals.length > 0)}
@@ -238,174 +213,60 @@ export default function ProposalsScreen() {
             />
           )}
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <MaterialCommunityIcons
-                name="clipboard-text-outline"
-                size={48}
-                color={Colors.dark.textMuted}
-              />
+            <View style={styles.empty}>
+              <Ionicons name="megaphone-outline" size={48} color={Colors.textSecondary} />
               <Text style={styles.emptyText}>{t("common.noResults")}</Text>
             </View>
           }
         />
       )}
 
-      <TouchableOpacity
-        style={[styles.fab, { bottom: Platform.OS === "web" ? 50 : 100 }]}
+      <Pressable
+        style={styles.fab}
         onPress={handleCreatePress}
-        activeOpacity={0.8}
       >
-        <Ionicons name="add" size={28} color="#000" />
-      </TouchableOpacity>
+        <Ionicons name="add" size={28} color={Colors.background} />
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-  },
-  filterRow: {
-    paddingVertical: 12,
-  },
-  filterList: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.dark.surface,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  filterChipActive: {
-    backgroundColor: Colors.dark.accent + "22",
-    borderColor: Colors.dark.accent,
-  },
-  filterText: {
-    color: Colors.dark.textSecondary,
-    fontSize: 14,
-    fontWeight: "500" as const,
-  },
-  filterTextActive: {
-    color: Colors.dark.accent,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  card: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  typeBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 6,
-  },
-  typeLabel: {
-    fontSize: 12,
-    fontWeight: "600" as const,
-  },
-  statusBadge: {
-    backgroundColor: Colors.dark.warning + "33",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  statusText: {
-    color: Colors.dark.warning,
-    fontSize: 11,
-    fontWeight: "600" as const,
-  },
-  cardTitle: {
-    color: Colors.dark.text,
-    fontSize: 17,
-    fontWeight: "700" as const,
-    marginBottom: 4,
-  },
-  cardDesc: {
-    color: Colors.dark.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 10,
-  },
-  cardMeta: {
-    gap: 6,
-    marginBottom: 10,
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  metaText: {
-    color: Colors.dark.textSecondary,
-    fontSize: 13,
-    flex: 1,
-  },
-  cardFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: Colors.dark.border,
-    paddingTop: 10,
-  },
-  participantsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  participantCount: {
-    color: Colors.dark.accent,
-    fontSize: 14,
-    fontWeight: "600" as const,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
+  filterRow: { flexDirection: "row", padding: 16, gap: 8 },
+  filterBtn: { backgroundColor: Colors.surface, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: Colors.border },
+  filterBtnActive: { backgroundColor: Colors.accent + "20", borderColor: Colors.accent },
+  filterText: { fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.textSecondary },
+  filterTextActive: { color: Colors.accent },
+  loading: { flex: 1, justifyContent: "center", alignItems: "center" },
+  list: { padding: 16, paddingBottom: 80 },
+  card: { backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 12 },
+  cardHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
+  cardHeaderInfo: { flex: 1 },
+  nickname: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.text },
+  type: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  badge: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12 },
+  badgeText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  cardTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold", color: Colors.text, marginBottom: 4 },
+  description: { fontSize: 15, fontFamily: "Inter_400Regular", color: Colors.text, marginBottom: 8 },
+  infoRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
+  infoText: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  empty: { alignItems: "center", paddingTop: 60, gap: 12 },
+  emptyText: { fontSize: 16, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
   fab: {
     position: "absolute",
+    bottom: Platform.OS === "web" ? 50 : 16,
     right: 20,
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: Colors.dark.accent,
-    justifyContent: "center",
+    backgroundColor: Colors.accent,
     alignItems: "center",
-    elevation: 8,
-    shadowColor: Colors.dark.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-  },
-  emptyContainer: {
-    flex: 1,
     justifyContent: "center",
-    alignItems: "center",
-    paddingTop: 80,
-    gap: 12,
-  },
-  emptyText: {
-    color: Colors.dark.textMuted,
-    fontSize: 16,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
 });

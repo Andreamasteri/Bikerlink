@@ -12,7 +12,7 @@ import {
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -71,7 +71,7 @@ function AdBannerItem({ campaign, onPress }: { campaign: AdCampaign; onPress: ()
           <MaterialCommunityIcons
             name="oil"
             size={22}
-            color={Colors.dark.accent}
+            color={Colors.accent}
           />
         </View>
         <View style={styles.bannerTextWrap}>
@@ -85,7 +85,7 @@ function AdBannerItem({ campaign, onPress }: { campaign: AdCampaign; onPress: ()
         <MaterialCommunityIcons
           name="chevron-right"
           size={20}
-          color={Colors.dark.textMuted}
+          color={Colors.textSecondary}
         />
       </View>
     </TouchableOpacity>
@@ -103,7 +103,7 @@ function AdCardItem({ campaign, onPress }: { campaign: AdCampaign; onPress: () =
         <MaterialCommunityIcons
           name="oil"
           size={28}
-          color={Colors.dark.accent}
+          color={Colors.accent}
         />
         <View style={styles.cardHeaderText}>
           <Text style={styles.cardTitle}>{campaign.name}</Text>
@@ -120,14 +120,14 @@ function AdCardItem({ campaign, onPress }: { campaign: AdCampaign; onPress: () =
           <MaterialCommunityIcons
             name="motorbike"
             size={14}
-            color={Colors.dark.accent}
+            color={Colors.accent}
           />
           <Text style={styles.cardBadgeText}>Syneco</Text>
         </View>
         <MaterialCommunityIcons
           name="open-in-new"
           size={16}
-          color={Colors.dark.azzurro}
+          color={Colors.maleIcon}
         />
       </View>
     </TouchableOpacity>
@@ -221,9 +221,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginVertical: 8,
     borderRadius: 12,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
     overflow: "hidden",
   },
   bannerInner: {
@@ -245,12 +245,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bannerTitle: {
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 14,
     fontWeight: "600" as const,
   },
   bannerSponsor: {
-    color: Colors.dark.accent,
+    color: Colors.accent,
     fontSize: 11,
     fontWeight: "500" as const,
     marginTop: 2,
@@ -260,9 +260,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginVertical: 8,
     borderRadius: 16,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
     padding: 16,
   },
   cardHeader: {
@@ -275,18 +275,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cardTitle: {
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 16,
     fontWeight: "700" as const,
   },
   cardSponsor: {
-    color: Colors.dark.accent,
+    color: Colors.accent,
     fontSize: 12,
     fontWeight: "500" as const,
     marginTop: 2,
   },
   cardDescription: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 12,
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   cardBadgeText: {
-    color: Colors.dark.accent,
+    color: Colors.accent,
     fontSize: 11,
     fontWeight: "600" as const,
     marginLeft: 4,

@@ -5,15 +5,16 @@ import {
   StyleSheet,
   FlatList,
   Image,
-  TouchableOpacity,
+  Pressable,
   Dimensions,
   ActivityIndicator,
   Platform,
   Alert,
   TextInput,
+  RefreshControl,
 } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -59,35 +60,32 @@ function ContestEntryCard({
   votingDisabled: boolean;
 }) {
   return (
-    <View style={styles.card}>
+    <View style={styles.photoCard}>
       <Image source={{ uri: entry.photoUrl }} style={styles.cardImage} />
-      <View style={styles.cardOverlay}>
-        <View style={styles.voteRow}>
-          <TouchableOpacity
-            onPress={() => onVote(entry.id)}
-            disabled={entry.hasVoted || entry.isOwn || votingDisabled}
-            style={[
-              styles.voteButton,
-              entry.hasVoted && styles.voteButtonActive,
-              (entry.isOwn || votingDisabled) && !entry.hasVoted && styles.voteButtonDisabled,
-            ]}
-          >
-            <MaterialCommunityIcons
-              name={entry.hasVoted ? "heart" : "heart-outline"}
-              size={18}
-              color={entry.hasVoted ? Colors.dark.rosa : "#FFF"}
-            />
-          </TouchableOpacity>
-          <Text style={styles.voteCount}>{entry.votesCount}</Text>
-        </View>
-      </View>
       {entry.caption ? (
-        <View style={styles.captionContainer}>
-          <Text style={styles.captionText} numberOfLines={2}>
-            {entry.caption}
-          </Text>
-        </View>
+        <Text style={styles.caption} numberOfLines={2}>
+          {entry.caption}
+        </Text>
       ) : null}
+      <View style={styles.photoFooter}>
+        <Pressable
+          onPress={() => onVote(entry.id)}
+          disabled={entry.hasVoted || entry.isOwn || votingDisabled}
+          style={[
+            styles.voteBtn,
+            (entry.isOwn || votingDisabled) && !entry.hasVoted && styles.voteBtnDisabled,
+          ]}
+        >
+          <Ionicons
+            name={entry.hasVoted ? "heart" : "heart-outline"}
+            size={18}
+            color={entry.hasVoted || !entry.isOwn ? Colors.accentRed : Colors.textSecondary}
+          />
+          <Text style={[styles.voteCount, entry.isOwn && { color: Colors.textSecondary }]}>
+            {entry.votesCount}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -98,8 +96,6 @@ export default function ContestScreen() {
   const [showUpload, setShowUpload] = useState(false);
   const [caption, setCaption] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-
-  const webTopInset = Platform.OS === "web" ? 67 : 0;
 
   const { data, isLoading, refetch } = useQuery<ContestResponse>({
     queryKey: ["/api/contest/entries"],
@@ -183,33 +179,32 @@ export default function ContestScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.center]}>
-        <ActivityIndicator size="large" color={Colors.dark.accent} />
+      <View style={[styles.container, styles.loading]}>
+        <ActivityIndicator size="large" color={Colors.accent} />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + webTopInset + 8 }]}>
-        <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>{t("contest.title")}</Text>
-          <TouchableOpacity
-            onPress={() => router.push("/contest/winners" as any)}
-            style={styles.winnersButton}
-          >
-            <MaterialCommunityIcons name="trophy" size={22} color={Colors.dark.accent} />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.votesInfo}>
-          <MaterialCommunityIcons name="heart" size={14} color={Colors.dark.rosa} />
-          <Text style={styles.votesText}>
-            {t("contest.votesLeft")}: {votesRemaining}/10
-          </Text>
-        </View>
-        <Text style={styles.weekLabel}>
-          {t("contest.thisWeek")} - {data?.weekNumber ?? ""}/{data?.year ?? ""}
+      <View style={styles.policyBar}>
+        <Ionicons name="information-circle" size={16} color={Colors.warning} />
+        <Text style={styles.policyText} numberOfLines={2}>
+          Carica le tue migliori foto in moto!
         </Text>
+      </View>
+
+      <View style={styles.votesBar}>
+        <Text style={styles.votesBarText}>
+          {t("contest.votesLeft")}: {votesRemaining}/10
+        </Text>
+        <Pressable
+          style={styles.winnersBtn}
+          onPress={() => router.push("/contest/winners" as any)}
+        >
+          <Ionicons name="trophy" size={16} color={Colors.accent} />
+          <Text style={styles.winnersText}>Hall of Fame</Text>
+        </Pressable>
       </View>
 
       {showUpload && selectedImage ? (
@@ -218,13 +213,13 @@ export default function ContestScreen() {
           <TextInput
             style={styles.captionInput}
             placeholder="Didascalia (opzionale)"
-            placeholderTextColor={Colors.dark.textMuted}
+            placeholderTextColor={Colors.textSecondary}
             value={caption}
             onChangeText={setCaption}
             maxLength={200}
           />
           <View style={styles.uploadActions}>
-            <TouchableOpacity
+            <Pressable
               onPress={() => {
                 setShowUpload(false);
                 setSelectedImage(null);
@@ -232,9 +227,9 @@ export default function ContestScreen() {
               }}
               style={styles.cancelUploadBtn}
             >
-              <MaterialCommunityIcons name="close" size={22} color={Colors.dark.text} />
-            </TouchableOpacity>
-            <TouchableOpacity
+              <Ionicons name="close" size={22} color={Colors.text} />
+            </Pressable>
+            <Pressable
               onPress={handleUpload}
               disabled={uploadMutation.isPending}
               style={styles.confirmUploadBtn}
@@ -242,9 +237,9 @@ export default function ContestScreen() {
               {uploadMutation.isPending ? (
                 <ActivityIndicator size="small" color="#FFF" />
               ) : (
-                <MaterialCommunityIcons name="check" size={22} color="#FFF" />
+                <Ionicons name="checkmark" size={22} color="#FFF" />
               )}
-            </TouchableOpacity>
+            </Pressable>
           </View>
         </View>
       ) : null}
@@ -254,19 +249,16 @@ export default function ContestScreen() {
         renderItem={renderEntry}
         keyExtractor={(item) => item.id}
         numColumns={COLUMN_COUNT}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={styles.list}
         columnWrapperStyle={styles.columnWrapper}
         showsVerticalScrollIndicator={false}
         scrollEnabled={(data?.entries?.length ?? 0) > 0}
-        onRefresh={refetch}
-        refreshing={isLoading}
+        refreshControl={
+          <RefreshControl refreshing={false} onRefresh={refetch} tintColor={Colors.accent} />
+        }
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons
-              name="camera-off"
-              size={48}
-              color={Colors.dark.textMuted}
-            />
+          <View style={styles.empty}>
+            <Ionicons name="camera-outline" size={48} color={Colors.textSecondary} />
             <Text style={styles.emptyText}>{t("common.noResults")}</Text>
             <Text style={styles.emptySubtext}>
               Carica la prima foto della settimana!
@@ -275,13 +267,12 @@ export default function ContestScreen() {
         }
       />
 
-      <TouchableOpacity
-        style={[styles.fab, { bottom: 90 + (Platform.OS === "web" ? 34 : 0) }]}
+      <Pressable
+        style={[styles.fab, { bottom: Platform.OS === "web" ? 50 : 16 }]}
         onPress={handlePickImage}
-        activeOpacity={0.8}
       >
-        <MaterialCommunityIcons name="camera-plus" size={26} color="#FFF" />
-      </TouchableOpacity>
+        <Ionicons name="camera" size={28} color={Colors.background} />
+      </Pressable>
     </View>
   );
 }
@@ -289,119 +280,107 @@ export default function ContestScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
   },
-  center: {
+  loading: {
     justifyContent: "center",
     alignItems: "center",
   },
-  header: {
+  policyBar: {
+    flexDirection: "row",
+    padding: 12,
     paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: Colors.dark.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    gap: 8,
+    backgroundColor: Colors.warning + "15",
+    alignItems: "center",
   },
-  headerRow: {
+  policyText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.warning,
+  },
+  votesBar: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "700" as const,
-    color: Colors.dark.text,
+  votesBarText: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
   },
-  winnersButton: {
-    padding: 8,
-  },
-  votesInfo: {
+  winnersBtn: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 6,
-    gap: 6,
+    gap: 4,
   },
-  votesText: {
-    fontSize: 13,
-    color: Colors.dark.textSecondary,
+  winnersText: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: Colors.accent,
   },
-  weekLabel: {
-    fontSize: 12,
-    color: Colors.dark.textMuted,
-    marginTop: 4,
-  },
-  listContent: {
-    padding: GAP,
-    paddingBottom: 120,
+  list: {
+    padding: 8,
+    paddingBottom: 80,
   },
   columnWrapper: {
     gap: GAP,
   },
-  card: {
-    width: CARD_WIDTH,
+  photoCard: {
+    flex: 1,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     overflow: "hidden",
-    backgroundColor: Colors.dark.surface,
-    marginBottom: GAP,
+    marginBottom: 8,
   },
   cardImage: {
     width: "100%",
-    height: CARD_WIDTH * 1.1,
-    backgroundColor: Colors.dark.surfaceLight,
+    aspectRatio: 4 / 3,
+    backgroundColor: Colors.surfaceLight,
   },
-  cardOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    padding: 8,
+  caption: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    paddingHorizontal: 8,
+    paddingTop: 4,
+  },
+  photoFooter: {
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 8,
   },
-  voteRow: {
+  voteBtn: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.55)",
-    borderRadius: 16,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
     gap: 4,
   },
-  voteButton: {
-    padding: 2,
-  },
-  voteButtonActive: {
-    opacity: 1,
-  },
-  voteButtonDisabled: {
-    opacity: 0.4,
+  voteBtnDisabled: {
+    opacity: 0.5,
   },
   voteCount: {
-    color: "#FFF",
-    fontSize: 13,
-    fontWeight: "600" as const,
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.accentRed,
   },
-  captionContainer: {
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
-  captionText: {
-    color: Colors.dark.textSecondary,
-    fontSize: 12,
-  },
-  emptyContainer: {
+  empty: {
     alignItems: "center",
-    paddingTop: 80,
-    gap: 12,
+    paddingTop: 60,
+    gap: 8,
   },
   emptyText: {
-    color: Colors.dark.textSecondary,
     fontSize: 16,
-    fontWeight: "600" as const,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
   },
   emptySubtext: {
-    color: Colors.dark.textMuted,
-    fontSize: 13,
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
   },
   fab: {
     position: "absolute",
@@ -409,34 +388,31 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: Colors.dark.accent,
-    justifyContent: "center",
+    backgroundColor: Colors.accent,
     alignItems: "center",
-    elevation: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    justifyContent: "center",
+    elevation: 4,
   },
   uploadContainer: {
     margin: 16,
     borderRadius: 12,
     overflow: "hidden",
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: Colors.dark.accent,
+    borderColor: Colors.accent,
   },
   uploadPreview: {
     width: "100%",
     height: 200,
-    backgroundColor: Colors.dark.surfaceLight,
+    backgroundColor: Colors.surfaceLight,
   },
   captionInput: {
     padding: 12,
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 14,
+    fontFamily: "Inter_400Regular",
     borderTopWidth: 1,
-    borderTopColor: Colors.dark.border,
+    borderTopColor: Colors.border,
   },
   uploadActions: {
     flexDirection: "row",
@@ -444,13 +420,13 @@ const styles = StyleSheet.create({
     padding: 10,
     gap: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.dark.border,
+    borderTopColor: Colors.border,
   },
   cancelUploadBtn: {
     padding: 8,
   },
   confirmUploadBtn: {
-    backgroundColor: Colors.dark.accent,
+    backgroundColor: Colors.accent,
     borderRadius: 20,
     padding: 10,
   },

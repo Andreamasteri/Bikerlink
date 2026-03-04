@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
@@ -200,7 +200,7 @@ export default function EditProfileScreen() {
           onPress={() => router.back()}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          <Ionicons name="arrow-back" size={24} color={Colors.dark.text} />
+          <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t("profile.edit")}</Text>
         <TouchableOpacity
@@ -209,9 +209,9 @@ export default function EditProfileScreen() {
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
           {updateProfileMutation.isPending ? (
-            <ActivityIndicator size="small" color={Colors.dark.accent} />
+            <ActivityIndicator size="small" color={Colors.accent} />
           ) : (
-            <Ionicons name="checkmark" size={26} color={Colors.dark.accent} />
+            <Ionicons name="checkmark" size={26} color={Colors.accent} />
           )}
         </TouchableOpacity>
       </View>
@@ -230,7 +230,7 @@ export default function EditProfileScreen() {
               style={styles.input}
               value={nickname}
               onChangeText={setNickname}
-              placeholderTextColor={Colors.dark.textMuted}
+              placeholderTextColor={Colors.textSecondary}
               maxLength={50}
             />
           </View>
@@ -242,7 +242,7 @@ export default function EditProfileScreen() {
               value={phone}
               onChangeText={setPhone}
               placeholder="+39..."
-              placeholderTextColor={Colors.dark.textMuted}
+              placeholderTextColor={Colors.textSecondary}
               keyboardType="phone-pad"
               maxLength={30}
             />
@@ -255,7 +255,7 @@ export default function EditProfileScreen() {
               value={birthYear}
               onChangeText={setBirthYear}
               placeholder="1990"
-              placeholderTextColor={Colors.dark.textMuted}
+              placeholderTextColor={Colors.textSecondary}
               keyboardType="number-pad"
               maxLength={4}
             />
@@ -271,7 +271,7 @@ export default function EditProfileScreen() {
               <Text
                 style={[
                   styles.selectText,
-                  !region && { color: Colors.dark.textMuted },
+                  !region && { color: Colors.textSecondary },
                 ]}
               >
                 {region || "Seleziona regione"}
@@ -279,7 +279,7 @@ export default function EditProfileScreen() {
               <Feather
                 name={showRegionPicker ? "chevron-up" : "chevron-down"}
                 size={18}
-                color={Colors.dark.textMuted}
+                color={Colors.textSecondary}
               />
             </TouchableOpacity>
             {showRegionPicker && (
@@ -324,7 +324,7 @@ export default function EditProfileScreen() {
             value={bio}
             onChangeText={setBio}
             placeholder="Scrivi qualcosa di te..."
-            placeholderTextColor={Colors.dark.textMuted}
+            placeholderTextColor={Colors.textSecondary}
             multiline
             maxLength={500}
             textAlignVertical="top"
@@ -341,7 +341,7 @@ export default function EditProfileScreen() {
                   <Ionicons
                     name="add-circle-outline"
                     size={24}
-                    color={Colors.dark.accent}
+                    color={Colors.accent}
                   />
                 </TouchableOpacity>
               )}
@@ -357,7 +357,7 @@ export default function EditProfileScreen() {
                       value={motoBrand}
                       onChangeText={setMotoBrand}
                       placeholder="es. Ducati"
-                      placeholderTextColor={Colors.dark.textMuted}
+                      placeholderTextColor={Colors.textSecondary}
                     />
                   </View>
                   <View style={[styles.field, { flex: 1 }]}>
@@ -367,7 +367,7 @@ export default function EditProfileScreen() {
                       value={motoModel}
                       onChangeText={setMotoModel}
                       placeholder="es. Monster"
-                      placeholderTextColor={Colors.dark.textMuted}
+                      placeholderTextColor={Colors.textSecondary}
                     />
                   </View>
                 </View>
@@ -380,7 +380,7 @@ export default function EditProfileScreen() {
                       value={motoYear}
                       onChangeText={setMotoYear}
                       placeholder="2023"
-                      placeholderTextColor={Colors.dark.textMuted}
+                      placeholderTextColor={Colors.textSecondary}
                       keyboardType="number-pad"
                       maxLength={4}
                     />
@@ -392,7 +392,7 @@ export default function EditProfileScreen() {
                       value={motoDisplacement}
                       onChangeText={setMotoDisplacement}
                       placeholder="821"
-                      placeholderTextColor={Colors.dark.textMuted}
+                      placeholderTextColor={Colors.textSecondary}
                       keyboardType="number-pad"
                     />
                   </View>
@@ -457,7 +457,7 @@ export default function EditProfileScreen() {
                     style={styles.cancelMotoBtn}
                     onPress={() => setShowAddMoto(false)}
                   >
-                    <Feather name="x" size={18} color={Colors.dark.textMuted} />
+                    <Feather name="x" size={18} color={Colors.textSecondary} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.saveMotoBtn}
@@ -490,7 +490,7 @@ export default function EditProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
   },
   headerBar: {
     flexDirection: "row",
@@ -499,12 +499,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border + "44",
+    borderBottomColor: Colors.border + "44",
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "700" as const,
-    color: Colors.dark.text,
+    color: Colors.text,
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -517,7 +517,7 @@ const styles = StyleSheet.create({
   groupTitle: {
     fontSize: 16,
     fontWeight: "700" as const,
-    color: Colors.dark.text,
+    color: Colors.text,
     marginBottom: 14,
   },
   groupHeader: {
@@ -531,19 +531,19 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 13,
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     marginBottom: 6,
     fontWeight: "500" as const,
   },
   input: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: Colors.dark.text,
+    color: Colors.text,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
   },
   bioInput: {
     height: 100,
@@ -551,52 +551,52 @@ const styles = StyleSheet.create({
   },
   charCount: {
     fontSize: 11,
-    color: Colors.dark.textMuted,
+    color: Colors.textSecondary,
     textAlign: "right",
     marginTop: 4,
   },
   selectInput: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
   selectText: {
     fontSize: 15,
-    color: Colors.dark.text,
+    color: Colors.text,
   },
   pickerList: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     marginTop: 6,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
     overflow: "hidden",
   },
   pickerItem: {
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border + "44",
+    borderBottomColor: Colors.border + "44",
   },
   pickerItemSelected: {
-    backgroundColor: Colors.dark.accent + "22",
+    backgroundColor: Colors.accent + "22",
   },
   pickerItemText: {
     fontSize: 14,
-    color: Colors.dark.text,
+    color: Colors.text,
   },
   pickerItemTextSelected: {
-    color: Colors.dark.accent,
+    color: Colors.accent,
     fontWeight: "600" as const,
   },
   addMotoForm: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 14,
     padding: 14,
   },
@@ -613,20 +613,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: Colors.dark.surfaceLight,
+    backgroundColor: Colors.surfaceLight,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
   },
   chipSelected: {
-    backgroundColor: Colors.dark.accent + "22",
-    borderColor: Colors.dark.accent,
+    backgroundColor: Colors.accent + "22",
+    borderColor: Colors.accent,
   },
   chipText: {
     fontSize: 13,
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
   },
   chipTextSelected: {
-    color: Colors.dark.accent,
+    color: Colors.accent,
     fontWeight: "600" as const,
   },
   motoActions: {
@@ -639,7 +639,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: Colors.dark.surfaceLight,
+    backgroundColor: Colors.surfaceLight,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -650,7 +650,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: Colors.dark.accent,
+    backgroundColor: Colors.accent,
   },
   saveMotoText: {
     fontSize: 14,

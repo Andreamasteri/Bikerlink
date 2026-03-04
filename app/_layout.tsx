@@ -6,7 +6,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { Platform } from "react-native";
@@ -14,42 +14,30 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient } from "@/lib/query-client";
-import { AuthProvider, useAuth } from "@/lib/auth-context";
-import { Colors } from "@/constants/colors";
+import { AuthProvider } from "@/lib/auth-context";
+import Colors from "@/constants/colors";
 
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
-  const { user, isLoading } = useAuth();
-  const segments = useSegments();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (isLoading) return;
-
-    const inAuthGroup = segments[0] === "(auth)";
-
-    if (!user && !inAuthGroup) {
-      router.replace("/(auth)/splash");
-    } else if (user && inAuthGroup) {
-      router.replace("/(tabs)");
-    }
-  }, [user, isLoading, segments]);
-
   return (
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: Colors.dark.background },
+        contentStyle: { backgroundColor: Colors.background },
       }}
     >
+      <Stack.Screen name="welcome" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="proposals" options={{ headerShown: false }} />
       <Stack.Screen name="profile" options={{ headerShown: false }} />
       <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="route" options={{ headerShown: false }} />
       <Stack.Screen name="admin" options={{ headerShown: false }} />
       <Stack.Screen name="moderator" options={{ headerShown: false }} />
+      <Stack.Screen name="contest" options={{ headerShown: false }} />
+      <Stack.Screen name="feedback/index" options={{ headerShown: true, headerTitle: "Feedback", headerStyle: { backgroundColor: Colors.surface }, headerTintColor: Colors.text }} />
     </Stack>
   );
 }
@@ -74,7 +62,7 @@ export default function RootLayout() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <GestureHandlerRootView>
+          <GestureHandlerRootView style={{ flex: 1 }}>
             {Platform.OS === "web" ? (
               <RootLayoutNav />
             ) : (

@@ -13,7 +13,7 @@ import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
@@ -50,15 +50,15 @@ interface ProposalDetail {
 function getTypeIcon(type: string): { name: string; color: string } {
   switch (type) {
     case "giro":
-      return { name: "motorbike", color: Colors.dark.azzurro };
+      return { name: "motorbike", color: Colors.maleIcon };
     case "raduno":
-      return { name: "account-group", color: Colors.dark.accent };
+      return { name: "account-group", color: Colors.accent };
     case "con_zavorrina":
-      return { name: "seat-passenger", color: Colors.dark.rosa };
+      return { name: "seat-passenger", color: Colors.femaleIcon };
     case "richiesta":
-      return { name: "hand-wave", color: Colors.dark.rosa };
+      return { name: "hand-wave", color: Colors.femaleIcon };
     default:
-      return { name: "clipboard-text", color: Colors.dark.textSecondary };
+      return { name: "clipboard-text", color: Colors.textSecondary };
   }
 }
 
@@ -74,10 +74,10 @@ function getTypeLabel(type: string): string {
 
 function getUserColor(userType: string): string {
   switch (userType) {
-    case "biker": return Colors.dark.bikerColor;
-    case "zavorrina": return Colors.dark.zavorrinaColor;
-    case "coppia": return Colors.dark.coppiaColor;
-    default: return Colors.dark.textSecondary;
+    case "biker": return Colors.maleIcon;
+    case "zavorrina": return Colors.femaleIcon;
+    case "coppia": return Colors.accent;
+    default: return Colors.textSecondary;
   }
 }
 
@@ -140,12 +140,12 @@ export default function ProposalDetailScreen() {
           options={{
             headerShown: true,
             title: "",
-            headerStyle: { backgroundColor: Colors.dark.surface },
-            headerTintColor: Colors.dark.text,
+            headerStyle: { backgroundColor: Colors.surface },
+            headerTintColor: Colors.text,
           }}
         />
         <View style={[styles.centered, { paddingTop: webTopInset }]}>
-          <ActivityIndicator size="large" color={Colors.dark.accent} />
+          <ActivityIndicator size="large" color={Colors.accent} />
         </View>
       </>
     );
@@ -158,8 +158,8 @@ export default function ProposalDetailScreen() {
           options={{
             headerShown: true,
             title: "",
-            headerStyle: { backgroundColor: Colors.dark.surface },
-            headerTintColor: Colors.dark.text,
+            headerStyle: { backgroundColor: Colors.surface },
+            headerTintColor: Colors.text,
           }}
         />
         <View style={[styles.centered, { paddingTop: webTopInset }]}>
@@ -177,8 +177,8 @@ export default function ProposalDetailScreen() {
         options={{
           headerShown: true,
           title: getTypeLabel(proposal.proposalType),
-          headerStyle: { backgroundColor: Colors.dark.surface },
-          headerTintColor: Colors.dark.text,
+          headerStyle: { backgroundColor: Colors.surface },
+          headerTintColor: Colors.text,
         }}
       />
       <ScrollView
@@ -238,19 +238,19 @@ export default function ProposalDetailScreen() {
           <View style={styles.infoCard}>
             {scheduledDate && (
               <View style={styles.infoRow}>
-                <Ionicons name="calendar" size={18} color={Colors.dark.accent} />
+                <Ionicons name="calendar" size={18} color={Colors.accent} />
                 <Text style={styles.infoText}>{scheduledDate}</Text>
               </View>
             )}
             {proposal.departureAddress && (
               <View style={styles.infoRow}>
-                <Ionicons name="location" size={18} color={Colors.dark.accent} />
+                <Ionicons name="location" size={18} color={Colors.accent} />
                 <Text style={styles.infoText}>{proposal.departureAddress}</Text>
               </View>
             )}
             {proposal.maxParticipants && (
               <View style={styles.infoRow}>
-                <Ionicons name="people" size={18} color={Colors.dark.accent} />
+                <Ionicons name="people" size={18} color={Colors.accent} />
                 <Text style={styles.infoText}>
                   Max {proposal.maxParticipants} partecipanti
                 </Text>
@@ -281,7 +281,7 @@ export default function ProposalDetailScreen() {
               <Text style={styles.participantName}>{p.nickname}</Text>
               {p.userId === proposal.userId && (
                 <View style={styles.creatorBadge}>
-                  <MaterialCommunityIcons name="crown" size={12} color={Colors.dark.accent} />
+                  <MaterialCommunityIcons name="crown" size={12} color={Colors.accent} />
                 </View>
               )}
             </View>
@@ -311,14 +311,14 @@ export default function ProposalDetailScreen() {
 
         {isParticipant && !isCreator && (
           <View style={styles.joinedBanner}>
-            <Ionicons name="checkmark-circle" size={20} color={Colors.dark.success} />
+            <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
             <Text style={styles.joinedText}>Sei iscritto a questa proposta</Text>
           </View>
         )}
 
         {isCreator && (
           <View style={styles.joinedBanner}>
-            <MaterialCommunityIcons name="crown" size={20} color={Colors.dark.accent} />
+            <MaterialCommunityIcons name="crown" size={20} color={Colors.accent} />
             <Text style={styles.joinedText}>Sei il creatore di questa proposta</Text>
           </View>
         )}
@@ -330,7 +330,7 @@ export default function ProposalDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
   },
   content: {
     padding: 20,
@@ -339,10 +339,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
   },
   errorText: {
-    color: Colors.dark.textMuted,
+    color: Colors.textSecondary,
     fontSize: 16,
   },
   typeBanner: {
@@ -359,18 +359,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statusBadge: {
-    backgroundColor: Colors.dark.warning + "33",
+    backgroundColor: Colors.warning + "33",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
   },
   statusText: {
-    color: Colors.dark.warning,
+    color: Colors.warning,
     fontSize: 12,
     fontWeight: "600" as const,
   },
   title: {
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 24,
     fontWeight: "800" as const,
     marginBottom: 16,
@@ -393,14 +393,14 @@ const styles = StyleSheet.create({
     fontWeight: "600" as const,
   },
   createdDate: {
-    color: Colors.dark.textMuted,
+    color: Colors.textSecondary,
     fontSize: 12,
   },
   section: {
     marginBottom: 20,
   },
   sectionLabel: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 13,
     fontWeight: "600" as const,
     textTransform: "uppercase" as const,
@@ -408,18 +408,18 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   descriptionText: {
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 15,
     lineHeight: 22,
   },
   infoCard: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 14,
     padding: 16,
     gap: 14,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
   },
   infoRow: {
     flexDirection: "row",
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   infoText: {
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 14,
     flex: 1,
   },
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: Colors.border,
   },
   participantAvatar: {
     width: 32,
@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   participantName: {
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 15,
     flex: 1,
   },
@@ -455,7 +455,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   joinButton: {
-    backgroundColor: Colors.dark.accent,
+    backgroundColor: Colors.accent,
     borderRadius: 14,
     paddingVertical: 16,
     flexDirection: "row",
@@ -476,15 +476,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 14,
     padding: 16,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
   },
   joinedText: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 14,
   },
 });

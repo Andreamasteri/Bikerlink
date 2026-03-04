@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from "
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 
 const adminSections = [
@@ -18,9 +18,9 @@ const adminSections = [
 
 function getIcon(iconSet: string, icon: string) {
   if (iconSet === "MaterialCommunityIcons") {
-    return <MaterialCommunityIcons name={icon as any} size={28} color={Colors.dark.accent} />;
+    return <MaterialCommunityIcons name={icon as any} size={28} color={Colors.accent} />;
   }
-  return <MaterialIcons name={icon as any} size={28} color={Colors.dark.accent} />;
+  return <MaterialIcons name={icon as any} size={28} color={Colors.accent} />;
 }
 
 export default function AdminDashboard() {
@@ -59,7 +59,7 @@ export default function AdminDashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
   },
   content: {
     padding: 16,
@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontFamily: "Inter_400Regular",
     fontSize: 14,
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     marginBottom: 24,
   },
   grid: {
@@ -77,18 +77,18 @@ const styles = StyleSheet.create({
   },
   card: {
     width: "47%",
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: 20,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
   },
   cardIcon: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   cardLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
-    color: Colors.dark.text,
+    color: Colors.text,
     textAlign: "center",
   },
 });

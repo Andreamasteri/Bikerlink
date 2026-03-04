@@ -14,7 +14,7 @@ import * as Location from "expo-location";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import TrackingMap from "@/components/TrackingMap";
 import { apiRequest } from "@/lib/query-client";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 
 interface GpsPoint {
@@ -284,7 +284,7 @@ export default function TrackingScreen() {
         <MaterialCommunityIcons
           name="map-marker-off"
           size={64}
-          color={Colors.dark.textMuted}
+          color={Colors.textSecondary}
         />
         <Text style={styles.permText}>
           Permesso di localizzazione necessario per il tracking GPS
@@ -296,7 +296,7 @@ export default function TrackingScreen() {
           !permission.canAskAgain &&
           Platform.OS !== "web" && (
             <TouchableOpacity
-              style={[styles.permButton, { backgroundColor: Colors.dark.surfaceLight }]}
+              style={[styles.permButton, { backgroundColor: Colors.surfaceLight }]}
               onPress={() => {
                 try {
                   Location.enableNetworkProviderAsync?.();
@@ -323,7 +323,7 @@ export default function TrackingScreen() {
             <MaterialCommunityIcons
               name="map-search"
               size={48}
-              color={Colors.dark.textMuted}
+              color={Colors.textSecondary}
             />
             <Text style={styles.mapPlaceholderText}>
               Acquisizione posizione...
@@ -428,7 +428,7 @@ function StatBox({
       <MaterialCommunityIcons
         name={icon as any}
         size={20}
-        color={Colors.dark.accent}
+        color={Colors.accent}
       />
       <Text style={styles.statLabel}>{label}</Text>
       <Text style={styles.statValue}>{value}</Text>
@@ -439,28 +439,28 @@ function StatBox({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
   },
   center: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
     justifyContent: "center",
     alignItems: "center",
     padding: 32,
   },
   loadingText: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 16,
   },
   permText: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 16,
     textAlign: "center",
     marginTop: 16,
     marginBottom: 24,
   },
   permButton: {
-    backgroundColor: Colors.dark.accent,
+    backgroundColor: Colors.accent,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
@@ -478,15 +478,15 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
   },
   mapPlaceholderText: {
-    color: Colors.dark.textMuted,
+    color: Colors.textSecondary,
     fontSize: 14,
     marginTop: 8,
   },
   statsPanel: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
@@ -499,19 +499,19 @@ const styles = StyleSheet.create({
   },
   statBox: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
     borderRadius: 12,
     padding: 12,
     marginHorizontal: 4,
     alignItems: "center",
   },
   statLabel: {
-    color: Colors.dark.textMuted,
+    color: Colors.textSecondary,
     fontSize: 11,
     marginTop: 4,
   },
   statValue: {
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 18,
     fontWeight: "700" as const,
     marginTop: 2,
@@ -523,7 +523,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   frequencyLabel: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 14,
     marginRight: 12,
   },
@@ -531,14 +531,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
     marginRight: 8,
   },
   freqChipActive: {
-    backgroundColor: Colors.dark.accent,
+    backgroundColor: Colors.accent,
   },
   freqChipText: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 14,
     fontWeight: "600" as const,
   },
@@ -555,11 +555,11 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: Colors.dark.error,
+    backgroundColor: Colors.error,
     marginRight: 8,
   },
   liveText: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 13,
     fontWeight: "600" as const,
   },
@@ -572,10 +572,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   startButton: {
-    backgroundColor: Colors.dark.success,
+    backgroundColor: Colors.success,
   },
   stopButton: {
-    backgroundColor: Colors.dark.error,
+    backgroundColor: Colors.error,
   },
   actionButtonText: {
     color: "#FFFFFF",

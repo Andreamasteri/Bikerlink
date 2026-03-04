@@ -1,128 +1,161 @@
-import { isLiquidGlassAvailable } from "expo-glass-effect";
+import React, { useEffect } from "react";
 import { Tabs } from "expo-router";
-import { NativeTabs, Icon, Label } from "expo-router/unstable-native-tabs";
-import { BlurView } from "expo-blur";
-import { Platform, StyleSheet } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React from "react";
+import { Ionicons } from "@expo/vector-icons";
+import Colors from "@/constants/colors";
+import { Platform, BackHandler, Text } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAuth } from "@/lib/auth-context";
+import { useQuery } from "@tanstack/react-query";
 
-import { Colors } from "@/constants/colors";
-import { t } from "@/lib/i18n";
+export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
 
-function NativeTabLayout() {
-  return (
-    <NativeTabs>
-      <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: "map", selected: "map.fill" }} />
-        <Label>{t("tabs.map")}</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="proposals">
-        <Icon sf={{ default: "doc.text", selected: "doc.text.fill" }} />
-        <Label>{t("tabs.proposals")}</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="chat">
-        <Icon sf={{ default: "bubble.left", selected: "bubble.left.fill" }} />
-        <Label>{t("tabs.chat")}</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="contest">
-        <Icon sf={{ default: "trophy", selected: "trophy.fill" }} />
-        <Label>{t("tabs.contest")}</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="profile">
-        <Icon sf={{ default: "person", selected: "person.fill" }} />
-        <Label>{t("tabs.profile")}</Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
-  );
-}
+  const isBikerOrCoppia = user?.userType === "biker" || user?.userType === "coppia";
 
-function ClassicTabLayout() {
+  const { data: profileData } = useQuery({
+    queryKey: ["/api/users/profile"],
+    enabled: !!user,
+  });
+
+  const isAvailable = (profileData as any)?.profile?.isAvailable || false;
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const handler = () => true;
+    const sub = BackHandler.addEventListener("hardwareBackPress", handler);
+    return () => sub.remove();
+  }, []);
+
+  const tabBarHeight = Platform.OS === "web" ? 84 : 60 + insets.bottom;
+  const tabBarPaddingBottom = Platform.OS === "web" ? 34 : insets.bottom;
+
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors.dark.accent,
-        tabBarInactiveTintColor: Colors.dark.tabIconDefault,
-        headerShown: false,
+        tabBarActiveTintColor: Colors.accent,
+        tabBarInactiveTintColor: Colors.textSecondary,
         tabBarStyle: {
-          position: "absolute" as const,
-          backgroundColor: Platform.select({
-            ios: "transparent",
-            android: Colors.dark.tabBar,
-            web: Colors.dark.tabBar,
-          }),
-          borderTopWidth: 0,
-          borderTopColor: Colors.dark.border,
-          elevation: 0,
-          height: Platform.OS === "web" ? 84 : 60,
-          paddingBottom: Platform.OS === "web" ? 34 : 8,
-          paddingTop: 4,
+          backgroundColor: Colors.surface,
+          borderTopColor: Colors.border,
+          height: tabBarHeight,
+          paddingBottom: tabBarPaddingBottom,
         },
-        tabBarBackground: () =>
-          Platform.OS === "ios" ? (
-            <BlurView
-              intensity={80}
-              tint="dark"
-              style={StyleSheet.absoluteFill}
-            />
-          ) : null,
         tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: "600" as const,
+          fontSize: 9,
+          fontFamily: "Inter_500Medium",
         },
+        headerStyle: {
+          backgroundColor: Colors.surface,
+        },
+        headerTintColor: Colors.text,
+        headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: t("tabs.map"),
+          title: "Mappa",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="motorbike" color={color} size={size} />
+            <Ionicons name="map" size={size} color={color} />
           ),
+          headerShown: false,
         }}
       />
       <Tabs.Screen
         name="proposals"
         options={{
-          title: t("tabs.proposals"),
+          title: "Proposte",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="clipboard-text-outline" color={color} size={size} />
+            <Ionicons name="megaphone" size={size} color={color} />
           ),
+          headerTitle: "Proposte e Richieste",
+        }}
+      />
+      <Tabs.Screen
+        name="ready"
+        options={{
+          title: "Ready\nto Ride",
+          tabBarIcon: ({ focused }) => (
+            <Ionicons
+              name="bicycle"
+              size={22}
+              color={isAvailable ? Colors.success : Colors.accentRed}
+            />
+          ),
+          headerTitle: "Ready to Ride",
+          tabBarLabel: ({ focused }) => (
+            <Text style={{
+              fontSize: 9,
+              fontFamily: "Inter_500Medium",
+              color: focused ? Colors.accent : Colors.textSecondary,
+              textAlign: "center",
+              lineHeight: 11,
+            }}>
+              {"Ready\nto Ride"}
+            </Text>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="tracking"
+        options={{
+          title: "Tracking",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="navigate" size={size} color={color} />
+          ),
+          headerTitle: "GPS Tracking",
+        }}
+      />
+      {isBikerOrCoppia ? (
+        <Tabs.Screen
+          name="garage"
+          options={{
+            title: "Garage",
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="build" size={size} color={color} />
+            ),
+            headerTitle: "Il Mio Garage",
+          }}
+        />
+      ) : (
+        <Tabs.Screen
+          name="garage"
+          options={{
+            href: null,
+          }}
+        />
+      )}
+      <Tabs.Screen
+        name="contest"
+        options={{
+          title: "Concorso",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="camera" size={size} color={color} />
+          ),
+          headerTitle: "Concorso Foto",
         }}
       />
       <Tabs.Screen
         name="chat"
         options={{
-          title: t("tabs.chat"),
+          title: "Chat",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="chat-outline" color={color} size={size} />
+            <Ionicons name="chatbubbles" size={size} color={color} />
           ),
-        }}
-      />
-      <Tabs.Screen
-        name="contest"
-        options={{
-          title: t("tabs.contest"),
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="trophy-outline" color={color} size={size} />
-          ),
+          headerTitle: "Chat",
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: t("tabs.profile"),
+          title: "Profilo",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="account-outline" color={color} size={size} />
+            <Ionicons name="person" size={size} color={color} />
           ),
+          headerTitle: "Il Mio Profilo",
         }}
       />
     </Tabs>
   );
-}
-
-export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
-  }
-  return <ClassicTabLayout />;
 }

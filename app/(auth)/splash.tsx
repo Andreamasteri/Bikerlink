@@ -17,7 +17,7 @@ import Animated, {
   interpolate,
 } from "react-native-reanimated";
 import { useRouter } from "expo-router";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 
 const { width, height } = Dimensions.get("window");
@@ -116,7 +116,7 @@ export default function SplashAnimatedScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
   },
   background: {
     flex: 1,
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
   },
   content: {
     flex: 1,
@@ -142,13 +142,13 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderRadius: 110,
-    backgroundColor: Colors.dark.accent,
+    backgroundColor: Colors.accent,
     opacity: 0.15,
   },
   title: {
     fontSize: 48,
     fontWeight: "bold" as const,
-    color: Colors.dark.accent,
+    color: Colors.accent,
     letterSpacing: 4,
     textAlign: "center",
     textShadowColor: "rgba(212, 160, 23, 0.5)",
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700" as const,
     fontStyle: "italic" as const,
-    color: Colors.dark.text,
+    color: Colors.text,
     marginTop: 16,
     letterSpacing: 1.5,
     textAlign: "center",
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   lineAccent: {
     width: 60,
     height: 3,
-    backgroundColor: Colors.dark.accent,
+    backgroundColor: Colors.accent,
     borderRadius: 2,
     marginTop: 20,
     opacity: 0.7,

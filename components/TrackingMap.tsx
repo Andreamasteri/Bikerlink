@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from "react";
 import { View, StyleSheet } from "react-native";
 import MapView, { Polyline, Marker } from "react-native-maps";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 
 interface TrackingMapProps {
   points: Array<{ latitude: number; longitude: number }>;
@@ -29,10 +29,10 @@ export default function TrackingMap({ points, currentLocation }: TrackingMapProp
     <View style={styles.wrapper}>
       <MapView ref={mapRef} style={styles.map} initialRegion={region} showsUserLocation>
         {points.length > 1 && (
-          <Polyline coordinates={points} strokeColor={Colors.dark.accent} strokeWidth={4} />
+          <Polyline coordinates={points} strokeColor={Colors.accent} strokeWidth={4} />
         )}
         {currentLocation && (
-          <Marker coordinate={currentLocation} pinColor={Colors.dark.success} />
+          <Marker coordinate={currentLocation} pinColor={Colors.success} />
         )}
       </MapView>
     </View>

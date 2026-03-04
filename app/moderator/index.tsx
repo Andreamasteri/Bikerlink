@@ -15,7 +15,7 @@ import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { t } from "@/lib/i18n";
 
@@ -58,7 +58,7 @@ function PhotoCard({ item, onApprove, onReject }: {
           <TextInput
             style={styles.rejectInput}
             placeholder="Motivo del rifiuto (opzionale)"
-            placeholderTextColor={Colors.dark.textMuted}
+            placeholderTextColor={Colors.textSecondary}
             value={rejectReason}
             onChangeText={setRejectReason}
           />
@@ -67,7 +67,7 @@ function PhotoCard({ item, onApprove, onReject }: {
               onPress={() => setShowRejectInput(false)}
               style={styles.cancelBtn}
             >
-              <Ionicons name="close" size={20} color={Colors.dark.textSecondary} />
+              <Ionicons name="close" size={20} color={Colors.textSecondary} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
@@ -87,13 +87,13 @@ function PhotoCard({ item, onApprove, onReject }: {
             onPress={() => onApprove(item.id, item.type)}
             style={styles.approveBtn}
           >
-            <Ionicons name="checkmark-circle" size={28} color={Colors.dark.success} />
+            <Ionicons name="checkmark-circle" size={28} color={Colors.success} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setShowRejectInput(true)}
             style={styles.rejectBtn}
           >
-            <Ionicons name="close-circle" size={28} color={Colors.dark.error} />
+            <Ionicons name="close-circle" size={28} color={Colors.error} />
           </TouchableOpacity>
         </View>
       )}
@@ -144,21 +144,21 @@ export default function ModeratorPhotosScreen() {
     <View style={[styles.container, { paddingTop: Math.max(insets.top, webTopInset) }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.dark.text} />
+          <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Moderazione Foto</Text>
         <TouchableOpacity onPress={() => router.push("/moderator/logs")}>
-          <MaterialCommunityIcons name="clipboard-text-outline" size={24} color={Colors.dark.accent} />
+          <MaterialCommunityIcons name="clipboard-text-outline" size={24} color={Colors.accent} />
         </TouchableOpacity>
       </View>
 
       {isLoading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={Colors.dark.accent} />
+          <ActivityIndicator size="large" color={Colors.accent} />
         </View>
       ) : !photos || photos.length === 0 ? (
         <View style={styles.center}>
-          <Ionicons name="checkmark-done-circle" size={64} color={Colors.dark.success} />
+          <Ionicons name="checkmark-done-circle" size={64} color={Colors.success} />
           <Text style={styles.emptyText}>Nessuna foto da moderare</Text>
         </View>
       ) : (
@@ -177,7 +177,7 @@ export default function ModeratorPhotosScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: "row",
@@ -186,12 +186,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: Colors.border,
   },
   headerTitle: {
     fontSize: 18,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.dark.text,
+    color: Colors.text,
   },
   center: {
     flex: 1,
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontFamily: "Inter_500Medium",
   },
   list: {
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   card: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     overflow: "hidden",
     marginBottom: 16,
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
   },
   typeBadge: {
     alignSelf: "flex-start",
-    backgroundColor: Colors.dark.accent + "30",
+    backgroundColor: Colors.accent + "30",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -232,17 +232,17 @@ const styles = StyleSheet.create({
   typeBadgeText: {
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.dark.accent,
+    color: Colors.accent,
     textTransform: "uppercase" as const,
   },
   caption: {
     fontSize: 14,
-    color: Colors.dark.text,
+    color: Colors.text,
     fontFamily: "Inter_400Regular",
   },
   dateText: {
     fontSize: 12,
-    color: Colors.dark.textMuted,
+    color: Colors.textSecondary,
     fontFamily: "Inter_400Regular",
   },
   actions: {
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     gap: 32,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.dark.border,
+    borderTopColor: Colors.border,
   },
   approveBtn: {
     padding: 8,
@@ -262,15 +262,15 @@ const styles = StyleSheet.create({
   rejectInputContainer: {
     padding: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.dark.border,
+    borderTopColor: Colors.border,
     gap: 8,
   },
   rejectInput: {
-    backgroundColor: Colors.dark.surfaceLight,
+    backgroundColor: Colors.surfaceLight,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    color: Colors.dark.text,
+    color: Colors.text,
     fontFamily: "Inter_400Regular",
     fontSize: 14,
   },
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   confirmRejectBtn: {
-    backgroundColor: Colors.dark.error,
+    backgroundColor: Colors.error,
     borderRadius: 8,
     padding: 8,
   },

@@ -10,7 +10,7 @@ import {
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 
 interface MapUser {
@@ -61,13 +61,13 @@ const ITALY_REGION: Region = {
 function getUserMarkerColor(userType: string, sex?: string | null): string {
   switch (userType) {
     case "biker":
-      return Colors.dark.bikerColor;
+      return Colors.maleIcon;
     case "zavorrina":
-      return Colors.dark.zavorrinaColor;
+      return Colors.femaleIcon;
     case "coppia":
-      return Colors.dark.coppiaColor;
+      return Colors.accent;
     default:
-      return Colors.dark.accent;
+      return Colors.accent;
   }
 }
 
@@ -209,46 +209,46 @@ export default function InteractiveMap({
 
       {locationLoading && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="small" color={Colors.dark.accent} />
+          <ActivityIndicator size="small" color={Colors.accent} />
         </View>
       )}
 
       <View style={styles.filterBar}>
         <TouchableOpacity
-          style={[styles.filterChip, filterBiker && { backgroundColor: Colors.dark.bikerColor }]}
+          style={[styles.filterChip, filterBiker && { backgroundColor: Colors.maleIcon }]}
           onPress={onToggleFilterBiker}
           activeOpacity={0.7}
         >
           <MaterialCommunityIcons
             name="motorbike"
             size={16}
-            color={filterBiker ? "#fff" : Colors.dark.bikerColor}
+            color={filterBiker ? "#fff" : Colors.maleIcon}
           />
           <Text style={[styles.filterText, filterBiker && styles.filterTextActive]}>Biker</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.filterChip, filterZavorrina && { backgroundColor: Colors.dark.zavorrinaColor }]}
+          style={[styles.filterChip, filterZavorrina && { backgroundColor: Colors.femaleIcon }]}
           onPress={onToggleFilterZavorrina}
           activeOpacity={0.7}
         >
           <MaterialCommunityIcons
             name="seat-passenger"
             size={16}
-            color={filterZavorrina ? "#fff" : Colors.dark.zavorrinaColor}
+            color={filterZavorrina ? "#fff" : Colors.femaleIcon}
           />
           <Text style={[styles.filterText, filterZavorrina && styles.filterTextActive]}>Zavorrina</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.filterChip, filterCoppia && { backgroundColor: Colors.dark.coppiaColor }]}
+          style={[styles.filterChip, filterCoppia && { backgroundColor: Colors.accent }]}
           onPress={onToggleFilterCoppia}
           activeOpacity={0.7}
         >
           <MaterialCommunityIcons
             name="account-group"
             size={16}
-            color={filterCoppia ? "#fff" : Colors.dark.coppiaColor}
+            color={filterCoppia ? "#fff" : Colors.accent}
           />
           <Text style={[styles.filterText, filterCoppia && styles.filterTextActive]}>Coppia</Text>
         </TouchableOpacity>
@@ -260,7 +260,7 @@ export default function InteractiveMap({
           onPress={centerOnUser}
           activeOpacity={0.7}
         >
-          <MaterialCommunityIcons name="crosshairs-gps" size={22} color={Colors.dark.accent} />
+          <MaterialCommunityIcons name="crosshairs-gps" size={22} color={Colors.accent} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -274,7 +274,7 @@ export default function InteractiveMap({
           <MaterialCommunityIcons
             name={isAvailable ? "broadcast" : "broadcast-off"}
             size={22}
-            color={isAvailable ? "#fff" : Colors.dark.textSecondary}
+            color={isAvailable ? "#fff" : Colors.textSecondary}
           />
           <Text
             style={[
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 16,
     right: 16,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 20,
     padding: 8,
   },
@@ -332,15 +332,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
   },
   filterText: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 12,
     fontWeight: "600" as const,
   },
@@ -355,32 +355,32 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   locationButton: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
   },
   availabilityButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
   },
   availabilityButtonActive: {
-    backgroundColor: Colors.dark.accent,
-    borderColor: Colors.dark.accent,
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
   },
   availabilityText: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 13,
     fontWeight: "700" as const,
   },

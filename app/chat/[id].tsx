@@ -14,7 +14,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
@@ -59,10 +59,10 @@ function formatMessageTime(dateStr: string): string {
 
 function getUserTypeColor(userType: string): string {
   switch (userType) {
-    case "biker": return Colors.dark.bikerColor;
-    case "zavorrina": return Colors.dark.zavorrinaColor;
-    case "coppia": return Colors.dark.coppiaColor;
-    default: return Colors.dark.textSecondary;
+    case "biker": return Colors.maleIcon;
+    case "zavorrina": return Colors.femaleIcon;
+    case "coppia": return Colors.accent;
+    default: return Colors.textSecondary;
   }
 }
 
@@ -77,14 +77,14 @@ function MessageBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolea
       <View style={[styles.bubble, isOwn ? styles.ownBubble : styles.otherBubble]}>
         {message.messageType === "location" && message.latitude && message.longitude ? (
           <View style={styles.locationContent}>
-            <Ionicons name="location" size={18} color={isOwn ? "#fff" : Colors.dark.accent} />
+            <Ionicons name="location" size={18} color={isOwn ? "#fff" : Colors.accent} />
             <Text style={[styles.messageText, isOwn ? styles.ownText : styles.otherText]}>
               {message.content || `${message.latitude.toFixed(4)}, ${message.longitude.toFixed(4)}`}
             </Text>
           </View>
         ) : message.messageType === "image" ? (
           <View style={styles.locationContent}>
-            <Ionicons name="image" size={18} color={isOwn ? "#fff" : Colors.dark.accent} />
+            <Ionicons name="image" size={18} color={isOwn ? "#fff" : Colors.accent} />
             <Text style={[styles.messageText, isOwn ? styles.ownText : styles.otherText]}>
               {message.content || "Foto"}
             </Text>
@@ -197,7 +197,7 @@ export default function ChatConversationScreen() {
     >
       <View style={[styles.topBar, { paddingTop: Platform.OS === "web" ? webTopInset + 12 : insets.top + 8 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={28} color={Colors.dark.text} />
+          <Ionicons name="chevron-back" size={28} color={Colors.text} />
         </TouchableOpacity>
         <View style={styles.topBarInfo}>
           <Text style={styles.topBarTitle} numberOfLines={1}>{getTitle()}</Text>
@@ -211,7 +211,7 @@ export default function ChatConversationScreen() {
 
       {isLoading ? (
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={Colors.dark.accent} />
+          <ActivityIndicator size="large" color={Colors.accent} />
         </View>
       ) : (
         <FlatList
@@ -226,7 +226,7 @@ export default function ChatConversationScreen() {
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <View style={styles.emptyChat}>
-              <Ionicons name="chatbubble-outline" size={40} color={Colors.dark.textMuted} />
+              <Ionicons name="chatbubble-outline" size={40} color={Colors.textSecondary} />
               <Text style={styles.emptyChatText}>Inizia la conversazione!</Text>
             </View>
           }
@@ -235,7 +235,7 @@ export default function ChatConversationScreen() {
 
       <View style={[styles.inputBar, { paddingBottom: Platform.OS === "web" ? 34 : Math.max(insets.bottom, 12) }]}>
         <TouchableOpacity onPress={handleSendLocation} style={styles.iconButton}>
-          <Ionicons name="location-outline" size={24} color={Colors.dark.accent} />
+          <Ionicons name="location-outline" size={24} color={Colors.accent} />
         </TouchableOpacity>
         <View style={styles.inputWrapper}>
           <TextInput
@@ -243,7 +243,7 @@ export default function ChatConversationScreen() {
             value={inputText}
             onChangeText={setInputText}
             placeholder={t("chat.typeMessage")}
-            placeholderTextColor={Colors.dark.textMuted}
+            placeholderTextColor={Colors.textSecondary}
             multiline
             maxLength={2000}
             returnKeyType="default"
@@ -257,7 +257,7 @@ export default function ChatConversationScreen() {
           <Ionicons
             name="send"
             size={20}
-            color={inputText.trim() ? "#fff" : Colors.dark.textMuted}
+            color={inputText.trim() ? "#fff" : Colors.textSecondary}
           />
         </TouchableOpacity>
       </View>
@@ -268,7 +268,7 @@ export default function ChatConversationScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
   },
   topBar: {
     flexDirection: "row",
@@ -276,8 +276,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingBottom: 12,
     borderBottomWidth: 0.5,
-    borderBottomColor: Colors.dark.border,
-    backgroundColor: Colors.dark.surface,
+    borderBottomColor: Colors.border,
+    backgroundColor: Colors.surface,
   },
   backButton: {
     padding: 4,
@@ -289,12 +289,12 @@ const styles = StyleSheet.create({
   topBarTitle: {
     fontSize: 18,
     fontFamily: "Inter_700Bold",
-    color: Colors.dark.text,
+    color: Colors.text,
   },
   topBarSubtitle: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     marginTop: 1,
   },
   centerContent: {
@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   emptyChatText: {
     fontSize: 14,
     fontFamily: "Inter_500Medium",
-    color: Colors.dark.textMuted,
+    color: Colors.textSecondary,
   },
   bubbleContainer: {
     maxWidth: "80%",
@@ -340,11 +340,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   ownBubble: {
-    backgroundColor: Colors.dark.accent,
+    backgroundColor: Colors.accent,
     borderBottomRightRadius: 4,
   },
   otherBubble: {
-    backgroundColor: Colors.dark.surfaceLight,
+    backgroundColor: Colors.surfaceLight,
     borderBottomLeftRadius: 4,
   },
   messageText: {
@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   otherText: {
-    color: Colors.dark.text,
+    color: Colors.text,
   },
   locationContent: {
     flexDirection: "row",
@@ -373,16 +373,16 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.6)",
   },
   otherTimeStamp: {
-    color: Colors.dark.textMuted,
+    color: Colors.textSecondary,
   },
   inputBar: {
     flexDirection: "row",
     alignItems: "flex-end",
     paddingHorizontal: 12,
     paddingTop: 10,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderTopWidth: 0.5,
-    borderTopColor: Colors.dark.border,
+    borderTopColor: Colors.border,
     gap: 8,
   },
   iconButton: {
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
   },
   inputWrapper: {
     flex: 1,
-    backgroundColor: Colors.dark.surfaceLight,
+    backgroundColor: Colors.surfaceLight,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: Platform.OS === "ios" ? 10 : 6,
@@ -400,19 +400,19 @@ const styles = StyleSheet.create({
   textInput: {
     fontSize: 15,
     fontFamily: "Inter_400Regular",
-    color: Colors.dark.text,
+    color: Colors.text,
     maxHeight: 100,
   },
   sendButton: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: Colors.dark.accent,
+    backgroundColor: Colors.accent,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 2,
   },
   sendButtonDisabled: {
-    backgroundColor: Colors.dark.surfaceLight,
+    backgroundColor: Colors.surfaceLight,
   },
 });

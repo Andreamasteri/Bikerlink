@@ -13,7 +13,7 @@ import {
 import { useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 
@@ -203,9 +203,9 @@ export default function RegisterScreen() {
           <MaterialCommunityIcons
             name="motorbike"
             size={48}
-            color={userType === "biker" ? Colors.dark.bikerColor : Colors.dark.textMuted}
+            color={userType === "biker" ? Colors.maleIcon : Colors.textSecondary}
           />
-          <Text style={[styles.typeLabel, userType === "biker" && { color: Colors.dark.bikerColor }]}>
+          <Text style={[styles.typeLabel, userType === "biker" && { color: Colors.maleIcon }]}>
             {t("register.step1.biker")}
           </Text>
         </TouchableOpacity>
@@ -218,9 +218,9 @@ export default function RegisterScreen() {
           <MaterialCommunityIcons
             name="seat-passenger"
             size={48}
-            color={userType === "zavorrina" ? Colors.dark.zavorrinaColor : Colors.dark.textMuted}
+            color={userType === "zavorrina" ? Colors.femaleIcon : Colors.textSecondary}
           />
-          <Text style={[styles.typeLabel, userType === "zavorrina" && { color: Colors.dark.zavorrinaColor }]}>
+          <Text style={[styles.typeLabel, userType === "zavorrina" && { color: Colors.femaleIcon }]}>
             {t("register.step1.zavorrina")}
           </Text>
         </TouchableOpacity>
@@ -233,9 +233,9 @@ export default function RegisterScreen() {
           <MaterialCommunityIcons
             name="account-group"
             size={48}
-            color={userType === "coppia" ? Colors.dark.coppiaColor : Colors.dark.textMuted}
+            color={userType === "coppia" ? Colors.accent : Colors.textSecondary}
           />
-          <Text style={[styles.typeLabel, userType === "coppia" && { color: Colors.dark.coppiaColor }]}>
+          <Text style={[styles.typeLabel, userType === "coppia" && { color: Colors.accent }]}>
             {t("register.step1.coppia")}
           </Text>
         </TouchableOpacity>
@@ -262,13 +262,13 @@ export default function RegisterScreen() {
                   <Ionicons
                     name={config.startsWith("M") ? "male" : "female"}
                     size={28}
-                    color={config.startsWith("M") ? Colors.dark.azzurro : Colors.dark.rosa}
+                    color={config.startsWith("M") ? Colors.maleIcon : Colors.femaleIcon}
                   />
                   <Text style={styles.plusSign}>+</Text>
                   <Ionicons
                     name={config.endsWith("M") ? "male" : "female"}
                     size={28}
-                    color={config.endsWith("M") ? Colors.dark.azzurro : Colors.dark.rosa}
+                    color={config.endsWith("M") ? Colors.maleIcon : Colors.femaleIcon}
                   />
                 </View>
                 <Text style={[styles.sexLabel, coupleSexConfig === config && styles.sexLabelSelected]}>
@@ -285,8 +285,8 @@ export default function RegisterScreen() {
             onPress={() => setSex("M")}
             testID="sex-male"
           >
-            <Ionicons name="male" size={48} color={sex === "M" ? Colors.dark.azzurro : Colors.dark.textMuted} />
-            <Text style={[styles.sexLabel, sex === "M" && { color: Colors.dark.azzurro }]}>
+            <Ionicons name="male" size={48} color={sex === "M" ? Colors.maleIcon : Colors.textSecondary} />
+            <Text style={[styles.sexLabel, sex === "M" && { color: Colors.maleIcon }]}>
               {t("register.step2.male")}
             </Text>
           </TouchableOpacity>
@@ -296,8 +296,8 @@ export default function RegisterScreen() {
             onPress={() => setSex("F")}
             testID="sex-female"
           >
-            <Ionicons name="female" size={48} color={sex === "F" ? Colors.dark.rosa : Colors.dark.textMuted} />
-            <Text style={[styles.sexLabel, sex === "F" && { color: Colors.dark.rosa }]}>
+            <Ionicons name="female" size={48} color={sex === "F" ? Colors.femaleIcon : Colors.textSecondary} />
+            <Text style={[styles.sexLabel, sex === "F" && { color: Colors.femaleIcon }]}>
               {t("register.step2.female")}
             </Text>
           </TouchableOpacity>
@@ -311,11 +311,11 @@ export default function RegisterScreen() {
       <Text style={styles.stepTitle}>{t("register.step3.title")}</Text>
 
       <View style={styles.inputWrapper}>
-        <Ionicons name="at" size={20} color={Colors.dark.textMuted} style={styles.inputIcon} />
+        <Ionicons name="at" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
         <TextInput
           style={styles.input}
           placeholder={t("auth.nickname")}
-          placeholderTextColor={Colors.dark.textMuted}
+          placeholderTextColor={Colors.textSecondary}
           value={nickname}
           onChangeText={setNickname}
           autoCapitalize="none"
@@ -325,11 +325,11 @@ export default function RegisterScreen() {
       </View>
 
       <View style={styles.inputWrapper}>
-        <Ionicons name="mail-outline" size={20} color={Colors.dark.textMuted} style={styles.inputIcon} />
+        <Ionicons name="mail-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
         <TextInput
           style={styles.input}
           placeholder={t("auth.email")}
-          placeholderTextColor={Colors.dark.textMuted}
+          placeholderTextColor={Colors.textSecondary}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
@@ -340,11 +340,11 @@ export default function RegisterScreen() {
       </View>
 
       <View style={styles.inputWrapper}>
-        <Ionicons name="call-outline" size={20} color={Colors.dark.textMuted} style={styles.inputIcon} />
+        <Ionicons name="call-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
         <TextInput
           style={styles.input}
           placeholder={`${t("auth.phone")} (opzionale)`}
-          placeholderTextColor={Colors.dark.textMuted}
+          placeholderTextColor={Colors.textSecondary}
           value={phone}
           onChangeText={setPhone}
           keyboardType="phone-pad"
@@ -353,11 +353,11 @@ export default function RegisterScreen() {
       </View>
 
       <View style={styles.inputWrapper}>
-        <Ionicons name="lock-closed-outline" size={20} color={Colors.dark.textMuted} style={styles.inputIcon} />
+        <Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
         <TextInput
           style={[styles.input, styles.passwordInput]}
           placeholder={t("auth.password")}
-          placeholderTextColor={Colors.dark.textMuted}
+          placeholderTextColor={Colors.textSecondary}
           value={password}
           onChangeText={setPassword}
           secureTextEntry={!showPassword}
@@ -368,17 +368,17 @@ export default function RegisterScreen() {
           <Ionicons
             name={showPassword ? "eye-off-outline" : "eye-outline"}
             size={22}
-            color={Colors.dark.textMuted}
+            color={Colors.textSecondary}
           />
         </TouchableOpacity>
       </View>
 
       <View style={styles.inputWrapper}>
-        <Ionicons name="calendar-outline" size={20} color={Colors.dark.textMuted} style={styles.inputIcon} />
+        <Ionicons name="calendar-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
         <TextInput
           style={styles.input}
           placeholder={`${t("auth.birthYear")} (opzionale)`}
-          placeholderTextColor={Colors.dark.textMuted}
+          placeholderTextColor={Colors.textSecondary}
           value={birthYear}
           onChangeText={setBirthYear}
           keyboardType="number-pad"
@@ -392,11 +392,11 @@ export default function RegisterScreen() {
         onPress={() => setShowRegions(!showRegions)}
         testID="reg-region-toggle"
       >
-        <Ionicons name="location-outline" size={20} color={Colors.dark.textMuted} style={styles.inputIcon} />
-        <Text style={[styles.input, { lineHeight: 52 }, !region && { color: Colors.dark.textMuted }]}>
+        <Ionicons name="location-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
+        <Text style={[styles.input, { lineHeight: 52 }, !region && { color: Colors.textSecondary }]}>
           {region || `${t("auth.region")} (opzionale)`}
         </Text>
-        <Ionicons name={showRegions ? "chevron-up" : "chevron-down"} size={20} color={Colors.dark.textMuted} />
+        <Ionicons name={showRegions ? "chevron-up" : "chevron-down"} size={20} color={Colors.textSecondary} />
       </TouchableOpacity>
 
       {showRegions && (
@@ -433,7 +433,7 @@ export default function RegisterScreen() {
         testID="eula-checkbox"
       >
         <View style={[styles.checkbox, eulaAccepted && styles.checkboxChecked]}>
-          {eulaAccepted && <Ionicons name="checkmark" size={16} color={Colors.dark.background} />}
+          {eulaAccepted && <Ionicons name="checkmark" size={16} color={Colors.background} />}
         </View>
         <Text style={styles.checkboxLabel}>{t("register.step4.accept")}</Text>
       </TouchableOpacity>
@@ -456,14 +456,14 @@ export default function RegisterScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <TouchableOpacity onPress={handleBack} style={styles.backButton} testID="register-back">
-          <Ionicons name="arrow-back" size={24} color={Colors.dark.text} />
+          <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </TouchableOpacity>
 
         {renderStepIndicator()}
 
         {error ? (
           <View style={styles.errorBanner}>
-            <Ionicons name="alert-circle" size={18} color={Colors.dark.error} />
+            <Ionicons name="alert-circle" size={18} color={Colors.error} />
             <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : null}
@@ -480,7 +480,7 @@ export default function RegisterScreen() {
           testID="register-next"
         >
           {registerMutation.isPending ? (
-            <ActivityIndicator color={Colors.dark.background} />
+            <ActivityIndicator color={Colors.background} />
           ) : (
             <Text style={styles.nextButtonText}>
               {step === totalSteps ? t("register.complete") : t("register.next")}
@@ -504,7 +504,7 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
   },
   container: {
     flexGrow: 1,
@@ -525,10 +525,10 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: Colors.dark.border,
+    backgroundColor: Colors.border,
   },
   stepDotActive: {
-    backgroundColor: Colors.dark.accent,
+    backgroundColor: Colors.accent,
     width: 28,
   },
   stepContent: {
@@ -538,12 +538,12 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: 26,
     fontWeight: "bold" as const,
-    color: Colors.dark.text,
+    color: Colors.text,
     textAlign: "center",
   },
   stepSubtitle: {
     fontSize: 15,
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     textAlign: "center",
   },
   typeGrid: {
@@ -555,22 +555,22 @@ const styles = StyleSheet.create({
   typeCard: {
     width: 100,
     height: 120,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
     gap: 8,
   },
   typeCardSelected: {
-    borderColor: Colors.dark.accent,
-    backgroundColor: Colors.dark.surfaceLight,
+    borderColor: Colors.accent,
+    backgroundColor: Colors.surfaceLight,
   },
   typeLabel: {
     fontSize: 13,
     fontWeight: "600" as const,
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
   },
   sexGrid: {
     flexDirection: "row",
@@ -579,12 +579,12 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   sexCard: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
     paddingVertical: 16,
     paddingHorizontal: 20,
     gap: 8,
@@ -594,16 +594,16 @@ const styles = StyleSheet.create({
     height: 130,
   },
   sexCardSelected: {
-    borderColor: Colors.dark.accent,
-    backgroundColor: Colors.dark.surfaceLight,
+    borderColor: Colors.accent,
+    backgroundColor: Colors.surfaceLight,
   },
   sexLabel: {
     fontSize: 14,
     fontWeight: "600" as const,
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
   },
   sexLabelSelected: {
-    color: Colors.dark.accent,
+    color: Colors.accent,
   },
   coupleIcons: {
     flexDirection: "row",
@@ -611,17 +611,17 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   plusSign: {
-    color: Colors.dark.textMuted,
+    color: Colors.textSecondary,
     fontSize: 18,
     fontWeight: "bold" as const,
   },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
     paddingHorizontal: 14,
     height: 52,
   },
@@ -630,7 +630,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 15,
     height: "100%",
   },
@@ -644,10 +644,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   regionList: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
     maxHeight: 200,
     overflow: "hidden",
   },
@@ -659,21 +659,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   regionItemSelected: {
-    backgroundColor: Colors.dark.surfaceLight,
+    backgroundColor: Colors.surfaceLight,
   },
   regionText: {
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 15,
   },
   regionTextSelected: {
-    color: Colors.dark.accent,
+    color: Colors.accent,
     fontWeight: "600" as const,
   },
   eulaContainer: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
     height: 280,
     overflow: "hidden",
   },
@@ -681,7 +681,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   eulaText: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 13,
     lineHeight: 20,
   },
@@ -696,16 +696,16 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
   checkboxChecked: {
-    backgroundColor: Colors.dark.accent,
-    borderColor: Colors.dark.accent,
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
   },
   checkboxLabel: {
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 14,
     flex: 1,
   },
@@ -720,12 +720,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   errorText: {
-    color: Colors.dark.error,
+    color: Colors.error,
     fontSize: 13,
     flex: 1,
   },
   nextButton: {
-    backgroundColor: Colors.dark.accent,
+    backgroundColor: Colors.accent,
     borderRadius: 12,
     height: 52,
     alignItems: "center",
@@ -735,7 +735,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   nextButtonText: {
-    color: Colors.dark.background,
+    color: Colors.background,
     fontSize: 17,
     fontWeight: "700" as const,
     letterSpacing: 0.5,
@@ -748,11 +748,11 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   loginPrompt: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 14,
   },
   loginLink: {
-    color: Colors.dark.accent,
+    color: Colors.accent,
     fontSize: 14,
     fontWeight: "600" as const,
   },

@@ -1,15 +1,15 @@
 import { Stack } from "expo-router";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 
 export default function AdminLayout() {
   return (
     <Stack
       screenOptions={{
         headerShown: true,
-        headerStyle: { backgroundColor: Colors.dark.surface },
-        headerTintColor: Colors.dark.accent,
-        headerTitleStyle: { color: Colors.dark.text, fontFamily: "Inter_600SemiBold" },
-        contentStyle: { backgroundColor: Colors.dark.background },
+        headerStyle: { backgroundColor: Colors.surface },
+        headerTintColor: Colors.accent,
+        headerTitleStyle: { color: Colors.text, fontFamily: "Inter_600SemiBold" },
+        contentStyle: { backgroundColor: Colors.background },
       }}
     >
       <Stack.Screen name="index" options={{ title: "Pannello Admin" }} />

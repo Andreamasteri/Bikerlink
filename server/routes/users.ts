@@ -126,6 +126,48 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+router.get("/profile", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    const { password: _, ...safeUser } = user;
+    const profile = await storage.getUserProfile(userId);
+    return res.json({
+      ...safeUser,
+      ...(profile || {}),
+    });
+  } catch (error) {
+    console.error("Get user profile error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const { isAvailable, latitude, longitude } = req.body;
+    const existingProfile = await storage.getUserProfile(userId);
+    const updateData: Record<string, unknown> = {};
+    if (typeof isAvailable === "boolean") updateData.isAvailable = isAvailable;
+    if (latitude !== undefined) updateData.latitude = latitude;
+    if (longitude !== undefined) updateData.longitude = longitude;
+
+    if (existingProfile) {
+      const profile = await storage.updateUserProfile(userId, updateData as any);
+      return res.json(profile);
+    } else {
+      const profile = await storage.createUserProfile({ userId, ...updateData } as any);
+      return res.json(profile);
+    }
+  } catch (error) {
+    console.error("Update dynamic profile error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/me/availability", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;

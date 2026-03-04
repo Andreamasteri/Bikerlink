@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, TextInput, M
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
 interface Workshop {
@@ -80,14 +80,14 @@ export default function AdminWorkshops() {
           {item.address && <Text style={styles.detail}>{item.address}</Text>}
           {item.phone && <Text style={styles.detail}>{item.phone}</Text>}
           <View style={styles.badges}>
-            <View style={[styles.badge, { backgroundColor: item.isApproved ? Colors.dark.success + "33" : Colors.dark.warning + "33" }]}>
-              <Text style={[styles.badgeText, { color: item.isApproved ? Colors.dark.success : Colors.dark.warning }]}>
+            <View style={[styles.badge, { backgroundColor: item.isApproved ? Colors.success + "33" : Colors.warning + "33" }]}>
+              <Text style={[styles.badgeText, { color: item.isApproved ? Colors.success : Colors.warning }]}>
                 {item.isApproved ? "Approvata" : "In attesa"}
               </Text>
             </View>
             {item.isSynecoPartner && (
-              <View style={[styles.badge, { backgroundColor: Colors.dark.accent + "33" }]}>
-                <Text style={[styles.badgeText, { color: Colors.dark.accent }]}>Syneco</Text>
+              <View style={[styles.badge, { backgroundColor: Colors.accent + "33" }]}>
+                <Text style={[styles.badgeText, { color: Colors.accent }]}>Syneco</Text>
               </View>
             )}
           </View>
@@ -95,11 +95,11 @@ export default function AdminWorkshops() {
         <View style={styles.actions}>
           {!item.isApproved && (
             <TouchableOpacity onPress={() => approveMutation.mutate(item.id)}>
-              <MaterialIcons name="check-circle" size={24} color={Colors.dark.success} />
+              <MaterialIcons name="check-circle" size={24} color={Colors.success} />
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={() => handleDelete(item)}>
-            <MaterialIcons name="delete" size={24} color={Colors.dark.error} />
+            <MaterialIcons name="delete" size={24} color={Colors.error} />
           </TouchableOpacity>
         </View>
       </View>
@@ -121,7 +121,7 @@ export default function AdminWorkshops() {
       />
 
       <TouchableOpacity style={styles.fab} onPress={() => setShowModal(true)}>
-        <MaterialIcons name="add" size={28} color={Colors.dark.background} />
+        <MaterialIcons name="add" size={28} color={Colors.background} />
       </TouchableOpacity>
 
       <Modal visible={showModal} animationType="slide" transparent>
@@ -130,14 +130,14 @@ export default function AdminWorkshops() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Nuova Officina</Text>
               <TouchableOpacity onPress={() => setShowModal(false)}>
-                <MaterialIcons name="close" size={24} color={Colors.dark.textSecondary} />
+                <MaterialIcons name="close" size={24} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
             <ScrollView>
-              <TextInput style={styles.input} placeholder="Nome *" placeholderTextColor={Colors.dark.textMuted} value={formName} onChangeText={setFormName} />
-              <TextInput style={styles.input} placeholder="Indirizzo" placeholderTextColor={Colors.dark.textMuted} value={formAddress} onChangeText={setFormAddress} />
-              <TextInput style={styles.input} placeholder="Telefono" placeholderTextColor={Colors.dark.textMuted} value={formPhone} onChangeText={setFormPhone} keyboardType="phone-pad" />
-              <TextInput style={styles.input} placeholder="Email" placeholderTextColor={Colors.dark.textMuted} value={formEmail} onChangeText={setFormEmail} keyboardType="email-address" />
+              <TextInput style={styles.input} placeholder="Nome *" placeholderTextColor={Colors.textSecondary} value={formName} onChangeText={setFormName} />
+              <TextInput style={styles.input} placeholder="Indirizzo" placeholderTextColor={Colors.textSecondary} value={formAddress} onChangeText={setFormAddress} />
+              <TextInput style={styles.input} placeholder="Telefono" placeholderTextColor={Colors.textSecondary} value={formPhone} onChangeText={setFormPhone} keyboardType="phone-pad" />
+              <TextInput style={styles.input} placeholder="Email" placeholderTextColor={Colors.textSecondary} value={formEmail} onChangeText={setFormEmail} keyboardType="email-address" />
               <TouchableOpacity
                 style={[styles.submitBtn, !formName && styles.submitBtnDisabled]}
                 disabled={!formName || createMutation.isPending}
@@ -154,33 +154,33 @@ export default function AdminWorkshops() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.dark.background },
+  container: { flex: 1, backgroundColor: Colors.background },
   card: {
-    backgroundColor: Colors.dark.surface, borderRadius: 12, padding: 16, marginBottom: 12,
-    flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: Colors.dark.border,
+    backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 12,
+    flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: Colors.border,
   },
   info: { flex: 1 },
-  name: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.dark.text },
-  detail: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.dark.textSecondary, marginTop: 2 },
+  name: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.text },
+  detail: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   badges: { flexDirection: "row", gap: 6, marginTop: 8 },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   badgeText: { fontFamily: "Inter_500Medium", fontSize: 11 },
   actions: { flexDirection: "row", gap: 12 },
-  emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.dark.textSecondary, textAlign: "center", marginTop: 40 },
+  emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", marginTop: 40 },
   fab: {
     position: "absolute", bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28,
-    backgroundColor: Colors.dark.accent, alignItems: "center", justifyContent: "center",
+    backgroundColor: Colors.accent, alignItems: "center", justifyContent: "center",
     shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5,
   },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
-  modalContent: { backgroundColor: Colors.dark.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "80%" },
+  modalContent: { backgroundColor: Colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "80%" },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
-  modalTitle: { fontFamily: "Inter_600SemiBold", fontSize: 18, color: Colors.dark.text },
+  modalTitle: { fontFamily: "Inter_600SemiBold", fontSize: 18, color: Colors.text },
   input: {
-    backgroundColor: Colors.dark.background, borderRadius: 12, padding: 14, marginBottom: 12,
-    fontFamily: "Inter_400Regular", fontSize: 15, color: Colors.dark.text, borderWidth: 1, borderColor: Colors.dark.border,
+    backgroundColor: Colors.background, borderRadius: 12, padding: 14, marginBottom: 12,
+    fontFamily: "Inter_400Regular", fontSize: 15, color: Colors.text, borderWidth: 1, borderColor: Colors.border,
   },
-  submitBtn: { backgroundColor: Colors.dark.accent, borderRadius: 12, padding: 16, alignItems: "center", marginTop: 8 },
+  submitBtn: { backgroundColor: Colors.accent, borderRadius: 12, padding: 16, alignItems: "center", marginTop: 8 },
   submitBtnDisabled: { opacity: 0.5 },
-  submitBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.dark.background },
+  submitBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.background },
 });

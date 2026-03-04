@@ -52,7 +52,7 @@ function WinnerItem({ item, index }: { item: PhotoWinner; index: number }) {
           Settimana {item.weekNumber}/{item.year}
         </Text>
         <View style={styles.votesRow}>
-          <MaterialCommunityIcons name="heart" size={14} color={Colors.dark.rosa} />
+          <MaterialCommunityIcons name="heart" size={14} color={Colors.femaleIcon} />
           <Text style={styles.winnerVotes}>{item.totalVotes} voti</Text>
         </View>
       </View>
@@ -73,14 +73,14 @@ export default function WinnersScreen() {
         options={{
           headerShown: true,
           title: t("contest.winners"),
-          headerStyle: { backgroundColor: Colors.dark.surface },
-          headerTintColor: Colors.dark.text,
+          headerStyle: { backgroundColor: Colors.surface },
+          headerTintColor: Colors.text,
         }}
       />
       <View style={styles.container}>
         {isLoading ? (
           <View style={styles.center}>
-            <ActivityIndicator size="large" color={Colors.dark.accent} />
+            <ActivityIndicator size="large" color={Colors.accent} />
           </View>
         ) : (
           <FlatList
@@ -102,7 +102,7 @@ export default function WinnersScreen() {
                 <MaterialCommunityIcons
                   name="trophy-outline"
                   size={48}
-                  color={Colors.dark.textMuted}
+                  color={Colors.textSecondary}
                 />
                 <Text style={styles.emptyText}>Nessun vincitore ancora</Text>
                 <Text style={styles.emptySubtext}>
@@ -120,7 +120,7 @@ export default function WinnersScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
   },
   center: {
     flex: 1,
@@ -133,24 +133,24 @@ const styles = StyleSheet.create({
   winnerCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
   },
   winnerRank: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.dark.surfaceLight,
+    backgroundColor: Colors.surfaceLight,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 14,
   },
   rankNumber: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 16,
     fontWeight: "700" as const,
   },
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   winnerWeek: {
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 15,
     fontWeight: "600" as const,
   },
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   winnerVotes: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 13,
   },
   emptyContainer: {
@@ -178,12 +178,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   emptyText: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 16,
     fontWeight: "600" as const,
   },
   emptySubtext: {
-    color: Colors.dark.textMuted,
+    color: Colors.textSecondary,
     fontSize: 13,
     textAlign: "center",
     paddingHorizontal: 40,

@@ -12,7 +12,7 @@ import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 
@@ -70,10 +70,10 @@ function formatTime(dateStr: string): string {
 
 function getUserTypeColor(userType: string): string {
   switch (userType) {
-    case "biker": return Colors.dark.bikerColor;
-    case "zavorrina": return Colors.dark.zavorrinaColor;
-    case "coppia": return Colors.dark.coppiaColor;
-    default: return Colors.dark.textSecondary;
+    case "biker": return Colors.maleIcon;
+    case "zavorrina": return Colors.femaleIcon;
+    case "coppia": return Colors.accent;
+    default: return Colors.textSecondary;
   }
 }
 
@@ -86,7 +86,7 @@ function ConversationRow({ item, userId, onPress }: { item: ConversationItem; us
 
   return (
     <TouchableOpacity style={styles.conversationRow} onPress={onPress} activeOpacity={0.7}>
-      <View style={[styles.avatar, { backgroundColor: isGroup ? Colors.dark.accent : getUserTypeColor(other?.userType || "biker") }]}>
+      <View style={[styles.avatar, { backgroundColor: isGroup ? Colors.accent : getUserTypeColor(other?.userType || "biker") }]}>
         <Ionicons
           name={isGroup ? "people" : "person"}
           size={22}
@@ -154,11 +154,11 @@ export default function ChatScreen() {
 
       {isLoading ? (
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={Colors.dark.accent} />
+          <ActivityIndicator size="large" color={Colors.accent} />
         </View>
       ) : !conversations || conversations.length === 0 ? (
         <View style={styles.centerContent}>
-          <Ionicons name="chatbubbles-outline" size={48} color={Colors.dark.textMuted} />
+          <Ionicons name="chatbubbles-outline" size={48} color={Colors.textSecondary} />
           <Text style={styles.emptyText}>{t("common.noResults")}</Text>
           <Text style={styles.emptySubtext}>Le conversazioni appariranno qui</Text>
         </View>
@@ -178,18 +178,18 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
   },
   header: {
     paddingHorizontal: 20,
     paddingBottom: 12,
     borderBottomWidth: 0.5,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: Colors.border,
   },
   headerTitle: {
     fontSize: 28,
     fontFamily: "Inter_700Bold",
-    color: Colors.dark.text,
+    color: Colors.text,
   },
   centerContent: {
     flex: 1,
@@ -200,12 +200,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
   },
   emptySubtext: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
-    color: Colors.dark.textMuted,
+    color: Colors.textSecondary,
   },
   listContent: {
     paddingTop: 8,
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
   conversationTitle: {
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.dark.text,
+    color: Colors.text,
     flex: 1,
     marginRight: 8,
   },
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    color: Colors.dark.textMuted,
+    color: Colors.textSecondary,
   },
   conversationFooter: {
     flexDirection: "row",
@@ -256,16 +256,16 @@ const styles = StyleSheet.create({
   previewText: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
-    color: Colors.dark.textMuted,
+    color: Colors.textSecondary,
     flex: 1,
     marginRight: 8,
   },
   unreadPreview: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontFamily: "Inter_500Medium",
   },
   unreadBadge: {
-    backgroundColor: Colors.dark.accent,
+    backgroundColor: Colors.accent,
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -276,6 +276,6 @@ const styles = StyleSheet.create({
   unreadBadgeText: {
     fontSize: 11,
     fontFamily: "Inter_700Bold",
-    color: Colors.dark.background,
+    color: Colors.background,
   },
 });

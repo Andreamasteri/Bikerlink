@@ -59,6 +59,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin", adminRoutes);
   app.use("/api/moderator", moderatorRoutes);
 
+  app.get("/api/settings/syneco-branding", (_req, res) => {
+    res.json({ visible: true });
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

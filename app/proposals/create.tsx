@@ -14,16 +14,16 @@ import { useRouter, Stack } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 
 const PROPOSAL_TYPES = [
-  { key: "giro", label: "Giro", icon: "motorbike", color: Colors.dark.azzurro, forTypes: ["biker", "coppia"] },
-  { key: "raduno", label: "Raduno", icon: "account-group", color: Colors.dark.accent, forTypes: ["biker", "coppia"] },
-  { key: "con_zavorrina", label: "Con zavorrina", icon: "seat-passenger", color: Colors.dark.rosa, forTypes: ["biker"] },
-  { key: "richiesta", label: "Richiesta passaggio", icon: "hand-wave", color: Colors.dark.rosa, forTypes: ["zavorrina"] },
+  { key: "giro", label: "Giro", icon: "motorbike", color: Colors.maleIcon, forTypes: ["biker", "coppia"] },
+  { key: "raduno", label: "Raduno", icon: "account-group", color: Colors.accent, forTypes: ["biker", "coppia"] },
+  { key: "con_zavorrina", label: "Con zavorrina", icon: "seat-passenger", color: Colors.femaleIcon, forTypes: ["biker"] },
+  { key: "richiesta", label: "Richiesta passaggio", icon: "hand-wave", color: Colors.femaleIcon, forTypes: ["zavorrina"] },
 ];
 
 export default function CreateProposalScreen() {
@@ -92,11 +92,11 @@ export default function CreateProposalScreen() {
         options={{
           headerShown: true,
           title: t("proposals.create"),
-          headerStyle: { backgroundColor: Colors.dark.surface },
-          headerTintColor: Colors.dark.text,
+          headerStyle: { backgroundColor: Colors.surface },
+          headerTintColor: Colors.text,
           headerLeft: () => (
             <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="close" size={24} color={Colors.dark.text} />
+              <Ionicons name="close" size={24} color={Colors.text} />
             </TouchableOpacity>
           ),
         }}
@@ -123,7 +123,7 @@ export default function CreateProposalScreen() {
               <MaterialCommunityIcons
                 name={pt.icon as any}
                 size={32}
-                color={proposalType === pt.key ? pt.color : Colors.dark.textSecondary}
+                color={proposalType === pt.key ? pt.color : Colors.textSecondary}
               />
               <Text
                 style={[
@@ -143,7 +143,7 @@ export default function CreateProposalScreen() {
           value={title}
           onChangeText={setTitle}
           placeholder="Es: Giro sui colli toscani"
-          placeholderTextColor={Colors.dark.textMuted}
+          placeholderTextColor={Colors.textSecondary}
           maxLength={200}
         />
 
@@ -153,7 +153,7 @@ export default function CreateProposalScreen() {
           value={description}
           onChangeText={setDescription}
           placeholder="Descrivi la proposta..."
-          placeholderTextColor={Colors.dark.textMuted}
+          placeholderTextColor={Colors.textSecondary}
           multiline
           numberOfLines={4}
           textAlignVertical="top"
@@ -165,7 +165,7 @@ export default function CreateProposalScreen() {
           value={departureAddress}
           onChangeText={setDepartureAddress}
           placeholder="Es: Piazza del Duomo, Firenze"
-          placeholderTextColor={Colors.dark.textMuted}
+          placeholderTextColor={Colors.textSecondary}
         />
 
         <Text style={styles.sectionTitle}>{t("proposals.date")}</Text>
@@ -174,7 +174,7 @@ export default function CreateProposalScreen() {
           value={scheduledAt}
           onChangeText={setScheduledAt}
           placeholder="YYYY-MM-DD HH:MM"
-          placeholderTextColor={Colors.dark.textMuted}
+          placeholderTextColor={Colors.textSecondary}
         />
 
         <Text style={styles.sectionTitle}>Max partecipanti</Text>
@@ -183,7 +183,7 @@ export default function CreateProposalScreen() {
           value={maxParticipants}
           onChangeText={setMaxParticipants}
           placeholder="Lascia vuoto per illimitato"
-          placeholderTextColor={Colors.dark.textMuted}
+          placeholderTextColor={Colors.textSecondary}
           keyboardType="number-pad"
         />
 
@@ -215,13 +215,13 @@ export default function CreateProposalScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.background,
   },
   content: {
     padding: 20,
   },
   sectionTitle: {
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 15,
     fontWeight: "600" as const,
     marginBottom: 8,
@@ -235,34 +235,34 @@ const styles = StyleSheet.create({
   typeCard: {
     flex: 1,
     minWidth: 140,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 14,
     padding: 16,
     alignItems: "center",
     gap: 8,
     borderWidth: 2,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
   },
   typeCardLabel: {
-    color: Colors.dark.textSecondary,
+    color: Colors.textSecondary,
     fontSize: 13,
     fontWeight: "600" as const,
     textAlign: "center",
   },
   input: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 14,
-    color: Colors.dark.text,
+    color: Colors.text,
     fontSize: 15,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.border,
   },
   textArea: {
     minHeight: 100,
   },
   submitButton: {
-    backgroundColor: Colors.dark.accent,
+    backgroundColor: Colors.accent,
     borderRadius: 14,
     paddingVertical: 16,
     flexDirection: "row",

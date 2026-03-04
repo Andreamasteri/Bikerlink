@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, TextInput, M
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors } from "@/constants/colors";
+import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
 interface Campaign {
@@ -77,18 +77,18 @@ export default function AdminAds() {
           <Text style={styles.name}>{item.name}</Text>
           <Text style={styles.detail}>{item.sponsor} | {item.displayMode}</Text>
           <Text style={styles.stats}>Impressioni: {item.impressions}</Text>
-          <View style={[styles.badge, { backgroundColor: item.isActive ? Colors.dark.success + "33" : Colors.dark.error + "33" }]}>
-            <Text style={[styles.badgeText, { color: item.isActive ? Colors.dark.success : Colors.dark.error }]}>
+          <View style={[styles.badge, { backgroundColor: item.isActive ? Colors.success + "33" : Colors.error + "33" }]}>
+            <Text style={[styles.badgeText, { color: item.isActive ? Colors.success : Colors.error }]}>
               {item.isActive ? "Attiva" : "Disattiva"}
             </Text>
           </View>
         </View>
         <View style={styles.actions}>
           <TouchableOpacity onPress={() => toggleMutation.mutate({ id: item.id, isActive: !item.isActive })}>
-            <MaterialIcons name={item.isActive ? "pause" : "play-arrow"} size={24} color={Colors.dark.textSecondary} />
+            <MaterialIcons name={item.isActive ? "pause" : "play-arrow"} size={24} color={Colors.textSecondary} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => handleDelete(item)}>
-            <MaterialIcons name="delete" size={24} color={Colors.dark.error} />
+            <MaterialIcons name="delete" size={24} color={Colors.error} />
           </TouchableOpacity>
         </View>
       </View>
@@ -110,7 +110,7 @@ export default function AdminAds() {
       />
 
       <TouchableOpacity style={styles.fab} onPress={() => setShowModal(true)}>
-        <MaterialIcons name="add" size={28} color={Colors.dark.background} />
+        <MaterialIcons name="add" size={28} color={Colors.background} />
       </TouchableOpacity>
 
       <Modal visible={showModal} animationType="slide" transparent>
@@ -119,15 +119,15 @@ export default function AdminAds() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Nuova Campagna</Text>
               <TouchableOpacity onPress={() => setShowModal(false)}>
-                <MaterialIcons name="close" size={24} color={Colors.dark.textSecondary} />
+                <MaterialIcons name="close" size={24} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
             <ScrollView>
-              <TextInput style={styles.input} placeholder="Nome campagna *" placeholderTextColor={Colors.dark.textMuted} value={formName} onChangeText={setFormName} />
-              <TextInput style={styles.input} placeholder="Sponsor" placeholderTextColor={Colors.dark.textMuted} value={formSponsor} onChangeText={setFormSponsor} />
-              <TextInput style={styles.input} placeholder="URL Immagine" placeholderTextColor={Colors.dark.textMuted} value={formImageUrl} onChangeText={setFormImageUrl} />
-              <TextInput style={styles.input} placeholder="URL Link" placeholderTextColor={Colors.dark.textMuted} value={formLinkUrl} onChangeText={setFormLinkUrl} />
-              <TextInput style={styles.input} placeholder="Descrizione" placeholderTextColor={Colors.dark.textMuted} value={formDescription} onChangeText={setFormDescription} multiline />
+              <TextInput style={styles.input} placeholder="Nome campagna *" placeholderTextColor={Colors.textSecondary} value={formName} onChangeText={setFormName} />
+              <TextInput style={styles.input} placeholder="Sponsor" placeholderTextColor={Colors.textSecondary} value={formSponsor} onChangeText={setFormSponsor} />
+              <TextInput style={styles.input} placeholder="URL Immagine" placeholderTextColor={Colors.textSecondary} value={formImageUrl} onChangeText={setFormImageUrl} />
+              <TextInput style={styles.input} placeholder="URL Link" placeholderTextColor={Colors.textSecondary} value={formLinkUrl} onChangeText={setFormLinkUrl} />
+              <TextInput style={styles.input} placeholder="Descrizione" placeholderTextColor={Colors.textSecondary} value={formDescription} onChangeText={setFormDescription} multiline />
               <Text style={styles.label}>Modalita display:</Text>
               <View style={styles.modeRow}>
                 {displayModes.map((mode) => (
@@ -160,39 +160,39 @@ export default function AdminAds() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.dark.background },
+  container: { flex: 1, backgroundColor: Colors.background },
   card: {
-    backgroundColor: Colors.dark.surface, borderRadius: 12, padding: 16, marginBottom: 12,
-    flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: Colors.dark.border,
+    backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 12,
+    flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: Colors.border,
   },
   info: { flex: 1 },
-  name: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.dark.text },
-  detail: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.dark.textSecondary, marginTop: 2 },
-  stats: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.dark.accent, marginTop: 4 },
+  name: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.text },
+  detail: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  stats: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.accent, marginTop: 4 },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, alignSelf: "flex-start", marginTop: 6 },
   badgeText: { fontFamily: "Inter_500Medium", fontSize: 11 },
   actions: { flexDirection: "row", gap: 12 },
-  emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.dark.textSecondary, textAlign: "center", marginTop: 40 },
+  emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", marginTop: 40 },
   fab: {
     position: "absolute", bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28,
-    backgroundColor: Colors.dark.accent, alignItems: "center", justifyContent: "center",
+    backgroundColor: Colors.accent, alignItems: "center", justifyContent: "center",
     shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5,
   },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
-  modalContent: { backgroundColor: Colors.dark.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "85%" },
+  modalContent: { backgroundColor: Colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "85%" },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
-  modalTitle: { fontFamily: "Inter_600SemiBold", fontSize: 18, color: Colors.dark.text },
+  modalTitle: { fontFamily: "Inter_600SemiBold", fontSize: 18, color: Colors.text },
   input: {
-    backgroundColor: Colors.dark.background, borderRadius: 12, padding: 14, marginBottom: 12,
-    fontFamily: "Inter_400Regular", fontSize: 15, color: Colors.dark.text, borderWidth: 1, borderColor: Colors.dark.border,
+    backgroundColor: Colors.background, borderRadius: 12, padding: 14, marginBottom: 12,
+    fontFamily: "Inter_400Regular", fontSize: 15, color: Colors.text, borderWidth: 1, borderColor: Colors.border,
   },
-  label: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.dark.textSecondary, marginBottom: 8 },
+  label: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.textSecondary, marginBottom: 8 },
   modeRow: { flexDirection: "row", gap: 8, marginBottom: 16, flexWrap: "wrap" },
-  modeBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: Colors.dark.background, borderWidth: 1, borderColor: Colors.dark.border },
-  modeBtnActive: { borderColor: Colors.dark.accent, backgroundColor: Colors.dark.accent + "22" },
-  modeBtnText: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.dark.textSecondary },
-  modeBtnTextActive: { color: Colors.dark.accent },
-  submitBtn: { backgroundColor: Colors.dark.accent, borderRadius: 12, padding: 16, alignItems: "center", marginTop: 8 },
+  modeBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
+  modeBtnActive: { borderColor: Colors.accent, backgroundColor: Colors.accent + "22" },
+  modeBtnText: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.textSecondary },
+  modeBtnTextActive: { color: Colors.accent },
+  submitBtn: { backgroundColor: Colors.accent, borderRadius: 12, padding: 16, alignItems: "center", marginTop: 8 },
   submitBtnDisabled: { opacity: 0.5 },
-  submitBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.dark.background },
+  submitBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.background },
 });
