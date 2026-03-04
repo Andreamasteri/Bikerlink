@@ -21,6 +21,7 @@ import { moderatorRouter } from "./routes/moderator";
 import { reportsRouter } from "./routes/reports";
 import { notificationsRouter } from "./routes/notifications";
 import { adsRouter } from "./routes/ads";
+import { feedbackRouter } from "./routes/feedback";
 import { setupWebSocket } from "./websocket";
 import { storage } from "./storage";
 import { uploadRateLimit, messageRateLimit } from "./middleware/security";
@@ -63,6 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/reports", reportsRouter);
   app.use("/api/notifications", notificationsRouter);
   app.use("/api/ads", adsRouter);
+  app.use("/api/feedback", feedbackRouter);
 
   await seedAdminAndDefaults();
 

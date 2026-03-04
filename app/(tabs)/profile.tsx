@@ -108,6 +108,7 @@ export default function ProfileScreen() {
         <MenuItem icon="create" label="Modifica Profilo" onPress={() => router.push("/profile/edit" as any)} />
         <MenuItem icon="chatbubbles" label="Le Mie Chat" onPress={() => router.push("/chat" as any)} />
         <MenuItem icon="gift" label="Easter Eggs Collezionati" onPress={() => router.push("/profile/easter-eggs" as any)} />
+        <MenuItem icon="chatbox-ellipses" label="Segnala Bug / Richieste" onPress={() => router.push("/feedback" as any)} color={Colors.warning} />
 
         {user.role === "admin" && (
           <MenuItem icon="shield" label="Pannello Admin" onPress={() => router.push("/admin" as any)} color={Colors.accent} />

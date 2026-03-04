@@ -699,6 +699,53 @@ export const storage = {
     return { valid: true };
   },
 
+  async createFeedbackTicket(data: { userId: string; type: (typeof schema.feedbackTicketTypeEnum)[number]; title: string; description: string; priority?: (typeof schema.feedbackTicketPriorityEnum)[number]; screenshotUrl?: string }) {
+    const [ticket] = await db.insert(schema.feedbackTickets).values(data).returning();
+    return ticket;
+  },
+
+  async getFeedbackTickets(statusFilter?: string) {
+    let query = db.select({ ticket: schema.feedbackTickets, user: schema.users })
+      .from(schema.feedbackTickets)
+      .innerJoin(schema.users, eq(schema.feedbackTickets.userId, schema.users.id));
+
+    if (statusFilter) {
+      return query
+        .where(eq(schema.feedbackTickets.status, statusFilter as any))
+        .orderBy(desc(schema.feedbackTickets.createdAt));
+    }
+    return query.orderBy(desc(schema.feedbackTickets.createdAt));
+  },
+
+  async getFeedbackTicketById(id: string) {
+    const [result] = await db.select({ ticket: schema.feedbackTickets, user: schema.users })
+      .from(schema.feedbackTickets)
+      .innerJoin(schema.users, eq(schema.feedbackTickets.userId, schema.users.id))
+      .where(eq(schema.feedbackTickets.id, id));
+    return result;
+  },
+
+  async updateFeedbackTicket(id: string, data: Partial<schema.FeedbackTicket>) {
+    const [ticket] = await db.update(schema.feedbackTickets)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.feedbackTickets.id, id))
+      .returning();
+    return ticket;
+  },
+
+  async getFeedbackTicketsByUser(userId: string) {
+    return db.select().from(schema.feedbackTickets)
+      .where(eq(schema.feedbackTickets.userId, userId))
+      .orderBy(desc(schema.feedbackTickets.createdAt));
+  },
+
+  async countNewFeedbackTickets() {
+    const [result] = await db.select({ count: count() })
+      .from(schema.feedbackTickets)
+      .where(eq(schema.feedbackTickets.status, "nuovo"));
+    return result?.count || 0;
+  },
+
   async seedDefaultSettings() {
     const defaults: Record<string, string> = {
       splash_image_url: "",

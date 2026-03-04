@@ -371,6 +371,76 @@ adminRouter.post("/invitation-codes/validate", requireAuth, requireAdmin, async 
   }
 });
 
+adminRouter.get("/feedback", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const statusFilter = req.query.status as string | undefined;
+    const results = await storage.getFeedbackTickets(statusFilter);
+    res.json({
+      tickets: results.map(r => ({
+        ...r.ticket,
+        user: { id: r.user.id, nickname: r.user.nickname, email: r.user.email, userType: r.user.userType },
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Errore nel caricamento feedback" });
+  }
+});
+
+adminRouter.get("/feedback/count", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const count = await storage.countNewFeedbackTickets();
+    res.json({ count });
+  } catch (err) {
+    res.status(500).json({ message: "Errore nel conteggio feedback" });
+  }
+});
+
+adminRouter.get("/feedback/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await storage.getFeedbackTicketById(req.params.id);
+    if (!result) return res.status(404).json({ message: "Ticket non trovato" });
+    res.json({
+      ticket: result.ticket,
+      user: { id: result.user.id, nickname: result.user.nickname, email: result.user.email, userType: result.user.userType },
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Errore nel caricamento ticket" });
+  }
+});
+
+adminRouter.put("/feedback/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { status, adminResponse } = req.body;
+    const existing = await storage.getFeedbackTicketById(req.params.id);
+    if (!existing) return res.status(404).json({ message: "Ticket non trovato" });
+
+    const updateData: any = {};
+    if (status) updateData.status = status;
+    if (adminResponse !== undefined) updateData.adminResponse = adminResponse;
+    if (status === "risolto" || status === "rifiutato") {
+      updateData.resolvedAt = new Date();
+    }
+
+    const ticket = await storage.updateFeedbackTicket(req.params.id, updateData);
+
+    if ((status === "risolto" || status === "rifiutato") && existing.ticket.userId) {
+      const typeLabel = existing.ticket.type === "bug" ? "Bug Report" : "Richiesta Funzionalità";
+      const statusLabel = status === "risolto" ? "Risolto" : "Rifiutato";
+      await storage.createNotification({
+        userId: existing.ticket.userId,
+        title: `${typeLabel}: ${statusLabel}`,
+        body: adminResponse || `La tua segnalazione "${existing.ticket.title}" è stata ${status === "risolto" ? "risolta" : "rifiutata"}.`,
+        type: "feedback_response",
+        relatedId: req.params.id,
+      });
+    }
+
+    res.json({ ticket, message: "Ticket aggiornato" });
+  } catch (err) {
+    res.status(500).json({ message: "Errore nell'aggiornamento ticket" });
+  }
+});
+
 adminRouter.get("/settings/backup", requireAuth, requireAdmin, async (req, res) => {
   const enabled = await storage.getSetting("gdrive_backup_enabled");
   res.json({ enabled: enabled === "true", status: "coming_soon" });

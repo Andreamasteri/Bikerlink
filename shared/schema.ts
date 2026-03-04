@@ -502,6 +502,29 @@ export const invitationCodes = pgTable("invitation_codes", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const feedbackTicketTypeEnum = ["bug", "richiesta_funzionalita"] as const;
+export const feedbackTicketStatusEnum = ["nuovo", "in_lavorazione", "risolto", "rifiutato"] as const;
+export const feedbackTicketPriorityEnum = ["bassa", "media", "alta"] as const;
+
+export const feedbackTickets = pgTable("feedback_tickets", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  type: text("type", { enum: feedbackTicketTypeEnum }).notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  status: text("status", { enum: feedbackTicketStatusEnum }).notNull().default("nuovo"),
+  adminResponse: text("admin_response"),
+  priority: text("priority", { enum: feedbackTicketPriorityEnum }).notNull().default("media"),
+  screenshotUrl: text("screenshot_url"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
 export const notifications = pgTable("notifications", {
   id: varchar("id")
     .primaryKey()
@@ -565,3 +588,4 @@ export type PhotoWinner = typeof photoWinners.$inferSelect;
 export type ModeratorLog = typeof moderatorLogs.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type InvitationCode = typeof invitationCodes.$inferSelect;
+export type FeedbackTicket = typeof feedbackTickets.$inferSelect;

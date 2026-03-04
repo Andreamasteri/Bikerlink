@@ -14,6 +14,7 @@ export default function AdminLayout() {
       <Stack.Screen name="moderator-logs" options={{ headerTitle: "Log Moderatori" }} />
       <Stack.Screen name="analytics" options={{ headerTitle: "Analytics" }} />
       <Stack.Screen name="invitation-codes" options={{ headerTitle: "Codici Invito" }} />
+      <Stack.Screen name="feedback" options={{ headerTitle: "Bug & Richieste" }} />
     </Stack>
   );
 }
