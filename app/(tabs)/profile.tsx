@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   Platform,
   Alert,
+  Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
@@ -18,6 +19,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { user, profile, logout } = useAuth();
   const insets = useSafeAreaInsets();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   if (!user) return null;
 
@@ -49,11 +51,9 @@ export default function ProfileScreen() {
 
   const handleLogout = () => {
     if (Platform.OS === "web") {
-      if (window.confirm("Vuoi davvero uscire?")) {
-        doLogout();
-      }
+      setShowLogoutModal(true);
     } else {
-      Alert.alert("Logout", "Vuoi davvero uscire?", [
+      Alert.alert("Logout", "Sei sicuro di voler uscire?", [
         { text: "Annulla", style: "cancel" },
         { text: "Esci", onPress: doLogout, style: "destructive" },
       ]);
@@ -130,6 +130,23 @@ export default function ProfileScreen() {
 
         <MenuItem icon="log-out" label="Logout" onPress={handleLogout} color={Colors.accentRed} />
       </View>
+
+      <Modal visible={showLogoutModal} transparent animationType="fade" onRequestClose={() => setShowLogoutModal(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setShowLogoutModal(false)}>
+          <View style={styles.modalContent}>
+            <Ionicons name="log-out" size={32} color={Colors.accentRed} />
+            <Text style={styles.modalTitle}>Sei sicuro di voler uscire?</Text>
+            <View style={styles.modalButtons}>
+              <Pressable style={styles.modalBtnCancel} onPress={() => setShowLogoutModal(false)}>
+                <Text style={styles.modalBtnCancelText}>Annulla</Text>
+              </Pressable>
+              <Pressable style={styles.modalBtnConfirm} onPress={() => { setShowLogoutModal(false); doLogout(); }}>
+                <Text style={styles.modalBtnConfirmText}>Esci</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }
@@ -150,4 +167,12 @@ const styles = StyleSheet.create({
   infoValue: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.text, marginTop: 2 },
   menuItem: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: Colors.surface, borderRadius: 12, padding: 14, marginBottom: 8 },
   menuLabel: { flex: 1, fontSize: 16, fontFamily: "Inter_500Medium", color: Colors.text },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },
+  modalContent: { backgroundColor: Colors.surface, borderRadius: 16, padding: 24, alignItems: "center", width: 300, gap: 16 },
+  modalTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold", color: Colors.text, textAlign: "center" },
+  modalButtons: { flexDirection: "row", gap: 12, width: "100%" },
+  modalBtnCancel: { flex: 1, backgroundColor: Colors.background, borderRadius: 10, padding: 12, alignItems: "center" },
+  modalBtnCancelText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary },
+  modalBtnConfirm: { flex: 1, backgroundColor: Colors.accentRed, borderRadius: 10, padding: 12, alignItems: "center" },
+  modalBtnConfirmText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });

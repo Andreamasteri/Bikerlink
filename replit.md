@@ -24,7 +24,7 @@
 3. **Chat**: Private and group chat with WebSocket, phone-number filter
 4. **Route Tracking**: GPS route recording with distance/duration
 5. **Photo Contest**: Submit photos, vote, admin publish results
-6. **Interactive Map**: Syneco-authorized workshops on map
+6. **Interactive Map**: OpenStreetMap (web) / react-native-maps (native), with Syneco workshops, nearby user markers
 7. **Easter Eggs**: Collectible location-based easter eggs
 8. **Feedback System**: Bug reports & feature requests from users → admin panel with badge, admin responses with notifications
 9. **Reports**: User-to-user behavior reports → admin only
@@ -53,7 +53,7 @@ users, proposals, chat_rooms, chat_messages, routes, contest_photos, workshops, 
 - `/api/moderator/*` — moderator endpoints
 
 ## Credentials (Dev)
-- Admin: admin@bikerlink.it / admin2025!
+- Admin: admin@bikerlink.it / admin2025! (username: admin)
 - Test users: user1-user30 @ userN@test.it / test
 
 ## Color Palette

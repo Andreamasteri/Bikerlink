@@ -91,7 +91,7 @@ async function seedAdminAndDefaults() {
       const passwordHash = await bcrypt.hash(adminPassword, 10);
       await storage.createUser({
         email: "admin@bikerlink.it",
-        nickname: "AdminBikerLink",
+        nickname: "admin",
         passwordHash,
         sex: "male",
         birthYear: 1990,
@@ -108,7 +108,11 @@ async function seedAdminAndDefaults() {
       console.log("[SEED] Admin creato: admin@bikerlink.it / admin2025!");
     } else {
       const passwordHash = await bcrypt.hash(adminPassword, 10);
-      await storage.updateUser(admin.id, { passwordHash });
+      const updates: any = { passwordHash };
+      if (admin.nickname !== "admin") {
+        updates.nickname = "admin";
+      }
+      await storage.updateUser(admin.id, updates);
       console.log("[SEED] Admin password aggiornata: admin@bikerlink.it / admin2025!");
     }
 
