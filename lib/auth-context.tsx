@@ -8,6 +8,7 @@ type SafeUser = Omit<User, "password">;
 interface AuthContextValue {
   user: SafeUser | null | undefined;
   isLoading: boolean;
+  isAuthenticated: boolean;
   loginMutation: ReturnType<typeof useLoginMutation>;
   registerMutation: ReturnType<typeof useRegisterMutation>;
   logoutMutation: ReturnType<typeof useLogoutMutation>;
@@ -79,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user: userQuery.data,
       isLoading: userQuery.isLoading,
+      isAuthenticated: !!userQuery.data,
       loginMutation,
       registerMutation,
       logoutMutation,

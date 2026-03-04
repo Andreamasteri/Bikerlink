@@ -36,6 +36,9 @@ export default function LoginScreen() {
     loginMutation.mutate(
       { identifier: identifier.trim(), password },
       {
+        onSuccess: () => {
+          router.replace("/(tabs)");
+        },
         onError: (err: any) => {
           const msg = err?.message || "Errore durante il login";
           const cleaned = msg.replace(/^\d+:\s*/, "");
