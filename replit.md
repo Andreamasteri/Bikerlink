@@ -121,6 +121,8 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - **Verifica email**: attivabile/disattivabile dall'admin (default OFF). Token stampato in console. Schermata `verify-email.tsx`.
 - **Selettore preferenza biker**: nel profilo, sceglie chi cercare (Solo Biker / Solo Zavorrine / Entrambi). Campo `searchPreference` in `user_profiles`.
 - **Colori icona profilo**: azzurro maschi, rosa donne, giallo oro coppie. `Colors.coupleIcon: '#FFD700'`
+- **Privacy Policy**: pagina separata con testo GDPR placeholder, caricabile dall'admin come file .txt. Link in welcome, registrazione e profilo. API: `GET /api/settings/privacy-policy`
+- **Cancellazione account**: richiesta con 30 giorni di attesa, annullabile dal profilo. Endpoint: `POST /api/users/me/request-deletion`, `POST /api/users/me/cancel-deletion`. Colonne `deletionRequestedAt`, `deletionScheduledFor` in `users`.
 - **Ready to Ride**: fix bug accesso dati (`.isAvailable` flat, non `.profile.isAvailable`)
 - **Tab labels**: fontSize aumentato a 11
 

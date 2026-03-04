@@ -37,6 +37,7 @@ interface ProfileData {
   avatarUrl?: string;
   role: string;
   status: string;
+  deletionRequestedAt?: string;
   profile?: {
     isAvailable: boolean;
     bio?: string;
@@ -159,6 +160,25 @@ export default function ProfileScreen() {
     },
   });
 
+  const requestDeletionMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/users/me/request-deletion");
+    },
+    onSuccess: () => {
+      Alert.alert("Account programmato per la cancellazione");
+      logoutMutation.mutate();
+    },
+  });
+
+  const cancelDeletionMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/users/me/cancel-deletion");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+    },
+  });
+
   const deleteMotoMutation = useMutation({
     mutationFn: async (motoId: string) => {
       await apiRequest("DELETE", `/api/motorcycles/${motoId}`);
@@ -205,6 +225,31 @@ export default function ProfileScreen() {
   const doLogout = async () => {
     logoutMutation.mutate();
   };
+
+  const handleRequestDeletion = useCallback(() => {
+    requestDeletionMutation.mutate();
+  }, []);
+
+  const handleDeleteAccount = useCallback(() => {
+    if (Platform.OS === "web") {
+      if (confirm("Il tuo account sarà cancellato definitivamente tra 30 giorni. Durante questo periodo puoi annullare la cancellazione effettuando il login. Vuoi procedere?")) {
+        handleRequestDeletion();
+      }
+    } else {
+      Alert.alert(
+        "Elimina Account",
+        "Il tuo account sarà cancellato definitivamente tra 30 giorni. Durante questo periodo puoi annullare la cancellazione effettuando il login. Vuoi procedere?",
+        [
+          { text: "Annulla", style: "cancel" },
+          {
+            text: "Elimina",
+            style: "destructive",
+            onPress: handleRequestDeletion,
+          },
+        ]
+      );
+    }
+  }, []);
 
   const handleLogout = useCallback(() => {
     if (Platform.OS === "web") {
@@ -314,6 +359,23 @@ export default function ProfileScreen() {
           </View>
         </View>
       </View>
+
+      {profile?.deletionRequestedAt && (
+        <View style={styles.deletionBanner}>
+          <Ionicons name="warning" size={20} color="#000" />
+          <Text style={styles.deletionBannerText}>
+            Il tuo account sarà eliminato il{" "}
+            {new Date(new Date(profile.deletionRequestedAt).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("it-IT")}.
+            {" "}Puoi annullare questa richiesta.
+          </Text>
+          <Pressable
+            style={styles.deletionCancelBtn}
+            onPress={() => cancelDeletionMutation.mutate()}
+          >
+            <Text style={styles.deletionCancelBtnText}>Annulla cancellazione</Text>
+          </Pressable>
+        </View>
+      )}
 
       {profile?.profile?.bio ? (
         <View style={styles.section}>
@@ -524,7 +586,9 @@ export default function ProfileScreen() {
           <MenuItem icon="eye" label="Pannello Moderatore" onPress={() => router.push("/moderator" as any)} color={Colors.warning} />
         )}
 
+        <MenuItem icon="document-text-outline" label="Privacy Policy" onPress={() => router.push("/privacy-policy" as any)} />
         <MenuItem icon="log-out" label="Logout" onPress={handleLogout} color={Colors.accentRed} />
+        <MenuItem icon="trash-outline" label="Elimina account" onPress={handleDeleteAccount} color={Colors.accentRed} />
       </View>
 
       <Modal visible={showLogoutModal} transparent animationType="fade" onRequestClose={() => setShowLogoutModal(false)}>
@@ -920,6 +984,33 @@ const styles = StyleSheet.create({
   },
   modalBtnConfirmText: {
     fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
+  },
+  deletionBanner: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    backgroundColor: Colors.warning,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+    gap: 8,
+  },
+  deletionBannerText: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: "#000",
+    textAlign: "center",
+  },
+  deletionCancelBtn: {
+    backgroundColor: "#000",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  deletionCancelBtnText: {
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
     color: "#fff",
   },

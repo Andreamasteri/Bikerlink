@@ -62,6 +62,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin", adminRoutes);
   app.use("/api/moderator", moderatorRoutes);
 
+  app.get("/api/settings/privacy-policy", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("privacy_policy_text");
+      const text = setting?.value || "";
+      res.json({ text });
+    } catch {
+      res.json({ text: "" });
+    }
+  });
+
   app.get("/api/settings/email-verification", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("email_verification_enabled");

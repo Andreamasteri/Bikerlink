@@ -312,4 +312,27 @@ router.delete("/me/photos/:id", requireAuth, async (req: Request, res: Response)
   }
 });
 
+router.post("/me/request-deletion", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    await storage.requestUserDeletion(userId);
+    req.session.destroy(() => {});
+    return res.json({ message: "Richiesta di cancellazione inviata. Il tuo account sarà eliminato tra 30 giorni." });
+  } catch (error) {
+    console.error("Request deletion error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/me/cancel-deletion", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    await storage.cancelUserDeletion(userId);
+    return res.json({ message: "Richiesta di cancellazione annullata." });
+  } catch (error) {
+    console.error("Cancel deletion error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 export default router;

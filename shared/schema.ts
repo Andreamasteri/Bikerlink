@@ -32,6 +32,8 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   emailVerified: boolean("email_verified").notNull().default(false),
   eulaAccepted: boolean("eula_accepted").notNull().default(false),
+  deletionRequestedAt: timestamp("deletion_requested_at"),
+  deletionScheduledFor: timestamp("deletion_scheduled_for"),
   invitationCode: varchar("invitation_code", { length: 50 }),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -372,7 +374,7 @@ export const reports = pgTable("reports", {
   description: text("description"),
   status: varchar("status", { length: 20 }).notNull().default("pending"),
   resolvedBy: varchar("resolved_by", { length: 36 })
-    .references(() => users.id),
+    .references(() => users.id, { onDelete: "set null" }),
   resolvedAt: timestamp("resolved_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
@@ -503,7 +505,7 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   id: varchar("id", { length: 36 })
     .primaryKey()
     .default(sql`gen_random_uuid()`),
-  userId: varchar("user_id", { length: 36 }).notNull(),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   token: varchar("token", { length: 64 }).notNull().unique(),
   expiresAt: timestamp("expires_at").notNull(),
   used: boolean("used").notNull().default(false),

@@ -106,6 +106,9 @@ export default function WelcomeScreen() {
           {synecoVisible && (
             <Text style={styles.sponsorText}>powered by Syneco Lubrificanti</Text>
           )}
+          <Pressable onPress={() => router.push("/privacy-policy")}>
+            <Text style={styles.privacyLink}>Privacy Policy</Text>
+          </Pressable>
         </Animated.View>
       </View>
     </ImageBackground>
@@ -187,5 +190,12 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     textAlign: "center",
+  },
+  privacyLink: {
+    marginTop: 15,
+    fontSize: 12,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    textDecorationLine: "underline" as const,
   },
 });

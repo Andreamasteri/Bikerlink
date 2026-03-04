@@ -83,6 +83,20 @@ export default function AdminSettings() {
 
   const [isUploadingEula, setIsUploadingEula] = useState(false);
 
+  const [privacyPolicyText, setPrivacyPolicyText] = useState("");
+  const [isUploadingPrivacy, setIsUploadingPrivacy] = useState(false);
+  const [isSavingPrivacy, setIsSavingPrivacy] = useState(false);
+
+  const { data: privacyData } = useQuery<{ text: string }>({
+    queryKey: ["/api/settings/privacy-policy"],
+  });
+
+  React.useEffect(() => {
+    if (privacyData?.text !== undefined) {
+      setPrivacyPolicyText(privacyData.text);
+    }
+  }, [privacyData?.text]);
+
   const updateMutation = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
       const baseUrl = getApiUrl();
@@ -152,6 +166,72 @@ export default function AdminSettings() {
       Alert.alert("Errore", error.message || "Errore durante l'upload del file");
     } finally {
       setIsUploadingEula(false);
+    }
+  }
+
+  async function handleSavePrivacyPolicy() {
+    try {
+      setIsSavingPrivacy(true);
+      await apiRequest("PUT", "/api/admin/settings/privacy_policy_text", { value: privacyPolicyText });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/privacy-policy"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      Alert.alert("Successo", "Privacy Policy salvata con successo");
+    } catch (error: any) {
+      Alert.alert("Errore", error.message || "Errore durante il salvataggio");
+    } finally {
+      setIsSavingPrivacy(false);
+    }
+  }
+
+  async function handleUploadPrivacyPolicy() {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "text/plain",
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      setIsUploadingPrivacy(true);
+
+      const formData = new FormData();
+      formData.append("file", {
+        uri: asset.uri,
+        name: asset.name || "privacy-policy.txt",
+        type: "text/plain",
+      } as any);
+
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/privacy-policy/upload", baseUrl);
+
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: "Errore durante l'upload" }));
+        Alert.alert("Errore", errorData.message || "Errore durante l'upload");
+        return;
+      }
+
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/privacy-policy"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+
+      if (data.value) {
+        setPrivacyPolicyText(data.value);
+      }
+
+      Alert.alert("Successo", "Privacy Policy caricata con successo");
+    } catch (error: any) {
+      Alert.alert("Errore", error.message || "Errore durante l'upload del file");
+    } finally {
+      setIsUploadingPrivacy(false);
     }
   }
 
@@ -273,6 +353,46 @@ export default function AdminSettings() {
           </View>
         ))
       )}
+
+      <View style={styles.privacyCard}>
+        <View style={styles.privacyHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="document-text-outline" size={20} color={Colors.accent} />
+            <Text style={styles.synecoLabel}>Privacy Policy</Text>
+          </View>
+          <View style={styles.settingActions}>
+            <TouchableOpacity
+              style={styles.uploadBtn}
+              onPress={handleUploadPrivacyPolicy}
+              disabled={isUploadingPrivacy}
+            >
+              {isUploadingPrivacy ? (
+                <ActivityIndicator size="small" color={Colors.accent} />
+              ) : (
+                <Ionicons name="cloud-upload" size={20} color={Colors.accent} />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+        <TextInput
+          style={[styles.input, { marginTop: 12, minHeight: 120 }]}
+          placeholder="Inserisci il testo della Privacy Policy..."
+          placeholderTextColor={Colors.textSecondary}
+          value={privacyPolicyText}
+          onChangeText={setPrivacyPolicyText}
+          multiline
+          numberOfLines={6}
+        />
+        <View style={styles.editActions}>
+          <TouchableOpacity
+            style={styles.saveBtn}
+            onPress={handleSavePrivacyPolicy}
+            disabled={isSavingPrivacy}
+          >
+            <Text style={styles.saveBtnText}>{isSavingPrivacy ? "..." : "Salva"}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </ScrollView>
   );
 }
@@ -312,4 +432,9 @@ const styles = StyleSheet.create({
   cancelBtnText: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.textSecondary },
   saveBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: Colors.accent },
   saveBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.background },
+  privacyCard: {
+    backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginTop: 16,
+    borderWidth: 1, borderColor: Colors.accent,
+  },
+  privacyHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
 });

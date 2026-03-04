@@ -477,6 +477,35 @@ router.post("/settings/eula/upload", eulaUpload.single("file"), async (req: Requ
   }
 });
 
+router.post("/settings/privacy-policy/upload", eulaUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "Nessun file caricato" });
+    }
+
+    const content = fs.readFileSync(req.file.path, "utf-8");
+    fs.unlinkSync(req.file.path);
+
+    const setting = await storage.upsertAppSetting("privacy_policy_text", content);
+
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "upload_privacy_policy",
+      targetType: "app_setting",
+      targetId: "privacy_policy_text",
+      details: "Privacy Policy caricata da file .txt",
+    });
+
+    return res.json({ message: "Privacy Policy caricata con successo", value: content, setting });
+  } catch (error) {
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    console.error("Admin upload Privacy Policy error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.get("/logs", async (_req: Request, res: Response) => {
   try {
     const logs = await storage.getModeratorLogs();

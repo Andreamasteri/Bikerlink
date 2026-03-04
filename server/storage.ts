@@ -888,6 +888,26 @@ export class DatabaseStorage implements IStorage {
   async markUserEmailVerified(userId: string): Promise<void> {
     await db.update(users).set({ emailVerified: true }).where(eq(users.id, userId));
   }
+
+  async requestUserDeletion(userId: string): Promise<void> {
+    const now = new Date();
+    const scheduledFor = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    await db.update(users).set({
+      deletionRequestedAt: now,
+      deletionScheduledFor: scheduledFor,
+    }).where(eq(users.id, userId));
+  }
+
+  async cancelUserDeletion(userId: string): Promise<void> {
+    await db.update(users).set({
+      deletionRequestedAt: null,
+      deletionScheduledFor: null,
+    }).where(eq(users.id, userId));
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    await db.delete(users).where(eq(users.id, userId));
+  }
 }
 
 export const storage = new DatabaseStorage();

@@ -560,6 +560,9 @@ export default function RegisterScreen() {
         </View>
         <Text style={styles.checkboxLabel}>{t("register.step4.accept")}</Text>
       </TouchableOpacity>
+      <TouchableOpacity onPress={() => router.push("/privacy-policy")}>
+        <Text style={styles.privacyLink}>Privacy Policy</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -977,5 +980,12 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
+  },
+  privacyLink: {
+    marginTop: 10,
+    fontSize: 12,
+    color: Colors.accent,
+    textAlign: "center" as const,
+    textDecorationLine: "underline" as const,
   },
 });
