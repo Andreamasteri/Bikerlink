@@ -1,0 +1,322 @@
+import { useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Platform,
+} from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import RouteMap from "@/components/RouteMap";
+import { apiRequest, getQueryFn } from "@/lib/query-client";
+import { Colors } from "@/constants/colors";
+import { t } from "@/lib/i18n";
+
+interface RouteDetail {
+  id: string;
+  title: string | null;
+  trackingFrequency: number;
+  status: string;
+  totalDistanceKm: number | null;
+  maxSpeedKmh: number | null;
+  avgSpeedKmh: number | null;
+  maxAltitude: number | null;
+  durationSeconds: number | null;
+  likes: number;
+  startedAt: string;
+  stoppedAt: string | null;
+  points: Array<{
+    id: string;
+    latitude: number;
+    longitude: number;
+    altitude: number | null;
+    speedKmh: number | null;
+    timestamp: string;
+  }>;
+}
+
+export default function RouteDetailScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
+
+  const { data: route, isLoading } = useQuery<RouteDetail>({
+    queryKey: ["/api/routes", id],
+    queryFn: getQueryFn({ on401: "throw" }),
+  });
+
+  const likeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/routes/${id}/like`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/routes", id] });
+    },
+  });
+
+  const formatDuration = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h.toString().padStart(2, "0")}:${m
+      .toString()
+      .padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("it-IT", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={Colors.dark.accent} />
+      </View>
+    );
+  }
+
+  if (!route) {
+    return (
+      <View style={styles.center}>
+        <MaterialCommunityIcons
+          name="map-marker-off"
+          size={64}
+          color={Colors.dark.textMuted}
+        />
+        <Text style={styles.emptyText}>Percorso non trovato</Text>
+      </View>
+    );
+  }
+
+  const pts = route.points || [];
+  const hasPoints = pts.length > 0;
+
+  const region = hasPoints
+    ? {
+        latitude: pts[Math.floor(pts.length / 2)].latitude,
+        longitude: pts[Math.floor(pts.length / 2)].longitude,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      }
+    : { latitude: 41.9, longitude: 12.5, latitudeDelta: 5, longitudeDelta: 5 };
+
+  return (
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+    >
+      <RouteMap
+        points={pts.map((p) => ({ latitude: p.latitude, longitude: p.longitude }))}
+        height={260}
+        showMarkers={true}
+      />
+
+      <View style={styles.header}>
+        <Text style={styles.title}>
+          {route.title || `Percorso del ${formatDate(route.startedAt)}`}
+        </Text>
+        <View style={styles.statusRow}>
+          <View
+            style={[
+              styles.statusBadge,
+              {
+                backgroundColor:
+                  route.status === "completed"
+                    ? Colors.dark.success
+                    : Colors.dark.warning,
+              },
+            ]}
+          >
+            <Text style={styles.statusText}>
+              {route.status === "completed" ? "Completato" : "Attivo"}
+            </Text>
+          </View>
+          <Text style={styles.dateText}>{formatDate(route.startedAt)}</Text>
+        </View>
+      </View>
+
+      <View style={styles.statsGrid}>
+        <StatCard
+          icon="road-variant"
+          label={t("tracking.distance")}
+          value={`${(route.totalDistanceKm ?? 0).toFixed(2)} km`}
+        />
+        <StatCard
+          icon="speedometer"
+          label="Vel. Media"
+          value={`${(route.avgSpeedKmh ?? 0).toFixed(1)} km/h`}
+        />
+        <StatCard
+          icon="speedometer-medium"
+          label="Vel. Max"
+          value={`${(route.maxSpeedKmh ?? 0).toFixed(1)} km/h`}
+        />
+        <StatCard
+          icon="mountain"
+          label="Alt. Max"
+          value={`${(route.maxAltitude ?? 0).toFixed(0)} m`}
+        />
+        <StatCard
+          icon="timer-outline"
+          label={t("tracking.duration")}
+          value={formatDuration(route.durationSeconds ?? 0)}
+        />
+        <StatCard
+          icon="map-marker-multiple"
+          label="Punti GPS"
+          value={`${pts.length}`}
+        />
+      </View>
+
+      <View style={styles.actionsRow}>
+        <TouchableOpacity
+          style={styles.likeButton}
+          onPress={() => likeMutation.mutate()}
+          disabled={likeMutation.isPending}
+        >
+          <MaterialCommunityIcons
+            name="heart"
+            size={22}
+            color={Colors.dark.rosa}
+          />
+          <Text style={styles.likeText}>{route.likes}</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={styles.statCard}>
+      <MaterialCommunityIcons
+        name={icon as any}
+        size={22}
+        color={Colors.dark.accent}
+      />
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statValue}>{value}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.dark.background,
+  },
+  center: {
+    flex: 1,
+    backgroundColor: Colors.dark.background,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyText: {
+    color: Colors.dark.textMuted,
+    fontSize: 16,
+    marginTop: 12,
+  },
+  mapWrapper: {
+    height: 260,
+    borderRadius: 0,
+    overflow: "hidden",
+  },
+  map: {
+    flex: 1,
+  },
+  header: {
+    padding: 20,
+  },
+  title: {
+    color: Colors.dark.text,
+    fontSize: 22,
+    fontWeight: "700" as const,
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+    gap: 12,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600" as const,
+  },
+  dateText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 13,
+  },
+  statsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  statCard: {
+    width: "31%" as any,
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 14,
+    padding: 14,
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  statLabel: {
+    color: Colors.dark.textMuted,
+    fontSize: 11,
+    marginTop: 6,
+    textAlign: "center",
+  },
+  statValue: {
+    color: Colors.dark.text,
+    fontSize: 16,
+    fontWeight: "700" as const,
+    marginTop: 2,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    paddingVertical: 20,
+  },
+  likeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.dark.surface,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 20,
+    gap: 8,
+  },
+  likeText: {
+    color: Colors.dark.text,
+    fontSize: 16,
+    fontWeight: "600" as const,
+  },
+});

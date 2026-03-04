@@ -1,20 +1,584 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  varchar,
+  integer,
+  boolean,
+  timestamp,
+  doublePrecision,
+  jsonb,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
-  id: varchar("id")
+  id: varchar("id", { length: 36 })
     .primaryKey()
     .default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
+  nickname: varchar("nickname", { length: 50 }).notNull().unique(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  phone: varchar("phone", { length: 30 }),
   password: text("password").notNull(),
+  userType: varchar("user_type", { length: 20 }).notNull().default("biker"),
+  sex: varchar("sex", { length: 5 }),
+  coupleSexConfig: varchar("couple_sex_config", { length: 10 }),
+  role: varchar("role", { length: 20 }).notNull().default("user"),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  birthYear: integer("birth_year"),
+  region: varchar("region", { length: 100 }),
+  avatarUrl: text("avatar_url"),
+  eulaAccepted: boolean("eula_accepted").notNull().default(false),
+  invitationCode: varchar("invitation_code", { length: 50 }),
+  lastLoginAt: timestamp("last_login_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const userPhotos = pgTable("user_photos", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  photoUrl: text("photo_url").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isApproved: boolean("is_approved").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("user_photos_user_id_idx").on(table.userId),
+]);
+
+export const userMotorcycles = pgTable("user_motorcycles", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  brand: varchar("brand", { length: 100 }).notNull(),
+  model: varchar("model", { length: 100 }).notNull(),
+  year: integer("year"),
+  displacement: integer("displacement"),
+  motorcycleType: varchar("motorcycle_type", { length: 50 }),
+  ridingStyle: varchar("riding_style", { length: 50 }),
+  photoUrl: text("photo_url"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("user_motorcycles_user_id_idx").on(table.userId),
+]);
+
+export const userProfiles = pgTable("user_profiles", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  isAvailable: boolean("is_available").notNull().default(false),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
+  maxPickupDistance: integer("max_pickup_distance").default(50),
+  bio: text("bio"),
+  totalKm: doublePrecision("total_km").notNull().default(0),
+  totalRides: integer("total_rides").notNull().default(0),
+  easterEggsCollected: integer("easter_eggs_collected").notNull().default(0),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("user_profiles_user_id_idx").on(table.userId),
+  index("user_profiles_location_idx").on(table.latitude, table.longitude),
+]);
+
+export const proposals = pgTable("proposals", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  proposalType: varchar("proposal_type", { length: 30 }).notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  departureLatitude: doublePrecision("departure_latitude"),
+  departureLongitude: doublePrecision("departure_longitude"),
+  departureAddress: text("departure_address"),
+  scheduledAt: timestamp("scheduled_at"),
+  maxParticipants: integer("max_participants"),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("proposals_user_id_idx").on(table.userId),
+  index("proposals_status_idx").on(table.status),
+]);
+
+export const proposalParticipants = pgTable("proposal_participants", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  proposalId: varchar("proposal_id", { length: 36 })
+    .notNull()
+    .references(() => proposals.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  joinedAt: timestamp("joined_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("proposal_participants_unique_idx").on(table.proposalId, table.userId),
+]);
+
+export const conversations = pgTable("conversations", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  conversationType: varchar("conversation_type", { length: 20 }).notNull().default("private"),
+  title: varchar("title", { length: 200 }),
+  proposalId: varchar("proposal_id", { length: 36 })
+    .references(() => proposals.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
+export const conversationParticipants = pgTable("conversation_participants", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id", { length: 36 })
+    .notNull()
+    .references(() => conversations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  joinedAt: timestamp("joined_at").notNull().defaultNow(),
+  lastReadAt: timestamp("last_read_at"),
+}, (table) => [
+  uniqueIndex("conversation_participants_unique_idx").on(table.conversationId, table.userId),
+  index("conversation_participants_user_id_idx").on(table.userId),
+]);
+
+export const messages = pgTable("messages", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id", { length: 36 })
+    .notNull()
+    .references(() => conversations.id, { onDelete: "cascade" }),
+  senderId: varchar("sender_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  messageType: varchar("message_type", { length: 20 }).notNull().default("text"),
+  content: text("content"),
+  imageUrl: text("image_url"),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
+  isFiltered: boolean("is_filtered").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("messages_conversation_id_idx").on(table.conversationId),
+  index("messages_sender_id_idx").on(table.senderId),
+]);
+
+export const routes = pgTable("routes", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 200 }),
+  trackingFrequency: integer("tracking_frequency").notNull().default(5),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  totalDistanceKm: doublePrecision("total_distance_km").default(0),
+  maxSpeedKmh: doublePrecision("max_speed_kmh").default(0),
+  avgSpeedKmh: doublePrecision("avg_speed_kmh").default(0),
+  maxAltitude: doublePrecision("max_altitude").default(0),
+  durationSeconds: integer("duration_seconds").default(0),
+  likes: integer("likes").notNull().default(0),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  stoppedAt: timestamp("stopped_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("routes_user_id_idx").on(table.userId),
+]);
+
+export const routePoints = pgTable("route_points", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  routeId: varchar("route_id", { length: 36 })
+    .notNull()
+    .references(() => routes.id, { onDelete: "cascade" }),
+  latitude: doublePrecision("latitude").notNull(),
+  longitude: doublePrecision("longitude").notNull(),
+  altitude: doublePrecision("altitude"),
+  speedKmh: doublePrecision("speed_kmh"),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+}, (table) => [
+  index("route_points_route_id_idx").on(table.routeId),
+]);
+
+export const photoContestEntries = pgTable("photo_contest_entries", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  photoUrl: text("photo_url").notNull(),
+  caption: text("caption"),
+  weekNumber: integer("week_number").notNull(),
+  year: integer("year").notNull(),
+  votesCount: integer("votes_count").notNull().default(0),
+  isApproved: boolean("is_approved").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("photo_contest_entries_user_id_idx").on(table.userId),
+  index("photo_contest_entries_week_idx").on(table.weekNumber, table.year),
+]);
+
+export const photoVotes = pgTable("photo_votes", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  entryId: varchar("entry_id", { length: 36 })
+    .notNull()
+    .references(() => photoContestEntries.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("photo_votes_unique_idx").on(table.entryId, table.userId),
+]);
+
+export const dailyVoteCounts = pgTable("daily_vote_counts", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  voteDate: varchar("vote_date", { length: 10 }).notNull(),
+  count: integer("count").notNull().default(0),
+}, (table) => [
+  uniqueIndex("daily_vote_counts_unique_idx").on(table.userId, table.voteDate),
+]);
+
+export const photoWinners = pgTable("photo_winners", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  entryId: varchar("entry_id", { length: 36 })
+    .notNull()
+    .references(() => photoContestEntries.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  weekNumber: integer("week_number").notNull(),
+  year: integer("year").notNull(),
+  totalVotes: integer("total_votes").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const workshops = pgTable("workshops", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 200 }).notNull(),
+  address: text("address"),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
+  phone: varchar("phone", { length: 30 }),
+  whatsapp: varchar("whatsapp", { length: 30 }),
+  email: varchar("email", { length: 255 }),
+  website: text("website"),
+  description: text("description"),
+  openingHours: jsonb("opening_hours"),
+  logoUrl: text("logo_url"),
+  qrCode: text("qr_code"),
+  isSynecoPartner: boolean("is_syneco_partner").notNull().default(false),
+  isApproved: boolean("is_approved").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("workshops_location_idx").on(table.latitude, table.longitude),
+]);
+
+export const workshopContacts = pgTable("workshop_contacts", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  workshopId: varchar("workshop_id", { length: 36 })
+    .notNull()
+    .references(() => workshops.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  contactType: varchar("contact_type", { length: 20 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("workshop_contacts_workshop_id_idx").on(table.workshopId),
+]);
+
+export const easterEggs = pgTable("easter_eggs", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  latitude: doublePrecision("latitude").notNull(),
+  longitude: doublePrecision("longitude").notNull(),
+  radius: integer("radius").notNull().default(100),
+  iconUrl: text("icon_url"),
+  points: integer("points").notNull().default(10),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("easter_eggs_location_idx").on(table.latitude, table.longitude),
+]);
+
+export const collectedEasterEggs = pgTable("collected_easter_eggs", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  easterEggId: varchar("easter_egg_id", { length: 36 })
+    .notNull()
+    .references(() => easterEggs.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  collectedAt: timestamp("collected_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("collected_easter_eggs_unique_idx").on(table.easterEggId, table.userId),
+]);
+
+export const reports = pgTable("reports", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  reporterId: varchar("reporter_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  reportedUserId: varchar("reported_user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  reason: varchar("reason", { length: 100 }).notNull(),
+  description: text("description"),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  resolvedBy: varchar("resolved_by", { length: 36 })
+    .references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("reports_status_idx").on(table.status),
+]);
+
+export const moderatorLogs = pgTable("moderator_logs", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  moderatorId: varchar("moderator_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  action: varchar("action", { length: 100 }).notNull(),
+  targetType: varchar("target_type", { length: 50 }).notNull(),
+  targetId: varchar("target_id", { length: 36 }).notNull(),
+  details: text("details"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const adCampaigns = pgTable("ad_campaigns", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 200 }).notNull(),
+  sponsor: varchar("sponsor", { length: 200 }).notNull().default("Syneco Lubrificanti"),
+  imageUrl: text("image_url"),
+  linkUrl: text("link_url"),
+  displayMode: varchar("display_mode", { length: 30 }).notNull().default("banner"),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  impressions: integer("impressions").notNull().default(0),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const adClicks = pgTable("ad_clicks", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id", { length: 36 })
+    .notNull()
+    .references(() => adCampaigns.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 })
+    .references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("ad_clicks_campaign_id_idx").on(table.campaignId),
+]);
+
+export const notifications = pgTable("notifications", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 200 }).notNull(),
+  body: text("body"),
+  notificationType: varchar("notification_type", { length: 50 }).notNull(),
+  referenceType: varchar("reference_type", { length: 50 }),
+  referenceId: varchar("reference_id", { length: 36 }),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("notifications_user_id_idx").on(table.userId),
+]);
+
+export const invitationCodes = pgTable("invitation_codes", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  code: varchar("code", { length: 50 }).notNull().unique(),
+  createdBy: varchar("created_by", { length: 36 })
+    .references(() => users.id, { onDelete: "set null" }),
+  usedBy: varchar("used_by", { length: 36 })
+    .references(() => users.id, { onDelete: "set null" }),
+  maxUses: integer("max_uses").notNull().default(1),
+  currentUses: integer("current_uses").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const feedbackTickets = pgTable("feedback_tickets", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .references(() => users.id, { onDelete: "set null" }),
+  ticketType: varchar("ticket_type", { length: 30 }).notNull().default("feedback"),
+  subject: varchar("subject", { length: 200 }).notNull(),
+  message: text("message").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("open"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const appSettings = pgTable("app_settings", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  key: varchar("key", { length: 100 }).notNull().unique(),
+  value: text("value"),
+  valueJson: jsonb("value_json"),
+  description: text("description"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const verificationCodes = pgTable("verification_codes", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .references(() => users.id, { onDelete: "cascade" }),
+  codeType: varchar("code_type", { length: 30 }).notNull(),
+  code: varchar("code", { length: 10 }).notNull(),
+  target: varchar("target", { length: 255 }).notNull(),
+  isUsed: boolean("is_used").notNull().default(false),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("verification_codes_target_idx").on(table.target),
+]);
+
+export const registerSchema = z.object({
+  nickname: z.string().min(3).max(50),
+  email: z.string().email(),
+  phone: z.string().optional(),
+  password: z
+    .string()
+    .min(8, "La password deve avere almeno 8 caratteri")
+    .regex(/[A-Z]/, "La password deve contenere almeno una lettera maiuscola")
+    .regex(/[a-z]/, "La password deve contenere almeno una lettera minuscola")
+    .regex(/[0-9]/, "La password deve contenere almeno un numero"),
+  userType: z.enum(["biker", "zavorrina", "coppia"]),
+  sex: z.enum(["M", "F"]).optional(),
+  coupleSexConfig: z.enum(["M+M", "M+F", "F+F"]).optional(),
+  birthYear: z.number().int().min(1940).max(2010).optional(),
+  region: z.string().max(100).optional(),
+  eulaAccepted: z.literal(true, {
+    errorMap: () => ({ message: "Devi accettare i termini di utilizzo" }),
+  }),
+  invitationCode: z.string().optional(),
+});
+
+export const loginSchema = z.object({
+  identifier: z.string().min(1, "Inserisci email o nickname"),
+  password: z.string().min(1, "Inserisci la password"),
+});
+
 export type User = typeof users.$inferSelect;
+export type InsertUser = typeof users.$inferInsert;
+export type UserPhoto = typeof userPhotos.$inferSelect;
+export type InsertUserPhoto = typeof userPhotos.$inferInsert;
+export type UserMotorcycle = typeof userMotorcycles.$inferSelect;
+export type InsertUserMotorcycle = typeof userMotorcycles.$inferInsert;
+export type UserProfile = typeof userProfiles.$inferSelect;
+export type InsertUserProfile = typeof userProfiles.$inferInsert;
+export type Proposal = typeof proposals.$inferSelect;
+export type InsertProposal = typeof proposals.$inferInsert;
+export type ProposalParticipant = typeof proposalParticipants.$inferSelect;
+export type InsertProposalParticipant = typeof proposalParticipants.$inferInsert;
+export type Conversation = typeof conversations.$inferSelect;
+export type InsertConversation = typeof conversations.$inferInsert;
+export type ConversationParticipant = typeof conversationParticipants.$inferSelect;
+export type InsertConversationParticipant = typeof conversationParticipants.$inferInsert;
+export type Message = typeof messages.$inferSelect;
+export type InsertMessage = typeof messages.$inferInsert;
+export type Route = typeof routes.$inferSelect;
+export type InsertRoute = typeof routes.$inferInsert;
+export type RoutePoint = typeof routePoints.$inferSelect;
+export type InsertRoutePoint = typeof routePoints.$inferInsert;
+export type PhotoContestEntry = typeof photoContestEntries.$inferSelect;
+export type InsertPhotoContestEntry = typeof photoContestEntries.$inferInsert;
+export type PhotoVote = typeof photoVotes.$inferSelect;
+export type InsertPhotoVote = typeof photoVotes.$inferInsert;
+export type DailyVoteCount = typeof dailyVoteCounts.$inferSelect;
+export type InsertDailyVoteCount = typeof dailyVoteCounts.$inferInsert;
+export type PhotoWinner = typeof photoWinners.$inferSelect;
+export type InsertPhotoWinner = typeof photoWinners.$inferInsert;
+export type Workshop = typeof workshops.$inferSelect;
+export type InsertWorkshop = typeof workshops.$inferInsert;
+export type WorkshopContact = typeof workshopContacts.$inferSelect;
+export type InsertWorkshopContact = typeof workshopContacts.$inferInsert;
+export type EasterEgg = typeof easterEggs.$inferSelect;
+export type InsertEasterEgg = typeof easterEggs.$inferInsert;
+export type CollectedEasterEgg = typeof collectedEasterEggs.$inferSelect;
+export type InsertCollectedEasterEgg = typeof collectedEasterEggs.$inferInsert;
+export type Report = typeof reports.$inferSelect;
+export type InsertReport = typeof reports.$inferInsert;
+export type ModeratorLog = typeof moderatorLogs.$inferSelect;
+export type InsertModeratorLog = typeof moderatorLogs.$inferInsert;
+export type AdCampaign = typeof adCampaigns.$inferSelect;
+export type InsertAdCampaign = typeof adCampaigns.$inferInsert;
+export type AdClick = typeof adClicks.$inferSelect;
+export type InsertAdClick = typeof adClicks.$inferInsert;
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;
+export type InvitationCode = typeof invitationCodes.$inferSelect;
+export type InsertInvitationCode = typeof invitationCodes.$inferInsert;
+export type FeedbackTicket = typeof feedbackTickets.$inferSelect;
+export type InsertFeedbackTicket = typeof feedbackTickets.$inferInsert;
+export type AppSetting = typeof appSettings.$inferSelect;
+export type InsertAppSetting = typeof appSettings.$inferInsert;
+export type VerificationCode = typeof verificationCodes.$inferSelect;
+export type InsertVerificationCode = typeof verificationCodes.$inferInsert;
+
+export type RegisterInput = z.infer<typeof registerSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;

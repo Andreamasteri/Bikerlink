@@ -1,0 +1,321 @@
+import { useState, useEffect, useRef } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Dimensions,
+  FlatList,
+  Linking,
+  Platform,
+} from "react-native";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { Colors } from "@/constants/colors";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  withSequence,
+  Easing,
+} from "react-native-reanimated";
+
+interface AdCampaign {
+  id: string;
+  name: string;
+  sponsor: string;
+  imageUrl: string | null;
+  linkUrl: string | null;
+  displayMode: string;
+  description: string | null;
+  isActive: boolean;
+  impressions: number;
+}
+
+type DisplayMode = "banner" | "card" | "carousel";
+
+interface SynecoAdProps {
+  displayMode?: DisplayMode;
+}
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+function AdBannerItem({ campaign, onPress }: { campaign: AdCampaign; onPress: () => void }) {
+  const shimmer = useSharedValue(0);
+
+  useEffect(() => {
+    shimmer.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      false
+    );
+  }, []);
+
+  const accentStyle = useAnimatedStyle(() => ({
+    opacity: 0.6 + shimmer.value * 0.4,
+  }));
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      style={styles.bannerContainer}
+    >
+      <View style={styles.bannerInner}>
+        <View style={styles.bannerIconWrap}>
+          <MaterialCommunityIcons
+            name="oil"
+            size={22}
+            color={Colors.dark.accent}
+          />
+        </View>
+        <View style={styles.bannerTextWrap}>
+          <Text style={styles.bannerTitle} numberOfLines={1}>
+            {campaign.name}
+          </Text>
+          <Animated.Text style={[styles.bannerSponsor, accentStyle]}>
+            {campaign.sponsor}
+          </Animated.Text>
+        </View>
+        <MaterialCommunityIcons
+          name="chevron-right"
+          size={20}
+          color={Colors.dark.textMuted}
+        />
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function AdCardItem({ campaign, onPress }: { campaign: AdCampaign; onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      style={styles.cardContainer}
+    >
+      <View style={styles.cardHeader}>
+        <MaterialCommunityIcons
+          name="oil"
+          size={28}
+          color={Colors.dark.accent}
+        />
+        <View style={styles.cardHeaderText}>
+          <Text style={styles.cardTitle}>{campaign.name}</Text>
+          <Text style={styles.cardSponsor}>{campaign.sponsor}</Text>
+        </View>
+      </View>
+      {campaign.description ? (
+        <Text style={styles.cardDescription} numberOfLines={3}>
+          {campaign.description}
+        </Text>
+      ) : null}
+      <View style={styles.cardFooter}>
+        <View style={styles.cardBadge}>
+          <MaterialCommunityIcons
+            name="motorbike"
+            size={14}
+            color={Colors.dark.accent}
+          />
+          <Text style={styles.cardBadgeText}>Syneco</Text>
+        </View>
+        <MaterialCommunityIcons
+          name="open-in-new"
+          size={16}
+          color={Colors.dark.azzurro}
+        />
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+export default function SynecoAd({ displayMode = "banner" }: SynecoAdProps) {
+  const { data: campaigns } = useQuery<AdCampaign[]>({
+    queryKey: ["/api/ads/active"],
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+
+  const clickMutation = useMutation({
+    mutationFn: async (campaignId: string) => {
+      await apiRequest("POST", `/api/ads/${campaignId}/click`);
+    },
+  });
+
+  const handleAdPress = async (campaign: AdCampaign) => {
+    clickMutation.mutate(campaign.id);
+    if (campaign.linkUrl) {
+      try {
+        const canOpen = await Linking.canOpenURL(campaign.linkUrl);
+        if (canOpen) {
+          await Linking.openURL(campaign.linkUrl);
+        }
+      } catch {}
+    }
+  };
+
+  if (!campaigns || campaigns.length === 0) {
+    return null;
+  }
+
+  const filtered = campaigns.filter((c) => {
+    if (displayMode === "banner") return true;
+    if (displayMode === "card") return true;
+    if (displayMode === "carousel") return true;
+    return c.displayMode === displayMode;
+  });
+
+  if (filtered.length === 0) return null;
+
+  if (displayMode === "banner") {
+    const campaign = filtered[0];
+    return (
+      <AdBannerItem
+        campaign={campaign}
+        onPress={() => handleAdPress(campaign)}
+      />
+    );
+  }
+
+  if (displayMode === "card") {
+    const campaign = filtered[0];
+    return (
+      <AdCardItem
+        campaign={campaign}
+        onPress={() => handleAdPress(campaign)}
+      />
+    );
+  }
+
+  if (displayMode === "carousel") {
+    return (
+      <FlatList
+        data={filtered}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.carouselContainer}
+        renderItem={({ item }) => (
+          <View style={styles.carouselItem}>
+            <AdCardItem
+              campaign={item}
+              onPress={() => handleAdPress(item)}
+            />
+          </View>
+        )}
+      />
+    );
+  }
+
+  return null;
+}
+
+const styles = StyleSheet.create({
+  bannerContainer: {
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 12,
+    backgroundColor: Colors.dark.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    overflow: "hidden",
+  },
+  bannerInner: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  bannerIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(212, 160, 23, 0.15)",
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    marginRight: 12,
+  },
+  bannerTextWrap: {
+    flex: 1,
+  },
+  bannerTitle: {
+    color: Colors.dark.text,
+    fontSize: 14,
+    fontWeight: "600" as const,
+  },
+  bannerSponsor: {
+    color: Colors.dark.accent,
+    fontSize: 11,
+    fontWeight: "500" as const,
+    marginTop: 2,
+  },
+
+  cardContainer: {
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 16,
+    backgroundColor: Colors.dark.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: 16,
+  },
+  cardHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    marginBottom: 10,
+  },
+  cardHeaderText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  cardTitle: {
+    color: Colors.dark.text,
+    fontSize: 16,
+    fontWeight: "700" as const,
+  },
+  cardSponsor: {
+    color: Colors.dark.accent,
+    fontSize: 12,
+    fontWeight: "500" as const,
+    marginTop: 2,
+  },
+  cardDescription: {
+    color: Colors.dark.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  cardFooter: {
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
+    alignItems: "center" as const,
+  },
+  cardBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    backgroundColor: "rgba(212, 160, 23, 0.1)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  cardBadgeText: {
+    color: Colors.dark.accent,
+    fontSize: 11,
+    fontWeight: "600" as const,
+    marginLeft: 4,
+  },
+
+  carouselContainer: {
+    paddingVertical: 8,
+  },
+  carouselItem: {
+    width: SCREEN_WIDTH - 32,
+    marginHorizontal: 0,
+  },
+});

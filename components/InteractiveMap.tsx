@@ -1,0 +1,390 @@
+import React, { useState, useCallback, useRef, useEffect } from "react";
+import {
+  View,
+  StyleSheet,
+  Platform,
+  TouchableOpacity,
+  Text,
+  ActivityIndicator,
+} from "react-native";
+import MapView, { Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Location from "expo-location";
+import { Colors } from "@/constants/colors";
+import { t } from "@/lib/i18n";
+
+interface MapUser {
+  id: string;
+  nickname: string;
+  userType: "biker" | "zavorrina" | "coppia";
+  sex?: string | null;
+  latitude: number;
+  longitude: number;
+}
+
+interface MapWorkshop {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  isSynecoPartner: boolean;
+}
+
+interface MapEasterEgg {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
+interface InteractiveMapProps {
+  users?: MapUser[];
+  workshops?: MapWorkshop[];
+  easterEggs?: MapEasterEgg[];
+  isAvailable: boolean;
+  onToggleAvailability: () => void;
+  filterBiker: boolean;
+  filterZavorrina: boolean;
+  filterCoppia: boolean;
+  onToggleFilterBiker: () => void;
+  onToggleFilterZavorrina: () => void;
+  onToggleFilterCoppia: () => void;
+}
+
+const ITALY_REGION: Region = {
+  latitude: 41.9028,
+  longitude: 12.4964,
+  latitudeDelta: 8,
+  longitudeDelta: 8,
+};
+
+function getUserMarkerColor(userType: string, sex?: string | null): string {
+  switch (userType) {
+    case "biker":
+      return Colors.dark.bikerColor;
+    case "zavorrina":
+      return Colors.dark.zavorrinaColor;
+    case "coppia":
+      return Colors.dark.coppiaColor;
+    default:
+      return Colors.dark.accent;
+  }
+}
+
+function getUserMarkerIcon(userType: string): keyof typeof MaterialCommunityIcons.glyphMap {
+  switch (userType) {
+    case "biker":
+      return "motorbike";
+    case "zavorrina":
+      return "seat-passenger";
+    case "coppia":
+      return "account-group";
+    default:
+      return "account";
+  }
+}
+
+export default function InteractiveMap({
+  users = [],
+  workshops = [],
+  easterEggs = [],
+  isAvailable,
+  onToggleAvailability,
+  filterBiker,
+  filterZavorrina,
+  filterCoppia,
+  onToggleFilterBiker,
+  onToggleFilterZavorrina,
+  onToggleFilterCoppia,
+}: InteractiveMapProps) {
+  const mapRef = useRef<MapView>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationLoading, setLocationLoading] = useState(true);
+  const [region, setRegion] = useState<Region>(ITALY_REGION);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        if (Platform.OS === "web") {
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                const loc = {
+                  latitude: position.coords.latitude,
+                  longitude: position.coords.longitude,
+                };
+                setUserLocation(loc);
+                setRegion({
+                  ...loc,
+                  latitudeDelta: 0.1,
+                  longitudeDelta: 0.1,
+                });
+                setLocationLoading(false);
+              },
+              () => setLocationLoading(false)
+            );
+          } else {
+            setLocationLoading(false);
+          }
+        } else {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === "granted") {
+            const loc = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+            const coords = {
+              latitude: loc.coords.latitude,
+              longitude: loc.coords.longitude,
+            };
+            setUserLocation(coords);
+            setRegion({
+              ...coords,
+              latitudeDelta: 0.1,
+              longitudeDelta: 0.1,
+            });
+          }
+          setLocationLoading(false);
+        }
+      } catch {
+        setLocationLoading(false);
+      }
+    })();
+  }, []);
+
+  const filteredUsers = users.filter((u) => {
+    if (u.userType === "biker" && !filterBiker) return false;
+    if (u.userType === "zavorrina" && !filterZavorrina) return false;
+    if (u.userType === "coppia" && !filterCoppia) return false;
+    return true;
+  });
+
+  const centerOnUser = useCallback(() => {
+    if (userLocation && mapRef.current) {
+      mapRef.current.animateToRegion({
+        ...userLocation,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      });
+    }
+  }, [userLocation]);
+
+  return (
+    <View style={styles.container}>
+      <MapView
+        ref={mapRef}
+        style={styles.map}
+        initialRegion={region}
+        showsUserLocation={!!userLocation}
+        showsMyLocationButton={false}
+        provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
+        customMapStyle={darkMapStyle}
+      >
+        {filteredUsers.map((user) => (
+          <Marker
+            key={`user-${user.id}`}
+            coordinate={{ latitude: user.latitude, longitude: user.longitude }}
+            title={user.nickname}
+            pinColor={getUserMarkerColor(user.userType, user.sex)}
+          />
+        ))}
+
+        {workshops.map((ws) => (
+          <Marker
+            key={`ws-${ws.id}`}
+            coordinate={{ latitude: ws.latitude, longitude: ws.longitude }}
+            title={ws.name}
+            pinColor="#FF6B00"
+          />
+        ))}
+
+        {easterEggs.map((egg) => (
+          <Marker
+            key={`egg-${egg.id}`}
+            coordinate={{ latitude: egg.latitude, longitude: egg.longitude }}
+            title={egg.name}
+            pinColor="#FFD700"
+          />
+        ))}
+      </MapView>
+
+      {locationLoading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="small" color={Colors.dark.accent} />
+        </View>
+      )}
+
+      <View style={styles.filterBar}>
+        <TouchableOpacity
+          style={[styles.filterChip, filterBiker && { backgroundColor: Colors.dark.bikerColor }]}
+          onPress={onToggleFilterBiker}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons
+            name="motorbike"
+            size={16}
+            color={filterBiker ? "#fff" : Colors.dark.bikerColor}
+          />
+          <Text style={[styles.filterText, filterBiker && styles.filterTextActive]}>Biker</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.filterChip, filterZavorrina && { backgroundColor: Colors.dark.zavorrinaColor }]}
+          onPress={onToggleFilterZavorrina}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons
+            name="seat-passenger"
+            size={16}
+            color={filterZavorrina ? "#fff" : Colors.dark.zavorrinaColor}
+          />
+          <Text style={[styles.filterText, filterZavorrina && styles.filterTextActive]}>Zavorrina</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.filterChip, filterCoppia && { backgroundColor: Colors.dark.coppiaColor }]}
+          onPress={onToggleFilterCoppia}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons
+            name="account-group"
+            size={16}
+            color={filterCoppia ? "#fff" : Colors.dark.coppiaColor}
+          />
+          <Text style={[styles.filterText, filterCoppia && styles.filterTextActive]}>Coppia</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.controlsContainer}>
+        <TouchableOpacity
+          style={styles.locationButton}
+          onPress={centerOnUser}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="crosshairs-gps" size={22} color={Colors.dark.accent} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.availabilityButton,
+            isAvailable && styles.availabilityButtonActive,
+          ]}
+          onPress={onToggleAvailability}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons
+            name={isAvailable ? "broadcast" : "broadcast-off"}
+            size={22}
+            color={isAvailable ? "#fff" : Colors.dark.textSecondary}
+          />
+          <Text
+            style={[
+              styles.availabilityText,
+              isAvailable && styles.availabilityTextActive,
+            ]}
+          >
+            {isAvailable ? t("map.available") : t("map.unavailable")}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const darkMapStyle = [
+  { elementType: "geometry", stylers: [{ color: "#212121" }] },
+  { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#757575" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#212121" }] },
+  { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#757575" }] },
+  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#181818" }] },
+  { featureType: "road", elementType: "geometry.fill", stylers: [{ color: "#2c2c2c" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212121" }] },
+  { featureType: "road.highway", elementType: "geometry.fill", stylers: [{ color: "#3c3c3c" }] },
+  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0e1626" }] },
+];
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  loadingOverlay: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 20,
+    padding: 8,
+  },
+  filterBar: {
+    position: "absolute",
+    top: Platform.OS === "web" ? 80 : 16,
+    left: 12,
+    right: 12,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+  },
+  filterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: Colors.dark.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  filterText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 12,
+    fontWeight: "600" as const,
+  },
+  filterTextActive: {
+    color: "#fff",
+  },
+  controlsContainer: {
+    position: "absolute",
+    bottom: Platform.OS === "web" ? 100 : 80,
+    right: 12,
+    gap: 10,
+    alignItems: "flex-end",
+  },
+  locationButton: {
+    backgroundColor: Colors.dark.surface,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  availabilityButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: Colors.dark.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  availabilityButtonActive: {
+    backgroundColor: Colors.dark.accent,
+    borderColor: Colors.dark.accent,
+  },
+  availabilityText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 13,
+    fontWeight: "700" as const,
+  },
+  availabilityTextActive: {
+    color: "#fff",
+  },
+});

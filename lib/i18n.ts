@@ -1,0 +1,166 @@
+type Locale = "it" | "en" | "de";
+
+const translations: Record<Locale, Record<string, string>> = {
+  it: {
+    "app.name": "BikerLink",
+    "app.tagline": "U'll never ride alone",
+
+    "auth.login": "Accedi",
+    "auth.register": "Registrati",
+    "auth.logout": "Esci",
+    "auth.email": "Email",
+    "auth.password": "Password",
+    "auth.nickname": "Nickname",
+    "auth.phone": "Telefono",
+    "auth.birthYear": "Anno di nascita",
+    "auth.region": "Regione",
+    "auth.confirmPassword": "Conferma password",
+    "auth.forgotPassword": "Password dimenticata?",
+    "auth.noAccount": "Non hai un account?",
+    "auth.hasAccount": "Hai già un account?",
+    "auth.emailOrNickname": "Email o Nickname",
+
+    "register.step1.title": "Chi sei?",
+    "register.step1.biker": "Biker",
+    "register.step1.zavorrina": "Zavorrina",
+    "register.step1.coppia": "Coppia",
+    "register.step2.title": "Sesso",
+    "register.step2.male": "Maschio",
+    "register.step2.female": "Femmina",
+    "register.step2.coupleConfig": "Configurazione coppia",
+    "register.step3.title": "I tuoi dati",
+    "register.step4.title": "Termini e condizioni",
+    "register.step4.accept": "Accetto i termini e le condizioni",
+    "register.next": "Avanti",
+    "register.back": "Indietro",
+    "register.complete": "Completa registrazione",
+
+    "tabs.map": "Mappa",
+    "tabs.proposals": "Proposte",
+    "tabs.chat": "Chat",
+    "tabs.contest": "Contest",
+    "tabs.profile": "Profilo",
+
+    "map.available": "Sono disponibile",
+    "map.unavailable": "Non disponibile",
+    "map.filters": "Filtri",
+    "map.nearbyUsers": "Utenti nelle vicinanze",
+
+    "proposals.title": "Proposte",
+    "proposals.create": "Crea proposta",
+    "proposals.ride": "Giro",
+    "proposals.rally": "Raduno",
+    "proposals.withPassenger": "Con zavorrina",
+    "proposals.request": "Richiesta",
+    "proposals.join": "Partecipa",
+    "proposals.departure": "Partenza",
+    "proposals.date": "Data",
+
+    "chat.title": "Chat",
+    "chat.newMessage": "Nuovo messaggio",
+    "chat.typeMessage": "Scrivi un messaggio...",
+    "chat.private": "Privata",
+    "chat.group": "Gruppo",
+
+    "contest.title": "Contest Foto",
+    "contest.upload": "Carica foto",
+    "contest.vote": "Vota",
+    "contest.winners": "Albo vincitori",
+    "contest.votesLeft": "Voti rimasti oggi",
+    "contest.thisWeek": "Questa settimana",
+
+    "profile.title": "Profilo",
+    "profile.edit": "Modifica profilo",
+    "profile.photos": "Foto",
+    "profile.motorcycles": "Moto",
+    "profile.stats": "Statistiche",
+    "profile.rides": "Giri fatti",
+    "profile.totalKm": "Km totali",
+    "profile.easterEggs": "Easter Eggs",
+    "profile.addMoto": "Aggiungi moto",
+    "profile.addPhoto": "Aggiungi foto",
+
+    "tracking.start": "Avvia tracking",
+    "tracking.stop": "Ferma tracking",
+    "tracking.distance": "Distanza",
+    "tracking.speed": "Velocità",
+    "tracking.altitude": "Altitudine",
+    "tracking.duration": "Durata",
+    "tracking.frequency": "Frequenza GPS",
+
+    "workshops.title": "Officine Syneco",
+    "workshops.contact": "Contatta",
+    "workshops.hours": "Orari",
+    "workshops.phone": "Telefono",
+    "workshops.whatsapp": "WhatsApp",
+
+    "easterEggs.title": "Easter Eggs",
+    "easterEggs.collected": "Raccolti",
+    "easterEggs.collect": "Raccogli!",
+    "easterEggs.congrats": "Complimenti!",
+
+    "notifications.title": "Notifiche",
+    "notifications.empty": "Nessuna notifica",
+
+    "feedback.title": "Feedback",
+    "feedback.send": "Invia feedback",
+    "feedback.placeholder": "Descrivi il problema o suggerimento...",
+    "feedback.type": "Tipo",
+    "feedback.bug": "Bug",
+    "feedback.suggestion": "Suggerimento",
+    "feedback.other": "Altro",
+
+    "admin.title": "Pannello Admin",
+    "admin.users": "Utenti",
+    "admin.workshops": "Officine",
+    "admin.easterEggs": "Easter Eggs",
+    "admin.ads": "Campagne",
+    "admin.reports": "Segnalazioni",
+    "admin.analytics": "Analytics",
+    "admin.settings": "Impostazioni",
+
+    "report.title": "Segnala utente",
+    "report.reason": "Motivo",
+    "report.send": "Invia segnalazione",
+
+    "common.save": "Salva",
+    "common.cancel": "Annulla",
+    "common.delete": "Elimina",
+    "common.confirm": "Conferma",
+    "common.loading": "Caricamento...",
+    "common.error": "Errore",
+    "common.success": "Successo",
+    "common.retry": "Riprova",
+    "common.noResults": "Nessun risultato",
+    "common.search": "Cerca",
+
+    "validation.required": "Campo obbligatorio",
+    "validation.emailInvalid": "Email non valida",
+    "validation.passwordMin": "La password deve avere almeno 8 caratteri",
+    "validation.passwordUpper": "La password deve contenere almeno una maiuscola",
+    "validation.passwordLower": "La password deve contenere almeno una minuscola",
+    "validation.passwordNumber": "La password deve contenere almeno un numero",
+    "validation.passwordMismatch": "Le password non coincidono",
+
+    "syneco.sponsor": "Sponsorizzato da Syneco Lubrificanti",
+  },
+  en: {},
+  de: {},
+};
+
+let currentLocale: Locale = "it";
+
+export function setLocale(locale: Locale) {
+  currentLocale = locale;
+}
+
+export function getLocale(): Locale {
+  return currentLocale;
+}
+
+export function t(key: string): string {
+  const dict = translations[currentLocale];
+  if (dict[key]) return dict[key];
+  const fallback = translations["it"];
+  return fallback[key] ?? key;
+}
