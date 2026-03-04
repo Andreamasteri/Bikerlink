@@ -326,7 +326,7 @@ function WishlistScreen() {
       <Modal visible={showMotoForm} transparent animationType="slide" onRequestClose={() => setShowMotoForm(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setShowMotoForm(false)}>
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-            <ScrollView keyboardShouldPersistTaps="handled">
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>{editingMotoId ? "Modifica Moto" : "Aggiungi Moto Desiderata"}</Text>
                 <Pressable onPress={() => setShowMotoForm(false)}>
@@ -719,7 +719,7 @@ function GarageContent() {
       <Modal visible={showForm} transparent animationType="slide" onRequestClose={() => { setShowForm(false); resetForm(); }}>
         <Pressable style={styles.modalOverlay} onPress={() => { setShowForm(false); resetForm(); }}>
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-            <ScrollView keyboardShouldPersistTaps="handled">
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>{editingId ? "Modifica Moto" : "Aggiungi Moto"}</Text>
                 <Pressable onPress={() => { setShowForm(false); resetForm(); }}>
@@ -853,7 +853,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  modalContent: { backgroundColor: Colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, maxHeight: "80%" },
+  modalContent: { backgroundColor: Colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, maxHeight: "90%" },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
   modalTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: Colors.text },
   warningBox: {
