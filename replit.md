@@ -123,7 +123,10 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - **Colori icona profilo**: azzurro maschi, rosa donne, giallo oro coppie. `Colors.coupleIcon: '#FFD700'`
 - **Privacy Policy**: pagina separata con testo GDPR placeholder, caricabile dall'admin come file .txt. Link in welcome, registrazione e profilo. API: `GET /api/settings/privacy-policy`
 - **Cancellazione account**: richiesta con 30 giorni di attesa, annullabile dal profilo. Endpoint: `POST /api/users/me/request-deletion`, `POST /api/users/me/cancel-deletion`. Colonne `deletionRequestedAt`, `deletionScheduledFor` in `users`.
-- **Ready to Ride**: fix bug accesso dati (`.isAvailable` flat, non `.profile.isAvailable`)
+- **Ready to Ride**: fix bug accesso dati (`.isAvailable` flat, non `.profile.isAvailable`). Colori pulsante: verde=attivo, rosso=disattivo.
+- **Mappa**: bottone "Sono Disponibile" sostituito con indicatore non cliccabile (riflette stato Ready to Ride). Click su marker utente apre pannello dettagli (garage, proposte, link profilo). Easter eggs visibili sulla mappa e collezionabili con feedback.
+- **Easter Eggs**: endpoint `GET /api/easter-eggs/nearby?lat=&lng=` (query params obbligatori), `POST /api/easter-eggs/:id/collect`. Admin CRUD completo con edit, toggle attivo/disattivo, statistiche raccolte (`GET /api/admin/easter-eggs-stats`).
+- **Endpoint pubblico utente**: `GET /api/users/:id/public` — restituisce profilo, bio, moto.
 - **Tab labels**: fontSize aumentato a 11
 
 ## Tabelle DB Aggiuntive

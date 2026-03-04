@@ -8,11 +8,12 @@ import {
   Platform,
   ScrollView,
   Modal,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/query-client";
+import { queryClient, apiRequest, getApiUrl } from "@/lib/query-client";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -29,10 +30,14 @@ export default function MapScreen() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
   const [mapFullscreen, setMapFullscreen] = useState(false);
-  const [isAvailable, setIsAvailable] = useState(false);
   const [filterBiker, setFilterBiker] = useState(true);
   const [filterZavorrina, setFilterZavorrina] = useState(true);
   const [filterCoppia, setFilterCoppia] = useState(true);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedUserDetail, setSelectedUserDetail] = useState<any>(null);
+  const [selectedUserProposals, setSelectedUserProposals] = useState<any[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [selectedEgg, setSelectedEgg] = useState<any>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -113,10 +118,19 @@ export default function MapScreen() {
   });
 
   const easterEggsQuery = useQuery<any[]>({
-    queryKey: ["/api/easter-eggs/nearby"],
+    queryKey: ["/api/easter-eggs/nearby", location?.latitude, location?.longitude],
+    queryFn: async () => {
+      if (!location) return [];
+      const url = new URL("/api/easter-eggs/nearby", getApiUrl());
+      url.searchParams.set("lat", String(location.latitude));
+      url.searchParams.set("lng", String(location.longitude));
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
     retry: false,
     staleTime: 60000,
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && !!location,
   });
 
   const { data: adsData } = useQuery({
@@ -124,25 +138,54 @@ export default function MapScreen() {
     enabled: isAuthenticated,
   });
 
-  const toggleAvailability = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("PUT", "/api/users/me/availability", {
-        isAvailable: !isAvailable,
-      });
-      return await res.json();
+  const profileQuery = useQuery({
+    queryKey: ["/api/users/profile"],
+    enabled: isAuthenticated,
+  });
+  const isAvailable = (profileQuery.data as any)?.isAvailable || false;
+
+  const collectEggMutation = useMutation({
+    mutationFn: async (eggId: string) => {
+      const res = await apiRequest("POST", `/api/easter-eggs/${eggId}/collect`);
+      return res.json();
     },
-    onSuccess: () => {
-      setIsAvailable((prev) => !prev);
-      queryClient.invalidateQueries({ queryKey: ["/api/users/nearby"] });
+    onSuccess: (data: any) => {
+      Alert.alert("Easter Egg!", data.message || "Raccolto!");
+      queryClient.invalidateQueries({ queryKey: ["/api/easter-eggs/nearby"] });
+      setSelectedEgg(null);
     },
-    onError: () => {
-      setIsAvailable((prev) => !prev);
+    onError: (err: any) => {
+      Alert.alert("Errore", err.message || "Impossibile raccogliere");
     },
   });
 
-  const handleToggleAvailability = useCallback(() => {
-    setIsAvailable((prev) => !prev);
-    toggleAvailability.mutate();
+  const handleUserPress = useCallback(async (mapUser: any) => {
+    setSelectedUser(mapUser);
+    setDetailLoading(true);
+    setSelectedUserDetail(null);
+    setSelectedUserProposals([]);
+    try {
+      const baseUrl = getApiUrl();
+      const [detailRes, proposalsRes] = await Promise.all([
+        fetch(new URL(`/api/users/${mapUser.id}/public`, baseUrl).toString(), { credentials: "include" }),
+        fetch(new URL("/api/proposals", baseUrl).toString(), { credentials: "include" }),
+      ]);
+      if (detailRes.ok) {
+        setSelectedUserDetail(await detailRes.json());
+      }
+      if (proposalsRes.ok) {
+        const allProposals = await proposalsRes.json();
+        const userProposals = (Array.isArray(allProposals) ? allProposals : []).filter(
+          (p: any) => p.userId === mapUser.id && p.status === "active"
+        );
+        setSelectedUserProposals(userProposals);
+      }
+    } catch (e) {}
+    setDetailLoading(false);
+  }, []);
+
+  const handleEasterEggPress = useCallback((egg: any) => {
+    setSelectedEgg(egg);
   }, []);
 
   const nearbyUsers = (nearbyUsersQuery.data as any) || [];
@@ -196,13 +239,14 @@ export default function MapScreen() {
           workshops={workshopsQuery.data ?? []}
           easterEggs={easterEggsQuery.data ?? []}
           isAvailable={isAvailable}
-          onToggleAvailability={handleToggleAvailability}
           filterBiker={filterBiker}
           filterZavorrina={filterZavorrina}
           filterCoppia={filterCoppia}
           onToggleFilterBiker={() => setFilterBiker((p) => !p)}
           onToggleFilterZavorrina={() => setFilterZavorrina((p) => !p)}
           onToggleFilterCoppia={() => setFilterCoppia((p) => !p)}
+          onUserPress={handleUserPress}
+          onEasterEggPress={handleEasterEggPress}
         />
         <View style={styles.expandHint}>
           <Ionicons name="expand" size={16} color={Colors.text} />
@@ -216,13 +260,14 @@ export default function MapScreen() {
             workshops={workshopsQuery.data ?? []}
             easterEggs={easterEggsQuery.data ?? []}
             isAvailable={isAvailable}
-            onToggleAvailability={handleToggleAvailability}
             filterBiker={filterBiker}
             filterZavorrina={filterZavorrina}
             filterCoppia={filterCoppia}
             onToggleFilterBiker={() => setFilterBiker((p) => !p)}
             onToggleFilterZavorrina={() => setFilterZavorrina((p) => !p)}
             onToggleFilterCoppia={() => setFilterCoppia((p) => !p)}
+            onUserPress={handleUserPress}
+            onEasterEggPress={handleEasterEggPress}
           />
           <Pressable style={[styles.closeBtn, { top: Platform.OS === "web" ? 20 : insets.top + 8 }]} onPress={() => setMapFullscreen(false)}>
             <Ionicons name="close" size={28} color="#fff" />
@@ -293,6 +338,119 @@ export default function MapScreen() {
           <Text style={styles.adText}>{ads[0].title}</Text>
         </View>
       )}
+
+      <Modal visible={!!selectedUser} transparent animationType="slide" onRequestClose={() => setSelectedUser(null)}>
+        <Pressable style={styles.detailOverlay} onPress={() => setSelectedUser(null)}>
+          <Pressable style={styles.detailSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.detailHandle} />
+            {detailLoading ? (
+              <ActivityIndicator size="large" color={Colors.accent} style={{ marginVertical: 40 }} />
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
+                <View style={styles.detailHeader}>
+                  <Ionicons
+                    name={getUserIcon(selectedUser || {})}
+                    size={32}
+                    color={getUserColor(selectedUser || {})}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.detailName}>{selectedUser?.nickname}</Text>
+                    <Text style={styles.detailType}>{getUserTypeLabel(selectedUser || {})}</Text>
+                  </View>
+                  <Pressable onPress={() => setSelectedUser(null)}>
+                    <Ionicons name="close" size={24} color={Colors.textSecondary} />
+                  </Pressable>
+                </View>
+
+                {selectedUserDetail?.bio && (
+                  <Text style={styles.detailBio}>{selectedUserDetail.bio}</Text>
+                )}
+
+                {selectedUserDetail?.motorcycles && selectedUserDetail.motorcycles.length > 0 && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionTitle}>Garage</Text>
+                    {selectedUserDetail.motorcycles.map((m: any) => (
+                      <View key={m.id} style={styles.detailMotoCard}>
+                        <Ionicons name="bicycle" size={18} color={Colors.accent} />
+                        <Text style={styles.detailMotoText}>
+                          {m.brand} {m.model}
+                          {m.motorcycleType ? ` · ${m.motorcycleType}` : ""}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {selectedUserProposals.length > 0 && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionTitle}>Proposte Giri</Text>
+                    {selectedUserProposals.map((p: any) => (
+                      <Pressable
+                        key={p.id}
+                        style={styles.detailProposalCard}
+                        onPress={() => { setSelectedUser(null); router.push(`/proposals/${p.id}` as any); }}
+                      >
+                        <Ionicons name="navigate" size={16} color={Colors.accent} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.detailProposalTitle}>{p.title}</Text>
+                          {p.location && <Text style={styles.detailProposalSub}>{p.location}</Text>}
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+
+                {selectedUserProposals.length === 0 && !detailLoading && (
+                  <View style={{ alignItems: "center", paddingVertical: 12 }}>
+                    <Text style={styles.detailType}>Nessuna proposta attiva</Text>
+                  </View>
+                )}
+
+                <Pressable
+                  style={styles.detailProfileBtn}
+                  onPress={() => { setSelectedUser(null); router.push(`/profile/${selectedUser?.id}` as any); }}
+                >
+                  <Text style={styles.detailProfileBtnText}>Vai al Profilo</Text>
+                </Pressable>
+              </ScrollView>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={!!selectedEgg} transparent animationType="fade" onRequestClose={() => setSelectedEgg(null)}>
+        <Pressable style={styles.detailOverlay} onPress={() => setSelectedEgg(null)}>
+          <Pressable style={styles.eggSheet} onPress={(e) => e.stopPropagation()}>
+            <Ionicons name="gift" size={48} color="#FFD700" style={{ alignSelf: "center" }} />
+            <Text style={styles.eggTitle}>{selectedEgg?.name}</Text>
+            {selectedEgg?.description && (
+              <Text style={styles.eggDescription}>{selectedEgg.description}</Text>
+            )}
+            {selectedEgg?.points && (
+              <Text style={styles.eggPoints}>{selectedEgg.points} punti</Text>
+            )}
+            {selectedEgg?.collected ? (
+              <View style={styles.eggCollectedBadge}>
+                <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+                <Text style={[styles.eggPoints, { color: Colors.success }]}>Già raccolto</Text>
+              </View>
+            ) : (
+              <Pressable
+                style={styles.eggCollectBtn}
+                onPress={() => selectedEgg && collectEggMutation.mutate(selectedEgg.id)}
+                disabled={collectEggMutation.isPending}
+              >
+                {collectEggMutation.isPending ? (
+                  <ActivityIndicator color={Colors.background} />
+                ) : (
+                  <Text style={styles.eggCollectBtnText}>Raccogli!</Text>
+                )}
+              </Pressable>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }
@@ -391,4 +549,88 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   adText: { fontSize: 13, fontFamily: "Inter_500Medium", color: Colors.accent },
+  detailOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+  },
+  detailSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: "70%",
+  },
+  detailHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: Colors.border,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  detailHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
+  },
+  detailName: { fontSize: 20, fontFamily: "Inter_700Bold", color: Colors.text },
+  detailType: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  detailBio: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginBottom: 12 },
+  detailSection: { marginBottom: 12 },
+  detailSectionTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.accent, marginBottom: 8 },
+  detailMotoCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: Colors.background,
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 6,
+  },
+  detailMotoText: { fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.text },
+  detailProposalCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: Colors.background,
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 6,
+  },
+  detailProposalTitle: { fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.text },
+  detailProposalSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  detailProfileBtn: {
+    backgroundColor: Colors.accent,
+    padding: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  detailProfileBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.background },
+  eggSheet: {
+    backgroundColor: Colors.surface,
+    marginHorizontal: 32,
+    borderRadius: 20,
+    padding: 24,
+    alignSelf: "center",
+    width: "85%",
+    maxWidth: 340,
+    position: "absolute",
+    top: "30%",
+  },
+  eggTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: Colors.text, textAlign: "center", marginTop: 12 },
+  eggDescription: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary, textAlign: "center", marginTop: 8 },
+  eggPoints: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.accent, textAlign: "center", marginTop: 8 },
+  eggCollectedBadge: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 12 },
+  eggCollectBtn: {
+    backgroundColor: "#FFD700",
+    padding: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 16,
+  },
+  eggCollectBtnText: { fontSize: 16, fontFamily: "Inter_700Bold", color: Colors.background },
 });

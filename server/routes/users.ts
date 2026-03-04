@@ -215,6 +215,27 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
   }
 });
 
+router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.params.id as string;
+    const targetUser = await storage.getUser(userId);
+    if (!targetUser) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    const { password: _, ...safeUser } = targetUser;
+    const profile = await storage.getUserProfile(userId);
+    const motorcycles = await storage.getUserMotorcycles(userId);
+    return res.json({
+      ...safeUser,
+      bio: profile?.bio || null,
+      motorcycles,
+    });
+  } catch (error) {
+    console.error("Get public user profile error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
   try {
     const lat = parseFloat(req.query.lat as string);

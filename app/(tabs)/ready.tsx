@@ -69,7 +69,7 @@ export default function ReadyToRideScreen() {
         <Pressable
           style={[
             styles.toggleBtn,
-            { backgroundColor: isAvailable ? Colors.accentRed : Colors.success },
+            { backgroundColor: isAvailable ? Colors.success : Colors.accentRed },
           ]}
           onPress={handleToggle}
           disabled={toggleMutation.isPending}
@@ -79,7 +79,7 @@ export default function ReadyToRideScreen() {
           ) : (
             <>
               <Ionicons
-                name={isAvailable ? "close-circle" : "checkmark-circle"}
+                name={isAvailable ? "checkmark-circle" : "close-circle"}
                 size={40}
                 color="#fff"
               />

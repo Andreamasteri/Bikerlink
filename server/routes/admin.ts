@@ -235,6 +235,42 @@ router.delete("/easter-eggs/:id", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/easter-eggs/:id/stats", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const egg = await storage.getEasterEgg(id);
+    if (!egg) {
+      return res.status(404).json({ message: "Easter egg non trovato" });
+    }
+    const { db } = await import("../db");
+    const { collectedEasterEggs } = await import("../../shared/schema");
+    const { eq, count } = await import("drizzle-orm");
+    const [result] = await db.select({ count: count() }).from(collectedEasterEggs).where(eq(collectedEasterEggs.easterEggId, id));
+    return res.json({ eggId: id, collectionsCount: result?.count || 0 });
+  } catch (error) {
+    console.error("Admin get easter egg stats error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/easter-eggs-stats", async (_req: Request, res: Response) => {
+  try {
+    const { db } = await import("../db");
+    const { collectedEasterEggs } = await import("../../shared/schema");
+    const { count, sql } = await import("drizzle-orm");
+    const rows = await db.select({
+      easterEggId: collectedEasterEggs.easterEggId,
+      collectionsCount: count(),
+    }).from(collectedEasterEggs).groupBy(collectedEasterEggs.easterEggId);
+    const statsMap: Record<string, number> = {};
+    rows.forEach((r) => { statsMap[r.easterEggId] = Number(r.collectionsCount); });
+    return res.json(statsMap);
+  } catch (error) {
+    console.error("Admin get easter egg stats error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.get("/campaigns", async (_req: Request, res: Response) => {
   try {
     const campaigns = await storage.getAllCampaigns();

@@ -39,13 +39,14 @@ interface InteractiveMapProps {
   workshops?: MapWorkshop[];
   easterEggs?: MapEasterEgg[];
   isAvailable: boolean;
-  onToggleAvailability: () => void;
   filterBiker: boolean;
   filterZavorrina: boolean;
   filterCoppia: boolean;
   onToggleFilterBiker: () => void;
   onToggleFilterZavorrina: () => void;
   onToggleFilterCoppia: () => void;
+  onUserPress?: (user: MapUser) => void;
+  onEasterEggPress?: (egg: MapEasterEgg) => void;
 }
 
 function getUserMarkerColor(userType: string): string {
@@ -79,13 +80,14 @@ export default function InteractiveMap({
   workshops = [],
   easterEggs = [],
   isAvailable,
-  onToggleAvailability,
   filterBiker,
   filterZavorrina,
   filterCoppia,
   onToggleFilterBiker,
   onToggleFilterZavorrina,
   onToggleFilterCoppia,
+  onUserPress,
+  onEasterEggPress,
 }: InteractiveMapProps) {
   const filteredUsers = users.filter((u) => {
     if (u.userType === "biker" && !filterBiker) return false;
@@ -135,7 +137,7 @@ export default function InteractiveMap({
               {t("map.nearbyUsers")} ({filteredUsers.length})
             </Text>
             {filteredUsers.map((user) => (
-              <View key={user.id} style={styles.listItem}>
+              <TouchableOpacity key={user.id} style={styles.listItem} onPress={() => onUserPress?.(user)}>
                 <View style={[styles.userDot, { backgroundColor: getUserMarkerColor(user.userType) }]}>
                   <MaterialCommunityIcons
                     name={getUserMarkerIcon(user.userType)}
@@ -147,7 +149,7 @@ export default function InteractiveMap({
                 <Text style={styles.listItemSub}>
                   {user.userType === "biker" ? "Biker" : user.userType === "zavorrina" ? "Zavorrina" : "Coppia"}
                 </Text>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -174,30 +176,28 @@ export default function InteractiveMap({
               Easter Eggs ({easterEggs.length})
             </Text>
             {easterEggs.map((e) => (
-              <View key={e.id} style={styles.listItem}>
-                <View style={[styles.userDot, { backgroundColor: Colors.accent }]}>
+              <TouchableOpacity key={e.id} style={styles.listItem} onPress={() => onEasterEggPress?.(e)}>
+                <View style={[styles.userDot, { backgroundColor: "#FFD700" }]}>
                   <MaterialCommunityIcons name="egg-easter" size={14} color="#fff" />
                 </View>
                 <Text style={styles.listItemText}>{e.name}</Text>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         )}
       </ScrollView>
 
-      <TouchableOpacity
-        style={[styles.availabilityBtn, isAvailable && styles.availabilityBtnActive]}
-        onPress={onToggleAvailability}
+      <View
+        style={[
+          styles.availabilityIndicator,
+          { borderColor: isAvailable ? Colors.success : Colors.accentRed },
+        ]}
       >
-        <MaterialCommunityIcons
-          name={isAvailable ? "broadcast" : "broadcast-off"}
-          size={20}
-          color="#fff"
-        />
+        <View style={[styles.statusDot, { backgroundColor: isAvailable ? Colors.success : Colors.accentRed }]} />
         <Text style={styles.availabilityText}>
           {isAvailable ? t("map.available") : t("map.unavailable")}
         </Text>
-      </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -266,23 +266,23 @@ const styles = StyleSheet.create({
   },
   listItemText: { color: Colors.text, fontSize: 14, fontFamily: "Inter_500Medium", flex: 1 },
   listItemSub: { color: Colors.textSecondary, fontSize: 12 },
-  availabilityBtn: {
+  availabilityIndicator: {
     position: "absolute",
     bottom: 34 + 16,
     right: 16,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
     backgroundColor: Colors.surface,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
   },
-  availabilityBtnActive: {
-    backgroundColor: Colors.success,
-    borderColor: Colors.success,
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
-  availabilityText: { color: "#fff", fontSize: 14, fontFamily: "Inter_500Medium" },
+  availabilityText: { color: Colors.textSecondary, fontSize: 12, fontFamily: "Inter_500Medium" },
 });

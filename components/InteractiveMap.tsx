@@ -42,13 +42,14 @@ interface InteractiveMapProps {
   workshops?: MapWorkshop[];
   easterEggs?: MapEasterEgg[];
   isAvailable: boolean;
-  onToggleAvailability: () => void;
   filterBiker: boolean;
   filterZavorrina: boolean;
   filterCoppia: boolean;
   onToggleFilterBiker: () => void;
   onToggleFilterZavorrina: () => void;
   onToggleFilterCoppia: () => void;
+  onUserPress?: (user: MapUser) => void;
+  onEasterEggPress?: (egg: MapEasterEgg) => void;
 }
 
 const ITALY_REGION: Region = {
@@ -89,13 +90,14 @@ export default function InteractiveMap({
   workshops = [],
   easterEggs = [],
   isAvailable,
-  onToggleAvailability,
   filterBiker,
   filterZavorrina,
   filterCoppia,
   onToggleFilterBiker,
   onToggleFilterZavorrina,
   onToggleFilterCoppia,
+  onUserPress,
+  onEasterEggPress,
 }: InteractiveMapProps) {
   const mapRef = useRef<MapView>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -179,12 +181,13 @@ export default function InteractiveMap({
         provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
         customMapStyle={darkMapStyle}
       >
-        {filteredUsers.map((user) => (
+        {filteredUsers.map((u) => (
           <Marker
-            key={`user-${user.id}`}
-            coordinate={{ latitude: user.latitude, longitude: user.longitude }}
-            title={user.nickname}
-            pinColor={getUserMarkerColor(user.userType, user.sex)}
+            key={`user-${u.id}`}
+            coordinate={{ latitude: u.latitude, longitude: u.longitude }}
+            title={u.nickname}
+            pinColor={getUserMarkerColor(u.userType, u.sex)}
+            onPress={() => onUserPress?.(u)}
           />
         ))}
 
@@ -203,6 +206,7 @@ export default function InteractiveMap({
             coordinate={{ latitude: egg.latitude, longitude: egg.longitude }}
             title={egg.name}
             pinColor="#FFD700"
+            onPress={() => onEasterEggPress?.(egg)}
           />
         ))}
       </MapView>
@@ -263,28 +267,17 @@ export default function InteractiveMap({
           <MaterialCommunityIcons name="crosshairs-gps" size={22} color={Colors.accent} />
         </TouchableOpacity>
 
-        <TouchableOpacity
+        <View
           style={[
-            styles.availabilityButton,
-            isAvailable && styles.availabilityButtonActive,
+            styles.availabilityIndicator,
+            { borderColor: isAvailable ? Colors.success : Colors.accentRed },
           ]}
-          onPress={onToggleAvailability}
-          activeOpacity={0.7}
         >
-          <MaterialCommunityIcons
-            name={isAvailable ? "broadcast" : "broadcast-off"}
-            size={22}
-            color={isAvailable ? "#fff" : Colors.textSecondary}
-          />
-          <Text
-            style={[
-              styles.availabilityText,
-              isAvailable && styles.availabilityTextActive,
-            ]}
-          >
+          <View style={[styles.statusDot, { backgroundColor: isAvailable ? Colors.success : Colors.accentRed }]} />
+          <Text style={styles.availabilityText}>
             {isAvailable ? t("map.available") : t("map.unavailable")}
           </Text>
-        </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -364,27 +357,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  availabilityButton: {
+  availabilityIndicator: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     backgroundColor: Colors.surface,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 24,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
   },
-  availabilityButtonActive: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   availabilityText: {
     color: Colors.textSecondary,
-    fontSize: 13,
-    fontWeight: "700" as const,
-  },
-  availabilityTextActive: {
-    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600" as const,
   },
 });
