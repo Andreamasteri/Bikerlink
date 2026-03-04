@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
+import { useSynecoVisible } from "@/lib/syneco-context";
 import Colors from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -19,6 +20,7 @@ const loginBg = require("@/assets/images/splash-bg.jpg");
 export default function WelcomeScreen() {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
+  const synecoVisible = useSynecoVisible();
   const insets = useSafeAreaInsets();
 
   const titleOpacity = useRef(new Animated.Value(0)).current;
@@ -101,7 +103,9 @@ export default function WelcomeScreen() {
           >
             <Text style={styles.registerText}>Registrati</Text>
           </Pressable>
-          <Text style={styles.sponsorText}>by Syneco Lubrificanti</Text>
+          {synecoVisible && (
+            <Text style={styles.sponsorText}>powered by Syneco Lubrificanti</Text>
+          )}
         </Animated.View>
       </View>
     </ImageBackground>
@@ -121,8 +125,9 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
+    paddingTop: 60,
   },
   title: {
     fontSize: 48,

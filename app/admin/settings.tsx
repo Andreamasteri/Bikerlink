@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, Switch } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { MaterialIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
 import Colors from "@/constants/colors";
-import { getApiUrl, queryClient } from "@/lib/query-client";
+import { getApiUrl, queryClient, apiRequest } from "@/lib/query-client";
 import { fetch } from "expo/fetch";
 
 interface AppSetting {
@@ -31,6 +31,30 @@ export default function AdminSettings() {
 
   const { data: settings = [], isLoading } = useQuery<AppSetting[]>({
     queryKey: ["/api/admin/settings"],
+  });
+
+  const { data: synecoData } = useQuery<{ visible: boolean }>({
+    queryKey: ["/api/settings/syneco-branding"],
+  });
+  const synecoVisible = synecoData?.visible === true;
+
+  const synecoBrandingMutation = useMutation({
+    mutationFn: async (visible: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/syneco_branding_visible", baseUrl);
+      const res = await fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: visible ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/syneco-branding"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
   });
 
   const [isUploadingEula, setIsUploadingEula] = useState(false);
@@ -127,6 +151,25 @@ export default function AdminSettings() {
       style={styles.container}
       contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}
     >
+      <View style={styles.synecoCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="megaphone" size={20} color={Colors.syneco} />
+            <Text style={styles.synecoLabel}>Branding Syneco</Text>
+          </View>
+          <Switch
+            value={synecoVisible}
+            onValueChange={(val) => synecoBrandingMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: Colors.syneco }}
+            thumbColor={synecoVisible ? Colors.text : Colors.textSecondary}
+            disabled={synecoBrandingMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {synecoVisible ? "Il branding Syneco è visibile nell'app" : "Il branding Syneco è nascosto"}
+        </Text>
+      </View>
+
       {isLoading ? (
         <Text style={styles.loadingText}>Caricamento...</Text>
       ) : (
@@ -144,13 +187,13 @@ export default function AdminSettings() {
                     {isUploadingEula ? (
                       <ActivityIndicator size="small" color={Colors.accent} />
                     ) : (
-                      <MaterialIcons name="upload-file" size={20} color={Colors.accent} />
+                      <Ionicons name="cloud-upload" size={20} color={Colors.accent} />
                     )}
                   </TouchableOpacity>
                 )}
                 {editingKey !== setting.key && (
                   <TouchableOpacity onPress={() => startEditing(setting.key)}>
-                    <MaterialIcons name="edit" size={20} color={Colors.accent} />
+                    <Ionicons name="create" size={20} color={Colors.accent} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -194,6 +237,14 @@ export default function AdminSettings() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 16 },
+  synecoCard: {
+    backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 16,
+    borderWidth: 1, borderColor: Colors.syneco,
+  },
+  synecoHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  synecoInfo: { flexDirection: "row", alignItems: "center", gap: 10 },
+  synecoLabel: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.text },
+  synecoDesc: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, marginTop: 8 },
   loadingText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", marginTop: 40 },
   settingCard: {
     backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 12,

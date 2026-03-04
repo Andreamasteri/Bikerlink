@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
+import { storage } from "./storage";
 import authRoutes from "./routes/auth";
 import userRoutes from "./routes/users";
 import motorcycleRoutes from "./routes/motorcycles";
@@ -59,8 +60,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin", adminRoutes);
   app.use("/api/moderator", moderatorRoutes);
 
-  app.get("/api/settings/syneco-branding", (_req, res) => {
-    res.json({ visible: true });
+  app.get("/api/settings/syneco-branding", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("syneco_branding_visible");
+      const visible = setting?.value === "true";
+      res.json({ visible });
+    } catch {
+      res.json({ visible: false });
+    }
   });
 
   const httpServer = createServer(app);
