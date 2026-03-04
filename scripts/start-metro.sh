@@ -22,4 +22,4 @@ for i in $(seq 1 10); do
 done
 
 echo "Starting Metro on port $PORT..."
-exec npx expo start --localhost --port $PORT
+exec npx expo start --port $PORT
