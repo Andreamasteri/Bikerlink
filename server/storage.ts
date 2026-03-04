@@ -148,6 +148,7 @@ export interface IStorage {
   updateConversationTimestamp(conversationId: string): Promise<void>;
 
   getRoutes(userId: string): Promise<Route[]>;
+  getAllRoutes(): Promise<Route[]>;
   getRoute(id: string): Promise<Route | undefined>;
   createRoute(route: InsertRoute): Promise<Route>;
   updateRoute(id: string, data: Partial<InsertRoute>): Promise<Route | undefined>;
@@ -390,6 +391,10 @@ export class DatabaseStorage implements IStorage {
 
   async getRoutes(userId: string): Promise<Route[]> {
     return db.select().from(routes).where(eq(routes.userId, userId)).orderBy(desc(routes.createdAt));
+  }
+
+  async getAllRoutes(): Promise<Route[]> {
+    return db.select().from(routes).orderBy(desc(routes.createdAt));
   }
 
   async getRoute(id: string): Promise<Route | undefined> {

@@ -542,6 +542,26 @@ router.post("/settings/privacy-policy/upload", eulaUpload.single("file"), async 
   }
 });
 
+router.get("/performance-records", async (_req: Request, res: Response) => {
+  try {
+    const allRoutes = await storage.getAllRoutes();
+    const userIds = [...new Set(allRoutes.map(r => r.userId))];
+    const usersMap: Record<string, string> = {};
+    for (const uid of userIds) {
+      const user = await storage.getUser(uid);
+      if (user) usersMap[uid] = user.nickname;
+    }
+    const records = allRoutes.map(r => ({
+      ...r,
+      nickname: usersMap[r.userId] || "Sconosciuto",
+    }));
+    return res.json(records);
+  } catch (error) {
+    console.error("Admin get performance records error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.get("/logs", async (_req: Request, res: Response) => {
   try {
     const logs = await storage.getModeratorLogs();

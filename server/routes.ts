@@ -92,6 +92,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/paypal", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("paypal_email");
+      const email = setting?.value || "Andreamasteri81@gmail.com";
+      res.json({ email });
+    } catch {
+      res.json({ email: "Andreamasteri81@gmail.com" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

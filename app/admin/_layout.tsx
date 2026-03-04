@@ -20,6 +20,7 @@ export default function AdminLayout() {
       <Stack.Screen name="reports" options={{ title: "Segnalazioni" }} />
       <Stack.Screen name="analytics" options={{ title: "Analytics" }} />
       <Stack.Screen name="settings" options={{ title: "Impostazioni" }} />
+      <Stack.Screen name="performance" options={{ title: "Record Performance" }} />
     </Stack>
   );
 }

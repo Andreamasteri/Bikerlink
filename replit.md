@@ -93,7 +93,6 @@ constants/
 
 ## Placeholder (predisposti ma disabilitati)
 
-- PayPal donations
 - Integrazione Foodtracker
 - Google Drive backup
 
@@ -128,6 +127,9 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - **Easter Eggs**: endpoint `GET /api/easter-eggs/nearby?lat=&lng=` (query params obbligatori), `POST /api/easter-eggs/:id/collect`. Admin CRUD completo con edit, toggle attivo/disattivo, statistiche raccolte (`GET /api/admin/easter-eggs-stats`).
 - **Endpoint pubblico utente**: `GET /api/users/:id/public` — restituisce profilo, bio, moto.
 - **Tab labels**: fontSize aumentato a 11
+- **Performance Counter**: tab tracking riscritta come contatore di performance (km totali, tempo fermo, tempo totale, velocità max, quota max). Storico record visibile sotto il contatore. Admin: pagina `app/admin/performance.tsx` con tutti i record di tutti gli utenti + ricerca per nickname. Endpoint: `GET /api/admin/performance-records`.
+- **Donazione PayPal**: sezione nel profilo utente con testo personalizzato e pulsante "Dona con PayPal". Email configurabile dall'admin (default: `Andreamasteri81@gmail.com`). Endpoint: `GET /api/settings/paypal`. Admin settings: casella per modificare l'email PayPal (chiave `paypal_email`).
+- **Ready to Ride**: rimosse scritte "Attiva"/"Disattiva" dal pulsante, solo icona.
 
 ## Tabelle DB Aggiuntive
 

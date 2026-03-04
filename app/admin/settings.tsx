@@ -87,6 +87,33 @@ export default function AdminSettings() {
   const [isUploadingPrivacy, setIsUploadingPrivacy] = useState(false);
   const [isSavingPrivacy, setIsSavingPrivacy] = useState(false);
 
+  const [paypalEmail, setPaypalEmail] = useState("");
+  const [isSavingPaypal, setIsSavingPaypal] = useState(false);
+
+  const { data: paypalData } = useQuery<{ email: string }>({
+    queryKey: ["/api/settings/paypal"],
+  });
+
+  React.useEffect(() => {
+    if (paypalData?.email !== undefined) {
+      setPaypalEmail(paypalData.email);
+    }
+  }, [paypalData?.email]);
+
+  async function handleSavePaypal() {
+    try {
+      setIsSavingPaypal(true);
+      await apiRequest("PUT", "/api/admin/settings/paypal_email", { value: paypalEmail });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/paypal"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      Alert.alert("Successo", "Email PayPal salvata con successo");
+    } catch (error: any) {
+      Alert.alert("Errore", error.message || "Errore durante il salvataggio");
+    } finally {
+      setIsSavingPaypal(false);
+    }
+  }
+
   const { data: privacyData } = useQuery<{ text: string }>({
     queryKey: ["/api/settings/privacy-policy"],
   });
@@ -354,6 +381,33 @@ export default function AdminSettings() {
         ))
       )}
 
+      <View style={styles.paypalCard}>
+        <View style={styles.privacyHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="logo-paypal" size={20} color="#003087" />
+            <Text style={styles.synecoLabel}>Email PayPal Donazioni</Text>
+          </View>
+        </View>
+        <TextInput
+          style={[styles.input, { marginTop: 12 }]}
+          placeholder="Andreamasteri81@gmail.com"
+          placeholderTextColor={Colors.textSecondary}
+          value={paypalEmail}
+          onChangeText={setPaypalEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+        <View style={styles.editActions}>
+          <TouchableOpacity
+            style={styles.saveBtn}
+            onPress={handleSavePaypal}
+            disabled={isSavingPaypal}
+          >
+            <Text style={styles.saveBtnText}>{isSavingPaypal ? "..." : "Salva"}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <View style={styles.privacyCard}>
         <View style={styles.privacyHeader}>
           <View style={styles.synecoInfo}>
@@ -437,4 +491,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.accent,
   },
   privacyHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  paypalCard: {
+    backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginTop: 16,
+    borderWidth: 1, borderColor: "#003087",
+  },
 });

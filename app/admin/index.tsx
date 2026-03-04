@@ -12,6 +12,7 @@ const adminSections = [
   { key: "easter-eggs", label: "Easter Eggs", icon: "egg-easter" as const, iconSet: "MaterialCommunityIcons", route: "/admin/easter-eggs" },
   { key: "ads", label: "Campagne Syneco", icon: "campaign" as const, iconSet: "MaterialIcons", route: "/admin/ads" },
   { key: "reports", label: "Segnalazioni", icon: "flag" as const, iconSet: "MaterialIcons", route: "/admin/reports" },
+  { key: "performance", label: "Record Performance", icon: "speedometer" as const, iconSet: "Ionicons", route: "/admin/performance" },
   { key: "analytics", label: "Analytics", icon: "analytics" as const, iconSet: "MaterialIcons", route: "/admin/analytics" },
   { key: "settings", label: "Impostazioni", icon: "settings" as const, iconSet: "MaterialIcons", route: "/admin/settings" },
 ];
@@ -19,6 +20,9 @@ const adminSections = [
 function getIcon(iconSet: string, icon: string) {
   if (iconSet === "MaterialCommunityIcons") {
     return <MaterialCommunityIcons name={icon as any} size={28} color={Colors.accent} />;
+  }
+  if (iconSet === "Ionicons") {
+    return <Ionicons name={icon as any} size={28} color={Colors.accent} />;
   }
   return <MaterialIcons name={icon as any} size={28} color={Colors.accent} />;
 }

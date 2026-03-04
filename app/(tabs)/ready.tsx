@@ -77,16 +77,11 @@ export default function ReadyToRideScreen() {
           {toggleMutation.isPending ? (
             <ActivityIndicator color="#fff" size="large" />
           ) : (
-            <>
-              <Ionicons
-                name={isAvailable ? "checkmark-circle" : "close-circle"}
-                size={40}
-                color="#fff"
-              />
-              <Text style={styles.toggleText}>
-                {isAvailable ? "Disattiva" : "Attiva"}
-              </Text>
-            </>
+            <Ionicons
+              name={isAvailable ? "checkmark-circle" : "close-circle"}
+              size={48}
+              color="#fff"
+            />
           )}
         </Pressable>
       </View>
@@ -135,10 +130,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     gap: 4,
-  },
-  toggleText: {
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-    color: "#fff",
   },
 });
