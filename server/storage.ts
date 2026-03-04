@@ -10,7 +10,7 @@ export const storage = {
   },
 
   async getUserByEmail(email: string) {
-    const [user] = await db.select().from(schema.users).where(eq(schema.users.email, email));
+    const [user] = await db.select().from(schema.users).where(sql`lower(${schema.users.email}) = ${email.toLowerCase()}`);
     return user;
   },
 

@@ -25,9 +25,17 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const insets = useSafeAreaInsets();
 
+  const showError = (title: string, message: string) => {
+    if (Platform.OS === "web") {
+      window.alert(`${title}: ${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
+  };
+
   const handleLogin = async () => {
     if (!identifier || !password) {
-      Alert.alert("Errore", "Inserisci email/username e password");
+      showError("Errore", "Inserisci email/username e password");
       return;
     }
 
@@ -38,12 +46,14 @@ export default function LoginScreen() {
     } catch (err: any) {
       const msg = err.message || "Errore nel login";
       const parsed = msg.includes(":") ? msg.split(": ").slice(1).join(": ") : msg;
+      let errorMsg = "Credenziali non valide";
       try {
         const json = JSON.parse(parsed);
-        Alert.alert("Errore", json.message || "Credenziali non valide");
+        errorMsg = json.message || errorMsg;
       } catch {
-        Alert.alert("Errore", parsed || "Credenziali non valide");
+        errorMsg = parsed || errorMsg;
       }
+      showError("Errore", errorMsg);
     } finally {
       setLoading(false);
     }
