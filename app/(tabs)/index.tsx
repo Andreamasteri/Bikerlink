@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Platform,
   ScrollView,
+  Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
@@ -26,6 +27,7 @@ export default function MapScreen() {
   const synecoVisible = useSynecoVisible();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
+  const [mapFullscreen, setMapFullscreen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -164,13 +166,41 @@ export default function MapScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.mapContainer}>
+      <Pressable style={styles.mapContainer} onPress={() => setMapFullscreen(true)}>
         <InteractiveMap
           latitude={lat}
           longitude={lng}
           markers={markers}
         />
-      </View>
+        <View style={styles.expandHint}>
+          <Ionicons name="expand" size={16} color={Colors.text} />
+        </View>
+      </Pressable>
+
+      <Modal visible={mapFullscreen} animationType="fade" onRequestClose={() => setMapFullscreen(false)}>
+        <View style={styles.fullscreenContainer}>
+          <InteractiveMap
+            latitude={lat}
+            longitude={lng}
+            markers={markers}
+          />
+          <Pressable style={[styles.closeBtn, { top: Platform.OS === "web" ? 20 : insets.top + 8 }]} onPress={() => setMapFullscreen(false)}>
+            <Ionicons name="close" size={28} color="#fff" />
+          </Pressable>
+          <View style={[styles.fullscreenOverlay, { top: Platform.OS === "web" ? 20 : insets.top + 8 }]}>
+            <View style={styles.statsChip}>
+              <Ionicons name="people" size={14} color={Colors.maleIcon} />
+              <Text style={styles.statsChipText}>{nearbyUsers.length} vicini</Text>
+            </View>
+            {workshops.length > 0 && (
+              <View style={styles.statsChip}>
+                <Ionicons name="construct" size={14} color={synecoVisible ? Colors.syneco : Colors.textSecondary} />
+                <Text style={styles.statsChipText}>{workshops.length} officine</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
@@ -241,7 +271,47 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     borderRadius: 16,
     overflow: "hidden",
+    position: "relative",
   },
+  expandHint: {
+    position: "absolute",
+    bottom: 10,
+    right: 10,
+    backgroundColor: Colors.surface + "CC",
+    borderRadius: 8,
+    padding: 6,
+  },
+  fullscreenContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  closeBtn: {
+    position: "absolute",
+    right: 16,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
+  },
+  fullscreenOverlay: {
+    position: "absolute",
+    left: 16,
+    flexDirection: "row",
+    gap: 8,
+  },
+  statsChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: Colors.surface + "E6",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  statsChipText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.text },
   statsRow: { flexDirection: "row", paddingHorizontal: 16, gap: 12, marginTop: 16 },
   statCard: {
     flex: 1,
