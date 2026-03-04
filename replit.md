@@ -141,6 +141,9 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 
 ## Note Importanti
 
+- **MAI usare `configureWorkflow()`** per riavviare workflow — riscrive la sezione `[[ports]]` nel `.replit` e rompe il mapping delle porte. Usare SOLO `restart_workflow`.
+- **Configurazione porte nel `.replit` NON va mai toccata.** Mapping corretto: `5000→5000`, `8081→80`, `8082→3000`.
+- Se Metro non parte per port conflict (EADDRINUSE 8081): prima uccidere i processi zombie (`ps aux | grep expo` + `kill -9`), poi `restart_workflow`.
 - react-native-maps: usare componenti con pattern `.web.tsx` per compatibilità web
 - KeyboardProvider: escluso su web (causa errore hooks)
 - react-native-maps pinnato a 1.18.0 per compatibilità Expo Go
