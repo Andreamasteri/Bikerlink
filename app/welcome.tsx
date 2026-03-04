@@ -132,8 +132,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 48,
     fontFamily: "Inter_700Bold",
+    fontStyle: "italic",
     color: Colors.accent,
     textAlign: "center",
+    transform: [{ rotate: "-5deg" }],
     textShadowColor: "rgba(0,0,0,0.8)",
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
