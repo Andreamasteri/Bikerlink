@@ -12,14 +12,12 @@ import {
   ScrollView,
   Alert,
   Platform,
-  Image,
 } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
-import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
+import { apiRequest, queryClient } from "@/lib/query-client";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const MOTO_TYPES = [
@@ -53,7 +51,6 @@ function WishlistScreen() {
   });
 
   const wishlist = (data as any)?.wishlist;
-  const photos: any[] = (data as any)?.photos || [];
   const motos: any[] = (data as any)?.motos || [];
 
   React.useEffect(() => {
@@ -69,22 +66,6 @@ function WishlistScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/wishlist"] });
     },
-  });
-
-  const uploadPhotoMutation = useMutation({
-    mutationFn: async ({ base64Data, filename }: { base64Data: string; filename: string }) => {
-      const res = await apiRequest("POST", "/api/wishlist/photos", { imageBase64: base64Data, filename });
-      return res.json();
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/wishlist"] }),
-    onError: (err: any) => Alert.alert("Errore", err.message || "Errore upload foto"),
-  });
-
-  const deletePhotoMutation = useMutation({
-    mutationFn: async (photoId: string) => {
-      await apiRequest("DELETE", `/api/wishlist/photos/${photoId}`);
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/wishlist"] }),
   });
 
   const addMotoMutation = useMutation({
@@ -125,38 +106,6 @@ function WishlistScreen() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/wishlist"] }),
   });
-
-  const pickWishlistPhoto = async () => {
-    if (photos.length >= 3) {
-      Alert.alert("Limite raggiunto", "Massimo 3 foto personali");
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-      allowsEditing: true,
-      base64: true,
-    });
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      const uri = asset.uri;
-      const ext = uri.split(".").pop()?.split("?")[0] || "jpg";
-      const filename = `photo_${Date.now()}.${ext}`;
-      const base64Data = `data:image/${ext === "png" ? "png" : "jpeg"};base64,${asset.base64}`;
-      uploadPhotoMutation.mutate({ base64Data, filename });
-    }
-  };
-
-  const handleDeletePhoto = (photoId: string) => {
-    if (Platform.OS === "web") {
-      if (window.confirm("Eliminare questa foto?")) deletePhotoMutation.mutate(photoId);
-    } else {
-      Alert.alert("Elimina Foto", "Eliminare questa foto?", [
-        { text: "Annulla", style: "cancel" },
-        { text: "Elimina", style: "destructive", onPress: () => deletePhotoMutation.mutate(photoId) },
-      ]);
-    }
-  };
 
   const openEditMoto = (moto: any) => {
     setEditingMotoId(moto.id);
@@ -199,7 +148,6 @@ function WishlistScreen() {
   );
 
   const getStyleLabel = (v: string) => RIDING_STYLES.find(t => t.value === v)?.label || v;
-  const baseUrl = getApiUrl();
 
   if (isLoading) {
     return (
@@ -240,28 +188,6 @@ function WishlistScreen() {
               <Text style={styles.saveBtnText}>Salva Descrizione</Text>
             )}
           </Pressable>
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="images-outline" size={28} color={Colors.accent} />
-            <Text style={styles.motoName}>Le Mie Foto ({photos.length}/3)</Text>
-          </View>
-          <View style={styles.photoRow}>
-            {photos.map((photo: any) => (
-              <View key={photo.id} style={styles.photoThumbContainer}>
-                <Image source={{ uri: new URL(photo.photoUrl, baseUrl).toString() }} style={styles.photoThumb} />
-                <Pressable style={styles.photoDeleteBtn} onPress={() => handleDeletePhoto(photo.id)} hitSlop={6}>
-                  <Ionicons name="close-circle" size={18} color={Colors.accentRed} />
-                </Pressable>
-              </View>
-            ))}
-            {photos.length < 3 && (
-              <Pressable style={styles.addPhotoThumb} onPress={pickWishlistPhoto}>
-                <Ionicons name="camera-outline" size={22} color={Colors.textSecondary} />
-              </Pressable>
-            )}
-          </View>
         </View>
 
         <View style={styles.card}>
@@ -479,28 +405,6 @@ function GarageContent() {
     },
   });
 
-  const uploadPhotoMutation = useMutation({
-    mutationFn: async ({ motoId, base64Data, filename }: { motoId: string; base64Data: string; filename: string }) => {
-      const res = await apiRequest("POST", `/api/motorcycles/${motoId}/photos`, { imageBase64: base64Data, filename });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/motorcycles"] });
-    },
-    onError: (err: any) => {
-      Alert.alert("Errore", err.message || "Errore upload foto");
-    },
-  });
-
-  const deletePhotoMutation = useMutation({
-    mutationFn: async ({ motoId, photoId }: { motoId: string; photoId: string }) => {
-      await apiRequest("DELETE", `/api/motorcycles/${motoId}/photos/${photoId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/motorcycles"] });
-    },
-  });
-
   const resetForm = () => {
     setForm({ brand: "", model: "", displacement: "", motorcycleType: "", ridingStyle: "", isDefault: false });
     setEditingId(null);
@@ -545,40 +449,6 @@ function GarageContent() {
     }
   };
 
-  const pickAndUploadPhoto = async (motoId: string, currentCount: number) => {
-    if (currentCount >= 3) {
-      Alert.alert("Limite raggiunto", "Massimo 3 foto per moto");
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-      allowsEditing: true,
-      base64: true,
-    });
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      const uri = asset.uri;
-      const ext = uri.split(".").pop()?.split("?")[0] || "jpg";
-      const filename = `photo_${Date.now()}.${ext}`;
-      const base64Data = `data:image/${ext === "png" ? "png" : "jpeg"};base64,${asset.base64}`;
-      uploadPhotoMutation.mutate({ motoId, base64Data, filename });
-    }
-  };
-
-  const handleDeletePhoto = (motoId: string, photoId: string) => {
-    if (Platform.OS === "web") {
-      if (window.confirm("Eliminare questa foto?")) {
-        deletePhotoMutation.mutate({ motoId, photoId });
-      }
-    } else {
-      Alert.alert("Elimina Foto", "Eliminare questa foto?", [
-        { text: "Annulla", style: "cancel" },
-        { text: "Elimina", style: "destructive", onPress: () => deletePhotoMutation.mutate({ motoId, photoId }) },
-      ]);
-    }
-  };
-
   const OptionButton = ({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) => (
     <Pressable style={[styles.optionBtn, selected && styles.optionBtnSelected]} onPress={onPress}>
       <Text style={[styles.optionText, selected && styles.optionTextSelected]}>{label}</Text>
@@ -599,8 +469,6 @@ function GarageContent() {
 
   const renderMoto = ({ item }: { item: any }) => {
     const displayName = getMotoDisplayName(item);
-    const photos: any[] = item.photos || [];
-    const baseUrl = getApiUrl();
 
     return (
       <Pressable style={styles.card} onPress={() => openEdit(item)}>
@@ -628,44 +496,6 @@ function GarageContent() {
             <Text style={styles.detailText}>{getStyleLabel(item.ridingStyle)}</Text>
           </View>
         </View>
-
-        {photos.length > 0 && (
-          <View style={styles.photoRow}>
-            {photos.map((photo: any) => (
-              <View key={photo.id} style={styles.photoThumbContainer}>
-                <Image
-                  source={{ uri: new URL(photo.photoUrl, baseUrl).toString() }}
-                  style={styles.photoThumb}
-                />
-                <Pressable
-                  style={styles.photoDeleteBtn}
-                  onPress={() => handleDeletePhoto(item.id, photo.id)}
-                  hitSlop={6}
-                >
-                  <Ionicons name="close-circle" size={18} color={Colors.accentRed} />
-                </Pressable>
-              </View>
-            ))}
-            {photos.length < 3 && (
-              <Pressable
-                style={styles.addPhotoThumb}
-                onPress={() => pickAndUploadPhoto(item.id, photos.length)}
-              >
-                <Ionicons name="camera-outline" size={22} color={Colors.textSecondary} />
-              </Pressable>
-            )}
-          </View>
-        )}
-
-        {photos.length === 0 && (
-          <Pressable
-            style={styles.addPhotoRow}
-            onPress={() => pickAndUploadPhoto(item.id, 0)}
-          >
-            <Ionicons name="camera-outline" size={18} color={Colors.accent} />
-            <Text style={styles.addPhotoText}>Aggiungi foto</Text>
-          </Pressable>
-        )}
       </Pressable>
     );
   };
@@ -798,28 +628,6 @@ const styles = StyleSheet.create({
   cardDetails: { flexDirection: "row", gap: 12, marginTop: 12 },
   detailChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.surfaceLight, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   detailText: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
-  photoRow: { flexDirection: "row", gap: 8, marginTop: 12, flexWrap: "wrap" },
-  photoThumbContainer: { position: "relative" },
-  photoThumb: { width: 72, height: 72, borderRadius: 8 },
-  photoDeleteBtn: { position: "absolute", top: -6, right: -6 },
-  addPhotoThumb: {
-    width: 72,
-    height: 72,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderStyle: "dashed",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  addPhotoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 12,
-    paddingVertical: 8,
-  },
-  addPhotoText: { fontSize: 13, fontFamily: "Inter_500Medium", color: Colors.accent },
   empty: { alignItems: "center", paddingTop: 80, gap: 12 },
   emptyText: { fontSize: 18, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary },
   emptySubtext: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
