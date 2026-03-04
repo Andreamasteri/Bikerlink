@@ -228,6 +228,7 @@ export interface IStorage {
   getWorkshopContactsByPeriod(startDate: Date, endDate: Date): Promise<WorkshopContact[]>;
   countUsers(): Promise<number>;
   countActiveUsers(since: Date): Promise<number>;
+  countAvailableUsers(): Promise<number>;
   getUnapprovedUserPhotos(): Promise<UserPhoto[]>;
   updateUserPhotoApproval(id: string, approved: boolean): Promise<UserPhoto | undefined>;
   getUnapprovedContestEntries(): Promise<PhotoContestEntry[]>;
@@ -715,6 +716,11 @@ export class DatabaseStorage implements IStorage {
 
   async countActiveUsers(since: Date): Promise<number> {
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(and(eq(users.status, "active"), gte(users.lastLoginAt, since)));
+    return result[0]?.count ?? 0;
+  }
+
+  async countAvailableUsers(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(and(eq(users.status, "active"), eq(users.isAvailable, true)));
     return result[0]?.count ?? 0;
   }
 

@@ -144,6 +144,12 @@ export default function MapScreen() {
     enabled: isAuthenticated,
   });
 
+  const availableCountQuery = useQuery<{ count: number }>({
+    queryKey: ["/api/users/available-count"],
+    staleTime: 30000,
+    enabled: isAuthenticated,
+  });
+
   const profileQuery = useQuery({
     queryKey: ["/api/users/profile"],
     enabled: isAuthenticated,
@@ -198,6 +204,7 @@ export default function MapScreen() {
   const workshops = (workshopsQuery.data as any) || [];
   const ads = (adsData as any)?.ads || [];
   const onlineCount = onlineCountQuery.data?.count ?? 0;
+  const availableCount = availableCountQuery.data?.count ?? 0;
 
   if (authLoading || locationLoading) {
     return (
@@ -299,6 +306,11 @@ export default function MapScreen() {
           <Ionicons name="radio-button-on" size={20} color={Colors.success} />
           <Text style={styles.statNumber}>{onlineCount}</Text>
           <Text style={styles.statLabel}>Online</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Ionicons name="hand-left" size={20} color={Colors.accent} />
+          <Text style={styles.statNumber}>{availableCount}</Text>
+          <Text style={styles.statLabel}>Disponibili</Text>
         </View>
         <View style={styles.statCard}>
           <Ionicons name="people" size={20} color={Colors.maleIcon} />
