@@ -56,9 +56,9 @@ export default function TrackingScreen() {
       }
 
       setLoading(true);
-      const res = await apiRequest("POST", "/api/routes/start", { trackingFrequency: frequency });
+      const res = await apiRequest("POST", "/api/routes", { trackingFrequency: frequency });
       const data = await res.json();
-      setRouteId(data.route.id);
+      setRouteId(data.id);
       setIsTracking(true);
       startTimeRef.current = Date.now();
       setSummary(null);
@@ -78,12 +78,14 @@ export default function TrackingScreen() {
             speed = loc.coords.speed || 0;
           }
 
-          await apiRequest("POST", `/api/routes/${data.route.id}/point`, {
-            latitude: lat,
-            longitude: lng,
-            altitude,
-            speed,
-            isStop: speed < 0.5,
+          await apiRequest("POST", `/api/routes/${data.id}/points`, {
+            points: [{
+              latitude: lat,
+              longitude: lng,
+              altitude,
+              speedKmh: speed * 3.6,
+              timestamp: new Date().toISOString(),
+            }],
           });
 
           setStats(prev => ({
@@ -113,9 +115,9 @@ export default function TrackingScreen() {
 
     setLoading(true);
     try {
-      const res = await apiRequest("POST", `/api/routes/${routeId}/stop`);
+      const res = await apiRequest("PUT", `/api/routes/${routeId}/stop`);
       const data = await res.json();
-      setSummary(data.route);
+      setSummary(data);
       setIsTracking(false);
     } catch (err) {
       Alert.alert("Errore", "Errore nel completamento tracciamento");
@@ -153,11 +155,11 @@ export default function TrackingScreen() {
             <Text style={styles.summaryLabel}>km/h max</Text>
           </View>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>{summary.totalDurationMinutes || "0"}</Text>
+            <Text style={styles.summaryValue}>{summary.durationSeconds ? Math.round(summary.durationSeconds / 60) : "0"}</Text>
             <Text style={styles.summaryLabel}>minuti</Text>
           </View>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>{summary.maxAltitudeM?.toFixed(0) || "-"}</Text>
+            <Text style={styles.summaryValue}>{summary.maxAltitude?.toFixed(0) || "-"}</Text>
             <Text style={styles.summaryLabel}>m alt. max</Text>
           </View>
         </View>

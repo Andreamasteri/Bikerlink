@@ -834,31 +834,51 @@ export class DatabaseStorage implements IStorage {
     return Number(result[0]?.count ?? 0);
   }
 
-  async findMatchingWishlistMotos(brand: string, model: string, ridingStyle: string): Promise<Array<ZavarrinaWishlistMoto & { userId: string }>> {
+  async findMatchingWishlistMotos(brand: string, model: string, ridingStyle: string, motorcycleType: string): Promise<Array<ZavarrinaWishlistMoto & { userId: string }>> {
+    const brandModelMatch = and(
+      sql`${zavarrinaWishlistMotos.brand} IS NOT NULL AND ${zavarrinaWishlistMotos.brand} != ''`,
+      sql`${zavarrinaWishlistMotos.model} IS NOT NULL AND ${zavarrinaWishlistMotos.model} != ''`,
+      sql`LOWER(${zavarrinaWishlistMotos.brand}) = LOWER(${brand})`,
+      sql`(LOWER(${zavarrinaWishlistMotos.model}) LIKE '%' || LOWER(${model}) || '%' OR LOWER(${model}) LIKE '%' || LOWER(${zavarrinaWishlistMotos.model}) || '%')`,
+      sql`LOWER(${zavarrinaWishlistMotos.ridingStyle}) = LOWER(${ridingStyle})`,
+    );
+    const typeMatch = and(
+      sql`(${zavarrinaWishlistMotos.brand} IS NULL OR ${zavarrinaWishlistMotos.brand} = '')`,
+      sql`(${zavarrinaWishlistMotos.model} IS NULL OR ${zavarrinaWishlistMotos.model} = '')`,
+      sql`${zavarrinaWishlistMotos.motorcycleType} IS NOT NULL AND ${zavarrinaWishlistMotos.motorcycleType} != ''`,
+      sql`LOWER(${zavarrinaWishlistMotos.motorcycleType}) = LOWER(${motorcycleType})`,
+      sql`LOWER(${zavarrinaWishlistMotos.ridingStyle}) = LOWER(${ridingStyle})`,
+    );
     const results = await db.select({
       id: zavarrinaWishlistMotos.id,
       wishlistId: zavarrinaWishlistMotos.wishlistId,
       brand: zavarrinaWishlistMotos.brand,
       model: zavarrinaWishlistMotos.model,
+      motorcycleType: zavarrinaWishlistMotos.motorcycleType,
       ridingStyle: zavarrinaWishlistMotos.ridingStyle,
       createdAt: zavarrinaWishlistMotos.createdAt,
       userId: zavarrinaWishlists.userId,
     }).from(zavarrinaWishlistMotos)
       .innerJoin(zavarrinaWishlists, eq(zavarrinaWishlistMotos.wishlistId, zavarrinaWishlists.id))
-      .where(and(
-        sql`LOWER(${zavarrinaWishlistMotos.brand}) = LOWER(${brand})`,
-        sql`LOWER(${zavarrinaWishlistMotos.model}) = LOWER(${model})`,
-        sql`LOWER(${zavarrinaWishlistMotos.ridingStyle}) = LOWER(${ridingStyle})`,
-      ));
+      .where(or(brandModelMatch, typeMatch));
     return results;
   }
 
-  async findMatchingBikerMotos(brand: string, model: string, ridingStyle: string): Promise<UserMotorcycle[]> {
-    return db.select().from(userMotorcycles).where(and(
-      sql`LOWER(${userMotorcycles.brand}) = LOWER(${brand})`,
-      sql`LOWER(${userMotorcycles.model}) = LOWER(${model})`,
-      sql`LOWER(${userMotorcycles.ridingStyle}) = LOWER(${ridingStyle})`,
-    ));
+  async findMatchingBikerMotos(brand: string, model: string, ridingStyle: string, motorcycleType: string): Promise<UserMotorcycle[]> {
+    if (brand && model) {
+      return db.select().from(userMotorcycles).where(and(
+        sql`LOWER(${userMotorcycles.brand}) = LOWER(${brand})`,
+        sql`(LOWER(${userMotorcycles.model}) LIKE '%' || LOWER(${model}) || '%' OR LOWER(${model}) LIKE '%' || LOWER(${userMotorcycles.model}) || '%')`,
+        sql`LOWER(${userMotorcycles.ridingStyle}) = LOWER(${ridingStyle})`,
+      ));
+    }
+    if (motorcycleType) {
+      return db.select().from(userMotorcycles).where(and(
+        sql`LOWER(${userMotorcycles.motorcycleType}) = LOWER(${motorcycleType})`,
+        sql`LOWER(${userMotorcycles.ridingStyle}) = LOWER(${ridingStyle})`,
+      ));
+    }
+    return [];
   }
 
   async createMatch(data: InsertBikerZavarrinaMatch): Promise<BikerZavarrinaMatch> {

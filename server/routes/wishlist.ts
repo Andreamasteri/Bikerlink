@@ -114,21 +114,22 @@ router.post("/motos", requireAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Massimo 5 moto nella wishlist" });
     }
 
-    const { brand, model, ridingStyle } = req.body;
-    if (!brand || !model) {
-      return res.status(400).json({ message: "Marca e modello sono obbligatori" });
+    const { brand, model, ridingStyle, motorcycleType } = req.body;
+    if (!brand && !model && !motorcycleType) {
+      return res.status(400).json({ message: "Specifica marca e modello oppure tipo moto" });
     }
 
     const moto = await storage.addWishlistMoto({
       wishlistId: wishlist.id,
-      brand,
-      model,
+      brand: brand || null,
+      model: model || null,
+      motorcycleType: motorcycleType || null,
       ridingStyle: ridingStyle || null,
     });
 
     let matches: any[] = [];
-    if (brand && model && ridingStyle) {
-      const bikerMotos = await storage.findMatchingBikerMotos(brand, model, ridingStyle);
+    if (ridingStyle) {
+      const bikerMotos = await storage.findMatchingBikerMotos(brand || "", model || "", ridingStyle, motorcycleType || "");
       for (const bikerMoto of bikerMotos) {
         if (bikerMoto.userId === userId) continue;
         await storage.createMatch({
@@ -169,8 +170,8 @@ router.post("/motos", requireAuth, async (req: Request, res: Response) => {
 router.put("/motos/:motoId", requireAuth, async (req: Request, res: Response) => {
   try {
     const motoId = req.params.motoId as string;
-    const { brand, model, ridingStyle } = req.body;
-    const moto = await storage.updateWishlistMoto(motoId, { brand, model, ridingStyle });
+    const { brand, model, ridingStyle, motorcycleType } = req.body;
+    const moto = await storage.updateWishlistMoto(motoId, { brand, model, ridingStyle, motorcycleType });
     return res.json(moto);
   } catch (error) {
     console.error("Update wishlist moto error:", error);

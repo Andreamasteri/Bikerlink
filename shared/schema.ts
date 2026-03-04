@@ -526,7 +526,7 @@ export const motorcyclePhotos = pgTable("motorcycle_photos", {
   index("motorcycle_photos_motorcycle_id_idx").on(table.motorcycleId),
 ]);
 
-export const zavarrinaWishlists = pgTable("zavarina_wishlists", {
+export const zavarrinaWishlists = pgTable("zavorrina_wishlists", {
   id: varchar("id", { length: 36 })
     .primaryKey()
     .default(sql`gen_random_uuid()`),
@@ -539,7 +539,7 @@ export const zavarrinaWishlists = pgTable("zavarina_wishlists", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const zavarrinaWishlistPhotos = pgTable("zavarina_wishlist_photos", {
+export const zavarrinaWishlistPhotos = pgTable("zavorrina_wishlist_photos", {
   id: varchar("id", { length: 36 })
     .primaryKey()
     .default(sql`gen_random_uuid()`),
@@ -551,27 +551,28 @@ export const zavarrinaWishlistPhotos = pgTable("zavarina_wishlist_photos", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const zavarrinaWishlistMotos = pgTable("zavarina_wishlist_motos", {
+export const zavarrinaWishlistMotos = pgTable("zavorrina_wishlist_motos", {
   id: varchar("id", { length: 36 })
     .primaryKey()
     .default(sql`gen_random_uuid()`),
   wishlistId: varchar("wishlist_id", { length: 36 })
     .notNull()
     .references(() => zavarrinaWishlists.id, { onDelete: "cascade" }),
-  brand: varchar("brand", { length: 100 }).notNull(),
-  model: varchar("model", { length: 100 }).notNull(),
+  brand: varchar("brand", { length: 100 }),
+  model: varchar("model", { length: 100 }),
+  motorcycleType: varchar("motorcycle_type", { length: 50 }),
   ridingStyle: varchar("riding_style", { length: 50 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const bikerZavarrinaMatches = pgTable("biker_zavarina_matches", {
+export const bikerZavarrinaMatches = pgTable("biker_zavorrina_matches", {
   id: varchar("id", { length: 36 })
     .primaryKey()
     .default(sql`gen_random_uuid()`),
   bikerId: varchar("biker_id", { length: 36 })
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  zavarrinaId: varchar("zavarina_id", { length: 36 })
+  zavarrinaId: varchar("zavorrina_id", { length: 36 })
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   bikerMotorcycleId: varchar("biker_motorcycle_id", { length: 36 })
@@ -584,7 +585,7 @@ export const bikerZavarrinaMatches = pgTable("biker_zavarina_matches", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("matches_biker_id_idx").on(table.bikerId),
-  index("matches_zavarina_id_idx").on(table.zavarrinaId),
+  index("matches_zavorrina_id_idx").on(table.zavarrinaId),
 ]);
 
 export const emailVerificationTokens = pgTable("email_verification_tokens", {

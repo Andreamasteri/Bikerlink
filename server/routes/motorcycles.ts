@@ -70,8 +70,8 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     });
 
     let matches: any[] = [];
-    if (brand && model && ridingStyle) {
-      const wishlistMotos = await storage.findMatchingWishlistMotos(brand, model, ridingStyle);
+    if (ridingStyle) {
+      const wishlistMotos = await storage.findMatchingWishlistMotos(brand || "", model || "", ridingStyle, motorcycleType || "");
       for (const wm of wishlistMotos) {
         if (wm.userId === userId) continue;
         await storage.createMatch({

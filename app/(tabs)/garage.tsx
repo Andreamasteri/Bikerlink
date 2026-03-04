@@ -47,7 +47,7 @@ function WishlistScreen() {
   const [showMotoForm, setShowMotoForm] = useState(false);
   const [editingMotoId, setEditingMotoId] = useState<string | null>(null);
   const [description, setDescription] = useState("");
-  const [motoForm, setMotoForm] = useState({ brand: "", model: "", ridingStyle: "" });
+  const [motoForm, setMotoForm] = useState({ brand: "", model: "", motorcycleType: "", ridingStyle: "" });
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["/api/wishlist"],
@@ -104,7 +104,7 @@ function WishlistScreen() {
     onSuccess: (responseData: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/wishlist"] });
       setShowMotoForm(false);
-      setMotoForm({ brand: "", model: "", ridingStyle: "" });
+      setMotoForm({ brand: "", model: "", motorcycleType: "", ridingStyle: "" });
       setEditingMotoId(null);
       if (responseData?.matches && responseData.matches.length > 0) {
         const matchInfo = responseData.matches
@@ -123,7 +123,7 @@ function WishlistScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/wishlist"] });
       setShowMotoForm(false);
-      setMotoForm({ brand: "", model: "", ridingStyle: "" });
+      setMotoForm({ brand: "", model: "", motorcycleType: "", ridingStyle: "" });
       setEditingMotoId(null);
     },
   });
@@ -163,13 +163,17 @@ function WishlistScreen() {
 
   const openEditMoto = (moto: any) => {
     setEditingMotoId(moto.id);
-    setMotoForm({ brand: moto.brand || "", model: moto.model || "", ridingStyle: moto.ridingStyle || "" });
+    setMotoForm({ brand: moto.brand || "", model: moto.model || "", motorcycleType: moto.motorcycleType || "", ridingStyle: moto.ridingStyle || "" });
     setShowMotoForm(true);
   };
 
+  const getMotoTypeLabel = (v: string) => MOTO_TYPES.find(t => t.value === v)?.label || v;
+
   const handleSaveMoto = () => {
-    if (!motoForm.brand || !motoForm.model) {
-      Alert.alert("Errore", "Marca e modello sono obbligatori");
+    const hasBrandModel = motoForm.brand.trim() && motoForm.model.trim();
+    const hasType = !!motoForm.motorcycleType;
+    if (!hasBrandModel && !hasType) {
+      Alert.alert("Errore", "Specifica marca e modello oppure il tipo moto");
       return;
     }
     if (editingMotoId) {
@@ -179,8 +183,8 @@ function WishlistScreen() {
     }
   };
 
-  const handleDeleteMoto = (id: string, brand: string, model: string) => {
-    const name = `${brand} ${model}`;
+  const handleDeleteMoto = (id: string, brand: string, model: string, motorcycleType?: string) => {
+    const name = brand && model ? `${brand} ${model}` : getMotoTypeLabel(motorcycleType || "");
     if (Platform.OS === "web") {
       if (window.confirm(`Eliminare "${name}" dalla wishlist?`)) deleteMotoMutation.mutate(id);
     } else {
@@ -270,16 +274,16 @@ function WishlistScreen() {
               <Text style={styles.motoName}>Moto Desiderate ({motos.length}/5)</Text>
             </View>
             {motos.length < 5 && (
-              <Pressable onPress={() => { setEditingMotoId(null); setMotoForm({ brand: "", model: "", ridingStyle: "" }); setShowMotoForm(true); }} hitSlop={10}>
+              <Pressable onPress={() => { setEditingMotoId(null); setMotoForm({ brand: "", model: "", motorcycleType: "", ridingStyle: "" }); setShowMotoForm(true); }} hitSlop={10}>
                 <Ionicons name="add-circle" size={24} color={Colors.accent} />
               </Pressable>
             )}
           </View>
 
           <View style={wStyles.warningBox}>
-            <Ionicons name="warning-outline" size={16} color={Colors.warning} />
+            <Ionicons name="information-circle-outline" size={16} color={Colors.accent} />
             <Text style={wStyles.warningText}>
-              Attenzione: specificare marca e modello precisi per usufruire del matching automatico
+              Puoi cercare per marca e modello oppure per tipo moto + stile guida
             </Text>
           </View>
 
@@ -292,15 +296,25 @@ function WishlistScreen() {
             motos.map((moto: any) => (
               <Pressable key={moto.id} style={wStyles.motoItem} onPress={() => openEditMoto(moto)}>
                 <View style={{ flex: 1 }}>
-                  <Text style={wStyles.motoItemTitle}>{moto.brand} {moto.model}</Text>
-                  {moto.ridingStyle && (
-                    <View style={styles.detailChip}>
-                      <Ionicons name="flash-outline" size={14} color={Colors.textSecondary} />
-                      <Text style={styles.detailText}>{getStyleLabel(moto.ridingStyle)}</Text>
-                    </View>
-                  )}
+                  <Text style={wStyles.motoItemTitle}>
+                    {moto.brand && moto.model ? `${moto.brand} ${moto.model}` : getMotoTypeLabel(moto.motorcycleType || "")}
+                  </Text>
+                  <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                    {moto.motorcycleType && (
+                      <View style={styles.detailChip}>
+                        <Ionicons name="bicycle-outline" size={14} color={Colors.textSecondary} />
+                        <Text style={styles.detailText}>{getMotoTypeLabel(moto.motorcycleType)}</Text>
+                      </View>
+                    )}
+                    {moto.ridingStyle && (
+                      <View style={styles.detailChip}>
+                        <Ionicons name="flash-outline" size={14} color={Colors.textSecondary} />
+                        <Text style={styles.detailText}>{getStyleLabel(moto.ridingStyle)}</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
-                <Pressable onPress={() => handleDeleteMoto(moto.id, moto.brand, moto.model)} hitSlop={10}>
+                <Pressable onPress={() => handleDeleteMoto(moto.id, moto.brand, moto.model, moto.motorcycleType)} hitSlop={10}>
                   <Ionicons name="trash-outline" size={20} color={Colors.accentRed} />
                 </Pressable>
               </Pressable>
@@ -321,29 +335,36 @@ function WishlistScreen() {
               </View>
 
               <View style={wStyles.warningBox}>
-                <Ionicons name="warning-outline" size={16} color={Colors.warning} />
+                <Ionicons name="information-circle-outline" size={16} color={Colors.accent} />
                 <Text style={wStyles.warningText}>
-                  Attenzione: specificare marca e modello precisi per usufruire del matching automatico
+                  Opzione 1: marca e modello specifici. Opzione 2: solo tipo moto.
                 </Text>
               </View>
 
-              <Text style={styles.label}>Marca *</Text>
+              <Text style={styles.label}>Marca</Text>
               <TextInput
                 style={styles.input}
-                placeholder='es. "Ducati"'
+                placeholder='es. "Ducati" (opzionale)'
                 placeholderTextColor={Colors.textSecondary}
                 value={motoForm.brand}
                 onChangeText={(v) => setMotoForm(p => ({ ...p, brand: v }))}
               />
 
-              <Text style={styles.label}>Modello *</Text>
+              <Text style={styles.label}>Modello</Text>
               <TextInput
                 style={styles.input}
-                placeholder='es. "Monster 821"'
+                placeholder='es. "Monster 821" (opzionale)'
                 placeholderTextColor={Colors.textSecondary}
                 value={motoForm.model}
                 onChangeText={(v) => setMotoForm(p => ({ ...p, model: v }))}
               />
+
+              <Text style={styles.label}>Tipo Moto</Text>
+              <View style={styles.optionRow}>
+                {MOTO_TYPES.map(t => (
+                  <OptionButton key={t.value} label={t.label} selected={motoForm.motorcycleType === t.value} onPress={() => setMotoForm(p => ({ ...p, motorcycleType: p.motorcycleType === t.value ? "" : t.value }))} />
+                ))}
+              </View>
 
               <Text style={styles.label}>Stile Guida</Text>
               <View style={styles.optionRow}>
