@@ -9,9 +9,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Modal,
+  FlatList,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
@@ -22,6 +24,41 @@ const ITALIAN_REGIONS = [
   "Friuli Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche",
   "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia",
   "Toscana", "Trentino-Alto Adige", "Umbria", "Valle d'Aosta", "Veneto",
+];
+
+const PHONE_PREFIXES = [
+  { code: "+39", country: "Italia" },
+  { code: "+1", country: "USA/Canada" },
+  { code: "+44", country: "Regno Unito" },
+  { code: "+49", country: "Germania" },
+  { code: "+33", country: "Francia" },
+  { code: "+34", country: "Spagna" },
+  { code: "+41", country: "Svizzera" },
+  { code: "+43", country: "Austria" },
+  { code: "+32", country: "Belgio" },
+  { code: "+31", country: "Paesi Bassi" },
+  { code: "+351", country: "Portogallo" },
+  { code: "+48", country: "Polonia" },
+  { code: "+46", country: "Svezia" },
+  { code: "+47", country: "Norvegia" },
+  { code: "+45", country: "Danimarca" },
+  { code: "+358", country: "Finlandia" },
+  { code: "+30", country: "Grecia" },
+  { code: "+36", country: "Ungheria" },
+  { code: "+420", country: "Rep. Ceca" },
+  { code: "+40", country: "Romania" },
+  { code: "+385", country: "Croazia" },
+  { code: "+386", country: "Slovenia" },
+  { code: "+381", country: "Serbia" },
+  { code: "+355", country: "Albania" },
+  { code: "+90", country: "Turchia" },
+  { code: "+7", country: "Russia" },
+  { code: "+61", country: "Australia" },
+  { code: "+81", country: "Giappone" },
+  { code: "+86", country: "Cina" },
+  { code: "+55", country: "Brasile" },
+  { code: "+52", country: "Messico" },
+  { code: "+91", country: "India" },
 ];
 
 const EULA_TEXT = `TERMINI E CONDIZIONI D'USO - BikerLink
@@ -75,9 +112,13 @@ export default function RegisterScreen() {
   const [coupleSexConfig, setCoupleSexConfig] = useState<"M+M" | "M+F" | "F+F" | "">("");
   const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
+  const [phonePrefix, setPhonePrefix] = useState("+39");
   const [phone, setPhone] = useState("");
+  const [showPrefixModal, setShowPrefixModal] = useState(false);
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [birthYear, setBirthYear] = useState("");
   const [region, setRegion] = useState("");
   const [showRegions, setShowRegions] = useState(false);
@@ -114,6 +155,7 @@ export default function RegisterScreen() {
       if (!/[A-Z]/.test(password)) { setError(t("validation.passwordUpper")); return false; }
       if (!/[a-z]/.test(password)) { setError(t("validation.passwordLower")); return false; }
       if (!/[0-9]/.test(password)) { setError(t("validation.passwordNumber")); return false; }
+      if (password !== confirmPassword) { setError("Le password non coincidono"); return false; }
     } else if (step === 4) {
       if (!eulaAccepted) {
         setError("Devi accettare i termini e le condizioni");
@@ -152,7 +194,7 @@ export default function RegisterScreen() {
       userType,
       eulaAccepted: true as const,
     };
-    if (phone.trim()) data.phone = phone.trim();
+    if (phone.trim()) data.phone = phonePrefix + phone.trim();
     if (userType === "coppia" && coupleSexConfig) {
       data.coupleSexConfig = coupleSexConfig;
     } else if (sex) {
@@ -162,6 +204,9 @@ export default function RegisterScreen() {
     if (region) data.region = region;
 
     registerMutation.mutate(data, {
+      onSuccess: () => {
+        router.replace("/(tabs)");
+      },
       onError: (err: any) => {
         const msg = err?.message || "Errore durante la registrazione";
         const cleaned = msg.replace(/^\d+:\s*/, "");
@@ -200,8 +245,8 @@ export default function RegisterScreen() {
           onPress={() => setUserType("biker")}
           testID="type-biker"
         >
-          <MaterialCommunityIcons
-            name="motorbike"
+          <Ionicons
+            name="bicycle"
             size={48}
             color={userType === "biker" ? Colors.maleIcon : Colors.textSecondary}
           />
@@ -215,8 +260,8 @@ export default function RegisterScreen() {
           onPress={() => setUserType("zavorrina")}
           testID="type-zavorrina"
         >
-          <MaterialCommunityIcons
-            name="seat-passenger"
+          <Ionicons
+            name="person"
             size={48}
             color={userType === "zavorrina" ? Colors.femaleIcon : Colors.textSecondary}
           />
@@ -230,8 +275,8 @@ export default function RegisterScreen() {
           onPress={() => setUserType("coppia")}
           testID="type-coppia"
         >
-          <MaterialCommunityIcons
-            name="account-group"
+          <Ionicons
+            name="people"
             size={48}
             color={userType === "coppia" ? Colors.accent : Colors.textSecondary}
           />
@@ -339,17 +384,26 @@ export default function RegisterScreen() {
         />
       </View>
 
-      <View style={styles.inputWrapper}>
-        <Ionicons name="call-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
-        <TextInput
-          style={styles.input}
-          placeholder={`${t("auth.phone")} (opzionale)`}
-          placeholderTextColor={Colors.textSecondary}
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-          testID="reg-phone"
-        />
+      <View style={styles.phoneRow}>
+        <TouchableOpacity
+          style={styles.prefixButton}
+          onPress={() => setShowPrefixModal(true)}
+          testID="reg-phone-prefix"
+        >
+          <Text style={styles.prefixText}>{phonePrefix}</Text>
+          <Ionicons name="chevron-down" size={14} color={Colors.textSecondary} />
+        </TouchableOpacity>
+        <View style={styles.phoneInputWrapper}>
+          <TextInput
+            style={styles.phoneInput}
+            placeholder={`${t("auth.phone")} (opzionale)`}
+            placeholderTextColor={Colors.textSecondary}
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            testID="reg-phone"
+          />
+        </View>
       </View>
 
       <View style={styles.inputWrapper}>
@@ -367,6 +421,27 @@ export default function RegisterScreen() {
         <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
           <Ionicons
             name={showPassword ? "eye-off-outline" : "eye-outline"}
+            size={22}
+            color={Colors.textSecondary}
+          />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.inputWrapper}>
+        <Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
+        <TextInput
+          style={[styles.input, styles.passwordInput]}
+          placeholder="Conferma Password"
+          placeholderTextColor={Colors.textSecondary}
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          secureTextEntry={!showConfirmPassword}
+          autoCapitalize="none"
+          testID="reg-confirm-password"
+        />
+        <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeButton}>
+          <Ionicons
+            name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
             size={22}
             color={Colors.textSecondary}
           />
@@ -414,6 +489,50 @@ export default function RegisterScreen() {
           </ScrollView>
         </View>
       )}
+
+      <Modal
+        visible={showPrefixModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPrefixModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Prefisso internazionale</Text>
+              <TouchableOpacity onPress={() => setShowPrefixModal(false)}>
+                <Ionicons name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={PHONE_PREFIXES}
+              keyExtractor={(item) => item.code}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.prefixItem,
+                    phonePrefix === item.code && styles.prefixItemSelected,
+                  ]}
+                  onPress={() => {
+                    setPhonePrefix(item.code);
+                    setShowPrefixModal(false);
+                  }}
+                >
+                  <Text style={[styles.prefixItemCode, phonePrefix === item.code && styles.prefixItemCodeSelected]}>
+                    {item.code}
+                  </Text>
+                  <Text style={[styles.prefixItemCountry, phonePrefix === item.code && styles.prefixItemCountrySelected]}>
+                    {item.country}
+                  </Text>
+                  {phonePrefix === item.code && (
+                    <Ionicons name="checkmark" size={20} color={Colors.accent} />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 
@@ -537,12 +656,13 @@ const styles = StyleSheet.create({
   },
   stepTitle: {
     fontSize: 26,
-    fontWeight: "bold" as const,
+    fontFamily: "Inter_700Bold",
     color: Colors.text,
     textAlign: "center",
   },
   stepSubtitle: {
     fontSize: 15,
+    fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     textAlign: "center",
   },
@@ -569,7 +689,7 @@ const styles = StyleSheet.create({
   },
   typeLabel: {
     fontSize: 13,
-    fontWeight: "600" as const,
+    fontFamily: "Inter_600SemiBold",
     color: Colors.textSecondary,
   },
   sexGrid: {
@@ -599,7 +719,7 @@ const styles = StyleSheet.create({
   },
   sexLabel: {
     fontSize: 14,
-    fontWeight: "600" as const,
+    fontFamily: "Inter_600SemiBold",
     color: Colors.textSecondary,
   },
   sexLabelSelected: {
@@ -613,7 +733,7 @@ const styles = StyleSheet.create({
   plusSign: {
     color: Colors.textSecondary,
     fontSize: 18,
-    fontWeight: "bold" as const,
+    fontFamily: "Inter_700Bold",
   },
   inputWrapper: {
     flexDirection: "row",
@@ -632,6 +752,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: Colors.text,
     fontSize: 15,
+    fontFamily: "Inter_400Regular",
     height: "100%",
   },
   passwordInput: {
@@ -642,6 +763,98 @@ const styles = StyleSheet.create({
     right: 14,
     height: "100%",
     justifyContent: "center",
+  },
+  phoneRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  prefixButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 12,
+    height: 52,
+    gap: 4,
+  },
+  prefixText: {
+    color: Colors.text,
+    fontSize: 15,
+    fontFamily: "Inter_500Medium",
+  },
+  phoneInputWrapper: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 14,
+    height: 52,
+  },
+  phoneInput: {
+    flex: 1,
+    color: Colors.text,
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    height: "100%",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "60%",
+    paddingBottom: Platform.OS === "web" ? 34 : 0,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
+  prefixItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  prefixItemSelected: {
+    backgroundColor: Colors.surfaceLight,
+  },
+  prefixItemCode: {
+    width: 60,
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
+  prefixItemCodeSelected: {
+    color: Colors.accent,
+  },
+  prefixItemCountry: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+  },
+  prefixItemCountrySelected: {
+    color: Colors.accent,
   },
   regionList: {
     backgroundColor: Colors.surface,
@@ -664,10 +877,11 @@ const styles = StyleSheet.create({
   regionText: {
     color: Colors.text,
     fontSize: 15,
+    fontFamily: "Inter_400Regular",
   },
   regionTextSelected: {
     color: Colors.accent,
-    fontWeight: "600" as const,
+    fontFamily: "Inter_600SemiBold",
   },
   eulaContainer: {
     backgroundColor: Colors.surface,
@@ -683,6 +897,7 @@ const styles = StyleSheet.create({
   eulaText: {
     color: Colors.textSecondary,
     fontSize: 13,
+    fontFamily: "Inter_400Regular",
     lineHeight: 20,
   },
   checkboxRow: {
@@ -707,6 +922,7 @@ const styles = StyleSheet.create({
   checkboxLabel: {
     color: Colors.text,
     fontSize: 14,
+    fontFamily: "Inter_400Regular",
     flex: 1,
   },
   errorBanner: {
@@ -717,11 +933,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 10,
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   errorText: {
     color: Colors.error,
     fontSize: 13,
+    fontFamily: "Inter_400Regular",
     flex: 1,
   },
   nextButton: {
@@ -737,7 +954,7 @@ const styles = StyleSheet.create({
   nextButtonText: {
     color: Colors.background,
     fontSize: 17,
-    fontWeight: "700" as const,
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.5,
   },
   loginRow: {
@@ -745,15 +962,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 6,
-    marginTop: 20,
+    marginTop: 16,
   },
   loginPrompt: {
     color: Colors.textSecondary,
     fontSize: 14,
+    fontFamily: "Inter_400Regular",
   },
   loginLink: {
     color: Colors.accent,
     fontSize: 14,
-    fontWeight: "600" as const,
+    fontFamily: "Inter_600SemiBold",
   },
 });

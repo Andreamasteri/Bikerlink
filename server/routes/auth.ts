@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { registerSchema, loginSchema } from "@shared/schema";
 import { storage } from "../storage";
 
@@ -133,6 +134,67 @@ router.get("/me", async (req: Request, res: Response) => {
     return res.json(safeUser);
   } catch (error) {
     console.error("Me error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/forgot-password", async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({ message: "Inserisci un'email valida" });
+    }
+
+    const user = await storage.getUserByEmail(email.trim().toLowerCase());
+    if (!user) {
+      return res.json({ message: "Se l'email è registrata, riceverai un link di recupero" });
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    await storage.createPasswordResetToken(user.id, token, expiresAt);
+
+    console.log(`\n========== PASSWORD RESET ==========`);
+    console.log(`User: ${user.nickname} (${user.email})`);
+    console.log(`Token: ${token}`);
+    console.log(`Expires: ${expiresAt.toISOString()}`);
+    console.log(`====================================\n`);
+
+    return res.json({ message: "Se l'email è registrata, riceverai un link di recupero" });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/reset-password", async (req: Request, res: Response) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) {
+      return res.status(400).json({ message: "Token e password richiesti" });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ message: "La password deve avere almeno 8 caratteri" });
+    }
+
+    const resetToken = await storage.getPasswordResetToken(token);
+    if (!resetToken) {
+      return res.status(400).json({ message: "Token non valido o già utilizzato" });
+    }
+
+    if (new Date(resetToken.expiresAt) < new Date()) {
+      return res.status(400).json({ message: "Token scaduto" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+    await storage.updateUser(resetToken.userId, { password: hashedPassword } as any);
+    await storage.markPasswordResetTokenUsed(token);
+
+    return res.json({ message: "Password aggiornata con successo" });
+  } catch (error) {
+    console.error("Reset password error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

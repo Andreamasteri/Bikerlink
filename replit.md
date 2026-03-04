@@ -41,7 +41,7 @@ components/
 
 server/
   routes/
-    auth.ts             # Registrazione, login, logout, sessione
+    auth.ts             # Registrazione, login, logout, sessione, recupero password
     users.ts            # Profilo, foto, disponibilità, utenti vicini
     motorcycles.ts      # CRUD moto
     proposals.ts        # Proposte giri e richieste
@@ -121,3 +121,6 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - Filtro telefono chat: persistente su DB (tabella `phone_sharing_tracker`)
 - EULA: caricabile come file .txt dall'admin panel (sezione Impostazioni)
 - expo-document-picker: usato per upload EULA nell'admin
+- Registrazione: conferma password, prefisso telefonico internazionale (default +39), regione e anno di nascita opzionali (aggiungibili dal profilo)
+- Recupero password: endpoint simulato (token stampato in console backend), schermata `forgot-password.tsx`
+- Tabella DB: `password_reset_tokens` per token di reset password

@@ -29,6 +29,7 @@ import {
   feedbackTickets,
   appSettings,
   verificationCodes,
+  passwordResetTokens,
   phoneSharingTracker,
   type User,
   type InsertUser,
@@ -726,6 +727,19 @@ export class DatabaseStorage implements IStorage {
       target: [phoneSharingTracker.conversationId, phoneSharingTracker.userId],
       set: { sharedCount: sql`${phoneSharingTracker.sharedCount} + 1` },
     });
+  }
+
+  async createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<void> {
+    await db.insert(passwordResetTokens).values({ userId, token, expiresAt });
+  }
+
+  async getPasswordResetToken(token: string) {
+    const [row] = await db.select().from(passwordResetTokens).where(and(eq(passwordResetTokens.token, token), eq(passwordResetTokens.used, false))).limit(1);
+    return row;
+  }
+
+  async markPasswordResetTokenUsed(token: string): Promise<void> {
+    await db.update(passwordResetTokens).set({ used: true }).where(eq(passwordResetTokens.token, token));
   }
 }
 

@@ -135,6 +135,14 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
+          <TouchableOpacity
+            onPress={() => router.push("/(auth)/forgot-password")}
+            style={styles.forgotRow}
+            testID="go-forgot-password"
+          >
+            <Text style={styles.forgotLink}>Password dimenticata?</Text>
+          </TouchableOpacity>
+
           <View style={styles.registerRow}>
             <Text style={styles.registerPrompt}>{t("auth.noAccount")}</Text>
             <TouchableOpacity onPress={() => router.push("/(auth)/register")} testID="go-register">
@@ -252,5 +260,14 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     fontSize: 14,
     fontWeight: "600" as const,
+  },
+  forgotRow: {
+    alignItems: "center",
+    marginTop: 8,
+  },
+  forgotLink: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
   },
 });

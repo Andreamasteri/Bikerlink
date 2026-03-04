@@ -497,6 +497,17 @@ export const verificationCodes = pgTable("verification_codes", {
   index("verification_codes_target_idx").on(table.target),
 ]);
 
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).notNull(),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const phoneSharingTracker = pgTable("phone_sharing_tracker", {
   id: varchar("id", { length: 36 })
     .primaryKey()
@@ -593,6 +604,8 @@ export type InsertVerificationCode = typeof verificationCodes.$inferInsert;
 
 export type PhoneSharingTracker = typeof phoneSharingTracker.$inferSelect;
 export type InsertPhoneSharingTracker = typeof phoneSharingTracker.$inferInsert;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

@@ -43,7 +43,7 @@ export default function WelcomeScreen() {
         duration: 600,
         useNativeDriver: true,
       }),
-      Animated.delay(1000),
+      Animated.delay(400),
       Animated.parallel([
         Animated.timing(buttonsTranslateY, {
           toValue: 0,
