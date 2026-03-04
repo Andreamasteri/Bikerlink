@@ -42,11 +42,22 @@ export default function ProfileScreen() {
     return "Coppia";
   };
 
+  const doLogout = async () => {
+    await logout();
+    router.replace("/welcome");
+  };
+
   const handleLogout = () => {
-    Alert.alert("Logout", "Vuoi davvero uscire?", [
-      { text: "Annulla", style: "cancel" },
-      { text: "Esci", onPress: logout, style: "destructive" },
-    ]);
+    if (Platform.OS === "web") {
+      if (window.confirm("Vuoi davvero uscire?")) {
+        doLogout();
+      }
+    } else {
+      Alert.alert("Logout", "Vuoi davvero uscire?", [
+        { text: "Annulla", style: "cancel" },
+        { text: "Esci", onPress: doLogout, style: "destructive" },
+      ]);
+    }
   };
 
   const MenuItem = ({ icon, label, onPress, color }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; color?: string }) => (
