@@ -20,8 +20,29 @@ import * as ImagePicker from "expo-image-picker";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
-import { fetch } from "expo/fetch";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+async function uriToBase64(uri: string): Promise<{ base64: string; filename: string }> {
+  const filename = uri.split("/").pop()?.split("?")[0] || "photo.jpg";
+  if (Platform.OS === "web") {
+    const response = await globalThis.fetch(uri);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        resolve({ base64: result, filename });
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } else {
+    const FileSystem = require("expo-file-system");
+    const b64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+    const ext = filename.split(".").pop() || "jpg";
+    return { base64: `data:image/${ext};base64,${b64}`, filename };
+  }
+}
 
 const MOTO_TYPES = [
   { value: "sportiva", label: "Sportiva" },
@@ -74,24 +95,12 @@ function WishlistScreen() {
 
   const uploadPhotoMutation = useMutation({
     mutationFn: async (uri: string) => {
-      const baseUrl = getApiUrl();
-      const url = new URL("/api/wishlist/photos", baseUrl);
-      const formData = new FormData();
-      const filename = uri.split("/").pop() || "photo.jpg";
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : "image/jpeg";
-      if (Platform.OS === "web") {
-        const blob = await (await globalThis.fetch(uri)).blob();
-        formData.append("photo", blob, filename);
-      } else {
-        formData.append("photo", { uri, name: filename, type } as any);
-      }
-      const res = await globalThis.fetch(url.toString(), { method: "POST", body: formData, credentials: "include" });
-      if (!res.ok) throw new Error("Errore upload foto");
+      const { base64, filename } = await uriToBase64(uri);
+      const res = await apiRequest("POST", "/api/wishlist/photos", { imageBase64: base64, filename });
       return res.json();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/wishlist"] }),
-    onError: (err: any) => Alert.alert("Errore", err.message),
+    onError: (err: any) => Alert.alert("Errore", err.message || "Errore upload foto"),
   });
 
   const deletePhotoMutation = useMutation({
@@ -489,29 +498,8 @@ function GarageContent() {
 
   const uploadPhotoMutation = useMutation({
     mutationFn: async ({ motoId, uri }: { motoId: string; uri: string }) => {
-      const baseUrl = getApiUrl();
-      const url = new URL(`/api/motorcycles/${motoId}/photos`, baseUrl);
-
-      const formData = new FormData();
-      const filename = uri.split("/").pop() || "photo.jpg";
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : "image/jpeg";
-      if (Platform.OS === "web") {
-        const blob = await (await globalThis.fetch(uri)).blob();
-        formData.append("photo", blob, filename);
-      } else {
-        formData.append("photo", { uri, name: filename, type } as any);
-      }
-
-      const res = await globalThis.fetch(url.toString(), {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Errore upload foto");
-      }
+      const { base64, filename } = await uriToBase64(uri);
+      const res = await apiRequest("POST", `/api/motorcycles/${motoId}/photos`, { imageBase64: base64, filename });
       return res.json();
     },
     onSuccess: () => {

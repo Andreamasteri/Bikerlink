@@ -1,9 +1,14 @@
 import { Router, type Request, type Response } from "express";
-import multer from "multer";
 import path from "path";
+import fs from "fs";
 import { storage } from "../storage";
 
 const router = Router();
+
+const uploadsDir = path.join(process.cwd(), "uploads", "wishlist");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
 function requireAuth(req: Request, res: Response, next: () => void) {
   if (!req.session.userId) {
@@ -11,18 +16,6 @@ function requireAuth(req: Request, res: Response, next: () => void) {
   }
   next();
 }
-
-const upload = multer({
-  dest: path.join(process.cwd(), "uploads", "wishlist"),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith("image/")) {
-      cb(null, true);
-    } else {
-      cb(new Error("Solo immagini permesse"));
-    }
-  },
-});
 
 router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
@@ -59,7 +52,7 @@ router.put("/", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-router.post("/photos", requireAuth, upload.single("photo"), async (req: Request, res: Response) => {
+router.post("/photos", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
     let wishlist = await storage.getWishlist(userId);
@@ -72,11 +65,18 @@ router.post("/photos", requireAuth, upload.single("photo"), async (req: Request,
       return res.status(400).json({ message: "Massimo 3 foto permesse" });
     }
 
-    if (!req.file) {
-      return res.status(400).json({ message: "Nessun file caricato" });
+    const { imageBase64, filename } = req.body;
+    if (!imageBase64) {
+      return res.status(400).json({ message: "Nessuna immagine fornita" });
     }
 
-    const photoUrl = `/uploads/wishlist/${req.file.filename}`;
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+    const ext = (filename || "photo.jpg").split(".").pop() || "jpg";
+    const uniqueName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${ext}`;
+    const filePath = path.join(uploadsDir, uniqueName);
+    fs.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
+
+    const photoUrl = `/uploads/wishlist/${uniqueName}`;
     const photo = await storage.addWishlistPhoto({
       wishlistId: wishlist.id,
       photoUrl,
