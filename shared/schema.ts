@@ -556,6 +556,40 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const proximitySessions = pgTable("proximity_sessions", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  user1Id: varchar("user1_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  user2Id: varchar("user2_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+  isActive: boolean("is_active").notNull().default(true),
+});
+
+export const proximityPairs = pgTable("proximity_pairs", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  user1Id: varchar("user1_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  user2Id: varchar("user2_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  pairCount: integer("pair_count").notNull().default(1),
+  totalDurationMinutes: integer("total_duration_minutes").notNull().default(0),
+  lastPairedAt: timestamp("last_paired_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type ProximitySession = typeof proximitySessions.$inferSelect;
+export type ProximityPair = typeof proximityPairs.$inferSelect;
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,

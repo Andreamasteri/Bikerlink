@@ -450,3 +450,12 @@ adminRouter.get("/settings/paypal", requireAuth, requireAdmin, async (req, res) 
   const enabled = await storage.getSetting("paypal_enabled");
   res.json({ enabled: enabled === "true", status: "coming_soon" });
 });
+
+adminRouter.get("/proximity-stats", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const pairs = await storage.getProximityStats();
+    res.json({ pairs });
+  } catch (err) {
+    res.status(500).json({ message: "Errore nel caricamento statistiche prossimità" });
+  }
+});

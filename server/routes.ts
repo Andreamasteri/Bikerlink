@@ -23,6 +23,7 @@ import { notificationsRouter } from "./routes/notifications";
 import { adsRouter } from "./routes/ads";
 import { feedbackRouter } from "./routes/feedback";
 import { garageRouter } from "./routes/garage";
+import { proximityRouter } from "./routes/proximity";
 import { setupWebSocket } from "./websocket";
 import { storage } from "./storage";
 import { uploadRateLimit, messageRateLimit } from "./middleware/security";
@@ -67,6 +68,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/ads", adsRouter);
   app.use("/api/feedback", feedbackRouter);
   app.use("/api/garage", garageRouter);
+  app.use("/api/proximity", proximityRouter);
+
+  app.get("/api/settings/paypal_donation_address", async (_req, res) => {
+    try {
+      const val = await storage.getSetting("paypal_donation_address");
+      res.json({ address: val || "" });
+    } catch {
+      res.json({ address: "" });
+    }
+  });
 
   app.get("/api/settings/syneco-branding", async (_req, res) => {
     try {

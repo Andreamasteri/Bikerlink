@@ -12,12 +12,14 @@ export default function AdminSettingsScreen() {
   const settings = (data as any)?.settings || {};
 
   const [eulaText, setEulaText] = useState("");
+  const [paypalAddress, setPaypalAddress] = useState("");
   const [saving, setSaving] = useState(false);
   const synecoVisible = settings.syneco_branding_visible === "true";
 
   useEffect(() => {
     if (settings.eula_text) setEulaText(settings.eula_text);
-  }, [settings.eula_text]);
+    if (settings.paypal_donation_address !== undefined) setPaypalAddress(settings.paypal_donation_address);
+  }, [settings.eula_text, settings.paypal_donation_address]);
 
   const saveSettings = async (updates: Record<string, string>) => {
     setSaving(true);
@@ -66,6 +68,13 @@ export default function AdminSettingsScreen() {
         <Text style={styles.buttonText}>Salva EULA</Text>
       </Pressable>
 
+      <Text style={styles.sectionTitle}>Donazione PayPal</Text>
+      <Text style={styles.fieldDesc}>Inserisci l'indirizzo email PayPal per ricevere donazioni. Lascia vuoto per nascondere il pulsante.</Text>
+      <TextInput style={styles.input} value={paypalAddress} onChangeText={setPaypalAddress} placeholder="email@paypal.com" placeholderTextColor={Colors.textSecondary} keyboardType="email-address" autoCapitalize="none" />
+      <Pressable style={styles.button} onPress={() => saveSettings({ paypal_donation_address: paypalAddress })} disabled={saving}>
+        <Text style={styles.buttonText}>Salva Indirizzo PayPal</Text>
+      </Pressable>
+
       <Text style={styles.sectionTitle}>Integrazioni (Coming Soon)</Text>
       <View style={styles.integrationRow}>
         <Text style={styles.integrationLabel}>Foodtracker</Text>
@@ -99,4 +108,5 @@ const styles = StyleSheet.create({
   integrationRow: { flexDirection: "row", justifyContent: "space-between", backgroundColor: Colors.surface, borderRadius: 10, padding: 14, opacity: 0.6 },
   integrationLabel: { fontSize: 15, fontFamily: "Inter_500Medium", color: Colors.text },
   integrationStatus: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  fieldDesc: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginBottom: 4 },
 });

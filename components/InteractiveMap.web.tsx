@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, Pressable } from "react-native";
+import { View, StyleSheet, Pressable, GestureResponderEvent } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
@@ -21,15 +21,21 @@ interface MapProps {
 export default function InteractiveMap({ latitude, longitude, style, onCenterPress, showCenterButton }: MapProps) {
   const src = `https://www.openstreetmap.org/export/embed.html?bbox=${longitude - 0.08}%2C${latitude - 0.05}%2C${longitude + 0.08}%2C${latitude + 0.05}&layer=mapnik&marker=${latitude}%2C${longitude}`;
 
+  const handleCenterPress = (e: GestureResponderEvent) => {
+    e.stopPropagation();
+    onCenterPress?.();
+  };
+
   return (
     <View style={[styles.container, style]}>
       <iframe
+        key={`${latitude.toFixed(4)}-${longitude.toFixed(4)}`}
         src={src}
         style={{ width: "100%", height: "100%", border: "none", borderRadius: 16 }}
         allowFullScreen
       />
       {showCenterButton && onCenterPress && (
-        <Pressable style={styles.centerBtn} onPress={onCenterPress}>
+        <Pressable style={styles.centerBtn} onPress={handleCenterPress}>
           <Ionicons name="locate" size={22} color={Colors.text} />
         </Pressable>
       )}
@@ -49,5 +55,6 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: "center" as const,
     justifyContent: "center" as const,
+    zIndex: 10,
   },
 });

@@ -32,9 +32,13 @@
 11. **Moderator Role**: Content moderation with action logging
 12. **Notifications**: In-app notifications for reports, feedback responses, etc.
 13. **Syneco Advertising**: Ad management system
+14. **Garage**: Motorcycle management for bikers/couples (type + riding style)
+15. **Ready to Ride**: Toggle availability with color-coded tab icon
+16. **Proximity Tracking**: Detects pairs of users within 100m for >1h, logs encounters to DB, admin statistics panel
+17. **PayPal Donations**: 1/5/10€ donation buttons, admin-configurable PayPal address
 
 ## Database Tables
-users, proposals, chat_rooms, chat_messages, routes, contest_photos, workshops, easter_eggs, user_easter_eggs, reports, notifications, ads, settings, moderator_logs, invitation_codes, feedback_tickets, session
+users, user_profiles, user_motorcycles, user_photos, proposals, conversations, conversation_participants, messages, routes, route_points, photo_contest_entries, photo_winners, workshops, easter_eggs, collected_easter_eggs, reports, notifications, ad_campaigns, app_settings, moderator_logs, invitation_codes, feedback_tickets, verification_codes, proximity_sessions, proximity_pairs, session
 
 ## API Routes
 - `/api/auth/*` — login, register, logout, me, eula
@@ -49,7 +53,10 @@ users, proposals, chat_rooms, chat_messages, routes, contest_photos, workshops, 
 - `/api/notifications/*` — user notifications
 - `/api/reports/*` — user reports
 - `/api/ads/*` — Syneco ads
-- `/api/admin/*` — admin endpoints (users, feedback, reports, settings, etc.)
+- `/api/garage/*` — motorcycle garage CRUD
+- `/api/proximity/*` — proximity check for nearby users
+- `/api/settings/*` — public settings (syneco-branding, paypal_donation_address)
+- `/api/admin/*` — admin endpoints (users, feedback, reports, settings, proximity-stats, etc.)
 - `/api/moderator/*` — moderator endpoints
 
 ## Credentials (Dev)

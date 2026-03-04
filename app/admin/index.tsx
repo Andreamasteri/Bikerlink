@@ -15,6 +15,7 @@ const BASE_SECTIONS = [
   { icon: "chatbox-ellipses" as const, label: "Bug & Richieste", route: "/admin/feedback", color: Colors.warning, hasBadge: true },
   { icon: "eye" as const, label: "Log Moderatori", route: "/admin/moderator-logs", color: Colors.textSecondary },
   { icon: "bar-chart" as const, label: "Analytics & Export", route: "/admin/analytics", color: Colors.success },
+  { icon: "location" as const, label: "Coppie Prossimità", route: "/admin/proximity", color: Colors.success },
   { icon: "key" as const, label: "Codici Invito", route: "/admin/invitation-codes", color: Colors.accent },
 ];
 

@@ -46,7 +46,6 @@ export const globalRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Troppe richieste. Riprova tra un minuto." },
-  keyGenerator: (req) => req.ip || req.socket.remoteAddress || "unknown",
 });
 
 export const authRateLimit = rateLimit({
@@ -55,7 +54,6 @@ export const authRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Troppi tentativi. Riprova tra 15 minuti." },
-  keyGenerator: (req) => req.ip || req.socket.remoteAddress || "unknown",
 });
 
 export const uploadRateLimit = rateLimit({
@@ -64,7 +62,6 @@ export const uploadRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Troppi upload. Riprova tra un minuto." },
-  keyGenerator: (req) => req.ip || req.socket.remoteAddress || "unknown",
 });
 
 export const messageRateLimit = rateLimit({
@@ -72,11 +69,6 @@ export const messageRateLimit = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { message: "Troppi messaggi. Riprova tra un minuto." },
-  keyGenerator: (req) => {
-    const userId = (req.session as any)?.userId;
-    return userId || req.ip || req.socket.remoteAddress || "unknown";
-  },
 });
 
 export function checkAccountLockout(req: Request, res: Response, next: NextFunction) {

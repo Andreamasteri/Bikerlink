@@ -786,12 +786,134 @@ export const storage = {
     return result?.count || 0;
   },
 
+  async getActiveProximitySessions() {
+    return db.select().from(schema.proximitySessions).where(eq(schema.proximitySessions.isActive, true));
+  },
+
+  async findActiveSession(user1Id: string, user2Id: string) {
+    const [s1, s2] = [user1Id, user2Id].sort();
+    const [session] = await db.select().from(schema.proximitySessions)
+      .where(and(
+        eq(schema.proximitySessions.user1Id, s1),
+        eq(schema.proximitySessions.user2Id, s2),
+        eq(schema.proximitySessions.isActive, true),
+      ));
+    return session;
+  },
+
+  async createProximitySession(user1Id: string, user2Id: string) {
+    const [s1, s2] = [user1Id, user2Id].sort();
+    const [session] = await db.insert(schema.proximitySessions).values({
+      user1Id: s1,
+      user2Id: s2,
+    }).returning();
+    return session;
+  },
+
+  async updateProximitySessionLastSeen(id: string) {
+    const [session] = await db.update(schema.proximitySessions)
+      .set({ lastSeenAt: new Date() })
+      .where(eq(schema.proximitySessions.id, id))
+      .returning();
+    return session;
+  },
+
+  async closeProximitySession(id: string) {
+    const [session] = await db.update(schema.proximitySessions)
+      .set({ isActive: false })
+      .where(eq(schema.proximitySessions.id, id))
+      .returning();
+    return session;
+  },
+
+  async closeExpiredSessions(maxAgeMinutes: number = 15) {
+    const cutoff = new Date(Date.now() - maxAgeMinutes * 60 * 1000);
+    const expired = await db.update(schema.proximitySessions)
+      .set({ isActive: false })
+      .where(and(
+        eq(schema.proximitySessions.isActive, true),
+        lte(schema.proximitySessions.lastSeenAt, cutoff),
+      ))
+      .returning();
+    return expired;
+  },
+
+  async findProximityPair(user1Id: string, user2Id: string) {
+    const [s1, s2] = [user1Id, user2Id].sort();
+    const [pair] = await db.select().from(schema.proximityPairs)
+      .where(and(
+        eq(schema.proximityPairs.user1Id, s1),
+        eq(schema.proximityPairs.user2Id, s2),
+      ));
+    return pair;
+  },
+
+  async upsertProximityPair(user1Id: string, user2Id: string, durationMinutes: number) {
+    const [s1, s2] = [user1Id, user2Id].sort();
+    const existing = await this.findProximityPair(s1, s2);
+    if (existing) {
+      const [pair] = await db.update(schema.proximityPairs).set({
+        pairCount: existing.pairCount + 1,
+        totalDurationMinutes: existing.totalDurationMinutes + durationMinutes,
+        lastPairedAt: new Date(),
+      }).where(eq(schema.proximityPairs.id, existing.id)).returning();
+      return pair;
+    }
+    const [pair] = await db.insert(schema.proximityPairs).values({
+      user1Id: s1,
+      user2Id: s2,
+      pairCount: 1,
+      totalDurationMinutes: durationMinutes,
+    }).returning();
+    return pair;
+  },
+
+  async getProximityStats() {
+    const pairs = await db.select({
+      pair: schema.proximityPairs,
+      user1: schema.users,
+      user2: schema.users,
+    })
+      .from(schema.proximityPairs)
+      .innerJoin(schema.users, eq(schema.proximityPairs.user1Id, schema.users.id))
+      .orderBy(desc(schema.proximityPairs.pairCount));
+
+    const results = [];
+    for (const row of pairs) {
+      const [u2] = await db.select().from(schema.users).where(eq(schema.users.id, row.pair.user2Id));
+      results.push({
+        ...row.pair,
+        user1Nickname: row.user1.nickname,
+        user1Type: row.user1.userType,
+        user2Nickname: u2?.nickname || "Sconosciuto",
+        user2Type: u2?.userType || "biker",
+      });
+    }
+    return results;
+  },
+
+  async getUsersWithRecentLocation(minutesAgo: number = 30) {
+    const cutoff = new Date(Date.now() - minutesAgo * 60 * 1000);
+    return db.select({
+      user: schema.users,
+      profile: schema.userProfiles,
+    })
+      .from(schema.users)
+      .innerJoin(schema.userProfiles, eq(schema.users.id, schema.userProfiles.userId))
+      .where(and(
+        sql`${schema.userProfiles.lastLatitude} IS NOT NULL`,
+        sql`${schema.userProfiles.lastLongitude} IS NOT NULL`,
+        eq(schema.users.status, "active"),
+      ));
+  },
+
   async seedDefaultSettings() {
     const defaults: Record<string, string> = {
       splash_image_url: "",
       eula_text: "Termini e Condizioni d'Uso di BikerLink\n\n1. L'utilizzo dell'app implica l'accettazione dei presenti termini.\n2. Non è incoraggiato in nessun modo l'utilizzo dell'app come un'app d'incontri tipo Tinder e affini.\n3. L'uso di immagini generate con intelligenza artificiale è sconsigliato. Sono ammessi avatar in stile anime e fumetto.\n4. Rispetta gli altri utenti e le regole della strada.\n5. BikerLink non è responsabile per eventuali incidenti durante i giri organizzati tramite l'app.\n6. La privacy degli utenti è la nostra priorità.",
       foodtracker_enabled: "false",
       paypal_enabled: "false",
+      paypal_donation_address: "",
       syneco_default_products: "olio_motore,lubrificante_catena",
       gdrive_backup_enabled: "false",
       syneco_branding_visible: "false",

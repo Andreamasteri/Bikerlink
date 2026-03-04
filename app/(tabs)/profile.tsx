@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import RegionPicker from "@/components/RegionPicker";
+import PayPalDonation from "@/components/PayPalDonation";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
 export default function ProfileScreen() {
@@ -118,6 +119,7 @@ export default function ProfileScreen() {
           <MenuItem icon="eye" label="Pannello Moderatore" onPress={() => router.push("/moderator" as any)} color={Colors.warning} />
         )}
 
+        <PayPalDonation />
         <MenuItem icon="log-out" label="Logout" onPress={handleLogout} color={Colors.accentRed} />
       </View>
 
