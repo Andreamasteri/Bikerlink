@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -156,6 +156,19 @@ export default function MapScreen() {
   });
   const isAvailable = (profileQuery.data as any)?.isAvailable || false;
 
+  const myProposalsQuery = useQuery<any[]>({
+    queryKey: ["/api/proposals?status=active"],
+    staleTime: 60000,
+    enabled: isAuthenticated,
+  });
+  const mySearchRadius = useMemo(() => {
+    const myActive = (myProposalsQuery.data || []).filter(
+      (p: any) => p.userId === user?.id && p.status === "active" && p.searchRadius
+    );
+    if (myActive.length === 0) return 0;
+    return Math.max(...myActive.map((p: any) => p.searchRadius || 0));
+  }, [myProposalsQuery.data, user?.id]);
+
   const collectEggMutation = useMutation({
     mutationFn: async (eggId: string) => {
       const res = await apiRequest("POST", `/api/easter-eggs/${eggId}/collect`);
@@ -253,6 +266,7 @@ export default function MapScreen() {
           workshops={workshopsQuery.data ?? []}
           easterEggs={easterEggsQuery.data ?? []}
           isAvailable={isAvailable}
+          searchRadiusKm={mySearchRadius}
           filterBiker={filterBiker}
           filterZavorrina={filterZavorrina}
           filterCoppia={filterCoppia}
@@ -274,6 +288,7 @@ export default function MapScreen() {
             workshops={workshopsQuery.data ?? []}
             easterEggs={easterEggsQuery.data ?? []}
             isAvailable={isAvailable}
+            searchRadiusKm={mySearchRadius}
             filterBiker={filterBiker}
             filterZavorrina={filterZavorrina}
             filterCoppia={filterCoppia}

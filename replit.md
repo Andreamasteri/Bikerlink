@@ -131,6 +131,18 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - **Donazione PayPal**: sezione nel profilo utente con testo personalizzato e pulsante "Dona con PayPal". Email configurabile dall'admin (default: `Andreamasteri81@gmail.com`). Endpoint: `GET /api/settings/paypal`. Admin settings: casella per modificare l'email PayPal (chiave `paypal_email`).
 - **Ready to Ride**: rimosse scritte "Attiva"/"Disattiva" dal pulsante, solo icona.
 
+- **Sistema Proposte v2 con Matching Automatico**:
+  - Tipi ricerca Biker/Coppia: FindAFriend, FindAGuest, Hitcher, HitchHiker
+  - Tipi ricerca Zavorrine: FindABiker, HitchHiker (label "Vorrei...")
+  - Ogni proposta ha: raggio ricerca (km), selezione moto dal garage (biker) o dai desideri (zavorrina), data GG/MM/AAAA, orario dalle/alle (tempo limite), tappe di ritrovo, descrizione
+  - Zavorrine: opzione "Qualsiasi moto va bene", toggle tempo limite rientro
+  - Matching engine: gira ogni 60s, incrocia proposte compatibili per zona (cerchi sovrapposti), data e orario
+  - Match: notifica → entrambi accettano → chat di gruppo automatica (con avviso deadline se presente)
+  - Auto-cleanup: proposte scadute (expiresAt = departureTimeTo + 2h) → status "expired"
+  - Cerchio raggio sulla mappa: visibile solo per l'utente quando disponibile con proposta attiva
+  - `server/matching-engine.ts`: motore di matching + cleanup
+- **Contatori separati**: Online (login ultimi 15min) e Disponibili (isAvailable) sulla mappa
+
 ## Tabelle DB Aggiuntive
 
 - `motorcycle_photos`: foto moto (max 3 per moto)
@@ -138,6 +150,7 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - `zavorrina_wishlist_photos`: foto personali wishlist (max 3)
 - `zavorrina_wishlist_motos`: moto desiderate wishlist (max 5), include `motorcycle_type` (varchar nullable)
 - `biker_zavorrina_matches`: match tra biker e zavorrine, colonna `zavorrina_id`
+- `proposal_matches`: match automatici tra proposte (proposalId1, proposalId2, userId1, userId2, status, acceptedByUser1/2, conversationId)
 - `email_verification_tokens`: token verifica email
 - Colonna `emailVerified` in `users`, `searchPreference` in `user_profiles`
 

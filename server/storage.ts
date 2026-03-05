@@ -37,6 +37,7 @@ import {
   zavarrinaWishlistMotos,
   bikerZavarrinaMatches,
   emailVerificationTokens,
+  proposalMatches,
   type User,
   type InsertUser,
   type UserPhoto,
@@ -107,6 +108,8 @@ import {
   type InsertBikerZavarrinaMatch,
   type EmailVerificationToken,
   type InsertEmailVerificationToken,
+  type ProposalMatch,
+  type InsertProposalMatch,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -131,11 +134,18 @@ export interface IStorage {
   updateUserProfile(userId: string, data: Partial<InsertUserProfile>): Promise<UserProfile | undefined>;
 
   getProposals(filters?: { status?: string }): Promise<Proposal[]>;
+  getActiveProposalsWithLocation(): Promise<Proposal[]>;
   getProposal(id: string): Promise<Proposal | undefined>;
   createProposal(proposal: InsertProposal): Promise<Proposal>;
   updateProposal(id: string, data: Partial<InsertProposal>): Promise<Proposal | undefined>;
   getProposalParticipants(proposalId: string): Promise<ProposalParticipant[]>;
   addProposalParticipant(participant: InsertProposalParticipant): Promise<ProposalParticipant>;
+  getProposalMatches(userId: string): Promise<ProposalMatch[]>;
+  getProposalMatch(id: string): Promise<ProposalMatch | undefined>;
+  createProposalMatch(match: InsertProposalMatch): Promise<ProposalMatch>;
+  updateProposalMatch(id: string, data: Partial<InsertProposalMatch>): Promise<ProposalMatch | undefined>;
+  findExistingMatch(proposalId1: string, proposalId2: string): Promise<ProposalMatch | undefined>;
+  expireOldProposals(): Promise<number>;
 
   getConversations(userId: string): Promise<Conversation[]>;
   getConversation(id: string): Promise<Conversation | undefined>;
@@ -345,6 +355,80 @@ export class DatabaseStorage implements IStorage {
   async addProposalParticipant(data: InsertProposalParticipant): Promise<ProposalParticipant> {
     const [participant] = await db.insert(proposalParticipants).values(data).returning();
     return participant;
+  }
+
+  async getActiveProposalsWithLocation(): Promise<Proposal[]> {
+    return db.select().from(proposals).where(
+      and(
+        eq(proposals.status, "active"),
+        sql`${proposals.departureLatitude} IS NOT NULL`,
+        sql`${proposals.departureLongitude} IS NOT NULL`,
+        sql`${proposals.searchType} IS NOT NULL`
+      )
+    );
+  }
+
+  async getProposalMatches(userId: string): Promise<ProposalMatch[]> {
+    return db.select().from(proposalMatches).where(
+      or(
+        eq(proposalMatches.userId1, userId),
+        eq(proposalMatches.userId2, userId)
+      )
+    ).orderBy(desc(proposalMatches.createdAt));
+  }
+
+  async getProposalMatch(id: string): Promise<ProposalMatch | undefined> {
+    const [match] = await db.select().from(proposalMatches).where(eq(proposalMatches.id, id));
+    return match;
+  }
+
+  async createProposalMatch(data: InsertProposalMatch): Promise<ProposalMatch> {
+    const [match] = await db.insert(proposalMatches).values(data).returning();
+    return match;
+  }
+
+  async updateProposalMatch(id: string, data: Partial<InsertProposalMatch>): Promise<ProposalMatch | undefined> {
+    const [match] = await db.update(proposalMatches).set(data).where(eq(proposalMatches.id, id)).returning();
+    return match;
+  }
+
+  async findExistingMatch(proposalId1: string, proposalId2: string): Promise<ProposalMatch | undefined> {
+    const [match] = await db.select().from(proposalMatches).where(
+      or(
+        and(eq(proposalMatches.proposalId1, proposalId1), eq(proposalMatches.proposalId2, proposalId2)),
+        and(eq(proposalMatches.proposalId1, proposalId2), eq(proposalMatches.proposalId2, proposalId1))
+      )
+    );
+    return match;
+  }
+
+  async expireOldProposals(): Promise<number> {
+    const now = new Date();
+    const result = await db.update(proposals)
+      .set({ status: "expired", updatedAt: now })
+      .where(
+        and(
+          eq(proposals.status, "active"),
+          sql`${proposals.expiresAt} IS NOT NULL`,
+          lte(proposals.expiresAt, now)
+        )
+      )
+      .returning();
+    if (result.length > 0) {
+      const expiredIds = result.map(p => p.id);
+      await db.update(proposalMatches)
+        .set({ status: "expired" })
+        .where(
+          and(
+            eq(proposalMatches.status, "pending"),
+            or(
+              sql`${proposalMatches.proposalId1} = ANY(${expiredIds})`,
+              sql`${proposalMatches.proposalId2} = ANY(${expiredIds})`
+            )
+          )
+        );
+    }
+    return result.length;
   }
 
   async getConversations(userId: string): Promise<Conversation[]> {

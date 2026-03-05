@@ -105,19 +105,33 @@ export const proposals = pgTable("proposals", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   proposalType: varchar("proposal_type", { length: 30 }).notNull(),
+  searchType: varchar("search_type", { length: 30 }),
   title: varchar("title", { length: 200 }).notNull(),
   description: text("description"),
+  searchRadius: integer("search_radius"),
+  motorcycleId: varchar("motorcycle_id", { length: 36 }),
+  wishlistMotoId: varchar("wishlist_moto_id", { length: 36 }),
+  anyMotoOk: boolean("any_moto_ok").notNull().default(false),
   departureLatitude: doublePrecision("departure_latitude"),
   departureLongitude: doublePrecision("departure_longitude"),
   departureAddress: text("departure_address"),
+  destinationAddress: text("destination_address"),
+  destinationLatitude: doublePrecision("destination_latitude"),
+  destinationLongitude: doublePrecision("destination_longitude"),
   scheduledAt: timestamp("scheduled_at"),
+  departureTimeFrom: timestamp("departure_time_from"),
+  departureTimeTo: timestamp("departure_time_to"),
+  returnDeadline: timestamp("return_deadline"),
+  stops: jsonb("stops"),
   maxParticipants: integer("max_participants"),
+  expiresAt: timestamp("expires_at"),
   status: varchar("status", { length: 20 }).notNull().default("active"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   index("proposals_user_id_idx").on(table.userId),
   index("proposals_status_idx").on(table.status),
+  index("proposals_expires_at_idx").on(table.expiresAt),
 ]);
 
 export const proposalParticipants = pgTable("proposal_participants", {
@@ -133,6 +147,33 @@ export const proposalParticipants = pgTable("proposal_participants", {
   joinedAt: timestamp("joined_at").notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("proposal_participants_unique_idx").on(table.proposalId, table.userId),
+]);
+
+export const proposalMatches = pgTable("proposal_matches", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  proposalId1: varchar("proposal_id_1", { length: 36 })
+    .notNull()
+    .references(() => proposals.id, { onDelete: "cascade" }),
+  proposalId2: varchar("proposal_id_2", { length: 36 })
+    .notNull()
+    .references(() => proposals.id, { onDelete: "cascade" }),
+  userId1: varchar("user_id_1", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  userId2: varchar("user_id_2", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  acceptedByUser1: boolean("accepted_by_user_1").notNull().default(false),
+  acceptedByUser2: boolean("accepted_by_user_2").notNull().default(false),
+  conversationId: varchar("conversation_id", { length: 36 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("proposal_matches_user1_idx").on(table.userId1),
+  index("proposal_matches_user2_idx").on(table.userId2),
+  index("proposal_matches_status_idx").on(table.status),
 ]);
 
 export const conversations = pgTable("conversations", {
@@ -650,6 +691,8 @@ export type Proposal = typeof proposals.$inferSelect;
 export type InsertProposal = typeof proposals.$inferInsert;
 export type ProposalParticipant = typeof proposalParticipants.$inferSelect;
 export type InsertProposalParticipant = typeof proposalParticipants.$inferInsert;
+export type ProposalMatch = typeof proposalMatches.$inferSelect;
+export type InsertProposalMatch = typeof proposalMatches.$inferInsert;
 export type Conversation = typeof conversations.$inferSelect;
 export type InsertConversation = typeof conversations.$inferInsert;
 export type ConversationParticipant = typeof conversationParticipants.$inferSelect;

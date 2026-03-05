@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -9,9 +9,10 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Switch,
 } from "react-native";
 import { useRouter, Stack } from "expo-router";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
@@ -19,28 +20,94 @@ import { t } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 
-const PROPOSAL_TYPES = [
-  { key: "giro", label: "Giro", icon: "motorbike", color: Colors.maleIcon, forTypes: ["biker", "coppia"] },
-  { key: "raduno", label: "Raduno", icon: "account-group", color: Colors.accent, forTypes: ["biker", "coppia"] },
-  { key: "con_zavorrina", label: "Con zavorrina", icon: "seat-passenger", color: Colors.femaleIcon, forTypes: ["biker"] },
-  { key: "richiesta", label: "Richiesta passaggio", icon: "hand-wave", color: Colors.femaleIcon, forTypes: ["zavorrina"] },
+const BIKER_SEARCH_TYPES = [
+  { key: "find_a_friend", label: "FindAFriend", subtitle: "Cerco altri biker", icon: "account-group", color: Colors.maleIcon },
+  { key: "find_a_guest", label: "FindAGuest", subtitle: "Sella libera per zavorre", icon: "seat-passenger", color: Colors.femaleIcon },
+  { key: "hitcher", label: "Hitcher", subtitle: "Ho la sella libera per un passaggio", icon: "motorbike", color: Colors.accent },
+  { key: "hitchhiker", label: "HitchHiker", subtitle: "Cerco un passaggio", icon: "thumb-up", color: Colors.success },
 ];
+
+const ZAVORRINA_SEARCH_TYPES = [
+  { key: "find_a_biker", label: "FindABiker", subtitle: "Giro in moto con rientro", icon: "motorbike", color: Colors.maleIcon },
+  { key: "hitchhiker", label: "HitchHiker", subtitle: "Mi serve un passaggio", icon: "thumb-up", color: Colors.accent },
+];
+
+function formatDateInput(val: string): string {
+  const nums = val.replace(/\D/g, "");
+  if (nums.length <= 2) return nums;
+  if (nums.length <= 4) return nums.slice(0, 2) + "/" + nums.slice(2);
+  return nums.slice(0, 2) + "/" + nums.slice(2, 4) + "/" + nums.slice(4, 8);
+}
+
+function formatTimeInput(val: string): string {
+  const nums = val.replace(/\D/g, "");
+  if (nums.length <= 2) return nums;
+  return nums.slice(0, 2) + ":" + nums.slice(2, 4);
+}
+
+function parseDateAndTime(dateStr: string, timeStr: string): Date | null {
+  const parts = dateStr.split("/");
+  if (parts.length !== 3) return null;
+  const [dd, mm, yyyy] = parts;
+  const timeParts = timeStr.split(":");
+  if (timeParts.length !== 2) return null;
+  const d = new Date(parseInt(yyyy), parseInt(mm) - 1, parseInt(dd), parseInt(timeParts[0]), parseInt(timeParts[1]));
+  return isNaN(d.getTime()) ? null : d;
+}
 
 export default function CreateProposalScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
-  const [proposalType, setProposalType] = useState("");
+  const [searchType, setSearchType] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [searchRadius, setSearchRadius] = useState("30");
+  const [selectedMotoId, setSelectedMotoId] = useState("");
+  const [selectedWishlistMotoId, setSelectedWishlistMotoId] = useState("");
+  const [anyMotoOk, setAnyMotoOk] = useState(false);
   const [departureAddress, setDepartureAddress] = useState("");
-  const [scheduledAt, setScheduledAt] = useState("");
+  const [destinationAddress, setDestinationAddress] = useState("");
+  const [dateStr, setDateStr] = useState("");
+  const [timeFrom, setTimeFrom] = useState("");
+  const [timeTo, setTimeTo] = useState("");
+  const [returnDeadlineEnabled, setReturnDeadlineEnabled] = useState(false);
+  const [returnDeadlineTime, setReturnDeadlineTime] = useState("");
+  const [stops, setStops] = useState<string[]>([]);
+  const [newStop, setNewStop] = useState("");
   const [maxParticipants, setMaxParticipants] = useState("");
 
-  const availableTypes = PROPOSAL_TYPES.filter((pt) =>
-    pt.forTypes.includes(user?.userType ?? "biker")
-  );
+  const isBikerOrCoppia = user?.userType === "biker" || user?.userType === "coppia";
+  const isZavorrina = user?.userType === "zavorrina";
+
+  const searchTypes = isBikerOrCoppia ? BIKER_SEARCH_TYPES : ZAVORRINA_SEARCH_TYPES;
+
+  const needsMotoSelection = isBikerOrCoppia && ["find_a_friend", "find_a_guest", "hitcher"].includes(searchType);
+  const needsWishlistMoto = isZavorrina && searchType === "find_a_biker";
+  const needsDestination = searchType === "hitchhiker";
+
+  const { data: motorcycles } = useQuery({
+    queryKey: ["/api/motorcycles"],
+    enabled: isBikerOrCoppia && !!searchType,
+  });
+
+  const { data: wishlistData } = useQuery({
+    queryKey: ["/api/wishlist"],
+    enabled: isZavorrina && !!searchType,
+  });
+
+  const motos = (motorcycles as any[]) || [];
+  const wishlistMotos = (wishlistData as any)?.motos || [];
+
+  const proposalType = useMemo(() => {
+    if (!searchType) return "";
+    if (searchType === "find_a_friend") return "giro";
+    if (searchType === "find_a_guest" || searchType === "hitcher") return "con_zavorrina";
+    if (searchType === "hitchhiker") return "richiesta";
+    if (searchType === "find_a_biker") return "richiesta";
+    return "giro";
+  }, [searchType]);
 
   const createMutation = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
@@ -52,34 +119,90 @@ export default function CreateProposalScreen() {
       router.back();
     },
     onError: (error: Error) => {
-      Alert.alert(t("common.error"), error.message);
+      Alert.alert("Errore", error.message);
     },
   });
 
+  const handleAddStop = () => {
+    if (newStop.trim()) {
+      setStops([...stops, newStop.trim()]);
+      setNewStop("");
+    }
+  };
+
+  const handleRemoveStop = (idx: number) => {
+    setStops(stops.filter((_, i) => i !== idx));
+  };
+
   const handleSubmit = () => {
-    if (!proposalType) {
-      Alert.alert(t("common.error"), "Seleziona un tipo di proposta");
+    if (!searchType) {
+      Alert.alert("Errore", "Seleziona cosa cerchi");
       return;
     }
     if (!title.trim()) {
-      Alert.alert(t("common.error"), "Inserisci un titolo");
+      Alert.alert("Errore", "Inserisci un titolo");
+      return;
+    }
+    if (!departureAddress.trim()) {
+      Alert.alert("Errore", "Inserisci il punto di partenza");
+      return;
+    }
+    if (!dateStr || !timeFrom) {
+      Alert.alert("Errore", "Inserisci data e orario di partenza");
+      return;
+    }
+    if (needsMotoSelection && !selectedMotoId) {
+      Alert.alert("Errore", "Seleziona la moto dal garage");
+      return;
+    }
+    if (needsWishlistMoto && !selectedWishlistMotoId && !anyMotoOk) {
+      Alert.alert("Errore", "Seleziona il tipo di moto o scegli 'Qualsiasi moto'");
+      return;
+    }
+    if (needsDestination && !destinationAddress.trim()) {
+      Alert.alert("Errore", "Inserisci la destinazione");
       return;
     }
 
+    const departureTimeFrom = parseDateAndTime(dateStr, timeFrom);
+    if (!departureTimeFrom) {
+      Alert.alert("Errore", "Data o orario non validi (GG/MM/AAAA e HH:MM)");
+      return;
+    }
+
+    let departureTimeTo: Date | null = null;
+    if (timeTo) {
+      departureTimeTo = parseDateAndTime(dateStr, timeTo);
+    }
+
+    let returnDeadline: Date | null = null;
+    if (returnDeadlineEnabled && returnDeadlineTime) {
+      returnDeadline = parseDateAndTime(dateStr, returnDeadlineTime);
+    }
+
+    const stopsData = stops.length > 0 ? stops.map((s) => ({ address: s })) : null;
+
     const data: Record<string, unknown> = {
       proposalType,
+      searchType,
       title: title.trim(),
       description: description.trim() || null,
-      departureAddress: departureAddress.trim() || null,
-      maxParticipants: maxParticipants ? parseInt(maxParticipants, 10) : null,
+      searchRadius: parseInt(searchRadius) || 30,
+      departureAddress: departureAddress.trim(),
+      scheduledAt: departureTimeFrom.toISOString(),
+      departureTimeFrom: departureTimeFrom.toISOString(),
+      departureTimeTo: departureTimeTo?.toISOString() || departureTimeFrom.toISOString(),
+      stops: stopsData,
+      maxParticipants: maxParticipants ? parseInt(maxParticipants) : null,
     };
 
-    if (scheduledAt.trim()) {
-      const parsed = new Date(scheduledAt.trim());
-      if (!isNaN(parsed.getTime())) {
-        data.scheduledAt = parsed.toISOString();
-      }
+    if (needsMotoSelection) data.motorcycleId = selectedMotoId;
+    if (needsWishlistMoto) {
+      data.wishlistMotoId = anyMotoOk ? null : selectedWishlistMotoId;
+      data.anyMotoOk = anyMotoOk;
     }
+    if (needsDestination) data.destinationAddress = destinationAddress.trim();
+    if (returnDeadline) data.returnDeadline = returnDeadline.toISOString();
 
     createMutation.mutate(data);
   };
@@ -91,7 +214,7 @@ export default function CreateProposalScreen() {
       <Stack.Screen
         options={{
           headerShown: true,
-          title: t("proposals.create"),
+          title: isZavorrina ? "Vorrei..." : "Nuova Proposta",
           headerStyle: { backgroundColor: Colors.surface },
           headerTintColor: Colors.text,
           headerLeft: () => (
@@ -106,105 +229,300 @@ export default function CreateProposalScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.sectionTitle}>Tipo di proposta</Text>
+        <Text style={styles.sectionTitle}>
+          {isZavorrina ? "Cosa vorresti?" : "Cosa cerchi?"}
+        </Text>
         <View style={styles.typeGrid}>
-          {availableTypes.map((pt) => (
+          {searchTypes.map((st) => (
             <TouchableOpacity
-              key={pt.key}
+              key={st.key}
               style={[
                 styles.typeCard,
-                proposalType === pt.key && {
-                  borderColor: pt.color,
-                  backgroundColor: pt.color + "15",
-                },
+                searchType === st.key && { borderColor: st.color, backgroundColor: st.color + "15" },
               ]}
-              onPress={() => setProposalType(pt.key)}
+              onPress={() => setSearchType(st.key)}
             >
               <MaterialCommunityIcons
-                name={pt.icon as any}
-                size={32}
-                color={proposalType === pt.key ? pt.color : Colors.textSecondary}
+                name={st.icon as any}
+                size={28}
+                color={searchType === st.key ? st.color : Colors.textSecondary}
               />
-              <Text
-                style={[
-                  styles.typeCardLabel,
-                  proposalType === pt.key && { color: pt.color },
-                ]}
-              >
-                {pt.label}
+              <Text style={[styles.typeCardLabel, searchType === st.key && { color: st.color }]}>
+                {st.label}
               </Text>
+              <Text style={styles.typeCardSub}>{st.subtitle}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={styles.sectionTitle}>Titolo *</Text>
-        <TextInput
-          style={styles.input}
-          value={title}
-          onChangeText={setTitle}
-          placeholder="Es: Giro sui colli toscani"
-          placeholderTextColor={Colors.textSecondary}
-          maxLength={200}
-        />
+        {!!searchType && (
+          <>
+            <Text style={styles.sectionTitle}>Titolo *</Text>
+            <TextInput
+              style={styles.input}
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Es: Giro sui colli toscani"
+              placeholderTextColor={Colors.textSecondary}
+              maxLength={200}
+            />
 
-        <Text style={styles.sectionTitle}>Descrizione</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={description}
-          onChangeText={setDescription}
-          placeholder="Descrivi la proposta..."
-          placeholderTextColor={Colors.textSecondary}
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
-        />
+            <Text style={styles.sectionTitle}>Raggio di ricerca (km) *</Text>
+            <TextInput
+              style={styles.input}
+              value={searchRadius}
+              onChangeText={setSearchRadius}
+              placeholder="30"
+              placeholderTextColor={Colors.textSecondary}
+              keyboardType="number-pad"
+            />
 
-        <Text style={styles.sectionTitle}>{t("proposals.departure")}</Text>
-        <TextInput
-          style={styles.input}
-          value={departureAddress}
-          onChangeText={setDepartureAddress}
-          placeholder="Es: Piazza del Duomo, Firenze"
-          placeholderTextColor={Colors.textSecondary}
-        />
+            {needsMotoSelection && (
+              <>
+                <Text style={styles.sectionTitle}>Seleziona la moto *</Text>
+                {motos.length === 0 ? (
+                  <Text style={styles.emptyText}>Nessuna moto nel garage. Aggiungine una prima.</Text>
+                ) : (
+                  <View style={styles.motoList}>
+                    {motos.map((m: any) => (
+                      <TouchableOpacity
+                        key={m.id}
+                        style={[
+                          styles.motoCard,
+                          selectedMotoId === m.id && styles.motoCardSelected,
+                        ]}
+                        onPress={() => setSelectedMotoId(m.id)}
+                      >
+                        <MaterialCommunityIcons
+                          name="motorbike"
+                          size={24}
+                          color={selectedMotoId === m.id ? Colors.accent : Colors.textSecondary}
+                        />
+                        <View style={styles.motoInfo}>
+                          <Text style={[styles.motoName, selectedMotoId === m.id && { color: Colors.accent }]}>
+                            {m.brand} {m.model}
+                          </Text>
+                          <Text style={styles.motoSub}>
+                            {m.motorcycleType} • {m.ridingStyle}
+                          </Text>
+                        </View>
+                        {selectedMotoId === m.id && (
+                          <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </>
+            )}
 
-        <Text style={styles.sectionTitle}>{t("proposals.date")}</Text>
-        <TextInput
-          style={styles.input}
-          value={scheduledAt}
-          onChangeText={setScheduledAt}
-          placeholder="YYYY-MM-DD HH:MM"
-          placeholderTextColor={Colors.textSecondary}
-        />
+            {needsWishlistMoto && (
+              <>
+                <Text style={styles.sectionTitle}>Con che tipo di moto? *</Text>
+                <TouchableOpacity
+                  style={[styles.motoCard, anyMotoOk && styles.motoCardSelected]}
+                  onPress={() => { setAnyMotoOk(!anyMotoOk); if (!anyMotoOk) setSelectedWishlistMotoId(""); }}
+                >
+                  <Ionicons name="checkmark-circle" size={24} color={anyMotoOk ? Colors.accent : Colors.textSecondary} />
+                  <Text style={[styles.motoName, { flex: 1 }, anyMotoOk && { color: Colors.accent }]}>
+                    Qualsiasi moto va bene
+                  </Text>
+                </TouchableOpacity>
+                {!anyMotoOk && wishlistMotos.length > 0 && (
+                  <View style={styles.motoList}>
+                    {wishlistMotos.map((m: any) => (
+                      <TouchableOpacity
+                        key={m.id}
+                        style={[
+                          styles.motoCard,
+                          selectedWishlistMotoId === m.id && styles.motoCardSelected,
+                        ]}
+                        onPress={() => setSelectedWishlistMotoId(m.id)}
+                      >
+                        <MaterialCommunityIcons
+                          name="motorbike"
+                          size={24}
+                          color={selectedWishlistMotoId === m.id ? Colors.accent : Colors.textSecondary}
+                        />
+                        <View style={styles.motoInfo}>
+                          <Text style={[styles.motoName, selectedWishlistMotoId === m.id && { color: Colors.accent }]}>
+                            {m.brand || ""} {m.model || ""} {m.motorcycleType || ""}
+                          </Text>
+                          {m.ridingStyle && <Text style={styles.motoSub}>{m.ridingStyle}</Text>}
+                        </View>
+                        {selectedWishlistMotoId === m.id && (
+                          <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+                {!anyMotoOk && wishlistMotos.length === 0 && (
+                  <Text style={styles.emptyText}>Nessun desiderio moto salvato. Puoi selezionare "Qualsiasi moto va bene".</Text>
+                )}
+              </>
+            )}
 
-        <Text style={styles.sectionTitle}>Max partecipanti</Text>
-        <TextInput
-          style={styles.input}
-          value={maxParticipants}
-          onChangeText={setMaxParticipants}
-          placeholder="Lascia vuoto per illimitato"
-          placeholderTextColor={Colors.textSecondary}
-          keyboardType="number-pad"
-        />
+            <Text style={styles.sectionTitle}>Punto di partenza *</Text>
+            <TextInput
+              style={styles.input}
+              value={departureAddress}
+              onChangeText={setDepartureAddress}
+              placeholder="Es: Piazza del Duomo, Firenze"
+              placeholderTextColor={Colors.textSecondary}
+            />
 
-        <TouchableOpacity
-          style={[
-            styles.submitButton,
-            (!proposalType || !title.trim() || createMutation.isPending) && styles.submitButtonDisabled,
-          ]}
-          onPress={handleSubmit}
-          disabled={!proposalType || !title.trim() || createMutation.isPending}
-          activeOpacity={0.8}
-        >
-          {createMutation.isPending ? (
-            <ActivityIndicator color="#000" />
-          ) : (
-            <>
-              <Ionicons name="checkmark" size={22} color="#000" />
-              <Text style={styles.submitText}>{t("proposals.create")}</Text>
-            </>
-          )}
-        </TouchableOpacity>
+            {needsDestination && (
+              <>
+                <Text style={styles.sectionTitle}>Destinazione *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={destinationAddress}
+                  onChangeText={setDestinationAddress}
+                  placeholder="Es: Stazione Centrale, Milano"
+                  placeholderTextColor={Colors.textSecondary}
+                />
+              </>
+            )}
+
+            <Text style={styles.sectionTitle}>Data *</Text>
+            <TextInput
+              style={styles.input}
+              value={dateStr}
+              onChangeText={(v) => setDateStr(formatDateInput(v))}
+              placeholder="GG/MM/AAAA"
+              placeholderTextColor={Colors.textSecondary}
+              keyboardType="number-pad"
+              maxLength={10}
+            />
+
+            <View style={styles.timeRow}>
+              <View style={styles.timeCol}>
+                <Text style={styles.sectionTitle}>Dalle *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={timeFrom}
+                  onChangeText={(v) => setTimeFrom(formatTimeInput(v))}
+                  placeholder="HH:MM"
+                  placeholderTextColor={Colors.textSecondary}
+                  keyboardType="number-pad"
+                  maxLength={5}
+                />
+              </View>
+              <View style={styles.timeCol}>
+                <Text style={styles.sectionTitle}>Alle (limite)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={timeTo}
+                  onChangeText={(v) => setTimeTo(formatTimeInput(v))}
+                  placeholder="HH:MM"
+                  placeholderTextColor={Colors.textSecondary}
+                  keyboardType="number-pad"
+                  maxLength={5}
+                />
+              </View>
+            </View>
+
+            {!needsDestination && (
+              <>
+                <Text style={styles.sectionTitle}>Tappe di ritrovo</Text>
+                {stops.map((s, i) => (
+                  <View key={i} style={styles.stopRow}>
+                    <Ionicons name="flag" size={16} color={Colors.accent} />
+                    <Text style={styles.stopText}>{s}</Text>
+                    <TouchableOpacity onPress={() => handleRemoveStop(i)}>
+                      <Ionicons name="close-circle" size={20} color={Colors.accentRed} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                <View style={styles.addStopRow}>
+                  <TextInput
+                    style={[styles.input, { flex: 1 }]}
+                    value={newStop}
+                    onChangeText={setNewStop}
+                    placeholder="Aggiungi tappa..."
+                    placeholderTextColor={Colors.textSecondary}
+                    onSubmitEditing={handleAddStop}
+                  />
+                  <TouchableOpacity style={styles.addStopBtn} onPress={handleAddStop}>
+                    <Ionicons name="add" size={22} color="#000" />
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {isZavorrina && (
+              <View style={styles.switchRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.switchLabel}>Tempo limite rientro</Text>
+                  <Text style={styles.switchSub}>Se attivo, il biker verrà avvisato</Text>
+                </View>
+                <Switch
+                  value={returnDeadlineEnabled}
+                  onValueChange={setReturnDeadlineEnabled}
+                  trackColor={{ false: Colors.border, true: Colors.accent + "80" }}
+                  thumbColor={returnDeadlineEnabled ? Colors.accent : Colors.textSecondary}
+                />
+              </View>
+            )}
+
+            {returnDeadlineEnabled && (
+              <>
+                <Text style={styles.sectionTitle}>Rientro entro le</Text>
+                <TextInput
+                  style={styles.input}
+                  value={returnDeadlineTime}
+                  onChangeText={(v) => setReturnDeadlineTime(formatTimeInput(v))}
+                  placeholder="HH:MM"
+                  placeholderTextColor={Colors.textSecondary}
+                  keyboardType="number-pad"
+                  maxLength={5}
+                />
+              </>
+            )}
+
+            <Text style={styles.sectionTitle}>Descrizione</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Descrivi cosa offri, cerchi o vuoi fare..."
+              placeholderTextColor={Colors.textSecondary}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+
+            <Text style={styles.sectionTitle}>Max partecipanti</Text>
+            <TextInput
+              style={styles.input}
+              value={maxParticipants}
+              onChangeText={setMaxParticipants}
+              placeholder="Lascia vuoto per illimitato"
+              placeholderTextColor={Colors.textSecondary}
+              keyboardType="number-pad"
+            />
+
+            <TouchableOpacity
+              style={[
+                styles.submitButton,
+                (!searchType || !title.trim() || createMutation.isPending) && styles.submitButtonDisabled,
+              ]}
+              onPress={handleSubmit}
+              disabled={!searchType || !title.trim() || createMutation.isPending}
+              activeOpacity={0.8}
+            >
+              {createMutation.isPending ? (
+                <ActivityIndicator color="#000" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark" size={22} color="#000" />
+                  <Text style={styles.submitText}>Pubblica</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
 
         <View style={{ height: Platform.OS === "web" ? 34 : 40 }} />
       </ScrollView>
@@ -213,13 +531,8 @@ export default function CreateProposalScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  content: {
-    padding: 20,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
+  content: { padding: 20 },
   sectionTitle: {
     color: Colors.text,
     fontSize: 15,
@@ -227,28 +540,20 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 16,
   },
-  typeGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
+  typeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   typeCard: {
     flex: 1,
     minWidth: 140,
     backgroundColor: Colors.surface,
     borderRadius: 14,
-    padding: 16,
+    padding: 14,
     alignItems: "center",
-    gap: 8,
+    gap: 6,
     borderWidth: 2,
     borderColor: Colors.border,
   },
-  typeCardLabel: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-    fontWeight: "600" as const,
-    textAlign: "center",
-  },
+  typeCardLabel: { color: Colors.textSecondary, fontSize: 13, fontWeight: "700" as const, textAlign: "center" },
+  typeCardSub: { color: Colors.textSecondary, fontSize: 11, textAlign: "center" },
   input: {
     backgroundColor: Colors.surface,
     borderRadius: 12,
@@ -258,9 +563,57 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  textArea: {
-    minHeight: 100,
+  textArea: { minHeight: 100 },
+  timeRow: { flexDirection: "row", gap: 12 },
+  timeCol: { flex: 1 },
+  motoList: { gap: 8 },
+  motoCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    gap: 12,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    marginBottom: 6,
   },
+  motoCardSelected: { borderColor: Colors.accent, backgroundColor: Colors.accent + "10" },
+  motoInfo: { flex: 1 },
+  motoName: { color: Colors.text, fontSize: 14, fontWeight: "600" as const },
+  motoSub: { color: Colors.textSecondary, fontSize: 12, marginTop: 2 },
+  emptyText: { color: Colors.textSecondary, fontSize: 13, fontStyle: "italic" as const, marginTop: 4 },
+  stopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 6,
+  },
+  stopText: { flex: 1, color: Colors.text, fontSize: 14 },
+  addStopRow: { flexDirection: "row", gap: 8, alignItems: "center" },
+  addStopBtn: {
+    backgroundColor: Colors.accent,
+    borderRadius: 10,
+    width: 44,
+    height: 44,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  switchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  switchLabel: { color: Colors.text, fontSize: 14, fontWeight: "600" as const },
+  switchSub: { color: Colors.textSecondary, fontSize: 11, marginTop: 2 },
   submitButton: {
     backgroundColor: Colors.accent,
     borderRadius: 14,
@@ -271,12 +624,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 24,
   },
-  submitButtonDisabled: {
-    opacity: 0.5,
-  },
-  submitText: {
-    color: "#000",
-    fontSize: 16,
-    fontWeight: "700" as const,
-  },
+  submitButtonDisabled: { opacity: 0.5 },
+  submitText: { color: "#000", fontSize: 16, fontWeight: "700" as const },
 });

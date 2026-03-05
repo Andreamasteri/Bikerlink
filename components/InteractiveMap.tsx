@@ -7,7 +7,7 @@ import {
   Text,
   ActivityIndicator,
 } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
+import MapView, { Marker, Circle, PROVIDER_GOOGLE, Region } from "react-native-maps";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import Colors from "@/constants/colors";
@@ -42,6 +42,7 @@ interface InteractiveMapProps {
   workshops?: MapWorkshop[];
   easterEggs?: MapEasterEgg[];
   isAvailable: boolean;
+  searchRadiusKm?: number;
   filterBiker: boolean;
   filterZavorrina: boolean;
   filterCoppia: boolean;
@@ -90,6 +91,7 @@ export default function InteractiveMap({
   workshops = [],
   easterEggs = [],
   isAvailable,
+  searchRadiusKm,
   filterBiker,
   filterZavorrina,
   filterCoppia,
@@ -209,6 +211,16 @@ export default function InteractiveMap({
             onPress={() => onEasterEggPress?.(egg)}
           />
         ))}
+
+        {isAvailable && userLocation && searchRadiusKm && searchRadiusKm > 0 && (
+          <Circle
+            center={userLocation}
+            radius={searchRadiusKm * 1000}
+            fillColor="rgba(255, 179, 0, 0.12)"
+            strokeColor="rgba(255, 179, 0, 0.5)"
+            strokeWidth={2}
+          />
+        )}
       </MapView>
 
       {locationLoading && (
