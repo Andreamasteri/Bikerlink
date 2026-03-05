@@ -38,6 +38,8 @@ export default function MapScreen() {
   const [selectedUserProposals, setSelectedUserProposals] = useState<any[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedEgg, setSelectedEgg] = useState<any>(null);
+  const [showOnlineList, setShowOnlineList] = useState(false);
+  const [showAvailableList, setShowAvailableList] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -155,6 +157,38 @@ export default function MapScreen() {
     enabled: isAuthenticated,
   });
   const isAvailable = (profileQuery.data as any)?.isAvailable || false;
+
+  const onlineListQuery = useQuery<any[]>({
+    queryKey: ["/api/users/online-list", location?.latitude, location?.longitude],
+    queryFn: async () => {
+      const url = new URL("/api/users/online-list", getApiUrl());
+      if (location) {
+        url.searchParams.set("lat", String(location.latitude));
+        url.searchParams.set("lng", String(location.longitude));
+      }
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 30000,
+    enabled: isAuthenticated && showOnlineList,
+  });
+
+  const availableListQuery = useQuery<any[]>({
+    queryKey: ["/api/users/available-list", location?.latitude, location?.longitude],
+    queryFn: async () => {
+      const url = new URL("/api/users/available-list", getApiUrl());
+      if (location) {
+        url.searchParams.set("lat", String(location.latitude));
+        url.searchParams.set("lng", String(location.longitude));
+      }
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 30000,
+    enabled: isAuthenticated && showAvailableList,
+  });
 
   const myProposalsQuery = useQuery<any[]>({
     queryKey: ["/api/proposals?status=active"],
@@ -317,21 +351,16 @@ export default function MapScreen() {
       </Modal>
 
       <View style={styles.statsRow}>
-        <View style={styles.statCard}>
+        <Pressable style={styles.statCard} onPress={() => setShowOnlineList(true)}>
           <Ionicons name="radio-button-on" size={20} color={Colors.success} />
           <Text style={styles.statNumber}>{onlineCount}</Text>
           <Text style={styles.statLabel}>Online</Text>
-        </View>
-        <View style={styles.statCard}>
+        </Pressable>
+        <Pressable style={styles.statCard} onPress={() => setShowAvailableList(true)}>
           <Ionicons name="hand-left" size={20} color={Colors.accent} />
           <Text style={styles.statNumber}>{availableCount}</Text>
           <Text style={styles.statLabel}>Disponibili</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Ionicons name="people" size={20} color={Colors.maleIcon} />
-          <Text style={styles.statNumber}>{nearbyUsersList.length}</Text>
-          <Text style={styles.statLabel}>Vicini</Text>
-        </View>
+        </Pressable>
         <View style={styles.statCard}>
           <Ionicons name="construct" size={20} color={synecoVisible ? Colors.syneco : Colors.textSecondary} />
           <Text style={styles.statNumber}>{workshopsList.length}</Text>
@@ -339,38 +368,97 @@ export default function MapScreen() {
         </View>
       </View>
 
-      {nearbyUsersList.length > 0 && (
-        <View style={styles.nearbySection}>
-          <Text style={styles.sectionTitle}>Utenti Disponibili</Text>
-          {nearbyUsersList.slice(0, 10).map((item: any) => {
-            const u = item.user || item;
-            return (
-              <Pressable
-                key={u.id}
-                style={styles.userCard}
-                onPress={() => router.push(`/profile/${u.id}` as any)}
-              >
-                <Ionicons name={getUserIcon(u)} size={24} color={getUserColor(u)} />
-                <View style={styles.userInfo}>
-                  <Text style={styles.userName}>{u.nickname}</Text>
-                  <Text style={styles.userType}>
-                    {getUserTypeLabel(u)}
-                    {item.profile?.ridingStyle ? ` · ${item.profile.ridingStyle}` : ""}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+      <Modal visible={showOnlineList} transparent animationType="slide" onRequestClose={() => setShowOnlineList(false)}>
+        <Pressable style={styles.detailOverlay} onPress={() => setShowOnlineList(false)}>
+          <Pressable style={styles.listSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.detailHandle} />
+            <View style={styles.listSheetHeader}>
+              <Ionicons name="radio-button-on" size={20} color={Colors.success} />
+              <Text style={styles.listSheetTitle}>Utenti Online</Text>
+              <Pressable onPress={() => setShowOnlineList(false)}>
+                <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </Pressable>
-            );
-          })}
-        </View>
-      )}
+            </View>
+            {onlineListQuery.isLoading ? (
+              <ActivityIndicator size="large" color={Colors.accent} style={{ marginVertical: 40 }} />
+            ) : (onlineListQuery.data || []).length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="people-outline" size={32} color={Colors.textSecondary} />
+                <Text style={styles.emptyText}>Nessun utente online</Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
+                {(onlineListQuery.data || []).map((u: any) => (
+                  <Pressable key={u.id} style={styles.userListCard} onPress={() => { setShowOnlineList(false); router.push(`/profile/${u.id}` as any); }}>
+                    <View style={styles.userListLeft}>
+                      <Ionicons name={getUserIcon(u)} size={28} color={getUserColor(u)} />
+                      {u.isAvailable && <View style={styles.availableDot} />}
+                    </View>
+                    <View style={styles.userListInfo}>
+                      <Text style={styles.userListName}>{u.nickname}</Text>
+                      <Text style={styles.userListDetail}>{getUserTypeLabel(u)}{u.sex ? ` · ${u.sex === "M" ? "M" : "F"}` : ""}{u.region ? ` · ${u.region}` : ""}</Text>
+                      {u.moto && <Text style={styles.userListDetail}>{u.moto}{u.ridingStyle ? ` · ${u.ridingStyle}` : ""}</Text>}
+                      {u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
+                      {u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
+                    </View>
+                    {u.distance != null && (
+                      <View style={styles.userListDistance}>
+                        <Text style={styles.distanceText}>{u.distance} km</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
-      {nearbyUsersList.length === 0 && (
-        <View style={styles.emptyState}>
-          <Ionicons name="people-outline" size={32} color={Colors.textSecondary} />
-          <Text style={styles.emptyText}>Nessun utente nelle vicinanze</Text>
-        </View>
-      )}
+      <Modal visible={showAvailableList} transparent animationType="slide" onRequestClose={() => setShowAvailableList(false)}>
+        <Pressable style={styles.detailOverlay} onPress={() => setShowAvailableList(false)}>
+          <Pressable style={styles.listSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.detailHandle} />
+            <View style={styles.listSheetHeader}>
+              <Ionicons name="hand-left" size={20} color={Colors.accent} />
+              <Text style={styles.listSheetTitle}>Utenti Disponibili</Text>
+              <Pressable onPress={() => setShowAvailableList(false)}>
+                <Ionicons name="close" size={24} color={Colors.textSecondary} />
+              </Pressable>
+            </View>
+            {availableListQuery.isLoading ? (
+              <ActivityIndicator size="large" color={Colors.accent} style={{ marginVertical: 40 }} />
+            ) : (availableListQuery.data || []).length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="people-outline" size={32} color={Colors.textSecondary} />
+                <Text style={styles.emptyText}>Nessun utente disponibile</Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
+                {(availableListQuery.data || []).map((u: any) => (
+                  <Pressable key={u.id} style={styles.userListCard} onPress={() => { setShowAvailableList(false); router.push(`/profile/${u.id}` as any); }}>
+                    <View style={styles.userListLeft}>
+                      <Ionicons name={getUserIcon(u)} size={28} color={getUserColor(u)} />
+                      <View style={styles.availableDot} />
+                    </View>
+                    <View style={styles.userListInfo}>
+                      <Text style={styles.userListName}>{u.nickname}</Text>
+                      <Text style={styles.userListDetail}>{getUserTypeLabel(u)}{u.sex ? ` · ${u.sex === "M" ? "M" : "F"}` : ""}{u.region ? ` · ${u.region}` : ""}</Text>
+                      {u.moto && <Text style={styles.userListDetail}>{u.moto}{u.ridingStyle ? ` · ${u.ridingStyle}` : ""}</Text>}
+                      {u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
+                      {u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
+                    </View>
+                    {u.distance != null && (
+                      <View style={styles.userListDistance}>
+                        <Text style={styles.distanceText}>{u.distance} km</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {synecoVisible && ads.length > 0 && (
         <View style={styles.adBanner}>
@@ -584,22 +672,54 @@ const styles = StyleSheet.create({
   },
   statNumber: { fontSize: 24, fontFamily: "Inter_700Bold", color: Colors.text },
   statLabel: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
-  nearbySection: { marginTop: 16, paddingHorizontal: 16 },
-  sectionTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold", color: Colors.text, marginBottom: 8 },
-  userCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 8,
-  },
-  userInfo: { flex: 1 },
-  userName: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.text },
-  userType: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
   emptyState: { alignItems: "center", padding: 24, gap: 8 },
   emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  listSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: "80%",
+  },
+  listSheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 16,
+  },
+  listSheetTitle: { flex: 1, fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.text },
+  userListCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    gap: 12,
+  },
+  userListLeft: { position: "relative" as const },
+  availableDot: {
+    position: "absolute" as const,
+    bottom: -2,
+    right: -2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: Colors.success,
+    borderWidth: 2,
+    borderColor: Colors.background,
+  },
+  userListInfo: { flex: 1, gap: 2 },
+  userListName: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.text },
+  userListDetail: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  userListBio: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic" as const },
+  userListDistance: {
+    backgroundColor: Colors.accent + "20",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  distanceText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.accent },
   adBanner: {
     backgroundColor: Colors.accent + "20",
     padding: 12,

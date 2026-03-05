@@ -803,9 +803,37 @@ export class DatabaseStorage implements IStorage {
     return result[0]?.count ?? 0;
   }
 
-  async countAvailableUsers(): Promise<number> {
-    const result = await db.select({ count: sql<number>`count(*)::int` }).from(userProfiles).innerJoin(users, eq(users.id, userProfiles.userId)).where(and(eq(users.status, "active"), eq(userProfiles.isAvailable, true)));
+  async countAvailableUsers(since?: Date): Promise<number> {
+    const conditions = [eq(users.status, "active"), eq(userProfiles.isAvailable, true)];
+    if (since) conditions.push(gte(users.lastLoginAt, since));
+    const result = await db.select({ count: sql<number>`count(*)::int` }).from(userProfiles).innerJoin(users, eq(users.id, userProfiles.userId)).where(and(...conditions));
     return result[0]?.count ?? 0;
+  }
+
+  async getOnlineUsersList(since: Date, lat?: number, lng?: number): Promise<any[]> {
+    const distanceExpr = lat != null && lng != null
+      ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
+      : sql<number>`0`.as("distance");
+    const results = await db
+      .select({ user: users, profile: userProfiles, distance: distanceExpr })
+      .from(users)
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(and(eq(users.status, "active"), gte(users.lastLoginAt, since)))
+      .orderBy(sql`distance`);
+    return results;
+  }
+
+  async getAvailableUsersList(since: Date, lat?: number, lng?: number): Promise<any[]> {
+    const distanceExpr = lat != null && lng != null
+      ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
+      : sql<number>`0`.as("distance");
+    const results = await db
+      .select({ user: users, profile: userProfiles, distance: distanceExpr })
+      .from(userProfiles)
+      .innerJoin(users, eq(users.id, userProfiles.userId))
+      .where(and(eq(users.status, "active"), eq(userProfiles.isAvailable, true), gte(users.lastLoginAt, since)))
+      .orderBy(sql`distance`);
+    return results;
   }
 
   async getUnapprovedUserPhotos(): Promise<UserPhoto[]> {

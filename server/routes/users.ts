@@ -249,11 +249,88 @@ router.get("/online-count", requireAuth, async (req: Request, res: Response) => 
 
 router.get("/available-count", requireAuth, async (req: Request, res: Response) => {
   try {
-    const count = await storage.countAvailableUsers();
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const count = await storage.countAvailableUsers(fifteenMinutesAgo);
     return res.json({ count });
   } catch (error) {
     console.error("Available count error:", error);
     return res.json({ count: 0 });
+  }
+});
+
+router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
+    const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
+    const results = await storage.getOnlineUsersList(fifteenMinutesAgo, lat, lng);
+    const motorcyclesMap: Record<string, any[]> = {};
+    for (const item of results) {
+      if (!motorcyclesMap[item.user.id]) {
+        motorcyclesMap[item.user.id] = await storage.getUserMotorcycles(item.user.id);
+      }
+    }
+    const mapped = results
+      .filter((item: any) => item.user.id !== req.session.userId)
+      .map((item: any) => {
+        const motos = motorcyclesMap[item.user.id] || [];
+        const firstMoto = motos[0];
+        return {
+          id: item.user.id,
+          nickname: item.user.nickname,
+          userType: item.user.userType,
+          sex: item.user.sex,
+          region: item.user.region,
+          birthYear: item.user.birthYear,
+          bio: item.profile?.bio || null,
+          moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
+          ridingStyle: firstMoto?.ridingStyle || null,
+          distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
+          isAvailable: item.profile?.isAvailable || false,
+        };
+      });
+    return res.json(mapped);
+  } catch (error) {
+    console.error("Online list error:", error);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+router.get("/available-list", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
+    const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
+    const results = await storage.getAvailableUsersList(fifteenMinutesAgo, lat, lng);
+    const motorcyclesMap: Record<string, any[]> = {};
+    for (const item of results) {
+      if (!motorcyclesMap[item.user.id]) {
+        motorcyclesMap[item.user.id] = await storage.getUserMotorcycles(item.user.id);
+      }
+    }
+    const mapped = results
+      .filter((item: any) => item.user.id !== req.session.userId)
+      .map((item: any) => {
+        const motos = motorcyclesMap[item.user.id] || [];
+        const firstMoto = motos[0];
+        return {
+          id: item.user.id,
+          nickname: item.user.nickname,
+          userType: item.user.userType,
+          sex: item.user.sex,
+          region: item.user.region,
+          birthYear: item.user.birthYear,
+          bio: item.profile?.bio || null,
+          moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
+          ridingStyle: firstMoto?.ridingStyle || null,
+          distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
+          isAvailable: true,
+        };
+      });
+    return res.json(mapped);
+  } catch (error) {
+    console.error("Available list error:", error);
+    return res.status(500).json({ message: "Errore interno" });
   }
 });
 

@@ -141,7 +141,7 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
   - Auto-cleanup: proposte scadute (expiresAt = departureTimeTo + 2h) → status "expired"
   - Cerchio raggio sulla mappa: visibile solo per l'utente quando disponibile con proposta attiva
   - `server/matching-engine.ts`: motore di matching + cleanup
-- **Contatori separati**: Online (login ultimi 15min) e Disponibili (isAvailable) sulla mappa
+- **Contatori cliccabili**: Card "Online" e "Disponibili" sulla mappa, cliccabili → aprono modal con lista utenti con 9 dettagli (nickname, tipo, sesso, regione, anno nascita, moto, stile guida, bio, distanza). Rimossa card "Vicini". Endpoint: `GET /api/users/online-list?lat=&lng=`, `GET /api/users/available-list?lat=&lng=`. Disponibili filtrati anche per lastLoginAt (non possono superare gli online).
 
 ## Tabelle DB Aggiuntive
 
