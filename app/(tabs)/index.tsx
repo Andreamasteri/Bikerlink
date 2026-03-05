@@ -9,12 +9,14 @@ import {
   ScrollView,
   Modal,
   Alert,
+  Linking,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, getApiUrl } from "@/lib/query-client";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
@@ -39,7 +41,9 @@ export default function MapScreen() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedEgg, setSelectedEgg] = useState<any>(null);
   const [showOnlineList, setShowOnlineList] = useState(false);
-  const [showAvailableList, setShowAvailableList] = useState(false);
+  const [showBikerList, setShowBikerList] = useState(false);
+  const [showZavorrinaList, setShowZavorrinaList] = useState(false);
+  const [adIndex, setAdIndex] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -135,8 +139,9 @@ export default function MapScreen() {
     enabled: isAuthenticated && !!location,
   });
 
-  const { data: adsData } = useQuery({
-    queryKey: ["/api/ads?displayMode=banner"],
+  const myAdsQuery = useQuery<any[]>({
+    queryKey: ["/api/ads/my-ads"],
+    staleTime: 60000,
     enabled: isAuthenticated,
   });
 
@@ -146,8 +151,14 @@ export default function MapScreen() {
     enabled: isAuthenticated,
   });
 
-  const availableCountQuery = useQuery<{ count: number }>({
-    queryKey: ["/api/users/available-count"],
+  const bikerCountQuery = useQuery<{ count: number }>({
+    queryKey: ["/api/users/biker-available-count"],
+    staleTime: 30000,
+    enabled: isAuthenticated,
+  });
+
+  const zavCountQuery = useQuery<{ count: number }>({
+    queryKey: ["/api/users/zavorrine-available-count"],
     staleTime: 30000,
     enabled: isAuthenticated,
   });
@@ -174,10 +185,10 @@ export default function MapScreen() {
     enabled: isAuthenticated && showOnlineList,
   });
 
-  const availableListQuery = useQuery<any[]>({
-    queryKey: ["/api/users/available-list", location?.latitude, location?.longitude],
+  const bikerListQuery = useQuery<any[]>({
+    queryKey: ["/api/users/biker-available-list", location?.latitude, location?.longitude],
     queryFn: async () => {
-      const url = new URL("/api/users/available-list", getApiUrl());
+      const url = new URL("/api/users/biker-available-list", getApiUrl());
       if (location) {
         url.searchParams.set("lat", String(location.latitude));
         url.searchParams.set("lng", String(location.longitude));
@@ -187,7 +198,23 @@ export default function MapScreen() {
       return res.json();
     },
     staleTime: 30000,
-    enabled: isAuthenticated && showAvailableList,
+    enabled: isAuthenticated && showBikerList,
+  });
+
+  const zavListQuery = useQuery<any[]>({
+    queryKey: ["/api/users/zavorrine-available-list", location?.latitude, location?.longitude],
+    queryFn: async () => {
+      const url = new URL("/api/users/zavorrine-available-list", getApiUrl());
+      if (location) {
+        url.searchParams.set("lat", String(location.latitude));
+        url.searchParams.set("lng", String(location.longitude));
+      }
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 30000,
+    enabled: isAuthenticated && showZavorrinaList,
   });
 
   const myProposalsQuery = useQuery<any[]>({
@@ -249,9 +276,33 @@ export default function MapScreen() {
 
   const nearbyUsers = (nearbyUsersQuery.data as any) || [];
   const workshops = (workshopsQuery.data as any) || [];
-  const ads = (adsData as any)?.ads || [];
+  const myAds = myAdsQuery.data || [];
   const onlineCount = onlineCountQuery.data?.count ?? 0;
-  const availableCount = availableCountQuery.data?.count ?? 0;
+  const bikerCount = bikerCountQuery.data?.count ?? 0;
+  const zavCount = zavCountQuery.data?.count ?? 0;
+
+  useEffect(() => {
+    if (myAds.length <= 1) return;
+    const firstAd = myAds[0] as any;
+    const duration = (firstAd?.rotationDuration || 10) * 1000;
+    const mode = firstAd?.rotationMode || "sequential";
+    const timer = setInterval(() => {
+      setAdIndex((prev) => {
+        if (mode === "random") return Math.floor(Math.random() * myAds.length);
+        return (prev + 1) % myAds.length;
+      });
+    }, duration);
+    return () => clearInterval(timer);
+  }, [myAds]);
+
+  const handleAdClick = useCallback(async (ad: any) => {
+    try {
+      await apiRequest("POST", `/api/ads/${ad.id}/click`);
+    } catch (e) {}
+    if (ad.linkUrl) {
+      Linking.openURL(ad.linkUrl);
+    }
+  }, []);
 
   if (authLoading || locationLoading) {
     return (
@@ -354,18 +405,18 @@ export default function MapScreen() {
         <Pressable style={styles.statCard} onPress={() => setShowOnlineList(true)}>
           <Ionicons name="radio-button-on" size={20} color={Colors.success} />
           <Text style={styles.statNumber}>{onlineCount}</Text>
-          <Text style={styles.statLabel}>Online</Text>
+          <Text style={styles.statLabel}>Utenti Online</Text>
         </Pressable>
-        <Pressable style={styles.statCard} onPress={() => setShowAvailableList(true)}>
+        <Pressable style={styles.statCard} onPress={() => setShowBikerList(true)}>
           <Ionicons name="hand-left" size={20} color={Colors.accent} />
-          <Text style={styles.statNumber}>{availableCount}</Text>
-          <Text style={styles.statLabel}>Disponibili</Text>
+          <Text style={styles.statNumber}>{bikerCount}</Text>
+          <Text style={styles.statLabel}>Biker Disponibili</Text>
         </Pressable>
-        <View style={styles.statCard}>
-          <Ionicons name="construct" size={20} color={synecoVisible ? Colors.syneco : Colors.textSecondary} />
-          <Text style={styles.statNumber}>{workshopsList.length}</Text>
-          <Text style={styles.statLabel}>Officine</Text>
-        </View>
+        <Pressable style={styles.statCard} onPress={() => setShowZavorrinaList(true)}>
+          <MaterialCommunityIcons name="seat-passenger" size={20} color={Colors.femaleIcon} />
+          <Text style={styles.statNumber}>{zavCount}</Text>
+          <Text style={styles.statLabel}>Zavorrine Disponibili</Text>
+        </Pressable>
       </View>
 
       <Modal visible={showOnlineList} transparent animationType="slide" onRequestClose={() => setShowOnlineList(false)}>
@@ -414,28 +465,28 @@ export default function MapScreen() {
         </Pressable>
       </Modal>
 
-      <Modal visible={showAvailableList} transparent animationType="slide" onRequestClose={() => setShowAvailableList(false)}>
-        <Pressable style={styles.detailOverlay} onPress={() => setShowAvailableList(false)}>
+      <Modal visible={showBikerList} transparent animationType="slide" onRequestClose={() => setShowBikerList(false)}>
+        <Pressable style={styles.detailOverlay} onPress={() => setShowBikerList(false)}>
           <Pressable style={styles.listSheet} onPress={(e) => e.stopPropagation()}>
             <View style={styles.detailHandle} />
             <View style={styles.listSheetHeader}>
               <Ionicons name="hand-left" size={20} color={Colors.accent} />
-              <Text style={styles.listSheetTitle}>Utenti Disponibili</Text>
-              <Pressable onPress={() => setShowAvailableList(false)}>
+              <Text style={styles.listSheetTitle}>Biker Disponibili</Text>
+              <Pressable onPress={() => setShowBikerList(false)}>
                 <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </Pressable>
             </View>
-            {availableListQuery.isLoading ? (
+            {bikerListQuery.isLoading ? (
               <ActivityIndicator size="large" color={Colors.accent} style={{ marginVertical: 40 }} />
-            ) : (availableListQuery.data || []).length === 0 ? (
+            ) : (bikerListQuery.data || []).length === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons name="people-outline" size={32} color={Colors.textSecondary} />
-                <Text style={styles.emptyText}>Nessun utente disponibile</Text>
+                <Ionicons name="bicycle" size={32} color={Colors.textSecondary} />
+                <Text style={styles.emptyText}>Nessun biker disponibile</Text>
               </View>
             ) : (
               <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
-                {(availableListQuery.data || []).map((u: any) => (
-                  <Pressable key={u.id} style={styles.userListCard} onPress={() => { setShowAvailableList(false); router.push(`/profile/${u.id}` as any); }}>
+                {(bikerListQuery.data || []).map((u: any) => (
+                  <Pressable key={u.id} style={styles.userListCard} onPress={() => { setShowBikerList(false); router.push(`/profile/${u.id}` as any); }}>
                     <View style={styles.userListLeft}>
                       <Ionicons name={getUserIcon(u)} size={28} color={getUserColor(u)} />
                       <View style={styles.availableDot} />
@@ -460,10 +511,75 @@ export default function MapScreen() {
         </Pressable>
       </Modal>
 
-      {synecoVisible && ads.length > 0 && (
-        <View style={styles.adBanner}>
-          <Text style={styles.adText}>{ads[0].title}</Text>
-        </View>
+      <Modal visible={showZavorrinaList} transparent animationType="slide" onRequestClose={() => setShowZavorrinaList(false)}>
+        <Pressable style={styles.detailOverlay} onPress={() => setShowZavorrinaList(false)}>
+          <Pressable style={styles.listSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.detailHandle} />
+            <View style={styles.listSheetHeader}>
+              <MaterialCommunityIcons name="seat-passenger" size={20} color={Colors.femaleIcon} />
+              <Text style={styles.listSheetTitle}>Zavorrine Disponibili</Text>
+              <Pressable onPress={() => setShowZavorrinaList(false)}>
+                <Ionicons name="close" size={24} color={Colors.textSecondary} />
+              </Pressable>
+            </View>
+            {zavListQuery.isLoading ? (
+              <ActivityIndicator size="large" color={Colors.femaleIcon} style={{ marginVertical: 40 }} />
+            ) : (zavListQuery.data || []).length === 0 ? (
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons name="seat-passenger" size={32} color={Colors.textSecondary} />
+                <Text style={styles.emptyText}>Nessuna zavorrina disponibile</Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
+                {(zavListQuery.data || []).map((u: any) => (
+                  <Pressable key={u.id} style={styles.userListCard} onPress={() => { setShowZavorrinaList(false); router.push(`/profile/${u.id}` as any); }}>
+                    <View style={styles.userListLeft}>
+                      <Ionicons name={getUserIcon(u)} size={28} color={getUserColor(u)} />
+                      <View style={styles.availableDot} />
+                    </View>
+                    <View style={styles.userListInfo}>
+                      <Text style={styles.userListName}>{u.nickname}</Text>
+                      <Text style={styles.userListDetail}>{getUserTypeLabel(u)}{u.sex ? ` · ${u.sex === "M" ? "M" : "F"}` : ""}{u.region ? ` · ${u.region}` : ""}</Text>
+                      {u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
+                      {u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
+                    </View>
+                    {u.distance != null && (
+                      <View style={styles.userListDistance}>
+                        <Text style={styles.distanceText}>{u.distance} km</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {myAds.length > 0 && (
+        <Pressable style={styles.adBanner} onPress={() => handleAdClick(myAds[adIndex % myAds.length])}>
+          {(myAds[adIndex % myAds.length] as any)?.imageUrl ? (
+            <Image
+              source={{ uri: `${getApiUrl()}${(myAds[adIndex % myAds.length] as any).imageUrl}` }}
+              style={styles.adImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.adPlaceholder}>
+              <Text style={styles.adText}>{(myAds[adIndex % myAds.length] as any)?.name}</Text>
+              {(myAds[adIndex % myAds.length] as any)?.description && (
+                <Text style={styles.adSubText}>{(myAds[adIndex % myAds.length] as any).description}</Text>
+              )}
+            </View>
+          )}
+          {myAds.length > 1 && (
+            <View style={styles.adDots}>
+              {myAds.map((_: any, i: number) => (
+                <View key={i} style={[styles.adDot, i === adIndex % myAds.length && styles.adDotActive]} />
+              ))}
+            </View>
+          )}
+        </Pressable>
       )}
 
       <Modal visible={!!selectedUser} transparent animationType="slide" onRequestClose={() => setSelectedUser(null)}>
@@ -671,7 +787,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   statNumber: { fontSize: 24, fontFamily: "Inter_700Bold", color: Colors.text },
-  statLabel: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  statLabel: { fontSize: 10, fontFamily: "Inter_400Regular", color: Colors.textSecondary, textAlign: "center" as const },
   emptyState: { alignItems: "center", padding: 24, gap: 8 },
   emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
   listSheet: {
@@ -721,14 +837,42 @@ const styles = StyleSheet.create({
   },
   distanceText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.accent },
   adBanner: {
-    backgroundColor: Colors.accent + "20",
-    padding: 12,
     marginHorizontal: 16,
     marginTop: 12,
-    borderRadius: 8,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: Colors.surface,
+  },
+  adImage: {
+    width: "100%",
+    height: 100,
+    borderRadius: 12,
+  },
+  adPlaceholder: {
+    backgroundColor: Colors.accent + "15",
+    padding: 16,
     alignItems: "center",
   },
-  adText: { fontSize: 13, fontFamily: "Inter_500Medium", color: Colors.accent },
+  adText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: Colors.accent },
+  adSubText: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 4 },
+  adDots: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 6,
+  },
+  adDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.textSecondary + "40",
+  },
+  adDotActive: {
+    backgroundColor: Colors.accent,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
   detailOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.6)",

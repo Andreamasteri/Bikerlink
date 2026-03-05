@@ -471,6 +471,129 @@ router.put("/settings/:key", async (req: Request, res: Response) => {
   }
 });
 
+const adsDir = path.join(process.cwd(), "uploads", "ads");
+if (!fs.existsSync(adsDir)) {
+  fs.mkdirSync(adsDir, { recursive: true });
+}
+
+const adImageStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, adsDir),
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const adUpload = multer({
+  storage: adImageStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Solo immagini JPEG, PNG, WebP o GIF"));
+    }
+  },
+});
+
+router.get("/advertisements", async (_req: Request, res: Response) => {
+  try {
+    const campaigns = await storage.getAllCampaigns();
+    return res.json(campaigns);
+  } catch (error) {
+    console.error("Admin get advertisements error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/advertisements", adUpload.single("image"), async (req: Request, res: Response) => {
+  try {
+    const { name, sponsor, linkUrl, description, targetUserType, rotationDuration, rotationMode, sortOrder, startDate, endDate } = req.body;
+    if (!name) {
+      return res.status(400).json({ message: "Nome campagna obbligatorio" });
+    }
+    const imageUrl = req.file ? `/uploads/ads/${req.file.filename}` : (req.body.imageUrl || null);
+    const campaign = await storage.createAdCampaign({
+      name,
+      sponsor: sponsor || "Syneco Lubrificanti",
+      imageUrl,
+      linkUrl: linkUrl || null,
+      displayMode: "banner",
+      description: description || null,
+      targetUserType: targetUserType || "biker",
+      rotationDuration: rotationDuration ? parseInt(rotationDuration) : 10,
+      rotationMode: rotationMode || "sequential",
+      sortOrder: sortOrder ? parseInt(sortOrder) : 0,
+      startDate: startDate ? new Date(startDate) : null,
+      endDate: endDate ? new Date(endDate) : null,
+    });
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "create_advertisement",
+      targetType: "campaign",
+      targetId: campaign.id,
+      details: `Pubblicità creata: ${campaign.name} (${targetUserType || "biker"})`,
+    });
+    return res.status(201).json(campaign);
+  } catch (error) {
+    console.error("Admin create advertisement error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.put("/advertisements/:id", adUpload.single("image"), async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    const updates: any = {};
+    if (req.body.name !== undefined) updates.name = req.body.name;
+    if (req.body.sponsor !== undefined) updates.sponsor = req.body.sponsor;
+    if (req.body.linkUrl !== undefined) updates.linkUrl = req.body.linkUrl;
+    if (req.body.description !== undefined) updates.description = req.body.description;
+    if (req.body.isActive !== undefined) updates.isActive = req.body.isActive === true || req.body.isActive === "true";
+    if (req.body.targetUserType !== undefined) updates.targetUserType = req.body.targetUserType;
+    if (req.body.rotationDuration !== undefined) updates.rotationDuration = parseInt(req.body.rotationDuration);
+    if (req.body.rotationMode !== undefined) updates.rotationMode = req.body.rotationMode;
+    if (req.body.sortOrder !== undefined) updates.sortOrder = parseInt(req.body.sortOrder);
+    if (req.body.startDate !== undefined) updates.startDate = req.body.startDate ? new Date(req.body.startDate) : null;
+    if (req.body.endDate !== undefined) updates.endDate = req.body.endDate ? new Date(req.body.endDate) : null;
+    if (req.file) updates.imageUrl = `/uploads/ads/${req.file.filename}`;
+    else if (req.body.imageUrl !== undefined) updates.imageUrl = req.body.imageUrl;
+    const campaign = await storage.updateAdCampaign(id, updates);
+    if (!campaign) {
+      return res.status(404).json({ message: "Campagna non trovata" });
+    }
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_advertisement",
+      targetType: "campaign",
+      targetId: id,
+      details: `Pubblicità aggiornata: ${campaign.name}`,
+    });
+    return res.json(campaign);
+  } catch (error) {
+    console.error("Admin update advertisement error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/advertisements/:id", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    await storage.deleteCampaign(id);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "delete_advertisement",
+      targetType: "campaign",
+      targetId: id,
+    });
+    return res.json({ message: "Pubblicità eliminata" });
+  } catch (error) {
+    console.error("Admin delete advertisement error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 const eulaUpload = multer({
   dest: path.join(process.cwd(), "uploads", "tmp"),
   limits: { fileSize: 1 * 1024 * 1024 },

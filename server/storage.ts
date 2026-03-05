@@ -195,6 +195,7 @@ export interface IStorage {
   createModeratorLog(log: InsertModeratorLog): Promise<ModeratorLog>;
 
   getActiveCampaigns(): Promise<AdCampaign[]>;
+  getActiveAdsByUserType(userType: string): Promise<AdCampaign[]>;
   createAdCampaign(campaign: InsertAdCampaign): Promise<AdCampaign>;
   updateAdCampaign(id: string, data: Partial<InsertAdCampaign>): Promise<AdCampaign | undefined>;
   createAdClick(click: InsertAdClick): Promise<AdClick>;
@@ -247,6 +248,11 @@ export interface IStorage {
 
   getPhoneSharedCount(conversationId: string, userId: string): Promise<number>;
   incrementPhoneSharedCount(conversationId: string, userId: string): Promise<void>;
+
+  countAvailableBikers(since: Date): Promise<number>;
+  countAvailableZavorrine(since: Date): Promise<number>;
+  getAvailableBikersList(since: Date, lat?: number, lng?: number): Promise<any[]>;
+  getAvailableZavorrinaList(since: Date, lat?: number, lng?: number): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -639,6 +645,10 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(adCampaigns).where(eq(adCampaigns.isActive, true));
   }
 
+  async getActiveAdsByUserType(userType: string): Promise<AdCampaign[]> {
+    return db.select().from(adCampaigns).where(and(eq(adCampaigns.isActive, true), eq(adCampaigns.targetUserType, userType))).orderBy(asc(adCampaigns.sortOrder));
+  }
+
   async createAdCampaign(data: InsertAdCampaign): Promise<AdCampaign> {
     const [campaign] = await db.insert(adCampaigns).values(data).returning();
     return campaign;
@@ -1013,6 +1023,66 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(bikerZavarrinaMatches).where(
       or(eq(bikerZavarrinaMatches.bikerId, userId), eq(bikerZavarrinaMatches.zavarrinaId, userId))
     ).orderBy(desc(bikerZavarrinaMatches.createdAt));
+  }
+
+  async countAvailableBikers(since: Date): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` })
+      .from(userProfiles)
+      .innerJoin(users, eq(users.id, userProfiles.userId))
+      .where(and(
+        eq(users.status, "active"),
+        eq(userProfiles.isAvailable, true),
+        gte(users.lastLoginAt, since),
+        or(eq(users.userType, "biker"), eq(users.userType, "coppia"))
+      ));
+    return result[0]?.count ?? 0;
+  }
+
+  async countAvailableZavorrine(since: Date): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` })
+      .from(userProfiles)
+      .innerJoin(users, eq(users.id, userProfiles.userId))
+      .where(and(
+        eq(users.status, "active"),
+        eq(userProfiles.isAvailable, true),
+        gte(users.lastLoginAt, since),
+        eq(users.userType, "zavorrina")
+      ));
+    return result[0]?.count ?? 0;
+  }
+
+  async getAvailableBikersList(since: Date, lat?: number, lng?: number): Promise<any[]> {
+    const distanceExpr = lat != null && lng != null
+      ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
+      : sql<number>`0`.as("distance");
+    return db
+      .select({ user: users, profile: userProfiles, distance: distanceExpr })
+      .from(userProfiles)
+      .innerJoin(users, eq(users.id, userProfiles.userId))
+      .where(and(
+        eq(users.status, "active"),
+        eq(userProfiles.isAvailable, true),
+        gte(users.lastLoginAt, since),
+        or(eq(users.userType, "biker"), eq(users.userType, "coppia"))
+      ))
+      .orderBy(sql`distance`);
+  }
+
+  async getAvailableZavorrinaList(since: Date, lat?: number, lng?: number): Promise<any[]> {
+    const distanceExpr = lat != null && lng != null
+      ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
+      : sql<number>`0`.as("distance");
+    return db
+      .select({ user: users, profile: userProfiles, distance: distanceExpr })
+      .from(userProfiles)
+      .innerJoin(users, eq(users.id, userProfiles.userId))
+      .where(and(
+        eq(users.status, "active"),
+        eq(userProfiles.isAvailable, true),
+        gte(users.lastLoginAt, since),
+        eq(users.userType, "zavorrina")
+      ))
+      .orderBy(sql`distance`);
   }
 
   async createEmailVerificationToken(userId: string, token: string, expiresAt: Date): Promise<void> {

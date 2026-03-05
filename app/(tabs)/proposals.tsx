@@ -47,9 +47,9 @@ interface ProposalItem {
 const FILTER_TYPES = [
   { key: "all", label: "Tutti" },
   { key: "giro", label: "Giro" },
-  { key: "raduno", label: "Raduno" },
-  { key: "con_zavorrina", label: "Con zavorrina" },
-  { key: "richiesta", label: "Richiesta" },
+  { key: "passaggio", label: "Passaggio" },
+  { key: "zavorrina", label: "Zavorrina" },
+  { key: "richieste", label: "Richieste" },
 ];
 
 const SEARCH_TYPE_LABELS: Record<string, string> = {
@@ -63,19 +63,19 @@ const SEARCH_TYPE_LABELS: Record<string, string> = {
 function getTypeIcon(type: string): { name: keyof typeof Ionicons.glyphMap; color: string } {
   switch (type) {
     case "giro": return { name: "bicycle", color: Colors.maleIcon };
-    case "raduno": return { name: "people", color: Colors.accent };
-    case "con_zavorrina": return { name: "person-add", color: Colors.femaleIcon };
-    case "richiesta": return { name: "hand-left", color: Colors.femaleIcon };
+    case "passaggio": return { name: "car", color: Colors.accent };
+    case "zavorrina": return { name: "person-add", color: Colors.femaleIcon };
+    case "richieste": return { name: "hand-left", color: Colors.femaleIcon };
     default: return { name: "document-text", color: Colors.textSecondary };
   }
 }
 
 function getTypeLabel(type: string): string {
   switch (type) {
-    case "giro": return t("proposals.ride");
-    case "raduno": return t("proposals.rally");
-    case "con_zavorrina": return t("proposals.withPassenger");
-    case "richiesta": return t("proposals.request");
+    case "giro": return "Giro";
+    case "passaggio": return "Passaggio";
+    case "zavorrina": return "Zavorrina";
+    case "richieste": return "Richieste";
     default: return type;
   }
 }
@@ -258,7 +258,7 @@ export default function ProposalsScreen() {
   const queryKey =
     activeFilter === "all"
       ? ["/api/proposals"]
-      : ["/api/proposals?type=" + activeFilter];
+      : ["/api/proposals?filter=" + activeFilter];
 
   const { data: proposals, isLoading, refetch, isRefetching } = useQuery<ProposalItem[]>({ queryKey });
 
@@ -415,8 +415,8 @@ export default function ProposalsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   filterRow: { flexDirection: "row", padding: 16, gap: 8 },
-  filterBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.surface, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: Colors.border },
-  filterBtnActive: { backgroundColor: Colors.accent + "20", borderColor: Colors.accent },
+  filterBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.surface, paddingVertical: 6, paddingHorizontal: 14, borderRadius: 16 },
+  filterBtnActive: { backgroundColor: Colors.accent + "20" },
   filterText: { fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.textSecondary },
   filterTextActive: { color: Colors.accent },
   matchBadge: { backgroundColor: Colors.accentRed, borderRadius: 10, width: 20, height: 20, justifyContent: "center", alignItems: "center" },

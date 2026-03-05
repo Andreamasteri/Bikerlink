@@ -17,11 +17,25 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const status = (req.query.status as string) || undefined;
     const proposalType = req.query.type as string | undefined;
+    const filter = req.query.filter as string | undefined;
 
     let allProposals = await storage.getProposals(status ? { status } : undefined);
 
     if (proposalType) {
       allProposals = allProposals.filter((p) => p.proposalType === proposalType);
+    }
+
+    if (filter) {
+      const filterMap: Record<string, string[]> = {
+        giro: ["find_a_friend"],
+        passaggio: ["hitcher", "hitchhiker"],
+        zavorrina: ["find_a_guest", "find_a_biker"],
+        richieste: ["hitchhiker", "find_a_biker"],
+      };
+      const allowedTypes = filterMap[filter];
+      if (allowedTypes) {
+        allProposals = allProposals.filter((p) => p.searchType && allowedTypes.includes(p.searchType));
+      }
     }
 
     const results = await Promise.all(

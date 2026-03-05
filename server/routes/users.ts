@@ -334,6 +334,100 @@ router.get("/available-list", requireAuth, async (req: Request, res: Response) =
   }
 });
 
+router.get("/biker-available-count", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const count = await storage.countAvailableBikers(fifteenMinutesAgo);
+    return res.json({ count });
+  } catch (error) {
+    console.error("Biker available count error:", error);
+    return res.json({ count: 0 });
+  }
+});
+
+router.get("/zavorrine-available-count", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const count = await storage.countAvailableZavorrine(fifteenMinutesAgo);
+    return res.json({ count });
+  } catch (error) {
+    console.error("Zavorrine available count error:", error);
+    return res.json({ count: 0 });
+  }
+});
+
+router.get("/biker-available-list", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
+    const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
+    const results = await storage.getAvailableBikersList(fifteenMinutesAgo, lat, lng);
+    const motorcyclesMap: Record<string, any[]> = {};
+    for (const item of results) {
+      if (!motorcyclesMap[item.user.id]) {
+        motorcyclesMap[item.user.id] = await storage.getUserMotorcycles(item.user.id);
+      }
+    }
+    const mapped = results.map((item: any) => {
+      const motos = motorcyclesMap[item.user.id] || [];
+      const firstMoto = motos[0];
+      return {
+        id: item.user.id,
+        nickname: item.user.nickname,
+        userType: item.user.userType,
+        sex: item.user.sex,
+        region: item.user.region,
+        birthYear: item.user.birthYear,
+        bio: item.profile?.bio || null,
+        moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
+        ridingStyle: firstMoto?.ridingStyle || null,
+        distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
+        isAvailable: true,
+      };
+    });
+    return res.json(mapped);
+  } catch (error) {
+    console.error("Biker available list error:", error);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
+    const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
+    const results = await storage.getAvailableZavorrinaList(fifteenMinutesAgo, lat, lng);
+    const motorcyclesMap: Record<string, any[]> = {};
+    for (const item of results) {
+      if (!motorcyclesMap[item.user.id]) {
+        motorcyclesMap[item.user.id] = await storage.getUserMotorcycles(item.user.id);
+      }
+    }
+    const mapped = results.map((item: any) => {
+      const motos = motorcyclesMap[item.user.id] || [];
+      const firstMoto = motos[0];
+      return {
+        id: item.user.id,
+        nickname: item.user.nickname,
+        userType: item.user.userType,
+        sex: item.user.sex,
+        region: item.user.region,
+        birthYear: item.user.birthYear,
+        bio: item.profile?.bio || null,
+        moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
+        ridingStyle: firstMoto?.ridingStyle || null,
+        distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
+        isAvailable: true,
+      };
+    });
+    return res.json(mapped);
+  } catch (error) {
+    console.error("Zavorrine available list error:", error);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
   try {
     const lat = parseFloat(req.query.lat as string);

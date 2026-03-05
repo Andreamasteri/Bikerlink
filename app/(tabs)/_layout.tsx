@@ -1,8 +1,8 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { Platform, BackHandler, Text } from "react-native";
+import { Platform, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery } from "@tanstack/react-query";
@@ -19,13 +19,6 @@ export default function TabLayout() {
   });
 
   const isAvailable = (profileData as any)?.isAvailable || false;
-
-  useEffect(() => {
-    if (Platform.OS !== "android") return;
-    const handler = () => true;
-    const sub = BackHandler.addEventListener("hardwareBackPress", handler);
-    return () => sub.remove();
-  }, []);
 
   const tabBarHeight = Platform.OS === "web" ? 84 : 60 + insets.bottom;
   const tabBarPaddingBottom = Platform.OS === "web" ? 34 : insets.bottom;

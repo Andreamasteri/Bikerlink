@@ -25,6 +25,33 @@ router.get("/active", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/my-ads", async (req: Request, res: Response) => {
+  try {
+    const userId = req.session?.userId;
+    if (!userId) {
+      return res.status(401).json({ message: "Non autenticato" });
+    }
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    const userType = user.userType || "biker";
+    const campaigns = await storage.getActiveAdsByUserType(userType);
+
+    const now = new Date();
+    const activeCampaigns = campaigns.filter((c) => {
+      if (c.startDate && new Date(c.startDate) > now) return false;
+      if (c.endDate && new Date(c.endDate) < now) return false;
+      return true;
+    });
+
+    return res.json(activeCampaigns);
+  } catch (error) {
+    console.error("Get my ads error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.post("/:id/click", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;

@@ -451,6 +451,10 @@ export const adCampaigns = pgTable("ad_campaigns", {
   impressions: integer("impressions").notNull().default(0),
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
+  targetUserType: varchar("target_user_type", { length: 30 }).notNull().default("biker"),
+  rotationDuration: integer("rotation_duration").notNull().default(10),
+  rotationMode: varchar("rotation_mode", { length: 20 }).notNull().default("sequential"),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
