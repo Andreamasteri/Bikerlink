@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { useRouter, Stack } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Location from "expo-location";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/query-client";
@@ -77,6 +78,50 @@ export default function CreateProposalScreen() {
   const [stops, setStops] = useState<string[]>([]);
   const [newStop, setNewStop] = useState("");
   const [maxParticipants, setMaxParticipants] = useState("");
+  const [departureLat, setDepartureLat] = useState<number | null>(null);
+  const [departureLng, setDepartureLng] = useState<number | null>(null);
+  const [gpsSource, setGpsSource] = useState<"profile" | "live" | null>(null);
+  const [gpsLoading, setGpsLoading] = useState(false);
+
+  useEffect(() => {
+    const profileLat = (user as any)?.profileLatitude;
+    const profileLng = (user as any)?.profileLongitude;
+    if (profileLat && profileLng && !departureLat) {
+      setDepartureLat(profileLat);
+      setDepartureLng(profileLng);
+      setGpsSource("profile");
+    }
+  }, [user]);
+
+  const fetchLiveLocation = useCallback(async () => {
+    setGpsLoading(true);
+    try {
+      if (Platform.OS === "web") {
+        if (navigator.geolocation) {
+          const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+          );
+          setDepartureLat(pos.coords.latitude);
+          setDepartureLng(pos.coords.longitude);
+          setGpsSource("live");
+        }
+      } else {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert("Permesso negato", "Attiva la localizzazione per usare la posizione attuale");
+          return;
+        }
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        setDepartureLat(loc.coords.latitude);
+        setDepartureLng(loc.coords.longitude);
+        setGpsSource("live");
+      }
+    } catch {
+      Alert.alert("Errore GPS", "Non è stato possibile rilevare la posizione");
+    } finally {
+      setGpsLoading(false);
+    }
+  }, []);
 
   const isBikerOrCoppia = user?.userType === "biker" || user?.userType === "coppia";
   const isZavorrina = user?.userType === "zavorrina";
@@ -182,6 +227,11 @@ export default function CreateProposalScreen() {
 
     const stopsData = stops.length > 0 ? stops.map((s) => ({ address: s })) : null;
 
+    if (!departureLat || !departureLng) {
+      Alert.alert("Posizione mancante", "Premi 'Usa la mia posizione' per rilevare le coordinate GPS");
+      return;
+    }
+
     const data: Record<string, unknown> = {
       proposalType,
       searchType,
@@ -189,6 +239,8 @@ export default function CreateProposalScreen() {
       description: description.trim() || null,
       searchRadius: parseInt(searchRadius) || 30,
       departureAddress: departureAddress.trim(),
+      departureLatitude: departureLat,
+      departureLongitude: departureLng,
       scheduledAt: departureTimeFrom.toISOString(),
       departureTimeFrom: departureTimeFrom.toISOString(),
       departureTimeTo: departureTimeTo?.toISOString() || departureTimeFrom.toISOString(),
@@ -201,7 +253,11 @@ export default function CreateProposalScreen() {
       data.wishlistMotoId = anyMotoOk ? null : selectedWishlistMotoId;
       data.anyMotoOk = anyMotoOk;
     }
-    if (needsDestination) data.destinationAddress = destinationAddress.trim();
+    if (needsDestination) {
+      data.destinationAddress = destinationAddress.trim();
+      data.destinationLatitude = departureLat;
+      data.destinationLongitude = departureLng;
+    }
     if (returnDeadline) data.returnDeadline = returnDeadline.toISOString();
 
     createMutation.mutate(data);
@@ -371,6 +427,43 @@ export default function CreateProposalScreen() {
               placeholder="Es: Piazza del Duomo, Firenze"
               placeholderTextColor={Colors.textSecondary}
             />
+
+            <View style={styles.gpsRow}>
+              <TouchableOpacity
+                style={styles.gpsButton}
+                onPress={fetchLiveLocation}
+                disabled={gpsLoading}
+              >
+                {gpsLoading ? (
+                  <ActivityIndicator size="small" color="#000" />
+                ) : (
+                  <Ionicons name="navigate" size={18} color="#000" />
+                )}
+                <Text style={styles.gpsButtonText}>
+                  {gpsLoading ? "Rilevamento..." : "Usa la mia posizione"}
+                </Text>
+              </TouchableOpacity>
+              {!!gpsSource && (
+                <View style={styles.gpsStatus}>
+                  <Ionicons
+                    name={gpsSource === "live" ? "location" : "location-outline"}
+                    size={16}
+                    color={Colors.success}
+                  />
+                  <Text style={styles.gpsStatusText}>
+                    {gpsSource === "live" ? "GPS attivo" : "Posizione profilo"}
+                  </Text>
+                </View>
+              )}
+              {!gpsSource && (
+                <View style={styles.gpsStatus}>
+                  <Ionicons name="warning" size={16} color={Colors.accentRed} />
+                  <Text style={[styles.gpsStatusText, { color: Colors.accentRed }]}>
+                    Posizione richiesta
+                  </Text>
+                </View>
+              )}
+            </View>
 
             {needsDestination && (
               <>
@@ -626,4 +719,34 @@ const styles = StyleSheet.create({
   },
   submitButtonDisabled: { opacity: 0.5 },
   submitText: { color: "#000", fontSize: 16, fontWeight: "700" as const },
+  gpsRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 12,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  gpsButton: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    backgroundColor: Colors.accent,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    gap: 6,
+  },
+  gpsButtonText: {
+    color: "#000",
+    fontSize: 13,
+    fontWeight: "600" as const,
+  },
+  gpsStatus: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+  },
+  gpsStatusText: {
+    color: Colors.success,
+    fontSize: 12,
+  },
 });

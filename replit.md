@@ -136,6 +136,7 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
   - Tipi ricerca Zavorrine: FindABiker, HitchHiker (label "Vorrei...")
   - Ogni proposta ha: raggio ricerca (km), selezione moto dal garage (biker) o dai desideri (zavorrina), data GG/MM/AAAA, orario dalle/alle (tempo limite), tappe di ritrovo, descrizione
   - Zavorrine: opzione "Qualsiasi moto va bene", toggle tempo limite rientro
+  - Coordinate GPS: il form usa le coordinate dal profilo utente come default + bottone "Usa la mia posizione" per GPS live. `/api/auth/me` restituisce `profileLatitude`/`profileLongitude`
   - Matching engine: gira ogni 60s, incrocia proposte compatibili per zona (cerchi sovrapposti), data e orario
   - Match: notifica → entrambi accettano → chat di gruppo automatica (con avviso deadline se presente)
   - Auto-cleanup: proposte scadute (expiresAt = departureTimeTo + 2h) → status "expired"

@@ -143,7 +143,12 @@ router.get("/me", async (req: Request, res: Response) => {
     }
 
     const { password: _, ...safeUser } = user;
-    return res.json(safeUser);
+    const profile = await storage.getUserProfile(user.id);
+    return res.json({
+      ...safeUser,
+      profileLatitude: profile?.latitude ?? null,
+      profileLongitude: profile?.longitude ?? null,
+    });
   } catch (error) {
     console.error("Me error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
