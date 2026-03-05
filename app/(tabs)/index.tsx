@@ -487,7 +487,7 @@ export default function MapScreen() {
             {selectedEgg?.description && (
               <Text style={styles.eggDescription}>{selectedEgg.description}</Text>
             )}
-            {selectedEgg?.points && (
+            {!!selectedEgg?.points && (
               <Text style={styles.eggPoints}>{selectedEgg.points} punti</Text>
             )}
             {selectedEgg?.collected ? (

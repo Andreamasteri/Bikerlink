@@ -146,7 +146,7 @@ function ProposalCard({ item, onPress }: { item: ProposalItem; onPress: () => vo
             {item.participantCount}{item.maxParticipants ? `/${item.maxParticipants}` : ""}
           </Text>
         </View>
-        {item.searchRadius && (
+        {!!item.searchRadius && (
           <View style={styles.infoRow}>
             <Ionicons name="radio-button-on" size={12} color={Colors.textSecondary} />
             <Text style={styles.infoText}>{item.searchRadius}km</Text>
