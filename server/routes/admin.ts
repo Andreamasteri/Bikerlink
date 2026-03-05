@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
+import bcrypt from "bcryptjs";
 import { storage } from "../storage";
 
 const router = Router();
@@ -691,6 +692,175 @@ router.get("/logs", async (_req: Request, res: Response) => {
     return res.json(logs);
   } catch (error) {
     console.error("Admin get logs error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/fake-users", async (_req: Request, res: Response) => {
+  try {
+    const stats = await storage.getFakeUserStats();
+    return res.json(stats);
+  } catch (error) {
+    console.error("Admin get fake users error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/fake-users", async (req: Request, res: Response) => {
+  try {
+    const { nickname, userType, sex, coupleSexConfig, birthYear, region, bio, moto, wishlistDescription, wishlistMotos } = req.body;
+    if (!nickname || !userType) {
+      return res.status(400).json({ message: "Nickname e tipo utente obbligatori" });
+    }
+    const email = `fake_${nickname.toLowerCase().replace(/[^a-z0-9]/g, "")}@fakeuser.bikerlink.it`;
+    const hashedPassword = await bcrypt.hash("fakeuser2025!", 10);
+    const user = await storage.createUser({
+      nickname,
+      email,
+      password: hashedPassword,
+      userType,
+      sex: sex || null,
+      coupleSexConfig: coupleSexConfig || null,
+      birthYear: birthYear || null,
+      region: region || null,
+      isFake: true,
+      status: "active",
+      emailVerified: true,
+      eulaAccepted: true,
+      lastLoginAt: new Date(),
+    });
+    const regionCoords: Record<string, { lat: number; lng: number }> = {
+      "Abruzzo": { lat: 42.19, lng: 13.73 }, "Basilicata": { lat: 40.64, lng: 15.97 },
+      "Calabria": { lat: 38.91, lng: 16.59 }, "Campania": { lat: 40.85, lng: 14.27 },
+      "Emilia-Romagna": { lat: 44.49, lng: 11.34 }, "Friuli Venezia Giulia": { lat: 46.07, lng: 13.23 },
+      "Lazio": { lat: 41.90, lng: 12.50 }, "Liguria": { lat: 44.41, lng: 8.95 },
+      "Lombardia": { lat: 45.46, lng: 9.19 }, "Marche": { lat: 43.62, lng: 13.52 },
+      "Molise": { lat: 41.56, lng: 14.67 }, "Piemonte": { lat: 45.07, lng: 7.69 },
+      "Puglia": { lat: 41.13, lng: 16.86 }, "Sardegna": { lat: 39.22, lng: 9.12 },
+      "Sicilia": { lat: 37.60, lng: 14.02 }, "Toscana": { lat: 43.77, lng: 11.25 },
+      "Trentino-Alto Adige": { lat: 46.07, lng: 11.13 }, "Umbria": { lat: 43.00, lng: 12.64 },
+      "Valle d'Aosta": { lat: 45.74, lng: 7.32 }, "Veneto": { lat: 45.44, lng: 12.33 },
+    };
+    const coords = region ? regionCoords[region] : null;
+    const lat = coords ? coords.lat + (Math.random() - 0.5) * 0.5 : null;
+    const lng = coords ? coords.lng + (Math.random() - 0.5) * 0.5 : null;
+    await storage.createUserProfile({
+      userId: user.id,
+      isAvailable: true,
+      latitude: lat,
+      longitude: lng,
+      bio: bio || null,
+    });
+    if (moto && (userType === "biker" || userType === "coppia")) {
+      await storage.createUserMotorcycle({
+        userId: user.id,
+        brand: moto.brand || "Ducati",
+        model: moto.model || "Monster",
+        year: moto.year || 2022,
+        displacement: moto.displacement || 821,
+        motorcycleType: moto.motorcycleType || "Naked",
+        ridingStyle: moto.ridingStyle || "Allegra",
+      });
+    }
+    if (userType === "zavorrina" && wishlistDescription) {
+      const wl = await storage.createOrUpdateWishlist(user.id, wishlistDescription);
+      if (wishlistMotos && Array.isArray(wishlistMotos)) {
+        for (const wm of wishlistMotos) {
+          await storage.addWishlistMoto({
+            wishlistId: wl.id,
+            brand: wm.brand || null,
+            model: wm.model || null,
+            motorcycleType: wm.motorcycleType || null,
+            ridingStyle: wm.ridingStyle || null,
+          });
+        }
+      }
+    }
+    const { password: _, ...safeUser } = user;
+    return res.status(201).json(safeUser);
+  } catch (error) {
+    console.error("Admin create fake user error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/fake-users/:id", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    await storage.deleteFakeUser(id);
+    return res.json({ message: "Utente finto eliminato" });
+  } catch (error) {
+    console.error("Admin delete fake user error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.put("/fake-users/:id/toggle-available", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    const profile = await storage.getUserProfile(id);
+    if (!profile) {
+      return res.status(404).json({ message: "Profilo non trovato" });
+    }
+    const overrideUntil = new Date(Date.now() + 60 * 60 * 1000);
+    await storage.updateUserProfile(id, {
+      isAvailable: !profile.isAvailable,
+      adminOverrideUntil: overrideUntil,
+    } as any);
+    return res.json({ isAvailable: !profile.isAvailable });
+  } catch (error) {
+    console.error("Admin toggle fake user availability error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.put("/fake-users/:id/toggle-online", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    const user = await storage.getUser(id);
+    if (!user || !user.isFake) {
+      return res.status(404).json({ message: "Utente finto non trovato" });
+    }
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const isCurrentlyOnline = user.lastLoginAt && new Date(user.lastLoginAt) >= fifteenMinutesAgo;
+    const newLoginAt = isCurrentlyOnline ? new Date("2020-01-01") : new Date();
+    await storage.updateUser(id, { lastLoginAt: newLoginAt } as any);
+    const overrideUntil = new Date(Date.now() + 60 * 60 * 1000);
+    await storage.updateUserProfile(id, { adminOverrideUntil: overrideUntil } as any);
+    return res.json({ isOnline: !isCurrentlyOnline });
+  } catch (error) {
+    console.error("Admin toggle fake user online error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/fake-users/:id/conversations", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    const convs = await storage.getFakeUserConversations(id);
+    return res.json(convs);
+  } catch (error) {
+    console.error("Admin get fake user conversations error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/fake-users/conversations/:convId/messages", async (req: Request, res: Response) => {
+  try {
+    const convId = req.params.convId;
+    const msgs = await storage.getMessages(convId, 200, 0);
+    const result = await Promise.all(
+      msgs.map(async (msg) => {
+        const sender = await storage.getUser(msg.senderId);
+        return {
+          ...msg,
+          sender: sender ? { id: sender.id, nickname: sender.nickname, userType: sender.userType, isFake: sender.isFake } : null,
+        };
+      })
+    );
+    return res.json(result);
+  } catch (error) {
+    console.error("Admin get fake user conversation messages error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

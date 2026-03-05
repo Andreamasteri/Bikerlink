@@ -222,6 +222,9 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
     if (!targetUser) {
       return res.status(404).json({ message: "Utente non trovato" });
     }
+    if (targetUser.isFake && req.session.userId && req.session.userId !== userId) {
+      storage.recordFakeUserInteraction(userId, req.session.userId, "profile_view").catch(() => {});
+    }
     const { password: _, ...safeUser } = targetUser;
     const profile = await storage.getUserProfile(userId);
     const motorcycles = await storage.getUserMotorcycles(userId);
@@ -263,14 +266,34 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
-    const results = await storage.getOnlineUsersList(fifteenMinutesAgo, lat, lng);
+    const includeOffline = req.query.includeOffline === "true";
+    const onlineResults = await storage.getOnlineUsersList(fifteenMinutesAgo, lat, lng);
+    let allResults = onlineResults;
+    const onlineIdSet = new Set(onlineResults.map((r: any) => r.user.id));
+    if (includeOffline) {
+      const { db } = await import("../db");
+      const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
+      const { eq, and, lt, or, isNull } = await import("drizzle-orm");
+      const { sql: sqlTag } = await import("drizzle-orm");
+      const distanceExpr = lat != null && lng != null
+        ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
+        : sqlTag<number>`0`.as("distance");
+      const offlineResults = await db
+        .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
+        .from(usersTable)
+        .leftJoin(profilesTable, eq(profilesTable.userId, usersTable.id))
+        .where(and(eq(usersTable.status, "active"), or(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt))))
+        .orderBy(sqlTag`distance`);
+      const offlineOnly = offlineResults.filter((r: any) => !onlineIdSet.has(r.user.id));
+      allResults = [...onlineResults, ...offlineOnly];
+    }
     const motorcyclesMap: Record<string, any[]> = {};
-    for (const item of results) {
+    for (const item of allResults) {
       if (!motorcyclesMap[item.user.id]) {
         motorcyclesMap[item.user.id] = await storage.getUserMotorcycles(item.user.id);
       }
     }
-    const mapped = results
+    const mapped = allResults
       .filter((item: any) => item.user.id !== req.session.userId)
       .map((item: any) => {
         const motos = motorcyclesMap[item.user.id] || [];
@@ -287,6 +310,7 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
           ridingStyle: firstMoto?.ridingStyle || null,
           distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
           isAvailable: item.profile?.isAvailable || false,
+          isOnline: onlineIdSet.has(item.user.id),
         };
       });
     return res.json(mapped);
@@ -361,14 +385,35 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
-    const results = await storage.getAvailableBikersList(fifteenMinutesAgo, lat, lng);
+    const includeOffline = req.query.includeOffline === "true";
+    const onlineResults = await storage.getAvailableBikersList(fifteenMinutesAgo, lat, lng);
+    let allResults = onlineResults;
+    if (includeOffline) {
+      const { db } = await import("../db");
+      const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
+      const { eq, and, or } = await import("drizzle-orm");
+      const { sql: sqlTag } = await import("drizzle-orm");
+      const distanceExpr = lat != null && lng != null
+        ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
+        : sqlTag<number>`0`.as("distance");
+      const allBikers = await db
+        .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
+        .from(profilesTable)
+        .innerJoin(usersTable, eq(usersTable.id, profilesTable.userId))
+        .where(and(eq(usersTable.status, "active"), or(eq(usersTable.userType, "biker"), eq(usersTable.userType, "coppia"))))
+        .orderBy(sqlTag`distance`);
+      const onlineIds = new Set(onlineResults.map((r: any) => r.user.id));
+      const offlineOnly = allBikers.filter((r: any) => !onlineIds.has(r.user.id));
+      allResults = [...onlineResults, ...offlineOnly];
+    }
     const motorcyclesMap: Record<string, any[]> = {};
-    for (const item of results) {
+    for (const item of allResults) {
       if (!motorcyclesMap[item.user.id]) {
         motorcyclesMap[item.user.id] = await storage.getUserMotorcycles(item.user.id);
       }
     }
-    const mapped = results.map((item: any) => {
+    const onlineAvailableIds = new Set(onlineResults.map((r: any) => r.user.id));
+    const mapped = allResults.map((item: any) => {
       const motos = motorcyclesMap[item.user.id] || [];
       const firstMoto = motos[0];
       return {
@@ -382,7 +427,8 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
         moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
         ridingStyle: firstMoto?.ridingStyle || null,
         distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
-        isAvailable: true,
+        isAvailable: item.profile?.isAvailable || false,
+        isOnline: onlineAvailableIds.has(item.user.id),
       };
     });
     return res.json(mapped);
@@ -397,14 +443,35 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
-    const results = await storage.getAvailableZavorrinaList(fifteenMinutesAgo, lat, lng);
+    const includeOffline = req.query.includeOffline === "true";
+    const onlineResults = await storage.getAvailableZavorrinaList(fifteenMinutesAgo, lat, lng);
+    let allResults = onlineResults;
+    if (includeOffline) {
+      const { db } = await import("../db");
+      const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const { sql: sqlTag } = await import("drizzle-orm");
+      const distanceExpr = lat != null && lng != null
+        ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
+        : sqlTag<number>`0`.as("distance");
+      const allZav = await db
+        .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
+        .from(profilesTable)
+        .innerJoin(usersTable, eq(usersTable.id, profilesTable.userId))
+        .where(and(eq(usersTable.status, "active"), eq(usersTable.userType, "zavorrina")))
+        .orderBy(sqlTag`distance`);
+      const onlineIds = new Set(onlineResults.map((r: any) => r.user.id));
+      const offlineOnly = allZav.filter((r: any) => !onlineIds.has(r.user.id));
+      allResults = [...onlineResults, ...offlineOnly];
+    }
     const motorcyclesMap: Record<string, any[]> = {};
-    for (const item of results) {
+    for (const item of allResults) {
       if (!motorcyclesMap[item.user.id]) {
         motorcyclesMap[item.user.id] = await storage.getUserMotorcycles(item.user.id);
       }
     }
-    const mapped = results.map((item: any) => {
+    const onlineAvailableIds = new Set(onlineResults.map((r: any) => r.user.id));
+    const mapped = allResults.map((item: any) => {
       const motos = motorcyclesMap[item.user.id] || [];
       const firstMoto = motos[0];
       return {
@@ -418,7 +485,8 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
         moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
         ridingStyle: firstMoto?.ridingStyle || null,
         distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
-        isAvailable: true,
+        isAvailable: item.profile?.isAvailable || false,
+        isOnline: onlineAvailableIds.has(item.user.id),
       };
     });
     return res.json(mapped);

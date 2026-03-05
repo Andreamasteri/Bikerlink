@@ -35,6 +35,7 @@ export const users = pgTable("users", {
   deletionRequestedAt: timestamp("deletion_requested_at"),
   deletionScheduledFor: timestamp("deletion_scheduled_for"),
   invitationCode: varchar("invitation_code", { length: 50 }),
+  isFake: boolean("is_fake").notNull().default(false),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -91,6 +92,7 @@ export const userProfiles = pgTable("user_profiles", {
   totalRides: integer("total_rides").notNull().default(0),
   easterEggsCollected: integer("easter_eggs_collected").notNull().default(0),
   searchPreference: varchar("search_preference", { length: 20 }).notNull().default("both"),
+  adminOverrideUntil: timestamp("admin_override_until"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   index("user_profiles_user_id_idx").on(table.userId),
@@ -657,6 +659,23 @@ export const phoneSharingTracker = pgTable("phone_sharing_tracker", {
   uniqueIndex("phone_sharing_tracker_unique_idx").on(table.conversationId, table.userId),
 ]);
 
+export const fakeUserInteractions = pgTable("fake_user_interactions", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  fakeUserId: varchar("fake_user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  realUserId: varchar("real_user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  interactionType: varchar("interaction_type", { length: 30 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("fake_interactions_fake_user_idx").on(table.fakeUserId),
+  index("fake_interactions_real_user_idx").on(table.realUserId),
+]);
+
 export const registerSchema = z.object({
   nickname: z.string().min(3).max(50),
   email: z.string().email(),
@@ -758,6 +777,9 @@ export type BikerZavarrinaMatch = typeof bikerZavarrinaMatches.$inferSelect;
 export type InsertBikerZavarrinaMatch = typeof bikerZavarrinaMatches.$inferInsert;
 export type EmailVerificationToken = typeof emailVerificationTokens.$inferSelect;
 export type InsertEmailVerificationToken = typeof emailVerificationTokens.$inferInsert;
+
+export type FakeUserInteraction = typeof fakeUserInteractions.$inferSelect;
+export type InsertFakeUserInteraction = typeof fakeUserInteractions.$inferInsert;
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

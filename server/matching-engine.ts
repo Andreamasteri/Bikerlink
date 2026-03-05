@@ -120,6 +120,14 @@ async function runCleanup(): Promise<number> {
   }
 }
 
+async function runFakeZavorrineRotation(): Promise<void> {
+  try {
+    await storage.toggleFakeZavorrineAvailability();
+  } catch (error) {
+    console.error("Fake zavorrine rotation error:", error);
+  }
+}
+
 export function startMatchingEngine(): void {
   console.log("Matching engine started (60s interval)");
 
@@ -133,4 +141,8 @@ export function startMatchingEngine(): void {
 
   run();
   setInterval(run, 60 * 1000);
+
+  runFakeZavorrineRotation();
+  setInterval(runFakeZavorrineRotation, 5 * 60 * 1000);
+  console.log("Fake zavorrine availability rotation started (5min interval)");
 }

@@ -38,6 +38,7 @@ import {
   bikerZavarrinaMatches,
   emailVerificationTokens,
   proposalMatches,
+  fakeUserInteractions,
   type User,
   type InsertUser,
   type UserPhoto,
@@ -110,6 +111,8 @@ import {
   type InsertEmailVerificationToken,
   type ProposalMatch,
   type InsertProposalMatch,
+  type FakeUserInteraction,
+  type InsertFakeUserInteraction,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -1120,6 +1123,80 @@ export class DatabaseStorage implements IStorage {
 
   async deleteUser(userId: string): Promise<void> {
     await db.delete(users).where(eq(users.id, userId));
+  }
+
+  async recordFakeUserInteraction(fakeUserId: string, realUserId: string, interactionType: string): Promise<void> {
+    await db.insert(fakeUserInteractions).values({ fakeUserId, realUserId, interactionType });
+  }
+
+  async getFakeUserStats(): Promise<any[]> {
+    const fakeUsers = await db.select().from(users).where(eq(users.isFake, true)).orderBy(desc(users.createdAt));
+    const stats = [];
+    for (const u of fakeUsers) {
+      const profile = await this.getUserProfile(u.id);
+      const [views] = await db.select({ count: sql<number>`count(*)::int` }).from(fakeUserInteractions).where(and(eq(fakeUserInteractions.fakeUserId, u.id), eq(fakeUserInteractions.interactionType, "profile_view")));
+      const [chats] = await db.select({ count: sql<number>`count(*)::int` }).from(fakeUserInteractions).where(and(eq(fakeUserInteractions.fakeUserId, u.id), eq(fakeUserInteractions.interactionType, "chat_request")));
+      const [msgs] = await db.select({ count: sql<number>`count(*)::int` }).from(fakeUserInteractions).where(and(eq(fakeUserInteractions.fakeUserId, u.id), eq(fakeUserInteractions.interactionType, "chat_message")));
+      const { password: _, ...safeUser } = u;
+      stats.push({
+        ...safeUser,
+        profile,
+        profileViews: views?.count ?? 0,
+        chatRequests: chats?.count ?? 0,
+        chatMessages: msgs?.count ?? 0,
+      });
+    }
+    return stats;
+  }
+
+  async getFakeUsers(): Promise<User[]> {
+    return db.select().from(users).where(eq(users.isFake, true)).orderBy(desc(users.createdAt));
+  }
+
+  async deleteFakeUser(id: string): Promise<void> {
+    await db.delete(users).where(and(eq(users.id, id), eq(users.isFake, true)));
+  }
+
+  async toggleFakeZavorrineAvailability(): Promise<void> {
+    const fakeZavorrine = await db.select({ id: users.id, profileUserId: userProfiles.userId, adminOverrideUntil: userProfiles.adminOverrideUntil })
+      .from(users)
+      .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(and(eq(users.isFake, true), eq(users.userType, "zavorrina")));
+    
+    const now = new Date();
+    for (const z of fakeZavorrine) {
+      if (z.adminOverrideUntil && new Date(z.adminOverrideUntil) > now) continue;
+      const available = Math.random() < 0.55;
+      await db.update(userProfiles).set({ isAvailable: available }).where(eq(userProfiles.userId, z.id));
+      if (available) {
+        await db.update(users).set({ lastLoginAt: now }).where(eq(users.id, z.id));
+      }
+    }
+  }
+
+  async getFakeUserConversations(fakeUserId: string): Promise<any[]> {
+    const participantRows = await db.select().from(conversationParticipants).where(eq(conversationParticipants.userId, fakeUserId));
+    if (participantRows.length === 0) return [];
+    const convIds = participantRows.map(p => p.conversationId);
+    const convs = await db.select().from(conversations).where(sql`${conversations.id} = ANY(${convIds})`).orderBy(desc(conversations.updatedAt));
+    const result = [];
+    for (const conv of convs) {
+      const parts = await this.getConversationParticipants(conv.id);
+      const partUsers = [];
+      for (const p of parts) {
+        const u = await this.getUser(p.userId);
+        if (u) partUsers.push({ id: u.id, nickname: u.nickname, userType: u.userType, isFake: u.isFake });
+      }
+      const msgs = await this.getMessages(conv.id, 1, 0);
+      const totalMsgs = await db.select({ count: sql<number>`count(*)::int` }).from(messages).where(eq(messages.conversationId, conv.id));
+      result.push({
+        ...conv,
+        participants: partUsers,
+        lastMessage: msgs[0] || null,
+        messageCount: totalMsgs[0]?.count ?? 0,
+      });
+    }
+    return result;
   }
 }
 

@@ -161,6 +161,10 @@ router.post("/conversations", async (req: Request, res: Response) => {
             conversationId: conv.id,
             userId: pid,
           });
+          const targetUser = await storage.getUser(pid);
+          if (targetUser?.isFake) {
+            storage.recordFakeUserInteraction(pid, userId, "chat_request").catch(() => {});
+          }
         }
       }
     }
@@ -243,6 +247,15 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     });
 
     await storage.updateConversationTimestamp(id);
+
+    for (const p of participants) {
+      if (p.userId !== userId) {
+        const targetUser = await storage.getUser(p.userId);
+        if (targetUser?.isFake) {
+          storage.recordFakeUserInteraction(p.userId, userId, "chat_message").catch(() => {});
+        }
+      }
+    }
 
     const sender = await storage.getUser(userId);
 

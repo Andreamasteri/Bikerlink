@@ -44,6 +44,10 @@ export default function MapScreen() {
   const [showBikerList, setShowBikerList] = useState(false);
   const [showZavorrinaList, setShowZavorrinaList] = useState(false);
   const [adIndex, setAdIndex] = useState(0);
+  const [showOfflineOnline, setShowOfflineOnline] = useState(false);
+  const [showOfflineBiker, setShowOfflineBiker] = useState(false);
+  const [showOfflineZav, setShowOfflineZav] = useState(false);
+  const [offlineCountdown, setOfflineCountdown] = useState<{ online: number; biker: number; zav: number }>({ online: 0, biker: 0, zav: 0 });
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -109,6 +113,32 @@ export default function MapScreen() {
     }
   }, [fetchGPSLocation, getRegionFallback]);
 
+  const startOfflineTimer = useCallback((key: "online" | "biker" | "zav") => {
+    setOfflineCountdown((prev) => ({ ...prev, [key]: 30 }));
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setOfflineCountdown((prev) => {
+        const next = { ...prev };
+        if (next.online > 0) {
+          next.online -= 1;
+          if (next.online === 0) setShowOfflineOnline(false);
+        }
+        if (next.biker > 0) {
+          next.biker -= 1;
+          if (next.biker === 0) setShowOfflineBiker(false);
+        }
+        if (next.zav > 0) {
+          next.zav -= 1;
+          if (next.zav === 0) setShowOfflineZav(false);
+        }
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const nearbyUsersQuery = useQuery<any[]>({
     queryKey: ["/api/users/nearby"],
     retry: false,
@@ -170,50 +200,53 @@ export default function MapScreen() {
   const isAvailable = (profileQuery.data as any)?.isAvailable || false;
 
   const onlineListQuery = useQuery<any[]>({
-    queryKey: ["/api/users/online-list", location?.latitude, location?.longitude],
+    queryKey: ["/api/users/online-list", location?.latitude, location?.longitude, showOfflineOnline],
     queryFn: async () => {
       const url = new URL("/api/users/online-list", getApiUrl());
       if (location) {
         url.searchParams.set("lat", String(location.latitude));
         url.searchParams.set("lng", String(location.longitude));
       }
+      if (showOfflineOnline) url.searchParams.set("includeOffline", "true");
       const res = await fetch(url.toString(), { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
-    staleTime: 30000,
+    staleTime: 15000,
     enabled: isAuthenticated && showOnlineList,
   });
 
   const bikerListQuery = useQuery<any[]>({
-    queryKey: ["/api/users/biker-available-list", location?.latitude, location?.longitude],
+    queryKey: ["/api/users/biker-available-list", location?.latitude, location?.longitude, showOfflineBiker],
     queryFn: async () => {
       const url = new URL("/api/users/biker-available-list", getApiUrl());
       if (location) {
         url.searchParams.set("lat", String(location.latitude));
         url.searchParams.set("lng", String(location.longitude));
       }
+      if (showOfflineBiker) url.searchParams.set("includeOffline", "true");
       const res = await fetch(url.toString(), { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
-    staleTime: 30000,
+    staleTime: 15000,
     enabled: isAuthenticated && showBikerList,
   });
 
   const zavListQuery = useQuery<any[]>({
-    queryKey: ["/api/users/zavorrine-available-list", location?.latitude, location?.longitude],
+    queryKey: ["/api/users/zavorrine-available-list", location?.latitude, location?.longitude, showOfflineZav],
     queryFn: async () => {
       const url = new URL("/api/users/zavorrine-available-list", getApiUrl());
       if (location) {
         url.searchParams.set("lat", String(location.latitude));
         url.searchParams.set("lng", String(location.longitude));
       }
+      if (showOfflineZav) url.searchParams.set("includeOffline", "true");
       const res = await fetch(url.toString(), { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
-    staleTime: 30000,
+    staleTime: 15000,
     enabled: isAuthenticated && showZavorrinaList,
   });
 
@@ -430,6 +463,24 @@ export default function MapScreen() {
                 <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </Pressable>
             </View>
+            <Pressable
+              style={[styles.offlineToggle, showOfflineOnline && styles.offlineToggleActive]}
+              onPress={() => {
+                const next = !showOfflineOnline;
+                setShowOfflineOnline(next);
+                if (next) {
+                  startOfflineTimer("online");
+                  queryClient.invalidateQueries({ queryKey: ["/api/users/online-list"] });
+                } else {
+                  setOfflineCountdown((p) => ({ ...p, online: 0 }));
+                }
+              }}
+            >
+              <Ionicons name={showOfflineOnline ? "eye" : "eye-off"} size={16} color={showOfflineOnline ? Colors.accent : Colors.textSecondary} />
+              <Text style={[styles.offlineToggleText, showOfflineOnline && { color: Colors.accent }]}>
+                {showOfflineOnline ? `Anche offline (${offlineCountdown.online}s)` : "Mostra anche offline"}
+              </Text>
+            </Pressable>
             {onlineListQuery.isLoading ? (
               <ActivityIndicator size="large" color={Colors.accent} style={{ marginVertical: 40 }} />
             ) : (onlineListQuery.data || []).length === 0 ? (
@@ -440,17 +491,17 @@ export default function MapScreen() {
             ) : (
               <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
                 {(onlineListQuery.data || []).map((u: any) => (
-                  <Pressable key={u.id} style={styles.userListCard} onPress={() => { setShowOnlineList(false); router.push(`/profile/${u.id}` as any); }}>
+                  <Pressable key={u.id} style={[styles.userListCard, u.isOnline === false && showOfflineOnline && { opacity: 0.5 }]} onPress={() => { setShowOnlineList(false); router.push(`/profile/${u.id}` as any); }}>
                     <View style={styles.userListLeft}>
                       <Ionicons name={getUserIcon(u)} size={28} color={getUserColor(u)} />
-                      {u.isAvailable && <View style={styles.availableDot} />}
+                      {u.isAvailable ? <View style={styles.availableDot} /> : showOfflineOnline ? <View style={[styles.availableDot, { backgroundColor: "#666" }]} /> : null}
                     </View>
                     <View style={styles.userListInfo}>
                       <Text style={styles.userListName}>{u.nickname}</Text>
                       <Text style={styles.userListDetail}>{getUserTypeLabel(u)}{u.sex ? ` · ${u.sex === "M" ? "M" : "F"}` : ""}{u.region ? ` · ${u.region}` : ""}</Text>
-                      {u.moto && <Text style={styles.userListDetail}>{u.moto}{u.ridingStyle ? ` · ${u.ridingStyle}` : ""}</Text>}
-                      {u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
-                      {u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
+                      {!!u.moto && <Text style={styles.userListDetail}>{u.moto}{u.ridingStyle ? ` · ${u.ridingStyle}` : ""}</Text>}
+                      {!!u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
+                      {!!u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
                     </View>
                     {u.distance != null && (
                       <View style={styles.userListDistance}>
@@ -476,6 +527,24 @@ export default function MapScreen() {
                 <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </Pressable>
             </View>
+            <Pressable
+              style={[styles.offlineToggle, showOfflineBiker && styles.offlineToggleActive]}
+              onPress={() => {
+                const next = !showOfflineBiker;
+                setShowOfflineBiker(next);
+                if (next) {
+                  startOfflineTimer("biker");
+                  queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-list"] });
+                } else {
+                  setOfflineCountdown((p) => ({ ...p, biker: 0 }));
+                }
+              }}
+            >
+              <Ionicons name={showOfflineBiker ? "eye" : "eye-off"} size={16} color={showOfflineBiker ? Colors.accent : Colors.textSecondary} />
+              <Text style={[styles.offlineToggleText, showOfflineBiker && { color: Colors.accent }]}>
+                {showOfflineBiker ? `Anche offline (${offlineCountdown.biker}s)` : "Mostra anche offline"}
+              </Text>
+            </Pressable>
             {bikerListQuery.isLoading ? (
               <ActivityIndicator size="large" color={Colors.accent} style={{ marginVertical: 40 }} />
             ) : (bikerListQuery.data || []).length === 0 ? (
@@ -486,17 +555,17 @@ export default function MapScreen() {
             ) : (
               <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
                 {(bikerListQuery.data || []).map((u: any) => (
-                  <Pressable key={u.id} style={styles.userListCard} onPress={() => { setShowBikerList(false); router.push(`/profile/${u.id}` as any); }}>
+                  <Pressable key={u.id} style={[styles.userListCard, u.isOnline === false && showOfflineBiker && { opacity: 0.5 }]} onPress={() => { setShowBikerList(false); router.push(`/profile/${u.id}` as any); }}>
                     <View style={styles.userListLeft}>
                       <Ionicons name={getUserIcon(u)} size={28} color={getUserColor(u)} />
-                      <View style={styles.availableDot} />
+                      {u.isAvailable ? <View style={styles.availableDot} /> : showOfflineBiker ? <View style={[styles.availableDot, { backgroundColor: "#666" }]} /> : null}
                     </View>
                     <View style={styles.userListInfo}>
                       <Text style={styles.userListName}>{u.nickname}</Text>
                       <Text style={styles.userListDetail}>{getUserTypeLabel(u)}{u.sex ? ` · ${u.sex === "M" ? "M" : "F"}` : ""}{u.region ? ` · ${u.region}` : ""}</Text>
-                      {u.moto && <Text style={styles.userListDetail}>{u.moto}{u.ridingStyle ? ` · ${u.ridingStyle}` : ""}</Text>}
-                      {u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
-                      {u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
+                      {!!u.moto && <Text style={styles.userListDetail}>{u.moto}{u.ridingStyle ? ` · ${u.ridingStyle}` : ""}</Text>}
+                      {!!u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
+                      {!!u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
                     </View>
                     {u.distance != null && (
                       <View style={styles.userListDistance}>
@@ -522,6 +591,24 @@ export default function MapScreen() {
                 <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </Pressable>
             </View>
+            <Pressable
+              style={[styles.offlineToggle, showOfflineZav && styles.offlineToggleActive]}
+              onPress={() => {
+                const next = !showOfflineZav;
+                setShowOfflineZav(next);
+                if (next) {
+                  startOfflineTimer("zav");
+                  queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-list"] });
+                } else {
+                  setOfflineCountdown((p) => ({ ...p, zav: 0 }));
+                }
+              }}
+            >
+              <Ionicons name={showOfflineZav ? "eye" : "eye-off"} size={16} color={showOfflineZav ? Colors.accent : Colors.textSecondary} />
+              <Text style={[styles.offlineToggleText, showOfflineZav && { color: Colors.accent }]}>
+                {showOfflineZav ? `Anche offline (${offlineCountdown.zav}s)` : "Mostra anche offline"}
+              </Text>
+            </Pressable>
             {zavListQuery.isLoading ? (
               <ActivityIndicator size="large" color={Colors.femaleIcon} style={{ marginVertical: 40 }} />
             ) : (zavListQuery.data || []).length === 0 ? (
@@ -532,16 +619,16 @@ export default function MapScreen() {
             ) : (
               <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
                 {(zavListQuery.data || []).map((u: any) => (
-                  <Pressable key={u.id} style={styles.userListCard} onPress={() => { setShowZavorrinaList(false); router.push(`/profile/${u.id}` as any); }}>
+                  <Pressable key={u.id} style={[styles.userListCard, u.isOnline === false && showOfflineZav && { opacity: 0.5 }]} onPress={() => { setShowZavorrinaList(false); router.push(`/profile/${u.id}` as any); }}>
                     <View style={styles.userListLeft}>
                       <Ionicons name={getUserIcon(u)} size={28} color={getUserColor(u)} />
-                      <View style={styles.availableDot} />
+                      {u.isAvailable ? <View style={styles.availableDot} /> : showOfflineZav ? <View style={[styles.availableDot, { backgroundColor: "#666" }]} /> : null}
                     </View>
                     <View style={styles.userListInfo}>
                       <Text style={styles.userListName}>{u.nickname}</Text>
                       <Text style={styles.userListDetail}>{getUserTypeLabel(u)}{u.sex ? ` · ${u.sex === "M" ? "M" : "F"}` : ""}{u.region ? ` · ${u.region}` : ""}</Text>
-                      {u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
-                      {u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
+                      {!!u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
+                      {!!u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
                     </View>
                     {u.distance != null && (
                       <View style={styles.userListDistance}>
@@ -812,6 +899,26 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
     gap: 12,
+  },
+  offlineToggle: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.surfaceLight,
+  },
+  offlineToggleActive: {
+    backgroundColor: Colors.accent + "20",
+    borderWidth: 1,
+    borderColor: Colors.accent + "40",
+  },
+  offlineToggleText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
   },
   userListLeft: { position: "relative" as const },
   availableDot: {

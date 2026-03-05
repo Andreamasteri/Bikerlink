@@ -146,6 +146,18 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - **Filtri Proposte rinominati**: Tutti, Giro, Passaggio, Zavorrina, Richieste — filtrano per searchType. Stile più essenziale.
 - **Fix tasto indietro Android**: Rimosso BackHandler che bloccava tutto.
 
+- **Sistema Utenti Finti (Fake Users)**:
+  - 52 utenti finti: 20 biker (18M+2F), 30 zavorrine (29F+1M), 2 coppie (M+F)
+  - Tutti con `is_fake=true`, online, bio con dialetti regionali autentici
+  - Biker e coppie sempre disponibili. Zavorrine con disponibilità randomica (job ogni 5 min)
+  - Admin override: se admin imposta manualmente stato, il job non lo sovrascrive per 1 ora (`admin_override_until`)
+  - Tracking interazioni: `fake_user_interactions` traccia profile_view, chat_request, chat_message
+  - API admin: CRUD su `/api/admin/fake-users`, toggle disponibilità/online, chat viewer
+  - Pannello admin: `app/admin/fake-users.tsx` — filtri per tipo, contatori, toggle, chat, form creazione
+  - Seed: `npx tsx server/seed-fake-users.ts` (idempotente, salta se >10 fake users esistono)
+  - Toggle "Mostra anche offline" nelle 3 stat card modals (auto-disattivazione dopo 30s con countdown)
+  - Utenti offline mostrati con opacità 0.5 e dot grigio
+
 ## Tabelle DB Aggiuntive
 
 - `motorcycle_photos`: foto moto (max 3 per moto)
@@ -155,6 +167,8 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - `biker_zavorrina_matches`: match tra biker e zavorrine, colonna `zavorrina_id`
 - `proposal_matches`: match automatici tra proposte (proposalId1, proposalId2, userId1, userId2, status, acceptedByUser1/2, conversationId)
 - `email_verification_tokens`: token verifica email
+- `fake_user_interactions`: tracking interazioni utenti reali con utenti finti (profile_view, chat_request, chat_message)
+- Colonna `isFake` in `users`, `adminOverrideUntil` in `user_profiles`
 - Colonna `emailVerified` in `users`, `searchPreference` in `user_profiles`
 
 ## Note Importanti
