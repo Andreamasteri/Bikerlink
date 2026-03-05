@@ -212,7 +212,7 @@ export default function InteractiveMap({
           />
         ))}
 
-        {isAvailable && userLocation && searchRadiusKm && searchRadiusKm > 0 && (
+        {isAvailable && !!userLocation && searchRadiusKm != null && searchRadiusKm > 0 && (
           <Circle
             center={userLocation}
             radius={searchRadiusKm * 1000}

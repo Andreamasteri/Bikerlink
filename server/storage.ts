@@ -804,7 +804,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async countAvailableUsers(): Promise<number> {
-    const result = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(and(eq(users.status, "active"), eq(users.isAvailable, true)));
+    const result = await db.select({ count: sql<number>`count(*)::int` }).from(userProfiles).innerJoin(users, eq(users.id, userProfiles.userId)).where(and(eq(users.status, "active"), eq(userProfiles.isAvailable, true)));
     return result[0]?.count ?? 0;
   }
 
