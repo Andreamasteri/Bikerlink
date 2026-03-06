@@ -1,4 +1,4 @@
-import { eq, and, or, sql, desc, asc, gte, lte } from "drizzle-orm";
+import { eq, and, or, sql, desc, asc, gte, lte, inArray } from "drizzle-orm";
 import { db } from "./db";
 import {
   users,
@@ -445,7 +445,7 @@ export class DatabaseStorage implements IStorage {
     const participantRows = await db.select().from(conversationParticipants).where(eq(conversationParticipants.userId, userId));
     if (participantRows.length === 0) return [];
     const convIds = participantRows.map((p) => p.conversationId);
-    return db.select().from(conversations).where(sql`${conversations.id} = ANY(${convIds})`).orderBy(desc(conversations.updatedAt));
+    return db.select().from(conversations).where(inArray(conversations.id, convIds)).orderBy(desc(conversations.updatedAt));
   }
 
   async getConversation(id: string): Promise<Conversation | undefined> {
