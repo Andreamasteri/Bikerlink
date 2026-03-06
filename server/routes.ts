@@ -92,6 +92,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/chatbot-enabled", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("chatbot_enabled");
+      const enabled = setting?.value !== "false";
+      res.json({ enabled });
+    } catch {
+      res.json({ enabled: true });
+    }
+  });
+
   app.get("/api/settings/paypal", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("paypal_email");

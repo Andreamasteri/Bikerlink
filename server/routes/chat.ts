@@ -582,6 +582,9 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
         if (targetUser?.isFake) {
           storage.recordFakeUserInteraction(p.userId, userId, "chat_message").catch(() => {});
 
+          const chatbotSetting = await storage.getAppSetting("chatbot_enabled");
+          if (chatbotSetting?.value === "false") continue;
+
           const fakeUserId = p.userId;
           const convId = id;
           const userContent = finalContent || "";
