@@ -323,6 +323,38 @@ export default function ProposalDetailScreen() {
           </View>
         )}
 
+        {isCreator && (
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => {
+              Alert.alert(
+                "Elimina proposta",
+                "Sei sicuro di voler eliminare questa proposta? L'azione è irreversibile.",
+                [
+                  { text: "Annulla", style: "cancel" },
+                  {
+                    text: "Elimina",
+                    style: "destructive",
+                    onPress: async () => {
+                      try {
+                        await apiRequest("DELETE", `/api/proposals/${id}`);
+                        queryClient.invalidateQueries({ queryKey: ["/api/proposals"] });
+                        router.back();
+                      } catch (e: any) {
+                        Alert.alert("Errore", e.message || "Impossibile eliminare la proposta");
+                      }
+                    },
+                  },
+                ]
+              );
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="trash" size={20} color="#fff" />
+            <Text style={styles.deleteButtonText}>Elimina proposta</Text>
+          </TouchableOpacity>
+        )}
+
         {(isParticipant || isCreator) && (
           <TouchableOpacity
             style={styles.groupChatButton}
@@ -511,6 +543,21 @@ const styles = StyleSheet.create({
   joinedText: {
     color: Colors.textSecondary,
     fontSize: 14,
+  },
+  deleteButton: {
+    backgroundColor: Colors.accentRed,
+    borderRadius: 14,
+    paddingVertical: 14,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+  },
+  deleteButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700" as const,
   },
   groupChatButton: {
     backgroundColor: Colors.accent,

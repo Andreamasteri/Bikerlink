@@ -394,4 +394,23 @@ router.post("/:id/join", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const proposalId = req.params.id;
+    const userId = req.session.userId!;
+    const proposal = await storage.getProposal(proposalId);
+    if (!proposal) {
+      return res.status(404).json({ message: "Proposta non trovata" });
+    }
+    if (proposal.userId !== userId) {
+      return res.status(403).json({ message: "Solo il creatore può eliminare questa proposta" });
+    }
+    await storage.deleteProposal(proposalId);
+    return res.json({ message: "Proposta eliminata" });
+  } catch (error) {
+    console.error("Delete proposal error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 export default router;

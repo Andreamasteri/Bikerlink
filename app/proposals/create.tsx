@@ -430,17 +430,25 @@ export default function CreateProposalScreen() {
 
             <View style={styles.gpsRow}>
               <TouchableOpacity
-                style={styles.gpsButton}
-                onPress={fetchLiveLocation}
+                style={[styles.gpsButton, !!gpsSource && { backgroundColor: Colors.accent + "30", borderColor: Colors.accent }]}
+                onPress={() => {
+                  if (gpsSource) {
+                    setGpsSource(null);
+                    setDepartureLat(null);
+                    setDepartureLng(null);
+                  } else {
+                    fetchLiveLocation();
+                  }
+                }}
                 disabled={gpsLoading}
               >
                 {gpsLoading ? (
                   <ActivityIndicator size="small" color="#000" />
                 ) : (
-                  <Ionicons name="navigate" size={18} color="#000" />
+                  <Ionicons name={gpsSource ? "close-circle" : "navigate"} size={18} color={gpsSource ? Colors.accentRed : "#000"} />
                 )}
                 <Text style={styles.gpsButtonText}>
-                  {gpsLoading ? "Rilevamento..." : "Usa la mia posizione"}
+                  {gpsLoading ? "Rilevamento..." : gpsSource ? "Rimuovi posizione" : "Usa la mia posizione"}
                 </Text>
               </TouchableOpacity>
               {!!gpsSource && (

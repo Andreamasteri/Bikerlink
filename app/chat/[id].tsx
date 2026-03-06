@@ -219,6 +219,11 @@ export default function ChatConversationScreen() {
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={Colors.accent} />
         </View>
+      ) : (messages || []).length === 0 ? (
+        <View style={styles.emptyChatOuter}>
+          <Ionicons name="chatbubble-outline" size={40} color={Colors.textSecondary} />
+          <Text style={styles.emptyChatText}>Inizia la conversazione!</Text>
+        </View>
       ) : (
         <FlatList
           ref={flatListRef}
@@ -230,12 +235,6 @@ export default function ChatConversationScreen() {
           showsVerticalScrollIndicator={false}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={
-            <View style={styles.emptyChat}>
-              <Ionicons name="chatbubble-outline" size={40} color={Colors.textSecondary} />
-              <Text style={styles.emptyChatText}>Inizia la conversazione!</Text>
-            </View>
-          }
         />
       )}
 
@@ -316,8 +315,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    transform: [{ scaleY: -1 }],
     paddingVertical: 40,
+  },
+  emptyChatOuter: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
   },
   emptyChatText: {
     fontSize: 14,

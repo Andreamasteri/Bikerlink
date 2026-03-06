@@ -141,6 +141,7 @@ export interface IStorage {
   getProposal(id: string): Promise<Proposal | undefined>;
   createProposal(proposal: InsertProposal): Promise<Proposal>;
   updateProposal(id: string, data: Partial<InsertProposal>): Promise<Proposal | undefined>;
+  deleteProposal(id: string): Promise<void>;
   getProposalParticipants(proposalId: string): Promise<ProposalParticipant[]>;
   addProposalParticipant(participant: InsertProposalParticipant): Promise<ProposalParticipant>;
   getProposalMatches(userId: string): Promise<ProposalMatch[]>;
@@ -345,6 +346,10 @@ export class DatabaseStorage implements IStorage {
   async getProposal(id: string): Promise<Proposal | undefined> {
     const [proposal] = await db.select().from(proposals).where(eq(proposals.id, id)).limit(1);
     return proposal;
+  }
+
+  async deleteProposal(id: string): Promise<void> {
+    await db.delete(proposals).where(eq(proposals.id, id));
   }
 
   async createProposal(data: InsertProposal): Promise<Proposal> {
@@ -1170,6 +1175,20 @@ export class DatabaseStorage implements IStorage {
       await db.update(userProfiles).set({ isAvailable: available }).where(eq(userProfiles.userId, z.id));
       if (available) {
         await db.update(users).set({ lastLoginAt: now }).where(eq(users.id, z.id));
+      }
+    }
+
+    const fakeBikers = await db.select({ id: users.id, profileUserId: userProfiles.userId, adminOverrideUntil: userProfiles.adminOverrideUntil })
+      .from(users)
+      .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(and(eq(users.isFake, true), or(eq(users.userType, "biker"), eq(users.userType, "coppia"))));
+
+    for (const b of fakeBikers) {
+      if (b.adminOverrideUntil && new Date(b.adminOverrideUntil) > now) continue;
+      const available = Math.random() < 0.55;
+      await db.update(userProfiles).set({ isAvailable: available }).where(eq(userProfiles.userId, b.id));
+      if (available) {
+        await db.update(users).set({ lastLoginAt: now }).where(eq(users.id, b.id));
       }
     }
   }
