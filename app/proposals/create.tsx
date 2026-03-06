@@ -179,7 +179,7 @@ export default function CreateProposalScreen() {
     setStops(stops.filter((_, i) => i !== idx));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!searchType) {
       Alert.alert("Errore", "Seleziona cosa cerchi");
       return;
@@ -209,6 +209,31 @@ export default function CreateProposalScreen() {
       return;
     }
 
+    const fromParts = timeFrom.split(":");
+    if (fromParts.length === 2) {
+      const fH = parseInt(fromParts[0]), fM = parseInt(fromParts[1]);
+      if (fH < 0 || fH > 23 || fM < 0 || fM > 59) {
+        Alert.alert("Errore", "Orario 'Dalle' non valido (HH:MM, 00:00-23:59)");
+        return;
+      }
+    }
+    if (timeTo) {
+      const toParts = timeTo.split(":");
+      if (toParts.length === 2) {
+        const tH = parseInt(toParts[0]), tM = parseInt(toParts[1]);
+        if (tH < 0 || tH > 23 || tM < 0 || tM > 59) {
+          Alert.alert("Errore", "Orario 'Alle' non valido (HH:MM, 00:00-23:59)");
+          return;
+        }
+        const fromMinutes = parseInt(fromParts[0]) * 60 + parseInt(fromParts[1]);
+        const toMinutes = tH * 60 + tM;
+        if (toMinutes <= fromMinutes) {
+          Alert.alert("Errore", "L'orario 'Alle' deve essere successivo all'orario 'Dalle'");
+          return;
+        }
+      }
+    }
+
     const departureTimeFrom = parseDateAndTime(dateStr, timeFrom);
     if (!departureTimeFrom) {
       Alert.alert("Errore", "Data o orario non validi (GG/MM/AAAA e HH:MM)");
@@ -223,13 +248,42 @@ export default function CreateProposalScreen() {
     let returnDeadline: Date | null = null;
     if (returnDeadlineEnabled && returnDeadlineTime) {
       returnDeadline = parseDateAndTime(dateStr, returnDeadlineTime);
+      if (returnDeadline && departureTimeFrom && returnDeadline <= departureTimeFrom) {
+        Alert.alert("Errore", "L'orario di rientro deve essere successivo all'orario di partenza");
+        return;
+      }
     }
 
     const stopsData = stops.length > 0 ? stops.map((s) => ({ address: s })) : null;
 
-    if (!departureLat || !departureLng) {
-      Alert.alert("Posizione mancante", "Premi 'Usa la mia posizione' per rilevare le coordinate GPS");
-      return;
+    let finalLat = departureLat;
+    let finalLng = departureLng;
+    if (!finalLat || !finalLng) {
+      if (departureAddress.trim()) {
+        try {
+          const geoRes = await fetch(
+            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(departureAddress.trim())}&format=json&limit=1`,
+            { headers: { "User-Agent": "BikerLink/1.0" } }
+          );
+          const geoData = await geoRes.json();
+          if (geoData && geoData.length > 0) {
+            finalLat = parseFloat(geoData[0].lat);
+            finalLng = parseFloat(geoData[0].lon);
+            setDepartureLat(finalLat);
+            setDepartureLng(finalLng);
+            setGpsSource("profile");
+          } else {
+            Alert.alert("Indirizzo non trovato", "Non è stato possibile trovare le coordinate per l'indirizzo inserito. Prova a essere più specifico o usa il GPS.");
+            return;
+          }
+        } catch {
+          Alert.alert("Errore geocoding", "Impossibile risolvere l'indirizzo. Usa il bottone GPS.");
+          return;
+        }
+      } else {
+        Alert.alert("Posizione mancante", "Inserisci un indirizzo o usa il bottone GPS");
+        return;
+      }
     }
 
     const data: Record<string, unknown> = {
@@ -239,8 +293,8 @@ export default function CreateProposalScreen() {
       description: description.trim() || null,
       searchRadius: parseInt(searchRadius) || 30,
       departureAddress: departureAddress.trim(),
-      departureLatitude: departureLat,
-      departureLongitude: departureLng,
+      departureLatitude: finalLat,
+      departureLongitude: finalLng,
       scheduledAt: departureTimeFrom.toISOString(),
       departureTimeFrom: departureTimeFrom.toISOString(),
       departureTimeTo: departureTimeTo?.toISOString() || departureTimeFrom.toISOString(),

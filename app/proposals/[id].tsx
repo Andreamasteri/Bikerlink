@@ -50,15 +50,22 @@ interface ProposalDetail {
 function getTypeIcon(type: string): { name: string; color: string } {
   switch (type) {
     case "giro":
-      return { name: "motorbike", color: Colors.maleIcon };
+    case "find_a_friend":
+      return { name: "account-group", color: Colors.maleIcon };
     case "raduno":
       return { name: "account-group", color: Colors.accent };
     case "con_zavorrina":
+    case "find_a_guest":
       return { name: "seat-passenger", color: Colors.femaleIcon };
+    case "hitcher":
+      return { name: "car-side", color: Colors.accent };
     case "richiesta":
+    case "hitchhiker":
       return { name: "hand-wave", color: Colors.femaleIcon };
+    case "find_a_biker":
+      return { name: "motorbike", color: Colors.maleIcon };
     default:
-      return { name: "clipboard-text", color: Colors.textSecondary };
+      return { name: "bullhorn", color: Colors.textSecondary };
   }
 }
 

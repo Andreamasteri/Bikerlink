@@ -62,20 +62,30 @@ const SEARCH_TYPE_LABELS: Record<string, string> = {
 
 function getTypeIcon(type: string): { name: keyof typeof Ionicons.glyphMap; color: string } {
   switch (type) {
-    case "giro": return { name: "bicycle", color: Colors.maleIcon };
-    case "passaggio": return { name: "car", color: Colors.accent };
-    case "zavorrina": return { name: "person-add", color: Colors.femaleIcon };
-    case "richieste": return { name: "hand-left", color: Colors.femaleIcon };
-    default: return { name: "document-text", color: Colors.textSecondary };
+    case "giro":
+    case "find_a_friend": return { name: "people", color: Colors.maleIcon };
+    case "passaggio":
+    case "hitcher": return { name: "car", color: Colors.accent };
+    case "zavorrina":
+    case "find_a_guest": return { name: "person-add", color: Colors.femaleIcon };
+    case "richieste":
+    case "hitchhiker": return { name: "thumbs-up", color: Colors.femaleIcon };
+    case "find_a_biker": return { name: "bicycle", color: Colors.maleIcon };
+    default: return { name: "megaphone", color: Colors.textSecondary };
   }
 }
 
 function getTypeLabel(type: string): string {
   switch (type) {
-    case "giro": return "Giro";
-    case "passaggio": return "Passaggio";
-    case "zavorrina": return "Zavorrina";
-    case "richieste": return "Richieste";
+    case "giro":
+    case "find_a_friend": return "Giro";
+    case "passaggio":
+    case "hitcher": return "Passaggio";
+    case "zavorrina":
+    case "find_a_guest": return "Zavorrina";
+    case "richieste":
+    case "hitchhiker": return "Richieste";
+    case "find_a_biker": return "Cerco Biker";
     default: return type;
   }
 }
