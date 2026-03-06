@@ -74,5 +74,8 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run expo:dev"
+args = "bash scripts/start-expo.sh"
 waitForPort = 8081
+
+[workflows.workflow.metadata]
+outputType = "console"
