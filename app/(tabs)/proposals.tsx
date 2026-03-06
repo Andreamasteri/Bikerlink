@@ -47,8 +47,8 @@ interface ProposalItem {
 const FILTER_TYPES = [
   { key: "all", label: "Tutti" },
   { key: "giro", label: "Giro" },
-  { key: "passaggio", label: "Passaggio" },
-  { key: "zavorrina", label: "Zavorrina" },
+  { key: "con_zavorrina", label: "Con Zavorrina" },
+  { key: "passaggio_al_volo", label: "Passaggio al volo" },
   { key: "richieste", label: "Richieste" },
 ];
 
@@ -64,12 +64,12 @@ function getTypeIcon(type: string): { name: keyof typeof Ionicons.glyphMap; colo
   switch (type) {
     case "giro":
     case "find_a_friend": return { name: "people", color: Colors.maleIcon };
-    case "passaggio":
-    case "hitcher": return { name: "car", color: Colors.accent };
-    case "zavorrina":
+    case "con_zavorrina":
     case "find_a_guest": return { name: "person-add", color: Colors.femaleIcon };
-    case "richieste":
-    case "hitchhiker": return { name: "thumbs-up", color: Colors.femaleIcon };
+    case "passaggio_al_volo":
+    case "hitcher":
+    case "hitchhiker": return { name: "car", color: Colors.accent };
+    case "richieste": return { name: "thumbs-up", color: Colors.femaleIcon };
     case "find_a_biker": return { name: "bicycle", color: Colors.maleIcon };
     default: return { name: "megaphone", color: Colors.textSecondary };
   }
@@ -79,12 +79,12 @@ function getTypeLabel(type: string): string {
   switch (type) {
     case "giro":
     case "find_a_friend": return "Giro";
-    case "passaggio":
-    case "hitcher": return "Passaggio";
-    case "zavorrina":
-    case "find_a_guest": return "Zavorrina";
-    case "richieste":
-    case "hitchhiker": return "Richieste";
+    case "con_zavorrina":
+    case "find_a_guest": return "Con Zavorrina";
+    case "passaggio_al_volo":
+    case "hitcher":
+    case "hitchhiker": return "Passaggio al volo";
+    case "richieste": return "Richieste";
     case "find_a_biker": return "Cerco Biker";
     default: return type;
   }

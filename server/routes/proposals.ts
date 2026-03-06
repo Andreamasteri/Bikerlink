@@ -28,9 +28,9 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     if (filter) {
       const filterMap: Record<string, string[]> = {
         giro: ["find_a_friend"],
-        passaggio: ["hitcher", "hitchhiker"],
-        zavorrina: ["find_a_guest", "find_a_biker"],
-        richieste: ["hitchhiker", "find_a_biker"],
+        con_zavorrina: ["find_a_guest"],
+        passaggio_al_volo: ["hitcher", "hitchhiker"],
+        richieste: ["find_a_biker"],
       };
       const allowedTypes = filterMap[filter];
       if (allowedTypes) {

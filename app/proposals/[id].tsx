@@ -57,6 +57,7 @@ function getTypeIcon(type: string): { name: string; color: string } {
     case "con_zavorrina":
     case "find_a_guest":
       return { name: "seat-passenger", color: Colors.femaleIcon };
+    case "passaggio_al_volo":
     case "hitcher":
       return { name: "car-side", color: Colors.accent };
     case "richiesta":
@@ -74,6 +75,7 @@ function getTypeLabel(type: string): string {
     case "giro": return t("proposals.ride");
     case "raduno": return t("proposals.rally");
     case "con_zavorrina": return t("proposals.withPassenger");
+    case "passaggio_al_volo": return "Passaggio al volo";
     case "richiesta": return t("proposals.request");
     default: return type;
   }

@@ -148,8 +148,8 @@ export default function CreateProposalScreen() {
   const proposalType = useMemo(() => {
     if (!searchType) return "";
     if (searchType === "find_a_friend") return "giro";
-    if (searchType === "find_a_guest" || searchType === "hitcher") return "con_zavorrina";
-    if (searchType === "hitchhiker") return "richiesta";
+    if (searchType === "find_a_guest") return "con_zavorrina";
+    if (searchType === "hitcher" || searchType === "hitchhiker") return "passaggio_al_volo";
     if (searchType === "find_a_biker") return "richiesta";
     return "giro";
   }, [searchType]);
