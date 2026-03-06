@@ -45,7 +45,6 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const allUsers = await storage.getAllUsers();
     const results = allUsers
-      .filter((u) => u.id !== req.session.userId)
       .map((u) => ({
         id: u.id,
         nickname: u.nickname,
@@ -294,7 +293,6 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
       }
     }
     const mapped = allResults
-      .filter((item: any) => item.user.id !== req.session.userId)
       .map((item: any) => {
         const motos = motorcyclesMap[item.user.id] || [];
         const firstMoto = motos[0];
@@ -333,7 +331,6 @@ router.get("/available-list", requireAuth, async (req: Request, res: Response) =
       }
     }
     const mapped = results
-      .filter((item: any) => item.user.id !== req.session.userId)
       .map((item: any) => {
         const motos = motorcyclesMap[item.user.id] || [];
         const firstMoto = motos[0];

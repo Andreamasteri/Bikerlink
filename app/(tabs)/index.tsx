@@ -140,10 +140,19 @@ export default function MapScreen() {
   }, []);
 
   const nearbyUsersQuery = useQuery<any[]>({
-    queryKey: ["/api/users/nearby"],
+    queryKey: ["/api/users/nearby", location?.latitude, location?.longitude],
+    queryFn: async () => {
+      if (!location) return [];
+      const url = new URL("/api/users/nearby", baseUrl);
+      url.searchParams.set("lat", String(location.latitude));
+      url.searchParams.set("lng", String(location.longitude));
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
     retry: false,
     staleTime: 30000,
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && !!location,
   });
 
   const workshopsQuery = useQuery<any[]>({
@@ -347,8 +356,9 @@ export default function MapScreen() {
   }
 
   const getUserColor = (u: any) => {
-    if (u.sex === "male") return Colors.maleIcon;
-    return Colors.femaleIcon;
+    if (u.userType === "biker") return Colors.maleIcon;
+    if (u.userType === "zavorrina") return Colors.femaleIcon;
+    return Colors.accent;
   };
 
   const getUserTypeLabel = (u: any) => {
