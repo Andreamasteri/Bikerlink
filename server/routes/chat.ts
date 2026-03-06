@@ -3,6 +3,90 @@ import { storage } from "../storage";
 
 const router = Router();
 
+const fakeBotMessageCounts = new Map<string, number>();
+
+const GREETING_KEYWORDS = ["ciao", "hey", "salve", "buongiorno", "buonasera", "ehi", "bella", "yo", "hola"];
+const PUSH_KEYWORDS = ["usciamo", "vediamo", "giro", "andiamo", "quando", "domani", "weekend", "sabato", "domenica", "stasera", "oggi", "uscire", "incontriamo", "vieni", "raggiungi", "dove ci", "ci troviamo", "partiamo", "pronti", "sei libero", "sei libera"];
+
+const GREETING_REPLIES = [
+  "Ciao! Tutto bene? 😊",
+  "Ehi! Come va?",
+  "Bella! Di dove sei?",
+  "Ciao ciao! Come stai?",
+  "Hey! Piacere! 🏍️",
+  "Buongiorno! Che moto hai?",
+];
+
+const VAGUE_REPLIES = [
+  "Ahah bella! 😄",
+  "Si si, vediamo dai!",
+  "Magari più avanti!",
+  "Bello! Ne parliamo!",
+  "Eh sì, sarebbe figo!",
+  "Ci sta! 👍",
+  "Ahahah esatto!",
+  "Vero vero!",
+  "Ma sì dai!",
+  "Beh dai non male!",
+  "Top! 🔥",
+  "Sì sì, assolutamente!",
+  "Haha bella questa!",
+  "Eh già! 😁",
+  "Forte!",
+];
+
+const EVASIVE_REPLIES = [
+  "Eh fa ancora troppo freddo per uscire... 🥶",
+  "Guarda io sono qua per testare l'app per ora 😅",
+  "Ho la moto dal meccanico in questo periodo...",
+  "Magari quando fa più caldo!",
+  "Questo weekend non posso, vediamo più avanti!",
+  "Eh guarda, ho un sacco di impegni ultimamente...",
+  "Sì sì, appena si sistema il tempo! ☀️",
+  "Bella idea ma sto periodo sono incasinato/a...",
+  "Dai più avanti sicuro! Ora è un periodaccio 😬",
+  "Ahah magari! Ma devo prima far revisionare la moto...",
+  "Mi piacerebbe ma sto testando l'app al momento 😅",
+  "Eh con questo tempo... meglio aspettare!",
+  "Sicuro! Ma non questa settimana purtroppo...",
+  "Appena finisco di sistemare la moto ne parliamo!",
+  "Ci sto! Ma non ora, ho il lavoro che mi ammazza... 😩",
+];
+
+const VERY_EVASIVE_REPLIES = [
+  "Guarda, io veramente sono qui solo per testare l'app 😂",
+  "Eh lo so che insisti ma davvero non posso ora!",
+  "Ahahah sei insistente! Ma veramente non è periodo...",
+  "Ma sì dai, prima o poi! Non ti preoccupare 😅",
+  "Tranquillo/a, appena posso ti scrivo io!",
+  "Eh magari... ma non prometto nulla! 🤷",
+  "Senti, ti faccio sapere io ok? 😊",
+  "Haha dai non insistere! Quando sarà sarà! 🏍️",
+];
+
+function getFakeBotReply(content: string, conversationId: string): string {
+  const count = fakeBotMessageCounts.get(conversationId) || 0;
+  fakeBotMessageCounts.set(conversationId, count + 1);
+
+  const lower = content.toLowerCase();
+
+  if (count === 0 && GREETING_KEYWORDS.some(k => lower.includes(k))) {
+    return GREETING_REPLIES[Math.floor(Math.random() * GREETING_REPLIES.length)];
+  }
+
+  const isPushing = PUSH_KEYWORDS.some(k => lower.includes(k));
+
+  if (isPushing && count >= 5) {
+    return VERY_EVASIVE_REPLIES[Math.floor(Math.random() * VERY_EVASIVE_REPLIES.length)];
+  }
+
+  if (isPushing) {
+    return EVASIVE_REPLIES[Math.floor(Math.random() * EVASIVE_REPLIES.length)];
+  }
+
+  return VAGUE_REPLIES[Math.floor(Math.random() * VAGUE_REPLIES.length)];
+}
+
 function requireAuth(req: Request, res: Response): string | null {
   if (!req.session.userId) {
     res.status(401).json({ message: "Non autenticato" });
@@ -253,6 +337,29 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
         const targetUser = await storage.getUser(p.userId);
         if (targetUser?.isFake) {
           storage.recordFakeUserInteraction(p.userId, userId, "chat_message").catch(() => {});
+
+          const fakeUserId = p.userId;
+          const convId = id;
+          const userContent = finalContent || "";
+          const delay = 1000 + Math.random() * 2000;
+          setTimeout(async () => {
+            try {
+              const replyText = getFakeBotReply(userContent, convId);
+              await storage.createMessage({
+                conversationId: convId,
+                senderId: fakeUserId,
+                messageType: "text",
+                content: replyText,
+                imageUrl: null,
+                latitude: null,
+                longitude: null,
+                isFiltered: false,
+              });
+              await storage.updateConversationTimestamp(convId);
+            } catch (err) {
+              console.error("Fake bot reply error:", err);
+            }
+          }, delay);
         }
       }
     }
