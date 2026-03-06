@@ -68,7 +68,7 @@ function getTypeIcon(type: string): { name: keyof typeof Ionicons.glyphMap; colo
     case "find_a_guest": return { name: "person-add", color: Colors.femaleIcon };
     case "passaggio_al_volo":
     case "hitcher":
-    case "hitchhiker": return { name: "car", color: Colors.accent };
+    case "hitchhiker": return { name: "car", color: Colors.success };
     case "richieste": return { name: "thumbs-up", color: Colors.femaleIcon };
     case "find_a_biker": return { name: "bicycle", color: Colors.maleIcon };
     default: return { name: "megaphone", color: Colors.textSecondary };
@@ -327,7 +327,7 @@ export default function ProposalsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+      <View style={styles.filterRow}>
         {FILTER_TYPES.map((f) => (
           <Pressable
             key={f.key}
@@ -344,7 +344,7 @@ export default function ProposalsScreen() {
             )}
           </Pressable>
         ))}
-      </ScrollView>
+      </View>
 
       {isLoading ? (
         <View style={styles.loading}>
@@ -424,8 +424,8 @@ export default function ProposalsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  filterRow: { flexDirection: "row", padding: 6, paddingHorizontal: 8, gap: 4 },
-  filterBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.surface, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 16 },
+  filterRow: { flexDirection: "row", flexWrap: "wrap", padding: 6, paddingHorizontal: 8, gap: 4 },
+  filterBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.surface, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 16, height: 32 },
   filterBtnActive: { backgroundColor: Colors.accent + "20" },
   filterText: { fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.textSecondary },
   filterTextActive: { color: Colors.accent },

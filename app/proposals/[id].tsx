@@ -59,10 +59,10 @@ function getTypeIcon(type: string): { name: string; color: string } {
       return { name: "seat-passenger", color: Colors.femaleIcon };
     case "passaggio_al_volo":
     case "hitcher":
-      return { name: "car-side", color: Colors.accent };
+      return { name: "car-side", color: Colors.success };
     case "richiesta":
     case "hitchhiker":
-      return { name: "hand-wave", color: Colors.femaleIcon };
+      return { name: "hand-wave", color: Colors.success };
     case "find_a_biker":
       return { name: "motorbike", color: Colors.maleIcon };
     default:
