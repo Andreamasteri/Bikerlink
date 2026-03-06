@@ -741,13 +741,11 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(users, eq(users.id, userProfiles.userId))
       .where(
         and(
-          eq(userProfiles.isAvailable, true),
           eq(users.status, "active"),
           sql`${userProfiles.latitude} IS NOT NULL`,
           sql`${userProfiles.longitude} IS NOT NULL`
         )
       )
-      .having(sql`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude})))) < ${radiusKm}`)
       .orderBy(sql`distance`);
     return results;
   }

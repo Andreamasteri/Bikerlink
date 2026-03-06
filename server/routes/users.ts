@@ -506,11 +506,13 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
     const nearbyUsers = await storage.getNearbyUsers(lat, lng, radius);
 
     const results = nearbyUsers
-      .filter((item) => item.user.id !== req.session.userId)
       .map((item) => {
         const { password: _, ...safeUser } = item.user;
         return {
           ...safeUser,
+          latitude: item.profile?.latitude,
+          longitude: item.profile?.longitude,
+          isAvailable: item.profile?.isAvailable || false,
           profile: item.profile,
           distance: Math.round(item.distance * 10) / 10,
         };
