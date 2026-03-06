@@ -4,87 +4,176 @@ import { storage } from "../storage";
 const router = Router();
 
 const fakeBotMessageCounts = new Map<string, number>();
+const fakeBotLastReplies = new Map<string, string[]>();
 
-const GREETING_KEYWORDS = ["ciao", "hey", "salve", "buongiorno", "buonasera", "ehi", "bella", "yo", "hola"];
-const PUSH_KEYWORDS = ["usciamo", "vediamo", "giro", "andiamo", "quando", "domani", "weekend", "sabato", "domenica", "stasera", "oggi", "uscire", "incontriamo", "vieni", "raggiungi", "dove ci", "ci troviamo", "partiamo", "pronti", "sei libero", "sei libera"];
+interface FakeUserContext {
+  nickname: string;
+  region?: string;
+  bio?: string;
+  brand?: string;
+  model?: string;
+  userType?: string;
+  sex?: string;
+}
 
-const GREETING_REPLIES = [
-  "Ciao! Tutto bene? 😊",
-  "Ehi! Come va?",
-  "Bella! Di dove sei?",
-  "Ciao ciao! Come stai?",
-  "Hey! Piacere! 🏍️",
-  "Buongiorno! Che moto hai?",
-];
+function pick(arr: string[]): string {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
 
-const VAGUE_REPLIES = [
-  "Ahah bella! 😄",
-  "Si si, vediamo dai!",
-  "Magari più avanti!",
-  "Bello! Ne parliamo!",
-  "Eh sì, sarebbe figo!",
-  "Ci sta! 👍",
-  "Ahahah esatto!",
-  "Vero vero!",
-  "Ma sì dai!",
-  "Beh dai non male!",
-  "Top! 🔥",
-  "Sì sì, assolutamente!",
-  "Haha bella questa!",
-  "Eh già! 😁",
-  "Forte!",
-];
+function maybeInformal(text: string): string {
+  if (Math.random() < 0.3) {
+    text = text.replace(/\bche\b/gi, "ke").replace(/\bperché\b/gi, "xke").replace(/\bcomunque\b/gi, "cmq");
+  }
+  if (Math.random() < 0.2) {
+    text = text.replace(/\bnon\b/gi, "nn");
+  }
+  return text;
+}
 
-const EVASIVE_REPLIES = [
-  "Eh fa ancora troppo freddo per uscire... 🥶",
-  "Guarda io sono qua per testare l'app per ora 😅",
-  "Ho la moto dal meccanico in questo periodo...",
-  "Magari quando fa più caldo!",
-  "Questo weekend non posso, vediamo più avanti!",
-  "Eh guarda, ho un sacco di impegni ultimamente...",
-  "Sì sì, appena si sistema il tempo! ☀️",
-  "Bella idea ma sto periodo sono incasinato/a...",
-  "Dai più avanti sicuro! Ora è un periodaccio 😬",
-  "Ahah magari! Ma devo prima far revisionare la moto...",
-  "Mi piacerebbe ma sto testando l'app al momento 😅",
-  "Eh con questo tempo... meglio aspettare!",
-  "Sicuro! Ma non questa settimana purtroppo...",
-  "Appena finisco di sistemare la moto ne parliamo!",
-  "Ci sto! Ma non ora, ho il lavoro che mi ammazza... 😩",
-];
+function maybeEmoji(text: string): string {
+  if (Math.random() > 0.45) return text;
+  const emojis = ["😄", "🏍️", "👍", "😊", "💪", "🔥", "😁", "✌️", "😎", "🤙"];
+  return text + " " + pick(emojis);
+}
 
-const VERY_EVASIVE_REPLIES = [
-  "Guarda, io veramente sono qui solo per testare l'app 😂",
-  "Eh lo so che insisti ma davvero non posso ora!",
-  "Ahahah sei insistente! Ma veramente non è periodo...",
-  "Ma sì dai, prima o poi! Non ti preoccupare 😅",
-  "Tranquillo/a, appena posso ti scrivo io!",
-  "Eh magari... ma non prometto nulla! 🤷",
-  "Senti, ti faccio sapere io ok? 😊",
-  "Haha dai non insistere! Quando sarà sarà! 🏍️",
-];
+function avoidRepeat(reply: string, conversationId: string): string {
+  const history = fakeBotLastReplies.get(conversationId) || [];
+  if (history.includes(reply)) {
+    return reply + (Math.random() > 0.5 ? " ahah" : " eh");
+  }
+  history.push(reply);
+  if (history.length > 8) history.shift();
+  fakeBotLastReplies.set(conversationId, history);
+  return reply;
+}
 
-function getFakeBotReply(content: string, conversationId: string): string {
+function getFakeBotReply(content: string, conversationId: string, ctx: FakeUserContext): string {
   const count = fakeBotMessageCounts.get(conversationId) || 0;
   fakeBotMessageCounts.set(conversationId, count + 1);
-
   const lower = content.toLowerCase();
+  const region = ctx.region || "la mia zona";
+  const bike = ctx.brand && ctx.model ? `${ctx.brand} ${ctx.model}` : "";
 
-  if (count === 0 && GREETING_KEYWORDS.some(k => lower.includes(k))) {
-    return GREETING_REPLIES[Math.floor(Math.random() * GREETING_REPLIES.length)];
+  const isGreeting = ["ciao", "hey", "salve", "buongiorno", "buonasera", "ehi", "yo", "hola", "bella"].some(k => lower.includes(k));
+  const isPushing = ["usciamo", "vediamo", "giro", "andiamo", "quando", "domani", "weekend", "sabato", "domenica", "stasera", "oggi", "uscire", "incontriamo", "vieni", "raggiungi", "dove ci", "ci troviamo", "partiamo", "pronti", "sei libero", "sei libera"].some(k => lower.includes(k));
+  const isMotoTalk = ["moto", "mota", "cilindrata", "cavalli", "modello", "marca", "guido", "patente", "naked", "sport", "adventure", "touring", "enduro", "scooter", "casco"].some(k => lower.includes(k));
+  const isQuestion = lower.includes("?") || ["come", "dove", "cosa", "quanto", "quale", "chi"].some(k => lower.startsWith(k));
+  const isWeather = ["tempo", "pioggia", "piove", "sole", "freddo", "caldo", "meteo", "vento"].some(k => lower.includes(k));
+  const isLocation = ["zona", "dove stai", "dove sei", "di dove", "città", "paese", "abiti"].some(k => lower.includes(k));
+
+  let reply: string;
+
+  if (count === 0 && isGreeting) {
+    const greetings = [
+      `Ehi ciao! Io sto in ${region}, te di dove sei?`,
+      "Come va? da quanto sei sull'app?",
+      `Bella! Io sono di ${region}`,
+      "Ciao! Tutto bene? Tu che moto hai?",
+      "Ehi piacere! Da quanto tempo guidi?",
+      `Uè ciao! Qui in ${region} oggi c'è un tempo assurdo`,
+    ];
+    reply = pick(greetings);
+  } else if (count === 0) {
+    const firstContact = [
+      "Ehi ciao, piacere!",
+      `Ciao! Io sono di ${region}, te?`,
+      "Oh bella, ciao! Come va?",
+    ];
+    reply = pick(firstContact);
+  } else if (isPushing && count >= 5) {
+    const veryEvasive = [
+      "Guarda ti scrivo io appena mi libero, promesso",
+      "Ahah ma nn è ke sei un po troppo precipitoso? calma dai",
+      "Eh lasciami respirare un attimo, sto periodo è pesante",
+      "Senti appena posso ti faccio sapere io ok?",
+      "Ma si dai, prima o poi si fa! nn ti preoccupare",
+      `Qua in ${region} è un periodaccio, vediamo più avanti`,
+      "Onestamente adesso nn riesco proprio, ma rimaniamo in contatto",
+      "Dai nn insistere troppo, ti scrivo io quando riesco",
+    ];
+    reply = pick(veryEvasive);
+  } else if (isPushing) {
+    const evasive = [
+      `Qua in ${region} piove da tipo una settimana di fila`,
+      bike ? `La ${bike} è dal meccanico, mi han detto minimo 2 settimane` : "Ho la moto dal meccanico, nn so quando me la ridanno",
+      "Sto periodo col lavoro nn ho un attimo libero",
+      "Bella idea ma devo prima capire i turni della prossima settimana",
+      "Eh magari, ma devo vedere come si mette il tempo",
+      "Si ne parliamo, fammi controllare gli impegni",
+      "In teoria si ma dipende dal lavoro, ti faccio sapere",
+      "Col freddo che fa adesso nn mi va tanto di tirare fuori la moto",
+      bike ? `Devo prima far fare il tagliando alla ${bike}, è un po ke rimando` : "Devo prima fare il tagliando, è un po ke rimando",
+      "Adesso è complicato, forse tra un paio di settimane",
+    ];
+    reply = pick(evasive);
+  } else if (isMotoTalk) {
+    const motoReplies = bike
+      ? [
+          `Io giro con la ${bike}, mi ci trovo benissimo`,
+          `La ${bike} è una gran moto, ce l'ho da un po e nn la cambierei`,
+          `Con la ${bike} ho fatto un sacco di km quest'anno`,
+          `Si la ${bike} va forte, l'unica cosa è ke consuma un po`,
+          "Tu che moto hai? Fai tanti km?",
+          `Io alla ${bike} ci sono affezionato, ormai è come una di famiglia`,
+        ]
+      : [
+          "Io ho sempre avuto un debole per le naked",
+          "Tu che moto hai? Sono curioso",
+          "A me piacciono le moto comode per i viaggi lunghi",
+          "Da quanto guidi? Io da un bel po ormai",
+        ];
+    reply = pick(motoReplies);
+  } else if (isWeather) {
+    const weatherReplies = [
+      `Qua in ${region} il tempo fa schifo ultimamente`,
+      "Eh si con sto tempo nn si va da nessuna parte",
+      "Speriamo ke si rimetta presto, ho voglia di uscire",
+      `In ${region} quando c'è il sole è spettacolare però`,
+      "Il meteo dice ke migliora la prossima settimana",
+    ];
+    reply = pick(weatherReplies);
+  } else if (isLocation) {
+    const locationReplies = [
+      `Io sto in ${region}, è una bella zona per guidare`,
+      `Sono di ${region}, te di dove?`,
+      `${region}, conosci? Ci sono delle strade bellissime`,
+      `Sto in ${region}. Non è male x i giri in moto`,
+    ];
+    reply = pick(locationReplies);
+  } else if (isQuestion && count < 4) {
+    const questionReplies = [
+      "Eh bella domanda, ci devo pensare",
+      "Mah guarda, dipende un po dai giorni",
+      "Si più o meno, te?",
+      "Eh ni, nel senso dipende",
+      "Diciamo di si, anche se nn sempre",
+      "Tu ke ne pensi?",
+    ];
+    reply = pick(questionReplies);
+  } else {
+    const conversational = [
+      "Si hai ragione",
+      "Eh vero, ci sta",
+      "Ma si dai, capisco",
+      "Ah ok, interessante",
+      "Eh si succede",
+      "Beh dai nn male",
+      "Si esatto, la penso uguale",
+      "Tu ke dici? io nn saprei",
+      "Da quanto tempo sei sull'app?",
+      "Vero, anche a me è capitato",
+      "Mah si, più o meno",
+      "Capisco si, ti do ragione",
+      bike ? `Io cmq appena posso prendo la ${bike} e mi faccio un giro` : "Io cmq appena posso mi faccio un giro",
+      `Qui in ${region} la situazione è così così`,
+    ];
+    reply = pick(conversational);
   }
 
-  const isPushing = PUSH_KEYWORDS.some(k => lower.includes(k));
-
-  if (isPushing && count >= 5) {
-    return VERY_EVASIVE_REPLIES[Math.floor(Math.random() * VERY_EVASIVE_REPLIES.length)];
-  }
-
-  if (isPushing) {
-    return EVASIVE_REPLIES[Math.floor(Math.random() * EVASIVE_REPLIES.length)];
-  }
-
-  return VAGUE_REPLIES[Math.floor(Math.random() * VAGUE_REPLIES.length)];
+  reply = maybeInformal(reply);
+  reply = maybeEmoji(reply);
+  reply = avoidRepeat(reply, conversationId);
+  return reply;
 }
 
 function requireAuth(req: Request, res: Response): string | null {
@@ -341,10 +430,25 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
           const fakeUserId = p.userId;
           const convId = id;
           const userContent = finalContent || "";
-          const delay = 1000 + Math.random() * 2000;
+          const contentLen = userContent.length;
+          const delay = contentLen > 50 ? 2000 + Math.random() * 2000 : 1000 + Math.random() * 2000;
+
+          const fakeProfile = await storage.getUserProfile(fakeUserId);
+          const fakeMotoList = await storage.getUserMotorcycles(fakeUserId);
+          const firstMoto = fakeMotoList[0];
+          const fakeCtx: FakeUserContext = {
+            nickname: targetUser.nickname,
+            region: fakeProfile?.region || undefined,
+            bio: fakeProfile?.bio || undefined,
+            brand: firstMoto?.brand || undefined,
+            model: firstMoto?.model || undefined,
+            userType: targetUser.userType || undefined,
+            sex: targetUser.sex || undefined,
+          };
+
           setTimeout(async () => {
             try {
-              const replyText = getFakeBotReply(userContent, convId);
+              const replyText = getFakeBotReply(userContent, convId, fakeCtx);
               await storage.createMessage({
                 conversationId: convId,
                 senderId: fakeUserId,
