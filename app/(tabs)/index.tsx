@@ -28,6 +28,7 @@ export default function MapScreen() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const insets = useSafeAreaInsets();
+  const baseUrl = getApiUrl();
   const synecoVisible = useSynecoVisible();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
@@ -293,7 +294,6 @@ export default function MapScreen() {
     setSelectedUserDetail(null);
     setSelectedUserProposals([]);
     try {
-      const baseUrl = getApiUrl();
       const [detailRes, proposalsRes] = await Promise.all([
         fetch(new URL(`/api/users/${mapUser.id}/public`, baseUrl).toString(), { credentials: "include" }),
         fetch(new URL("/api/proposals", baseUrl).toString(), { credentials: "include" }),

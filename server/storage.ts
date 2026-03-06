@@ -221,9 +221,6 @@ export interface IStorage {
   upsertAppSetting(key: string, value?: string, valueJson?: unknown): Promise<AppSetting>;
 
   createVerificationCode(code: InsertVerificationCode): Promise<VerificationCode>;
-  getVerificationCode(target: string, codeType: string): Promise<VerificationCode | undefined>;
-  markVerificationCodeUsed(id: string): Promise<void>;
-
   getNearbyUsers(lat: number, lng: number, radiusKm: number): Promise<Array<{
     user: User;
     profile: UserProfile;
@@ -239,7 +236,6 @@ export interface IStorage {
   deleteWorkshop(id: string): Promise<void>;
   deleteCampaign(id: string): Promise<void>;
   getAllAppSettings(): Promise<AppSetting[]>;
-  getAdClicksByPeriod(campaignId: string, startDate: Date, endDate: Date): Promise<AdClick[]>;
   getWorkshopContactsByPeriod(startDate: Date, endDate: Date): Promise<WorkshopContact[]>;
   countUsers(): Promise<number>;
   countActiveUsers(since: Date): Promise<number>;
@@ -734,15 +730,6 @@ export class DatabaseStorage implements IStorage {
     return code;
   }
 
-  async getVerificationCode(target: string, codeType: string): Promise<VerificationCode | undefined> {
-    const [code] = await db.select().from(verificationCodes).where(and(eq(verificationCodes.target, target), eq(verificationCodes.codeType, codeType), eq(verificationCodes.isUsed, false))).orderBy(desc(verificationCodes.createdAt)).limit(1);
-    return code;
-  }
-
-  async markVerificationCodeUsed(id: string): Promise<void> {
-    await db.update(verificationCodes).set({ isUsed: true }).where(eq(verificationCodes.id, id));
-  }
-
   async getNearbyUsers(lat: number, lng: number, radiusKm: number): Promise<Array<{ user: User; profile: UserProfile; distance: number }>> {
     const results = await db
       .select({
@@ -801,10 +788,6 @@ export class DatabaseStorage implements IStorage {
 
   async getAllAppSettings(): Promise<AppSetting[]> {
     return db.select().from(appSettings);
-  }
-
-  async getAdClicksByPeriod(campaignId: string, startDate: Date, endDate: Date): Promise<AdClick[]> {
-    return db.select().from(adClicks).where(and(eq(adClicks.campaignId, campaignId), gte(adClicks.createdAt, startDate), lte(adClicks.createdAt, endDate)));
   }
 
   async getWorkshopContactsByPeriod(startDate: Date, endDate: Date): Promise<WorkshopContact[]> {

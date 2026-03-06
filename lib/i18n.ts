@@ -1,6 +1,4 @@
-type Locale = "it" | "en" | "de";
-
-const translations: Record<Locale, Record<string, string>> = {
+const translations: Record<string, Record<string, string>> = {
   it: {
     "app.name": "BikerLink",
     "app.tagline": "U'll never ride alone",
@@ -144,23 +142,8 @@ const translations: Record<Locale, Record<string, string>> = {
 
     "syneco.sponsor": "Sponsorizzato da Syneco Lubrificanti",
   },
-  en: {},
-  de: {},
 };
 
-let currentLocale: Locale = "it";
-
-export function setLocale(locale: Locale) {
-  currentLocale = locale;
-}
-
-export function getLocale(): Locale {
-  return currentLocale;
-}
-
 export function t(key: string): string {
-  const dict = translations[currentLocale];
-  if (dict[key]) return dict[key];
-  const fallback = translations["it"];
-  return fallback[key] ?? key;
+  return translations["it"][key] ?? key;
 }
