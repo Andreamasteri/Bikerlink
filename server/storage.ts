@@ -132,6 +132,7 @@ export interface IStorage {
   updateUserMotorcycle(id: string, data: Partial<InsertUserMotorcycle>): Promise<UserMotorcycle | undefined>;
   deleteUserMotorcycle(id: string): Promise<void>;
 
+  searchUsers(query: string): Promise<{ user: User; profile: UserProfile | null }[]>;
   getUserProfile(userId: string): Promise<UserProfile | undefined>;
   createUserProfile(profile: InsertUserProfile): Promise<UserProfile>;
   updateUserProfile(userId: string, data: Partial<InsertUserProfile>): Promise<UserProfile | undefined>;
@@ -315,6 +316,25 @@ export class DatabaseStorage implements IStorage {
 
   async deleteUserMotorcycle(id: string): Promise<void> {
     await db.delete(userMotorcycles).where(eq(userMotorcycles.id, id));
+  }
+
+  async searchUsers(query: string): Promise<{ user: User; profile: UserProfile | null }[]> {
+    const pattern = `%${query}%`;
+    const results = await db
+      .select({ user: users, profile: userProfiles })
+      .from(users)
+      .leftJoin(userProfiles, eq(users.id, userProfiles.userId))
+      .where(
+        and(
+          eq(users.status, "active"),
+          or(
+            sql`${users.nickname} ILIKE ${pattern}`,
+            sql`${users.email} ILIKE ${pattern}`
+          )
+        )
+      )
+      .limit(20);
+    return results.map(r => ({ user: r.user, profile: r.profile }));
   }
 
   async getUserProfile(userId: string): Promise<UserProfile | undefined> {

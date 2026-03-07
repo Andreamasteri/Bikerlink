@@ -58,12 +58,10 @@ function formatMessageTime(dateStr: string): string {
 }
 
 function getUserTypeColor(userType: string): string {
-  switch (userType) {
-    case "biker": return Colors.maleIcon;
-    case "zavorrina": return Colors.femaleIcon;
-    case "coppia": return Colors.accent;
-    default: return Colors.textSecondary;
-  }
+  if (userType.startsWith("biker")) return Colors.maleIcon;
+  if (userType.startsWith("zavorrina")) return Colors.femaleIcon;
+  if (userType === "coppia") return Colors.coupleIcon;
+  return Colors.textSecondary;
 }
 
 function MessageBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolean }) {
@@ -213,6 +211,15 @@ export default function ChatConversationScreen() {
             </Text>
           )}
         </View>
+        {conversation?.conversationType !== "group" && (() => {
+          const otherUser = conversation?.participants.find((p: any) => p.id !== userId);
+          if (!otherUser) return null;
+          return (
+            <TouchableOpacity onPress={() => router.push(`/profile/${otherUser.id}` as any)} style={styles.infoButton}>
+              <Ionicons name="information-circle-outline" size={26} color={Colors.text} />
+            </TouchableOpacity>
+          );
+        })()}
       </View>
 
       {isLoading ? (
@@ -287,6 +294,10 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 4,
     marginRight: 4,
+  },
+  infoButton: {
+    padding: 4,
+    marginLeft: 8,
   },
   topBarInfo: {
     flex: 1,

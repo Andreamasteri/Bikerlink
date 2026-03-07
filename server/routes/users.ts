@@ -525,6 +525,30 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+router.get("/search", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const q = (req.query.q as string || "").trim();
+    if (q.length < 2) {
+      return res.json([]);
+    }
+    const results = await storage.searchUsers(q);
+    const safeResults = results.map((item: any) => {
+      const { password: _, ...safeUser } = item.user;
+      return {
+        ...safeUser,
+        latitude: item.profile?.latitude || null,
+        longitude: item.profile?.longitude || null,
+        isAvailable: item.profile?.isAvailable || false,
+        profile: item.profile,
+      };
+    });
+    return res.json(safeResults);
+  } catch (error) {
+    console.error("Search users error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.post("/me/photos", requireAuth, upload.single("photo"), async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;

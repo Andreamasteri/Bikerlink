@@ -11,6 +11,9 @@ import {
   Alert,
   Linking,
   Image,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
@@ -38,6 +41,10 @@ export default function MapScreen() {
   const [filterCoppia, setFilterCoppia] = useState(true);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [selectedUserDetail, setSelectedUserDetail] = useState<any>(null);
+  const [searchText, setSearchText] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const [selectedUserProposals, setSelectedUserProposals] = useState<any[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedEgg, setSelectedEgg] = useState<any>(null);
@@ -356,22 +363,50 @@ export default function MapScreen() {
   }
 
   const getUserColor = (u: any) => {
-    if (u.userType === "biker") return Colors.maleIcon;
-    if (u.userType === "zavorrina") return Colors.femaleIcon;
+    if (u.userType?.startsWith("biker")) return Colors.maleIcon;
+    if (u.userType?.startsWith("zavorrina")) return Colors.femaleIcon;
     return Colors.accent;
   };
 
   const getUserTypeLabel = (u: any) => {
-    if (u.userType === "biker") return "Biker";
-    if (u.userType === "zavorrina") return "Zavorrina/o";
+    if (u.userType?.startsWith("biker")) return "Biker";
+    if (u.userType?.startsWith("zavorrina")) return "Zavorrina/o";
     return "Coppia";
   };
 
   const getUserIcon = (u: any): keyof typeof Ionicons.glyphMap => {
     if (u.userType === "coppia") return "people";
-    if (u.userType === "zavorrina") return "person";
+    if (u.userType?.startsWith("zavorrina")) return "person";
     return "bicycle";
   };
+
+  const handleSearch = useCallback(async (text: string) => {
+    setSearchText(text);
+    if (text.trim().length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+    setSearchLoading(true);
+    setShowSearchResults(true);
+    try {
+      const url = new URL("/api/users/search", baseUrl);
+      url.searchParams.set("q", text.trim());
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setSearchResults(data.filter((u: any) => u.id !== user?.id));
+      }
+    } catch { }
+    setSearchLoading(false);
+  }, [baseUrl, user?.id]);
+
+  const handleSearchResultPress = useCallback((u: any) => {
+    setShowSearchResults(false);
+    setSearchText("");
+    setSearchResults([]);
+    handleUserPress(u);
+  }, []);
 
   const nearbyUsersList = Array.isArray(nearbyUsers) ? nearbyUsers : [];
   const workshopsList = Array.isArray(workshops) ? workshops : [];
@@ -386,6 +421,47 @@ export default function MapScreen() {
         <Pressable onPress={() => router.push("/chat" as any)}>
           <Ionicons name="chatbubbles" size={24} color={Colors.accent} />
         </Pressable>
+      </View>
+
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputRow}>
+          <Ionicons name="search" size={18} color={Colors.textSecondary} style={{ marginRight: 8 }} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Cerca per nickname o email..."
+            placeholderTextColor={Colors.textSecondary}
+            value={searchText}
+            onChangeText={handleSearch}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchText.length > 0 && (
+            <TouchableOpacity onPress={() => { setSearchText(""); setSearchResults([]); setShowSearchResults(false); }}>
+              <Ionicons name="close-circle" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {showSearchResults && (
+          <View style={styles.searchResultsContainer}>
+            {searchLoading ? (
+              <ActivityIndicator size="small" color={Colors.accent} style={{ padding: 12 }} />
+            ) : searchResults.length === 0 ? (
+              <Text style={styles.searchNoResults}>Nessun risultato</Text>
+            ) : (
+              <ScrollView style={{ maxHeight: 200 }} keyboardShouldPersistTaps="handled">
+                {searchResults.map((u: any) => (
+                  <TouchableOpacity key={u.id} style={styles.searchResultItem} onPress={() => handleSearchResultPress(u)}>
+                    <Ionicons name={getUserIcon(u)} size={22} color={getUserColor(u)} style={{ marginRight: 10 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.searchResultName}>{u.nickname}</Text>
+                      <Text style={styles.searchResultDetail}>{getUserTypeLabel(u)}{u.region ? ` · ${u.region}` : ""}{!u.latitude ? " · Posizione non disponibile" : ""}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        )}
       </View>
 
       <Pressable style={styles.mapContainer} onPress={() => setMapFullscreen(true)}>
@@ -828,6 +904,62 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   title: { fontSize: 24, fontFamily: "Inter_700Bold", color: Colors.accent },
+  searchContainer: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    zIndex: 10,
+  },
+  searchInputRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === "web" ? 10 : 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: Colors.text,
+    padding: 0,
+  },
+  searchResultsContainer: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: "hidden" as const,
+  },
+  searchNoResults: {
+    padding: 12,
+    textAlign: "center" as const,
+    color: Colors.textSecondary,
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+  },
+  searchResultItem: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 0.5,
+    borderBottomColor: Colors.border,
+  },
+  searchResultName: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
+  searchResultDetail: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginTop: 1,
+  },
   mapContainer: {
     height: 280,
     marginHorizontal: 16,

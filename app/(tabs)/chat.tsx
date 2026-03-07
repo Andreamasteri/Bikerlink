@@ -79,12 +79,10 @@ function formatTime(dateStr: string): string {
 }
 
 function getUserTypeColor(userType: string): string {
-  switch (userType) {
-    case "biker": return Colors.maleIcon;
-    case "zavorrina": return Colors.femaleIcon;
-    case "coppia": return Colors.coupleIcon;
-    default: return Colors.textSecondary;
-  }
+  if (userType.startsWith("biker")) return Colors.maleIcon;
+  if (userType.startsWith("zavorrina")) return Colors.femaleIcon;
+  if (userType === "coppia") return Colors.coupleIcon;
+  return Colors.textSecondary;
 }
 
 function getConversationIcon(conv: ConversationItem): { name: keyof typeof Ionicons.glyphMap; bg: string } {
