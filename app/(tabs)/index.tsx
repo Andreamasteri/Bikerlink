@@ -72,8 +72,10 @@ export default function MapScreen() {
 
   const fetchGPSLocation = useCallback(async (): Promise<{ latitude: number; longitude: number } | null> => {
     try {
+      let coords: { latitude: number; longitude: number } | null = null;
+
       if (Platform.OS === "web") {
-        return new Promise((resolve) => {
+        coords = await new Promise((resolve) => {
           if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
               (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
@@ -84,17 +86,22 @@ export default function MapScreen() {
             resolve(null);
           }
         });
+      } else {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") return null;
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
       }
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") return null;
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      try {
-        await apiRequest("PUT", "/api/users/location", {
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-        });
-      } catch (e) {}
-      return { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+
+      if (coords) {
+        try {
+          await apiRequest("PUT", "/api/users/location", {
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+          });
+        } catch (e) {}
+      }
+      return coords;
     } catch {
       return null;
     }
