@@ -363,6 +363,9 @@ export default function MapScreen() {
   }
 
   const getUserColor = (u: any) => {
+    if (u.userType === "coppia") return Colors.accent;
+    if (u.userType?.endsWith("_f")) return Colors.femaleIcon;
+    if (u.userType?.endsWith("_m")) return Colors.maleIcon;
     if (u.userType?.startsWith("biker")) return Colors.maleIcon;
     if (u.userType?.startsWith("zavorrina")) return Colors.femaleIcon;
     return Colors.accent;

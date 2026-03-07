@@ -58,9 +58,11 @@ function formatMessageTime(dateStr: string): string {
 }
 
 function getUserTypeColor(userType: string): string {
+  if (userType === "coppia") return Colors.coupleIcon;
+  if (userType.endsWith("_f")) return Colors.femaleIcon;
+  if (userType.endsWith("_m")) return Colors.maleIcon;
   if (userType.startsWith("biker")) return Colors.maleIcon;
   if (userType.startsWith("zavorrina")) return Colors.femaleIcon;
-  if (userType === "coppia") return Colors.coupleIcon;
   return Colors.textSecondary;
 }
 
