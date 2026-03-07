@@ -61,29 +61,17 @@ const ITALY_REGION: Region = {
 };
 
 function getUserMarkerColor(userType: string, sex?: string | null): string {
-  switch (userType) {
-    case "biker":
-      return Colors.maleIcon;
-    case "zavorrina":
-      return Colors.femaleIcon;
-    case "coppia":
-      return Colors.accent;
-    default:
-      return Colors.accent;
-  }
+  if (userType?.startsWith("biker")) return Colors.maleIcon;
+  if (userType?.startsWith("zavorrina")) return Colors.femaleIcon;
+  if (userType === "coppia") return Colors.accent;
+  return Colors.accent;
 }
 
 function getUserMarkerIcon(userType: string): keyof typeof MaterialCommunityIcons.glyphMap {
-  switch (userType) {
-    case "biker":
-      return "motorbike";
-    case "zavorrina":
-      return "seat-passenger";
-    case "coppia":
-      return "account-group";
-    default:
-      return "account";
-  }
+  if (userType?.startsWith("biker")) return "motorbike";
+  if (userType?.startsWith("zavorrina")) return "seat-passenger";
+  if (userType === "coppia") return "account-group";
+  return "account";
 }
 
 export default function InteractiveMap({
@@ -188,9 +176,13 @@ export default function InteractiveMap({
             key={`user-${u.id}`}
             coordinate={{ latitude: u.latitude, longitude: u.longitude }}
             title={u.nickname}
-            pinColor={getUserMarkerColor(u.userType, u.sex)}
             onPress={() => onUserPress?.(u)}
-          />
+            anchor={{ x: 0.5, y: 0.5 }}
+          >
+            <View style={[markerStyles.dot, { backgroundColor: getUserMarkerColor(u.userType, u.sex) }]}>
+              <MaterialCommunityIcons name={getUserMarkerIcon(u.userType)} size={14} color="#fff" />
+            </View>
+          </Marker>
         ))}
 
         {workshops.map((ws) => (
@@ -388,5 +380,17 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 12,
     fontWeight: "600" as const,
+  },
+});
+
+const markerStyles = StyleSheet.create({
+  dot: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
   },
 });
