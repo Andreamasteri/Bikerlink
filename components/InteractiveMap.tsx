@@ -62,10 +62,10 @@ const ITALY_REGION: Region = {
 
 function getUserMarkerColor(userType: string, sex?: string | null): string {
   if (userType === "coppia") return Colors.accent;
-  if (userType?.endsWith("_f")) return Colors.femaleIcon;
-  if (userType?.endsWith("_m")) return Colors.maleIcon;
-  if (userType?.startsWith("biker")) return Colors.maleIcon;
+  if (sex === "F") return Colors.femaleIcon;
+  if (sex === "M") return Colors.maleIcon;
   if (userType?.startsWith("zavorrina")) return Colors.femaleIcon;
+  if (userType?.startsWith("biker")) return Colors.maleIcon;
   return Colors.accent;
 }
 

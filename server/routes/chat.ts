@@ -378,7 +378,7 @@ router.get("/conversations", async (req: Request, res: Response) => {
           participants.map(async (p) => {
             const user = await storage.getUser(p.userId);
             return user
-              ? { id: user.id, nickname: user.nickname, avatarUrl: user.avatarUrl, userType: user.userType }
+              ? { id: user.id, nickname: user.nickname, avatarUrl: user.avatarUrl, userType: user.userType, sex: user.sex }
               : null;
           })
         );
@@ -526,7 +526,7 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
         return {
           ...msg,
           sender: sender
-            ? { id: sender.id, nickname: sender.nickname, avatarUrl: sender.avatarUrl, userType: sender.userType }
+            ? { id: sender.id, nickname: sender.nickname, avatarUrl: sender.avatarUrl, userType: sender.userType, sex: sender.sex }
             : null,
         };
       })

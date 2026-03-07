@@ -57,12 +57,12 @@ function formatMessageTime(dateStr: string): string {
   return date.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
 }
 
-function getUserTypeColor(userType: string): string {
+function getUserTypeColor(userType: string, sex?: string | null): string {
   if (userType === "coppia") return Colors.coupleIcon;
-  if (userType.endsWith("_f")) return Colors.femaleIcon;
-  if (userType.endsWith("_m")) return Colors.maleIcon;
-  if (userType.startsWith("biker")) return Colors.maleIcon;
+  if (sex === "F") return Colors.femaleIcon;
+  if (sex === "M") return Colors.maleIcon;
   if (userType.startsWith("zavorrina")) return Colors.femaleIcon;
+  if (userType.startsWith("biker")) return Colors.maleIcon;
   return Colors.textSecondary;
 }
 
@@ -70,7 +70,7 @@ function MessageBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolea
   return (
     <View style={[styles.bubbleContainer, isOwn ? styles.bubbleRight : styles.bubbleLeft]}>
       {!isOwn && message.sender && (
-        <Text style={[styles.senderName, { color: getUserTypeColor(message.sender.userType) }]}>
+        <Text style={[styles.senderName, { color: getUserTypeColor(message.sender.userType, message.sender.sex) }]}>
           {message.sender.nickname}
         </Text>
       )}

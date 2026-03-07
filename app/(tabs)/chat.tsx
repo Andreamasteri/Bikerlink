@@ -78,12 +78,12 @@ function formatTime(dateStr: string): string {
   return date.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
 }
 
-function getUserTypeColor(userType: string): string {
+function getUserTypeColor(userType: string, sex?: string | null): string {
   if (userType === "coppia") return Colors.coupleIcon;
-  if (userType.endsWith("_f")) return Colors.femaleIcon;
-  if (userType.endsWith("_m")) return Colors.maleIcon;
-  if (userType.startsWith("biker")) return Colors.maleIcon;
+  if (sex === "F") return Colors.femaleIcon;
+  if (sex === "M") return Colors.maleIcon;
   if (userType.startsWith("zavorrina")) return Colors.femaleIcon;
+  if (userType.startsWith("biker")) return Colors.maleIcon;
   return Colors.textSecondary;
 }
 
@@ -99,7 +99,7 @@ function ConversationRow({ item, userId, onPress }: { item: ConversationItem; us
   const time = item.lastMessage ? formatTime(item.lastMessage.createdAt) : "";
   const other = item.participants.find((p) => p.id !== userId);
   const icon = getConversationIcon(item);
-  const avatarBg = item.conversationType === "private" ? getUserTypeColor(other?.userType || "biker") : icon.bg;
+  const avatarBg = item.conversationType === "private" ? getUserTypeColor(other?.userType || "biker", other?.sex) : icon.bg;
 
   return (
     <TouchableOpacity style={styles.conversationRow} onPress={onPress} activeOpacity={0.7}>
@@ -299,7 +299,7 @@ export default function ChatScreen() {
                   onPress={() => handleContactUser(item.id)}
                   disabled={createConversationMutation.isPending}
                 >
-                  <View style={[styles.userAvatar, { backgroundColor: getUserTypeColor(item.userType) }]}>
+                  <View style={[styles.userAvatar, { backgroundColor: getUserTypeColor(item.userType, item.sex) }]}>
                     <Ionicons name="person" size={18} color="#fff" />
                   </View>
                   <Text style={styles.userNickname}>{item.nickname}</Text>
