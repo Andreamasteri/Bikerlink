@@ -120,8 +120,7 @@ export default function AdminAds() {
     mutationFn: async (formData: FormData) => {
       const baseUrl = getApiUrl();
       const url = new URL("/api/admin/advertisements", baseUrl);
-      const { fetch: expoFetch } = await import("expo/fetch");
-      const res = await expoFetch(url.toString(), {
+      const res = await globalThis.fetch(url.toString(), {
         method: "POST",
         body: formData,
         credentials: "include",
