@@ -76,16 +76,22 @@ router.post("/:id/collect", async (req: Request<{ id: string }>, res: Response) 
     });
 
     const profile = await storage.getUserProfile(req.session.userId);
+    const newCount = (profile?.easterEggsCollected || 0) + 1;
     if (profile) {
       await storage.updateUserProfile(req.session.userId, {
-        easterEggsCollected: (profile.easterEggsCollected || 0) + 1,
+        easterEggsCollected: newCount,
       });
     }
 
+    const prizeUnlocked = newCount === 10;
     return res.status(201).json({
       collected,
-      message: `Complimenti! Hai raccolto "${egg.name}" e guadagnato ${egg.points} punti!`,
+      message: prizeUnlocked
+        ? `Hai sbloccato un premio! Hai raccolto 10 Easter Egg!`
+        : `Complimenti! Hai raccolto un premio! Continua così!`,
       points: egg.points,
+      prizeUnlocked,
+      totalCollected: newCount,
     });
   } catch (error) {
     console.error("Collect easter egg error:", error);

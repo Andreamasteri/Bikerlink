@@ -9,10 +9,11 @@ import {
   RefreshControl,
   Modal,
   TextInput,
-  ScrollView,
   Alert,
   Platform,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
@@ -159,9 +160,9 @@ function WishlistScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView
+      <KeyboardAwareScrollViewCompat
         contentContainerStyle={[styles.list, { paddingBottom: Platform.OS === "web" ? 100 : insets.bottom + 80 }]}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} tintColor={Colors.accent} />}
+        bottomOffset={20}
       >
         <View style={styles.card}>
           <View style={styles.cardHeader}>
@@ -244,14 +245,15 @@ function WishlistScreen() {
             ))
           )}
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollViewCompat>
 
       <Modal visible={showMotoForm} transparent animationType="slide" onRequestClose={() => setShowMotoForm(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setShowMotoForm(false)}>
-          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{editingMotoId ? "Modifica Moto" : "Aggiungi Moto Desiderata"}</Text>
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+          <Pressable style={styles.modalOverlay} onPress={() => setShowMotoForm(false)}>
+            <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+              <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }} bottomOffset={20}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>{editingMotoId ? "Modifica Moto" : "Aggiungi Moto Desiderata"}</Text>
                 <Pressable onPress={() => setShowMotoForm(false)}>
                   <Ionicons name="close" size={24} color={Colors.textSecondary} />
                 </Pressable>
@@ -303,9 +305,10 @@ function WishlistScreen() {
                   <Text style={styles.saveBtnText}>{editingMotoId ? "Salva Modifiche" : "Aggiungi alla Wishlist"}</Text>
                 )}
               </Pressable>
-            </ScrollView>
+              </KeyboardAwareScrollViewCompat>
+            </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -529,9 +532,10 @@ function GarageContent() {
       </Pressable>
 
       <Modal visible={showForm} transparent animationType="slide" onRequestClose={() => { setShowForm(false); resetForm(); }}>
-        <Pressable style={styles.modalOverlay} onPress={() => { setShowForm(false); resetForm(); }}>
-          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+          <Pressable style={styles.modalOverlay} onPress={() => { setShowForm(false); resetForm(); }}>
+            <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+              <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }} bottomOffset={20}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>{editingId ? "Modifica Moto" : "Aggiungi Moto"}</Text>
                 <Pressable onPress={() => { setShowForm(false); resetForm(); }}>
@@ -602,9 +606,10 @@ function GarageContent() {
                   <Text style={styles.saveBtnText}>{editingId ? "Salva Modifiche" : "Aggiungi al Garage"}</Text>
                 )}
               </Pressable>
-            </ScrollView>
+              </KeyboardAwareScrollViewCompat>
+            </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

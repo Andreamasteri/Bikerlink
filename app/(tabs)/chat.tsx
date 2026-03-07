@@ -11,6 +11,7 @@ import {
   TextInput,
   Alert,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -268,8 +269,9 @@ export default function ChatScreen() {
       )}
 
       <Modal visible={showNewChat} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { paddingTop: Platform.OS === "web" ? 24 : insets.top + 12 }]}>
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { paddingTop: Platform.OS === "web" ? 24 : insets.top + 12 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Nuova conversazione</Text>
               <TouchableOpacity onPress={() => { setShowNewChat(false); setSearchQuery(""); setChatType("contact"); }}>
@@ -337,8 +339,9 @@ export default function ChatScreen() {
                 ) : null
               }
             />
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

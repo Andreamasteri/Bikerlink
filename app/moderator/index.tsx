@@ -11,6 +11,7 @@ import {
   Alert,
   Platform,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -141,36 +142,39 @@ export default function ModeratorPhotosScreen() {
   );
 
   return (
-    <View style={[styles.container, { paddingTop: Math.max(insets.top, webTopInset) }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Moderazione Foto</Text>
-        <TouchableOpacity onPress={() => router.push("/moderator/logs")}>
-          <MaterialCommunityIcons name="clipboard-text-outline" size={24} color={Colors.accent} />
-        </TouchableOpacity>
-      </View>
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+      <View style={[styles.container, { paddingTop: Math.max(insets.top, webTopInset) }]}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Moderazione Foto</Text>
+          <TouchableOpacity onPress={() => router.push("/moderator/logs")}>
+            <MaterialCommunityIcons name="clipboard-text-outline" size={24} color={Colors.accent} />
+          </TouchableOpacity>
+        </View>
 
-      {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={Colors.accent} />
-        </View>
-      ) : !photos || photos.length === 0 ? (
-        <View style={styles.center}>
-          <Ionicons name="checkmark-done-circle" size={64} color={Colors.success} />
-          <Text style={styles.emptyText}>Nessuna foto da moderare</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={photos}
-          renderItem={renderItem}
-          keyExtractor={(item) => `${item.type}-${item.id}`}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
-    </View>
+        {isLoading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={Colors.accent} />
+          </View>
+        ) : !photos || photos.length === 0 ? (
+          <View style={styles.center}>
+            <Ionicons name="checkmark-done-circle" size={64} color={Colors.success} />
+            <Text style={styles.emptyText}>Nessuna foto da moderare</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={photos}
+            renderItem={renderItem}
+            keyExtractor={(item) => `${item.type}-${item.id}`}
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          />
+        )}
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 

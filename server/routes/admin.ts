@@ -198,6 +198,41 @@ router.post("/easter-eggs", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/easter-eggs/batch", async (req: Request, res: Response) => {
+  try {
+    const count = parseInt(req.body.count) || 10;
+    const radius = parseInt(req.body.radius) || 30;
+    const points = parseInt(req.body.points) || 10;
+    const existing = await storage.getEasterEggs();
+    const startNum = existing.length + 1;
+    const created = [];
+    for (let i = 0; i < count; i++) {
+      const lat = 36 + Math.random() * 11;
+      const lng = 6.5 + Math.random() * 12;
+      const egg = await storage.createEasterEgg({
+        name: `Easter Egg #${startNum + i}`,
+        latitude: parseFloat(lat.toFixed(6)),
+        longitude: parseFloat(lng.toFixed(6)),
+        radius,
+        points,
+        isActive: true,
+      });
+      created.push(egg);
+    }
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "batch_create_easter_eggs",
+      targetType: "easter_egg",
+      targetId: "",
+      details: `${count} Easter Egg creati in batch`,
+    });
+    return res.status(201).json(created);
+  } catch (error) {
+    console.error("Admin batch create easter eggs error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/easter-eggs/:id", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;

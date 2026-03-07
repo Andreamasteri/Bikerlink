@@ -8,11 +8,12 @@ import {
   Alert,
   TextInput,
   Modal,
-  ScrollView,
   Image,
   ActivityIndicator,
   Platform,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialIcons, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -306,15 +307,16 @@ export default function AdminAds() {
       </TouchableOpacity>
 
       <Modal visible={showCreateModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Nuova Campagna — {currentTab.label}</Text>
-              <TouchableOpacity onPress={() => { setShowCreateModal(false); resetForm(); }}>
-                <MaterialIcons name="close" size={24} color={Colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView keyboardShouldPersistTaps="handled">
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Nuova Campagna — {currentTab.label}</Text>
+                <TouchableOpacity onPress={() => { setShowCreateModal(false); resetForm(); }}>
+                  <MaterialIcons name="close" size={24} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <KeyboardAwareScrollViewCompat bottomOffset={20} keyboardShouldPersistTaps="handled">
               <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
                 {formImageUri ? (
                   <Image source={{ uri: formImageUri }} style={styles.imagePreview} resizeMode="cover" />
@@ -363,14 +365,16 @@ export default function AdminAds() {
                   <Text style={styles.submitBtnText}>Crea Campagna</Text>
                 )}
               </TouchableOpacity>
-            </ScrollView>
+              </KeyboardAwareScrollViewCompat>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={showSettingsModal} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.settingsContent, { paddingBottom: insets.bottom + 20 }]}>
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.settingsContent, { paddingBottom: insets.bottom + 20 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Rotazione — {currentTab.label}</Text>
               <TouchableOpacity onPress={() => setShowSettingsModal(false)}>
@@ -417,8 +421,9 @@ export default function AdminAds() {
                 <Text style={styles.submitBtnText}>Salva Impostazioni</Text>
               )}
             </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

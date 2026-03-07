@@ -5,12 +5,12 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  ScrollView,
   Platform,
   Alert,
   ActivityIndicator,
   Switch,
 } from "react-native";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useRouter, Stack } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
@@ -334,10 +334,11 @@ export default function CreateProposalScreen() {
           ),
         }}
       />
-      <ScrollView
+      <KeyboardAwareScrollViewCompat
         style={[styles.container, { paddingTop: webTopInset }]}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        bottomOffset={20}
       >
         <Text style={styles.sectionTitle}>
           {isZavorrina ? "Cosa vorresti?" : "Cosa cerchi?"}
@@ -680,7 +681,7 @@ export default function CreateProposalScreen() {
         )}
 
         <View style={{ height: Platform.OS === "web" ? 34 : 40 }} />
-      </ScrollView>
+      </KeyboardAwareScrollViewCompat>
     </>
   );
 }

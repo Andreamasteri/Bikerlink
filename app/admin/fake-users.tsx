@@ -12,6 +12,8 @@ import {
   ActivityIndicator,
   Switch,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -241,7 +243,7 @@ export default function FakeUsersAdmin() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 80 }]}>
+      <KeyboardAwareScrollViewCompat contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 80 }]} bottomOffset={20}>
         <Text style={styles.title}>Utenti Fake</Text>
 
         <View style={styles.summaryRow}>
@@ -343,7 +345,7 @@ export default function FakeUsersAdmin() {
         {!isLoading && filteredUsers.length === 0 && (
           <Text style={styles.emptyText}>Nessun utente fake trovato</Text>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollViewCompat>
 
       <TouchableOpacity
         style={[styles.fab, { bottom: insets.bottom + 20 }]}
@@ -413,16 +415,17 @@ export default function FakeUsersAdmin() {
       </Modal>
 
       <Modal visible={createModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 10 }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Nuovo Utente Fake</Text>
-              <TouchableOpacity onPress={() => setCreateModalVisible(false)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
-              </TouchableOpacity>
-            </View>
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 10 }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Nuovo Utente Fake</Text>
+                <TouchableOpacity onPress={() => setCreateModalVisible(false)}>
+                  <Ionicons name="close" size={24} color={Colors.text} />
+                </TouchableOpacity>
+              </View>
 
-            <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
+              <KeyboardAwareScrollViewCompat style={styles.modalScroll} bottomOffset={20} keyboardShouldPersistTaps="handled">
               <Text style={styles.fieldLabel}>Tipo utente</Text>
               <View style={styles.filterRow}>
                 {["biker", "zavorrina", "coppia"].map((t) => (
@@ -571,9 +574,10 @@ export default function FakeUsersAdmin() {
                   <Text style={styles.createBtnText}>Crea Utente Fake</Text>
                 )}
               </TouchableOpacity>
-            </ScrollView>
+              </KeyboardAwareScrollViewCompat>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

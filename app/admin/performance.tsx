@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, FlatList, TextInput, ActivityIndicator } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -75,35 +76,38 @@ export default function AdminPerformance() {
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.searchBar}>
-        <Ionicons name="search" size={18} color={Colors.textSecondary} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Cerca per nickname..."
-          placeholderTextColor={Colors.textSecondary}
-          value={search}
-          onChangeText={setSearch}
-        />
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+      <View style={styles.container}>
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={18} color={Colors.textSecondary} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Cerca per nickname..."
+            placeholderTextColor={Colors.textSecondary}
+            value={search}
+            onChangeText={setSearch}
+          />
+        </View>
+        <Text style={styles.count}>{filtered.length} record trovati</Text>
+        {isLoading ? (
+          <ActivityIndicator size="large" color={Colors.accent} style={{ marginTop: 40 }} />
+        ) : (
+          <FlatList
+            data={filtered}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 20, paddingHorizontal: 16 }}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Ionicons name="analytics" size={40} color={Colors.textSecondary} />
+                <Text style={styles.emptyText}>Nessun record di performance</Text>
+              </View>
+            }
+          />
+        )}
       </View>
-      <Text style={styles.count}>{filtered.length} record trovati</Text>
-      {isLoading ? (
-        <ActivityIndicator size="large" color={Colors.accent} style={{ marginTop: 40 }} />
-      ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 20, paddingHorizontal: 16 }}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="analytics" size={40} color={Colors.textSecondary} />
-              <Text style={styles.emptyText}>Nessun record di performance</Text>
-            </View>
-          }
-        />
-      )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

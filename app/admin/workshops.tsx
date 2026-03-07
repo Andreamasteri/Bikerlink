@@ -1,5 +1,7 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, TextInput, Modal, ScrollView } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, TextInput, Modal } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -125,29 +127,31 @@ export default function AdminWorkshops() {
       </TouchableOpacity>
 
       <Modal visible={showModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Nuova Officina</Text>
-              <TouchableOpacity onPress={() => setShowModal(false)}>
-                <MaterialIcons name="close" size={24} color={Colors.textSecondary} />
-              </TouchableOpacity>
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Nuova Officina</Text>
+                <TouchableOpacity onPress={() => setShowModal(false)}>
+                  <MaterialIcons name="close" size={24} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <KeyboardAwareScrollViewCompat bottomOffset={20} keyboardShouldPersistTaps="handled">
+                <TextInput style={styles.input} placeholder="Nome *" placeholderTextColor={Colors.textSecondary} value={formName} onChangeText={setFormName} />
+                <TextInput style={styles.input} placeholder="Indirizzo" placeholderTextColor={Colors.textSecondary} value={formAddress} onChangeText={setFormAddress} />
+                <TextInput style={styles.input} placeholder="Telefono" placeholderTextColor={Colors.textSecondary} value={formPhone} onChangeText={setFormPhone} keyboardType="phone-pad" />
+                <TextInput style={styles.input} placeholder="Email" placeholderTextColor={Colors.textSecondary} value={formEmail} onChangeText={setFormEmail} keyboardType="email-address" />
+                <TouchableOpacity
+                  style={[styles.submitBtn, !formName && styles.submitBtnDisabled]}
+                  disabled={!formName || createMutation.isPending}
+                  onPress={() => createMutation.mutate({ name: formName, address: formAddress || undefined, phone: formPhone || undefined, email: formEmail || undefined, isApproved: true, isSynecoPartner: false })}
+                >
+                  <Text style={styles.submitBtnText}>{createMutation.isPending ? "Salvataggio..." : "Crea Officina"}</Text>
+                </TouchableOpacity>
+              </KeyboardAwareScrollViewCompat>
             </View>
-            <ScrollView>
-              <TextInput style={styles.input} placeholder="Nome *" placeholderTextColor={Colors.textSecondary} value={formName} onChangeText={setFormName} />
-              <TextInput style={styles.input} placeholder="Indirizzo" placeholderTextColor={Colors.textSecondary} value={formAddress} onChangeText={setFormAddress} />
-              <TextInput style={styles.input} placeholder="Telefono" placeholderTextColor={Colors.textSecondary} value={formPhone} onChangeText={setFormPhone} keyboardType="phone-pad" />
-              <TextInput style={styles.input} placeholder="Email" placeholderTextColor={Colors.textSecondary} value={formEmail} onChangeText={setFormEmail} keyboardType="email-address" />
-              <TouchableOpacity
-                style={[styles.submitBtn, !formName && styles.submitBtnDisabled]}
-                disabled={!formName || createMutation.isPending}
-                onPress={() => createMutation.mutate({ name: formName, address: formAddress || undefined, phone: formPhone || undefined, email: formEmail || undefined, isApproved: true, isSynecoPartner: false })}
-              >
-                <Text style={styles.submitBtnText}>{createMutation.isPending ? "Salvataggio..." : "Crea Officina"}</Text>
-              </TouchableOpacity>
-            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

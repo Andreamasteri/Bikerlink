@@ -13,6 +13,7 @@ import {
   TextInput,
   RefreshControl,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -186,8 +187,9 @@ export default function ContestScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.policyBar}>
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+      <View style={styles.container}>
+        <View style={styles.policyBar}>
         <Ionicons name="information-circle" size={16} color={Colors.warning} />
         <Text style={styles.policyText} numberOfLines={2}>
           Carica le tue migliori foto in moto!
@@ -267,13 +269,14 @@ export default function ContestScreen() {
         }
       />
 
-      <Pressable
-        style={[styles.fab, { bottom: Platform.OS === "web" ? 50 : 16 }]}
-        onPress={handlePickImage}
-      >
-        <Ionicons name="camera" size={28} color={Colors.background} />
-      </Pressable>
-    </View>
+        <Pressable
+          style={[styles.fab, { bottom: Platform.OS === "web" ? 50 : 16 }]}
+          onPress={handlePickImage}
+        >
+          <Ionicons name="camera" size={28} color={Colors.background} />
+        </Pressable>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 

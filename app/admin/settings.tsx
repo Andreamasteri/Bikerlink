@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, Switch } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Switch } from "react-native";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -302,9 +303,10 @@ export default function AdminSettings() {
   }
 
   return (
-    <ScrollView
+    <KeyboardAwareScrollViewCompat
       style={styles.container}
       contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}
+      bottomOffset={20}
     >
       <View style={styles.synecoCard}>
         <View style={styles.synecoHeader}>
@@ -490,7 +492,7 @@ export default function AdminSettings() {
           </TouchableOpacity>
         </View>
       </View>
-    </ScrollView>
+    </KeyboardAwareScrollViewCompat>
   );
 }
 

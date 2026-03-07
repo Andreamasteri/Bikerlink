@@ -1,8 +1,10 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, TextInput, Modal, ScrollView, Platform } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, TextInput, Modal, Platform, ActivityIndicator } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
@@ -17,16 +19,31 @@ interface EasterEgg {
   isActive: boolean;
 }
 
+const ITALY_REGION = {
+  latitude: 42.5,
+  longitude: 12.5,
+  latitudeDelta: 12,
+  longitudeDelta: 12,
+};
+
+function randomItalyCoords() {
+  return {
+    lat: parseFloat((36 + Math.random() * 11).toFixed(6)),
+    lng: parseFloat((6.5 + Math.random() * 12).toFixed(6)),
+  };
+}
+
 export default function AdminEasterEggs() {
   const insets = useSafeAreaInsets();
   const [showModal, setShowModal] = useState(false);
+  const [showMapPicker, setShowMapPicker] = useState(false);
   const [editingEgg, setEditingEgg] = useState<EasterEgg | null>(null);
   const [formName, setFormName] = useState("");
-  const [formDescription, setFormDescription] = useState("");
   const [formLat, setFormLat] = useState("");
   const [formLng, setFormLng] = useState("");
-  const [formRadius, setFormRadius] = useState("100");
+  const [formRadius, setFormRadius] = useState("30");
   const [formPoints, setFormPoints] = useState("10");
+  const [mapPickerCoord, setMapPickerCoord] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const { data: eggs = [], isLoading } = useQuery<EasterEgg[]>({
     queryKey: ["/api/admin/easter-eggs"],
@@ -73,24 +90,33 @@ export default function AdminEasterEggs() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/easter-eggs"] }),
   });
 
+  const batchMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/easter-eggs/batch", { count: 10, radius: 30, points: 10 });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/easter-eggs"] });
+      Alert.alert("Fatto!", "10 Easter Egg creati con posizioni casuali in Italia");
+    },
+  });
+
   function closeModal() {
     setShowModal(false);
     setEditingEgg(null);
     setFormName("");
-    setFormDescription("");
     setFormLat("");
     setFormLng("");
-    setFormRadius("100");
+    setFormRadius("30");
     setFormPoints("10");
   }
 
   function openCreate() {
     setEditingEgg(null);
     setFormName("");
-    setFormDescription("");
     setFormLat("");
     setFormLng("");
-    setFormRadius("100");
+    setFormRadius("30");
     setFormPoints("10");
     setShowModal(true);
   }
@@ -98,7 +124,6 @@ export default function AdminEasterEggs() {
   function openEdit(egg: EasterEgg) {
     setEditingEgg(egg);
     setFormName(egg.name);
-    setFormDescription(egg.description || "");
     setFormLat(String(egg.latitude));
     setFormLng(String(egg.longitude));
     setFormRadius(String(egg.radius));
@@ -109,10 +134,9 @@ export default function AdminEasterEggs() {
   function handleSubmit() {
     const payload = {
       name: formName,
-      description: formDescription || undefined,
       latitude: parseFloat(formLat),
       longitude: parseFloat(formLng),
-      radius: parseInt(formRadius) || 100,
+      radius: parseInt(formRadius) || 30,
       points: parseInt(formPoints) || 10,
     };
 
@@ -123,10 +147,40 @@ export default function AdminEasterEggs() {
     }
   }
 
+  function handleRandomPosition() {
+    const { lat, lng } = randomItalyCoords();
+    setFormLat(String(lat));
+    setFormLng(String(lng));
+  }
+
+  function handleOpenMapPicker() {
+    setMapPickerCoord(
+      formLat && formLng
+        ? { latitude: parseFloat(formLat), longitude: parseFloat(formLng) }
+        : null
+    );
+    setShowMapPicker(true);
+  }
+
+  function handleMapPickerConfirm() {
+    if (mapPickerCoord) {
+      setFormLat(mapPickerCoord.latitude.toFixed(6));
+      setFormLng(mapPickerCoord.longitude.toFixed(6));
+    }
+    setShowMapPicker(false);
+  }
+
   function handleDelete(egg: EasterEgg) {
     Alert.alert("Elimina Easter Egg", `Eliminare "${egg.name}"?`, [
       { text: "Annulla", style: "cancel" },
       { text: "Elimina", style: "destructive", onPress: () => deleteMutation.mutate(egg.id) },
+    ]);
+  }
+
+  function handleBatch() {
+    Alert.alert("Aggiungi 10 Easter Egg", "Verranno creati 10 Easter Egg in posizioni casuali in Italia (raggio 30m, 10 punti ciascuno)", [
+      { text: "Annulla", style: "cancel" },
+      { text: "Crea 10", onPress: () => batchMutation.mutate() },
     ]);
   }
 
@@ -144,7 +198,6 @@ export default function AdminEasterEggs() {
             <Ionicons name="gift" size={18} color="#FFD700" />
             <Text style={styles.name}>{item.name}</Text>
           </View>
-          {item.description && <Text style={styles.detail}>{item.description}</Text>}
           <Text style={styles.coords}>
             {item.latitude.toFixed(4)}, {item.longitude.toFixed(4)} | r:{item.radius}m | {item.points} pts
           </Text>
@@ -206,22 +259,32 @@ export default function AdminEasterEggs() {
         }
       />
 
-      <TouchableOpacity style={styles.fab} onPress={openCreate}>
-        <Ionicons name="add" size={28} color={Colors.background} />
-      </TouchableOpacity>
+      <View style={styles.fabRow}>
+        <TouchableOpacity style={[styles.fab, styles.fabSecondary]} onPress={handleBatch} disabled={batchMutation.isPending}>
+          {batchMutation.isPending ? (
+            <ActivityIndicator color={Colors.accent} />
+          ) : (
+            <Text style={styles.fabSecondaryText}>+10</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.fab} onPress={openCreate}>
+          <Ionicons name="add" size={28} color={Colors.background} />
+        </TouchableOpacity>
+      </View>
 
       <Modal visible={showModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editingEgg ? "Modifica Easter Egg" : "Nuovo Easter Egg"}
-              </Text>
-              <TouchableOpacity onPress={closeModal}>
-                <Ionicons name="close" size={24} color={Colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {editingEgg ? "Modifica Easter Egg" : "Nuovo Easter Egg"}
+                </Text>
+                <TouchableOpacity onPress={closeModal}>
+                  <Ionicons name="close" size={24} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
               <TextInput
                 style={styles.input}
                 placeholder="Nome *"
@@ -229,32 +292,28 @@ export default function AdminEasterEggs() {
                 value={formName}
                 onChangeText={setFormName}
               />
-              <TextInput
-                style={styles.input}
-                placeholder="Descrizione"
-                placeholderTextColor={Colors.textSecondary}
-                value={formDescription}
-                onChangeText={setFormDescription}
-                multiline
-              />
+
+              <Text style={styles.sectionLabel}>Posizione</Text>
               <View style={styles.row}>
-                <TextInput
-                  style={[styles.input, styles.halfInput]}
-                  placeholder="Latitudine *"
-                  placeholderTextColor={Colors.textSecondary}
-                  value={formLat}
-                  onChangeText={setFormLat}
-                  keyboardType="decimal-pad"
-                />
-                <TextInput
-                  style={[styles.input, styles.halfInput]}
-                  placeholder="Longitudine *"
-                  placeholderTextColor={Colors.textSecondary}
-                  value={formLng}
-                  onChangeText={setFormLng}
-                  keyboardType="decimal-pad"
-                />
+                <TouchableOpacity style={[styles.posBtn, { flex: 1 }]} onPress={handleOpenMapPicker}>
+                  <Ionicons name="map" size={18} color={Colors.accent} />
+                  <Text style={styles.posBtnText}>Scegli sulla mappa</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.posBtn, { flex: 1 }]} onPress={handleRandomPosition}>
+                  <Ionicons name="shuffle" size={18} color={Colors.accent} />
+                  <Text style={styles.posBtnText}>Casuale</Text>
+                </TouchableOpacity>
               </View>
+              {formLat && formLng ? (
+                <Text style={styles.coordsPreview}>
+                  📍 {parseFloat(formLat).toFixed(4)}, {parseFloat(formLng).toFixed(4)}
+                </Text>
+              ) : (
+                <Text style={[styles.coordsPreview, { color: Colors.accentRed }]}>
+                  Nessuna posizione selezionata
+                </Text>
+              )}
+
               <View style={styles.row}>
                 <TextInput
                   style={[styles.input, styles.halfInput]}
@@ -282,8 +341,39 @@ export default function AdminEasterEggs() {
                   {isPending ? "Salvataggio..." : editingEgg ? "Salva Modifiche" : "Crea Easter Egg"}
                 </Text>
               </TouchableOpacity>
-            </ScrollView>
+            </View>
           </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal visible={showMapPicker} animationType="slide">
+        <View style={{ flex: 1, backgroundColor: Colors.background }}>
+          <View style={[styles.mapHeader, { paddingTop: insets.top + 8 }]}>
+            <TouchableOpacity onPress={() => setShowMapPicker(false)}>
+              <Ionicons name="close" size={24} color={Colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.mapHeaderTitle}>Tocca per posizionare</Text>
+            <TouchableOpacity onPress={handleMapPickerConfirm} disabled={!mapPickerCoord}>
+              <Text style={[styles.mapConfirmText, !mapPickerCoord && { opacity: 0.4 }]}>Conferma</Text>
+            </TouchableOpacity>
+          </View>
+          <MapView
+            style={{ flex: 1 }}
+            initialRegion={ITALY_REGION}
+            provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
+            onPress={(e) => setMapPickerCoord(e.nativeEvent.coordinate)}
+          >
+            {mapPickerCoord && (
+              <Marker coordinate={mapPickerCoord} pinColor="#FFD700" />
+            )}
+          </MapView>
+          {mapPickerCoord && (
+            <View style={styles.mapCoordsBar}>
+              <Text style={styles.mapCoordsText}>
+                {mapPickerCoord.latitude.toFixed(6)}, {mapPickerCoord.longitude.toFixed(6)}
+              </Text>
+            </View>
+          )}
         </View>
       </Modal>
     </View>
@@ -323,17 +413,21 @@ const styles = StyleSheet.create({
   info: { flex: 1 },
   nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   name: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.text },
-  detail: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, marginTop: 4 },
   coords: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 4 },
   statsRow: { flexDirection: "row", gap: 8, marginTop: 6, flexWrap: "wrap" },
   badge: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   badgeText: { fontFamily: "Inter_500Medium", fontSize: 11 },
   actions: { flexDirection: "column", gap: 14, marginLeft: 8 },
   emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", marginTop: 40 },
-  fab: {
+  fabRow: {
     position: "absolute",
     bottom: 24,
     right: 24,
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "center",
+  },
+  fab: {
     width: 56,
     height: 56,
     borderRadius: 28,
@@ -346,6 +440,16 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
+  fabSecondary: {
+    backgroundColor: Colors.surface,
+    borderWidth: 2,
+    borderColor: Colors.accent,
+  },
+  fabSecondaryText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    color: Colors.accent,
+  },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
   modalContent: {
     backgroundColor: Colors.surface,
@@ -356,6 +460,7 @@ const styles = StyleSheet.create({
   },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
   modalTitle: { fontFamily: "Inter_600SemiBold", fontSize: 18, color: Colors.text },
+  sectionLabel: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.textSecondary, marginBottom: 8, marginTop: 4 },
   input: {
     backgroundColor: Colors.background,
     borderRadius: 12,
@@ -369,7 +474,44 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: "row", gap: 12 },
   halfInput: { flex: 1 },
+  posBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.accent + "44",
+  },
+  posBtnText: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.accent },
+  coordsPreview: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.text, textAlign: "center", marginBottom: 12 },
   submitBtn: { backgroundColor: Colors.accent, borderRadius: 12, padding: 16, alignItems: "center", marginTop: 8 },
   submitBtnDisabled: { opacity: 0.5 },
   submitBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.background },
+  mapHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  mapHeaderTitle: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.text },
+  mapConfirmText: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.accent },
+  mapCoordsBar: {
+    position: "absolute",
+    bottom: 40,
+    left: 16,
+    right: 16,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: "center",
+  },
+  mapCoordsText: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.text },
 });

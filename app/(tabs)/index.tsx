@@ -182,7 +182,8 @@ export default function MapScreen() {
       return res.json();
     },
     retry: false,
-    staleTime: 60000,
+    staleTime: 15000,
+    refetchInterval: 15000,
     enabled: isAuthenticated && !!location,
   });
 
@@ -280,13 +281,19 @@ export default function MapScreen() {
     return Math.max(...myActive.map((p: any) => p.searchRadius || 0));
   }, [myProposalsQuery.data, user?.id]);
 
+  const autoCollectingRef = React.useRef<Set<string>>(new Set());
+
   const collectEggMutation = useMutation({
     mutationFn: async (eggId: string) => {
       const res = await apiRequest("POST", `/api/easter-eggs/${eggId}/collect`);
       return res.json();
     },
     onSuccess: (data: any) => {
-      Alert.alert("Easter Egg!", data.message || "Raccolto!");
+      if (data.prizeUnlocked) {
+        Alert.alert("🏆 Premio Sbloccato!", data.message || "Hai raccolto 10 Easter Egg!");
+      } else {
+        Alert.alert("Easter Egg!", data.message || "Complimenti! Hai raccolto un premio! Continua così!");
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/easter-eggs/nearby"] });
       setSelectedEgg(null);
     },
@@ -294,6 +301,21 @@ export default function MapScreen() {
       Alert.alert("Errore", err.message || "Impossibile raccogliere");
     },
   });
+
+  useEffect(() => {
+    const nearbyEggs = easterEggsQuery.data || [];
+    const uncollected = nearbyEggs.filter((e: any) => !e.collected && !autoCollectingRef.current.has(e.id));
+    if (uncollected.length > 0) {
+      uncollected.forEach((egg: any) => {
+        autoCollectingRef.current.add(egg.id);
+        collectEggMutation.mutate(egg.id, {
+          onSettled: () => {
+            autoCollectingRef.current.delete(egg.id);
+          },
+        });
+      });
+    }
+  }, [easterEggsQuery.data]);
 
   const handleUserPress = useCallback(async (mapUser: any) => {
     setSelectedUser(mapUser);
