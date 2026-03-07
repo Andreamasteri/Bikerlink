@@ -178,14 +178,9 @@ export default function InteractiveMap({
             key={`user-${u.id}`}
             coordinate={{ latitude: u.latitude, longitude: u.longitude }}
             title={u.nickname}
+            pinColor={getUserMarkerColor(u.userType, u.sex)}
             onPress={() => onUserPress?.(u)}
-            anchor={{ x: 0.5, y: 0.5 }}
-            tracksViewChanges={false}
-          >
-            <View style={[markerStyles.dot, { backgroundColor: getUserMarkerColor(u.userType, u.sex) }]}>
-              <MaterialCommunityIcons name={getUserMarkerIcon(u.userType)} size={14} color="#fff" />
-            </View>
-          </Marker>
+          />
         ))}
 
         {workshops.map((ws) => (
@@ -383,17 +378,5 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 12,
     fontWeight: "600" as const,
-  },
-});
-
-const markerStyles = StyleSheet.create({
-  dot: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#fff",
   },
 });
