@@ -180,6 +180,7 @@ export default function InteractiveMap({
             title={u.nickname}
             onPress={() => onUserPress?.(u)}
             anchor={{ x: 0.5, y: 0.5 }}
+            tracksViewChanges={false}
           >
             <View style={[markerStyles.dot, { backgroundColor: getUserMarkerColor(u.userType, u.sex) }]}>
               <MaterialCommunityIcons name={getUserMarkerIcon(u.userType)} size={14} color="#fff" />
