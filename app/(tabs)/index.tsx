@@ -353,6 +353,34 @@ export default function MapScreen() {
     }
   }, []);
 
+  const handleSearch = useCallback(async (text: string) => {
+    setSearchText(text);
+    if (text.trim().length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+    setSearchLoading(true);
+    setShowSearchResults(true);
+    try {
+      const url = new URL("/api/users/search", baseUrl);
+      url.searchParams.set("q", text.trim());
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setSearchResults(data.filter((u: any) => u.id !== user?.id));
+      }
+    } catch { }
+    setSearchLoading(false);
+  }, [baseUrl, user?.id]);
+
+  const handleSearchResultPress = useCallback((u: any) => {
+    setShowSearchResults(false);
+    setSearchText("");
+    setSearchResults([]);
+    handleUserPress(u);
+  }, []);
+
   if (authLoading || locationLoading) {
     return (
       <View style={styles.loading}>
@@ -382,34 +410,6 @@ export default function MapScreen() {
     if (u.userType?.startsWith("zavorrina")) return "person";
     return "bicycle";
   };
-
-  const handleSearch = useCallback(async (text: string) => {
-    setSearchText(text);
-    if (text.trim().length < 2) {
-      setSearchResults([]);
-      setShowSearchResults(false);
-      return;
-    }
-    setSearchLoading(true);
-    setShowSearchResults(true);
-    try {
-      const url = new URL("/api/users/search", baseUrl);
-      url.searchParams.set("q", text.trim());
-      const res = await fetch(url.toString(), { credentials: "include" });
-      if (res.ok) {
-        const data = await res.json();
-        setSearchResults(data.filter((u: any) => u.id !== user?.id));
-      }
-    } catch { }
-    setSearchLoading(false);
-  }, [baseUrl, user?.id]);
-
-  const handleSearchResultPress = useCallback((u: any) => {
-    setShowSearchResults(false);
-    setSearchText("");
-    setSearchResults([]);
-    handleUserPress(u);
-  }, []);
 
   const nearbyUsersList = Array.isArray(nearbyUsers) ? nearbyUsers : [];
   const workshopsList = Array.isArray(workshops) ? workshops : [];
