@@ -504,6 +504,25 @@ router.post("/conversations", async (req: Request, res: Response) => {
   }
 });
 
+router.delete("/conversations/:id", async (req: Request, res: Response) => {
+  try {
+    const userId = requireAuth(req, res);
+    if (!userId) return;
+
+    const id = req.params.id as string;
+    const participants = await storage.getConversationParticipants(id);
+    if (!participants.find((p) => p.userId === userId)) {
+      return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+    }
+
+    await storage.deleteConversation(id);
+    return res.json({ message: "Conversazione eliminata" });
+  } catch (error) {
+    console.error("Delete conversation error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.get("/conversations/:id/messages", async (req: Request, res: Response) => {
   try {
     const userId = requireAuth(req, res);

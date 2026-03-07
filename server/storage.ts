@@ -155,6 +155,7 @@ export interface IStorage {
   getConversations(userId: string): Promise<Conversation[]>;
   getConversation(id: string): Promise<Conversation | undefined>;
   createConversation(conv: InsertConversation): Promise<Conversation>;
+  deleteConversation(id: string): Promise<void>;
   getConversationParticipants(conversationId: string): Promise<ConversationParticipant[]>;
   addConversationParticipant(participant: InsertConversationParticipant): Promise<ConversationParticipant>;
   getMessages(conversationId: string, limit?: number, offset?: number): Promise<Message[]>;
@@ -476,6 +477,12 @@ export class DatabaseStorage implements IStorage {
   async createConversation(data: InsertConversation): Promise<Conversation> {
     const [conv] = await db.insert(conversations).values(data).returning();
     return conv;
+  }
+
+  async deleteConversation(id: string): Promise<void> {
+    await db.delete(messages).where(eq(messages.conversationId, id));
+    await db.delete(conversationParticipants).where(eq(conversationParticipants.conversationId, id));
+    await db.delete(conversations).where(eq(conversations.id, id));
   }
 
   async getConversationParticipants(conversationId: string): Promise<ConversationParticipant[]> {

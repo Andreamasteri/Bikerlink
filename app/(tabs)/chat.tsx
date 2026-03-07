@@ -93,7 +93,7 @@ function getConversationIcon(conv: ConversationItem): { name: keyof typeof Ionic
   return { name: "person", bg: Colors.maleIcon };
 }
 
-function ConversationRow({ item, userId, onPress }: { item: ConversationItem; userId: string; onPress: () => void }) {
+function ConversationRow({ item, userId, onPress, onDelete }: { item: ConversationItem; userId: string; onPress: () => void; onDelete: (id: string) => void }) {
   const title = getConversationTitle(item, userId);
   const preview = getLastMessagePreview(item.lastMessage);
   const time = item.lastMessage ? formatTime(item.lastMessage.createdAt) : "";
@@ -101,8 +101,19 @@ function ConversationRow({ item, userId, onPress }: { item: ConversationItem; us
   const icon = getConversationIcon(item);
   const avatarBg = item.conversationType === "private" ? getUserTypeColor(other?.userType || "biker", other?.sex) : icon.bg;
 
+  const handleLongPress = () => {
+    Alert.alert(
+      "Elimina chat",
+      `Vuoi eliminare questa conversazione con ${title}? Tutti i messaggi verranno cancellati.`,
+      [
+        { text: "Annulla", style: "cancel" },
+        { text: "Elimina", style: "destructive", onPress: () => onDelete(item.id) },
+      ]
+    );
+  };
+
   return (
-    <TouchableOpacity style={styles.conversationRow} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity style={styles.conversationRow} onPress={onPress} onLongPress={handleLongPress} activeOpacity={0.7}>
       <View style={[styles.avatar, { backgroundColor: avatarBg }]}>
         <Ionicons
           name={icon.name}
@@ -198,15 +209,29 @@ export default function ChatScreen() {
     [router]
   );
 
+  const deleteConversationMutation = useMutation({
+    mutationFn: async (convId: string) => {
+      await apiRequest("DELETE", `/api/chat/conversations/${convId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+    },
+  });
+
+  const handleDeleteConversation = useCallback((convId: string) => {
+    deleteConversationMutation.mutate(convId);
+  }, []);
+
   const renderItem = useCallback(
     ({ item }: { item: ConversationItem }) => (
       <ConversationRow
         item={item}
         userId={userId}
         onPress={() => handleConversationPress(item.id)}
+        onDelete={handleDeleteConversation}
       />
     ),
-    [userId, handleConversationPress]
+    [userId, handleConversationPress, handleDeleteConversation]
   );
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
