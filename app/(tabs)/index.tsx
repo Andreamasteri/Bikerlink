@@ -507,9 +507,9 @@ export default function MapScreen() {
 
       <Pressable style={styles.mapContainer} onPress={() => setMapFullscreen(true)}>
         <InteractiveMap
-          users={nearbyUsersQuery.data ?? []}
-          workshops={workshopsQuery.data ?? []}
-          easterEggs={easterEggsQuery.data ?? []}
+          users={(nearbyUsersQuery.data ?? []).filter((u: any) => u.latitude != null && u.longitude != null && !isNaN(u.latitude) && !isNaN(u.longitude))}
+          workshops={(workshopsQuery.data ?? []).filter((w: any) => w.latitude != null && w.longitude != null && !isNaN(w.latitude) && !isNaN(w.longitude))}
+          easterEggs={(easterEggsQuery.data ?? []).filter((e: any) => e.latitude != null && e.longitude != null && !isNaN(e.latitude) && !isNaN(e.longitude))}
           isAvailable={isAvailable}
           searchRadiusKm={mySearchRadius}
           filterBiker={filterBiker}
@@ -529,9 +529,9 @@ export default function MapScreen() {
       <Modal visible={mapFullscreen} animationType="fade" onRequestClose={() => setMapFullscreen(false)}>
         <View style={styles.fullscreenContainer}>
           <InteractiveMap
-            users={nearbyUsersQuery.data ?? []}
-            workshops={workshopsQuery.data ?? []}
-            easterEggs={easterEggsQuery.data ?? []}
+            users={(nearbyUsersQuery.data ?? []).filter((u: any) => u.latitude != null && u.longitude != null && !isNaN(u.latitude) && !isNaN(u.longitude))}
+            workshops={(workshopsQuery.data ?? []).filter((w: any) => w.latitude != null && w.longitude != null && !isNaN(w.latitude) && !isNaN(w.longitude))}
+            easterEggs={(easterEggsQuery.data ?? []).filter((e: any) => e.latitude != null && e.longitude != null && !isNaN(e.latitude) && !isNaN(e.longitude))}
             isAvailable={isAvailable}
             searchRadiusKm={mySearchRadius}
             filterBiker={filterBiker}

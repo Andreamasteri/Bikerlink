@@ -536,7 +536,8 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
           profile: item.profile,
           distance: Math.round(item.distance * 10) / 10,
         };
-      });
+      })
+      .filter((item) => item.latitude != null && item.longitude != null && !isNaN(item.latitude) && !isNaN(item.longitude));
 
     return res.json(results);
   } catch (error) {
