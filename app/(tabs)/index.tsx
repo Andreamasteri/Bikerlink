@@ -290,7 +290,7 @@ export default function MapScreen() {
     },
     onSuccess: (data: any) => {
       if (data.prizeUnlocked) {
-        Alert.alert("🏆 Premio Sbloccato!", data.message || "Hai raccolto 10 Easter Egg!");
+        Alert.alert("Premio Sbloccato!", data.message || "Hai raccolto 10 Easter Egg!");
       } else {
         Alert.alert("Easter Egg!", data.message || "Complimenti! Hai raccolto un premio! Continua così!");
       }
@@ -308,11 +308,20 @@ export default function MapScreen() {
     if (uncollected.length > 0) {
       uncollected.forEach((egg: any) => {
         autoCollectingRef.current.add(egg.id);
-        collectEggMutation.mutate(egg.id, {
-          onSettled: () => {
+        apiRequest("POST", `/api/easter-eggs/${egg.id}/collect`)
+          .then((res) => res.json())
+          .then((data: any) => {
+            if (data.prizeUnlocked) {
+              Alert.alert("Premio Sbloccato!", data.message || "Hai raccolto 10 Easter Egg!");
+            } else {
+              Alert.alert("Easter Egg!", data.message || "Complimenti! Hai raccolto un premio! Continua così!");
+            }
+            queryClient.invalidateQueries({ queryKey: ["/api/easter-eggs/nearby"] });
+          })
+          .catch(() => {})
+          .finally(() => {
             autoCollectingRef.current.delete(egg.id);
-          },
-        });
+          });
       });
     }
   }, [easterEggsQuery.data]);

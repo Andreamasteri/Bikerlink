@@ -186,6 +186,26 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
   }
 });
 
+router.put("/location", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const { latitude, longitude } = req.body;
+    if (latitude === undefined || longitude === undefined) {
+      return res.status(400).json({ message: "Latitudine e longitudine richieste" });
+    }
+    const existingProfile = await storage.getUserProfile(userId);
+    if (existingProfile) {
+      await storage.updateUserProfile(userId, { latitude, longitude } as any);
+    } else {
+      await storage.createUserProfile({ userId, latitude, longitude } as any);
+    }
+    return res.json({ message: "Posizione aggiornata" });
+  } catch (error) {
+    console.error("Update location error:", error);
+    return res.status(500).json({ message: "Errore aggiornamento posizione" });
+  }
+});
+
 router.put("/me/availability", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
