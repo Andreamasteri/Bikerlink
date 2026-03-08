@@ -546,6 +546,46 @@ export default function MapScreen() {
           <Pressable style={[styles.closeBtn, { top: Platform.OS === "web" ? 20 : insets.top + 8 }]} onPress={() => setMapFullscreen(false)}>
             <Ionicons name="close" size={28} color="#fff" />
           </Pressable>
+          <View style={[styles.fullscreenSearchContainer, { top: Platform.OS === "web" ? 20 : insets.top + 8 }]}>
+            <View style={styles.fullscreenSearchRow}>
+              <Ionicons name="search" size={18} color={Colors.textSecondary} style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Cerca per nickname o email..."
+                placeholderTextColor={Colors.textSecondary}
+                value={searchText}
+                onChangeText={handleSearch}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {searchText.length > 0 && (
+                <TouchableOpacity onPress={() => { setSearchText(""); setSearchResults([]); setShowSearchResults(false); }}>
+                  <Ionicons name="close-circle" size={20} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+            </View>
+            {showSearchResults && (
+              <View style={styles.searchResultsContainer}>
+                {searchLoading ? (
+                  <ActivityIndicator size="small" color={Colors.accent} style={{ padding: 12 }} />
+                ) : searchResults.length === 0 ? (
+                  <Text style={styles.searchNoResults}>Nessun risultato</Text>
+                ) : (
+                  <ScrollView style={{ maxHeight: 200 }} keyboardShouldPersistTaps="handled">
+                    {searchResults.map((u: any) => (
+                      <TouchableOpacity key={u.id} style={styles.searchResultItem} onPress={() => { setMapFullscreen(false); handleSearchResultPress(u); }}>
+                        <Ionicons name={getUserIcon(u)} size={22} color={getUserColor(u)} style={{ marginRight: 10 }} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.searchResultName}>{u.nickname}</Text>
+                          <Text style={styles.searchResultDetail}>{getUserTypeLabel(u)}{u.region ? ` · ${u.region}` : ""}{!u.latitude ? " · Posizione non disponibile" : ""}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+            )}
+          </View>
           <View style={[styles.fullscreenOverlay, { top: Platform.OS === "web" ? 20 : insets.top + 8 }]}>
             <View style={styles.statsChip}>
               <Ionicons name="people" size={14} color={Colors.maleIcon} />
@@ -949,6 +989,22 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 8,
     zIndex: 10,
+  },
+  fullscreenSearchContainer: {
+    position: "absolute" as const,
+    left: 56,
+    right: 56,
+    zIndex: 20,
+  },
+  fullscreenSearchRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    backgroundColor: "rgba(30,30,30,0.92)",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === "web" ? 10 : 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
   },
   searchInputRow: {
     flexDirection: "row" as const,

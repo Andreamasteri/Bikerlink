@@ -535,8 +535,8 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Menu</Text>
         <MenuItem icon="create" label="Modifica Profilo" onPress={() => router.push("/profile/edit" as any)} />
-        <MenuItem icon="bug" label="Segnala un Bug" onPress={() => router.push("/feedback?type=bug" as any)} color={Colors.accentRed} />
-        <MenuItem icon="bulb" label="Richiedi Funzione" onPress={() => router.push("/feedback?type=feedback" as any)} color={Colors.accent} />
+        <MenuItem icon="bug" label="Segnala un Bug" onPress={() => router.push("/feedback/bug" as any)} color={Colors.accentRed} />
+        <MenuItem icon="bulb" label="Richiedi Funzione" onPress={() => router.push("/feedback/feature" as any)} color={Colors.accent} />
 
         {(profile?.role === "admin" || (user as any)?.role === "admin") && (
           <MenuItem icon="shield" label="Pannello Admin" onPress={() => router.push("/admin" as any)} color={Colors.accent} />
