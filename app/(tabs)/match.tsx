@@ -293,6 +293,13 @@ export default function MatchScreen() {
         ))}
       </View>
 
+      <View style={styles.infoBanner}>
+        <Ionicons name="information-circle" size={16} color={Colors.accent} />
+        <Text style={styles.infoBannerText}>
+          Il sistema è sempre in cerca di match, sia tra altri Biker che zavorrine. Se vuoi ricevere subito notifiche, non chiudere l'app.
+        </Text>
+      </View>
+
       {isLoading ? (
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={Colors.accent} />
@@ -336,6 +343,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  infoBanner: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    backgroundColor: Colors.accent + "15",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.accent + "30",
+  },
+  infoBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    lineHeight: 17,
   },
   tabRow: {
     flexDirection: "row" as const,

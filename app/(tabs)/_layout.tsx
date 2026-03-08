@@ -92,11 +92,11 @@ export default function TabLayout() {
       <Tabs.Screen
         name="tracking"
         options={{
-          title: "Tracking",
+          title: "Crono",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="navigate" size={size} color={color} />
           ),
-          headerTitle: "GPS Tracking",
+          headerTitle: "Crono",
         }}
       />
       <Tabs.Screen
@@ -112,11 +112,11 @@ export default function TabLayout() {
       <Tabs.Screen
         name="contest"
         options={{
-          title: "Concorso",
+          title: "Pic!",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="camera" size={size} color={color} />
           ),
-          headerTitle: "Concorso Foto",
+          headerTitle: "Pic!",
         }}
       />
       <Tabs.Screen
