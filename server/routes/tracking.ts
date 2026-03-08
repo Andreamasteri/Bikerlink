@@ -145,6 +145,43 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
   }
 });
 
+router.patch("/:id/stats", async (req: Request, res: Response) => {
+  try {
+    const userId = requireAuth(req, res);
+    if (!userId) return;
+
+    const id = req.params.id as string;
+    const route = await storage.getRoute(id);
+
+    if (!route) {
+      return res.status(404).json({ message: "Percorso non trovato" });
+    }
+    if (route.userId !== userId) {
+      return res.status(403).json({ message: "Non autorizzato" });
+    }
+    if (route.status !== "active") {
+      return res.status(400).json({ message: "Il percorso non è attivo" });
+    }
+
+    const { totalDistanceKm, maxSpeedKmh, avgSpeedKmh, maxAltitude, idleTimeSeconds } = req.body;
+    const updates: any = {};
+    if (totalDistanceKm !== undefined) updates.totalDistanceKm = totalDistanceKm;
+    if (maxSpeedKmh !== undefined) updates.maxSpeedKmh = maxSpeedKmh;
+    if (avgSpeedKmh !== undefined) updates.avgSpeedKmh = avgSpeedKmh;
+    if (maxAltitude !== undefined) updates.maxAltitude = maxAltitude;
+    if (idleTimeSeconds !== undefined) updates.idleTimeSeconds = idleTimeSeconds;
+
+    if (Object.keys(updates).length > 0) {
+      await storage.updateRoute(id, updates);
+    }
+
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("Update route stats error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.get("/", async (req: Request, res: Response) => {
   try {
     const userId = requireAuth(req, res);

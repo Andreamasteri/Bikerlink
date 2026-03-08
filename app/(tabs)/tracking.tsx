@@ -8,10 +8,12 @@ import {
   ActivityIndicator,
   ScrollView,
   Platform,
+  AppState,
+  type AppStateStatus,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
 import * as Location from "expo-location";
@@ -29,12 +31,69 @@ interface RouteRecord {
   createdAt: string;
 }
 
+interface GpsPoint {
+  latitude: number;
+  longitude: number;
+  altitude: number;
+  speedKmh: number;
+  timestamp: string;
+}
+
+type TrackingMode = "highway" | "city" | "idle";
+type BatteryImpact = "alta" | "media" | "bassa";
+
 const IDLE_THRESHOLD_KMH = 3;
+const BATCH_SIZE = 10;
+const BATCH_FLUSH_INTERVAL_MS = 30000;
+const AUTO_PAUSE_TIMEOUT_MS = 10 * 60 * 1000;
+const STATS_SYNC_INTERVAL_MS = 60000;
+
+function getTrackingMode(speedKmh: number): TrackingMode {
+  if (speedKmh > 60) return "highway";
+  if (speedKmh > 10) return "city";
+  return "idle";
+}
+
+function getModeConfig(mode: TrackingMode): { accuracy: Location.Accuracy; timeInterval: number; distanceInterval: number } {
+  switch (mode) {
+    case "highway":
+      return { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 3000, distanceInterval: 10 };
+    case "city":
+      return { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 5 };
+    case "idle":
+      return { accuracy: Location.Accuracy.Balanced, timeInterval: 15000, distanceInterval: 2 };
+  }
+}
+
+function getBatteryImpact(mode: TrackingMode): BatteryImpact {
+  switch (mode) {
+    case "highway": return "alta";
+    case "city": return "media";
+    case "idle": return "bassa";
+  }
+}
+
+function getBatteryColor(impact: BatteryImpact): string {
+  switch (impact) {
+    case "alta": return Colors.accentRed;
+    case "media": return Colors.warning;
+    case "bassa": return Colors.success;
+  }
+}
+
+function getBatteryIcon(impact: BatteryImpact): string {
+  switch (impact) {
+    case "alta": return "battery-dead";
+    case "media": return "battery-half";
+    case "bassa": return "battery-full";
+  }
+}
 
 export default function TrackingScreen() {
   const insets = useSafeAreaInsets();
 
   const [isTracking, setIsTracking] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [loading, setLoading] = useState(false);
   const routeIdRef = useRef<string | null>(null);
 
@@ -44,8 +103,13 @@ export default function TrackingScreen() {
   const [maxSpeed, setMaxSpeed] = useState(0);
   const [maxAltitude, setMaxAltitude] = useState(0);
   const [currentSpeed, setCurrentSpeed] = useState(0);
+  const [trackingMode, setTrackingMode] = useState<TrackingMode>("idle");
+  const [pointsBuffered, setPointsBuffered] = useState(0);
+  const [totalPointsSent, setTotalPointsSent] = useState(0);
 
   const startTimeRef = useRef(0);
+  const pausedTimeRef = useRef(0);
+  const pauseStartRef = useRef(0);
   const idleAccRef = useRef(0);
   const lastPosRef = useRef<{ lat: number; lng: number; time: number } | null>(null);
   const totalKmRef = useRef(0);
@@ -54,24 +118,115 @@ export default function TrackingScreen() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const watchSubRef = useRef<Location.LocationSubscription | null>(null);
   const webWatchIdRef = useRef<number | null>(null);
+  const pointsBufferRef = useRef<GpsPoint[]>([]);
+  const flushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastMovementRef = useRef(Date.now());
+  const autoPauseAlertedRef = useRef(false);
+  const isPausedRef = useRef(false);
+  const currentModeRef = useRef<TrackingMode>("idle");
+  const totalPointsSentRef = useRef(0);
+  const statsSyncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { data: records = [], isLoading: recordsLoading } = useQuery<RouteRecord[]>({
     queryKey: ["/api/routes"],
   });
 
-  const completedRecords = records.filter((r: RouteRecord) => r.status === "completed");
+  const completedRecords = (records || []).filter((r: RouteRecord) => r.status === "completed");
 
   useEffect(() => {
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (watchSubRef.current) watchSubRef.current.remove();
-      if (webWatchIdRef.current !== null && Platform.OS === "web") {
-        navigator.geolocation.clearWatch(webWatchIdRef.current);
-      }
+      subscription.remove();
+      cleanupTracking();
     };
   }, []);
 
+  const handleAppStateChange = useCallback((nextState: AppStateStatus) => {
+    if (nextState === "active" && routeIdRef.current && pointsBufferRef.current.length > 0) {
+      flushPoints();
+    }
+  }, []);
+
+  const cleanupTracking = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (flushTimerRef.current) clearInterval(flushTimerRef.current);
+    if (statsSyncTimerRef.current) clearInterval(statsSyncTimerRef.current);
+    if (watchSubRef.current) watchSubRef.current.remove();
+    if (webWatchIdRef.current !== null && Platform.OS === "web") {
+      navigator.geolocation.clearWatch(webWatchIdRef.current);
+    }
+  };
+
+  const flushPoints = useCallback(async () => {
+    const routeId = routeIdRef.current;
+    if (!routeId || pointsBufferRef.current.length === 0) return;
+
+    const batch = [...pointsBufferRef.current];
+    pointsBufferRef.current = [];
+    setPointsBuffered(0);
+
+    try {
+      const url = new URL(`/api/routes/${routeId}/points`, getApiUrl());
+      await globalThis.fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ points: batch }),
+      });
+      totalPointsSentRef.current += batch.length;
+      setTotalPointsSent(totalPointsSentRef.current);
+    } catch {
+      pointsBufferRef.current = [...batch, ...pointsBufferRef.current];
+      setPointsBuffered(pointsBufferRef.current.length);
+    }
+  }, []);
+
+  const syncStats = useCallback(async () => {
+    const routeId = routeIdRef.current;
+    if (!routeId) return;
+
+    try {
+      const url = new URL(`/api/routes/${routeId}/stats`, getApiUrl());
+      await globalThis.fetch(url.toString(), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          totalDistanceKm: totalKmRef.current,
+          maxSpeedKmh: maxSpeedRef.current,
+          maxAltitude: maxAltRef.current,
+          idleTimeSeconds: Math.round(idleAccRef.current),
+        }),
+      });
+    } catch {}
+  }, []);
+
+  const switchTrackingAccuracy = useCallback(async (newMode: TrackingMode) => {
+    if (Platform.OS === "web") return;
+    if (currentModeRef.current === newMode) return;
+    currentModeRef.current = newMode;
+    setTrackingMode(newMode);
+
+    if (watchSubRef.current) {
+      watchSubRef.current.remove();
+      watchSubRef.current = null;
+    }
+
+    const config = getModeConfig(newMode);
+    const sub = await Location.watchPositionAsync(
+      { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
+      (loc) => {
+        if (!isPausedRef.current) {
+          handleGpsUpdate(loc.coords.latitude, loc.coords.longitude, loc.coords.altitude, loc.coords.speed);
+        }
+      }
+    );
+    watchSubRef.current = sub;
+  }, []);
+
   const handleGpsUpdate = useCallback((lat: number, lng: number, altitude: number | null, speedMs: number | null) => {
+    if (isPausedRef.current) return;
+
     const now = Date.now();
     const speedKmh = speedMs !== null && speedMs >= 0 ? speedMs * 3.6 : 0;
 
@@ -90,8 +245,10 @@ export default function TrackingScreen() {
 
     if (lastPosRef.current) {
       const dist = haversineKm(lastPosRef.current.lat, lastPosRef.current.lng, lat, lng);
-      totalKmRef.current += dist;
-      setTotalKm(totalKmRef.current);
+      if (dist > 0.001) {
+        totalKmRef.current += dist;
+        setTotalKm(totalKmRef.current);
+      }
 
       const intervalSec = (now - lastPosRef.current.time) / 1000;
       if (speedKmh < IDLE_THRESHOLD_KMH) {
@@ -102,17 +259,90 @@ export default function TrackingScreen() {
 
     lastPosRef.current = { lat, lng, time: now };
 
-    const routeId = routeIdRef.current;
-    if (routeId) {
-      apiRequest("POST", `/api/routes/${routeId}/points`, {
-        points: [{
-          latitude: lat,
-          longitude: lng,
-          altitude: alt,
-          speedKmh,
-          timestamp: new Date().toISOString(),
-        }],
-      }).catch(() => {});
+    if (speedKmh >= IDLE_THRESHOLD_KMH) {
+      lastMovementRef.current = now;
+      autoPauseAlertedRef.current = false;
+    } else if (now - lastMovementRef.current > AUTO_PAUSE_TIMEOUT_MS && !autoPauseAlertedRef.current) {
+      autoPauseAlertedRef.current = true;
+      Alert.alert(
+        "Fermo da 10 minuti",
+        "Sembra che tu sia fermo. Vuoi mettere in pausa il tracciamento?",
+        [
+          { text: "Continua", style: "cancel" },
+          { text: "Pausa", onPress: () => togglePause() },
+        ]
+      );
+    }
+
+    const newMode = getTrackingMode(speedKmh);
+    if (newMode !== currentModeRef.current) {
+      switchTrackingAccuracy(newMode);
+    }
+
+    const point: GpsPoint = {
+      latitude: lat,
+      longitude: lng,
+      altitude: alt,
+      speedKmh,
+      timestamp: new Date(now).toISOString(),
+    };
+    pointsBufferRef.current.push(point);
+    setPointsBuffered(pointsBufferRef.current.length);
+
+    if (pointsBufferRef.current.length >= BATCH_SIZE) {
+      flushPoints();
+    }
+  }, []);
+
+  const togglePause = useCallback(() => {
+    if (isPausedRef.current) {
+      const pauseDuration = Date.now() - pauseStartRef.current;
+      pausedTimeRef.current += pauseDuration;
+      isPausedRef.current = false;
+      setIsPaused(false);
+      lastMovementRef.current = Date.now();
+      autoPauseAlertedRef.current = false;
+
+      if (Platform.OS !== "web") {
+        const config = getModeConfig(currentModeRef.current);
+        Location.watchPositionAsync(
+          { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
+          (loc) => {
+            if (!isPausedRef.current) {
+              handleGpsUpdate(loc.coords.latitude, loc.coords.longitude, loc.coords.altitude, loc.coords.speed);
+            }
+          }
+        ).then((sub) => {
+          watchSubRef.current = sub;
+        });
+      } else if (Platform.OS === "web") {
+        const wid = navigator.geolocation.watchPosition(
+          (pos) => {
+            if (!isPausedRef.current) {
+              handleGpsUpdate(pos.coords.latitude, pos.coords.longitude, pos.coords.altitude, pos.coords.speed);
+            }
+          },
+          () => {},
+          { enableHighAccuracy: true, maximumAge: 3000 }
+        );
+        webWatchIdRef.current = wid;
+      }
+    } else {
+      isPausedRef.current = true;
+      setIsPaused(true);
+      pauseStartRef.current = Date.now();
+      setCurrentSpeed(0);
+
+      if (watchSubRef.current) {
+        watchSubRef.current.remove();
+        watchSubRef.current = null;
+      }
+      if (webWatchIdRef.current !== null && Platform.OS === "web") {
+        navigator.geolocation.clearWatch(webWatchIdRef.current);
+        webWatchIdRef.current = null;
+      }
+
+      flushPoints();
     }
   }, []);
 
@@ -121,11 +351,18 @@ export default function TrackingScreen() {
       setLoading(true);
 
       if (Platform.OS !== "web") {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
+        const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
+        if (fgStatus !== "granted") {
           Alert.alert("Permesso Negato", "Il permesso GPS è necessario per il tracciamento.");
           return;
         }
+
+        try {
+          const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
+          if (bgStatus === "granted") {
+            // background available — can be used for future background task
+          }
+        } catch {}
       } else {
         const perm = await new Promise<boolean>((resolve) => {
           if (!navigator.geolocation) {
@@ -165,42 +402,63 @@ export default function TrackingScreen() {
       setMaxSpeed(0);
       setMaxAltitude(0);
       setCurrentSpeed(0);
+      setTrackingMode("idle");
+      setIsPaused(false);
+      setPointsBuffered(0);
+      setTotalPointsSent(0);
       startTimeRef.current = Date.now();
+      pausedTimeRef.current = 0;
+      pauseStartRef.current = 0;
       idleAccRef.current = 0;
       lastPosRef.current = null;
       totalKmRef.current = 0;
       maxSpeedRef.current = 0;
       maxAltRef.current = 0;
+      pointsBufferRef.current = [];
+      lastMovementRef.current = Date.now();
+      autoPauseAlertedRef.current = false;
+      isPausedRef.current = false;
+      currentModeRef.current = "idle";
+      totalPointsSentRef.current = 0;
 
       setIsTracking(true);
 
       timerRef.current = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-        setTotalTime(elapsed);
+        if (!isPausedRef.current) {
+          const elapsed = Math.floor((Date.now() - startTimeRef.current - pausedTimeRef.current) / 1000);
+          setTotalTime(elapsed);
+        }
       }, 1000);
 
+      flushTimerRef.current = setInterval(() => {
+        if (!isPausedRef.current) {
+          flushPoints();
+        }
+      }, BATCH_FLUSH_INTERVAL_MS);
+
+      statsSyncTimerRef.current = setInterval(() => {
+        if (!isPausedRef.current) {
+          syncStats();
+        }
+      }, STATS_SYNC_INTERVAL_MS);
+
       if (Platform.OS !== "web") {
+        const config = getModeConfig("idle");
         const sub = await Location.watchPositionAsync(
-          { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 0 },
+          { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
           (loc) => {
-            handleGpsUpdate(
-              loc.coords.latitude,
-              loc.coords.longitude,
-              loc.coords.altitude,
-              loc.coords.speed
-            );
+            if (!isPausedRef.current) {
+              handleGpsUpdate(loc.coords.latitude, loc.coords.longitude, loc.coords.altitude, loc.coords.speed);
+            }
           }
         );
         watchSubRef.current = sub;
       } else {
         const wid = navigator.geolocation.watchPosition(
           (pos) => {
-            handleGpsUpdate(
-              pos.coords.latitude,
-              pos.coords.longitude,
-              pos.coords.altitude,
-              pos.coords.speed
-            );
+            if (!isPausedRef.current) {
+              handleGpsUpdate(pos.coords.latitude, pos.coords.longitude, pos.coords.altitude, pos.coords.speed);
+            }
           },
           () => {},
           { enableHighAccuracy: true, maximumAge: 3000 }
@@ -213,18 +471,19 @@ export default function TrackingScreen() {
   };
 
   const stopTracking = async () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
+    if (isPausedRef.current) {
+      isPausedRef.current = false;
+      setIsPaused(false);
     }
-    if (watchSubRef.current) {
-      watchSubRef.current.remove();
-      watchSubRef.current = null;
-    }
-    if (webWatchIdRef.current !== null && Platform.OS === "web") {
-      navigator.geolocation.clearWatch(webWatchIdRef.current);
-      webWatchIdRef.current = null;
-    }
+
+    cleanupTracking();
+    timerRef.current = null;
+    flushTimerRef.current = null;
+    statsSyncTimerRef.current = null;
+    watchSubRef.current = null;
+    webWatchIdRef.current = null;
+
+    await flushPoints();
 
     const routeId = routeIdRef.current;
     if (!routeId) return;
@@ -236,15 +495,18 @@ export default function TrackingScreen() {
       routeIdRef.current = null;
       queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
 
-      const netTime = Math.max(totalTime - Math.round(idleAccRef.current), 0);
+      const dur = totalTime;
+      const idle = Math.round(idleAccRef.current);
+      const netT = Math.max(dur - idle, 0);
       Alert.alert(
         "Sessione Completata",
         `Km: ${totalKmRef.current.toFixed(2)}\n` +
-        `Tempo totale: ${formatTime(totalTime)}\n` +
-        `Pause: ${formatTime(Math.round(idleAccRef.current))}\n` +
-        `Tempo netto: ${formatTime(netTime)}\n` +
+        `Tempo totale: ${formatTime(dur)}\n` +
+        `Pause: ${formatTime(idle)}\n` +
+        `Tempo netto: ${formatTime(netT)}\n` +
         `Vel. Max: ${maxSpeedRef.current.toFixed(0)} km/h\n` +
-        `Quota Max: ${maxAltRef.current.toFixed(0)} m`
+        `Quota Max: ${maxAltRef.current.toFixed(0)} m\n` +
+        `Punti GPS: ${totalPointsSentRef.current}`
       );
 
       setTotalTime(0);
@@ -253,6 +515,8 @@ export default function TrackingScreen() {
       setMaxSpeed(0);
       setMaxAltitude(0);
       setCurrentSpeed(0);
+      setPointsBuffered(0);
+      setTotalPointsSent(0);
     } catch {
       Alert.alert("Errore", "Errore nel completamento della sessione.");
     } finally {
@@ -262,6 +526,8 @@ export default function TrackingScreen() {
 
   const netTime = totalTime - idleTime;
   const avgSpeed = netTime > 0 ? totalKm / (netTime / 3600) : 0;
+  const batteryImpact = getBatteryImpact(trackingMode);
+  const batteryColor = getBatteryColor(batteryImpact);
 
   return (
     <ScrollView
@@ -280,8 +546,25 @@ export default function TrackingScreen() {
 
       {isTracking && (
         <View style={styles.dashboard}>
+          <View style={styles.statusRow}>
+            <View style={[styles.statusBadge, { backgroundColor: isPaused ? Colors.warning + "30" : Colors.success + "30" }]}>
+              <View style={[styles.statusDot, { backgroundColor: isPaused ? Colors.warning : Colors.success }]} />
+              <Text style={[styles.statusText, { color: isPaused ? Colors.warning : Colors.success }]}>
+                {isPaused ? "IN PAUSA" : trackingMode === "highway" ? "AUTOSTRADA" : trackingMode === "city" ? "CITTÀ" : "FERMO"}
+              </Text>
+            </View>
+            <View style={[styles.batteryBadge, { backgroundColor: batteryColor + "20" }]}>
+              <Ionicons name={getBatteryIcon(batteryImpact) as any} size={14} color={batteryColor} />
+              <Text style={[styles.batteryText, { color: batteryColor }]}>
+                {batteryImpact.toUpperCase()}
+              </Text>
+            </View>
+          </View>
+
           <View style={styles.speedBox}>
-            <Text style={styles.speedValue}>{currentSpeed.toFixed(0)}</Text>
+            <Text style={[styles.speedValue, isPaused && { color: Colors.textSecondary }]}>
+              {isPaused ? "--" : currentSpeed.toFixed(0)}
+            </Text>
             <Text style={styles.speedUnit}>km/h</Text>
           </View>
 
@@ -299,24 +582,59 @@ export default function TrackingScreen() {
           </View>
           <View style={styles.row}>
             <StatCard icon="navigate" color={Colors.accent} value={totalKm.toFixed(2)} label="Km totali" />
+            <StatCard icon="cloud-upload" color={Colors.maleIcon} value={`${pointsBuffered}/${totalPointsSent}`} label="Buffer / Inviati" />
           </View>
         </View>
       )}
 
-      <Pressable
-        style={[styles.mainBtn, { backgroundColor: isTracking ? Colors.accentRed : Colors.success }]}
-        onPress={isTracking ? stopTracking : startTracking}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" size="large" />
-        ) : (
-          <Ionicons name={isTracking ? "stop-circle" : "play-circle"} size={56} color="#fff" />
-        )}
-      </Pressable>
+      {isTracking ? (
+        <View style={styles.controlRow}>
+          <Pressable
+            style={[styles.controlBtn, { backgroundColor: isPaused ? Colors.success : Colors.warning }]}
+            onPress={togglePause}
+          >
+            <Ionicons name={isPaused ? "play" : "pause"} size={28} color="#fff" />
+            <Text style={styles.controlLabel}>{isPaused ? "Riprendi" : "Pausa"}</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.mainBtn, { backgroundColor: Colors.accentRed }]}
+            onPress={stopTracking}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" size="large" />
+            ) : (
+              <Ionicons name="stop-circle" size={56} color="#fff" />
+            )}
+          </Pressable>
+          <View style={styles.controlPlaceholder} />
+        </View>
+      ) : (
+        <Pressable
+          style={[styles.mainBtn, { backgroundColor: Colors.success, alignSelf: "center" }]}
+          onPress={startTracking}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" size="large" />
+          ) : (
+            <Ionicons name="play-circle" size={56} color="#fff" />
+          )}
+        </Pressable>
+      )}
       <Text style={styles.hint}>
-        {isTracking ? "Tocca per fermare" : "Tocca per iniziare"}
+        {isTracking ? (isPaused ? "In pausa — tocca Riprendi o Stop" : "Tracciamento attivo") : "Tocca per iniziare"}
       </Text>
+
+      {isTracking && (
+        <View style={styles.infoBox}>
+          <Ionicons name="information-circle" size={16} color={Colors.textSecondary} />
+          <Text style={styles.infoText}>
+            Frequenza GPS adattiva: {trackingMode === "highway" ? "3s (alta precisione)" : trackingMode === "city" ? "5s (bilanciato)" : "15s (risparmio)"}
+            {" · "}Punti inviati in batch da {BATCH_SIZE}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.recordsSection}>
         <Text style={styles.recordsTitle}>I tuoi record</Text>
@@ -410,6 +728,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontFamily: "Inter_700Bold", color: Colors.text, textAlign: "center" },
   subtitle: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary, textAlign: "center", marginBottom: 24 },
   dashboard: { marginBottom: 24 },
+  statusRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  statusBadge: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  statusText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  batteryBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
+  batteryText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   speedBox: {
     backgroundColor: Colors.surface, borderRadius: 20, padding: 20, alignItems: "center",
     marginBottom: 12, borderWidth: 1, borderColor: Colors.accent,
@@ -423,16 +747,29 @@ const styles = StyleSheet.create({
   },
   statValue: { fontSize: 20, fontFamily: "Inter_700Bold", color: Colors.text },
   statLabel: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  controlRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 4 },
+  controlBtn: {
+    width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center",
+    elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25, shadowRadius: 4,
+  },
+  controlLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#fff", marginTop: 2 },
+  controlPlaceholder: { width: 80 },
   mainBtn: {
-    width: 120, height: 120, borderRadius: 60, alignSelf: "center",
+    width: 120, height: 120, borderRadius: 60,
     alignItems: "center", justifyContent: "center",
     elevation: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3, shadowRadius: 8,
   },
   hint: {
     fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary,
-    textAlign: "center", marginTop: 8, marginBottom: 32,
+    textAlign: "center", marginTop: 8, marginBottom: 16,
   },
+  infoBox: {
+    flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: Colors.surface,
+    borderRadius: 10, padding: 10, marginBottom: 24, borderWidth: 1, borderColor: Colors.border,
+  },
+  infoText: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary, flex: 1 },
   recordsSection: { marginTop: 8 },
   recordsTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.text, marginBottom: 12 },
   recordsLoader: { marginTop: 16 },
