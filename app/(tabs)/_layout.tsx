@@ -68,7 +68,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="ready"
         options={{
-          title: "Ready\nto Ride",
+          title: "Ready!",
           tabBarIcon: ({ focused }) => (
             <Ionicons
               name="bicycle"
@@ -76,18 +76,7 @@ export default function TabLayout() {
               color={isAvailable ? Colors.success : Colors.accentRed}
             />
           ),
-          headerTitle: "Ready to Ride",
-          tabBarLabel: ({ focused }) => (
-            <Text style={{
-              fontSize: 11,
-              fontFamily: "Inter_500Medium",
-              color: focused ? Colors.accent : Colors.textSecondary,
-              textAlign: "center",
-              lineHeight: 13,
-            }}>
-              {"Ready\nto Ride"}
-            </Text>
-          ),
+          headerTitle: "Ready!",
         }}
       />
       <Tabs.Screen
