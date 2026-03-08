@@ -311,7 +311,7 @@ export default function ProfileScreen() {
             )}
           </View>
         </TouchableOpacity>
-        {uploadAvatarMutation.isPending && (
+        {uploadPhotoMutation.isPending && (
           <ActivityIndicator
             size="small"
             color={Colors.accent}
