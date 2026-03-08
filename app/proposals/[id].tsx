@@ -335,27 +335,30 @@ export default function ProposalDetailScreen() {
         {isCreator && (
           <TouchableOpacity
             style={styles.deleteButton}
-            onPress={() => {
-              Alert.alert(
-                "Elimina proposta",
-                "Sei sicuro di voler eliminare questa proposta? L'azione è irreversibile.",
-                [
-                  { text: "Annulla", style: "cancel" },
-                  {
-                    text: "Elimina",
-                    style: "destructive",
-                    onPress: async () => {
-                      try {
-                        await apiRequest("DELETE", `/api/proposals/${id}`);
-                        queryClient.invalidateQueries({ queryKey: ["/api/proposals"] });
-                        router.back();
-                      } catch (e: any) {
-                        Alert.alert("Errore", e.message || "Impossibile eliminare la proposta");
-                      }
-                    },
-                  },
-                ]
-              );
+            onPress={async () => {
+              const doDelete = async () => {
+                try {
+                  await apiRequest("DELETE", `/api/proposals/${id}`);
+                  queryClient.invalidateQueries({ queryKey: ["/api/proposals"] });
+                  router.back();
+                } catch (e: any) {
+                  Alert.alert("Errore", e.message || "Impossibile eliminare la proposta");
+                }
+              };
+              if (Platform.OS === "web") {
+                if (window.confirm("Sei sicuro di voler eliminare questa proposta? L'azione è irreversibile.")) {
+                  await doDelete();
+                }
+              } else {
+                Alert.alert(
+                  "Elimina proposta",
+                  "Sei sicuro di voler eliminare questa proposta? L'azione è irreversibile.",
+                  [
+                    { text: "Annulla", style: "cancel" },
+                    { text: "Elimina", style: "destructive", onPress: doDelete },
+                  ]
+                );
+              }
             }}
             activeOpacity={0.8}
           >
