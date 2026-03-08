@@ -91,6 +91,16 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="match"
+        options={{
+          title: "Match",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="flash" size={size} color={color} />
+          ),
+          headerTitle: "I Miei Match",
+        }}
+      />
+      <Tabs.Screen
         name="tracking"
         options={{
           title: "Tracking",

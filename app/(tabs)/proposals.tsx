@@ -8,17 +8,14 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
-  ScrollView,
   TouchableOpacity,
-  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
-import { queryClient, apiRequest } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 
 interface ProposalItem {
@@ -173,97 +170,11 @@ function ProposalCard({ item, onPress }: { item: ProposalItem; onPress: () => vo
   );
 }
 
-function MatchCard({ match, currentUserId, onAccept, onReject, onChatPress, isPending }: {
-  match: any;
-  currentUserId: string;
-  onAccept: () => void;
-  onReject: () => void;
-  onChatPress?: () => void;
-  isPending: boolean;
-}) {
-  const isUser1 = match.userId1 === currentUserId;
-  const myProposal = isUser1 ? match.proposal1 : match.proposal2;
-  const otherProposal = isUser1 ? match.proposal2 : match.proposal1;
-  const otherNickname = isUser1 ? match.user2Nickname : match.user1Nickname;
-  const otherType = isUser1 ? match.user2Type : match.user1Type;
-
-  const otherColor = otherType === "biker" ? Colors.maleIcon : otherType === "zavorrina" ? Colors.femaleIcon : Colors.accent;
-  const isAccepted = match.status === "accepted";
-  const isRejected = match.status === "rejected";
-
-  return (
-    <View style={[styles.matchCard, isAccepted && styles.matchCardAccepted]}>
-      <View style={styles.matchHeader}>
-        <Ionicons name="flash" size={20} color={Colors.accent} />
-        <Text style={styles.matchTitle}>
-          {isAccepted ? "Match accettato!" : isRejected ? "Match rifiutato" : "Nuovo match!"}
-        </Text>
-      </View>
-
-      <View style={styles.matchPair}>
-        <View style={styles.matchProposal}>
-          <Text style={styles.matchLabel}>La tua proposta</Text>
-          <Text style={styles.matchProposalTitle} numberOfLines={1}>{myProposal?.title}</Text>
-          <Text style={styles.matchProposalSub}>
-            {myProposal?.searchType ? SEARCH_TYPE_LABELS[myProposal.searchType] : ""}
-          </Text>
-        </View>
-        <Ionicons name="swap-horizontal" size={20} color={Colors.accent} />
-        <View style={styles.matchProposal}>
-          <Text style={[styles.matchLabel, { color: otherColor }]}>{otherNickname}</Text>
-          <Text style={styles.matchProposalTitle} numberOfLines={1}>{otherProposal?.title}</Text>
-          <Text style={styles.matchProposalSub}>
-            {otherProposal?.searchType ? SEARCH_TYPE_LABELS[otherProposal.searchType] : ""}
-          </Text>
-        </View>
-      </View>
-
-      {match.status === "pending" && (
-        <View style={styles.matchActions}>
-          <TouchableOpacity
-            style={[styles.matchBtn, styles.matchRejectBtn]}
-            onPress={onReject}
-            disabled={isPending}
-          >
-            <Ionicons name="close" size={18} color={Colors.accentRed} />
-            <Text style={[styles.matchBtnText, { color: Colors.accentRed }]}>Rifiuta</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.matchBtn, styles.matchAcceptBtn]}
-            onPress={onAccept}
-            disabled={isPending}
-          >
-            {isPending ? (
-              <ActivityIndicator size="small" color="#000" />
-            ) : (
-              <>
-                <Ionicons name="checkmark" size={18} color="#000" />
-                <Text style={[styles.matchBtnText, { color: "#000" }]}>Accetta</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {isAccepted && match.conversationId && onChatPress && (
-        <TouchableOpacity
-          style={styles.chatLink}
-          onPress={onChatPress}
-        >
-          <Ionicons name="chatbubbles" size={16} color={Colors.accent} />
-          <Text style={styles.chatLinkText}>Apri chat del match</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-}
-
 export default function ProposalsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [activeFilter, setActiveFilter] = useState("all");
-  const [pendingMatchId, setPendingMatchId] = useState<string | null>(null);
 
   const queryKey =
     activeFilter === "all"
@@ -276,34 +187,7 @@ export default function ProposalsScreen() {
     queryKey: ["/api/proposals/matches"],
   });
 
-  const pendingMatches = (matches || []).filter((m: any) => m.status === "pending");
-  const recentMatches = (matches || []).filter((m: any) => m.status !== "pending").slice(0, 5);
-
-  const acceptMutation = useMutation({
-    mutationFn: async (matchId: string) => {
-      const res = await apiRequest("POST", `/api/proposals/matches/${matchId}/accept`);
-      return res.json();
-    },
-    onSuccess: () => {
-      setPendingMatchId(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches"] });
-    },
-    onError: (err: Error) => {
-      setPendingMatchId(null);
-      Alert.alert("Errore", err.message);
-    },
-  });
-
-  const rejectMutation = useMutation({
-    mutationFn: async (matchId: string) => {
-      const res = await apiRequest("POST", `/api/proposals/matches/${matchId}/reject`);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches"] });
-    },
-    onError: (err: Error) => Alert.alert("Errore", err.message),
-  });
+  const pendingMatchCount = (matches || []).filter((m: any) => m.status === "pending").length;
 
   const handleCreatePress = useCallback(() => {
     router.push("/proposals/create");
@@ -314,13 +198,8 @@ export default function ProposalsScreen() {
   }, [router]);
 
   const allData: any[] = [];
-  if (pendingMatches.length > 0) {
-    allData.push({ type: "matchHeader", key: "mh" });
-    pendingMatches.forEach((m: any) => allData.push({ type: "match", key: `match-${m.id}`, data: m }));
-  }
-  if (recentMatches.length > 0) {
-    allData.push({ type: "recentMatchHeader", key: "rmh" });
-    recentMatches.forEach((m: any) => allData.push({ type: "recentMatch", key: `rm-${m.id}`, data: m }));
+  if (pendingMatchCount > 0) {
+    allData.push({ type: "matchBanner", key: "mb" });
   }
   allData.push({ type: "proposalHeader", key: "ph" });
   (proposals || []).forEach((p) => allData.push({ type: "proposal", key: `p-${p.id}`, data: p }));
@@ -337,9 +216,9 @@ export default function ProposalsScreen() {
             <Text style={[styles.filterText, activeFilter === f.key && styles.filterTextActive]}>
               {f.label}
             </Text>
-            {f.key === "all" && pendingMatches.length > 0 && (
+            {f.key === "all" && pendingMatchCount > 0 && (
               <View style={styles.matchBadge}>
-                <Text style={styles.matchBadgeText}>{pendingMatches.length}</Text>
+                <Text style={styles.matchBadgeText}>{pendingMatchCount}</Text>
               </View>
             )}
           </Pressable>
@@ -360,40 +239,23 @@ export default function ProposalsScreen() {
           }
           scrollEnabled={allData.length > 1}
           renderItem={({ item }) => {
-            if (item.type === "matchHeader") {
+            if (item.type === "matchBanner") {
               return (
-                <View style={styles.sectionHeader}>
-                  <Ionicons name="flash" size={18} color={Colors.accent} />
-                  <Text style={styles.sectionTitle}>Match trovati</Text>
-                </View>
-              );
-            }
-            if (item.type === "recentMatchHeader") {
-              return (
-                <View style={[styles.sectionHeader, { marginTop: 12 }]}>
-                  <Ionicons name="time" size={18} color={Colors.textSecondary} />
-                  <Text style={[styles.sectionTitle, { color: Colors.textSecondary }]}>Match recenti</Text>
-                </View>
-              );
-            }
-            if (item.type === "match" || item.type === "recentMatch") {
-              return (
-                <MatchCard
-                  match={item.data}
-                  currentUserId={user?.id || ""}
-                  onAccept={() => {
-                    setPendingMatchId(item.data.id);
-                    acceptMutation.mutate(item.data.id);
-                  }}
-                  onReject={() => rejectMutation.mutate(item.data.id)}
-                  onChatPress={item.data.conversationId ? () => router.push(`/chat/${item.data.conversationId}`) : undefined}
-                  isPending={pendingMatchId === item.data.id}
-                />
+                <TouchableOpacity
+                  style={styles.matchBannerCard}
+                  onPress={() => router.push("/(tabs)/match" as any)}
+                >
+                  <Ionicons name="flash" size={20} color={Colors.accent} />
+                  <Text style={styles.matchBannerText}>
+                    Hai {pendingMatchCount} match in attesa!
+                  </Text>
+                  <Ionicons name="chevron-forward" size={18} color={Colors.accent} />
+                </TouchableOpacity>
               );
             }
             if (item.type === "proposalHeader") {
               return (
-                <View style={[styles.sectionHeader, { marginTop: pendingMatches.length > 0 ? 12 : 0 }]}>
+                <View style={styles.sectionHeader}>
                   <Ionicons name="megaphone" size={18} color={Colors.text} />
                   <Text style={styles.sectionTitle}>Proposte</Text>
                 </View>
@@ -465,27 +327,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },
-  matchCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
+  matchBannerCard: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 10,
+    backgroundColor: Colors.accent + "15",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: Colors.accent + "40",
+    borderColor: Colors.accent + "30",
   },
-  matchCardAccepted: { borderColor: Colors.success + "60", backgroundColor: Colors.success + "08" },
-  matchHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
-  matchTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.accent },
-  matchPair: { flexDirection: "row", alignItems: "center", gap: 10 },
-  matchProposal: { flex: 1, backgroundColor: Colors.background, borderRadius: 10, padding: 10 },
-  matchLabel: { fontSize: 11, fontFamily: "Inter_500Medium", color: Colors.textSecondary, marginBottom: 4 },
-  matchProposalTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.text },
-  matchProposalSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 },
-  matchActions: { flexDirection: "row", gap: 10, marginTop: 12 },
-  matchBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 10 },
-  matchAcceptBtn: { backgroundColor: Colors.accent },
-  matchRejectBtn: { backgroundColor: Colors.accentRed + "15", borderWidth: 1, borderColor: Colors.accentRed + "40" },
-  matchBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  chatLink: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10, justifyContent: "center" },
-  chatLinkText: { fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.accent },
+  matchBannerText: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.accent,
+  },
 });
