@@ -863,6 +863,20 @@ export default function MapScreen() {
                   <Text style={styles.detailBio}>{selectedUserDetail.bio}</Text>
                 )}
 
+                {selectedUserDetail?.photos && selectedUserDetail.photos.length > 0 && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionTitle}>Foto</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+                      {selectedUserDetail.photos.map((p: any) => {
+                        const pUri = p.photoUrl?.startsWith("http") ? p.photoUrl : `${baseUrl}${p.photoUrl}`;
+                        return (
+                          <Image key={p.id} source={{ uri: pUri }} style={{ width: 80, height: 80, borderRadius: 10, marginRight: 8 }} />
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                )}
+
                 {selectedUserDetail?.motorcycles && selectedUserDetail.motorcycles.length > 0 && (
                   <View style={styles.detailSection}>
                     <Text style={styles.detailSectionTitle}>Garage</Text>

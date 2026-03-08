@@ -247,10 +247,13 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
     const { password: _, ...safeUser } = targetUser;
     const profile = await storage.getUserProfile(userId);
     const motorcycles = await storage.getUserMotorcycles(userId);
+    const photos = await storage.getUserPhotos(userId);
+    const approvedPhotos = photos.filter((p) => p.isApproved);
     return res.json({
       ...safeUser,
       bio: profile?.bio || null,
       motorcycles,
+      photos: approvedPhotos,
     });
   } catch (error) {
     console.error("Get public user profile error:", error);

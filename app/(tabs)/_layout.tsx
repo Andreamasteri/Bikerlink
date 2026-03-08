@@ -1,14 +1,15 @@
 import React from "react";
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { Platform, Text } from "react-native";
+import { Platform, Text, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery } from "@tanstack/react-query";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { user } = useAuth();
 
   const isBikerOrCoppia = user?.userType === "biker" || user?.userType === "coppia";
@@ -98,6 +99,11 @@ export default function TabLayout() {
           ),
           headerTitle: "Crono",
           href: null,
+          headerLeft: () => (
+            <Pressable onPress={() => router.back()} style={{ marginLeft: 8 }}>
+              <Ionicons name="arrow-back" size={24} color={Colors.text} />
+            </Pressable>
+          ),
         }}
       />
       <Tabs.Screen
@@ -109,6 +115,11 @@ export default function TabLayout() {
           ),
           headerTitle: isBikerOrCoppia ? "Il Mio Garage" : "La Mia Wishlist",
           href: null,
+          headerLeft: () => (
+            <Pressable onPress={() => router.back()} style={{ marginLeft: 8 }}>
+              <Ionicons name="arrow-back" size={24} color={Colors.text} />
+            </Pressable>
+          ),
         }}
       />
       <Tabs.Screen

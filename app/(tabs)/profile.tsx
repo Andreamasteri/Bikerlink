@@ -112,20 +112,24 @@ export default function ProfileScreen() {
   const currentCoupleSexConfig = profile?.coupleSexConfig ?? (user as any)?.coupleSexConfig;
   const typeColor = getUserTypeColor(currentUserType, currentSex, currentCoupleSexConfig);
 
-  const uploadAvatarMutation = useMutation({
+  const uploadPhotoMutation = useMutation({
     mutationFn: async (uri: string) => {
       const formData = new FormData();
-      const filename = uri.split("/").pop() || "avatar.jpg";
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : "image/jpeg";
-      formData.append("photo", {
-        uri,
-        name: filename,
-        type,
-      } as any);
+      const filename = uri.split("/").pop() || "photo.jpg";
+      const ext = /\.(\w+)$/.exec(filename);
+      const mimeType = ext ? `image/${ext[1]}` : "image/jpeg";
+
+      if (Platform.OS === "web") {
+        const response = await globalThis.fetch(uri);
+        const blob = await response.blob();
+        formData.append("photo", blob, filename);
+      } else {
+        formData.append("photo", { uri, name: filename, type: mimeType } as any);
+      }
+
       const baseUrl = getApiUrl();
       const url = new URL("/api/users/me/photos", baseUrl);
-      const res = await fetch(url.toString(), {
+      const res = await globalThis.fetch(url.toString(), {
         method: "POST",
         body: formData,
         credentials: "include",
@@ -184,15 +188,25 @@ export default function ProfileScreen() {
     },
   });
 
-  const pickImage = useCallback(async () => {
+  const [replacingSlot, setReplacingSlot] = useState<string | null>(null);
+
+  const pickImageForSlot = useCallback(async (existingPhotoId?: string) => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"] as any,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {
-      uploadAvatarMutation.mutate(result.assets[0].uri);
+      if (existingPhotoId) {
+        setReplacingSlot(existingPhotoId);
+        try {
+          await apiRequest("DELETE", `/api/users/me/photos/${existingPhotoId}`);
+        } catch {}
+      }
+      uploadPhotoMutation.mutate(result.assets[0].uri, {
+        onSettled: () => setReplacingSlot(null),
+      });
     }
   }, []);
 
@@ -288,7 +302,7 @@ export default function ProfileScreen() {
       }
     >
       <View style={styles.profileHeader}>
-        <TouchableOpacity onPress={pickImage} activeOpacity={0.8}>
+        <TouchableOpacity onPress={() => pickImageForSlot()} activeOpacity={0.8}>
           <View style={[styles.avatar, { borderColor: typeColor }]}>
             {avatarSource ? (
               <Image source={avatarSource} style={styles.avatarImage} />
@@ -374,62 +388,69 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>{t("profile.photos")}</Text>
-            {(profile?.photos?.length ?? 0) < 3 && (
-              <TouchableOpacity
-                onPress={pickImage}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons name="add-circle-outline" size={24} color={Colors.accent} />
-              </TouchableOpacity>
-            )}
           </View>
-          {profile?.photos && profile.photos.length > 0 ? (
-            <View style={styles.photoGrid}>
-              {profile.photos.map((photo) => {
+          <View style={styles.photoGrid}>
+            {[0, 1, 2].map((slotIndex) => {
+              const photo = profile?.photos?.[slotIndex];
+              const isUploading = uploadPhotoMutation.isPending && !photo;
+              const isReplacing = photo && replacingSlot === photo.id;
+              if (photo) {
                 const photoUri = photo.photoUrl.startsWith("http")
                   ? photo.photoUrl
                   : `${getApiUrl()}${photo.photoUrl}`;
                 return (
                   <View key={photo.id} style={styles.photoItem}>
                     <Image source={{ uri: photoUri }} style={styles.photoImage} />
-                    <TouchableOpacity
-                      style={styles.photoDeleteBtn}
-                      onPress={() => handleDeletePhoto(photo.id)}
-                    >
-                      <Ionicons name="close" size={14} color="#FFFFFF" />
-                    </TouchableOpacity>
+                    {isReplacing && (
+                      <View style={styles.photoOverlay}>
+                        <ActivityIndicator color="#FFFFFF" />
+                      </View>
+                    )}
+                    <View style={styles.photoActions}>
+                      <TouchableOpacity
+                        style={styles.photoActionBtn}
+                        onPress={() => pickImageForSlot(photo.id)}
+                      >
+                        <Ionicons name="swap-horizontal" size={14} color="#FFFFFF" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.photoActionBtn, { backgroundColor: "rgba(220,50,50,0.8)" }]}
+                        onPress={() => handleDeletePhoto(photo.id)}
+                      >
+                        <Ionicons name="trash" size={14} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
                     {!photo.isApproved && (
                       <View style={styles.pendingBadge}>
                         <Text style={styles.pendingText}>In attesa</Text>
                       </View>
                     )}
+                    <View style={styles.slotLabel}>
+                      <Text style={styles.slotLabelText}>Foto {slotIndex + 1}</Text>
+                    </View>
                   </View>
                 );
-              })}
-              {profile.photos.length < 3 && (
+              }
+              return (
                 <TouchableOpacity
+                  key={`empty-${slotIndex}`}
                   style={styles.addPhotoSlot}
-                  onPress={pickImage}
+                  onPress={() => pickImageForSlot()}
                   activeOpacity={0.7}
+                  disabled={isUploading}
                 >
-                  <Ionicons name="add" size={32} color={Colors.textSecondary} />
-                  <Text style={styles.addPhotoText}>
-                    {3 - profile.photos.length} rimaste
-                  </Text>
+                  {isUploading ? (
+                    <ActivityIndicator color={Colors.accent} />
+                  ) : (
+                    <>
+                      <Ionicons name="add" size={28} color={Colors.textSecondary} />
+                      <Text style={styles.addPhotoText}>Foto {slotIndex + 1}</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
-              )}
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.emptySection}
-              onPress={pickImage}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="image-outline" size={32} color={Colors.textSecondary} />
-              <Text style={styles.emptyText}>{t("profile.addPhoto")}</Text>
-              <Text style={styles.emptySubtext}>Max 3 foto</Text>
-            </TouchableOpacity>
-          )}
+              );
+            })}
+          </View>
         </View>
       )}
 
@@ -807,6 +828,41 @@ const styles = StyleSheet.create({
   photoImage: {
     width: "100%",
     height: "100%",
+  },
+  photoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoActions: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    flexDirection: "row",
+    gap: 6,
+  },
+  photoActionBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  slotLabel: {
+    position: "absolute",
+    top: 6,
+    left: 6,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  slotLabelText: {
+    fontSize: 10,
+    color: "#FFFFFF",
+    fontFamily: "Inter_500Medium",
   },
   photoDeleteBtn: {
     position: "absolute",
