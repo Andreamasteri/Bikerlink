@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -17,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function ReadyToRideScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const { data, isLoading } = useQuery({
     queryKey: ["/api/users/profile"],
@@ -91,6 +93,14 @@ export default function ReadyToRideScreen() {
             />
           )}
         </Pressable>
+
+        <Pressable
+          style={styles.cronoBtn}
+          onPress={() => router.push("/tracking" as any)}
+        >
+          <Ionicons name="navigate" size={20} color={Colors.accent} />
+          <Text style={styles.cronoBtnText}>Crono</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -136,5 +146,22 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
+  },
+  cronoBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 32,
+    backgroundColor: Colors.surface,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: Colors.accent + "40",
+  },
+  cronoBtnText: {
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.accent,
   },
 });

@@ -534,6 +534,11 @@ export default function ProfileScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Menu</Text>
+        <MenuItem
+          icon={profile?.userType === "biker" || profile?.userType === "coppia" ? "build" : "heart"}
+          label={profile?.userType === "biker" || profile?.userType === "coppia" ? "Il Mio Garage" : "La Mia Wishlist"}
+          onPress={() => router.push("/garage" as any)}
+        />
         <MenuItem icon="create" label="Modifica Profilo" onPress={() => router.push("/profile/edit" as any)} />
         <MenuItem icon="bug" label="Segnala un Bug" onPress={() => router.push("/feedback/bug" as any)} color={Colors.accentRed} />
         <MenuItem icon="bulb" label="Richiedi Funzione" onPress={() => router.push("/feedback/feature" as any)} color={Colors.accent} />

@@ -97,6 +97,7 @@ export default function TabLayout() {
             <Ionicons name="navigate" size={size} color={color} />
           ),
           headerTitle: "Crono",
+          href: null,
         }}
       />
       <Tabs.Screen
@@ -107,6 +108,7 @@ export default function TabLayout() {
             <Ionicons name={isBikerOrCoppia ? "build" : "heart"} size={size} color={color} />
           ),
           headerTitle: isBikerOrCoppia ? "Il Mio Garage" : "La Mia Wishlist",
+          href: null,
         }}
       />
       <Tabs.Screen
