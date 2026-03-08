@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Switch,
+  Modal,
 } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useRouter, Stack } from "expo-router";
@@ -20,6 +21,7 @@ import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
+import MapPickerContent from "@/components/MapPickerModal";
 
 const BIKER_SEARCH_TYPES = [
   { key: "find_a_friend", label: "FindAFriend", subtitle: "Cerco altri biker", icon: "account-group", color: Colors.maleIcon },
@@ -80,8 +82,10 @@ export default function CreateProposalScreen() {
   const [maxParticipants, setMaxParticipants] = useState("");
   const [departureLat, setDepartureLat] = useState<number | null>(null);
   const [departureLng, setDepartureLng] = useState<number | null>(null);
-  const [gpsSource, setGpsSource] = useState<"profile" | "live" | null>(null);
+  const [gpsSource, setGpsSource] = useState<"profile" | "live" | "map" | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
+  const [showMapPicker, setShowMapPicker] = useState(false);
+  const [mapPickerCoord, setMapPickerCoord] = useState<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
     const profileLat = (user as any)?.profileLatitude;
@@ -91,6 +95,7 @@ export default function CreateProposalScreen() {
       setDepartureLng(profileLng);
       setGpsSource("profile");
     }
+    fetchLiveLocation();
   }, [user]);
 
   const fetchLiveLocation = useCallback(async () => {
@@ -324,7 +329,7 @@ export default function CreateProposalScreen() {
       <Stack.Screen
         options={{
           headerShown: true,
-          title: isZavorrina ? "Vorrei..." : "Nuova Proposta",
+          title: isZavorrina ? "Richieste" : "Nuova Proposta",
           headerStyle: { backgroundColor: Colors.surface },
           headerTintColor: Colors.text,
           headerLeft: () => (
@@ -485,9 +490,9 @@ export default function CreateProposalScreen() {
 
             <View style={styles.gpsRow}>
               <TouchableOpacity
-                style={[styles.gpsButton, !!gpsSource && { backgroundColor: Colors.accent + "30", borderColor: Colors.accent }]}
+                style={[styles.gpsButton, gpsSource === "live" && { backgroundColor: Colors.accent + "30", borderColor: Colors.accent }]}
                 onPress={() => {
-                  if (gpsSource) {
+                  if (gpsSource === "live") {
                     setGpsSource(null);
                     setDepartureLat(null);
                     setDepartureLng(null);
@@ -500,33 +505,45 @@ export default function CreateProposalScreen() {
                 {gpsLoading ? (
                   <ActivityIndicator size="small" color="#000" />
                 ) : (
-                  <Ionicons name={gpsSource ? "close-circle" : "navigate"} size={18} color={gpsSource ? Colors.accentRed : "#000"} />
+                  <Ionicons name={gpsSource === "live" ? "checkmark-circle" : "navigate"} size={18} color={gpsSource === "live" ? Colors.success : "#000"} />
                 )}
                 <Text style={styles.gpsButtonText}>
-                  {gpsLoading ? "Rilevamento..." : gpsSource ? "Rimuovi posizione" : "Usa la mia posizione"}
+                  {gpsLoading ? "Rilevamento..." : gpsSource === "live" ? "GPS attivo" : "Posizione attuale"}
                 </Text>
               </TouchableOpacity>
-              {!!gpsSource && (
-                <View style={styles.gpsStatus}>
-                  <Ionicons
-                    name={gpsSource === "live" ? "location" : "location-outline"}
-                    size={16}
-                    color={Colors.success}
-                  />
-                  <Text style={styles.gpsStatusText}>
-                    {gpsSource === "live" ? "GPS attivo" : "Posizione profilo"}
-                  </Text>
-                </View>
-              )}
-              {!gpsSource && (
-                <View style={styles.gpsStatus}>
-                  <Ionicons name="warning" size={16} color={Colors.accentRed} />
-                  <Text style={[styles.gpsStatusText, { color: Colors.accentRed }]}>
-                    Posizione richiesta
-                  </Text>
-                </View>
-              )}
+              <TouchableOpacity
+                style={[styles.gpsButton, gpsSource === "map" && { backgroundColor: Colors.accent + "30", borderColor: Colors.accent }]}
+                onPress={() => {
+                  setMapPickerCoord(departureLat && departureLng ? { latitude: departureLat, longitude: departureLng } : null);
+                  setShowMapPicker(true);
+                }}
+              >
+                <Ionicons name={gpsSource === "map" ? "checkmark-circle" : "map"} size={18} color={gpsSource === "map" ? Colors.success : "#000"} />
+                <Text style={styles.gpsButtonText}>
+                  {gpsSource === "map" ? "Mappa" : "Scegli sulla mappa"}
+                </Text>
+              </TouchableOpacity>
             </View>
+            {!!gpsSource && (
+              <View style={styles.gpsStatus}>
+                <Ionicons
+                  name={gpsSource === "live" ? "location" : gpsSource === "map" ? "pin" : "location-outline"}
+                  size={16}
+                  color={Colors.success}
+                />
+                <Text style={styles.gpsStatusText}>
+                  {gpsSource === "live" ? "Posizione GPS attuale" : gpsSource === "map" ? "Punto selezionato sulla mappa" : "Posizione profilo"}
+                </Text>
+              </View>
+            )}
+            {!gpsSource && (
+              <View style={styles.gpsStatus}>
+                <Ionicons name="warning" size={16} color={Colors.accentRed} />
+                <Text style={[styles.gpsStatusText, { color: Colors.accentRed }]}>
+                  Posizione richiesta
+                </Text>
+              </View>
+            )}
 
             {needsDestination && (
               <>
@@ -682,6 +699,22 @@ export default function CreateProposalScreen() {
 
         <View style={{ height: Platform.OS === "web" ? 34 : 40 }} />
       </KeyboardAwareScrollViewCompat>
+
+      <Modal visible={showMapPicker} animationType="slide" onRequestClose={() => setShowMapPicker(false)}>
+        <MapPickerContent
+          coord={mapPickerCoord}
+          onCoordChange={setMapPickerCoord}
+          onConfirm={() => {
+            if (mapPickerCoord) {
+              setDepartureLat(mapPickerCoord.latitude);
+              setDepartureLng(mapPickerCoord.longitude);
+              setGpsSource("map");
+            }
+            setShowMapPicker(false);
+          }}
+          onClose={() => setShowMapPicker(false)}
+        />
+      </Modal>
     </>
   );
 }

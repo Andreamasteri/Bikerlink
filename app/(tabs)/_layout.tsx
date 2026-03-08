@@ -58,11 +58,11 @@ export default function TabLayout() {
       <Tabs.Screen
         name="proposals"
         options={{
-          title: "Proposte",
+          title: isBikerOrCoppia ? "Proposte" : "Richieste",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="megaphone" size={size} color={color} />
           ),
-          headerTitle: "Proposte e Richieste",
+          headerTitle: isBikerOrCoppia ? "Proposte e Richieste" : "Le Mie Richieste",
         }}
       />
       <Tabs.Screen
