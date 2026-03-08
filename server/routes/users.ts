@@ -603,6 +603,7 @@ router.post("/me/photos", requireAuth, upload.single("photo"), async (req: Reque
       userId,
       photoUrl,
       sortOrder,
+      isApproved: true,
     });
 
     return res.status(201).json(photo);
