@@ -6,6 +6,7 @@ import {
   Pressable,
   Platform,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -57,13 +58,21 @@ export default function ReadyToRideScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[
+        styles.scrollContent,
+        {
+          paddingTop: Platform.OS === "web" ? 67 : insets.top + 16,
+          paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16,
+        },
+      ]}
+    >
       <View style={styles.content}>
         <Ionicons
           name="bicycle"
-          size={80}
+          size={64}
           color={isAvailable ? Colors.success : Colors.accentRed}
-          style={styles.icon}
         />
 
         <Text style={styles.statusText}>
@@ -71,7 +80,7 @@ export default function ReadyToRideScreen() {
         </Text>
         <Text style={styles.statusSubtext}>
           {isAvailable
-            ? "Gli altri biker possono vederti sulla mappa"
+            ? "Fai sapere a tutti che sei online e pronto a farti un giro!"
             : "Tocca il pulsante per renderti disponibile"}
         </Text>
 
@@ -102,7 +111,7 @@ export default function ReadyToRideScreen() {
           <Text style={styles.cronoBtnText}>Crono</Text>
         </Pressable>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -110,22 +119,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
   },
   content: {
     alignItems: "center",
     padding: 24,
-    gap: 16,
-  },
-  icon: {
-    marginBottom: 8,
+    gap: 8,
   },
   statusText: {
     fontSize: 28,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
     textAlign: "center",
+    marginTop: 4,
   },
   statusSubtext: {
     fontSize: 15,
@@ -140,7 +150,7 @@ const styles = StyleSheet.create({
     borderRadius: 70,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 24,
+    marginTop: 16,
     elevation: 6,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
