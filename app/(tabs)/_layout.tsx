@@ -68,7 +68,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="ready"
         options={{
-          title: "Ready!",
+          title: "Ride!",
           tabBarIcon: ({ focused }) => (
             <Ionicons
               name="bicycle"
@@ -76,7 +76,7 @@ export default function TabLayout() {
               color={isAvailable ? Colors.success : Colors.accentRed}
             />
           ),
-          headerTitle: "Ready!",
+          headerTitle: "Ride!",
         }}
       />
       <Tabs.Screen
