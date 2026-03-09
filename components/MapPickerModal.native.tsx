@@ -1,9 +1,16 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
-import { Ionicons } from "@expo/vector-icons";
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+
+interface ExistingWaypoint {
+  latitude: number;
+  longitude: number;
+  name: string;
+  waypointType: string;
+}
 
 interface Props {
   coord: { latitude: number; longitude: number } | null;
@@ -11,6 +18,7 @@ interface Props {
   onConfirm: () => void;
   onClose: () => void;
   initialRegion?: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
+  existingWaypoints?: ExistingWaypoint[];
 }
 
 const ITALY_REGION = {
@@ -20,8 +28,20 @@ const ITALY_REGION = {
   longitudeDelta: 12,
 };
 
-export default function MapPickerContent({ coord, onCoordChange, onConfirm, onClose, initialRegion }: Props) {
+const WAYPOINT_TYPE_COLORS: Record<string, string> = {
+  start: "#4CAF50",
+  stop: "#FF9800",
+  poi: "#2196F3",
+  end: "#E63946",
+};
+
+export default function MapPickerContent({ coord, onCoordChange, onConfirm, onClose, initialRegion, existingWaypoints = [] }: Props) {
   const insets = useSafeAreaInsets();
+  const region = initialRegion || ITALY_REGION;
+
+  const existingPolyline = existingWaypoints.length > 1
+    ? existingWaypoints.map((wp) => ({ latitude: wp.latitude, longitude: wp.longitude }))
+    : [];
 
   return (
     <View style={{ flex: 1, backgroundColor: Colors.background }}>
@@ -35,17 +55,43 @@ export default function MapPickerContent({ coord, onCoordChange, onConfirm, onCl
         </TouchableOpacity>
       </View>
       <MapView
+        key={`map-${region.latitude}-${region.longitude}`}
         style={{ flex: 1 }}
-        initialRegion={initialRegion || ITALY_REGION}
+        initialRegion={region}
         provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
         onPress={(e: any) => onCoordChange(e.nativeEvent.coordinate)}
       >
+        {existingPolyline.length > 1 && (
+          <Polyline
+            coordinates={existingPolyline}
+            strokeColor={Colors.accent}
+            strokeWidth={2}
+            lineDashPattern={[6, 4]}
+          />
+        )}
+        {existingWaypoints.map((wp, index) => (
+          <Marker
+            key={`existing-${index}`}
+            coordinate={{ latitude: wp.latitude, longitude: wp.longitude }}
+            title={wp.name}
+            pinColor={WAYPOINT_TYPE_COLORS[wp.waypointType] || "#888"}
+            opacity={0.7}
+          />
+        ))}
         {coord && <Marker coordinate={coord} pinColor="#FFD700" />}
       </MapView>
       {coord && (
         <View style={styles.mapCoordsBar}>
           <Text style={styles.mapCoordsText}>
             {coord.latitude.toFixed(6)}, {coord.longitude.toFixed(6)}
+          </Text>
+        </View>
+      )}
+      {existingWaypoints.length > 0 && (
+        <View style={styles.legendBar}>
+          <MaterialCommunityIcons name="map-marker-check" size={14} color={Colors.textSecondary} />
+          <Text style={styles.legendText}>
+            {existingWaypoints.length} {existingWaypoints.length === 1 ? "tappa inserita" : "tappe inserite"}
           </Text>
         </View>
       )}
@@ -77,4 +123,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   mapCoordsText: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.text },
+  legendBar: {
+    position: "absolute",
+    top: 0,
+    right: 16,
+    backgroundColor: Colors.surface + "DD",
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  legendText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
 });

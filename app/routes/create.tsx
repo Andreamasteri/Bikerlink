@@ -299,6 +299,12 @@ export default function CreateRouteScreen() {
             latitudeDelta: 0.05,
             longitudeDelta: 0.05,
           } : undefined}
+          existingWaypoints={waypoints.map((wp) => ({
+            latitude: wp.latitude,
+            longitude: wp.longitude,
+            name: wp.name,
+            waypointType: wp.waypointType,
+          }))}
         />
       </Modal>
 

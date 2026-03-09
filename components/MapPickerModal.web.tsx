@@ -4,12 +4,20 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 
+interface ExistingWaypoint {
+  latitude: number;
+  longitude: number;
+  name: string;
+  waypointType: string;
+}
+
 interface Props {
   coord: { latitude: number; longitude: number } | null;
   onCoordChange: (coord: { latitude: number; longitude: number }) => void;
   onConfirm: () => void;
   onClose: () => void;
   initialRegion?: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
+  existingWaypoints?: ExistingWaypoint[];
 }
 
 export default function MapPickerContent({ coord, onCoordChange, onConfirm, onClose }: Props) {
