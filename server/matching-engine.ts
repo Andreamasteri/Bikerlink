@@ -111,6 +111,73 @@ async function runMatching(): Promise<number> {
   }
 }
 
+async function runWishlistMatching(): Promise<number> {
+  try {
+    const wishlistMotos = await storage.getAllWishlistMotosWithUsers();
+    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
+
+    if (wishlistMotos.length === 0 || bikerMotorcycles.length === 0) return 0;
+
+    let matchCount = 0;
+
+    for (const wm of wishlistMotos) {
+      const zavarrinaId = wm.userId;
+      const wish = wm.wishlistMoto;
+
+      for (const bm of bikerMotorcycles) {
+        const bikerId = bm.userId;
+        const moto = bm.motorcycle;
+
+        if (bikerId === zavarrinaId) continue;
+
+        let compatible = false;
+
+        if (wish.motorcycleType && moto.motorcycleType) {
+          if (wish.motorcycleType.toLowerCase() === moto.motorcycleType.toLowerCase()) {
+            compatible = true;
+          }
+        }
+
+        if (wish.brand && moto.brand) {
+          if (wish.brand.toLowerCase() === moto.brand.toLowerCase()) {
+            compatible = true;
+          }
+        }
+
+        if (wish.brand && wish.model && moto.brand && moto.model) {
+          if (
+            wish.brand.toLowerCase() === moto.brand.toLowerCase() &&
+            (moto.model.toLowerCase().includes(wish.model.toLowerCase()) ||
+             wish.model.toLowerCase().includes(moto.model.toLowerCase()))
+          ) {
+            compatible = true;
+          }
+        }
+
+        if (!compatible) continue;
+
+        const existing = await storage.findExistingBikerZavarrinaMatch(bikerId, zavarrinaId, moto.id, wish.id);
+        if (existing) continue;
+
+        await storage.createMatch({
+          bikerId,
+          zavarrinaId,
+          bikerMotorcycleId: moto.id,
+          wishlistMotoId: wish.id,
+          status: "new",
+        });
+
+        matchCount++;
+      }
+    }
+
+    return matchCount;
+  } catch (error) {
+    console.error("Wishlist matching error:", error);
+    return 0;
+  }
+}
+
 async function runCleanup(): Promise<number> {
   try {
     return await storage.expireOldProposals();
@@ -136,7 +203,10 @@ export function startMatchingEngine(): void {
     if (expired > 0) console.log(`Expired ${expired} proposals`);
 
     const matches = await runMatching();
-    if (matches > 0) console.log(`Found ${matches} new matches`);
+    if (matches > 0) console.log(`Found ${matches} new proposal matches`);
+
+    const garageMatches = await runWishlistMatching();
+    if (garageMatches > 0) console.log(`Found ${garageMatches} new garage matches`);
   };
 
   run();

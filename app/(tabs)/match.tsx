@@ -37,7 +37,40 @@ function getSearchTypeIcon(searchType?: string | null): keyof typeof Ionicons.gl
   }
 }
 
-type TabKey = "pending" | "accepted" | "history";
+function GarageMatchCard({ match, currentUserId }: { match: any; currentUserId: string }) {
+  const isBiker = match.bikerId === currentUserId;
+  const otherNickname = isBiker ? match.zavarrinaNickname : match.bikerNickname;
+  const otherType = isBiker ? "zavorrina" : "biker";
+  const otherColor = otherType === "biker" ? Colors.maleIcon : Colors.femaleIcon;
+  const motoInfo = match.bikerMoto;
+  const wishInfo = match.wishlistMoto;
+
+  return (
+    <View style={styles.matchCard}>
+      <View style={styles.matchStatusRow}>
+        <Ionicons name="bicycle" size={16} color={Colors.accent} />
+        <Text style={styles.statusLabel}>Match Garage</Text>
+      </View>
+
+      <View style={styles.proposalRow}>
+        <Ionicons name="person" size={16} color={otherColor} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.proposalTitle}>{otherNickname}</Text>
+          <Text style={styles.proposalMeta}>
+            {isBiker ? "Cerca" : "Ha"}: {motoInfo ? `${motoInfo.brand || ""} ${motoInfo.model || ""}`.trim() || motoInfo.motorcycleType || "Moto" : "Moto"}
+          </Text>
+          {wishInfo && (
+            <Text style={[styles.proposalMeta, { color: Colors.accent }]}>
+              Wishlist: {`${wishInfo.brand || ""} ${wishInfo.model || ""}`.trim() || wishInfo.motorcycleType || "Qualsiasi"}
+            </Text>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+type TabKey = "pending" | "accepted" | "garage" | "history";
 
 function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, isPending }: {
   match: any;
@@ -190,12 +223,18 @@ export default function MatchScreen() {
     refetchInterval: 30000,
   });
 
+  const { data: garageMatches, isLoading: garageLoading, refetch: garageRefetch } = useQuery<any[]>({
+    queryKey: ["/api/proposals/garage-matches"],
+    refetchInterval: 30000,
+  });
+
   const allMatches = matches || [];
+  const allGarageMatches = garageMatches || [];
   const pendingMatches = allMatches.filter((m: any) => m.status === "pending");
   const acceptedMatches = allMatches.filter((m: any) => m.status === "accepted");
   const historyMatches = allMatches.filter((m: any) => m.status === "rejected" || m.status === "expired");
 
-  const currentList = activeTab === "pending" ? pendingMatches : activeTab === "accepted" ? acceptedMatches : historyMatches;
+  const currentList = activeTab === "pending" ? pendingMatches : activeTab === "accepted" ? acceptedMatches : activeTab === "garage" ? allGarageMatches : historyMatches;
 
   const acceptMutation = useMutation({
     mutationFn: async (matchId: string) => {
@@ -239,23 +278,29 @@ export default function MatchScreen() {
     onError: (err: Error) => Alert.alert("Errore", err.message),
   });
 
-  const renderItem = useCallback(({ item }: { item: any }) => (
-    <MatchCardFull
-      match={item}
-      currentUserId={user?.id || ""}
-      onAccept={() => {
-        setPendingMatchId(item.id);
-        acceptMutation.mutate(item.id);
-      }}
-      onReject={() => rejectMutation.mutate(item.id)}
-      onChatPress={item.conversationId ? () => router.push(`/chat/${item.conversationId}` as any) : undefined}
-      isPending={pendingMatchId === item.id}
-    />
-  ), [user?.id, pendingMatchId, acceptMutation, rejectMutation, router]);
+  const renderItem = useCallback(({ item }: { item: any }) => {
+    if (activeTab === "garage") {
+      return <GarageMatchCard match={item} currentUserId={user?.id || ""} />;
+    }
+    return (
+      <MatchCardFull
+        match={item}
+        currentUserId={user?.id || ""}
+        onAccept={() => {
+          setPendingMatchId(item.id);
+          acceptMutation.mutate(item.id);
+        }}
+        onReject={() => rejectMutation.mutate(item.id)}
+        onChatPress={item.conversationId ? () => router.push(`/chat/${item.conversationId}` as any) : undefined}
+        isPending={pendingMatchId === item.id}
+      />
+    );
+  }, [user?.id, pendingMatchId, acceptMutation, rejectMutation, router, activeTab]);
 
   const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; count: number }[] = [
     { key: "pending", label: "In attesa", icon: "hourglass", count: pendingMatches.length },
     { key: "accepted", label: "Accettati", icon: "checkmark-circle", count: acceptedMatches.length },
+    { key: "garage", label: "Garage", icon: "bicycle", count: allGarageMatches.length },
     { key: "history", label: "Cronologia", icon: "time", count: historyMatches.length },
   ];
 
@@ -311,24 +356,26 @@ export default function MatchScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.accent} />
+            <RefreshControl refreshing={isRefetching} onRefresh={() => { refetch(); garageRefetch(); }} tintColor={Colors.accent} />
           }
           scrollEnabled={currentList.length > 0}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons
-                name={activeTab === "pending" ? "flash-outline" : activeTab === "accepted" ? "checkmark-done-outline" : "archive-outline"}
+                name={activeTab === "pending" ? "flash-outline" : activeTab === "accepted" ? "checkmark-done-outline" : activeTab === "garage" ? "bicycle-outline" as any : "archive-outline"}
                 size={48}
                 color={Colors.textSecondary}
               />
               <Text style={styles.emptyTitle}>
-                {activeTab === "pending" ? "Nessun match in attesa" : activeTab === "accepted" ? "Nessun match accettato" : "Nessun match nella cronologia"}
+                {activeTab === "pending" ? "Nessun match in attesa" : activeTab === "accepted" ? "Nessun match accettato" : activeTab === "garage" ? "Nessun match garage" : "Nessun match nella cronologia"}
               </Text>
               <Text style={styles.emptyDesc}>
                 {activeTab === "pending"
                   ? "Crea una proposta nella tab Proposte e il sistema troverà automaticamente biker o zavorrine compatibili!"
                   : activeTab === "accepted"
                   ? "Quando accetti un match, apparirà qui con il link alla chat."
+                  : activeTab === "garage"
+                  ? "Il sistema incrocia le moto dei biker con la wishlist delle zavorrine. Aggiungi moto al garage o alla wishlist per trovare match!"
                   : "I match rifiutati o scaduti appariranno qui."}
               </Text>
             </View>

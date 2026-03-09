@@ -960,6 +960,11 @@ export class DatabaseStorage implements IStorage {
     return Number(result[0]?.count ?? 0);
   }
 
+  async getWishlistMoto(id: string): Promise<ZavarrinaWishlistMoto | undefined> {
+    const [moto] = await db.select().from(zavarrinaWishlistMotos).where(eq(zavarrinaWishlistMotos.id, id)).limit(1);
+    return moto;
+  }
+
   async getWishlistMotos(wishlistId: string): Promise<ZavarrinaWishlistMoto[]> {
     return db.select().from(zavarrinaWishlistMotos).where(eq(zavarrinaWishlistMotos.wishlistId, wishlistId));
   }
@@ -1039,6 +1044,37 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(bikerZavarrinaMatches).where(
       or(eq(bikerZavarrinaMatches.bikerId, userId), eq(bikerZavarrinaMatches.zavarrinaId, userId))
     ).orderBy(desc(bikerZavarrinaMatches.createdAt));
+  }
+
+  async getAllWishlistMotosWithUsers(): Promise<{ wishlistMoto: any; userId: string }[]> {
+    const results = await db.select({
+      wishlistMoto: zavarrinaWishlistMotos,
+      userId: zavarrinaWishlists.userId,
+    }).from(zavarrinaWishlistMotos)
+      .innerJoin(zavarrinaWishlists, eq(zavarrinaWishlists.id, zavarrinaWishlistMotos.wishlistId));
+    return results;
+  }
+
+  async getAllBikerMotorcyclesWithUsers(): Promise<{ motorcycle: any; userId: string }[]> {
+    const results = await db.select({
+      motorcycle: userMotorcycles,
+      userId: userMotorcycles.userId,
+    }).from(userMotorcycles)
+      .innerJoin(users, eq(users.id, userMotorcycles.userId))
+      .where(or(eq(users.userType, "biker"), eq(users.userType, "coppia")));
+    return results;
+  }
+
+  async findExistingBikerZavarrinaMatch(bikerId: string, zavarrinaId: string, bikerMotorcycleId: string, wishlistMotoId: string): Promise<BikerZavarrinaMatch | undefined> {
+    const [match] = await db.select().from(bikerZavarrinaMatches).where(
+      and(
+        eq(bikerZavarrinaMatches.bikerId, bikerId),
+        eq(bikerZavarrinaMatches.zavarrinaId, zavarrinaId),
+        eq(bikerZavarrinaMatches.bikerMotorcycleId, bikerMotorcycleId),
+        eq(bikerZavarrinaMatches.wishlistMotoId, wishlistMotoId)
+      )
+    ).limit(1);
+    return match;
   }
 
   async countAvailableBikers(since: Date): Promise<number> {

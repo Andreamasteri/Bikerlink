@@ -99,6 +99,37 @@ router.get("/matches", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+router.get("/garage-matches", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const garageMatches = await storage.getMatchesForUser(userId);
+
+    const results = await Promise.all(
+      garageMatches.map(async (match) => {
+        const biker = await storage.getUser(match.bikerId);
+        const zavorrina = await storage.getUser(match.zavarrinaId);
+        const bikerMoto = await storage.getUserMotorcycle(match.bikerMotorcycleId);
+        const wishlistMoto = await storage.getWishlistMoto(match.wishlistMotoId);
+
+        return {
+          ...match,
+          bikerNickname: biker?.nickname,
+          bikerType: biker?.userType,
+          zavarrinaNickname: zavorrina?.nickname,
+          zavarrinaType: zavorrina?.userType,
+          bikerMoto: bikerMoto ? { brand: bikerMoto.brand, model: bikerMoto.model, motorcycleType: bikerMoto.motorcycleType } : null,
+          wishlistMoto: wishlistMoto ? { brand: wishlistMoto.brand, model: wishlistMoto.model, motorcycleType: wishlistMoto.motorcycleType } : null,
+        };
+      })
+    );
+
+    return res.json(results);
+  } catch (error) {
+    console.error("Get garage matches error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.post("/matches/:id/accept", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
