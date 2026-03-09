@@ -310,69 +310,65 @@ export default function AdminAds() {
         <MaterialIcons name="add" size={28} color={Colors.background} />
       </TouchableOpacity>
 
-      <Modal visible={showCreateModal} animationType="slide" transparent>
-        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Nuova Campagna — {currentTab.label}</Text>
-                <TouchableOpacity onPress={() => { setShowCreateModal(false); resetForm(); }}>
-                  <MaterialIcons name="close" size={24} color={Colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-              <KeyboardAwareScrollViewCompat bottomOffset={20} keyboardShouldPersistTaps="handled">
-              <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
-                {formImageUri ? (
-                  <Image source={{ uri: formImageUri }} style={styles.imagePreview} resizeMode="cover" />
-                ) : (
-                  <View style={styles.imagePlaceholder}>
-                    <MaterialIcons name="add-photo-alternate" size={36} color={Colors.textSecondary} />
-                    <Text style={styles.imagePlaceholderText}>Carica immagine</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              <TextInput
-                style={styles.input}
-                placeholder="Nome campagna *"
-                placeholderTextColor={Colors.textSecondary}
-                value={formName}
-                onChangeText={setFormName}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="URL Link (es. https://...)"
-                placeholderTextColor={Colors.textSecondary}
-                value={formLinkUrl}
-                onChangeText={setFormLinkUrl}
-                keyboardType="url"
-                autoCapitalize="none"
-              />
-              <TextInput
-                style={[styles.input, { minHeight: 80 }]}
-                placeholder="Descrizione"
-                placeholderTextColor={Colors.textSecondary}
-                value={formDescription}
-                onChangeText={setFormDescription}
-                multiline
-                textAlignVertical="top"
-              />
-
-              <TouchableOpacity
-                style={[styles.submitBtn, { backgroundColor: currentTab.color }, !formName.trim() && styles.submitBtnDisabled]}
-                disabled={!formName.trim() || createMutation.isPending}
-                onPress={handleCreate}
-              >
-                {createMutation.isPending ? (
-                  <ActivityIndicator color={Colors.background} />
-                ) : (
-                  <Text style={styles.submitBtnText}>Crea Campagna</Text>
-                )}
-              </TouchableOpacity>
-              </KeyboardAwareScrollViewCompat>
-            </View>
+      <Modal visible={showCreateModal} animationType="slide">
+        <View style={[styles.createModalContainer, { paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Nuova Campagna — {currentTab.label}</Text>
+            <TouchableOpacity onPress={() => { setShowCreateModal(false); resetForm(); }}>
+              <MaterialIcons name="close" size={24} color={Colors.textSecondary} />
+            </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+          <KeyboardAwareScrollViewCompat bottomOffset={20} keyboardShouldPersistTaps="handled">
+            <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
+              {formImageUri ? (
+                <Image source={{ uri: formImageUri }} style={styles.imagePreview} resizeMode="cover" />
+              ) : (
+                <View style={styles.imagePlaceholder}>
+                  <MaterialIcons name="add-photo-alternate" size={36} color={Colors.textSecondary} />
+                  <Text style={styles.imagePlaceholderText}>Carica immagine</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Nome campagna *"
+              placeholderTextColor={Colors.textSecondary}
+              value={formName}
+              onChangeText={setFormName}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="URL Link (es. https://...)"
+              placeholderTextColor={Colors.textSecondary}
+              value={formLinkUrl}
+              onChangeText={setFormLinkUrl}
+              keyboardType="url"
+              autoCapitalize="none"
+            />
+            <TextInput
+              style={[styles.input, { minHeight: 80 }]}
+              placeholder="Descrizione"
+              placeholderTextColor={Colors.textSecondary}
+              value={formDescription}
+              onChangeText={setFormDescription}
+              multiline
+              textAlignVertical="top"
+            />
+
+            <TouchableOpacity
+              style={[styles.submitBtn, { backgroundColor: currentTab.color }, !formName.trim() && styles.submitBtnDisabled]}
+              disabled={!formName.trim() || createMutation.isPending}
+              onPress={handleCreate}
+            >
+              {createMutation.isPending ? (
+                <ActivityIndicator color={Colors.background} />
+              ) : (
+                <Text style={styles.submitBtnText}>Crea Campagna</Text>
+              )}
+            </TouchableOpacity>
+          </KeyboardAwareScrollViewCompat>
+        </View>
       </Modal>
 
       <Modal visible={showSettingsModal} animationType="fade" transparent>
@@ -565,6 +561,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 6,
+  },
+  createModalContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    padding: 20,
   },
   modalOverlay: {
     flex: 1,

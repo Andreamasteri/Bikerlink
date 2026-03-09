@@ -10,7 +10,14 @@ kill_port() {
   pkill -9 -f "node.*8081" 2>/dev/null || true
   lsof -ti:$PORT 2>/dev/null | xargs kill -9 2>/dev/null || true
   fuser -k -9 ${PORT}/tcp 2>/dev/null || true
-  sleep 3
+
+  for i in $(seq 1 10); do
+    if ! lsof -ti:$PORT >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "Attenzione: porta $PORT ancora occupata dopo 10s"
 }
 
 for retry in $(seq 1 $MAX_RETRIES); do
@@ -35,6 +42,10 @@ for retry in $(seq 1 $MAX_RETRIES); do
     wait $METRO_PID
     EXIT_CODE=$?
     echo "Metro terminato con codice: $EXIT_CODE"
+    if [ $EXIT_CODE -eq 137 ] || [ $EXIT_CODE -eq 143 ]; then
+      echo "Metro fermato dal sistema (signal kill/term), uscita pulita."
+      exit 0
+    fi
     if [ $retry -lt $MAX_RETRIES ]; then
       echo "Riavvio in corso..."
       continue

@@ -52,6 +52,7 @@ export default function MapScreen() {
   const [showBikerList, setShowBikerList] = useState(false);
   const [showZavorrinaList, setShowZavorrinaList] = useState(false);
   const [adIndex, setAdIndex] = useState(0);
+  const [adImageError, setAdImageError] = useState<string | null>(null);
   const [showOfflineOnline, setShowOfflineOnline] = useState(false);
   const [offlineCountdown, setOfflineCountdown] = useState<{ online: number }>({ online: 0 });
 
@@ -774,11 +775,12 @@ export default function MapScreen() {
 
       {adsGloballyEnabled && myAds.length > 0 && (
         <Pressable style={styles.adBanner} onPress={() => handleAdClick(myAds[adIndex % myAds.length])}>
-          {(myAds[adIndex % myAds.length] as any)?.imageUrl ? (
+          {(myAds[adIndex % myAds.length] as any)?.imageUrl && adImageError !== (myAds[adIndex % myAds.length] as any)?.id ? (
             <Image
               source={{ uri: `${getApiUrl()}${(myAds[adIndex % myAds.length] as any).imageUrl}` }}
               style={styles.adImage}
               resizeMode="cover"
+              onError={() => setAdImageError((myAds[adIndex % myAds.length] as any)?.id)}
             />
           ) : (
             <View style={styles.adPlaceholder}>
