@@ -120,7 +120,7 @@ export default function ChatConversationScreen() {
 
   const { data: messages, isLoading } = useQuery<ChatMessage[]>({
     queryKey: ["/api/chat/conversations", id, "messages"],
-    refetchInterval: 5000,
+    refetchInterval: 30000,
     enabled: !!id,
   });
 
