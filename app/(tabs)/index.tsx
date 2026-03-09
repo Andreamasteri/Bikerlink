@@ -187,10 +187,17 @@ export default function MapScreen() {
     enabled: isAuthenticated && !!location,
   });
 
+  const { data: adsEnabledData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/ads-enabled"],
+    staleTime: 30000,
+    enabled: isAuthenticated,
+  });
+  const adsGloballyEnabled = adsEnabledData?.enabled !== false;
+
   const myAdsQuery = useQuery<any[]>({
     queryKey: ["/api/ads/my-ads"],
     staleTime: 60000,
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && adsGloballyEnabled,
   });
 
   const onlineCountQuery = useQuery<{ count: number }>({
@@ -765,7 +772,7 @@ export default function MapScreen() {
         </Pressable>
       </Modal>
 
-      {myAds.length > 0 && (
+      {adsGloballyEnabled && myAds.length > 0 && (
         <Pressable style={styles.adBanner} onPress={() => handleAdClick(myAds[adIndex % myAds.length])}>
           {(myAds[adIndex % myAds.length] as any)?.imageUrl ? (
             <Image

@@ -449,7 +449,7 @@ export default function AdminSettings() {
         <View style={styles.synecoHeader}>
           <View style={styles.synecoInfo}>
             <Ionicons name="volume-high" size={20} color={Colors.syneco} />
-            <Text style={styles.synecoLabel}>Pubblicità</Text>
+            <Text style={styles.synecoLabel}>Advertisement</Text>
           </View>
           <Switch
             value={adsEnabled}
@@ -460,7 +460,7 @@ export default function AdminSettings() {
           />
         </View>
         <Text style={styles.synecoDesc}>
-          {adsEnabled ? "Le pubblicità sono attive nell'app" : "Le pubblicità sono disattivate"}
+          {adsEnabled ? "Gli advertisement sono attivi nell'app" : "Gli advertisement sono disattivati"}
         </Text>
       </View>
 

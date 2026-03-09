@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -98,6 +98,7 @@ function CampaignCard({
 
 export default function AdminAds() {
   const insets = useSafeAreaInsets();
+  const flatListRef = useRef<FlatList>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("biker");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -153,7 +154,10 @@ export default function AdminAds() {
     mutationFn: async (id: string) => {
       await apiRequest("DELETE", `/api/admin/advertisements/${id}`);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    },
   });
 
   const updateRotationMutation = useMutation({
@@ -278,6 +282,7 @@ export default function AdminAds() {
         </View>
       ) : (
         <FlatList
+          ref={flatListRef}
           data={campaigns}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
