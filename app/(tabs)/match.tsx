@@ -477,7 +477,7 @@ export default function MatchScreen() {
           >
             <Ionicons
               name={tab.icon}
-              size={16}
+              size={14}
               color={activeTab === tab.key ? Colors.accent : Colors.textSecondary}
             />
             <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
@@ -575,18 +575,19 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: "row" as const,
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
     paddingVertical: 8,
-    gap: 6,
+    gap: 4,
   },
   tab: {
     flex: 1,
     flexDirection: "row" as const,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 12,
+    gap: 3,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 10,
     backgroundColor: Colors.surface,
   },
   tabActive: {
@@ -595,7 +596,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent + "40",
   },
   tabText: {
-    fontSize: 13,
+    fontSize: 11,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
   },
@@ -604,15 +605,15 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   countBadge: {
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
   },
   countBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "700" as const,
   },
   loading: {
