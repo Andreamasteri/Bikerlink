@@ -158,6 +158,13 @@ export default function CreateRouteScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={styles.betaWarning}>
+          <MaterialCommunityIcons name="alert" size={22} color="#FF6600" />
+          <Text style={styles.betaWarningText}>
+            ATTENZIONE!!! QUESTA OPZIONE È ANCORA IN FASE BETA! I COLLEGAMENTI TRA UNA TAPPA E L'ALTRA SONO DIRETTI, NON TENGONO CONTO DELLE STRADE. PER AVERE IL PERCORSO COMPLETO SU GOOGLE MAPS, BASTA SELEZIONARE IL LINK GENERATO
+          </Text>
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Titolo *</Text>
           <TextInput
@@ -388,6 +395,24 @@ const styles = StyleSheet.create({
   },
   scroll: { flex: 1 },
   scrollContent: { padding: 16 },
+  betaWarning: {
+    flexDirection: "row" as const,
+    backgroundColor: "#FF660018",
+    borderWidth: 1,
+    borderColor: "#FF6600",
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+    marginBottom: 16,
+    alignItems: "flex-start" as const,
+  },
+  betaWarningText: {
+    flex: 1,
+    color: "#FF6600",
+    fontSize: 12,
+    fontWeight: "700" as const,
+    lineHeight: 18,
+  },
   section: { marginBottom: 16 },
   sectionLabel: {
     fontSize: 13,

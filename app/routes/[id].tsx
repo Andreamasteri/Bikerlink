@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Linking,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -149,6 +150,21 @@ export default function CustomRouteDetailScreen() {
           waypointTypeColors={WAYPOINT_TYPE_COLORS}
         />
       </View>
+
+      {waypoints.length >= 2 && (
+        <TouchableOpacity
+          style={styles.googleMapsBtn}
+          onPress={() => {
+            const coords = waypoints.map((wp) => `${wp.latitude},${wp.longitude}`).join("/");
+            const url = `https://www.google.com/maps/dir/${coords}`;
+            Linking.openURL(url);
+          }}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="google-maps" size={20} color="#fff" />
+          <Text style={styles.googleMapsBtnText}>Apri in Google Maps</Text>
+        </TouchableOpacity>
+      )}
 
       <View style={styles.header}>
         <View style={styles.titleRow}>
@@ -299,6 +315,23 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 16,
     marginTop: 12,
+  },
+  googleMapsBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    backgroundColor: "#1a73e8",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginHorizontal: 20,
+    marginTop: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  googleMapsBtnText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600" as const,
   },
   mapContainer: {
     height: 280,
