@@ -162,7 +162,7 @@ export default function ChatScreen() {
 
   const { data: conversations, isLoading } = useQuery<ConversationItem[]>({
     queryKey: ["/api/chat/conversations"],
-    refetchInterval: 30000,
+    refetchInterval: 10000,
   });
 
   const { data: users } = useQuery<UserSearchResult[]>({

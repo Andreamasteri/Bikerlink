@@ -4,7 +4,6 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
 import { storage } from "./storage";
-import { setupWebSocket } from "./websocket";
 import authRoutes from "./routes/auth";
 import userRoutes from "./routes/users";
 import motorcycleRoutes from "./routes/motorcycles";
@@ -191,9 +190,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
-
-  const sessionSecret = process.env.SESSION_SECRET || "bikerlink-secret-key-change-in-production";
-  setupWebSocket(httpServer, sessionSecret);
 
   return httpServer;
 }

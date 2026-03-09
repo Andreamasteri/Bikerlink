@@ -3,7 +3,6 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { storage } from "../storage";
-import { broadcastToUser } from "../websocket";
 
 const router = Router();
 
@@ -224,11 +223,9 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
 
     if (existingProfile) {
       const profile = await storage.updateUserProfile(userId, updateData as any);
-      broadcastToUser(userId, "user:availabilityChanged", { isAvailable });
       return res.json(profile);
     } else {
       const profile = await storage.createUserProfile({ userId, ...updateData } as any);
-      broadcastToUser(userId, "user:availabilityChanged", { isAvailable });
       return res.json(profile);
     }
   } catch (error) {

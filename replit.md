@@ -236,11 +236,3 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - Badge "PRIMAL" dorato (#FFD700) visibile nel pannello admin utenti e nel profilo utente
 - Endpoint: `GET /api/settings/primal-user`, setting key: `primal_user_enabled`
 
-### Sincronizzazione Multi-Dispositivo (WebSocket)
-- `server/websocket.ts`: server WebSocket (`ws` package) su path `/ws`, autenticazione via session cookie
-- Mappa `userId → Set<WebSocket>` per supporto multi-dispositivo
-- Ping/pong heartbeat ogni 30s per mantenere connessioni attive
-- Eventi emessi: `chat:newMessage`, `chat:messageSent`, `user:availabilityChanged`
-- `lib/websocket-context.tsx`: hook React con auto-reconnect (backoff esponenziale), invalida cache React Query su eventi
-- Polling chat ridotto a 30s (da 5s/10s) come fallback — WebSocket gestisce aggiornamenti in tempo reale
-- WebSocketProvider integrato in `app/_layout.tsx` dentro AuthProvider

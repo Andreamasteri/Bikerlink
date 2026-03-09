@@ -1,6 +1,5 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
-import { broadcastToUser, broadcastToUsers } from "../websocket";
 
 const router = Router();
 
@@ -628,16 +627,6 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
 
     await storage.updateConversationTimestamp(id);
 
-    const otherParticipantIds = participants
-      .filter((p) => p.userId !== userId)
-      .map((p) => p.userId);
-    broadcastToUsers(otherParticipantIds, "chat:newMessage", {
-      conversationId: id,
-      senderId: userId,
-      messageType: messageType || "text",
-    });
-    broadcastToUser(userId, "chat:messageSent", { conversationId: id });
-
     for (const p of participants) {
       if (p.userId !== userId) {
         const targetUser = await storage.getUser(p.userId);
@@ -684,11 +673,6 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
                 isFiltered: false,
               });
               await storage.updateConversationTimestamp(convId);
-              broadcastToUser(userId, "chat:newMessage", {
-                conversationId: convId,
-                senderId: fakeUserId,
-                messageType: "text",
-              });
             } catch (err) {
               console.error("Fake bot reply error:", err);
             }
