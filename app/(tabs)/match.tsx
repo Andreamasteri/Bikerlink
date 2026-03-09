@@ -37,7 +37,7 @@ function getSearchTypeIcon(searchType?: string | null): keyof typeof Ionicons.gl
   }
 }
 
-function GarageMatchCard({ match, currentUserId }: { match: any; currentUserId: string }) {
+function GarageMatchCard({ match, currentUserId, onPress }: { match: any; currentUserId: string; onPress?: () => void }) {
   const isBiker = match.bikerId === currentUserId;
   const otherNickname = isBiker ? match.zavarrinaNickname : match.bikerNickname;
   const otherType = isBiker ? "zavorrina" : "biker";
@@ -45,28 +45,53 @@ function GarageMatchCard({ match, currentUserId }: { match: any; currentUserId: 
   const motoInfo = match.bikerMoto;
   const wishInfo = match.wishlistMoto;
 
+  const createdDate = match.createdAt
+    ? new Date(match.createdAt).toLocaleDateString("it-IT", {
+        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+      })
+    : null;
+
   return (
-    <View style={styles.matchCard}>
+    <TouchableOpacity style={styles.matchCard} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.matchStatusRow}>
         <Ionicons name="bicycle" size={16} color={Colors.accent} />
         <Text style={styles.statusLabel}>Match Garage</Text>
+        {createdDate && <Text style={styles.matchDate}>{createdDate}</Text>}
       </View>
 
-      <View style={styles.proposalRow}>
-        <Ionicons name="person" size={16} color={otherColor} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.proposalTitle}>{otherNickname}</Text>
-          <Text style={styles.proposalMeta}>
-            {isBiker ? "Cerca" : "Ha"}: {motoInfo ? `${motoInfo.brand || ""} ${motoInfo.model || ""}`.trim() || motoInfo.motorcycleType || "Moto" : "Moto"}
-          </Text>
-          {wishInfo && (
-            <Text style={[styles.proposalMeta, { color: Colors.accent }]}>
-              Wishlist: {`${wishInfo.brand || ""} ${wishInfo.model || ""}`.trim() || wishInfo.motorcycleType || "Qualsiasi"}
+      <View style={styles.matchUserRow}>
+        <View style={styles.matchUserInfo}>
+          <Ionicons
+            name={otherType === "biker" ? "bicycle" : "person"}
+            size={28}
+            color={otherColor}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.matchNickname, { color: otherColor }]}>{otherNickname}</Text>
+            <Text style={styles.matchUserType}>
+              {otherType === "biker" ? "Biker" : "Zavorrina"}
             </Text>
-          )}
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+      </View>
+
+      <View style={styles.matchProposals}>
+        <View style={[styles.proposalMini, { flex: 1 }]}>
+          <Text style={styles.proposalMiniLabel}>Moto</Text>
+          <Text style={styles.proposalMiniTitle} numberOfLines={1}>
+            {motoInfo ? `${motoInfo.brand || ""} ${motoInfo.model || ""}`.trim() || motoInfo.motorcycleType || "Moto" : "Moto"}
+          </Text>
+        </View>
+        <Ionicons name="swap-horizontal" size={18} color={Colors.accent} style={{ marginHorizontal: 4 }} />
+        <View style={[styles.proposalMini, { flex: 1 }]}>
+          <Text style={[styles.proposalMiniLabel, { color: Colors.accent }]}>Wishlist</Text>
+          <Text style={styles.proposalMiniTitle} numberOfLines={1}>
+            {wishInfo ? `${wishInfo.brand || ""} ${wishInfo.model || ""}`.trim() || wishInfo.motorcycleType || "Qualsiasi" : "Qualsiasi"}
+          </Text>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -232,11 +257,14 @@ export default function MatchScreen() {
 
   const allMatches = matches || [];
   const allGarageMatches = garageMatches || [];
-  const pendingMatches = allMatches.filter((m: any) => m.status === "pending");
+  const pendingProposalMatches = allMatches.filter((m: any) => m.status === "pending");
   const acceptedMatches = allMatches.filter((m: any) => m.status === "accepted");
   const historyMatches = allMatches.filter((m: any) => m.status === "rejected" || m.status === "expired");
 
-  const totalNewMatches = pendingMatches.length + allGarageMatches.length;
+  const garageMatchesTagged = allGarageMatches.map((m: any) => ({ ...m, _isGarage: true }));
+  const pendingMatches = [...pendingProposalMatches, ...garageMatchesTagged];
+
+  const totalNewMatches = pendingMatches.length;
 
   useEffect(() => {
     if (prevMatchCountRef.current === null) {
@@ -253,7 +281,7 @@ export default function MatchScreen() {
     prevMatchCountRef.current = totalNewMatches;
   }, [totalNewMatches]);
 
-  const currentList = activeTab === "pending" ? pendingMatches : activeTab === "accepted" ? acceptedMatches : activeTab === "garage" ? allGarageMatches : historyMatches;
+  const currentList = activeTab === "pending" ? pendingMatches : activeTab === "accepted" ? acceptedMatches : activeTab === "garage" ? garageMatchesTagged : historyMatches;
 
   const acceptMutation = useMutation({
     mutationFn: async (matchId: string) => {
@@ -297,9 +325,26 @@ export default function MatchScreen() {
     onError: (err: Error) => Alert.alert("Errore", err.message),
   });
 
+  const handleGarageMatchPress = useCallback((item: any) => {
+    const isBiker = item.bikerId === user?.id;
+    const otherNickname = isBiker ? item.zavarrinaNickname : item.bikerNickname;
+    const motoInfo = item.bikerMoto;
+    const wishInfo = item.wishlistMoto;
+    const motoStr = motoInfo ? `${motoInfo.brand || ""} ${motoInfo.model || ""}`.trim() || motoInfo.motorcycleType || "Moto" : "Moto";
+    const wishStr = wishInfo ? `${wishInfo.brand || ""} ${wishInfo.model || ""}`.trim() || wishInfo.motorcycleType || "" : "";
+
+    const message = `${otherNickname} ${isBiker ? "cerca" : "ha"} una ${motoStr}${wishStr ? `\nWishlist: ${wishStr}` : ""}`;
+
+    if (Platform.OS === "web") {
+      window.alert(`Match Garage!\n\n${message}`);
+    } else {
+      Alert.alert("Match Garage!", message);
+    }
+  }, [user?.id]);
+
   const renderItem = useCallback(({ item }: { item: any }) => {
-    if (activeTab === "garage") {
-      return <GarageMatchCard match={item} currentUserId={user?.id || ""} />;
+    if (item._isGarage) {
+      return <GarageMatchCard match={item} currentUserId={user?.id || ""} onPress={() => handleGarageMatchPress(item)} />;
     }
     return (
       <MatchCardFull
@@ -314,12 +359,12 @@ export default function MatchScreen() {
         isPending={pendingMatchId === item.id}
       />
     );
-  }, [user?.id, pendingMatchId, acceptMutation, rejectMutation, router, activeTab]);
+  }, [user?.id, pendingMatchId, acceptMutation, rejectMutation, router, handleGarageMatchPress]);
 
   const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; count: number }[] = [
     { key: "pending", label: "In attesa", icon: "hourglass", count: pendingMatches.length },
     { key: "accepted", label: "Accettati", icon: "checkmark-circle", count: acceptedMatches.length },
-    { key: "garage", label: "Garage", icon: "bicycle", count: allGarageMatches.length },
+    { key: "garage", label: "Garage", icon: "bicycle", count: garageMatchesTagged.length },
     { key: "history", label: "Cronologia", icon: "time", count: historyMatches.length },
   ];
 
