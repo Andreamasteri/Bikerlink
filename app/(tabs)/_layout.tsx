@@ -6,8 +6,6 @@ import { Platform, View, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery } from "@tanstack/react-query";
-import { useAudioPlayer } from "expo-audio";
-
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -29,15 +27,21 @@ export default function TabLayout() {
 
   const unreadCount = unreadData?.count ?? 0;
 
-  const notifPlayer = useAudioPlayer("https://www.soundjay.com/buttons/beep-01a.mp3");
-
   useEffect(() => {
     if (unreadCount > prevUnreadRef.current && prevUnreadRef.current >= 0) {
-      try {
-        notifPlayer.seekTo(0);
-        notifPlayer.volume = 0.3;
-        notifPlayer.play();
-      } catch {}
+      if (Platform.OS === "web" && typeof window !== "undefined" && (window as any).AudioContext) {
+        try {
+          const ctx = new ((window as any).AudioContext || (window as any).webkitAudioContext)();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = 800;
+          gain.gain.value = 0.1;
+          osc.start();
+          osc.stop(ctx.currentTime + 0.15);
+        } catch {}
+      }
     }
     prevUnreadRef.current = unreadCount;
   }, [unreadCount]);
