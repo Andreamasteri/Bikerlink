@@ -1954,10 +1954,10 @@ router2.get("/online-list", requireAuth, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq2, and: and2, lt, or: or2, isNull } = await import("drizzle-orm");
+      const { eq: eq3, and: and2, lt, or: or2, isNull } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const offlineResults = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(usersTable).leftJoin(profilesTable, eq2(profilesTable.userId, usersTable.id)).where(and2(eq2(usersTable.status, "active"), or2(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt)))).orderBy(sqlTag`distance`);
+      const offlineResults = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(usersTable).leftJoin(profilesTable, eq3(profilesTable.userId, usersTable.id)).where(and2(eq3(usersTable.status, "active"), or2(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt)))).orderBy(sqlTag`distance`);
       const offlineOnly = offlineResults.filter((r) => !onlineIdSet.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
     }
@@ -2057,10 +2057,10 @@ router2.get("/biker-available-list", requireAuth, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq2, and: and2, or: or2 } = await import("drizzle-orm");
+      const { eq: eq3, and: and2, or: or2 } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const allBikers = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq2(usersTable.id, profilesTable.userId)).where(and2(eq2(usersTable.status, "active"), or2(eq2(usersTable.userType, "biker"), eq2(usersTable.userType, "coppia")))).orderBy(sqlTag`distance`);
+      const allBikers = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq3(usersTable.id, profilesTable.userId)).where(and2(eq3(usersTable.status, "active"), or2(eq3(usersTable.userType, "biker"), eq3(usersTable.userType, "coppia")))).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));
       const offlineOnly = allBikers.filter((r) => !onlineIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
@@ -2107,10 +2107,10 @@ router2.get("/zavorrine-available-list", requireAuth, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq2, and: and2 } = await import("drizzle-orm");
+      const { eq: eq3, and: and2 } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const allZav = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq2(usersTable.id, profilesTable.userId)).where(and2(eq2(usersTable.status, "active"), eq2(usersTable.userType, "zavorrina"))).orderBy(sqlTag`distance`);
+      const allZav = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq3(usersTable.id, profilesTable.userId)).where(and2(eq3(usersTable.status, "active"), eq3(usersTable.userType, "zavorrina"))).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));
       const offlineOnly = allZav.filter((r) => !onlineIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
@@ -4690,8 +4690,8 @@ router16.get("/easter-eggs/:id/stats", async (req, res) => {
     }
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { collectedEasterEggs: collectedEasterEggs2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq2, count } = await import("drizzle-orm");
-    const [result] = await db2.select({ count: count() }).from(collectedEasterEggs2).where(eq2(collectedEasterEggs2.easterEggId, id));
+    const { eq: eq3, count } = await import("drizzle-orm");
+    const [result] = await db2.select({ count: count() }).from(collectedEasterEggs2).where(eq3(collectedEasterEggs2.easterEggId, id));
     return res.json({ eggId: id, collectionsCount: result?.count || 0 });
   } catch (error) {
     console.error("Admin get easter egg stats error:", error);
@@ -5880,6 +5880,54 @@ function startMatchingEngine() {
   console.log("Fake zavorrine availability rotation started (5min interval)");
 }
 
+// server/auto-seed.ts
+init_db();
+init_schema();
+import bcrypt3 from "bcryptjs";
+import { eq as eq2 } from "drizzle-orm";
+var essentialUsers = [
+  {
+    nickname: "admin",
+    email: "admin@bikerlink.it",
+    password: "admin2025!",
+    role: "admin",
+    userType: "biker",
+    sex: "M"
+  },
+  {
+    nickname: "moderatore",
+    email: "mod@bikerlink.it",
+    password: "mod2025!",
+    role: "moderator",
+    userType: "biker",
+    sex: "M"
+  }
+];
+async function autoSeedEssentialUsers() {
+  try {
+    for (const userData of essentialUsers) {
+      const existing = await db.select().from(users).where(eq2(users.email, userData.email)).limit(1);
+      if (existing.length > 0) {
+        continue;
+      }
+      const hashedPassword = await bcrypt3.hash(userData.password, 12);
+      const [user] = await db.insert(users).values({
+        nickname: userData.nickname,
+        email: userData.email,
+        password: hashedPassword,
+        role: userData.role,
+        userType: userData.userType,
+        sex: userData.sex,
+        eulaAccepted: true
+      }).returning();
+      await db.insert(userProfiles).values({ userId: user.id });
+      console.log(`Auto-seeded essential user: ${user.nickname} (${user.role})`);
+    }
+  } catch (err) {
+    console.error("Auto-seed failed:", err);
+  }
+}
+
 // server/index.ts
 import * as fs5 from "fs";
 import * as path5 from "path";
@@ -6049,6 +6097,7 @@ function setupErrorHandler(app2) {
   configureExpoAndLanding(app);
   const server = await registerRoutes(app);
   setupErrorHandler(app);
+  await autoSeedEssentialUsers();
   const port = parseInt(process.env.PORT || "5000", 10);
   server.listen(
     {
