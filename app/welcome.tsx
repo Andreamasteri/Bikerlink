@@ -34,28 +34,30 @@ export default function WelcomeScreen() {
       return;
     }
 
+    const useNative = Platform.OS !== "web";
+
     Animated.sequence([
       Animated.timing(titleOpacity, {
         toValue: 1,
         duration: 800,
-        useNativeDriver: true,
+        useNativeDriver: useNative,
       }),
       Animated.timing(taglineOpacity, {
         toValue: 1,
         duration: 600,
-        useNativeDriver: true,
+        useNativeDriver: useNative,
       }),
       Animated.delay(400),
       Animated.parallel([
         Animated.timing(buttonsTranslateY, {
           toValue: 0,
           duration: 500,
-          useNativeDriver: true,
+          useNativeDriver: useNative,
         }),
         Animated.timing(buttonsOpacity, {
           toValue: 1,
           duration: 500,
-          useNativeDriver: true,
+          useNativeDriver: useNative,
         }),
       ]),
     ]).start();
