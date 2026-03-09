@@ -488,7 +488,7 @@ export default function ProfileScreen() {
 
       {currentUserType === "biker" && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Cerco</Text>
+          <Text style={styles.sectionTitle}>Ricerca Match con ...</Text>
           <View style={styles.searchPrefRow}>
             {([
               { value: "bikers" as const, label: "Solo Biker", icon: "bicycle" as keyof typeof Ionicons.glyphMap },

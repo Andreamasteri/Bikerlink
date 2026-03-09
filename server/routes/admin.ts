@@ -138,6 +138,28 @@ router.put("/users/:id/password", async (req: Request, res: Response) => {
   }
 });
 
+router.delete("/users/:id", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const user = await storage.getUser(id);
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    await storage.deleteUser(id);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "delete_user",
+      targetType: "user",
+      targetId: id,
+      details: `Utente eliminato: ${user.nickname}`,
+    });
+    return res.json({ message: "Utente eliminato con successo" });
+  } catch (error) {
+    console.error("Admin delete user error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.get("/workshops", async (_req: Request, res: Response) => {
   try {
     const workshopsList = await storage.getWorkshops();
@@ -471,8 +493,11 @@ router.get("/analytics", async (_req: Request, res: Response) => {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const [totalUsers, activeUsersMonth, activeUsersWeek, workshopContacts, campaigns, pendingReports] = await Promise.all([
-      storage.countUsers(),
+    const { pool } = await import("../db");
+    const totalUsersResult = await pool.query("SELECT count(*)::int as count FROM users WHERE is_fake = false");
+    const totalUsers = totalUsersResult.rows[0]?.count ?? 0;
+
+    const [activeUsersMonth, activeUsersWeek, workshopContacts, campaigns, pendingReports] = await Promise.all([
       storage.countActiveUsers(thirtyDaysAgo),
       storage.countActiveUsers(sevenDaysAgo),
       storage.getWorkshopContactsByPeriod(thirtyDaysAgo, now),
@@ -527,6 +552,71 @@ router.get("/analytics/export-csv", async (_req: Request, res: Response) => {
     return res.send(csv);
   } catch (error) {
     console.error("Admin export CSV error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/analytics/users-list", async (_req: Request, res: Response) => {
+  try {
+    const { pool } = await import("../db");
+    const result = await pool.query(
+      "SELECT id, nickname, user_type as \"userType\", sex, region, created_at as \"createdAt\" FROM users WHERE is_fake = false ORDER BY created_at DESC"
+    );
+    return res.json(result.rows);
+  } catch (error) {
+    console.error("Admin analytics users-list error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/analytics/active-users", async (req: Request, res: Response) => {
+  try {
+    const period = parseInt(req.query.period as string) || 30;
+    const since = new Date(Date.now() - period * 24 * 60 * 60 * 1000);
+    const { pool } = await import("../db");
+    const result = await pool.query(
+      "SELECT id, nickname, user_type as \"userType\", last_login_at as \"lastLoginAt\" FROM users WHERE is_fake = false AND status = 'active' AND last_login_at >= $1 ORDER BY last_login_at DESC",
+      [since]
+    );
+    return res.json(result.rows);
+  } catch (error) {
+    console.error("Admin analytics active-users error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/analytics/ad-clicks", async (_req: Request, res: Response) => {
+  try {
+    const { pool } = await import("../db");
+    const result = await pool.query(
+      `SELECT ac.id, ac.user_id as "userId", u.nickname, u.user_type as "userType", 
+              camp.name as "adTitle", ac.created_at as "clickedAt"
+       FROM ad_clicks ac
+       LEFT JOIN users u ON ac.user_id = u.id
+       LEFT JOIN ad_campaigns camp ON ac.campaign_id = camp.id
+       ORDER BY ac.created_at DESC`
+    );
+    return res.json(result.rows);
+  } catch (error) {
+    console.error("Admin analytics ad-clicks error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/analytics/pending-reports", async (_req: Request, res: Response) => {
+  try {
+    const { pool } = await import("../db");
+    const result = await pool.query(
+      `SELECT ft.id, ft.ticket_type as "type", ft.subject as "title", ft.message as "description",
+              u.nickname as "submittedBy", ft.created_at as "createdAt"
+       FROM feedback_tickets ft
+       LEFT JOIN users u ON ft.user_id = u.id
+       WHERE ft.status = 'open'
+       ORDER BY ft.created_at DESC`
+    );
+    return res.json(result.rows);
+  } catch (error) {
+    console.error("Admin analytics pending-reports error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -868,6 +958,28 @@ router.post("/fake-users", async (req: Request, res: Response) => {
     return res.status(201).json(safeUser);
   } catch (error) {
     console.error("Admin create fake user error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.put("/fake-users/toggle-all", async (req: Request, res: Response) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== "boolean") {
+      return res.status(400).json({ message: "Il campo 'enabled' deve essere un booleano" });
+    }
+    const { db } = await import("../db");
+    const { users: usersTable, userProfiles } = await import("../../shared/schema");
+    const { eq } = await import("drizzle-orm");
+    const fakeUsers = await db.select().from(usersTable).where(eq(usersTable.isFake, true));
+    const newLoginAt = enabled ? new Date() : new Date("2020-01-01");
+    for (const fakeUser of fakeUsers) {
+      await db.update(userProfiles).set({ isAvailable: enabled }).where(eq(userProfiles.userId, fakeUser.id));
+      await db.update(usersTable).set({ lastLoginAt: newLoginAt }).where(eq(usersTable.id, fakeUser.id));
+    }
+    return res.json({ message: `Tutti gli utenti fake sono stati ${enabled ? "abilitati" : "disabilitati"}`, count: fakeUsers.length });
+  } catch (error) {
+    console.error("Admin toggle all fake users error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

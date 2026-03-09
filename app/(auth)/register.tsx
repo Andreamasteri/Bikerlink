@@ -11,6 +11,7 @@ import {
   ScrollView,
   Modal,
   FlatList,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -187,6 +188,16 @@ export default function RegisterScreen() {
 
   const handleRegister = () => {
     setError("");
+
+    if (birthYear) {
+      const currentYear = new Date().getFullYear();
+      const age = currentYear - parseInt(birthYear, 10);
+      if (age < 18) {
+        Alert.alert("Attenzione", "Devi avere almeno 18 anni per registrarti");
+        return;
+      }
+    }
+
     const data: any = {
       nickname: nickname.trim(),
       email: email.trim().toLowerCase(),

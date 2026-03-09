@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "My App",
-    "slug": "my-app",
+    "name": "BikerLink",
+    "slug": "bikerlink",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "bikerlink",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,10 +15,17 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.myapp"
+      "bundleIdentifier": "com.bikerlink.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "BikerLink usa la tua posizione per mostrare i motociclisti vicini e registrare i tuoi giri.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "BikerLink usa la posizione in background per registrare il percorso anche a schermo spento.",
+        "NSPhotoLibraryUsageDescription": "BikerLink accede alle tue foto per caricare immagini del profilo e delle moto.",
+        "NSCameraUsageDescription": "BikerLink accede alla fotocamera per scattare foto del profilo e delle moto."
+      }
     },
     "android": {
-      "package": "com.myapp",
+      "package": "com.bikerlink.app",
+      "permissions": ["ACCESS_BACKGROUND_LOCATION"],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

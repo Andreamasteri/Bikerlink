@@ -1,16 +1,18 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import { Tabs, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { Platform, Text, Pressable } from "react-native";
+import { Platform, View, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery } from "@tanstack/react-query";
+import { useAudioPlayer } from "expo-audio";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
+  const prevUnreadRef = useRef<number>(0);
 
   const isBikerOrCoppia = user?.userType === "biker" || user?.userType === "coppia";
 
@@ -18,6 +20,27 @@ export default function TabLayout() {
     queryKey: ["/api/users/profile"],
     enabled: !!user,
   });
+
+  const { data: unreadData } = useQuery<{ count: number }>({
+    queryKey: ["/api/chat/unread-total"],
+    enabled: !!user,
+    refetchInterval: 30000,
+  });
+
+  const unreadCount = unreadData?.count ?? 0;
+
+  const notifPlayer = useAudioPlayer("https://www.soundjay.com/buttons/beep-01a.mp3");
+
+  useEffect(() => {
+    if (unreadCount > prevUnreadRef.current && prevUnreadRef.current >= 0) {
+      try {
+        notifPlayer.seekTo(0);
+        notifPlayer.volume = 0.3;
+        notifPlayer.play();
+      } catch {}
+    }
+    prevUnreadRef.current = unreadCount;
+  }, [unreadCount]);
 
   const isAvailable = (profileData as any)?.isAvailable || false;
 
@@ -137,7 +160,22 @@ export default function TabLayout() {
         options={{
           title: "Chat",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubbles" size={size} color={color} />
+            <View>
+              <Ionicons name="chatbubbles" size={size} color={color} />
+              {unreadCount > 0 && (
+                <View
+                  style={{
+                    position: "absolute",
+                    top: -2,
+                    right: -4,
+                    width: 10,
+                    height: 10,
+                    borderRadius: 5,
+                    backgroundColor: Colors.accent,
+                  }}
+                />
+              )}
+            </View>
           ),
           headerTitle: "Chat",
         }}

@@ -94,6 +94,47 @@ export default function FakeUsersAdmin() {
   const [formDesiredModel, setFormDesiredModel] = useState("");
   const [showRegionPicker, setShowRegionPicker] = useState(false);
 
+  const { data: chatbotData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/chatbot-enabled"],
+  });
+  const chatbotEnabled = chatbotData?.enabled !== false;
+
+  const chatbotMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/chatbot_enabled", baseUrl);
+      const res = await fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/chatbot-enabled"] });
+    },
+  });
+
+  const toggleAllMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/fake-users/toggle-all", baseUrl);
+      const res = await fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] });
+    },
+  });
+
   const { data: users = [], isLoading } = useQuery<FakeUser[]>({
     queryKey: ["/api/admin/fake-users"],
     queryFn: async () => {
@@ -103,6 +144,8 @@ export default function FakeUsersAdmin() {
       return res.json();
     },
   });
+
+  const allEnabled = users.length > 0 && users.every((u) => u.profile?.isAvailable);
 
   const toggleAvailableMutation = useMutation({
     mutationFn: (id: number) => apiRequest("PUT", `/api/admin/fake-users/${id}/toggle-available`),
@@ -245,6 +288,44 @@ export default function FakeUsersAdmin() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <KeyboardAwareScrollViewCompat contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 80 }]} bottomOffset={20}>
         <Text style={styles.title}>Utenti Fake</Text>
+
+        <View style={styles.controlsCard}>
+          <View style={styles.controlRow}>
+            <View style={styles.controlInfo}>
+              <Ionicons name="people" size={20} color={Colors.accent} />
+              <Text style={styles.controlLabel}>Abilita utenti fake</Text>
+            </View>
+            <Switch
+              value={allEnabled}
+              onValueChange={(val) => toggleAllMutation.mutate(val)}
+              trackColor={{ false: Colors.border, true: Colors.success }}
+              thumbColor={allEnabled ? Colors.text : Colors.textSecondary}
+              disabled={toggleAllMutation.isPending}
+            />
+          </View>
+          <Text style={styles.controlDesc}>
+            {allEnabled ? "Tutti gli utenti fake sono attivi e visibili" : "Gli utenti fake sono disattivati"}
+          </Text>
+
+          <View style={[styles.controlDivider]} />
+
+          <View style={styles.controlRow}>
+            <View style={styles.controlInfo}>
+              <Ionicons name="chatbubbles" size={20} color={Colors.accent} />
+              <Text style={styles.controlLabel}>Chatbot Utenti Fittizi</Text>
+            </View>
+            <Switch
+              value={chatbotEnabled}
+              onValueChange={(val) => chatbotMutation.mutate(val)}
+              trackColor={{ false: Colors.border, true: Colors.accent }}
+              thumbColor={chatbotEnabled ? Colors.text : Colors.textSecondary}
+              disabled={chatbotMutation.isPending}
+            />
+          </View>
+          <Text style={styles.controlDesc}>
+            {chatbotEnabled ? "Il bot risponde automaticamente per gli utenti fittizi" : "Il bot è disattivato, gli utenti fittizi non rispondono"}
+          </Text>
+        </View>
 
         <View style={styles.summaryRow}>
           <View style={styles.summaryCard}>
@@ -596,6 +677,40 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: Colors.text,
     marginBottom: 16,
+  },
+  controlsCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+  },
+  controlRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  controlInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  controlLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: Colors.text,
+  },
+  controlDesc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 6,
+  },
+  controlDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginVertical: 14,
   },
   summaryRow: {
     flexDirection: "row",

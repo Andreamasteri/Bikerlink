@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import rateLimit from "express-rate-limit";
 import { registerSchema, loginSchema } from "@shared/schema";
 import { storage } from "../storage";
 
@@ -12,7 +13,31 @@ declare module "express-session" {
 
 const router = Router();
 
-router.post("/register", async (req: Request, res: Response) => {
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { message: "Troppi tentativi. Riprova più tardi." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  message: { message: "Troppi tentativi. Riprova più tardi." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  message: { message: "Troppi tentativi. Riprova più tardi." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.post("/register", registerLimiter, async (req: Request, res: Response) => {
   try {
     const parsed = registerSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -20,6 +45,14 @@ router.post("/register", async (req: Request, res: Response) => {
     }
 
     const data = parsed.data;
+
+    if (data.birthYear) {
+      const currentYear = new Date().getFullYear();
+      const age = currentYear - data.birthYear;
+      if (age < 18) {
+        return res.status(403).json({ message: "Devi avere almeno 18 anni per registrarti" });
+      }
+    }
 
     const existingEmail = await storage.getUserByEmail(data.email);
     if (existingEmail) {
@@ -82,7 +115,7 @@ router.post("/register", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/login", async (req: Request, res: Response) => {
+router.post("/login", loginLimiter, async (req: Request, res: Response) => {
   try {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -155,7 +188,7 @@ router.get("/me", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/forgot-password", async (req: Request, res: Response) => {
+router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
     if (!email || typeof email !== "string") {

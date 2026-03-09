@@ -39,11 +39,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       cookie: {
         maxAge: 30 * 24 * 60 * 60 * 1000,
         httpOnly: true,
-        secure: false,
+        secure: !!process.env.REPL_SLUG,
         sameSite: "lax",
       },
     })
   );
+
+  app.use(async (req: any, _res: any, next: any) => {
+    if (req.session?.userId) {
+      try {
+        const user = await storage.getUser(req.session.userId);
+        if (user && user.lastLoginAt) {
+          const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+          if (new Date(user.lastLoginAt) < fiveMinAgo) {
+            await storage.updateUser(req.session.userId, { lastLoginAt: new Date() } as any);
+          }
+        }
+      } catch {}
+    }
+    next();
+  });
 
   app.use("/api/auth", authRoutes);
   app.use("/api/users", userRoutes);

@@ -10,7 +10,7 @@ const adminSections = [
   { key: "users", label: "Utenti", icon: "people" as const, iconSet: "MaterialIcons", route: "/admin/users" },
   { key: "workshops", label: "Officine", icon: "store" as const, iconSet: "MaterialIcons", route: "/admin/workshops" },
   { key: "easter-eggs", label: "Easter Eggs", icon: "egg-easter" as const, iconSet: "MaterialCommunityIcons", route: "/admin/easter-eggs" },
-  { key: "ads", label: "Campagne Syneco", icon: "campaign" as const, iconSet: "MaterialIcons", route: "/admin/ads" },
+  { key: "ads", label: "Advertisement", icon: "campaign" as const, iconSet: "MaterialIcons", route: "/admin/ads" },
   { key: "reports", label: "Segnalazioni", icon: "flag" as const, iconSet: "MaterialIcons", route: "/admin/reports" },
   { key: "performance", label: "Record Performance", icon: "speedometer" as const, iconSet: "Ionicons", route: "/admin/performance" },
   { key: "analytics", label: "Analytics", icon: "analytics" as const, iconSet: "MaterialIcons", route: "/admin/analytics" },

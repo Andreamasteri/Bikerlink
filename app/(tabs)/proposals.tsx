@@ -51,7 +51,7 @@ const FILTER_TYPES = [
 
 const SEARCH_TYPE_LABELS: Record<string, string> = {
   find_a_friend: "FindAFriend",
-  find_a_guest: "FindAGuest",
+  find_a_guest: "Trova Zavorrina",
   hitcher: "Hitcher",
   hitchhiker: "HitchHiker",
   find_a_biker: "FindABiker",

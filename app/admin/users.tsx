@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, TextInput, Platform } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { MaterialIcons, Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
@@ -14,6 +14,7 @@ interface AdminUser {
   role: string;
   status: string;
   createdAt: string;
+  isFake?: boolean;
 }
 
 export default function AdminUsers() {
@@ -27,6 +28,7 @@ export default function AdminUsers() {
   const [editEmail, setEditEmail] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [searchText, setSearchText] = useState("");
+  const [hideFake, setHideFake] = useState(false);
 
   const { data: users = [], isLoading } = useQuery<AdminUser[]>({
     queryKey: ["/api/admin/users"],
@@ -72,7 +74,20 @@ export default function AdminUsers() {
     onError: () => Alert.alert("Errore", "Impossibile aggiornare la password"),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const res = await apiRequest("DELETE", `/api/admin/users/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      Alert.alert("Successo", "Profilo eliminato");
+    },
+    onError: () => Alert.alert("Errore", "Impossibile eliminare il profilo"),
+  });
+
   const filteredUsers = users.filter((u) => {
+    if (hideFake && u.isFake === true) return false;
     if (!searchText) return true;
     const q = searchText.toLowerCase();
     return u.nickname.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
@@ -114,15 +129,46 @@ export default function AdminUsers() {
     ]);
   }
 
-  function handleRoleChange(user: AdminUser) {
-    const options = ["user", "moderator", "admin"].filter((r) => r !== user.role);
-    Alert.alert("Cambia ruolo", `Utente: ${user.nickname}`, [
-      ...options.map((role) => ({
-        text: role.charAt(0).toUpperCase() + role.slice(1),
-        onPress: () => roleMutation.mutate({ id: user.id, role }),
-      })),
-      { text: "Annulla", style: "cancel" as const },
-    ]);
+  function handleMakeModerator(user: AdminUser) {
+    Alert.alert(
+      "Rendi Moderatore",
+      `Vuoi rendere ${user.nickname} un moderatore?`,
+      [
+        { text: "Annulla", style: "cancel" as const },
+        {
+          text: "Conferma",
+          onPress: () => roleMutation.mutate({ id: user.id, role: "moderator" }),
+        },
+      ]
+    );
+  }
+
+  function handleDeleteUser(user: AdminUser) {
+    Alert.alert(
+      "Elimina profilo",
+      `Sei sicuro di voler eliminare il profilo di ${user.nickname}?`,
+      [
+        { text: "Annulla", style: "cancel" as const },
+        {
+          text: "Elimina",
+          style: "destructive" as const,
+          onPress: () => {
+            Alert.alert(
+              "Conferma eliminazione",
+              "Questa azione è irreversibile. Procedere?",
+              [
+                { text: "Annulla", style: "cancel" as const },
+                {
+                  text: "Elimina definitivamente",
+                  style: "destructive" as const,
+                  onPress: () => deleteMutation.mutate({ id: user.id }),
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
   }
 
   function getStatusColor(status: string) {
@@ -146,6 +192,9 @@ export default function AdminUsers() {
     return (
       <View style={styles.card}>
         <View style={styles.userInfo}>
+          {item.isFake === true && (
+            <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#FF00FF" }}>FAKE</Text>
+          )}
           <Text style={styles.nickname}>{item.nickname}</Text>
           <Text style={styles.email}>{item.email}</Text>
           <View style={styles.badges}>
@@ -162,13 +211,18 @@ export default function AdminUsers() {
         </View>
         <View style={styles.actions}>
           <TouchableOpacity onPress={() => openEditModal(item)} style={styles.actionBtn}>
-            <MaterialIcons name="edit" size={22} color={Colors.accent} />
+            <Ionicons name="create-outline" size={22} color={Colors.accent} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => handleStatusChange(item)} style={styles.actionBtn}>
-            <MaterialIcons name="block" size={22} color={Colors.textSecondary} />
+            <Ionicons name="ban-outline" size={22} color={Colors.textSecondary} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleRoleChange(item)} style={styles.actionBtn}>
-            <MaterialIcons name="admin-panel-settings" size={22} color={Colors.textSecondary} />
+          {item.role === "user" && (
+            <TouchableOpacity onPress={() => handleMakeModerator(item)} style={styles.actionBtn}>
+              <Ionicons name="shield-checkmark-outline" size={22} color={Colors.maleIcon} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={() => handleDeleteUser(item)} style={styles.actionBtn}>
+            <Ionicons name="trash-outline" size={22} color={Colors.error} />
           </TouchableOpacity>
         </View>
       </View>
@@ -177,20 +231,30 @@ export default function AdminUsers() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={18} color={Colors.textSecondary} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Cerca per nickname o email..."
-          placeholderTextColor="#666"
-          value={searchText}
-          onChangeText={setSearchText}
-        />
-        {!!searchText && (
-          <TouchableOpacity onPress={() => setSearchText("")}>
-            <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
-          </TouchableOpacity>
-        )}
+      <View style={styles.searchRow}>
+        <View style={[styles.searchContainer, { flex: 1, margin: 0 }]}>
+          <Ionicons name="search" size={18} color={Colors.textSecondary} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Cerca per nickname o email..."
+            placeholderTextColor="#666"
+            value={searchText}
+            onChangeText={setSearchText}
+          />
+          {!!searchText && (
+            <TouchableOpacity onPress={() => setSearchText("")}>
+              <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        <TouchableOpacity
+          style={[styles.fakeToggle, hideFake && { backgroundColor: "#FF00FF33", borderColor: "#FF00FF" }]}
+          onPress={() => setHideFake(!hideFake)}
+        >
+          <Text style={[styles.fakeToggleText, hideFake && { color: "#FF00FF" }]}>
+            {hideFake ? "Mostra fake" : "Nascondi fake"}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {isLoading ? (
@@ -281,19 +345,28 @@ export default function AdminUsers() {
               </View>
 
               <View style={styles.quickActions}>
-                <TouchableOpacity
-                  style={styles.quickActionBtn}
-                  onPress={() => { setEditModalVisible(false); if (selectedUser) handleRoleChange(selectedUser); }}
-                >
-                  <MaterialIcons name="admin-panel-settings" size={20} color={Colors.accent} />
-                  <Text style={styles.quickActionText}>Cambia Ruolo</Text>
-                </TouchableOpacity>
+                {selectedUser?.role === "user" && (
+                  <TouchableOpacity
+                    style={styles.quickActionBtn}
+                    onPress={() => { setEditModalVisible(false); if (selectedUser) handleMakeModerator(selectedUser); }}
+                  >
+                    <Ionicons name="shield-checkmark-outline" size={20} color={Colors.maleIcon} />
+                    <Text style={styles.quickActionText}>Rendi Moderatore</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={styles.quickActionBtn}
                   onPress={() => { setEditModalVisible(false); if (selectedUser) handleStatusChange(selectedUser); }}
                 >
-                  <MaterialIcons name="block" size={20} color={Colors.warning} />
+                  <Ionicons name="ban-outline" size={20} color={Colors.warning} />
                   <Text style={styles.quickActionText}>Cambia Stato</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.quickActionBtn, { borderColor: Colors.error }]}
+                  onPress={() => { setEditModalVisible(false); if (selectedUser) handleDeleteUser(selectedUser); }}
+                >
+                  <Ionicons name="trash-outline" size={20} color={Colors.error} />
+                  <Text style={[styles.quickActionText, { color: Colors.error }]}>Elimina</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -306,6 +379,27 @@ export default function AdminUsers() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  fakeToggle: {
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  fakeToggleText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: Colors.textSecondary,
+  },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",

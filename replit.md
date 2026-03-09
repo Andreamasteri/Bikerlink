@@ -194,3 +194,37 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - Registrazione: conferma password, prefisso telefonico internazionale (default +39), regione e anno di nascita opzionali (aggiungibili dal profilo)
 - Recupero password: endpoint simulato (token stampato in console backend), schermata `forgot-password.tsx`
 - Tabella DB: `password_reset_tokens` per token di reset password
+
+## Sessione Sicurezza & Funzionalità (Marzo 2026)
+
+### Sicurezza
+- **T004**: Profili pubblici espongono solo campi sicuri (id, nickname, userType, sex, birthYear, region, avatarUrl, bio, motorcycles, photos). Email/ruolo/status rimossi da `/nearby`, `/search`, `/:id/public`.
+- **T011**: Verifica età 18+ alla registrazione (server + client, messaggio italiano)
+- **T012**: Cookie sessione `secure: true` in produzione
+- **T013**: Rate limiting: login (5/15min), registrazione (3/h), recupero password (3/h) con `express-rate-limit`
+
+### Fix & Miglioramenti
+- **T001**: Web blank page fix (`--base-url /web` nel build)
+- **T002**: Heartbeat middleware (aggiorna `lastLoginAt` ogni 5 min per utenti autenticati)
+- **T003**: Server build format `--format=cjs` (fix warning Node.js ESM)
+- **T006**: Suono notifica nuovi messaggi (migrato da `expo-av` deprecato a `expo-audio`)
+- **T007**: Auto-unavailable quando l'app va in background (AppState), ripristino al ritorno
+- **T008**: "FindAGuest" → "Trova Zavorrina"
+- **T009**: Fix KeyboardAwareScrollViewCompat per iOS (KeyboardAvoidingView + ScrollView)
+- **T010**: app.json aggiornato con metadati BikerLink reali + permessi iOS in italiano
+- **T024**: "Cerco" → "Ricerca Match con ..."
+
+### Chat
+- **T005**: Badge arancione non-letto sul tab Chat (polling 30s, endpoint `/api/chat/unread-total`)
+
+### Admin Panel
+- **T014**: Toggle "Chatbot Utenti Fittizi" spostato da Settings a Fake Users
+- **T015**: Toggle master "Abilita utenti fake" (abilita/disabilita tutti)
+- **T016**: Label "FAKE" in fucsia sopra nickname fake users nel pannello utenti
+- **T017**: Filtro "Nascondi fake" nel pannello utenti admin
+- **T018**: "Cambia ruolo" sostituito con "Rendi Moderatore" + "Elimina profilo" con doppia conferma
+- **T019**: "Campagne Syneco" → "Advertisement", label analytics rinominate
+- **T020**: "Utenti totali" esclude fake, card cliccabile con lista utenti + badge "Nuovo 24h/48h"
+- **T021**: "Utenti Attivi (30gg/7gg)" cliccabili con lista e lastLoginAt
+- **T022**: "Advertisement" cliccabile con statistiche click dettagliate
+- **T023**: "Segnalazioni pendenti" cliccabile con lista report pendenti

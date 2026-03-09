@@ -1,5 +1,5 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking } from "react-native";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Modal, FlatList } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,11 +16,87 @@ interface Analytics {
   pendingReports: number;
 }
 
+interface UserItem {
+  id: string;
+  nickname: string;
+  userType: string;
+  sex: string;
+  region: string;
+  createdAt: string;
+}
+
+interface ActiveUserItem {
+  id: string;
+  nickname: string;
+  userType: string;
+  lastLoginAt: string;
+}
+
+interface AdClickItem {
+  id: string;
+  userId: string;
+  nickname: string;
+  userType: string;
+  adTitle: string;
+  clickedAt: string;
+}
+
+interface PendingReportItem {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  submittedBy: string;
+  createdAt: string;
+}
+
+type ModalType = "users" | "active30" | "active7" | "adClicks" | "pendingReports" | null;
+
+function formatDateIT(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function getUserBadge(createdAt: string): { label: string; color: string } | null {
+  const now = Date.now();
+  const created = new Date(createdAt).getTime();
+  const diffH = (now - created) / (1000 * 60 * 60);
+  if (diffH <= 24) return { label: "Nuovo 24h", color: Colors.success };
+  if (diffH <= 48) return { label: "Nuovo 48h", color: Colors.warning };
+  return null;
+}
+
 export default function AdminAnalytics() {
   const insets = useSafeAreaInsets();
+  const [activeModal, setActiveModal] = useState<ModalType>(null);
 
   const { data, isLoading } = useQuery<Analytics>({
     queryKey: ["/api/admin/analytics"],
+  });
+
+  const usersQuery = useQuery<UserItem[]>({
+    queryKey: ["/api/admin/analytics/users-list"],
+    enabled: activeModal === "users",
+  });
+
+  const active30Query = useQuery<ActiveUserItem[]>({
+    queryKey: ["/api/admin/analytics/active-users", { period: 30 }],
+    enabled: activeModal === "active30",
+  });
+
+  const active7Query = useQuery<ActiveUserItem[]>({
+    queryKey: ["/api/admin/analytics/active-users", { period: 7 }],
+    enabled: activeModal === "active7",
+  });
+
+  const adClicksQuery = useQuery<AdClickItem[]>({
+    queryKey: ["/api/admin/analytics/ad-clicks"],
+    enabled: activeModal === "adClicks",
+  });
+
+  const pendingReportsQuery = useQuery<PendingReportItem[]>({
+    queryKey: ["/api/admin/analytics/pending-reports"],
+    enabled: activeModal === "pendingReports",
   });
 
   function handleExportCSV() {
@@ -31,15 +107,162 @@ export default function AdminAnalytics() {
     });
   }
 
+  function handleCardPress(label: string) {
+    if (label === "Utenti totali") setActiveModal("users");
+    else if (label === "Utenti Attivi (30gg)") setActiveModal("active30");
+    else if (label === "Utenti Attivi (7gg)") setActiveModal("active7");
+    else if (label === "Advertisement") setActiveModal("adClicks");
+    else if (label === "Segnalazioni pendenti") setActiveModal("pendingReports");
+  }
+
+  const tappableLabels = ["Utenti totali", "Utenti Attivi (30gg)", "Utenti Attivi (7gg)", "Advertisement", "Segnalazioni pendenti"];
+
   const stats = [
     { label: "Utenti totali", value: data?.totalUsers ?? 0, icon: "people" as const, color: Colors.maleIcon },
-    { label: "Attivi (30gg)", value: data?.activeUsersMonth ?? 0, icon: "trending-up" as const, color: Colors.success },
-    { label: "Attivi (7gg)", value: data?.activeUsersWeek ?? 0, icon: "show-chart" as const, color: Colors.accent },
+    { label: "Utenti Attivi (30gg)", value: data?.activeUsersMonth ?? 0, icon: "trending-up" as const, color: Colors.success },
+    { label: "Utenti Attivi (7gg)", value: data?.activeUsersWeek ?? 0, icon: "show-chart" as const, color: Colors.accent },
     { label: "Contatti officine (30gg)", value: data?.workshopContactsMonth ?? 0, icon: "store" as const, color: Colors.femaleIcon },
     { label: "Click ads totali", value: data?.totalAdClicks ?? 0, icon: "ads-click" as const, color: Colors.warning },
-    { label: "Campagne attive", value: data?.activeCampaigns ?? 0, icon: "campaign" as const, color: Colors.accent },
+    { label: "Advertisement", value: data?.activeCampaigns ?? 0, icon: "campaign" as const, color: Colors.accent },
     { label: "Segnalazioni pendenti", value: data?.pendingReports ?? 0, icon: "flag" as const, color: Colors.error },
   ];
+
+  function renderUsersModal() {
+    const users = usersQuery.data ?? [];
+    return (
+      <FlatList
+        data={users}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.modalList}
+        renderItem={({ item }) => {
+          const badge = getUserBadge(item.createdAt);
+          return (
+            <View style={styles.listItem}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.listItemTitle}>{item.nickname}</Text>
+                <Text style={styles.listItemSub}>{item.userType} - {item.region || "N/A"} - {item.sex || "N/A"}</Text>
+                <Text style={styles.listItemDate}>{formatDateIT(item.createdAt)}</Text>
+              </View>
+              {badge && (
+                <View style={[styles.badge, { backgroundColor: badge.color + "22", borderColor: badge.color }]}>
+                  <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
+                </View>
+              )}
+            </View>
+          );
+        }}
+        ListEmptyComponent={<Text style={styles.emptyText}>Nessun utente</Text>}
+      />
+    );
+  }
+
+  function renderActiveUsersModal(period: number) {
+    const activeData = period === 30 ? active30Query.data : active7Query.data;
+    const users = activeData ?? [];
+    return (
+      <FlatList
+        data={users}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.modalList}
+        renderItem={({ item }) => (
+          <View style={styles.listItem}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.listItemTitle}>{item.nickname}</Text>
+              <Text style={styles.listItemSub}>{item.userType}</Text>
+              <Text style={styles.listItemDate}>Ultimo accesso: {formatDateIT(item.lastLoginAt)}</Text>
+            </View>
+          </View>
+        )}
+        ListEmptyComponent={<Text style={styles.emptyText}>Nessun utente attivo</Text>}
+      />
+    );
+  }
+
+  function renderAdClicksModal() {
+    const clicks = adClicksQuery.data ?? [];
+    const bikerCount = clicks.filter((c) => c.userType === "biker").length;
+    const zavarrinaCount = clicks.filter((c) => c.userType === "zavorrina").length;
+    return (
+      <View style={{ flex: 1 }}>
+        <View style={styles.adSummary}>
+          <Text style={styles.adSummaryText}>Totale click: {clicks.length}</Text>
+          <Text style={styles.adSummaryText}>Biker: {bikerCount} | Zavorrina: {zavarrinaCount}</Text>
+        </View>
+        <FlatList
+          data={clicks}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.modalList}
+          renderItem={({ item }) => (
+            <View style={styles.listItem}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.listItemTitle}>{item.nickname || "Anonimo"}</Text>
+                <Text style={styles.listItemSub}>{item.userType} - {item.adTitle || "N/A"}</Text>
+                <Text style={styles.listItemDate}>{formatDateIT(item.clickedAt)}</Text>
+              </View>
+            </View>
+          )}
+          ListEmptyComponent={<Text style={styles.emptyText}>Nessun click registrato</Text>}
+        />
+      </View>
+    );
+  }
+
+  function renderPendingReportsModal() {
+    const reports = pendingReportsQuery.data ?? [];
+    return (
+      <FlatList
+        data={reports}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.modalList}
+        renderItem={({ item }) => (
+          <View style={styles.listItem}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <View style={[styles.typeBadge, { backgroundColor: item.type === "bug" ? Colors.error + "22" : Colors.accent + "22" }]}>
+                  <Text style={[styles.typeBadgeText, { color: item.type === "bug" ? Colors.error : Colors.accent }]}>
+                    {item.type === "bug" ? "Bug" : "Feature"}
+                  </Text>
+                </View>
+                <Text style={styles.listItemTitle} numberOfLines={1}>{item.title}</Text>
+              </View>
+              <Text style={styles.listItemSub} numberOfLines={2}>{item.description}</Text>
+              <Text style={styles.listItemDate}>Da: {item.submittedBy || "Anonimo"} - {formatDateIT(item.createdAt)}</Text>
+            </View>
+          </View>
+        )}
+        ListEmptyComponent={<Text style={styles.emptyText}>Nessuna segnalazione pendente</Text>}
+      />
+    );
+  }
+
+  function getModalTitle(): string {
+    switch (activeModal) {
+      case "users": return "Utenti totali";
+      case "active30": return "Utenti Attivi (30gg)";
+      case "active7": return "Utenti Attivi (7gg)";
+      case "adClicks": return "Advertisement - Click";
+      case "pendingReports": return "Segnalazioni pendenti";
+      default: return "";
+    }
+  }
+
+  function renderModalContent() {
+    switch (activeModal) {
+      case "users": return renderUsersModal();
+      case "active30": return renderActiveUsersModal(30);
+      case "active7": return renderActiveUsersModal(7);
+      case "adClicks": return renderAdClicksModal();
+      case "pendingReports": return renderPendingReportsModal();
+      default: return null;
+    }
+  }
+
+  const isModalLoading =
+    (activeModal === "users" && usersQuery.isLoading) ||
+    (activeModal === "active30" && active30Query.isLoading) ||
+    (activeModal === "active7" && active7Query.isLoading) ||
+    (activeModal === "adClicks" && adClicksQuery.isLoading) ||
+    (activeModal === "pendingReports" && pendingReportsQuery.isLoading);
 
   return (
     <ScrollView
@@ -51,23 +274,52 @@ export default function AdminAnalytics() {
       ) : (
         <>
           <View style={styles.grid}>
-            {stats.map((stat) => (
-              <View key={stat.label} style={styles.statCard}>
-                <View style={[styles.statIcon, { backgroundColor: stat.color + "22" }]}>
-                  <MaterialIcons name={stat.icon} size={24} color={stat.color} />
-                </View>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
-              </View>
-            ))}
+            {stats.map((stat) => {
+              const isTappable = tappableLabels.includes(stat.label);
+              const CardWrapper = isTappable ? TouchableOpacity : View;
+              return (
+                <CardWrapper
+                  key={stat.label}
+                  style={styles.statCard}
+                  {...(isTappable ? { onPress: () => handleCardPress(stat.label), activeOpacity: 0.7 } : {})}
+                >
+                  <View style={[styles.statIcon, { backgroundColor: stat.color + "22" }]}>
+                    <MaterialIcons name={stat.icon} size={24} color={stat.color} />
+                  </View>
+                  <Text style={styles.statValue}>{stat.value}</Text>
+                  <Text style={styles.statLabel}>{stat.label}</Text>
+                  {isTappable && (
+                    <MaterialIcons name="chevron-right" size={16} color={Colors.textSecondary} style={{ position: "absolute", top: 16, right: 12 }} />
+                  )}
+                </CardWrapper>
+              );
+            })}
           </View>
 
           <TouchableOpacity style={styles.exportBtn} onPress={handleExportCSV}>
             <MaterialIcons name="file-download" size={20} color={Colors.background} />
-            <Text style={styles.exportBtnText}>Esporta CSV per Syneco</Text>
+            <Text style={styles.exportBtnText}>Esporta CSV</Text>
           </TouchableOpacity>
         </>
       )}
+
+      <Modal visible={activeModal !== null} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 10 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{getModalTitle()}</Text>
+              <TouchableOpacity onPress={() => setActiveModal(null)}>
+                <MaterialIcons name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+            {isModalLoading ? (
+              <Text style={styles.loadingText}>Caricamento...</Text>
+            ) : (
+              renderModalContent()
+            )}
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -89,4 +341,28 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent, borderRadius: 12, padding: 16, marginTop: 24,
   },
   exportBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.background },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)" },
+  modalContainer: { flex: 1, backgroundColor: Colors.background, marginTop: 40, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  modalHeader: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  modalTitle: { fontFamily: "Inter_700Bold", fontSize: 18, color: Colors.text },
+  modalList: { paddingHorizontal: 16, paddingVertical: 8 },
+  listItem: {
+    flexDirection: "row", alignItems: "center", backgroundColor: Colors.surface,
+    borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: Colors.border,
+  },
+  listItemTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text },
+  listItemSub: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  listItemDate: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 4 },
+  badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1 },
+  badgeText: { fontFamily: "Inter_600SemiBold", fontSize: 10 },
+  typeBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  typeBadgeText: { fontFamily: "Inter_500Medium", fontSize: 10 },
+  emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", marginTop: 40 },
+  adSummary: {
+    paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  adSummaryText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text, marginBottom: 4 },
 });

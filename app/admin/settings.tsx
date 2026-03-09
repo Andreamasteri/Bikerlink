@@ -44,11 +44,6 @@ export default function AdminSettings() {
   });
   const emailVerifEnabled = emailVerifData?.enabled === true;
 
-  const { data: chatbotData } = useQuery<{ enabled: boolean }>({
-    queryKey: ["/api/settings/chatbot-enabled"],
-  });
-  const chatbotEnabled = chatbotData?.enabled !== false;
-
   const { data: autoMatchData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/auto-matching"],
   });
@@ -74,25 +69,6 @@ export default function AdminSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/email-verification"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-    },
-  });
-
-  const chatbotMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const baseUrl = getApiUrl();
-      const url = new URL("/api/admin/settings/chatbot_enabled", baseUrl);
-      const res = await fetch(url.toString(), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value: enabled ? "true" : "false" }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/chatbot-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
   });
@@ -418,25 +394,6 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {synecoVisible ? "Il branding Syneco è visibile nell'app" : "Il branding Syneco è nascosto"}
-        </Text>
-      </View>
-
-      <View style={styles.synecoCard}>
-        <View style={styles.synecoHeader}>
-          <View style={styles.synecoInfo}>
-            <Ionicons name="chatbubbles" size={20} color={Colors.accent} />
-            <Text style={styles.synecoLabel}>Chatbot Utenti Fittizi</Text>
-          </View>
-          <Switch
-            value={chatbotEnabled}
-            onValueChange={(val) => chatbotMutation.mutate(val)}
-            trackColor={{ false: Colors.border, true: Colors.accent }}
-            thumbColor={chatbotEnabled ? Colors.text : Colors.textSecondary}
-            disabled={chatbotMutation.isPending}
-          />
-        </View>
-        <Text style={styles.synecoDesc}>
-          {chatbotEnabled ? "Il bot risponde automaticamente per gli utenti fittizi" : "Il bot è disattivato, gli utenti fittizi non rispondono"}
         </Text>
       </View>
 

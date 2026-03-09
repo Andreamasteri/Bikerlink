@@ -244,13 +244,19 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
     if (targetUser.isFake && req.session.userId && req.session.userId !== userId) {
       storage.recordFakeUserInteraction(userId, req.session.userId, "profile_view").catch(() => {});
     }
-    const { password: _, ...safeUser } = targetUser;
     const profile = await storage.getUserProfile(userId);
     const motorcycles = await storage.getUserMotorcycles(userId);
     const photos = await storage.getUserPhotos(userId);
     const approvedPhotos = photos.filter((p) => p.isApproved);
     return res.json({
-      ...safeUser,
+      id: targetUser.id,
+      nickname: targetUser.nickname,
+      userType: targetUser.userType,
+      sex: targetUser.sex,
+      coupleSexConfig: targetUser.coupleSexConfig,
+      birthYear: targetUser.birthYear,
+      region: targetUser.region,
+      avatarUrl: targetUser.avatarUrl,
       bio: profile?.bio || null,
       motorcycles,
       photos: approvedPhotos,
@@ -530,13 +536,18 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
 
     const results = nearbyUsers
       .map((item) => {
-        const { password: _, ...safeUser } = item.user;
         return {
-          ...safeUser,
+          id: item.user.id,
+          nickname: item.user.nickname,
+          userType: item.user.userType,
+          sex: item.user.sex,
+          birthYear: item.user.birthYear,
+          region: item.user.region,
+          avatarUrl: item.user.avatarUrl,
           latitude: item.profile?.latitude,
           longitude: item.profile?.longitude,
           isAvailable: item.profile?.isAvailable || false,
-          profile: item.profile,
+          bio: item.profile?.bio || null,
           distance: Math.round(item.distance * 10) / 10,
         };
       })
@@ -557,13 +568,18 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
     }
     const results = await storage.searchUsers(q);
     const safeResults = results.map((item: any) => {
-      const { password: _, ...safeUser } = item.user;
       return {
-        ...safeUser,
+        id: item.user.id,
+        nickname: item.user.nickname,
+        userType: item.user.userType,
+        sex: item.user.sex,
+        birthYear: item.user.birthYear,
+        region: item.user.region,
+        avatarUrl: item.user.avatarUrl,
         latitude: item.profile?.latitude || null,
         longitude: item.profile?.longitude || null,
         isAvailable: item.profile?.isAvailable || false,
-        profile: item.profile,
+        bio: item.profile?.bio || null,
       };
     });
     return res.json(safeResults);

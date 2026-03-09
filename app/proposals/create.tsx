@@ -25,7 +25,7 @@ import MapPickerContent from "@/components/MapPickerModal";
 
 const BIKER_SEARCH_TYPES = [
   { key: "find_a_friend", label: "FindAFriend", subtitle: "Cerco altri biker", icon: "account-group", color: Colors.maleIcon },
-  { key: "find_a_guest", label: "FindAGuest", subtitle: "Sella libera per zavorre", icon: "seat-passenger", color: Colors.femaleIcon },
+  { key: "find_a_guest", label: "Trova Zavorrina", subtitle: "Sella libera per zavorre", icon: "seat-passenger", color: Colors.femaleIcon },
   { key: "hitcher", label: "Hitcher", subtitle: "Ho la sella libera per un passaggio", icon: "motorbike", color: Colors.accent },
   { key: "hitchhiker", label: "HitchHiker", subtitle: "Cerco un passaggio", icon: "thumb-up", color: Colors.success },
 ];

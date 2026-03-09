@@ -361,6 +361,38 @@ async function filterPhoneNumbers(content: string, conversationId: string, sende
   };
 }
 
+router.get("/unread-total", async (req: Request, res: Response) => {
+  try {
+    const userId = requireAuth(req, res);
+    if (!userId) return;
+
+    const convs = await storage.getConversations(userId);
+    let total = 0;
+
+    for (const conv of convs) {
+      const participants = await storage.getConversationParticipants(conv.id);
+      const myParticipant = participants.find((p) => p.userId === userId);
+      const msgs = await storage.getMessages(conv.id, 1, 0);
+      const lastMessage = msgs[0] || null;
+
+      if (lastMessage && lastMessage.senderId !== userId) {
+        if (myParticipant?.lastReadAt) {
+          if (new Date(lastMessage.createdAt) > new Date(myParticipant.lastReadAt)) {
+            total++;
+          }
+        } else {
+          total++;
+        }
+      }
+    }
+
+    return res.json({ count: total });
+  } catch (error) {
+    console.error("Get unread total error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.get("/conversations", async (req: Request, res: Response) => {
   try {
     const userId = requireAuth(req, res);
