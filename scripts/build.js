@@ -545,12 +545,70 @@ async function main() {
   console.log("Updating manifests and creating landing page...");
   updateManifests(manifests, timestamp, baseUrl, assetsByHash);
 
-  console.log("Build complete! Deploy to:", baseUrl);
+  console.log("Native build complete! Deploy to:", baseUrl);
 
   if (metroProcess) {
     metroProcess.kill();
+    metroProcess = null;
   }
+
+  console.log("Building web export...");
+  try {
+    await buildWebExport(domain);
+    console.log("Web export complete!");
+  } catch (err) {
+    console.error("Web export failed (non-fatal):", err.message);
+  }
+
+  console.log("Full build complete!");
   process.exit(0);
+}
+
+function buildWebExport(domain) {
+  return new Promise((resolve, reject) => {
+    const env = {
+      ...process.env,
+      EXPO_PUBLIC_DOMAIN: domain,
+    };
+    const child = spawn("npx", ["expo", "export", "--platform", "web", "--output-dir", "static-build/web"], {
+      stdio: ["ignore", "pipe", "pipe"],
+      env,
+    });
+
+    let stderr = "";
+    if (child.stdout) {
+      child.stdout.on("data", (data) => {
+        const output = data.toString().trim();
+        if (output) console.log(`[WebExport] ${output}`);
+      });
+    }
+    if (child.stderr) {
+      child.stderr.on("data", (data) => {
+        const output = data.toString().trim();
+        if (output) {
+          console.error(`[WebExport] ${output}`);
+          stderr += output + "\n";
+        }
+      });
+    }
+
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`expo export exited with code ${code}: ${stderr}`));
+      }
+    });
+
+    child.on("error", (err) => {
+      reject(err);
+    });
+
+    setTimeout(() => {
+      child.kill();
+      reject(new Error("Web export timed out after 120 seconds"));
+    }, 120000);
+  });
 }
 
 main().catch((error) => {
