@@ -77,6 +77,9 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
 
     const hashedPassword = await bcrypt.hash(data.password, 12);
 
+    const primalSetting = await storage.getAppSetting("primal_user_enabled");
+    const isPrimal = primalSetting?.value === "true";
+
     const user = await storage.createUser({
       nickname: data.nickname,
       email: data.email,
@@ -89,6 +92,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       region: data.region,
       eulaAccepted: data.eulaAccepted,
       invitationCode: data.invitationCode,
+      isPrimal,
     });
 
     await storage.createUserProfile({ userId: user.id });

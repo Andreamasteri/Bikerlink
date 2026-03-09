@@ -36,6 +36,7 @@ export const users = pgTable("users", {
   deletionScheduledFor: timestamp("deletion_scheduled_for"),
   invitationCode: varchar("invitation_code", { length: 50 }),
   isFake: boolean("is_fake").notNull().default(false),
+  isPrimal: boolean("is_primal").notNull().default(false),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

@@ -15,6 +15,7 @@ interface AdminUser {
   status: string;
   createdAt: string;
   isFake?: boolean;
+  isPrimal?: boolean;
 }
 
 export default function AdminUsers() {
@@ -194,6 +195,9 @@ export default function AdminUsers() {
         <View style={styles.userInfo}>
           {item.isFake === true && (
             <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#FF00FF" }}>FAKE</Text>
+          )}
+          {item.isPrimal === true && (
+            <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#FFD700" }}>PRIMAL</Text>
           )}
           <Text style={styles.nickname}>{item.nickname}</Text>
           <Text style={styles.email}>{item.email}</Text>

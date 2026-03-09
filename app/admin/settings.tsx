@@ -49,6 +49,11 @@ export default function AdminSettings() {
   });
   const autoMatchEnabled = autoMatchData?.enabled !== false;
 
+  const { data: primalData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/primal-user"],
+  });
+  const primalEnabled = primalData?.enabled === true;
+
   const { data: customRoutesData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/custom-routes"],
   });
@@ -107,6 +112,25 @@ export default function AdminSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/auto-matching"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const primalMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/primal_user_enabled", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/primal-user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
   });
@@ -413,6 +437,25 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {emailVerifEnabled ? "Attiva la verifica email per le nuove registrazioni" : "La verifica email è disattivata"}
+        </Text>
+      </View>
+
+      <View style={styles.emailVerifCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="star" size={20} color="#FFD700" />
+            <Text style={styles.synecoLabel}>Primal User</Text>
+          </View>
+          <Switch
+            value={primalEnabled}
+            onValueChange={(val) => primalMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: "#FFD700" }}
+            thumbColor={primalEnabled ? Colors.text : Colors.textSecondary}
+            disabled={primalMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {primalEnabled ? "I nuovi utenti registrati saranno marcati come 'Primal'" : "La marcatura Primal è disattivata"}
         </Text>
       </View>
 

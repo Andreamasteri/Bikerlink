@@ -38,6 +38,7 @@ interface ProfileData {
   avatarUrl?: string;
   role: string;
   status: string;
+  isPrimal?: boolean;
   deletionRequestedAt?: string;
   profile?: {
     isAvailable: boolean;
@@ -321,6 +322,12 @@ export default function ProfileScreen() {
         <Text style={styles.nickname}>
           {profile?.nickname ?? user?.nickname ?? ""}
         </Text>
+        {profile?.isPrimal === true && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
+            <Ionicons name="star" size={14} color="#FFD700" />
+            <Text style={{ fontSize: 12, fontWeight: "bold" as const, color: "#FFD700", fontFamily: "Inter_700Bold" }}>Primal</Text>
+          </View>
+        )}
         <View style={styles.badges}>
           <View style={[styles.badge, { backgroundColor: typeColor + "20" }]}>
             <Text style={[styles.badgeText, { color: typeColor }]}>

@@ -139,6 +139,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/primal-user", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("primal_user_enabled");
+      const enabled = setting?.value === "true";
+      res.json({ enabled });
+    } catch {
+      res.json({ enabled: false });
+    }
+  });
+
   app.get("/api/settings/paypal", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("paypal_email");

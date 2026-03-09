@@ -228,3 +228,10 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - **T021**: "Utenti Attivi (30gg/7gg)" cliccabili con lista e lastLoginAt
 - **T022**: "Advertisement" cliccabile con statistiche click dettagliate
 - **T023**: "Segnalazioni pendenti" cliccabile con lista report pendenti
+
+### Primal User
+- Colonna `is_primal` aggiunta a `users` (boolean, default false)
+- Toggle admin "Primal User" in Impostazioni: quando attivo, i nuovi utenti registrati ricevono `isPrimal = true`
+- Tutti gli utenti reali esistenti marcati come Primal
+- Badge "PRIMAL" dorato (#FFD700) visibile nel pannello admin utenti e nel profilo utente
+- Endpoint: `GET /api/settings/primal-user`, setting key: `primal_user_enabled`
