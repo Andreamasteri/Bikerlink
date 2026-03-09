@@ -202,11 +202,18 @@ export function startMatchingEngine(): void {
     const expired = await runCleanup();
     if (expired > 0) console.log(`Expired ${expired} proposals`);
 
-    const matches = await runMatching();
-    if (matches > 0) console.log(`Found ${matches} new proposal matches`);
+    const autoMatchSetting = await storage.getAppSetting("auto_matching_enabled");
+    const autoMatchEnabled = autoMatchSetting?.value !== "false";
 
-    const garageMatches = await runWishlistMatching();
-    if (garageMatches > 0) console.log(`Found ${garageMatches} new garage matches`);
+    if (autoMatchEnabled) {
+      const matches = await runMatching();
+      if (matches > 0) console.log(`Found ${matches} new proposal matches`);
+
+      const garageMatches = await runWishlistMatching();
+      if (garageMatches > 0) console.log(`Found ${garageMatches} new garage matches`);
+    } else {
+      console.log("Auto matching disabled by admin, skipping");
+    }
   };
 
   run();

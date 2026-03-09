@@ -49,6 +49,11 @@ export default function AdminSettings() {
   });
   const chatbotEnabled = chatbotData?.enabled !== false;
 
+  const { data: autoMatchData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/auto-matching"],
+  });
+  const autoMatchEnabled = autoMatchData?.enabled !== false;
+
   const emailVerifMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       const baseUrl = getApiUrl();
@@ -83,6 +88,25 @@ export default function AdminSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/chatbot-enabled"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const autoMatchMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/auto_matching_enabled", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/auto-matching"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
   });
@@ -308,6 +332,33 @@ export default function AdminSettings() {
       contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}
       bottomOffset={20}
     >
+      <View style={styles.paidSectionHeader}>
+        <Ionicons name="card" size={22} color={Colors.warning} />
+        <Text style={styles.paidSectionTitle}>A Pagamento</Text>
+      </View>
+      <Text style={styles.paidSectionDesc}>
+        Funzioni premium che verranno attivate a pagamento in futuro.
+      </Text>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="git-compare" size={20} color={Colors.warning} />
+            <Text style={styles.synecoLabel}>Match Automatico</Text>
+          </View>
+          <Switch
+            value={autoMatchEnabled}
+            onValueChange={(val) => autoMatchMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: Colors.warning }}
+            thumbColor={autoMatchEnabled ? Colors.text : Colors.textSecondary}
+            disabled={autoMatchMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {autoMatchEnabled ? "Il motore di matching automatico è attivo" : "Il matching automatico è disattivato"}
+        </Text>
+      </View>
+
       <View style={styles.synecoCard}>
         <View style={styles.synecoHeader}>
           <View style={styles.synecoInfo}>
@@ -511,6 +562,19 @@ const styles = StyleSheet.create({
   emailVerifCard: {
     backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 16,
     borderWidth: 1, borderColor: Colors.accent,
+  },
+  paidSectionHeader: {
+    flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4, marginTop: 8,
+  },
+  paidSectionTitle: {
+    fontFamily: "Inter_700Bold", fontSize: 20, color: Colors.warning,
+  },
+  paidSectionDesc: {
+    fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, marginBottom: 16,
+  },
+  paidCard: {
+    backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 16,
+    borderWidth: 1, borderColor: Colors.warning,
   },
   settingCard: {
     backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 12,

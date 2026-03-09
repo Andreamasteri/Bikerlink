@@ -117,8 +117,8 @@ function ProposalCard({ item, onPress }: { item: ProposalItem; onPress: () => vo
             {item.searchType ? SEARCH_TYPE_LABELS[item.searchType] || item.searchType : getTypeLabel(item.proposalType)}
           </Text>
         </View>
-        <View style={[styles.badge, { backgroundColor: typeInfo.color + "30" }]}>
-          <Text style={[styles.badgeText, { color: typeInfo.color }]}>
+        <View style={[styles.badge, { backgroundColor: (typeInfo.dual ? Colors.femaleIcon : typeInfo.color) + "30" }]}>
+          <Text style={[styles.badgeText, { color: typeInfo.dual ? Colors.femaleIcon : typeInfo.color }]}>
             {getTypeLabel(item.proposalType)}
           </Text>
         </View>
