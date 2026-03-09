@@ -24,9 +24,9 @@ router.post("/entries", async (req: Request, res: Response) => {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
-    const { photoUrl, caption } = req.body;
-    if (!photoUrl) {
-      return res.status(400).json({ message: "URL foto obbligatorio" });
+    const { photoUrl, caption, performanceData } = req.body;
+    if (!photoUrl && !performanceData) {
+      return res.status(400).json({ message: "Foto o dati performance obbligatori" });
     }
 
     const now = new Date();
@@ -35,8 +35,9 @@ router.post("/entries", async (req: Request, res: Response) => {
 
     const entry = await storage.createPhotoContestEntry({
       userId,
-      photoUrl,
+      photoUrl: photoUrl || null,
       caption: caption || null,
+      performanceData: performanceData ? (typeof performanceData === "string" ? performanceData : JSON.stringify(performanceData)) : null,
       weekNumber,
       year,
       isApproved: true,

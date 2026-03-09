@@ -32,8 +32,9 @@ const CARD_WIDTH = (SCREEN_WIDTH - GAP * (COLUMN_COUNT + 1)) / COLUMN_COUNT;
 interface ContestEntry {
   id: string;
   userId: string;
-  photoUrl: string;
+  photoUrl: string | null;
   caption: string | null;
+  performanceData: string | null;
   weekNumber: number;
   year: number;
   votesCount: number;
@@ -43,12 +44,66 @@ interface ContestEntry {
   isOwn: boolean;
 }
 
+interface PerformanceData {
+  totalDistanceKm: number;
+  maxSpeedKmh: number;
+  avgSpeedKmh: number;
+  maxAltitude: number;
+  durationSeconds: number;
+  idleTimeSeconds: number;
+  date: string;
+}
+
 interface ContestResponse {
   entries: ContestEntry[];
   weekNumber: number;
   year: number;
   votesUsed: number;
   maxVotesPerDay: number;
+}
+
+function formatPerfTime(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function PerformanceCard({ data }: { data: PerformanceData }) {
+  const dur = data.durationSeconds || 0;
+  const net = Math.max(dur - (data.idleTimeSeconds || 0), 0);
+
+  return (
+    <View style={styles.perfCard}>
+      <View style={styles.perfHeader}>
+        <Ionicons name="speedometer" size={16} color={Colors.accent} />
+        <Text style={styles.perfHeaderText}>Performance</Text>
+      </View>
+      <View style={styles.perfGrid}>
+        <View style={styles.perfItem}>
+          <Text style={styles.perfValue}>{data.totalDistanceKm.toFixed(1)}</Text>
+          <Text style={styles.perfLabel}>km</Text>
+        </View>
+        <View style={styles.perfItem}>
+          <Text style={styles.perfValue}>{data.maxSpeedKmh.toFixed(0)}</Text>
+          <Text style={styles.perfLabel}>km/h max</Text>
+        </View>
+        <View style={styles.perfItem}>
+          <Text style={styles.perfValue}>{data.maxAltitude.toFixed(0)}</Text>
+          <Text style={styles.perfLabel}>m quota</Text>
+        </View>
+        <View style={styles.perfItem}>
+          <Text style={styles.perfValue}>{formatPerfTime(net)}</Text>
+          <Text style={styles.perfLabel}>in moto</Text>
+        </View>
+      </View>
+      {data.date ? (
+        <Text style={styles.perfDate}>
+          {new Date(data.date).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}
+        </Text>
+      ) : null}
+    </View>
+  );
 }
 
 function ContestEntryCard({
@@ -60,9 +115,24 @@ function ContestEntryCard({
   onVote: (id: string) => void;
   votingDisabled: boolean;
 }) {
+  let perfData: PerformanceData | null = null;
+  if (entry.performanceData) {
+    try {
+      perfData = JSON.parse(entry.performanceData);
+    } catch {}
+  }
+
   return (
     <View style={styles.photoCard}>
-      <Image source={{ uri: entry.photoUrl }} style={styles.cardImage} />
+      {perfData ? (
+        <PerformanceCard data={perfData} />
+      ) : entry.photoUrl ? (
+        <Image source={{ uri: entry.photoUrl }} style={styles.cardImage} />
+      ) : (
+        <View style={[styles.cardImage, { justifyContent: "center", alignItems: "center" }]}>
+          <Ionicons name="image-outline" size={32} color={Colors.textSecondary} />
+        </View>
+      )}
       {entry.caption ? (
         <Text style={styles.caption} numberOfLines={2}>
           {entry.caption}
@@ -432,5 +502,54 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
     borderRadius: 20,
     padding: 10,
+  },
+  perfCard: {
+    backgroundColor: Colors.background,
+    padding: 12,
+    aspectRatio: 4 / 3,
+    justifyContent: "center",
+  },
+  perfHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 10,
+    justifyContent: "center",
+  },
+  perfHeaderText: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    color: Colors.accent,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  perfGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 4,
+  },
+  perfItem: {
+    alignItems: "center",
+    width: "45%",
+    paddingVertical: 4,
+  },
+  perfValue: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+  },
+  perfLabel: {
+    fontSize: 9,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+  },
+  perfDate: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginTop: 6,
   },
 });

@@ -9,12 +9,15 @@ import {
   ScrollView,
   Platform,
   AppState,
+  Modal,
+  TextInput,
+  TouchableOpacity,
   type AppStateStatus,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
 import * as Location from "expo-location";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -126,6 +129,46 @@ export default function TrackingScreen() {
   const currentModeRef = useRef<TrackingMode>("idle");
   const totalPointsSentRef = useRef(0);
   const statsSyncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [publishRecord, setPublishRecord] = useState<RouteRecord | null>(null);
+  const [publishCaption, setPublishCaption] = useState("");
+
+  const publishMutation = useMutation({
+    mutationFn: async (data: { performanceData: string; caption: string }) => {
+      await apiRequest("POST", "/api/contest/entries", data);
+    },
+    onSuccess: () => {
+      setPublishRecord(null);
+      setPublishCaption("");
+      queryClient.invalidateQueries({ queryKey: ["/api/contest/entries"] });
+      if (Platform.OS === "web") {
+        window.alert("Record pubblicato su Pic!");
+      } else {
+        Alert.alert("Pubblicato!", "Il tuo record è stato pubblicato nella sezione Pic!");
+      }
+    },
+    onError: () => {
+      if (Platform.OS === "web") {
+        window.alert("Errore durante la pubblicazione");
+      } else {
+        Alert.alert("Errore", "Impossibile pubblicare il record");
+      }
+    },
+  });
+
+  const handlePublish = useCallback(() => {
+    if (!publishRecord) return;
+    const perfData = JSON.stringify({
+      totalDistanceKm: publishRecord.totalDistanceKm || 0,
+      maxSpeedKmh: publishRecord.maxSpeedKmh || 0,
+      avgSpeedKmh: publishRecord.avgSpeedKmh || 0,
+      maxAltitude: publishRecord.maxAltitude || 0,
+      durationSeconds: publishRecord.durationSeconds || 0,
+      idleTimeSeconds: publishRecord.idleTimeSeconds || 0,
+      date: publishRecord.createdAt,
+    });
+    publishMutation.mutate({ performanceData: perfData, caption: publishCaption });
+  }, [publishRecord, publishCaption]);
 
   const { data: records = [], isLoading: recordsLoading } = useQuery<RouteRecord[]>({
     queryKey: ["/api/routes"],
@@ -647,10 +690,59 @@ export default function TrackingScreen() {
           </View>
         ) : (
           completedRecords.map((item: RouteRecord) => (
-            <RecordCard key={item.id} item={item} />
+            <RecordCard key={item.id} item={item} onPublish={() => { setPublishRecord(item); setPublishCaption(""); }} />
           ))
         )}
       </View>
+
+      <Modal
+        visible={!!publishRecord}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPublishRecord(null)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setPublishRecord(null)}>
+          <Pressable style={styles.publishModal} onPress={() => {}}>
+            <Text style={styles.publishTitle}>Pubblica su Pic!</Text>
+            <Text style={styles.publishSubtitle}>
+              Aggiungi una descrizione al tuo record prima di pubblicarlo
+            </Text>
+            <TextInput
+              style={styles.publishInput}
+              placeholder="Es: Giro fantastico sulle colline toscane!"
+              placeholderTextColor={Colors.textSecondary}
+              value={publishCaption}
+              onChangeText={setPublishCaption}
+              maxLength={200}
+              multiline
+            />
+            <View style={styles.publishActions}>
+              <TouchableOpacity
+                style={styles.publishCancelBtn}
+                onPress={() => setPublishRecord(null)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.publishCancelText}>Annulla</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.publishConfirmBtn, publishMutation.isPending && { opacity: 0.5 }]}
+                onPress={handlePublish}
+                disabled={publishMutation.isPending}
+                activeOpacity={0.7}
+              >
+                {publishMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="share-outline" size={16} color="#fff" />
+                    <Text style={styles.publishConfirmText}>Pubblica</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }
@@ -665,7 +757,7 @@ function StatCard({ icon, color, value, label }: { icon: string; color: string; 
   );
 }
 
-function RecordCard({ item }: { item: RouteRecord }) {
+function RecordCard({ item, onPublish }: { item: RouteRecord; onPublish: () => void }) {
   const dur = item.durationSeconds || 0;
   const idle = item.idleTimeSeconds || 0;
   const net = Math.max(dur - idle, 0);
@@ -674,9 +766,12 @@ function RecordCard({ item }: { item: RouteRecord }) {
     <View style={styles.recordCard}>
       <View style={styles.recordHeader}>
         <Ionicons name="flag" size={16} color={Colors.accent} />
-        <Text style={styles.recordDate}>
+        <Text style={[styles.recordDate, { flex: 1 }]}>
           {new Date(item.createdAt).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}
         </Text>
+        <TouchableOpacity onPress={onPublish} style={styles.publishIconBtn} activeOpacity={0.7}>
+          <Ionicons name="share-outline" size={18} color={Colors.accent} />
+        </TouchableOpacity>
       </View>
       <View style={styles.recordRow}>
         <RecordStat value={(item.totalDistanceKm || 0).toFixed(1)} label="km" />
@@ -785,4 +880,80 @@ const styles = StyleSheet.create({
   recordStat: { alignItems: "center", flex: 1 },
   recordValue: { fontSize: 14, fontFamily: "Inter_700Bold", color: Colors.text },
   recordLabel: { fontSize: 10, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  publishIconBtn: {
+    padding: 4,
+    borderRadius: 8,
+    backgroundColor: Colors.accent + "15",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  publishModal: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    width: "100%",
+    maxWidth: 380,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  publishTitle: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+    marginBottom: 6,
+  },
+  publishSubtitle: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginBottom: 14,
+  },
+  publishInput: {
+    backgroundColor: Colors.background,
+    borderRadius: 10,
+    padding: 12,
+    color: Colors.text,
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    borderWidth: 1,
+    borderColor: Colors.border,
+    minHeight: 70,
+    textAlignVertical: "top" as const,
+    marginBottom: 16,
+  },
+  publishActions: {
+    flexDirection: "row" as const,
+    justifyContent: "flex-end" as const,
+    gap: 10,
+  },
+  publishCancelBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.background,
+  },
+  publishCancelText: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+  },
+  publishConfirmBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.accent,
+  },
+  publishConfirmText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
+  },
 });

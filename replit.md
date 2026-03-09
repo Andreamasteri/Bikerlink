@@ -164,6 +164,7 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - **Sezione Admin "A Pagamento"**: sezione nel pannello admin che raggruppa le funzioni premium future. Attualmente contiene: Match Automatico e Percorsi Personalizzati. Setting keys: `auto_matching_enabled`, `custom_routes_enabled`.
 - **Schema colori**: cambiato da oro Grindr a KTM arancione `#FF6600`. Icone proposte: blu (biker) + rosa (zavorrina) per proposte "Con Zavorrina"; badge rosa. "Giro" rinominato "Giro tra Biker".
 - **Ottimizzazioni startup**: endpoint batch `/api/settings/all` (6 query DB in parallelo → 1 chiamata), hook `useSetting()` in `lib/settings-context.ts`, timer countdown offline attivo solo quando necessario, logging backend ottimizzato (no JSON body su 304, troncamento a 200 chars).
+- **Pubblica Performance su Pic!**: pulsante share su ogni record di performance nel tab Tracking. Apre modale con campo testo, poi pubblica come entry nel contest. Le entry con `performanceData` vengono renderizzate come card stilizzata (sfondo scuro, dati performance) nel feed Pic! invece di un'immagine. Campo `performance_data` (text JSON) aggiunto a `photo_contest_entries`.
 
 ## Tabelle DB Aggiuntive
 

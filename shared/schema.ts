@@ -311,8 +311,9 @@ export const photoContestEntries = pgTable("photo_contest_entries", {
   userId: varchar("user_id", { length: 36 })
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  photoUrl: text("photo_url").notNull(),
+  photoUrl: text("photo_url"),
   caption: text("caption"),
+  performanceData: text("performance_data"),
   weekNumber: integer("week_number").notNull(),
   year: integer("year").notNull(),
   votesCount: integer("votes_count").notNull().default(0),
