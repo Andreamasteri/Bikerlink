@@ -130,6 +130,50 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
   }
 });
 
+router.post("/garage-matches/:id/accept", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const matchId = req.params.id;
+    const match = await storage.getGarageMatch(matchId);
+    if (!match) {
+      return res.status(404).json({ message: "Match non trovato" });
+    }
+    if (match.bikerId !== userId && match.zavarrinaId !== userId) {
+      return res.status(403).json({ message: "Non autorizzato" });
+    }
+    if (match.status !== "new") {
+      return res.status(400).json({ message: "Match già gestito" });
+    }
+    const updated = await storage.updateGarageMatch(matchId, { status: "accepted" });
+    return res.json(updated);
+  } catch (error) {
+    console.error("Accept garage match error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/garage-matches/:id/reject", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const matchId = req.params.id;
+    const match = await storage.getGarageMatch(matchId);
+    if (!match) {
+      return res.status(404).json({ message: "Match non trovato" });
+    }
+    if (match.bikerId !== userId && match.zavarrinaId !== userId) {
+      return res.status(403).json({ message: "Non autorizzato" });
+    }
+    if (match.status !== "new") {
+      return res.status(400).json({ message: "Match già gestito" });
+    }
+    const updated = await storage.updateGarageMatch(matchId, { status: "rejected" });
+    return res.json(updated);
+  } catch (error) {
+    console.error("Reject garage match error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.post("/matches/:id/accept", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;

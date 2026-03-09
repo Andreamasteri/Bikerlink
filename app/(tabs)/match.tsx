@@ -37,13 +37,20 @@ function getSearchTypeIcon(searchType?: string | null): keyof typeof Ionicons.gl
   }
 }
 
-function GarageMatchCard({ match, currentUserId, onPress }: { match: any; currentUserId: string; onPress?: () => void }) {
+function GarageMatchCard({ match, currentUserId, onAccept, onReject, isPending }: { match: any; currentUserId: string; onAccept: () => void; onReject: () => void; isPending: boolean }) {
   const isBiker = match.bikerId === currentUserId;
   const otherNickname = isBiker ? match.zavarrinaNickname : match.bikerNickname;
   const otherType = isBiker ? "zavorrina" : "biker";
   const otherColor = otherType === "biker" ? Colors.maleIcon : Colors.femaleIcon;
   const motoInfo = match.bikerMoto;
   const wishInfo = match.wishlistMoto;
+  const isNew = match.status === "new";
+  const isAccepted = match.status === "accepted";
+  const isRejected = match.status === "rejected";
+
+  const statusColor = isAccepted ? Colors.success : isRejected ? Colors.accentRed : Colors.accent;
+  const statusLabel = isAccepted ? "Accettato" : isRejected ? "Rifiutato" : "Match Garage";
+  const statusIcon: keyof typeof Ionicons.glyphMap = isAccepted ? "checkmark-circle" : isRejected ? "close-circle" : "bicycle";
 
   const createdDate = match.createdAt
     ? new Date(match.createdAt).toLocaleDateString("it-IT", {
@@ -52,10 +59,14 @@ function GarageMatchCard({ match, currentUserId, onPress }: { match: any; curren
     : null;
 
   return (
-    <TouchableOpacity style={styles.matchCard} onPress={onPress} activeOpacity={0.7}>
+    <View style={[
+      styles.matchCard,
+      isAccepted && styles.matchCardAccepted,
+      isRejected && styles.matchCardDimmed,
+    ]}>
       <View style={styles.matchStatusRow}>
-        <Ionicons name="bicycle" size={16} color={Colors.accent} />
-        <Text style={styles.statusLabel}>Match Garage</Text>
+        <Ionicons name={statusIcon} size={16} color={statusColor} />
+        <Text style={[styles.statusLabel, { color: statusColor }]}>{statusLabel}</Text>
         {createdDate && <Text style={styles.matchDate}>{createdDate}</Text>}
       </View>
 
@@ -73,7 +84,6 @@ function GarageMatchCard({ match, currentUserId, onPress }: { match: any; curren
             </Text>
           </View>
         </View>
-        <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
       </View>
 
       <View style={styles.matchProposals}>
@@ -91,7 +101,34 @@ function GarageMatchCard({ match, currentUserId, onPress }: { match: any; curren
           </Text>
         </View>
       </View>
-    </TouchableOpacity>
+
+      {isNew && (
+        <View style={styles.matchActions}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.rejectBtn]}
+            onPress={onReject}
+            disabled={isPending}
+          >
+            <Ionicons name="close" size={20} color="#fff" />
+            <Text style={styles.actionBtnText}>Rifiuta</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.acceptBtn]}
+            onPress={onAccept}
+            disabled={isPending}
+          >
+            {isPending ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="checkmark" size={20} color="#fff" />
+                <Text style={styles.actionBtnText}>Accetta</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -258,11 +295,17 @@ export default function MatchScreen() {
   const allMatches = matches || [];
   const allGarageMatches = garageMatches || [];
   const pendingProposalMatches = allMatches.filter((m: any) => m.status === "pending");
-  const acceptedMatches = allMatches.filter((m: any) => m.status === "accepted");
-  const historyMatches = allMatches.filter((m: any) => m.status === "rejected" || m.status === "expired");
+  const acceptedProposalMatches = allMatches.filter((m: any) => m.status === "accepted");
+  const historyProposalMatches = allMatches.filter((m: any) => m.status === "rejected" || m.status === "expired");
 
   const garageMatchesTagged = allGarageMatches.map((m: any) => ({ ...m, _isGarage: true }));
-  const pendingMatches = [...pendingProposalMatches, ...garageMatchesTagged];
+  const newGarageMatches = garageMatchesTagged.filter((m: any) => m.status === "new");
+  const acceptedGarageMatches = garageMatchesTagged.filter((m: any) => m.status === "accepted");
+  const rejectedGarageMatches = garageMatchesTagged.filter((m: any) => m.status === "rejected");
+
+  const pendingMatches = [...pendingProposalMatches, ...newGarageMatches];
+  const acceptedMatches = [...acceptedProposalMatches, ...acceptedGarageMatches];
+  const historyMatches = [...historyProposalMatches, ...rejectedGarageMatches];
 
   const totalNewMatches = pendingMatches.length;
 
@@ -325,26 +368,56 @@ export default function MatchScreen() {
     onError: (err: Error) => Alert.alert("Errore", err.message),
   });
 
-  const handleGarageMatchPress = useCallback((item: any) => {
-    const isBiker = item.bikerId === user?.id;
-    const otherNickname = isBiker ? item.zavarrinaNickname : item.bikerNickname;
-    const motoInfo = item.bikerMoto;
-    const wishInfo = item.wishlistMoto;
-    const motoStr = motoInfo ? `${motoInfo.brand || ""} ${motoInfo.model || ""}`.trim() || motoInfo.motorcycleType || "Moto" : "Moto";
-    const wishStr = wishInfo ? `${wishInfo.brand || ""} ${wishInfo.model || ""}`.trim() || wishInfo.motorcycleType || "" : "";
+  const acceptGarageMutation = useMutation({
+    mutationFn: async (matchId: string) => {
+      const url = new URL(`/api/proposals/garage-matches/${matchId}/accept`, getApiUrl());
+      const res = await globalThis.fetch(url.toString(), { method: "POST", credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Errore" }));
+        throw new Error(err.message || "Errore nell'accettazione");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setPendingMatchId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
+    },
+    onError: (err: Error) => {
+      setPendingMatchId(null);
+      Alert.alert("Errore", err.message);
+    },
+  });
 
-    const message = `${otherNickname} ${isBiker ? "cerca" : "ha"} una ${motoStr}${wishStr ? `\nWishlist: ${wishStr}` : ""}`;
-
-    if (Platform.OS === "web") {
-      window.alert(`Match Garage!\n\n${message}`);
-    } else {
-      Alert.alert("Match Garage!", message);
-    }
-  }, [user?.id]);
+  const rejectGarageMutation = useMutation({
+    mutationFn: async (matchId: string) => {
+      const url = new URL(`/api/proposals/garage-matches/${matchId}/reject`, getApiUrl());
+      const res = await globalThis.fetch(url.toString(), { method: "POST", credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Errore" }));
+        throw new Error(err.message || "Errore nel rifiuto");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
+    },
+    onError: (err: Error) => Alert.alert("Errore", err.message),
+  });
 
   const renderItem = useCallback(({ item }: { item: any }) => {
     if (item._isGarage) {
-      return <GarageMatchCard match={item} currentUserId={user?.id || ""} onPress={() => handleGarageMatchPress(item)} />;
+      return (
+        <GarageMatchCard
+          match={item}
+          currentUserId={user?.id || ""}
+          onAccept={() => {
+            setPendingMatchId(item.id);
+            acceptGarageMutation.mutate(item.id);
+          }}
+          onReject={() => rejectGarageMutation.mutate(item.id)}
+          isPending={pendingMatchId === item.id}
+        />
+      );
     }
     return (
       <MatchCardFull
@@ -359,7 +432,7 @@ export default function MatchScreen() {
         isPending={pendingMatchId === item.id}
       />
     );
-  }, [user?.id, pendingMatchId, acceptMutation, rejectMutation, router, handleGarageMatchPress]);
+  }, [user?.id, pendingMatchId, acceptMutation, rejectMutation, acceptGarageMutation, rejectGarageMutation, router]);
 
   const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; count: number }[] = [
     { key: "pending", label: "In attesa", icon: "hourglass", count: pendingMatches.length },

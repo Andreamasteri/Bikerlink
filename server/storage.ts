@@ -1044,6 +1044,16 @@ export class DatabaseStorage implements IStorage {
     ).orderBy(desc(bikerZavarrinaMatches.createdAt));
   }
 
+  async getGarageMatch(id: string): Promise<BikerZavarrinaMatch | undefined> {
+    const [match] = await db.select().from(bikerZavarrinaMatches).where(eq(bikerZavarrinaMatches.id, id));
+    return match;
+  }
+
+  async updateGarageMatch(id: string, data: Partial<InsertBikerZavarrinaMatch>): Promise<BikerZavarrinaMatch | undefined> {
+    const [updated] = await db.update(bikerZavarrinaMatches).set(data).where(eq(bikerZavarrinaMatches.id, id)).returning();
+    return updated;
+  }
+
   async getAllWishlistMotosWithUsers(): Promise<{ wishlistMoto: any; userId: string }[]> {
     const results = await db.select({
       wishlistMoto: zavarrinaWishlistMotos,
