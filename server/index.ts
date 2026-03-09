@@ -241,6 +241,22 @@ function setupErrorHandler(app: express.Application) {
   });
 }
 
+function startMemoryMonitor(intervalMs = 60000) {
+  const formatMB = (bytes: number) => (bytes / 1024 / 1024).toFixed(1);
+
+  setInterval(() => {
+    const mem = process.memoryUsage();
+    const heapUsedPct = ((mem.heapUsed / mem.heapTotal) * 100).toFixed(1);
+    const line = `[RAM] RSS: ${formatMB(mem.rss)}MB | Heap: ${formatMB(mem.heapUsed)}/${formatMB(mem.heapTotal)}MB (${heapUsedPct}%) | External: ${formatMB(mem.external)}MB`;
+
+    if (parseFloat(heapUsedPct) > 80) {
+      console.warn(`⚠️ HIGH MEMORY ${line}`);
+    } else {
+      log(line);
+    }
+  }, intervalMs);
+}
+
 (async () => {
   app.set("trust proxy", 1);
 
@@ -270,6 +286,7 @@ function setupErrorHandler(app: express.Application) {
     },
     () => {
       log(`express server serving on port ${port}`);
+      startMemoryMonitor();
       startMatchingEngine();
     },
   );
