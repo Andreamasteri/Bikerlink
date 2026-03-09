@@ -84,12 +84,14 @@ function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress
             </Text>
           </View>
         </View>
-        {isAccepted && onChatPress && (
-          <TouchableOpacity onPress={onChatPress} style={styles.chatIconBtn}>
-            <Ionicons name="chatbubble" size={22} color={Colors.accent} />
-          </TouchableOpacity>
-        )}
       </View>
+
+      {isAccepted && onChatPress && (
+        <TouchableOpacity style={styles.chatBtn} onPress={onChatPress}>
+          <Ionicons name="chatbubble" size={18} color={Colors.background} />
+          <Text style={styles.chatBtnText}>Manda un messaggio privato</Text>
+        </TouchableOpacity>
+      )}
 
       <View style={styles.matchProposals}>
         <View style={[styles.proposalMini, { flex: 1 }]}>
