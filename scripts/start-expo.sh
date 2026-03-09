@@ -1,33 +1,53 @@
 #!/bin/bash
 
 PORT=8081
-echo "=== Pulizia processi sulla porta $PORT ==="
+MAX_RETRIES=3
 
-pkill -9 -f "metro" 2>/dev/null || true
-pkill -9 -f "expo start" 2>/dev/null || true
-pkill -9 -f "react-native start" 2>/dev/null || true
-pkill -9 -f "node.*8081" 2>/dev/null || true
-sleep 2
-
-for attempt in 1 2 3 4 5; do
-  PIDS=$(lsof -ti:$PORT 2>/dev/null)
-  if [ -z "$PIDS" ]; then
-    echo "Porta $PORT libera (tentativo $attempt)"
-    break
-  fi
-
-  echo "Porta $PORT occupata da PID: $PIDS - killing... (tentativo $attempt/5)"
-  echo "$PIDS" | xargs kill -9 2>/dev/null || true
+kill_port() {
+  pkill -9 -f "metro" 2>/dev/null || true
+  pkill -9 -f "expo start" 2>/dev/null || true
+  pkill -9 -f "react-native start" 2>/dev/null || true
+  pkill -9 -f "node.*8081" 2>/dev/null || true
+  lsof -ti:$PORT 2>/dev/null | xargs kill -9 2>/dev/null || true
   fuser -k -9 ${PORT}/tcp 2>/dev/null || true
   sleep 3
+}
+
+for retry in $(seq 1 $MAX_RETRIES); do
+  echo "=== Tentativo $retry/$MAX_RETRIES ==="
+  echo "Pulizia porta $PORT..."
+  kill_port
+
+  PIDS=$(lsof -ti:$PORT 2>/dev/null)
+  if [ -n "$PIDS" ]; then
+    echo "Porta $PORT ancora occupata da PID: $PIDS, riprovo..."
+    continue
+  fi
+
+  echo "Porta $PORT libera, avvio Metro..."
+  npm run expo:dev &
+  METRO_PID=$!
+
+  sleep 8
+
+  if kill -0 $METRO_PID 2>/dev/null; then
+    echo "Metro avviato con successo (PID: $METRO_PID)"
+    wait $METRO_PID
+    EXIT_CODE=$?
+    echo "Metro terminato con codice: $EXIT_CODE"
+    if [ $retry -lt $MAX_RETRIES ]; then
+      echo "Riavvio in corso..."
+      continue
+    fi
+    exit $EXIT_CODE
+  else
+    echo "Metro crashato al tentativo $retry"
+    if [ $retry -lt $MAX_RETRIES ]; then
+      echo "Riprovo tra 3 secondi..."
+      sleep 3
+    fi
+  fi
 done
 
-PIDS=$(lsof -ti:$PORT 2>/dev/null)
-if [ -n "$PIDS" ]; then
-  echo "ERRORE: impossibile liberare la porta $PORT dopo 5 tentativi"
-  lsof -i:$PORT 2>/dev/null
-  exit 1
-fi
-
-echo "=== Avvio Metro ==="
-exec npm run expo:dev
+echo "ERRORE: impossibile avviare Metro dopo $MAX_RETRIES tentativi"
+exit 1
