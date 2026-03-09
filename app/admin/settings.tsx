@@ -34,6 +34,11 @@ export default function AdminSettings() {
     queryKey: ["/api/admin/settings"],
   });
 
+  const { data: adsEnabledData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/ads-enabled"],
+  });
+  const adsEnabled = adsEnabledData?.enabled !== false;
+
   const { data: synecoData } = useQuery<{ visible: boolean }>({
     queryKey: ["/api/settings/syneco-branding"],
   });
@@ -150,6 +155,25 @@ export default function AdminSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/syneco-branding"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const adsEnabledMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/ads_enabled", baseUrl);
+      const res = await fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/ads-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
   });
@@ -418,6 +442,25 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {synecoVisible ? "Il branding Syneco è visibile nell'app" : "Il branding Syneco è nascosto"}
+        </Text>
+      </View>
+
+      <View style={styles.synecoCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="volume-high" size={20} color={Colors.syneco} />
+            <Text style={styles.synecoLabel}>Pubblicità</Text>
+          </View>
+          <Switch
+            value={adsEnabled}
+            onValueChange={(val) => adsEnabledMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: Colors.syneco }}
+            thumbColor={adsEnabled ? Colors.text : Colors.textSecondary}
+            disabled={adsEnabledMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {adsEnabled ? "Le pubblicità sono attive nell'app" : "Le pubblicità sono disattivate"}
         </Text>
       </View>
 

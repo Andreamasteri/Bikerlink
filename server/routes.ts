@@ -99,6 +99,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/ads-enabled", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("ads_enabled");
+      const enabled = setting?.value !== "false";
+      res.json({ enabled });
+    } catch {
+      res.json({ enabled: true });
+    }
+  });
+
   app.get("/api/settings/syneco-branding", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("syneco_branding_visible");

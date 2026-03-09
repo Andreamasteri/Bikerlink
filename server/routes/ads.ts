@@ -5,6 +5,11 @@ const router = Router();
 
 router.get("/active", async (req: Request, res: Response) => {
   try {
+    const adsSetting = await storage.getAppSetting("ads_enabled");
+    if (adsSetting?.value === "false") {
+      return res.json([]);
+    }
+
     const campaigns = await storage.getActiveCampaigns();
 
     const now = new Date();
@@ -27,6 +32,11 @@ router.get("/active", async (req: Request, res: Response) => {
 
 router.get("/my-ads", async (req: Request, res: Response) => {
   try {
+    const adsSetting = await storage.getAppSetting("ads_enabled");
+    if (adsSetting?.value === "false") {
+      return res.json([]);
+    }
+
     const userId = req.session?.userId;
     if (!userId) {
       return res.status(401).json({ message: "Non autenticato" });
