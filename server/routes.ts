@@ -21,6 +21,7 @@ import workshopRoutes from "./routes/workshops";
 import easterEggRoutes from "./routes/easter-eggs";
 import adminRoutes from "./routes/admin";
 import moderatorRoutes from "./routes/moderator";
+import customRoutesRouter from "./routes/custom-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const PgStore = connectPgSimple(session);
@@ -59,6 +60,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/feedback", feedbackRoutes);
   app.use("/api/invitations", invitationRoutes);
   app.use("/api/routes", trackingRoutes);
+  app.use(customRoutesRouter);
   app.use("/api/admin", adminRoutes);
   app.use("/api/moderator", moderatorRoutes);
 
@@ -95,6 +97,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/settings/chatbot-enabled", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("chatbot_enabled");
+      const enabled = setting?.value !== "false";
+      res.json({ enabled });
+    } catch {
+      res.json({ enabled: true });
+    }
+  });
+
+  app.get("/api/settings/custom-routes", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("custom_routes_enabled");
       const enabled = setting?.value !== "false";
       res.json({ enabled });
     } catch {

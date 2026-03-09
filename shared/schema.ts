@@ -269,6 +269,41 @@ export const routePoints = pgTable("route_points", {
   index("route_points_route_id_idx").on(table.routeId),
 ]);
 
+export const customRoutes = pgTable("custom_routes", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  totalDistanceKm: doublePrecision("total_distance_km").default(0),
+  isPublic: boolean("is_public").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("custom_routes_user_id_idx").on(table.userId),
+]);
+
+export const customRouteWaypoints = pgTable("custom_route_waypoints", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  routeId: varchar("route_id", { length: 36 })
+    .notNull()
+    .references(() => customRoutes.id, { onDelete: "cascade" }),
+  orderIndex: integer("order_index").notNull().default(0),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  latitude: doublePrecision("latitude").notNull(),
+  longitude: doublePrecision("longitude").notNull(),
+  waypointType: varchar("waypoint_type", { length: 20 }).notNull().default("stop"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("custom_route_waypoints_route_id_idx").on(table.routeId),
+]);
+
 export const photoContestEntries = pgTable("photo_contest_entries", {
   id: varchar("id", { length: 36 })
     .primaryKey()
@@ -780,6 +815,10 @@ export type InsertEmailVerificationToken = typeof emailVerificationTokens.$infer
 
 export type FakeUserInteraction = typeof fakeUserInteractions.$inferSelect;
 export type InsertFakeUserInteraction = typeof fakeUserInteractions.$inferInsert;
+export type CustomRoute = typeof customRoutes.$inferSelect;
+export type InsertCustomRoute = typeof customRoutes.$inferInsert;
+export type CustomRouteWaypoint = typeof customRouteWaypoints.$inferSelect;
+export type InsertCustomRouteWaypoint = typeof customRouteWaypoints.$inferInsert;
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

@@ -54,6 +54,11 @@ export default function AdminSettings() {
   });
   const autoMatchEnabled = autoMatchData?.enabled !== false;
 
+  const { data: customRoutesData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/custom-routes"],
+  });
+  const customRoutesEnabled = customRoutesData?.enabled !== false;
+
   const emailVerifMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       const baseUrl = getApiUrl();
@@ -88,6 +93,25 @@ export default function AdminSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/chatbot-enabled"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const customRoutesMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/custom_routes_enabled", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/custom-routes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
   });
@@ -356,6 +380,25 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {autoMatchEnabled ? "Il motore di matching automatico è attivo" : "Il matching automatico è disattivato"}
+        </Text>
+      </View>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="map" size={20} color={Colors.warning} />
+            <Text style={styles.synecoLabel}>Percorsi Personalizzati</Text>
+          </View>
+          <Switch
+            value={customRoutesEnabled}
+            onValueChange={(val) => customRoutesMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: Colors.warning }}
+            thumbColor={customRoutesEnabled ? Colors.text : Colors.textSecondary}
+            disabled={customRoutesMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {customRoutesEnabled ? "Gli utenti possono creare percorsi personalizzati" : "I percorsi personalizzati sono disattivati"}
         </Text>
       </View>
 

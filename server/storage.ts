@@ -39,6 +39,8 @@ import {
   emailVerificationTokens,
   proposalMatches,
   fakeUserInteractions,
+  customRoutes,
+  customRouteWaypoints,
   type User,
   type InsertUser,
   type UserPhoto,
@@ -113,6 +115,10 @@ import {
   type InsertProposalMatch,
   type FakeUserInteraction,
   type InsertFakeUserInteraction,
+  type CustomRoute,
+  type InsertCustomRoute,
+  type CustomRouteWaypoint,
+  type InsertCustomRouteWaypoint,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -255,6 +261,17 @@ export interface IStorage {
   countAvailableZavorrine(since: Date): Promise<number>;
   getAvailableBikersList(since: Date, lat?: number, lng?: number): Promise<any[]>;
   getAvailableZavorrinaList(since: Date, lat?: number, lng?: number): Promise<any[]>;
+
+  getCustomRoutes(userId: string): Promise<CustomRoute[]>;
+  getPublicCustomRoutes(): Promise<CustomRoute[]>;
+  getCustomRoute(id: string): Promise<CustomRoute | undefined>;
+  createCustomRoute(data: InsertCustomRoute): Promise<CustomRoute>;
+  updateCustomRoute(id: string, data: Partial<InsertCustomRoute>): Promise<CustomRoute | undefined>;
+  deleteCustomRoute(id: string): Promise<void>;
+  getCustomRouteWaypoints(routeId: string): Promise<CustomRouteWaypoint[]>;
+  createCustomRouteWaypoint(data: InsertCustomRouteWaypoint): Promise<CustomRouteWaypoint>;
+  updateCustomRouteWaypoint(id: string, data: Partial<InsertCustomRouteWaypoint>): Promise<CustomRouteWaypoint | undefined>;
+  deleteCustomRouteWaypoint(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1268,6 +1285,51 @@ export class DatabaseStorage implements IStorage {
       });
     }
     return result;
+  }
+
+  async getCustomRoutes(userId: string): Promise<CustomRoute[]> {
+    return db.select().from(customRoutes).where(eq(customRoutes.userId, userId)).orderBy(desc(customRoutes.createdAt));
+  }
+
+  async getPublicCustomRoutes(): Promise<CustomRoute[]> {
+    return db.select().from(customRoutes).where(eq(customRoutes.isPublic, true)).orderBy(desc(customRoutes.createdAt));
+  }
+
+  async getCustomRoute(id: string): Promise<CustomRoute | undefined> {
+    const [route] = await db.select().from(customRoutes).where(eq(customRoutes.id, id)).limit(1);
+    return route;
+  }
+
+  async createCustomRoute(data: InsertCustomRoute): Promise<CustomRoute> {
+    const [route] = await db.insert(customRoutes).values(data).returning();
+    return route;
+  }
+
+  async updateCustomRoute(id: string, data: Partial<InsertCustomRoute>): Promise<CustomRoute | undefined> {
+    const [route] = await db.update(customRoutes).set({ ...data, updatedAt: new Date() }).where(eq(customRoutes.id, id)).returning();
+    return route;
+  }
+
+  async deleteCustomRoute(id: string): Promise<void> {
+    await db.delete(customRoutes).where(eq(customRoutes.id, id));
+  }
+
+  async getCustomRouteWaypoints(routeId: string): Promise<CustomRouteWaypoint[]> {
+    return db.select().from(customRouteWaypoints).where(eq(customRouteWaypoints.routeId, routeId)).orderBy(asc(customRouteWaypoints.orderIndex));
+  }
+
+  async createCustomRouteWaypoint(data: InsertCustomRouteWaypoint): Promise<CustomRouteWaypoint> {
+    const [wp] = await db.insert(customRouteWaypoints).values(data).returning();
+    return wp;
+  }
+
+  async updateCustomRouteWaypoint(id: string, data: Partial<InsertCustomRouteWaypoint>): Promise<CustomRouteWaypoint | undefined> {
+    const [wp] = await db.update(customRouteWaypoints).set(data).where(eq(customRouteWaypoints.id, id)).returning();
+    return wp;
+  }
+
+  async deleteCustomRouteWaypoint(id: string): Promise<void> {
+    await db.delete(customRouteWaypoints).where(eq(customRouteWaypoints.id, id));
   }
 }
 

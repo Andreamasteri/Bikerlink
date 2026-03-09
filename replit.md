@@ -69,7 +69,7 @@ lib/
   query-client.ts       # Configurazione React Query + API client
 
 constants/
-  colors.ts             # Tema dark BikerLink (bg #0D0D0D, accent #D4A017)
+  colors.ts             # Tema dark BikerLink (bg #0D0D0D, accent #FF6600)
 ```
 
 ## Tipi Utente
@@ -158,6 +158,10 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
   - Seed: `npx tsx server/seed-fake-users.ts` (idempotente, salta se >10 fake users esistono)
   - Toggle "Mostra anche offline" nelle 3 stat card modals (auto-disattivazione dopo 30s con countdown)
   - Utenti offline mostrati con opacità 0.5 e dot grigio
+
+- **Percorsi Personalizzati**: creazione di percorsi con waypoint (Partenza, Sosta, Punto di Interesse, Arrivo) su mappa. Percorsi pubblici/privati, riordinamento tappe. Toggle admin in sezione "A Pagamento" (default attivo). Tabelle: `custom_routes`, `custom_route_waypoints`. API: `/api/custom-routes`, `/api/custom-routes/:id/waypoints`. Schermate: `app/routes/index.tsx` (lista), `app/routes/create.tsx` (editor), `app/routes/[id].tsx` (dettaglio). Pulsante "I Miei Percorsi" nel tab Ride!
+- **Sezione Admin "A Pagamento"**: sezione nel pannello admin che raggruppa le funzioni premium future. Attualmente contiene: Match Automatico e Percorsi Personalizzati. Setting keys: `auto_matching_enabled`, `custom_routes_enabled`.
+- **Schema colori**: cambiato da oro Grindr a KTM arancione `#FF6600`. Icone proposte: blu (biker) + rosa (zavorrina) per proposte "Con Zavorrina"; badge rosa. "Giro" rinominato "Giro tra Biker".
 
 ## Tabelle DB Aggiuntive
 

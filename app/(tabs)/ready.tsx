@@ -63,7 +63,7 @@ export default function ReadyToRideScreen() {
       contentContainerStyle={[
         styles.scrollContent,
         {
-          paddingTop: Platform.OS === "web" ? 67 : insets.top + 16,
+          paddingTop: Platform.OS === "web" ? 67 : 8,
           paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16,
         },
       ]}
@@ -109,6 +109,14 @@ export default function ReadyToRideScreen() {
         >
           <Ionicons name="navigate" size={20} color={Colors.accent} />
           <Text style={styles.cronoBtnText}>Registra Giro e Performance</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.cronoBtn}
+          onPress={() => router.push("/routes" as any)}
+        >
+          <Ionicons name="map" size={20} color={Colors.accent} />
+          <Text style={styles.cronoBtnText}>I Miei Percorsi</Text>
         </Pressable>
       </View>
     </ScrollView>
