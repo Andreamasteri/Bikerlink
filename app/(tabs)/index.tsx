@@ -132,7 +132,10 @@ export default function MapScreen() {
     setOfflineCountdown((prev) => ({ ...prev, [key]: 30 }));
   }, []);
 
+  const hasActiveCountdown = offlineCountdown.online > 0 || offlineCountdown.biker > 0 || offlineCountdown.zav > 0;
+
   useEffect(() => {
+    if (!hasActiveCountdown) return;
     const interval = setInterval(() => {
       setOfflineCountdown((prev) => {
         const next = { ...prev };
@@ -152,7 +155,7 @@ export default function MapScreen() {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [hasActiveCountdown]);
 
   const nearbyUsersQuery = useQuery<any[]>({
     queryKey: ["/api/users/nearby", location?.latitude, location?.longitude],

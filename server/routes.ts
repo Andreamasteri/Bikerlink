@@ -134,6 +134,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/all", async (_req, res) => {
+    try {
+      const [syneco, emailVerification, chatbot, autoMatching, customRoutes, paypal] = await Promise.all([
+        storage.getAppSetting("syneco_branding_visible"),
+        storage.getAppSetting("email_verification_enabled"),
+        storage.getAppSetting("chatbot_enabled"),
+        storage.getAppSetting("auto_matching_enabled"),
+        storage.getAppSetting("custom_routes_enabled"),
+        storage.getAppSetting("paypal_email"),
+      ]);
+      res.json({
+        synecoBranding: syneco?.value === "true",
+        emailVerification: emailVerification?.value === "true",
+        chatbotEnabled: chatbot?.value !== "false",
+        autoMatching: autoMatching?.value !== "false",
+        customRoutes: customRoutes?.value !== "false",
+        paypalEmail: paypal?.value || "Andreamasteri81@gmail.com",
+      });
+    } catch {
+      res.json({
+        synecoBranding: false,
+        emailVerification: false,
+        chatbotEnabled: true,
+        autoMatching: true,
+        customRoutes: true,
+        paypalEmail: "Andreamasteri81@gmail.com",
+      });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

@@ -14,6 +14,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
+import { useSetting } from "@/lib/settings-context";
 
 interface CustomRoute {
   id: string;
@@ -33,17 +34,14 @@ export default function RoutesListScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
 
-  const settingsQuery = useQuery<{ enabled: boolean }>({
-    queryKey: ["/api/settings/custom-routes"],
-  });
+  const featureEnabled = useSetting("customRoutes");
 
   const routesQuery = useQuery<{ myRoutes: CustomRoute[]; publicRoutes: CustomRoute[] }>({
     queryKey: ["/api/custom-routes"],
-    enabled: settingsQuery.data?.enabled !== false,
+    enabled: featureEnabled,
   });
 
-  const featureEnabled = settingsQuery.data?.enabled !== false;
-  const isLoading = settingsQuery.isLoading || routesQuery.isLoading;
+  const isLoading = routesQuery.isLoading;
 
   if (isLoading) {
     return (

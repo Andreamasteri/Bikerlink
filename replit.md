@@ -163,6 +163,7 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - **Auto-eliminazione proposte scadute**: le proposte con status "expired" vengono eliminate automaticamente dal database ogni 60s dal matching engine (insieme ai match e partecipanti associati)
 - **Sezione Admin "A Pagamento"**: sezione nel pannello admin che raggruppa le funzioni premium future. Attualmente contiene: Match Automatico e Percorsi Personalizzati. Setting keys: `auto_matching_enabled`, `custom_routes_enabled`.
 - **Schema colori**: cambiato da oro Grindr a KTM arancione `#FF6600`. Icone proposte: blu (biker) + rosa (zavorrina) per proposte "Con Zavorrina"; badge rosa. "Giro" rinominato "Giro tra Biker".
+- **Ottimizzazioni startup**: endpoint batch `/api/settings/all` (6 query DB in parallelo → 1 chiamata), hook `useSetting()` in `lib/settings-context.ts`, timer countdown offline attivo solo quando necessario, logging backend ottimizzato (no JSON body su 304, troncamento a 200 chars).
 
 ## Tabelle DB Aggiuntive
 

@@ -1,6 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useSetting } from "@/lib/settings-context";
 
 export function useSynecoVisible(): boolean {
-  const { data } = useQuery({ queryKey: ["/api/settings/syneco-branding"] });
-  return (data as any)?.visible === true;
+  return useSetting("synecoBranding");
 }
