@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -9,7 +9,6 @@ import {
   Alert,
   Platform,
   Linking,
-  TextInput,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -89,36 +88,6 @@ export default function CustomRouteDetailScreen() {
     },
   });
 
-  const [gmapsLink, setGmapsLink] = useState("");
-  const [importError, setImportError] = useState("");
-  const [importSuccess, setImportSuccess] = useState(false);
-
-  const importMutation = useMutation({
-    mutationFn: async (link: string) => {
-      const res = await apiRequest("POST", `/api/custom-routes/${id}/import-gmaps`, { gmapsLink: link });
-      return res.json();
-    },
-    onSuccess: (data) => {
-      setImportSuccess(true);
-      setImportError("");
-      setGmapsLink("");
-      queryClient.invalidateQueries({ queryKey: ["/api/custom-routes", id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
-      setTimeout(() => setImportSuccess(false), 5000);
-    },
-    onError: (err: any) => {
-      setImportError(err.message || "Errore durante l'importazione");
-      setImportSuccess(false);
-    },
-  });
-
-  const handleImport = () => {
-    if (!gmapsLink.trim()) return;
-    setImportError("");
-    setImportSuccess(false);
-    importMutation.mutate(gmapsLink.trim());
-  };
-
   const handleDelete = () => {
     if (Platform.OS === "web") {
       if (confirm("Eliminare questo percorso?")) {
@@ -195,67 +164,6 @@ export default function CustomRouteDetailScreen() {
           <MaterialCommunityIcons name="google-maps" size={20} color="#fff" />
           <Text style={styles.googleMapsBtnText}>Apri in Google Maps</Text>
         </TouchableOpacity>
-      )}
-
-      {route.isMine && waypoints.length >= 2 && (
-        <View style={styles.importSection}>
-          <View style={styles.instructionsBox}>
-            <MaterialCommunityIcons name="information-outline" size={18} color={Colors.accent} />
-            <Text style={styles.instructionsTitle}>
-              Per un percorso dettagliato con strade e percorrenze:
-            </Text>
-          </View>
-          <View style={styles.instructionsList}>
-            <Text style={styles.instructionStep}>1. Premi "Apri in Google Maps" qui sopra</Text>
-            <Text style={styles.instructionStep}>2. Su Google Maps seleziona "Condividi"</Text>
-            <Text style={styles.instructionStep}>3. In "Condividi" seleziona "Copia"</Text>
-            <Text style={styles.instructionStep}>4. Incolla il link qui sotto e premi "Importa"</Text>
-          </View>
-
-          <View style={styles.importRow}>
-            <TextInput
-              style={styles.importInput}
-              placeholder="Incolla il link di Google Maps..."
-              placeholderTextColor={Colors.textSecondary}
-              value={gmapsLink}
-              onChangeText={setGmapsLink}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TouchableOpacity
-              style={[
-                styles.importBtn,
-                (!gmapsLink.trim() || importMutation.isPending) && { opacity: 0.5 },
-              ]}
-              onPress={handleImport}
-              disabled={!gmapsLink.trim() || importMutation.isPending}
-              activeOpacity={0.7}
-            >
-              {importMutation.isPending ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <MaterialCommunityIcons name="import" size={18} color="#fff" />
-              )}
-              <Text style={styles.importBtnText}>Importa</Text>
-            </TouchableOpacity>
-          </View>
-
-          {importError ? (
-            <View style={styles.importFeedback}>
-              <MaterialCommunityIcons name="alert-circle" size={16} color={Colors.accentRed} />
-              <Text style={styles.importErrorText}>{importError}</Text>
-            </View>
-          ) : null}
-
-          {importSuccess ? (
-            <View style={styles.importFeedback}>
-              <MaterialCommunityIcons name="check-circle" size={16} color={Colors.success} />
-              <Text style={styles.importSuccessText}>
-                Percorso importato con successo! La mappa è stata aggiornata.
-              </Text>
-            </View>
-          ) : null}
-        </View>
       )}
 
       <View style={styles.header}>
@@ -424,82 +332,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 15,
     fontWeight: "600" as const,
-  },
-  importSection: {
-    marginHorizontal: 20,
-    marginTop: 12,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  instructionsBox: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 8,
-    marginBottom: 10,
-  },
-  instructionsTitle: {
-    color: Colors.accent,
-    fontSize: 13,
-    fontWeight: "600" as const,
-    flex: 1,
-  },
-  instructionsList: {
-    marginBottom: 14,
-    gap: 4,
-  },
-  instructionStep: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  importRow: {
-    flexDirection: "row" as const,
-    gap: 8,
-  },
-  importInput: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    color: Colors.text,
-    fontSize: 13,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  importBtn: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-    backgroundColor: Colors.accent,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    gap: 6,
-  },
-  importBtnText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "600" as const,
-  },
-  importFeedback: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 6,
-    marginTop: 10,
-  },
-  importErrorText: {
-    color: Colors.accentRed,
-    fontSize: 12,
-    flex: 1,
-  },
-  importSuccessText: {
-    color: Colors.success,
-    fontSize: 12,
-    flex: 1,
   },
   mapContainer: {
     height: 280,
