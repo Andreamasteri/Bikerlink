@@ -63,7 +63,7 @@ export default function ReadyToRideScreen() {
       contentContainerStyle={[
         styles.scrollContent,
         {
-          paddingTop: Platform.OS === "web" ? 67 : 8,
+          paddingTop: Platform.OS === "web" ? 67 : 0,
           paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16,
         },
       ]}
