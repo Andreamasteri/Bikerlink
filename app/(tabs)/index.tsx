@@ -386,7 +386,13 @@ export default function MapScreen() {
       await apiRequest("POST", `/api/ads/${ad.id}/click`);
     } catch (e) {}
     if (ad.linkUrl) {
-      Linking.openURL(ad.linkUrl);
+      let url = ad.linkUrl.trim();
+      if (!/^https?:\/\//i.test(url)) {
+        url = "https://" + url;
+      }
+      try {
+        await Linking.openURL(url);
+      } catch (e) {}
     }
   }, []);
 
