@@ -43,7 +43,7 @@ interface ProposalItem {
 
 const FILTER_TYPES = [
   { key: "all", label: "Tutti" },
-  { key: "giro", label: "Giro" },
+  { key: "giro", label: "Giro tra Biker" },
   { key: "con_zavorrina", label: "Con Zavorrina" },
   { key: "passaggio_al_volo", label: "Passaggio al volo" },
   { key: "richieste", label: "Richieste" },
@@ -57,12 +57,12 @@ const SEARCH_TYPE_LABELS: Record<string, string> = {
   find_a_biker: "FindABiker",
 };
 
-function getTypeIcon(type: string): { name: keyof typeof Ionicons.glyphMap; color: string } {
+function getTypeIcon(type: string): { name: keyof typeof Ionicons.glyphMap; color: string; dual?: boolean } {
   switch (type) {
     case "giro":
     case "find_a_friend": return { name: "people", color: Colors.maleIcon };
     case "con_zavorrina":
-    case "find_a_guest": return { name: "person-add", color: Colors.femaleIcon };
+    case "find_a_guest": return { name: "bicycle", color: Colors.maleIcon, dual: true };
     case "passaggio_al_volo":
     case "hitcher":
     case "hitchhiker": return { name: "car", color: Colors.success };
@@ -75,7 +75,7 @@ function getTypeIcon(type: string): { name: keyof typeof Ionicons.glyphMap; colo
 function getTypeLabel(type: string): string {
   switch (type) {
     case "giro":
-    case "find_a_friend": return "Giro";
+    case "find_a_friend": return "Giro tra Biker";
     case "con_zavorrina":
     case "find_a_guest": return "Con Zavorrina";
     case "passaggio_al_volo":
@@ -103,7 +103,14 @@ function ProposalCard({ item, onPress }: { item: ProposalItem; onPress: () => vo
   return (
     <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.cardHeader}>
-        <Ionicons name={typeInfo.name} size={24} color={typeInfo.color} />
+        {typeInfo.dual ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+            <Ionicons name="bicycle" size={20} color={Colors.maleIcon} />
+            <Ionicons name="person" size={20} color={Colors.femaleIcon} />
+          </View>
+        ) : (
+          <Ionicons name={typeInfo.name} size={24} color={typeInfo.color} />
+        )}
         <View style={styles.cardHeaderInfo}>
           <Text style={styles.nickname}>{item.creatorNickname}</Text>
           <Text style={styles.type}>
