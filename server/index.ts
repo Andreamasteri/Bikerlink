@@ -242,6 +242,8 @@ function setupErrorHandler(app: express.Application) {
 }
 
 (async () => {
+  app.set("trust proxy", 1);
+
   app.get("/healthz", (_req: Request, res: Response) => {
     res.status(200).send("ok");
   });
