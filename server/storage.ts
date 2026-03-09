@@ -263,6 +263,49 @@ export interface IStorage {
   getAvailableBikersList(since: Date, lat?: number, lng?: number): Promise<any[]>;
   getAvailableZavorrinaList(since: Date, lat?: number, lng?: number): Promise<any[]>;
 
+  getMotorcyclePhotos(motorcycleId: string): Promise<MotorcyclePhoto[]>;
+  addMotorcyclePhoto(data: InsertMotorcyclePhoto): Promise<MotorcyclePhoto>;
+  deleteMotorcyclePhoto(id: string): Promise<void>;
+  getMotorcyclePhotoCount(motorcycleId: string): Promise<number>;
+
+  getWishlist(userId: string): Promise<ZavarrinaWishlist | undefined>;
+  createOrUpdateWishlist(userId: string, description: string): Promise<ZavarrinaWishlist>;
+  getWishlistPhotos(wishlistId: string): Promise<ZavarrinaWishlistPhoto[]>;
+  addWishlistPhoto(data: InsertZavarrinaWishlistPhoto): Promise<ZavarrinaWishlistPhoto>;
+  deleteWishlistPhoto(id: string): Promise<void>;
+  getWishlistPhotoCount(wishlistId: string): Promise<number>;
+  getWishlistMoto(id: string): Promise<ZavarrinaWishlistMoto | undefined>;
+  getWishlistMotos(wishlistId: string): Promise<ZavarrinaWishlistMoto[]>;
+  addWishlistMoto(data: InsertZavarrinaWishlistMoto): Promise<ZavarrinaWishlistMoto>;
+  updateWishlistMoto(id: string, data: Partial<InsertZavarrinaWishlistMoto>): Promise<ZavarrinaWishlistMoto | undefined>;
+  deleteWishlistMoto(id: string): Promise<void>;
+  getWishlistMotoCount(wishlistId: string): Promise<number>;
+  findMatchingWishlistMotos(brand: string, model: string, ridingStyle: string, motorcycleType: string): Promise<Array<ZavarrinaWishlistMoto & { userId: string }>>;
+  findMatchingBikerMotos(brand: string, model: string, ridingStyle: string, motorcycleType: string): Promise<UserMotorcycle[]>;
+  createMatch(data: InsertBikerZavarrinaMatch): Promise<BikerZavarrinaMatch>;
+  getMatchesForUser(userId: string): Promise<BikerZavarrinaMatch[]>;
+  getGarageMatch(id: string): Promise<BikerZavarrinaMatch | undefined>;
+  updateGarageMatch(id: string, data: Partial<InsertBikerZavarrinaMatch>): Promise<BikerZavarrinaMatch | undefined>;
+  getAllWishlistMotosWithUsers(): Promise<{ wishlistMoto: any; userId: string }[]>;
+  getAllBikerMotorcyclesWithUsers(): Promise<{ motorcycle: any; userId: string }[]>;
+  findExistingBikerZavarrinaMatch(bikerId: string, zavarrinaId: string, bikerMotorcycleId: string, wishlistMotoId: string): Promise<BikerZavarrinaMatch | undefined>;
+
+  createEmailVerificationToken(userId: string, token: string, expiresAt: Date): Promise<void>;
+  getEmailVerificationToken(token: string): Promise<EmailVerificationToken | undefined>;
+  deleteEmailVerificationTokens(userId: string): Promise<void>;
+  markUserEmailVerified(userId: string): Promise<void>;
+
+  requestUserDeletion(userId: string): Promise<void>;
+  cancelUserDeletion(userId: string): Promise<void>;
+  deleteUser(userId: string): Promise<void>;
+
+  recordFakeUserInteraction(fakeUserId: string, realUserId: string, interactionType: string): Promise<void>;
+  getFakeUserStats(): Promise<any[]>;
+  getFakeUsers(): Promise<User[]>;
+  deleteFakeUser(id: string): Promise<void>;
+  toggleFakeZavorrineAvailability(): Promise<void>;
+  getFakeUserConversations(fakeUserId: string): Promise<any[]>;
+
   getCustomRoutes(userId: string): Promise<CustomRoute[]>;
   getPublicCustomRoutes(): Promise<CustomRoute[]>;
   getCustomRoute(id: string): Promise<CustomRoute | undefined>;
