@@ -611,7 +611,7 @@ export default function TrackingScreen() {
         </View>
       ) : (
         <Pressable
-          style={[styles.mainBtn, { backgroundColor: Colors.success, alignSelf: "center" }]}
+          style={[styles.mainBtn, { backgroundColor: Colors.warning, alignSelf: "center" }]}
           onPress={startTracking}
           disabled={loading}
         >
