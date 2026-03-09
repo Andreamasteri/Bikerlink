@@ -9,6 +9,7 @@ interface Props {
   onCoordChange: (coord: { latitude: number; longitude: number }) => void;
   onConfirm: () => void;
   onClose: () => void;
+  initialRegion?: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
 }
 
 export default function MapPickerContent({ coord, onCoordChange, onConfirm, onClose }: Props) {

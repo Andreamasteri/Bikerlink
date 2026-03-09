@@ -293,6 +293,12 @@ export default function CreateRouteScreen() {
           onCoordChange={setPendingCoord}
           onConfirm={handleMapConfirm}
           onClose={() => setMapOpen(false)}
+          initialRegion={waypoints.length > 0 ? {
+            latitude: waypoints[waypoints.length - 1].latitude,
+            longitude: waypoints[waypoints.length - 1].longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          } : undefined}
         />
       </Modal>
 

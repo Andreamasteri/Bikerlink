@@ -10,6 +10,7 @@ interface Props {
   onCoordChange: (coord: { latitude: number; longitude: number }) => void;
   onConfirm: () => void;
   onClose: () => void;
+  initialRegion?: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
 }
 
 const ITALY_REGION = {
@@ -19,7 +20,7 @@ const ITALY_REGION = {
   longitudeDelta: 12,
 };
 
-export default function MapPickerContent({ coord, onCoordChange, onConfirm, onClose }: Props) {
+export default function MapPickerContent({ coord, onCoordChange, onConfirm, onClose, initialRegion }: Props) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -35,7 +36,7 @@ export default function MapPickerContent({ coord, onCoordChange, onConfirm, onCl
       </View>
       <MapView
         style={{ flex: 1 }}
-        initialRegion={ITALY_REGION}
+        initialRegion={initialRegion || ITALY_REGION}
         provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
         onPress={(e: any) => onCoordChange(e.nativeEvent.coordinate)}
       >
