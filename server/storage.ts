@@ -157,6 +157,7 @@ export interface IStorage {
   updateProposalMatch(id: string, data: Partial<InsertProposalMatch>): Promise<ProposalMatch | undefined>;
   findExistingMatch(proposalId1: string, proposalId2: string): Promise<ProposalMatch | undefined>;
   expireOldProposals(): Promise<number>;
+  deleteExpiredProposals(): Promise<number>;
 
   getConversations(userId: string): Promise<Conversation[]>;
   getConversation(id: string): Promise<Conversation | undefined>;
@@ -475,6 +476,33 @@ export class DatabaseStorage implements IStorage {
         );
     }
     return result.length;
+  }
+
+  async deleteExpiredProposals(): Promise<number> {
+    const expiredProposalsList = await db.select({ id: proposals.id })
+      .from(proposals)
+      .where(eq(proposals.status, "expired"));
+
+    if (expiredProposalsList.length === 0) return 0;
+
+    const expiredIds = expiredProposalsList.map(p => p.id);
+
+    await db.delete(proposalMatches).where(
+      or(
+        inArray(proposalMatches.proposalId1, expiredIds),
+        inArray(proposalMatches.proposalId2, expiredIds)
+      )
+    );
+
+    await db.delete(proposalParticipants).where(
+      inArray(proposalParticipants.proposalId, expiredIds)
+    );
+
+    const deleted = await db.delete(proposals)
+      .where(eq(proposals.status, "expired"))
+      .returning();
+
+    return deleted.length;
   }
 
   async getConversations(userId: string): Promise<Conversation[]> {

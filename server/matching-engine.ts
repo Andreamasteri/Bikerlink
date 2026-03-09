@@ -202,6 +202,13 @@ export function startMatchingEngine(): void {
     const expired = await runCleanup();
     if (expired > 0) console.log(`Expired ${expired} proposals`);
 
+    try {
+      const deleted = await storage.deleteExpiredProposals();
+      if (deleted > 0) console.log(`Deleted ${deleted} expired proposals`);
+    } catch (err) {
+      console.error("Error deleting expired proposals:", err);
+    }
+
     const autoMatchSetting = await storage.getAppSetting("auto_matching_enabled");
     const autoMatchEnabled = autoMatchSetting?.value !== "false";
 

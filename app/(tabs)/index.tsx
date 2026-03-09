@@ -189,8 +189,8 @@ export default function MapScreen() {
       return res.json();
     },
     retry: false,
-    staleTime: 15000,
-    refetchInterval: 15000,
+    staleTime: 60000,
+    refetchInterval: 60000,
     enabled: isAuthenticated && !!location,
   });
 

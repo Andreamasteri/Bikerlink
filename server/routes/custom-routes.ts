@@ -10,30 +10,30 @@ router.get("/api/custom-routes", async (req, res) => {
 
     const featureSetting = await storage.getAppSetting("custom_routes_enabled");
     if (featureSetting?.value === "false") {
-      return res.json({ disabled: true, routes: [] });
+      return res.json({ disabled: true, myRoutes: [], publicRoutes: [] });
     }
 
-    const myRoutes = await storage.getCustomRoutes(userId);
-    const publicRoutes = await storage.getPublicCustomRoutes();
-    const allRoutes = [
-      ...myRoutes.map((r) => ({ ...r, isMine: true })),
-      ...publicRoutes
-        .filter((r) => r.userId !== userId)
-        .map((r) => ({ ...r, isMine: false })),
-    ];
+    const myRoutesRaw = await storage.getCustomRoutes(userId);
+    const publicRoutesRaw = await storage.getPublicCustomRoutes();
 
-    const enriched = [];
-    for (const route of allRoutes) {
+    const enrichRoute = async (route: any) => {
       const waypoints = await storage.getCustomRouteWaypoints(route.id);
       const creator = await storage.getUser(route.userId);
-      enriched.push({
+      return {
         ...route,
         waypointCount: waypoints.length,
         creatorNickname: creator?.nickname || "Sconosciuto",
-      });
-    }
+      };
+    };
 
-    res.json({ disabled: false, routes: enriched });
+    const myRoutes = await Promise.all(myRoutesRaw.map(enrichRoute));
+    const publicRoutes = await Promise.all(
+      publicRoutesRaw
+        .filter((r) => r.userId !== userId)
+        .map(enrichRoute)
+    );
+
+    res.json({ disabled: false, myRoutes, publicRoutes });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
