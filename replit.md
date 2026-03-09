@@ -141,7 +141,7 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
   - Match: notifica → entrambi accettano → chat di gruppo automatica (con avviso deadline se presente)
   - Auto-cleanup: proposte scadute (expiresAt = departureTimeTo + 2h) → status "expired"
   - Cerchio raggio sulla mappa: visibile solo per l'utente quando disponibile con proposta attiva
-  - `server/matching-engine.ts`: motore di matching + cleanup
+  - `server/matching-engine.ts`: motore di matching + cleanup + protezione carico automatica (raddoppio intervallo se ciclo >85%, notifica admin, auto-ripristino sotto 30%)
 - **3 Stat Card sulla mappa**: "Utenti Online", "Biker Disponibili", "Zavorrine Disponibili" — cliccabili, aprono modal con lista utenti (9 dettagli + distanza). Endpoint separati: `online-count`, `biker-available-count`, `zavorrine-available-count`, e relativi `-list`. L'utente corrente è incluso nelle liste.
 - **Sistema Advertisement**: Banner pubblicitari sulla mappa, con targeting per tipo utente (biker/zavorrina/coppia). Rotazione automatica configurabile (durata, random/sequenziale). Pannello admin "Advertisement" con 3 sezioni separate. Upload immagini, link cliccabili, toggle attivo/disattivo, date inizio/fine opzionali. Endpoint: `GET /api/ads/my-ads`, `POST /api/ads/:id/click`, CRUD admin su `/api/admin/advertisements`. Colonne aggiunte a `ad_campaigns`: `target_user_type`, `rotation_duration`, `rotation_mode`, `sort_order`.
 - **Filtri Proposte rinominati**: Tutti, Giro, Passaggio, Zavorrina, Richieste — filtrano per searchType. Stile più essenziale.

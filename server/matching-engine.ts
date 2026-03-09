@@ -195,10 +195,43 @@ async function runFakeZavorrineRotation(): Promise<void> {
   }
 }
 
+const BASE_INTERVAL_MS = 60 * 1000;
+const MAX_INTERVAL_MS = 16 * 60 * 1000;
+const LOAD_THRESHOLD = 0.85;
+
+let currentIntervalMs = BASE_INTERVAL_MS;
+let adminNotifiedAt = 0;
+
+async function notifyAdminOverload(intervalSec: number, cycleDurationSec: number): Promise<void> {
+  const now = Date.now();
+  if (now - adminNotifiedAt < 30 * 60 * 1000) return;
+
+  try {
+    const adminUser = await storage.getUserByNickname("admin");
+    if (!adminUser) return;
+
+    await storage.createNotification({
+      userId: adminUser.id,
+      title: "Matching Engine sotto carico",
+      body: `Il ciclo di matching ha impiegato ${cycleDurationSec.toFixed(1)}s. L'intervallo è stato raddoppiato a ${intervalSec}s. È tempo di implementare una soluzione per i troppi calcoli!`,
+      notificationType: "system",
+      referenceType: "system",
+      referenceId: "matching-engine",
+    });
+
+    adminNotifiedAt = now;
+    console.warn(`[Matching] Notifica inviata all'admin: intervallo raddoppiato a ${intervalSec}s`);
+  } catch (err) {
+    console.error("[Matching] Errore invio notifica admin:", err);
+  }
+}
+
 export function startMatchingEngine(): void {
-  console.log("Matching engine started (60s interval)");
+  console.log(`Matching engine started (${currentIntervalMs / 1000}s interval)`);
 
   const run = async () => {
+    const cycleStart = Date.now();
+
     const expired = await runCleanup();
     if (expired > 0) console.log(`Expired ${expired} proposals`);
 
@@ -221,10 +254,30 @@ export function startMatchingEngine(): void {
     } else {
       console.log("Auto matching disabled by admin, skipping");
     }
+
+    const cycleDuration = Date.now() - cycleStart;
+    const loadRatio = cycleDuration / currentIntervalMs;
+
+    console.log(`[Matching] Ciclo completato in ${(cycleDuration / 1000).toFixed(1)}s (${(loadRatio * 100).toFixed(0)}% dell'intervallo di ${currentIntervalMs / 1000}s)`);
+
+    if (loadRatio > LOAD_THRESHOLD && currentIntervalMs < MAX_INTERVAL_MS) {
+      const oldInterval = currentIntervalMs;
+      currentIntervalMs = Math.min(currentIntervalMs * 2, MAX_INTERVAL_MS);
+      console.warn(`[Matching] CARICO ELEVATO: ciclo ${(cycleDuration / 1000).toFixed(1)}s > 85% di ${oldInterval / 1000}s. Intervallo raddoppiato a ${currentIntervalMs / 1000}s`);
+      await notifyAdminOverload(currentIntervalMs / 1000, cycleDuration / 1000);
+    } else if (loadRatio < 0.3 && currentIntervalMs > BASE_INTERVAL_MS) {
+      currentIntervalMs = Math.max(currentIntervalMs / 2, BASE_INTERVAL_MS);
+      console.log(`[Matching] Carico basso: intervallo ridotto a ${currentIntervalMs / 1000}s`);
+    }
+
+    scheduleNext();
+  };
+
+  const scheduleNext = () => {
+    setTimeout(run, currentIntervalMs);
   };
 
   run();
-  setInterval(run, 60 * 1000);
 
   runFakeZavorrineRotation();
   setInterval(runFakeZavorrineRotation, 5 * 60 * 1000);
