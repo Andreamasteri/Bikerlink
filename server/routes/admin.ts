@@ -85,6 +85,59 @@ router.put("/users/:id/role", async (req: Request, res: Response) => {
   }
 });
 
+router.put("/users/:id/email", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { email } = req.body;
+    if (!email || !email.includes("@")) {
+      return res.status(400).json({ message: "Email non valida" });
+    }
+    const user = await storage.updateUser(id, { email });
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_email",
+      targetType: "user",
+      targetId: id,
+      details: `Email aggiornata a ${email}`,
+    });
+    const { password: _, ...safeUser } = user;
+    return res.json(safeUser);
+  } catch (error) {
+    console.error("Admin update user email error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.put("/users/:id/password", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { password } = req.body;
+    if (!password || password.length < 6) {
+      return res.status(400).json({ message: "La password deve avere almeno 6 caratteri" });
+    }
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const user = await storage.updateUser(id, { password: hashedPassword });
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "reset_password",
+      targetType: "user",
+      targetId: id,
+      details: "Password resettata dall'admin",
+    });
+    const { password: _pw, ...safeUser } = user;
+    return res.json(safeUser);
+  } catch (error) {
+    console.error("Admin update user password error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.get("/workshops", async (_req: Request, res: Response) => {
   try {
     const workshopsList = await storage.getWorkshops();

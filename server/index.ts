@@ -2,7 +2,7 @@ import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { startMatchingEngine } from "./matching-engine";
-import { autoSeedEssentialUsers } from "./auto-seed";
+import { autoSeedEssentialUsers, autoSeedFakeUsers } from "./auto-seed";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -206,6 +206,17 @@ function configureExpoAndLanding(app: express.Application) {
   app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
   app.use(express.static(path.resolve(process.cwd(), "static-build")));
 
+  const webBuildDir = path.resolve(process.cwd(), "static-build", "web");
+  app.use("/web", express.static(webBuildDir));
+  app.use("/web", (_req: Request, res: Response) => {
+    const indexPath = path.join(webBuildDir, "index.html");
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).send("Web build not available");
+    }
+  });
+
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }
 
@@ -242,6 +253,7 @@ function setupErrorHandler(app: express.Application) {
   setupErrorHandler(app);
 
   await autoSeedEssentialUsers();
+  await autoSeedFakeUsers();
 
   const port = parseInt(process.env.PORT || "5000", 10);
   server.listen(

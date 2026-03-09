@@ -1376,9 +1376,9 @@ var DatabaseStorage = class {
     await db.delete(users).where(and(eq(users.id, id), eq(users.isFake, true)));
   }
   async toggleFakeZavorrineAvailability() {
-    const fakeZavorrine = await db.select({ id: users.id, profileUserId: userProfiles.userId, adminOverrideUntil: userProfiles.adminOverrideUntil }).from(users).innerJoin(userProfiles, eq(userProfiles.userId, users.id)).where(and(eq(users.isFake, true), eq(users.userType, "zavorrina")));
+    const fakeZavorrine2 = await db.select({ id: users.id, profileUserId: userProfiles.userId, adminOverrideUntil: userProfiles.adminOverrideUntil }).from(users).innerJoin(userProfiles, eq(userProfiles.userId, users.id)).where(and(eq(users.isFake, true), eq(users.userType, "zavorrina")));
     const now = /* @__PURE__ */ new Date();
-    for (const z3 of fakeZavorrine) {
+    for (const z3 of fakeZavorrine2) {
       if (z3.adminOverrideUntil && new Date(z3.adminOverrideUntil) > now) continue;
       const available = Math.random() < 0.55;
       await db.update(userProfiles).set({ isAvailable: available }).where(eq(userProfiles.userId, z3.id));
@@ -1386,8 +1386,8 @@ var DatabaseStorage = class {
         await db.update(users).set({ lastLoginAt: now }).where(eq(users.id, z3.id));
       }
     }
-    const fakeBikers = await db.select({ id: users.id, profileUserId: userProfiles.userId, adminOverrideUntil: userProfiles.adminOverrideUntil }).from(users).innerJoin(userProfiles, eq(userProfiles.userId, users.id)).where(and(eq(users.isFake, true), or(eq(users.userType, "biker"), eq(users.userType, "coppia"))));
-    for (const b of fakeBikers) {
+    const fakeBikers2 = await db.select({ id: users.id, profileUserId: userProfiles.userId, adminOverrideUntil: userProfiles.adminOverrideUntil }).from(users).innerJoin(userProfiles, eq(userProfiles.userId, users.id)).where(and(eq(users.isFake, true), or(eq(users.userType, "biker"), eq(users.userType, "coppia"))));
+    for (const b of fakeBikers2) {
       if (b.adminOverrideUntil && new Date(b.adminOverrideUntil) > now) continue;
       const available = Math.random() < 0.55;
       await db.update(userProfiles).set({ isAvailable: available }).where(eq(userProfiles.userId, b.id));
@@ -4505,6 +4505,57 @@ router16.put("/users/:id/role", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
+router16.put("/users/:id/email", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { email } = req.body;
+    if (!email || !email.includes("@")) {
+      return res.status(400).json({ message: "Email non valida" });
+    }
+    const user = await storage.updateUser(id, { email });
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId,
+      action: "update_email",
+      targetType: "user",
+      targetId: id,
+      details: `Email aggiornata a ${email}`
+    });
+    const { password: _, ...safeUser } = user;
+    return res.json(safeUser);
+  } catch (error) {
+    console.error("Admin update user email error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router16.put("/users/:id/password", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { password } = req.body;
+    if (!password || password.length < 6) {
+      return res.status(400).json({ message: "La password deve avere almeno 6 caratteri" });
+    }
+    const hashedPassword = await bcrypt2.hash(password, 12);
+    const user = await storage.updateUser(id, { password: hashedPassword });
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId,
+      action: "reset_password",
+      targetType: "user",
+      targetId: id,
+      details: "Password resettata dall'admin"
+    });
+    const { password: _pw, ...safeUser } = user;
+    return res.json(safeUser);
+  } catch (error) {
+    console.error("Admin update user password error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
 router16.get("/workshops", async (_req, res) => {
   try {
     const workshopsList = await storage.getWorkshops();
@@ -5135,7 +5186,7 @@ router16.post("/fake-users", async (req, res) => {
       eulaAccepted: true,
       lastLoginAt: /* @__PURE__ */ new Date()
     });
-    const regionCoords = {
+    const regionCoords2 = {
       "Abruzzo": { lat: 42.19, lng: 13.73 },
       "Basilicata": { lat: 40.64, lng: 15.97 },
       "Calabria": { lat: 38.91, lng: 16.59 },
@@ -5157,7 +5208,7 @@ router16.post("/fake-users", async (req, res) => {
       "Valle d'Aosta": { lat: 45.74, lng: 7.32 },
       "Veneto": { lat: 45.44, lng: 12.33 }
     };
-    const coords = region ? regionCoords[region] : null;
+    const coords = region ? regionCoords2[region] : null;
     const lat = coords ? coords.lat + (Math.random() - 0.5) * 0.5 : null;
     const lng = coords ? coords.lng + (Math.random() - 0.5) * 0.5 : null;
     await storage.createUserProfile({
@@ -5924,7 +5975,224 @@ async function autoSeedEssentialUsers() {
       console.log(`Auto-seeded essential user: ${user.nickname} (${user.role})`);
     }
   } catch (err) {
-    console.error("Auto-seed failed:", err);
+    console.error("Auto-seed essential users failed:", err);
+  }
+}
+var regionCoords = {
+  "Abruzzo": { lat: 42.19, lng: 13.73 },
+  "Basilicata": { lat: 40.64, lng: 15.97 },
+  "Calabria": { lat: 38.91, lng: 16.59 },
+  "Campania": { lat: 40.85, lng: 14.27 },
+  "Emilia-Romagna": { lat: 44.49, lng: 11.34 },
+  "Friuli Venezia Giulia": { lat: 46.07, lng: 13.23 },
+  "Lazio": { lat: 41.9, lng: 12.5 },
+  "Liguria": { lat: 44.41, lng: 8.95 },
+  "Lombardia": { lat: 45.46, lng: 9.19 },
+  "Marche": { lat: 43.62, lng: 13.52 },
+  "Molise": { lat: 41.56, lng: 14.67 },
+  "Piemonte": { lat: 45.07, lng: 7.69 },
+  "Puglia": { lat: 41.13, lng: 16.86 },
+  "Sardegna": { lat: 39.22, lng: 9.12 },
+  "Sicilia": { lat: 37.6, lng: 14.02 },
+  "Toscana": { lat: 43.77, lng: 11.25 },
+  "Trentino-Alto Adige": { lat: 46.07, lng: 11.13 },
+  "Umbria": { lat: 43, lng: 12.64 },
+  "Valle d'Aosta": { lat: 45.74, lng: 7.32 },
+  "Veneto": { lat: 45.44, lng: 12.33 }
+};
+function randOffset() {
+  return (Math.random() - 0.5) * 0.5;
+}
+var fakeBikers = [
+  { nickname: "RobyThunder", sex: "M", birthYear: 1985, region: "Lombardia", brand: "Ducati", model: "Monster 821", year: 2019, displacement: 821, motoType: "Naked", ridingStyle: "Sportiva", bio: "Biker della domenica, ma sulla Monster mi sento un campione! Hmu se ti va un giro sui laghi" },
+  { nickname: "TonyRomano", sex: "M", birthYear: 1978, region: "Lazio", brand: "Aprilia", model: "Tuono V4", year: 2021, displacement: 1077, motoType: "Naked", ridingStyle: "Sportiva", bio: "A Roma co er traffico ce vole coraggio... ma io c'ho la Tuono e nun me ferma nessuno!" },
+  { nickname: "SalvatoreVento", sex: "M", birthYear: 1982, region: "Campania", brand: "Yamaha", model: "MT-09", year: 2020, displacement: 890, motoType: "Naked", ridingStyle: "Allegra", bio: "Aggio fatto 200mila km cu a mia MT... chi sal a moto con me nun scende cchiu!" },
+  { nickname: "PeppeSud", sex: "M", birthYear: 1990, region: "Calabria", brand: "Honda", model: "Africa Twin", year: 2022, displacement: 1100, motoType: "Adventure", ridingStyle: "Turistica", bio: "Sugnu calabrisi e giro cu l'Africa Twin pe tutta a costa. Veniti cu mia!" },
+  { nickname: "MarcoBiella", sex: "M", birthYear: 1975, region: "Piemonte", brand: "BMW", model: "R 1250 GS", year: 2021, displacement: 1254, motoType: "Adventure", ridingStyle: "Turistica", bio: "Piemontese doc, passo i weekend sulle strade alpine con la mia GS. Cerco compagni di viaggio" },
+  { nickname: "LucaTrieste", sex: "M", birthYear: 1988, region: "Friuli Venezia Giulia", brand: "KTM", model: "790 Duke", year: 2020, displacement: 790, motoType: "Naked", ridingStyle: "Allegra", bio: "Dal Carso al mare, sempre in sella. La Duke \xE8 la mia compagna di vita ormai" },
+  { nickname: "FrancoSardo", sex: "M", birthYear: 1980, region: "Sardegna", brand: "Triumph", model: "Tiger 900", year: 2021, displacement: 888, motoType: "Adventure", ridingStyle: "Turistica", bio: "In Sardegna le strade sono bellissime ma vuote... cerco qualcuno pe f\xE0 compagnia!" },
+  { nickname: "AndreaVeneto", sex: "M", birthYear: 1995, region: "Veneto", brand: "Kawasaki", model: "Z900", year: 2022, displacement: 948, motoType: "Naked", ridingStyle: "Sportiva", bio: "Veneto de Padova, giro co a Z900 tuti i finesettimana. Se te vol vegner, scrivi!" },
+  { nickname: "GianlucaMarche", sex: "M", birthYear: 1983, region: "Marche", brand: "Moto Guzzi", model: "V85 TT", year: 2020, displacement: 853, motoType: "Adventure", ridingStyle: "Tranquilla", bio: "Marchigiano tranquillo, mi piace girare per le colline con la mia Guzzi senza fretta" },
+  { nickname: "NinoEtna", sex: "M", birthYear: 1992, region: "Sicilia", brand: "Ducati", model: "Multistrada V4", year: 2023, displacement: 1158, motoType: "Adventure", ridingStyle: "Turistica", bio: "Minchia chi bellu andari n moto! Cerco qualcuno pi fari un giro fino all'Etna e ritorno" },
+  { nickname: "DavideBO", sex: "M", birthYear: 1987, region: "Emilia-Romagna", brand: "Aprilia", model: "RS 660", year: 2022, displacement: 659, motoType: "Sport", ridingStyle: "Sportiva", bio: "Emiliano DOC, la domenica \xE8 sacra: tortellini e poi via in moto verso l'Appennino" },
+  { nickname: "MatteoUmbro", sex: "M", birthYear: 1970, region: "Umbria", brand: "Honda", model: "CB 650R", year: 2021, displacement: 649, motoType: "Naked", ridingStyle: "Tranquilla", bio: "Giro per l'Umbria da 30 anni, conosco ogni curva. Venite che ve porto io" },
+  { nickname: "GiuseppeBari", sex: "M", birthYear: 1993, region: "Puglia", brand: "Yamaha", model: "Tracer 9", year: 2022, displacement: 890, motoType: "Touring", ridingStyle: "Turistica", bio: "Barese verace, giro la Puglia in lungo e in largo. Le strade del Gargano so na meraviglia" },
+  { nickname: "AldoTrentino", sex: "M", birthYear: 1976, region: "Trentino-Alto Adige", brand: "BMW", model: "F 850 GS", year: 2020, displacement: 853, motoType: "Enduro", ridingStyle: "Allegra", bio: "Tra le Dolomiti con la mia GS, estate e inverno. Il Passo Stelvio \xE8 casa mia" },
+  { nickname: "EnzoCampobasso", sex: "M", birthYear: 1998, region: "Molise", brand: "KTM", model: "390 Adventure", year: 2021, displacement: 373, motoType: "Adventure", ridingStyle: "Allegra", bio: "Il Molise esiste e ha strade bellissime! Venite a scoprirlo con me e la mia KTM" },
+  { nickname: "PaoloLigure", sex: "M", birthYear: 2e3, region: "Liguria", brand: "Harley-Davidson", model: "Iron 883", year: 2019, displacement: 883, motoType: "Cruiser", ridingStyle: "Tranquilla", bio: "Sulla costiera ligure con la mia Harley, piano piano... tanto la vista \xE8 troppo bella per correre" },
+  { nickname: "FilippoToscano", sex: "M", birthYear: 1986, region: "Toscana", brand: "Triumph", model: "Street Triple", year: 2021, displacement: 765, motoType: "Naked", ridingStyle: "Sportiva", bio: "Firenze-Siena andata e ritorno ogni weekend, la Crete Senesi in moto son qualcosa di unico" },
+  { nickname: "IvanVDA", sex: "M", birthYear: 2003, region: "Valle d'Aosta", brand: "Kawasaki", model: "Versys 650", year: 2022, displacement: 649, motoType: "Touring", ridingStyle: "Turistica", bio: "Il pi\xF9 giovane del gruppo ma il pi\xF9 matto! Passo del Gran San Bernardo ogni domenica" },
+  { nickname: "ChiaraBiker", sex: "F", birthYear: 1991, region: "Basilicata", brand: "Ducati", model: "Scrambler Icon", year: 2021, displacement: 803, motoType: "Naked", ridingStyle: "Allegra", bio: "Lucana e fiera! Giro con la mia Scrambler tra i Sassi di Matera e le montagne" },
+  { nickname: "ValentinaRide", sex: "F", birthYear: 1996, region: "Abruzzo", brand: "Honda", model: "Rebel 500", year: 2022, displacement: 471, motoType: "Cruiser", ridingStyle: "Tranquilla", bio: "Abruzzese, amo il Gran Sasso e le strade di montagna. Cerco compagnia pe gir\xE0 tranquilla" }
+];
+var fakeZavorrine = [
+  { nickname: "RosaNapoli", sex: "F", birthYear: 1990, region: "Campania", bio: "Sto cercann nu biker serio pe f\xE0 n giro sulla costiera... sono simpatica e mi piace l'avventura!", personality: "avventurosa", isAvailable: true, wishlistDesc: "Cerco un biker con moto comoda per girare la costiera amalfitana", motos: [{ brand: "Ducati", model: "Multistrada", motoType: "Adventure", ridingStyle: "Turistica" }] },
+  { nickname: "AntonellaCaserta", sex: "F", birthYear: 1985, region: "Campania", bio: "Aggio sempre sognato e gir\xE0 in moto ma nun tengo a patente... chi me porta?", personality: "sognatrice", isAvailable: true, wishlistDesc: "Sogno un giro in Ducati per le strade della Campania", motos: [{ brand: "Ducati", model: "Monster", motoType: "Naked", ridingStyle: "Allegra" }] },
+  { nickname: "MariaGrazia_NA", sex: "F", birthYear: 1978, region: "Campania", bio: "So napulitana e me piac a velocit\xE0! Voglio sent\xEC o viento nfaccia", personality: "civetta", isAvailable: false, wishlistDesc: "Un biker che mi faccia sentire il vento sulla costiera", motos: [{ brand: "Yamaha", model: "MT-09", motoType: "Naked", ridingStyle: "Sportiva" }, { brand: "Aprilia", model: "Tuono", motoType: "Naked", ridingStyle: "Sportiva" }] },
+  { nickname: "GiulianaSicilia", sex: "F", birthYear: 1993, region: "Sicilia", bio: "Minchia, vogghiu fari un giro in moto fino a Taormina! Chi mi porta?", personality: "avventurosa", isAvailable: true, wishlistDesc: "Un giro fino a Taormina su una moto potente", motos: [{ brand: "BMW", model: "R 1250 GS", motoType: "Adventure", ridingStyle: "Turistica" }] },
+  { nickname: "ConcettaPA", sex: "F", birthYear: 2001, region: "Sicilia", bio: "Palermitana doc, cerco biker pi girari a costa. No perditempo pls", personality: "pratica", isAvailable: true, wishlistDesc: "Biker serio con moto sportiva per la costa siciliana", motos: [{ brand: "Kawasaki", model: "Ninja 650", motoType: "Sport", ridingStyle: "Sportiva" }] },
+  { nickname: "SarettaCT", sex: "F", birthYear: 1997, region: "Sicilia", bio: "Catanisa e timida ma sulla moto divento un'altra! Scrivetemi senza paura", personality: "timida", isAvailable: false, wishlistDesc: "Cerco qualcuno tranquillo per un primo giro in moto", motos: [{ brand: "Honda", model: "CB 500F", motoType: "Naked", ridingStyle: "Tranquilla" }] },
+  { nickname: "FrancescaRC", sex: "F", birthYear: 1989, region: "Calabria", bio: "Reggina e ironica, cerco un biker che non abbia paura delle curve calabresi!", personality: "ironica", isAvailable: true, wishlistDesc: "Voglio un biker coraggioso per le strade della Calabria", motos: [{ brand: "KTM", model: "890 Duke", motoType: "Naked", ridingStyle: "Sportiva" }] },
+  { nickname: "MariaCZ", sex: "F", birthYear: 1995, region: "Calabria", bio: "Sugnu i Catanzaro e mi piaciaria girare nda Sila cu na moto grossa", personality: "sognatrice", isAvailable: true, wishlistDesc: "Un giro nella Sila su una adventure", motos: [{ brand: "Triumph", model: "Tiger 900", motoType: "Adventure", ridingStyle: "Turistica" }] },
+  { nickname: "AngelaCosenza", sex: "F", birthYear: 2004, region: "Calabria", bio: "Giovanissima ma gi\xE0 pazza per le moto! Cerco qualcuno pe fare esperienza", personality: "avventurosa", isAvailable: true, wishlistDesc: "Prima esperienza in moto, voglio una cruiser comoda", motos: [{ brand: "Harley-Davidson", model: "Iron 883", motoType: "Cruiser", ridingStyle: "Tranquilla" }] },
+  { nickname: "LuciaBari", sex: "F", birthYear: 1988, region: "Puglia", bio: "Barese e civetta, cerco un biker che mi porti a vedere il tramonto sul Gargano", personality: "civetta", isAvailable: true, wishlistDesc: "Tramonto sul Gargano in moto, chi viene?", motos: [{ brand: "Moto Guzzi", model: "V85 TT", motoType: "Adventure", ridingStyle: "Turistica" }, { brand: "BMW", model: "F 850 GS", motoType: "Adventure", ridingStyle: "Turistica" }] },
+  { nickname: "ElenaLecce", sex: "F", birthYear: 1999, region: "Puglia", bio: "Salentina verace! Mi piace il vento tra i capeli e le strade dritte verso il mare", personality: "sognatrice", isAvailable: false, wishlistDesc: "Un giro nel Salento con una naked veloce", motos: [{ brand: "Yamaha", model: "MT-07", motoType: "Naked", ridingStyle: "Allegra" }] },
+  { nickname: "GraziaFoggia", sex: "F", birthYear: 1982, region: "Puglia", bio: "Cerco compagnia seria pe girare la Puglia, no scherzi. S\xF2 de Foggia", personality: "pratica", isAvailable: true, wishlistDesc: "Biker affidabile per giri domenicali in Puglia", motos: [{ brand: "Honda", model: "Africa Twin", motoType: "Adventure", ridingStyle: "Turistica" }] },
+  { nickname: "MonicaSassari", sex: "F", birthYear: 1994, region: "Sardegna", bio: "In Sardegna c'\xE8 troppo bello pe stare fermi! Cerco qualcuno che mi porti a scoprire le coste", personality: "avventurosa", isAvailable: true, wishlistDesc: "Costa Smeralda in moto, sogno ricorrente", motos: [{ brand: "Ducati", model: "Scrambler", motoType: "Naked", ridingStyle: "Allegra" }] },
+  { nickname: "PaolaCagliari", sex: "F", birthYear: 1986, region: "Sardegna", bio: "Cagliaritana ironica, cerco un biker che sappia guidare e anche far ridere!", personality: "ironica", isAvailable: false, wishlistDesc: "Un biker simpatico con una touring comoda", motos: [{ brand: "Yamaha", model: "Tracer 9", motoType: "Touring", ridingStyle: "Tranquilla" }] },
+  { nickname: "TeresaPZ", sex: "F", birthYear: 1991, region: "Basilicata", bio: "Da Potenza cerco un biker pe gir\xE0 verso Maratea... il mare lucano \xE8 sottovalutato!", personality: "pratica", isAvailable: true, wishlistDesc: "Un giro verso Maratea su una moto adventure", motos: [{ brand: "KTM", model: "790 Adventure", motoType: "Adventure", ridingStyle: "Turistica" }] },
+  { nickname: "AnnaCB", sex: "F", birthYear: 2e3, region: "Molise", bio: "Il Molise esiste e io pure! Cerco biker avventurosi che vogliono scoprirlo", personality: "ironica", isAvailable: true, wishlistDesc: "Scoprite il Molise con me! Serve una moto comoda", motos: [{ brand: "BMW", model: "F 750 GS", motoType: "Adventure", ridingStyle: "Tranquilla" }] },
+  { nickname: "SimonaAQ", sex: "F", birthYear: 1987, region: "Abruzzo", bio: "Aquilana, amo la montagna e le strade con le curve. Cercasi biker paiente", personality: "timida", isAvailable: false, wishlistDesc: "Giro tranquillo sulle montagne abruzzesi", motos: [{ brand: "Honda", model: "CB 650R", motoType: "Naked", ridingStyle: "Tranquilla" }] },
+  { nickname: "FedericaPE", sex: "F", birthYear: 2003, region: "Abruzzo", bio: "Pescarese e un po pazza, voglio provare la moto per la prima volta! Chi si offre?", personality: "avventurosa", isAvailable: true, wishlistDesc: "Prima volta in moto! Qualcosa di tranquillo", motos: [{ brand: "Kawasaki", model: "Vulcan S", motoType: "Cruiser", ridingStyle: "Tranquilla" }, { brand: "Honda", model: "Rebel 500", motoType: "Cruiser", ridingStyle: "Tranquilla" }] },
+  { nickname: "AlessiaRM", sex: "F", birthYear: 1992, region: "Lazio", bio: "Romana de Roma, cerco un biker che me porti fori dal raccordo annulare finalmente!", personality: "ironica", isAvailable: true, wishlistDesc: "Fuggire dal GRA su una naked potente", motos: [{ brand: "Aprilia", model: "Tuono 660", motoType: "Naked", ridingStyle: "Sportiva" }] },
+  { nickname: "GiorgiaLT", sex: "F", birthYear: 1984, region: "Lazio", bio: "Da Latina, cerco compagnia per giri verso il Circeo e le isole pontine. S\xF2 tranquilla", personality: "tranquilla", isAvailable: true, wishlistDesc: "Giro costiero verso il Circeo su moto comoda", motos: [{ brand: "Triumph", model: "Bonneville", motoType: "Naked", ridingStyle: "Tranquilla" }] },
+  { nickname: "ElisaToscana", sex: "F", birthYear: 1996, region: "Toscana", bio: "Fiorentina doc, le Crete Senesi in moto sono il paradiso. Cercasi compagno di strada", personality: "sognatrice", isAvailable: true, wishlistDesc: "Le colline toscane su una moto vintage", motos: [{ brand: "Moto Guzzi", model: "V7", motoType: "Naked", ridingStyle: "Tranquilla" }] },
+  { nickname: "SaraSiena", sex: "F", birthYear: 2007, region: "Toscana", bio: "Appena 18 e gi\xE0 sogno di girare la Toscana in moto! Per ora cerco passaggio", personality: "sognatrice", isAvailable: false, wishlistDesc: "Primo giro in moto tra le colline senesi", motos: [{ brand: "Ducati", model: "Scrambler Icon", motoType: "Naked", ridingStyle: "Allegra" }] },
+  { nickname: "ChiaraPG", sex: "F", birthYear: 1990, region: "Umbria", bio: "Perugina e un po hippie, cerco un biker pe girare l'Umbria verde senza freta", personality: "tranquilla", isAvailable: true, wishlistDesc: "Giro lento per borghi umbri su moto adventure", motos: [{ brand: "BMW", model: "R 1250 GS", motoType: "Adventure", ridingStyle: "Turistica" }] },
+  { nickname: "LauraAN", sex: "F", birthYear: 1983, region: "Marche", bio: "Anconetana, il Conero in moto \xE8 spettacolare. Cerco qualcuno che conosce le strade giuste", personality: "pratica", isAvailable: true, wishlistDesc: "Il Conero e le colline marchigiane in moto", motos: [{ brand: "Yamaha", model: "Tracer 7", motoType: "Touring", ridingStyle: "Turistica" }] },
+  { nickname: "MartinaMI", sex: "F", birthYear: 1998, region: "Lombardia", bio: "Milanese ma non troppo, il weekend scappo dalla citt\xE0. Cercasi biker con moto comoda!", personality: "civetta", isAvailable: true, wishlistDesc: "Fuga dal traffico milanese su una touring", motos: [{ brand: "BMW", model: "R 1250 RT", motoType: "Touring", ridingStyle: "Tranquilla" }] },
+  { nickname: "GiuliaBG", sex: "F", birthYear: 2002, region: "Lombardia", bio: "Bergamasca e avventurosa, le Orobie in moto devono essere pazzesche! Chi mi ci porta?", personality: "avventurosa", isAvailable: true, wishlistDesc: "Le valli bergamasche su una enduro", motos: [{ brand: "KTM", model: "690 Enduro", motoType: "Enduro", ridingStyle: "Sportiva" }] },
+  { nickname: "SilviaVR", sex: "F", birthYear: 1971, region: "Veneto", bio: "Veronese e romantica, cerco biker per giri sul Lago di Garda e le colline venete", personality: "sognatrice", isAvailable: false, wishlistDesc: "Giro romantico sul Garda con moto cruiser", motos: [{ brand: "Harley-Davidson", model: "Sportster", motoType: "Cruiser", ridingStyle: "Tranquilla" }, { brand: "Triumph", model: "Bonneville", motoType: "Naked", ridingStyle: "Tranquilla" }] },
+  { nickname: "AuroraTorino", sex: "F", birthYear: 1994, region: "Piemonte", bio: "Torinese e pratica, cerco un biker per esplorare il Canavese e le Langhe nel weekend", personality: "pratica", isAvailable: true, wishlistDesc: "Le Langhe in moto con un biker esperto", motos: [{ brand: "Ducati", model: "Multistrada V2", motoType: "Adventure", ridingStyle: "Turistica" }] },
+  { nickname: "RobertaBO", sex: "F", birthYear: 1989, region: "Emilia-Romagna", bio: "Bolognese e ironica, dopo i tortellini della nonna cerco un biker pe smaltirli in moto!", personality: "ironica", isAvailable: true, wishlistDesc: "Post-pranzo in moto sulle colline bolognesi", motos: [{ brand: "Aprilia", model: "RS 660", motoType: "Sport", ridingStyle: "Sportiva" }] },
+  { nickname: "AndreaZav", sex: "M", birthYear: 1995, region: "Liguria", bio: "Si sono un ragazzo zavorrina! Mi piace stare in moto dietro, la guida la lascio a chi \xE8 pi\xF9 bravo", personality: "ironica", isAvailable: true, wishlistDesc: "Cerco bikers per giri sulla riviera ligure", motos: [{ brand: "Honda", model: "Gold Wing", motoType: "Touring", ridingStyle: "Turistica" }] }
+];
+var fakeCoppie = [
+  { nickname: "Marco&Elena", region: "Lombardia", bio: "Coppia milanese, viaggiamo insieme da 10 anni! La moto \xE8 la nostra seconda casa", brand: "BMW", model: "R 1250 GS Adventure", year: 2022, displacement: 1254, motoType: "Adventure", ridingStyle: "Turistica" },
+  { nickname: "Fabio&Laura", region: "Campania", bio: "Coppia napoletana, amma fatto tutt'Italia in moto! Cerchiamo amici pe viaggiare insieme", brand: "Ducati", model: "Multistrada V4 S", year: 2023, displacement: 1158, motoType: "Adventure", ridingStyle: "Turistica" }
+];
+async function autoSeedFakeUsers() {
+  try {
+    const existingFakes = await db.select().from(users).where(eq2(users.isFake, true)).limit(11);
+    if (existingFakes.length > 10) {
+      return;
+    }
+    console.log("Auto-seeding fake users...");
+    const hashedPassword = await bcrypt3.hash("fakeuser2025!", 12);
+    for (const biker of fakeBikers) {
+      try {
+        const email = `fake_${biker.nickname.toLowerCase()}@fakeuser.bikerlink.it`;
+        const coords = regionCoords[biker.region];
+        const [user] = await db.insert(users).values({
+          nickname: biker.nickname,
+          email,
+          password: hashedPassword,
+          userType: "biker",
+          sex: biker.sex,
+          role: "user",
+          status: "active",
+          birthYear: biker.birthYear,
+          region: biker.region,
+          emailVerified: true,
+          eulaAccepted: true,
+          isFake: true,
+          lastLoginAt: /* @__PURE__ */ new Date()
+        }).returning();
+        await db.insert(userProfiles).values({
+          userId: user.id,
+          isAvailable: true,
+          latitude: coords.lat + randOffset(),
+          longitude: coords.lng + randOffset(),
+          bio: biker.bio
+        });
+        await db.insert(userMotorcycles).values({
+          userId: user.id,
+          brand: biker.brand,
+          model: biker.model,
+          year: biker.year,
+          displacement: biker.displacement,
+          motorcycleType: biker.motoType,
+          ridingStyle: biker.ridingStyle
+        });
+      } catch (err) {
+        console.error(`Failed to seed biker "${biker.nickname}":`, err.message);
+      }
+    }
+    for (const zav of fakeZavorrine) {
+      try {
+        const email = `fake_${zav.nickname.toLowerCase()}@fakeuser.bikerlink.it`;
+        const coords = regionCoords[zav.region];
+        const [user] = await db.insert(users).values({
+          nickname: zav.nickname,
+          email,
+          password: hashedPassword,
+          userType: "zavorrina",
+          sex: zav.sex,
+          role: "user",
+          status: "active",
+          birthYear: zav.birthYear,
+          region: zav.region,
+          emailVerified: true,
+          eulaAccepted: true,
+          isFake: true,
+          lastLoginAt: /* @__PURE__ */ new Date()
+        }).returning();
+        await db.insert(userProfiles).values({
+          userId: user.id,
+          isAvailable: zav.isAvailable,
+          latitude: coords.lat + randOffset(),
+          longitude: coords.lng + randOffset(),
+          bio: zav.bio
+        });
+        const [wishlist] = await db.insert(zavarrinaWishlists).values({
+          userId: user.id,
+          description: zav.wishlistDesc
+        }).returning();
+        for (const moto of zav.motos) {
+          await db.insert(zavarrinaWishlistMotos).values({
+            wishlistId: wishlist.id,
+            brand: moto.brand,
+            model: moto.model,
+            motorcycleType: moto.motoType,
+            ridingStyle: moto.ridingStyle
+          });
+        }
+      } catch (err) {
+        console.error(`Failed to seed zavorrina "${zav.nickname}":`, err.message);
+      }
+    }
+    for (const coppia of fakeCoppie) {
+      try {
+        const email = `fake_${coppia.nickname.toLowerCase().replace("&", "_")}@fakeuser.bikerlink.it`;
+        const coords = regionCoords[coppia.region];
+        const [user] = await db.insert(users).values({
+          nickname: coppia.nickname,
+          email,
+          password: hashedPassword,
+          userType: "coppia",
+          sex: null,
+          coupleSexConfig: "MF",
+          role: "user",
+          status: "active",
+          region: coppia.region,
+          emailVerified: true,
+          eulaAccepted: true,
+          isFake: true,
+          lastLoginAt: /* @__PURE__ */ new Date()
+        }).returning();
+        await db.insert(userProfiles).values({
+          userId: user.id,
+          isAvailable: true,
+          latitude: coords.lat + randOffset(),
+          longitude: coords.lng + randOffset(),
+          bio: coppia.bio
+        });
+        await db.insert(userMotorcycles).values({
+          userId: user.id,
+          brand: coppia.brand,
+          model: coppia.model,
+          year: coppia.year,
+          displacement: coppia.displacement,
+          motorcycleType: coppia.motoType,
+          ridingStyle: coppia.ridingStyle
+        });
+      } catch (err) {
+        console.error(`Failed to seed coppia "${coppia.nickname}":`, err.message);
+      }
+    }
+    console.log("Auto-seeded fake users complete");
+  } catch (err) {
+    console.error("Auto-seed fake users failed:", err);
   }
 }
 
@@ -6076,6 +6344,16 @@ function configureExpoAndLanding(app2) {
   app2.use("/assets", express.static(path5.resolve(process.cwd(), "assets")));
   app2.use("/uploads", express.static(path5.resolve(process.cwd(), "uploads")));
   app2.use(express.static(path5.resolve(process.cwd(), "static-build")));
+  const webBuildDir = path5.resolve(process.cwd(), "static-build", "web");
+  app2.use("/web", express.static(webBuildDir));
+  app2.use("/web", (_req, res) => {
+    const indexPath = path5.join(webBuildDir, "index.html");
+    if (fs5.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).send("Web build not available");
+    }
+  });
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }
 function setupErrorHandler(app2) {
@@ -6098,6 +6376,7 @@ function setupErrorHandler(app2) {
   const server = await registerRoutes(app);
   setupErrorHandler(app);
   await autoSeedEssentialUsers();
+  await autoSeedFakeUsers();
   const port = parseInt(process.env.PORT || "5000", 10);
   server.listen(
     {
