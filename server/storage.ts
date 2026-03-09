@@ -452,10 +452,8 @@ export class DatabaseStorage implements IStorage {
         .where(
           and(
             eq(proposalMatches.status, "pending"),
-            or(
-              sql`${proposalMatches.proposalId1} = ANY(${expiredIds})`,
-              sql`${proposalMatches.proposalId2} = ANY(${expiredIds})`
-            )
+            sql`${proposalMatches.proposalId1} = ANY(${expiredIds})`,
+            sql`${proposalMatches.proposalId2} = ANY(${expiredIds})`
           )
         );
     }

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -228,11 +228,30 @@ export default function MatchScreen() {
     refetchInterval: 30000,
   });
 
+  const prevMatchCountRef = useRef<number | null>(null);
+
   const allMatches = matches || [];
   const allGarageMatches = garageMatches || [];
   const pendingMatches = allMatches.filter((m: any) => m.status === "pending");
   const acceptedMatches = allMatches.filter((m: any) => m.status === "accepted");
   const historyMatches = allMatches.filter((m: any) => m.status === "rejected" || m.status === "expired");
+
+  const totalNewMatches = pendingMatches.length + allGarageMatches.length;
+
+  useEffect(() => {
+    if (prevMatchCountRef.current === null) {
+      prevMatchCountRef.current = totalNewMatches;
+      return;
+    }
+    if (totalNewMatches > prevMatchCountRef.current) {
+      if (Platform.OS === "web") {
+        window.alert("EHI, HAI DEI MATCH!\nCONTROLLA NELLA TAB!!!");
+      } else {
+        Alert.alert("EHI, HAI DEI MATCH!", "CONTROLLA NELLA TAB!!!");
+      }
+    }
+    prevMatchCountRef.current = totalNewMatches;
+  }, [totalNewMatches]);
 
   const currentList = activeTab === "pending" ? pendingMatches : activeTab === "accepted" ? acceptedMatches : activeTab === "garage" ? allGarageMatches : historyMatches;
 
