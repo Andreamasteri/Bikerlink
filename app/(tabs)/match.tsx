@@ -15,7 +15,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { queryClient, getApiUrl } from "@/lib/query-client";
+import { queryClient, getApiUrl, apiRequest } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 
 const SEARCH_TYPE_LABELS: Record<string, string> = {
@@ -37,7 +37,7 @@ function getSearchTypeIcon(searchType?: string | null): keyof typeof Ionicons.gl
   }
 }
 
-function GarageMatchCard({ match, currentUserId, onAccept, onReject, isPending }: { match: any; currentUserId: string; onAccept: () => void; onReject: () => void; isPending: boolean }) {
+function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress, isPending }: { match: any; currentUserId: string; onAccept: () => void; onReject: () => void; onChatPress?: () => void; isPending: boolean }) {
   const isBiker = match.bikerId === currentUserId;
   const otherNickname = isBiker ? match.zavarrinaNickname : match.bikerNickname;
   const otherType = isBiker ? "zavorrina" : "biker";
@@ -84,6 +84,11 @@ function GarageMatchCard({ match, currentUserId, onAccept, onReject, isPending }
             </Text>
           </View>
         </View>
+        {isAccepted && onChatPress && (
+          <TouchableOpacity onPress={onChatPress} style={styles.chatIconBtn}>
+            <Ionicons name="chatbubble" size={22} color={Colors.accent} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.matchProposals}>
@@ -404,8 +409,25 @@ export default function MatchScreen() {
     onError: (err: Error) => Alert.alert("Errore", err.message),
   });
 
+  const startGarageChatMutation = useMutation({
+    mutationFn: async (otherUserId: string) => {
+      const res = await apiRequest("POST", "/api/chat/conversations", {
+        conversationType: "private",
+        participantIds: [otherUserId],
+      });
+      return await res.json();
+    },
+    onSuccess: (conv) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      router.push(`/chat/${conv.id}` as any);
+    },
+    onError: (err: Error) => Alert.alert("Errore", err.message),
+  });
+
   const renderItem = useCallback(({ item }: { item: any }) => {
     if (item._isGarage) {
+      const isBiker = item.bikerId === user?.id;
+      const otherUserId = isBiker ? item.zavarrinaId : item.bikerId;
       return (
         <GarageMatchCard
           match={item}
@@ -415,6 +437,7 @@ export default function MatchScreen() {
             acceptGarageMutation.mutate(item.id);
           }}
           onReject={() => rejectGarageMutation.mutate(item.id)}
+          onChatPress={item.status === "accepted" ? () => startGarageChatMutation.mutate(otherUserId) : undefined}
           isPending={pendingMatchId === item.id}
         />
       );
@@ -432,7 +455,7 @@ export default function MatchScreen() {
         isPending={pendingMatchId === item.id}
       />
     );
-  }, [user?.id, pendingMatchId, acceptMutation, rejectMutation, acceptGarageMutation, rejectGarageMutation, router]);
+  }, [user?.id, pendingMatchId, acceptMutation, rejectMutation, acceptGarageMutation, rejectGarageMutation, startGarageChatMutation, router]);
 
   const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; count: number }[] = [
     { key: "pending", label: "In attesa", icon: "hourglass", count: pendingMatches.length },
@@ -719,6 +742,11 @@ const styles = StyleSheet.create({
   actionBtnText: {
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
+  },
+  chatIconBtn: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: Colors.accent + "20",
   },
   chatBtn: {
     flexDirection: "row" as const,
