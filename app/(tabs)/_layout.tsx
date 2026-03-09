@@ -93,11 +93,11 @@ export default function TabLayout() {
       <Tabs.Screen
         name="tracking"
         options={{
-          title: "Crono",
+          title: "Registra Giro e Performance",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="navigate" size={size} color={color} />
           ),
-          headerTitle: "Crono",
+          headerTitle: "Registra Giro e Performance",
           href: null,
           headerLeft: () => (
             <Pressable onPress={() => router.back()} style={{ marginLeft: 8 }}>

@@ -108,7 +108,7 @@ export default function ReadyToRideScreen() {
           onPress={() => router.push("/tracking" as any)}
         >
           <Ionicons name="navigate" size={20} color={Colors.accent} />
-          <Text style={styles.cronoBtnText}>Crono</Text>
+          <Text style={styles.cronoBtnText}>Registra Giro e Performance</Text>
         </Pressable>
       </View>
     </ScrollView>
