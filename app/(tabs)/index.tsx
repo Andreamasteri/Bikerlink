@@ -542,7 +542,7 @@ export default function MapScreen() {
             filterBiker={filterBiker}
             filterZavorrina={filterZavorrina}
             filterCoppia={filterCoppia}
-            filterBarTopOffset={Platform.OS === "web" ? 48 : insets.top + 40}
+            filterBarTopOffset={Platform.OS === "web" ? 12 : insets.top + 4}
             onToggleFilterBiker={() => setFilterBiker((p) => !p)}
             onToggleFilterZavorrina={() => setFilterZavorrina((p) => !p)}
             onToggleFilterCoppia={() => setFilterCoppia((p) => !p)}
@@ -552,7 +552,7 @@ export default function MapScreen() {
           <Pressable style={[styles.closeBtn, { top: Platform.OS === "web" ? 12 : insets.top + 4 }]} onPress={() => setMapFullscreen(false)}>
             <Ionicons name="close" size={28} color="#fff" />
           </Pressable>
-          <View style={[styles.fullscreenOverlay, { top: Platform.OS === "web" ? 12 : insets.top + 4 }]}>
+          <View style={[styles.fullscreenBottomStats, { bottom: Platform.OS === "web" ? 110 : 100 }]}>
             <View style={styles.statsChip}>
               <MaterialCommunityIcons name="motorbike" size={14} color={Colors.maleIcon} />
               <Text style={styles.statsChipText}>{bikerCount}</Text>
@@ -566,7 +566,7 @@ export default function MapScreen() {
               <Text style={styles.statsChipText}>{onlineCount}</Text>
             </View>
           </View>
-          <View style={[styles.fullscreenSearchContainer, { top: Platform.OS === "web" ? 92 : insets.top + 80 }]}>
+          <View style={[styles.fullscreenSearchContainer, { top: Platform.OS === "web" ? 48 : insets.top + 40 }]}>
             <View style={styles.fullscreenSearchRow}>
               <Ionicons name="search" size={18} color={Colors.textSecondary} style={{ marginRight: 8 }} />
               <TextInput
@@ -1080,6 +1080,13 @@ const styles = StyleSheet.create({
     right: 56,
     flexDirection: "row",
     justifyContent: "center",
+    gap: 8,
+    zIndex: 20,
+  },
+  fullscreenBottomStats: {
+    position: "absolute",
+    left: 16,
+    flexDirection: "row",
     gap: 8,
     zIndex: 20,
   },
