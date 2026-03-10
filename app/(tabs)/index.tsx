@@ -542,6 +542,7 @@ export default function MapScreen() {
             filterBiker={filterBiker}
             filterZavorrina={filterZavorrina}
             filterCoppia={filterCoppia}
+            filterBarTopOffset={Platform.OS === "web" ? 76 : insets.top + 56}
             onToggleFilterBiker={() => setFilterBiker((p) => !p)}
             onToggleFilterZavorrina={() => setFilterZavorrina((p) => !p)}
             onToggleFilterCoppia={() => setFilterCoppia((p) => !p)}

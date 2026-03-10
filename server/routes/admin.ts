@@ -724,6 +724,20 @@ router.put("/settings/email-config", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/migrate/verify-real-users", async (_req: Request, res: Response) => {
+  try {
+    const allUsers = await storage.getAllUsers();
+    const realUsers = allUsers.filter((u: any) => !u.isFake && !u.emailVerified);
+    for (const user of realUsers) {
+      await storage.markUserEmailVerified(user.id);
+    }
+    return res.json({ message: `${realUsers.length} utenti reali marcati come verificati` });
+  } catch (error) {
+    console.error("Migrate verify real users error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/settings/:key", async (req: Request, res: Response) => {
   try {
     const key = req.params.key as string;

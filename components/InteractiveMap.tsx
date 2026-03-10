@@ -46,6 +46,7 @@ interface InteractiveMapProps {
   filterBiker: boolean;
   filterZavorrina: boolean;
   filterCoppia: boolean;
+  filterBarTopOffset?: number;
   onToggleFilterBiker: () => void;
   onToggleFilterZavorrina: () => void;
   onToggleFilterCoppia: () => void;
@@ -85,6 +86,7 @@ export default function InteractiveMap({
   filterBiker,
   filterZavorrina,
   filterCoppia,
+  filterBarTopOffset,
   onToggleFilterBiker,
   onToggleFilterZavorrina,
   onToggleFilterCoppia,
@@ -219,7 +221,7 @@ export default function InteractiveMap({
         </View>
       )}
 
-      <View style={styles.filterBar}>
+      <View style={[styles.filterBar, filterBarTopOffset != null && { top: filterBarTopOffset }]}>
         <TouchableOpacity
           style={[styles.filterChip, filterBiker && { backgroundColor: Colors.maleIcon }]}
           onPress={onToggleFilterBiker}
