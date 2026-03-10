@@ -270,7 +270,7 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
 router.get("/online-count", requireAuth, async (req: Request, res: Response) => {
   try {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    const count = await storage.countActiveUsers(fifteenMinutesAgo);
+    const count = await storage.countOnlineUsers(fifteenMinutesAgo);
     return res.json({ count });
   } catch (error) {
     console.error("Online count error:", error);
