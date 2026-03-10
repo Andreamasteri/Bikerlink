@@ -399,7 +399,7 @@ export default function AdminSettings() {
   }
 
   function getSettingValue(key: string): string {
-    const setting = settings.find((s) => s.key === key);
+    const setting = (settings || []).find((s) => s.key === key);
     return setting?.value ?? "";
   }
 

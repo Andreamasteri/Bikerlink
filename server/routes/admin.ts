@@ -671,6 +671,59 @@ router.get("/settings", async (_req: Request, res: Response) => {
   }
 });
 
+router.get("/settings/email-config", async (_req: Request, res: Response) => {
+  try {
+    const userSetting = await storage.getAppSetting("gmail_user");
+    const gmailUser = userSetting?.value || "";
+    let masked = "";
+    if (gmailUser) {
+      const [local, domain] = gmailUser.split("@");
+      if (local && domain) {
+        masked = local.substring(0, 3) + "***@" + domain;
+      } else {
+        masked = gmailUser.substring(0, 3) + "***";
+      }
+    }
+    const passSetting = await storage.getAppSetting("gmail_app_password");
+    const configured = !!(gmailUser && passSetting?.value);
+    return res.json({ configured, maskedEmail: masked });
+  } catch (error) {
+    console.error("Get email config error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.put("/settings/email-config", async (req: Request, res: Response) => {
+  try {
+    const { gmailUser, gmailAppPassword, adminPassword } = req.body;
+    if (!adminPassword) {
+      return res.status(400).json({ message: "Password admin richiesta" });
+    }
+
+    const admin = (req as any).currentUser;
+    if (!admin) {
+      return res.status(401).json({ message: "Non autenticato" });
+    }
+
+    const validPassword = await bcrypt.compare(adminPassword, admin.password);
+    if (!validPassword) {
+      return res.status(403).json({ message: "Password admin non corretta" });
+    }
+
+    if (gmailUser) {
+      await storage.upsertAppSetting("gmail_user", gmailUser);
+    }
+    if (gmailAppPassword) {
+      await storage.upsertAppSetting("gmail_app_password", gmailAppPassword);
+    }
+
+    return res.json({ message: "Configurazione email aggiornata" });
+  } catch (error) {
+    console.error("Update email config error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/settings/:key", async (req: Request, res: Response) => {
   try {
     const key = req.params.key as string;
@@ -1189,59 +1242,6 @@ router.get("/fake-users/conversations/:convId/messages", async (req: Request, re
     return res.json(result);
   } catch (error) {
     console.error("Admin get fake user conversation messages error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-
-router.get("/settings/email-config", async (_req: Request, res: Response) => {
-  try {
-    const userSetting = await storage.getAppSetting("gmail_user");
-    const gmailUser = userSetting?.value || "";
-    let masked = "";
-    if (gmailUser) {
-      const [local, domain] = gmailUser.split("@");
-      if (local && domain) {
-        masked = local.substring(0, 3) + "***@" + domain;
-      } else {
-        masked = gmailUser.substring(0, 3) + "***";
-      }
-    }
-    const passSetting = await storage.getAppSetting("gmail_app_password");
-    const configured = !!(gmailUser && passSetting?.value);
-    return res.json({ configured, maskedEmail: masked });
-  } catch (error) {
-    console.error("Get email config error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-
-router.put("/settings/email-config", async (req: Request, res: Response) => {
-  try {
-    const { gmailUser, gmailAppPassword, adminPassword } = req.body;
-    if (!adminPassword) {
-      return res.status(400).json({ message: "Password admin richiesta" });
-    }
-
-    const admin = (req as any).currentUser;
-    if (!admin) {
-      return res.status(401).json({ message: "Non autenticato" });
-    }
-
-    const validPassword = await bcrypt.compare(adminPassword, admin.password);
-    if (!validPassword) {
-      return res.status(403).json({ message: "Password admin non corretta" });
-    }
-
-    if (gmailUser) {
-      await storage.upsertAppSetting("gmail_user", gmailUser);
-    }
-    if (gmailAppPassword) {
-      await storage.upsertAppSetting("gmail_app_password", gmailAppPassword);
-    }
-
-    return res.json({ message: "Configurazione email aggiornata" });
-  } catch (error) {
-    console.error("Update email config error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
