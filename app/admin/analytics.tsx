@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Modal, FlatList } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
@@ -50,11 +50,55 @@ interface PendingReportItem {
   createdAt: string;
 }
 
+interface UserStatsData {
+  user: {
+    id: string;
+    nickname: string;
+    email: string;
+    userType: string;
+    role: string;
+    status: string;
+    createdAt: string;
+    lastLoginAt: string | null;
+    isFake: boolean;
+    isPrimal: boolean;
+    totalKm: number | null;
+    totalRides: number | null;
+    isAvailable: boolean;
+    bio: string | null;
+  };
+  stats: {
+    proposalsCreated: number;
+    conversationsCount: number;
+    messagesSent: number;
+    reportsFiled: number;
+    reportsReceived: number;
+  };
+  adClicks: { id: string; adTitle: string; clickedAt: string }[];
+  motorcycles: { brand: string; model: string; year: number; displacement: number; motorcycleType: string; ridingStyle: string }[];
+  moderatorLogs: { action: string; createdAt: string; moderatorNickname: string }[];
+}
+
 type ModalType = "users" | "active30" | "active7" | "adClicks" | "pendingReports" | null;
 
-function formatDateIT(dateStr: string): string {
+function formatDateIT(dateStr: string | null): string {
+  if (!dateStr) return "Mai";
   const d = new Date(dateStr);
   return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function timeAgo(dateStr: string | null): string {
+  if (!dateStr) return "Mai connesso";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Adesso";
+  if (mins < 60) return `${mins} min fa`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h fa`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}gg fa`;
+  const months = Math.floor(days / 30);
+  return `${months} mesi fa`;
 }
 
 function getUserBadge(createdAt: string): { label: string; color: string } | null {
@@ -66,9 +110,27 @@ function getUserBadge(createdAt: string): { label: string; color: string } | nul
   return null;
 }
 
+function getStatusColor(status: string) {
+  switch (status) {
+    case "active": return Colors.success;
+    case "suspended": return Colors.warning;
+    case "blocked": return Colors.error;
+    default: return Colors.textSecondary;
+  }
+}
+
+function getRoleColor(role: string) {
+  switch (role) {
+    case "admin": return Colors.accent;
+    case "moderator": return Colors.maleIcon;
+    default: return Colors.textSecondary;
+  }
+}
+
 export default function AdminAnalytics() {
   const insets = useSafeAreaInsets();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery<Analytics>({
     queryKey: ["/api/admin/analytics"],
@@ -99,6 +161,16 @@ export default function AdminAnalytics() {
     enabled: activeModal === "pendingReports",
   });
 
+  const statsQuery = useQuery<UserStatsData>({
+    queryKey: ["/api/admin/users", selectedUserId, "stats"],
+    enabled: !!selectedUserId,
+    queryFn: async () => {
+      const res = await fetch(`${getApiUrl()}/api/admin/users/${selectedUserId}/stats`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
   function handleExportCSV() {
     const baseUrl = getApiUrl();
     const url = new URL("/api/admin/analytics/export-csv", baseUrl);
@@ -113,6 +185,10 @@ export default function AdminAnalytics() {
     else if (label === "Utenti Attivi (7gg)") setActiveModal("active7");
     else if (label === "Advertisement") setActiveModal("adClicks");
     else if (label === "Segnalazioni pendenti") setActiveModal("pendingReports");
+  }
+
+  function handleUserPress(userId: string) {
+    setSelectedUserId(userId);
   }
 
   const tappableLabels = ["Utenti totali", "Utenti Attivi (30gg)", "Utenti Attivi (7gg)", "Advertisement", "Segnalazioni pendenti"];
@@ -137,7 +213,7 @@ export default function AdminAnalytics() {
         renderItem={({ item }) => {
           const badge = getUserBadge(item.createdAt);
           return (
-            <View style={styles.listItem}>
+            <TouchableOpacity style={styles.listItem} onPress={() => handleUserPress(item.id)} activeOpacity={0.7}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.listItemTitle}>{item.nickname}</Text>
                 <Text style={styles.listItemSub}>{item.userType} - {item.region || "N/A"} - {item.sex || "N/A"}</Text>
@@ -148,7 +224,8 @@ export default function AdminAnalytics() {
                   <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
                 </View>
               )}
-            </View>
+              <MaterialIcons name="chevron-right" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
           );
         }}
         ListEmptyComponent={<Text style={styles.emptyText}>Nessun utente</Text>}
@@ -165,13 +242,14 @@ export default function AdminAnalytics() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.modalList}
         renderItem={({ item }) => (
-          <View style={styles.listItem}>
+          <TouchableOpacity style={styles.listItem} onPress={() => handleUserPress(item.id)} activeOpacity={0.7}>
             <View style={{ flex: 1 }}>
               <Text style={styles.listItemTitle}>{item.nickname}</Text>
               <Text style={styles.listItemSub}>{item.userType}</Text>
               <Text style={styles.listItemDate}>Ultimo accesso: {formatDateIT(item.lastLoginAt)}</Text>
             </View>
-          </View>
+            <MaterialIcons name="chevron-right" size={20} color={Colors.textSecondary} />
+          </TouchableOpacity>
         )}
         ListEmptyComponent={<Text style={styles.emptyText}>Nessun utente attivo</Text>}
       />
@@ -193,13 +271,14 @@ export default function AdminAnalytics() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.modalList}
           renderItem={({ item }) => (
-            <View style={styles.listItem}>
+            <TouchableOpacity style={styles.listItem} onPress={() => handleUserPress(item.userId)} activeOpacity={0.7}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.listItemTitle}>{item.nickname || "Anonimo"}</Text>
                 <Text style={styles.listItemSub}>{item.userType} - {item.adTitle || "N/A"}</Text>
                 <Text style={styles.listItemDate}>{formatDateIT(item.clickedAt)}</Text>
               </View>
-            </View>
+              <MaterialIcons name="chevron-right" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
           )}
           ListEmptyComponent={<Text style={styles.emptyText}>Nessun click registrato</Text>}
         />
@@ -232,6 +311,144 @@ export default function AdminAnalytics() {
         )}
         ListEmptyComponent={<Text style={styles.emptyText}>Nessuna segnalazione pendente</Text>}
       />
+    );
+  }
+
+  function renderUserStatsContent() {
+    const s = statsQuery.data;
+    if (!s) return null;
+
+    const u = s.user;
+    const daysSinceRegistration = Math.floor((Date.now() - new Date(u.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+
+    return (
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}>
+        <View style={sStyles.section}>
+          <Text style={sStyles.sectionTitle}>Informazioni</Text>
+          <View style={sStyles.row}>
+            <Text style={sStyles.label}>Nickname</Text>
+            <Text style={sStyles.value}>{u.nickname}</Text>
+          </View>
+          <View style={sStyles.row}>
+            <Text style={sStyles.label}>Email</Text>
+            <Text style={sStyles.value}>{u.email}</Text>
+          </View>
+          <View style={sStyles.row}>
+            <Text style={sStyles.label}>Tipo</Text>
+            <Text style={sStyles.value}>{u.userType}</Text>
+          </View>
+          <View style={sStyles.row}>
+            <Text style={sStyles.label}>Ruolo</Text>
+            <Text style={[sStyles.value, { color: getRoleColor(u.role) }]}>{u.role}</Text>
+          </View>
+          <View style={sStyles.row}>
+            <Text style={sStyles.label}>Stato</Text>
+            <Text style={[sStyles.value, { color: getStatusColor(u.status) }]}>{u.status}</Text>
+          </View>
+          {u.bio && (
+            <View style={sStyles.row}>
+              <Text style={sStyles.label}>Bio</Text>
+              <Text style={[sStyles.value, { flex: 1, textAlign: "right" as const }]} numberOfLines={3}>{u.bio}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={sStyles.section}>
+          <Text style={sStyles.sectionTitle}>Connessione</Text>
+          <View style={sStyles.row}>
+            <Text style={sStyles.label}>Ultimo accesso</Text>
+            <Text style={sStyles.value}>{timeAgo(u.lastLoginAt)}</Text>
+          </View>
+          <View style={sStyles.row}>
+            <Text style={sStyles.label}>Data ultimo accesso</Text>
+            <Text style={sStyles.value}>{formatDateIT(u.lastLoginAt)}</Text>
+          </View>
+          <View style={sStyles.row}>
+            <Text style={sStyles.label}>Registrazione</Text>
+            <Text style={sStyles.value}>{formatDateIT(u.createdAt)}</Text>
+          </View>
+          <View style={sStyles.row}>
+            <Text style={sStyles.label}>Giorni dall'iscrizione</Text>
+            <Text style={sStyles.value}>{daysSinceRegistration}</Text>
+          </View>
+          <View style={sStyles.row}>
+            <Text style={sStyles.label}>Disponibile</Text>
+            <MaterialIcons name={u.isAvailable ? "check-circle" : "cancel"} size={18} color={u.isAvailable ? Colors.success : Colors.error} />
+          </View>
+        </View>
+
+        <View style={sStyles.section}>
+          <Text style={sStyles.sectionTitle}>Attivit&agrave;</Text>
+          <View style={sStyles.statsGrid}>
+            <View style={sStyles.statBox}>
+              <Text style={sStyles.statNumber}>{s.stats.proposalsCreated}</Text>
+              <Text style={sStyles.statLabel}>Proposte</Text>
+            </View>
+            <View style={sStyles.statBox}>
+              <Text style={sStyles.statNumber}>{s.stats.conversationsCount}</Text>
+              <Text style={sStyles.statLabel}>Conversazioni</Text>
+            </View>
+            <View style={sStyles.statBox}>
+              <Text style={sStyles.statNumber}>{s.stats.messagesSent}</Text>
+              <Text style={sStyles.statLabel}>Messaggi</Text>
+            </View>
+            <View style={sStyles.statBox}>
+              <Text style={sStyles.statNumber}>{s.stats.reportsFiled}</Text>
+              <Text style={sStyles.statLabel}>Segnalazioni fatte</Text>
+            </View>
+            <View style={sStyles.statBox}>
+              <Text style={sStyles.statNumber}>{s.stats.reportsReceived}</Text>
+              <Text style={sStyles.statLabel}>Segnalazioni ricevute</Text>
+            </View>
+            <View style={sStyles.statBox}>
+              <Text style={sStyles.statNumber}>{u.totalRides ?? 0}</Text>
+              <Text style={sStyles.statLabel}>Percorsi</Text>
+            </View>
+          </View>
+          {(u.totalKm ?? 0) > 0 && (
+            <View style={sStyles.row}>
+              <Text style={sStyles.label}>Km totali</Text>
+              <Text style={sStyles.value}>{u.totalKm} km</Text>
+            </View>
+          )}
+        </View>
+
+        {s.motorcycles.length > 0 && (
+          <View style={sStyles.section}>
+            <Text style={sStyles.sectionTitle}>Moto</Text>
+            {s.motorcycles.map((m, i) => (
+              <View key={i} style={sStyles.motoCard}>
+                <Text style={sStyles.motoTitle}>{m.brand} {m.model}</Text>
+                <Text style={sStyles.motoSub}>{m.year} - {m.displacement}cc - {m.motorcycleType} - {m.ridingStyle}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {s.adClicks.length > 0 && (
+          <View style={sStyles.section}>
+            <Text style={sStyles.sectionTitle}>Click Ads ({s.adClicks.length})</Text>
+            {s.adClicks.map((click) => (
+              <View key={click.id} style={sStyles.logItem}>
+                <Text style={sStyles.logText}>{click.adTitle || "N/A"}</Text>
+                <Text style={sStyles.logDate}>{formatDateIT(click.clickedAt)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {s.moderatorLogs.length > 0 && (
+          <View style={sStyles.section}>
+            <Text style={sStyles.sectionTitle}>Log moderazione</Text>
+            {s.moderatorLogs.map((log, i) => (
+              <View key={i} style={sStyles.logItem}>
+                <Text style={sStyles.logText}>{log.action} (da {log.moderatorNickname || "sistema"})</Text>
+                <Text style={sStyles.logDate}>{formatDateIT(log.createdAt)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
     );
   }
 
@@ -320,9 +537,133 @@ export default function AdminAnalytics() {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={!!selectedUserId} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[sStyles.modalContainer, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 10 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{statsQuery.data?.user?.nickname || "Dettaglio utente"}</Text>
+              <TouchableOpacity onPress={() => setSelectedUserId(null)}>
+                <MaterialIcons name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+            {statsQuery.isLoading ? (
+              <Text style={styles.loadingText}>Caricamento statistiche...</Text>
+            ) : statsQuery.isError ? (
+              <Text style={styles.loadingText}>Errore nel caricamento</Text>
+            ) : (
+              renderUserStatsContent()
+            )}
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
+
+const sStyles = StyleSheet.create({
+  modalContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    marginTop: 40,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  section: {
+    marginTop: 20,
+  },
+  sectionTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: Colors.accent,
+    marginBottom: 10,
+    textTransform: "uppercase" as const,
+    letterSpacing: 1,
+  },
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border + "44",
+  },
+  label: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  value: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.text,
+  },
+  statsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  statBox: {
+    width: "31%",
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  statNumber: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+    color: Colors.text,
+  },
+  statLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginTop: 4,
+  },
+  motoCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  motoTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.text,
+  },
+  motoSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  logItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border + "44",
+  },
+  logText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.text,
+    flex: 1,
+  },
+  logDate: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginLeft: 8,
+  },
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
