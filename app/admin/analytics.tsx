@@ -165,7 +165,8 @@ export default function AdminAnalytics() {
     queryKey: ["/api/admin/users", selectedUserId, "stats"],
     enabled: !!selectedUserId,
     queryFn: async () => {
-      const res = await fetch(`${getApiUrl()}/api/admin/users/${selectedUserId}/stats`, { credentials: "include" });
+      const url = new URL(`/api/admin/users/${selectedUserId}/stats`, getApiUrl());
+      const res = await fetch(url.toString(), { credentials: "include" });
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },

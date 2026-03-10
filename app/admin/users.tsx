@@ -91,7 +91,8 @@ export default function AdminUsers() {
     queryKey: ["/api/admin/users", selectedUser?.id, "stats"],
     enabled: statsModalVisible && !!selectedUser,
     queryFn: async () => {
-      const res = await fetch(`${getApiUrl()}/api/admin/users/${selectedUser!.id}/stats`, { credentials: "include" });
+      const url = new URL(`/api/admin/users/${selectedUser!.id}/stats`, getApiUrl());
+      const res = await fetch(url.toString(), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch stats");
       return res.json();
     },
