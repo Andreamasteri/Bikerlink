@@ -138,6 +138,29 @@ router.put("/users/:id/password", async (req: Request, res: Response) => {
   }
 });
 
+router.put("/users/:id/primal", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { isPrimal } = req.body;
+    const user = await storage.updateUser(id, { isPrimal: !!isPrimal });
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: isPrimal ? "assign_primal" : "remove_primal",
+      targetType: "user",
+      targetId: id,
+      details: `Primal ${isPrimal ? "assegnato" : "rimosso"} a ${user.nickname}`,
+    });
+    const { password: _pw, ...safeUser } = user;
+    return res.json(safeUser);
+  } catch (error) {
+    console.error("Admin toggle primal error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.delete("/users/:id", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;

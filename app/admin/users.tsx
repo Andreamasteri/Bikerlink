@@ -150,6 +150,17 @@ export default function AdminUsers() {
     onError: () => Alert.alert("Errore", "Impossibile eliminare il profilo"),
   });
 
+  const primalMutation = useMutation({
+    mutationFn: async ({ id, isPrimal }: { id: string; isPrimal: boolean }) => {
+      const res = await apiRequest("PUT", `/api/admin/users/${id}/primal`, { isPrimal });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    },
+    onError: () => Alert.alert("Errore", "Impossibile aggiornare stato Primal"),
+  });
+
   const filteredUsers = users.filter((u) => {
     if (hideFake && u.isFake === true) return false;
     if (!searchText) return true;
@@ -295,6 +306,12 @@ export default function AdminUsers() {
           )}
           <TouchableOpacity onPress={() => handleDeleteUser(item)} style={styles.actionBtn}>
             <Ionicons name="trash-outline" size={22} color={Colors.error} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => primalMutation.mutate({ id: item.id, isPrimal: !item.isPrimal })}
+            style={styles.actionBtn}
+          >
+            <Ionicons name="star" size={22} color={item.isPrimal ? "#FFD700" : Colors.border} />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>

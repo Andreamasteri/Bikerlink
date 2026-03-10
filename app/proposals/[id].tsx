@@ -274,7 +274,7 @@ export default function ProposalDetailScreen() {
             {proposal.maxParticipants ? `/${proposal.maxParticipants}` : ""})
           </Text>
           {proposal.participants.map((p) => (
-            <View key={p.id} style={styles.participantRow}>
+            <TouchableOpacity key={p.id} style={styles.participantRow} onPress={() => router.push(`/profile/${p.userId}`)} activeOpacity={0.7}>
               <View
                 style={[
                   styles.participantAvatar,
@@ -293,7 +293,8 @@ export default function ProposalDetailScreen() {
                   <MaterialCommunityIcons name="crown" size={12} color={Colors.accent} />
                 </View>
               )}
-            </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} style={{ marginLeft: "auto" }} />
+            </TouchableOpacity>
           ))}
         </View>
 
