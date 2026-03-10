@@ -913,7 +913,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async countActiveUsers(since: Date): Promise<number> {
-    const result = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(and(eq(users.status, "active"), gte(users.lastLoginAt, since)));
+    const result = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(and(eq(users.status, "active"), eq(users.isFake, false), gte(users.lastLoginAt, since)));
     return result[0]?.count ?? 0;
   }
 

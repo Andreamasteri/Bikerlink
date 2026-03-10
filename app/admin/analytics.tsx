@@ -80,12 +80,12 @@ export default function AdminAnalytics() {
   });
 
   const active30Query = useQuery<ActiveUserItem[]>({
-    queryKey: ["/api/admin/analytics/active-users", { period: 30 }],
+    queryKey: ["/api/admin/analytics/active-users?period=30"],
     enabled: activeModal === "active30",
   });
 
   const active7Query = useQuery<ActiveUserItem[]>({
-    queryKey: ["/api/admin/analytics/active-users", { period: 7 }],
+    queryKey: ["/api/admin/analytics/active-users?period=7"],
     enabled: activeModal === "active7",
   });
 

@@ -962,6 +962,94 @@ router.post("/fake-users", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/users/:id/stats", async (req: Request, res: Response) => {
+  try {
+    const userId = req.params.id;
+    const { pool } = await import("../db");
+
+    const userResult = await pool.query(
+      `SELECT u.id, u.nickname, u.email, u.user_type as "userType", u.role, u.status,
+              u.created_at as "createdAt", u.last_login_at as "lastLoginAt",
+              u.is_fake as "isFake", u.is_primal as "isPrimal",
+              up.total_km as "totalKm", up.total_rides as "totalRides",
+              up.is_available as "isAvailable", up.bio,
+              up.latitude, up.longitude
+       FROM users u
+       LEFT JOIN user_profiles up ON up.user_id = u.id
+       WHERE u.id = $1`,
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+
+    const user = userResult.rows[0];
+
+    const [proposalsResult, conversationsResult, messagesResult, adClicksResult, reportsResult, motorcyclesResult] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*)::int as count FROM proposals WHERE creator_id = $1`,
+        [userId]
+      ),
+      pool.query(
+        `SELECT COUNT(*)::int as count FROM conversation_participants WHERE user_id = $1`,
+        [userId]
+      ),
+      pool.query(
+        `SELECT COUNT(*)::int as count FROM messages WHERE sender_id = $1`,
+        [userId]
+      ),
+      pool.query(
+        `SELECT ac.id, camp.name as "adTitle", ac.created_at as "clickedAt"
+         FROM ad_clicks ac
+         LEFT JOIN ad_campaigns camp ON ac.campaign_id = camp.id
+         WHERE ac.user_id = $1
+         ORDER BY ac.created_at DESC
+         LIMIT 20`,
+        [userId]
+      ),
+      pool.query(
+        `SELECT COUNT(*)::int as "filed", 
+                (SELECT COUNT(*)::int FROM reports WHERE reported_user_id = $1) as "received"
+         FROM reports WHERE reporter_id = $1`,
+        [userId]
+      ),
+      pool.query(
+        `SELECT brand, model, year, displacement, motorcycle_type as "motorcycleType", riding_style as "ridingStyle"
+         FROM user_motorcycles WHERE user_id = $1`,
+        [userId]
+      ),
+    ]);
+
+    const loginHistory = await pool.query(
+      `SELECT ml.action, ml.created_at as "createdAt", m.nickname as "moderatorNickname"
+       FROM moderator_logs ml
+       LEFT JOIN users m ON ml.moderator_id = m.id
+       WHERE ml.target_id = $1
+       ORDER BY ml.created_at DESC
+       LIMIT 20`,
+      [userId]
+    );
+
+    return res.json({
+      user,
+      stats: {
+        proposalsCreated: proposalsResult.rows[0]?.count ?? 0,
+        conversationsCount: conversationsResult.rows[0]?.count ?? 0,
+        messagesSent: messagesResult.rows[0]?.count ?? 0,
+        reportsFiled: reportsResult.rows[0]?.filed ?? 0,
+        reportsReceived: reportsResult.rows[0]?.received ?? 0,
+      },
+      adClicks: adClicksResult.rows,
+      motorcycles: motorcyclesResult.rows,
+      moderatorLogs: loginHistory.rows,
+    });
+  } catch (error) {
+    console.error("Admin user stats error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/fake-users/toggle-all", async (req: Request, res: Response) => {
   try {
     const { enabled } = req.body;
