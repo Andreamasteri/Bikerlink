@@ -416,9 +416,11 @@ router.get("/conversations", async (req: Request, res: Response) => {
         );
 
         const myParticipant = participants.find((p) => p.userId === userId);
-        const unreadCount = lastMessage && myParticipant?.lastReadAt
-          ? new Date(lastMessage.createdAt) > new Date(myParticipant.lastReadAt) ? 1 : 0
-          : lastMessage ? 1 : 0;
+        const unreadCount = lastMessage && lastMessage.senderId !== userId
+          ? myParticipant?.lastReadAt
+            ? new Date(lastMessage.createdAt) > new Date(myParticipant.lastReadAt) ? 1 : 0
+            : 1
+          : 0;
 
         return {
           ...conv,
