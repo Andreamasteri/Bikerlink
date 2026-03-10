@@ -23,10 +23,11 @@ export default function WelcomeScreen() {
   const synecoVisible = useSynecoVisible();
   const insets = useSafeAreaInsets();
 
-  const titleOpacity = useRef(new Animated.Value(0)).current;
-  const taglineOpacity = useRef(new Animated.Value(0)).current;
-  const buttonsTranslateY = useRef(new Animated.Value(100)).current;
-  const buttonsOpacity = useRef(new Animated.Value(0)).current;
+  const isWeb = Platform.OS === "web";
+  const titleOpacity = useRef(new Animated.Value(isWeb ? 1 : 0)).current;
+  const taglineOpacity = useRef(new Animated.Value(isWeb ? 1 : 0)).current;
+  const buttonsTranslateY = useRef(new Animated.Value(isWeb ? 0 : 100)).current;
+  const buttonsOpacity = useRef(new Animated.Value(isWeb ? 1 : 0)).current;
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -34,30 +35,30 @@ export default function WelcomeScreen() {
       return;
     }
 
-    const useNative = Platform.OS !== "web";
+    if (isWeb) return;
 
     Animated.sequence([
       Animated.timing(titleOpacity, {
         toValue: 1,
         duration: 800,
-        useNativeDriver: useNative,
+        useNativeDriver: true,
       }),
       Animated.timing(taglineOpacity, {
         toValue: 1,
         duration: 600,
-        useNativeDriver: useNative,
+        useNativeDriver: true,
       }),
       Animated.delay(400),
       Animated.parallel([
         Animated.timing(buttonsTranslateY, {
           toValue: 0,
           duration: 500,
-          useNativeDriver: useNative,
+          useNativeDriver: true,
         }),
         Animated.timing(buttonsOpacity, {
           toValue: 1,
           duration: 500,
-          useNativeDriver: useNative,
+          useNativeDriver: true,
         }),
       ]),
     ]).start();

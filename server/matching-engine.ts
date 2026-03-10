@@ -78,6 +78,9 @@ function areCompatible(p1: Proposal, p2: Proposal): boolean {
 async function runMatching(): Promise<number> {
   try {
     const activeProposals = await storage.getActiveProposalsWithLocation();
+    if (activeProposals.length < 2) return 0;
+
+    const existingKeys = await storage.getAllExistingProposalMatchKeys();
     let matchCount = 0;
 
     for (let i = 0; i < activeProposals.length; i++) {
@@ -87,8 +90,7 @@ async function runMatching(): Promise<number> {
 
         if (!areCompatible(p1, p2)) continue;
 
-        const existing = await storage.findExistingMatch(p1.id, p2.id);
-        if (existing) continue;
+        if (existingKeys.has(`${p1.id}:${p2.id}`)) continue;
 
         await storage.createProposalMatch({
           proposalId1: p1.id,
@@ -100,6 +102,8 @@ async function runMatching(): Promise<number> {
           acceptedByUser2: false,
         });
 
+        existingKeys.add(`${p1.id}:${p2.id}`);
+        existingKeys.add(`${p2.id}:${p1.id}`);
         matchCount++;
       }
     }
@@ -118,6 +122,7 @@ async function runWishlistMatching(): Promise<number> {
 
     if (wishlistMotos.length === 0 || bikerMotorcycles.length === 0) return 0;
 
+    const existingKeys = await storage.getAllExistingBikerZavarrinaMatchKeys();
     let matchCount = 0;
 
     for (const wm of wishlistMotos) {
@@ -156,8 +161,8 @@ async function runWishlistMatching(): Promise<number> {
 
         if (!compatible) continue;
 
-        const existing = await storage.findExistingBikerZavarrinaMatch(bikerId, zavarrinaId, moto.id, wish.id);
-        if (existing) continue;
+        const key = `${bikerId}:${zavarrinaId}:${moto.id}:${wish.id}`;
+        if (existingKeys.has(key)) continue;
 
         await storage.createMatch({
           bikerId,
@@ -167,6 +172,7 @@ async function runWishlistMatching(): Promise<number> {
           status: "new",
         });
 
+        existingKeys.add(key);
         matchCount++;
       }
     }

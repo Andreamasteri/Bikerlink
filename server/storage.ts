@@ -289,6 +289,8 @@ export interface IStorage {
   getAllWishlistMotosWithUsers(): Promise<{ wishlistMoto: any; userId: string }[]>;
   getAllBikerMotorcyclesWithUsers(): Promise<{ motorcycle: any; userId: string }[]>;
   findExistingBikerZavarrinaMatch(bikerId: string, zavarrinaId: string, bikerMotorcycleId: string, wishlistMotoId: string): Promise<BikerZavarrinaMatch | undefined>;
+  getAllExistingBikerZavarrinaMatchKeys(): Promise<Set<string>>;
+  getAllExistingProposalMatchKeys(): Promise<Set<string>>;
 
   createEmailVerificationToken(userId: string, token: string, expiresAt: Date): Promise<void>;
   getEmailVerificationToken(token: string): Promise<EmailVerificationToken | undefined>;
@@ -1171,6 +1173,33 @@ export class DatabaseStorage implements IStorage {
       )
     ).limit(1);
     return match;
+  }
+
+  async getAllExistingBikerZavarrinaMatchKeys(): Promise<Set<string>> {
+    const rows = await db.select({
+      bikerId: bikerZavarrinaMatches.bikerId,
+      zavarrinaId: bikerZavarrinaMatches.zavarrinaId,
+      bikerMotorcycleId: bikerZavarrinaMatches.bikerMotorcycleId,
+      wishlistMotoId: bikerZavarrinaMatches.wishlistMotoId,
+    }).from(bikerZavarrinaMatches);
+    const keys = new Set<string>();
+    for (const r of rows) {
+      keys.add(`${r.bikerId}:${r.zavarrinaId}:${r.bikerMotorcycleId}:${r.wishlistMotoId}`);
+    }
+    return keys;
+  }
+
+  async getAllExistingProposalMatchKeys(): Promise<Set<string>> {
+    const rows = await db.select({
+      proposalId1: proposalMatches.proposalId1,
+      proposalId2: proposalMatches.proposalId2,
+    }).from(proposalMatches);
+    const keys = new Set<string>();
+    for (const r of rows) {
+      keys.add(`${r.proposalId1}:${r.proposalId2}`);
+      keys.add(`${r.proposalId2}:${r.proposalId1}`);
+    }
+    return keys;
   }
 
   async countAvailableBikers(since: Date): Promise<number> {
