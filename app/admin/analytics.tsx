@@ -8,7 +8,7 @@ import { getApiUrl } from "@/lib/query-client";
 
 interface Analytics {
   totalUsers: number;
-  activeUsersMonth: number;
+  onlineUsersNow: number;
   activeUsersWeek: number;
   workshopContactsMonth: number;
   totalAdClicks: number;
@@ -141,9 +141,9 @@ export default function AdminAnalytics() {
     enabled: activeModal === "users",
   });
 
-  const active30Query = useQuery<ActiveUserItem[]>({
-    queryKey: ["/api/admin/analytics/active-users?period=30"],
-    enabled: activeModal === "active30",
+  const onlineNowQuery = useQuery<ActiveUserItem[]>({
+    queryKey: ["/api/admin/analytics/online-now"],
+    enabled: activeModal === "onlineNow",
   });
 
   const active7Query = useQuery<ActiveUserItem[]>({
@@ -182,8 +182,8 @@ export default function AdminAnalytics() {
 
   function handleCardPress(label: string) {
     if (label === "Utenti totali") setActiveModal("users");
-    else if (label === "Utenti Attivi (30gg)") setActiveModal("active30");
-    else if (label === "Utenti Attivi (7gg)") setActiveModal("active7");
+    else if (label === "Utenti connessi Adesso") setActiveModal("onlineNow");
+    else if (label === "Utenti connessi 7gg") setActiveModal("active7");
     else if (label === "Advertisement") setActiveModal("adClicks");
     else if (label === "Segnalazioni pendenti") setActiveModal("pendingReports");
   }
@@ -192,12 +192,12 @@ export default function AdminAnalytics() {
     setSelectedUserId(userId);
   }
 
-  const tappableLabels = ["Utenti totali", "Utenti Attivi (30gg)", "Utenti Attivi (7gg)", "Advertisement", "Segnalazioni pendenti"];
+  const tappableLabels = ["Utenti totali", "Utenti connessi Adesso", "Utenti connessi 7gg", "Advertisement", "Segnalazioni pendenti"];
 
   const stats = [
     { label: "Utenti totali", value: data?.totalUsers ?? 0, icon: "people" as const, color: Colors.maleIcon },
-    { label: "Utenti Attivi (30gg)", value: data?.activeUsersMonth ?? 0, icon: "trending-up" as const, color: Colors.success },
-    { label: "Utenti Attivi (7gg)", value: data?.activeUsersWeek ?? 0, icon: "show-chart" as const, color: Colors.accent },
+    { label: "Utenti connessi Adesso", value: data?.onlineUsersNow ?? 0, icon: "wifi" as const, color: Colors.success },
+    { label: "Utenti connessi 7gg", value: data?.activeUsersWeek ?? 0, icon: "show-chart" as const, color: Colors.accent },
     { label: "Contatti officine (30gg)", value: data?.workshopContactsMonth ?? 0, icon: "store" as const, color: Colors.femaleIcon },
     { label: "Click ads totali", value: data?.totalAdClicks ?? 0, icon: "ads-click" as const, color: Colors.warning },
     { label: "Advertisement", value: data?.activeCampaigns ?? 0, icon: "campaign" as const, color: Colors.accent },
@@ -234,8 +234,8 @@ export default function AdminAnalytics() {
     );
   }
 
-  function renderActiveUsersModal(period: number) {
-    const activeData = period === 30 ? active30Query.data : active7Query.data;
+  function renderActiveUsersModal(type: "onlineNow" | "7") {
+    const activeData = type === "onlineNow" ? onlineNowQuery.data : active7Query.data;
     const users = activeData ?? [];
     return (
       <FlatList
@@ -456,8 +456,8 @@ export default function AdminAnalytics() {
   function getModalTitle(): string {
     switch (activeModal) {
       case "users": return "Utenti totali";
-      case "active30": return "Utenti Attivi (30gg)";
-      case "active7": return "Utenti Attivi (7gg)";
+      case "onlineNow": return "Utenti connessi Adesso";
+      case "active7": return "Utenti connessi 7gg";
       case "adClicks": return "Advertisement - Click";
       case "pendingReports": return "Segnalazioni pendenti";
       default: return "";
@@ -467,8 +467,8 @@ export default function AdminAnalytics() {
   function renderModalContent() {
     switch (activeModal) {
       case "users": return renderUsersModal();
-      case "active30": return renderActiveUsersModal(30);
-      case "active7": return renderActiveUsersModal(7);
+      case "onlineNow": return renderActiveUsersModal("onlineNow");
+      case "active7": return renderActiveUsersModal("7");
       case "adClicks": return renderAdClicksModal();
       case "pendingReports": return renderPendingReportsModal();
       default: return null;
@@ -477,7 +477,7 @@ export default function AdminAnalytics() {
 
   const isModalLoading =
     (activeModal === "users" && usersQuery.isLoading) ||
-    (activeModal === "active30" && active30Query.isLoading) ||
+    (activeModal === "onlineNow" && onlineNowQuery.isLoading) ||
     (activeModal === "active7" && active7Query.isLoading) ||
     (activeModal === "adClicks" && adClicksQuery.isLoading) ||
     (activeModal === "pendingReports" && pendingReportsQuery.isLoading);

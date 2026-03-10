@@ -497,8 +497,10 @@ router.get("/analytics", async (_req: Request, res: Response) => {
     const totalUsersResult = await pool.query("SELECT count(*)::int as count FROM users WHERE is_fake = false");
     const totalUsers = totalUsersResult.rows[0]?.count ?? 0;
 
-    const [activeUsersMonth, activeUsersWeek, workshopContacts, campaigns, pendingReports] = await Promise.all([
-      storage.countActiveUsers(thirtyDaysAgo),
+    const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
+
+    const [onlineUsersNow, activeUsersWeek, workshopContacts, campaigns, pendingReports] = await Promise.all([
+      storage.countActiveUsers(fifteenMinutesAgo),
       storage.countActiveUsers(sevenDaysAgo),
       storage.getWorkshopContactsByPeriod(thirtyDaysAgo, now),
       storage.getAllCampaigns(),
@@ -509,7 +511,7 @@ router.get("/analytics", async (_req: Request, res: Response) => {
 
     return res.json({
       totalUsers,
-      activeUsersMonth,
+      onlineUsersNow,
       activeUsersWeek,
       workshopContactsMonth: workshopContacts.length,
       totalAdClicks,
@@ -581,6 +583,21 @@ router.get("/analytics/active-users", async (req: Request, res: Response) => {
     return res.json(result.rows);
   } catch (error) {
     console.error("Admin analytics active-users error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/analytics/online-now", async (_req: Request, res: Response) => {
+  try {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const { pool } = await import("../db");
+    const result = await pool.query(
+      "SELECT id, nickname, user_type as \"userType\", last_login_at as \"lastLoginAt\" FROM users WHERE is_fake = false AND status = 'active' AND last_login_at >= $1 ORDER BY last_login_at DESC",
+      [fifteenMinutesAgo]
+    );
+    return res.json(result.rows);
+  } catch (error) {
+    console.error("Admin analytics online-now error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
