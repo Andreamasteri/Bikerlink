@@ -27,6 +27,9 @@ function AppStateHandler() {
   useEffect(() => {
     if (!user) return;
 
+    apiRequest("PUT", "/api/users/me/availability", { isAvailable: true }).catch(() => {});
+    queryClient.invalidateQueries({ queryKey: ["/api/users/profile"] });
+
     const subscription = AppState.addEventListener("change", async (nextAppState) => {
       if (appStateRef.current.match(/active/) && nextAppState.match(/inactive|background/)) {
         try {
