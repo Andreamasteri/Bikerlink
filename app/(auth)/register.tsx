@@ -14,6 +14,7 @@ import {
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
@@ -104,6 +105,11 @@ export default function RegisterScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { registerMutation } = useAuth();
+
+  const { data: emailVerifData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/email-verification"],
+  });
+  const emailVerifEnabled = emailVerifData?.enabled === true;
 
   const [step, setStep] = useState(1);
   const [error, setError] = useState("");
@@ -397,6 +403,17 @@ export default function RegisterScreen() {
           keyboardType="email-address"
           testID="reg-email"
         />
+        {emailVerifEnabled && (
+          <TouchableOpacity
+            onPress={() => Alert.alert(
+              "Verifica Email",
+              "La verifica dell'email è una sicurezza che il tuo indirizzo sia associato correttamente al tuo account.\n\nTi servirà in caso di reset della password."
+            )}
+            style={{ paddingHorizontal: 8 }}
+          >
+            <Ionicons name="information-circle-outline" size={20} color={Colors.accent} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.phoneRow}>

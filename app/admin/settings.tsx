@@ -469,6 +469,21 @@ export default function AdminSettings() {
           <View style={styles.synecoInfo}>
             <Ionicons name="mail" size={20} color={Colors.accent} />
             <Text style={styles.synecoLabel}>Verifica Email</Text>
+            <TouchableOpacity
+              onPress={() => Alert.alert(
+                "Verifica Email - Info",
+                "Quando attiva:\n\n" +
+                "1. Ogni nuovo utente riceve un codice di verifica a 6 cifre\n" +
+                "2. L'utente deve inserire il codice nella schermata di verifica per completare la registrazione\n" +
+                "3. Il codice scade dopo 30 minuti\n" +
+                "4. L'utente non potrà fare login finché non verifica l'email\n" +
+                "5. L'admin riceve una notifica con il codice generato\n" +
+                "6. L'utente può richiedere un nuovo codice dalla schermata di verifica"
+              )}
+              style={{ marginLeft: 6 }}
+            >
+              <Ionicons name="information-circle-outline" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
           </View>
           <Switch
             value={emailVerifEnabled}

@@ -44,8 +44,10 @@ function useRegisterMutation() {
       const res = await apiRequest("POST", "/api/auth/register", data);
       return await res.json();
     },
-    onSuccess: (user: SafeUser) => {
-      queryClient.setQueryData(["/api/auth/me"], user);
+    onSuccess: (response: any) => {
+      if (!response?.requiresEmailVerification) {
+        queryClient.setQueryData(["/api/auth/me"], response);
+      }
     },
   });
 }

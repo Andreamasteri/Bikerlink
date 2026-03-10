@@ -105,6 +105,23 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
       await storage.createEmailVerificationToken(user.id, token, expiresAt);
       console.log(`[EMAIL VERIFICATION] User: ${user.email}, Token: ${token}`);
+
+      try {
+        const adminUser = await storage.getUserByNickname("admin");
+        if (adminUser) {
+          await storage.createNotification({
+            userId: adminUser.id,
+            title: "Nuova registrazione - Verifica Email",
+            body: `L'utente ${user.nickname} (${user.email}) si è registrato. Codice verifica: ${token}`,
+            notificationType: "system",
+            referenceType: "user",
+            referenceId: user.id,
+          });
+        }
+      } catch (e) {
+        console.error("Failed to notify admin about email verification:", e);
+      }
+
       const { password: _, ...safeUser } = user;
       return res.status(201).json({ ...safeUser, requiresEmailVerification: true });
     }
@@ -139,6 +156,11 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
 
     if (user.status === "blocked" || user.status === "suspended") {
       return res.status(403).json({ message: "Account sospeso o bloccato" });
+    }
+
+    const emailVerifSetting = await storage.getAppSetting("email_verification_enabled");
+    if (emailVerifSetting?.value === "true" && !user.emailVerified) {
+      return res.status(403).json({ message: "Verifica la tua email prima di accedere. Controlla la tua casella di posta." });
     }
 
     const validPassword = await bcrypt.compare(password, user.password);
