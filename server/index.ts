@@ -257,6 +257,18 @@ function setupErrorHandler(app: express.Application) {
 
   const server = await registerRoutes(app);
 
+  const webBuildIndex = path.join(path.resolve(process.cwd(), "static-build", "web"), "index.html");
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.method !== "GET" && req.method !== "HEAD") return next();
+    if (req.path.startsWith("/api/")) return next();
+    if (req.path === "/" || req.path === "/manifest" || req.path === "/healthz") return next();
+    if (req.path.match(/\.\w+$/)) return next();
+    if (fs.existsSync(webBuildIndex)) {
+      return res.sendFile(webBuildIndex);
+    }
+    next();
+  });
+
   setupErrorHandler(app);
 
   await autoSeedEssentialUsers();
