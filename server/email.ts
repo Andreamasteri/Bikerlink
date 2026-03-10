@@ -1,0 +1,94 @@
+import nodemailer from "nodemailer";
+import { storage } from "./storage";
+
+async function getEmailCredentials(): Promise<{ user: string; pass: string } | null> {
+  try {
+    const userSetting = await storage.getAppSetting("gmail_user");
+    const passSetting = await storage.getAppSetting("gmail_app_password");
+    if (userSetting?.value && passSetting?.value) {
+      return { user: userSetting.value, pass: passSetting.value };
+    }
+  } catch (e) {
+    // fallback to env vars
+  }
+
+  const user = process.env.GMAIL_USER;
+  const pass = process.env.GMAIL_APP_PASSWORD;
+  if (user && pass) {
+    return { user, pass };
+  }
+
+  return null;
+}
+
+async function createTransporter() {
+  const creds = await getEmailCredentials();
+  if (!creds) {
+    console.warn("[EMAIL] Credenziali Gmail non configurate. Email non inviata.");
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: creds.user,
+      pass: creds.pass,
+    },
+  });
+}
+
+export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
+  const transporter = await createTransporter();
+  if (!transporter) return false;
+
+  const creds = await getEmailCredentials();
+  if (!creds) return false;
+
+  try {
+    await transporter.sendMail({
+      from: `"BikerLink" <${creds.user}>`,
+      to,
+      subject,
+      html,
+    });
+    console.log(`[EMAIL] Email inviata a ${to}: ${subject}`);
+    return true;
+  } catch (error) {
+    console.error(`[EMAIL] Errore invio email a ${to}:`, error);
+    return false;
+  }
+}
+
+export async function sendVerificationEmail(to: string, nickname: string, token: string): Promise<boolean> {
+  const subject = "BikerLink - Codice di verifica email";
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
+      <div style="text-align: center; margin-bottom: 30px;">
+        <h1 style="color: #FF6B35; margin: 0; font-size: 28px;">🏍️ BikerLink</h1>
+        <p style="color: #888; font-size: 14px; margin-top: 4px;">U'll never ride alone</p>
+      </div>
+
+      <div style="background: #1a1a2e; border-radius: 12px; padding: 30px; color: #fff;">
+        <h2 style="margin-top: 0; font-size: 20px;">Ciao ${nickname}!</h2>
+        <p style="color: #ccc; line-height: 1.6;">
+          Benvenuto su BikerLink! Per completare la registrazione, inserisci il seguente codice di verifica nell'app:
+        </p>
+
+        <div style="background: #FF6B35; border-radius: 8px; padding: 20px; text-align: center; margin: 24px 0;">
+          <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #fff;">${token}</span>
+        </div>
+
+        <p style="color: #999; font-size: 13px; line-height: 1.5;">
+          Il codice scade tra 30 minuti.<br/>
+          Se non hai richiesto questa verifica, ignora questa email.
+        </p>
+      </div>
+
+      <p style="text-align: center; color: #666; font-size: 12px; margin-top: 20px;">
+        © ${new Date().getFullYear()} BikerLink — Tutti i diritti riservati
+      </p>
+    </div>
+  `;
+
+  return sendEmail(to, subject, html);
+}

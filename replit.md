@@ -235,4 +235,17 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - Tutti gli utenti reali esistenti marcati come Primal
 - Badge "PRIMAL" dorato (#FFD700) visibile nel pannello admin utenti e nel profilo utente
 - Endpoint: `GET /api/settings/primal-user`, setting key: `primal_user_enabled`
+- Gli utenti Primal saltano la verifica email (login/registrazione senza blocco)
+
+### Email SMTP (Gmail)
+- Servizio email: `server/email.ts` con nodemailer + Gmail SMTP
+- Credenziali: lette da DB (`gmail_user`, `gmail_app_password` in app_settings), fallback su env vars `GMAIL_USER` / `GMAIL_APP_PASSWORD`
+- Card "Email SMTP (Gmail)" in admin settings con stato configurazione (pallino verde/rosso)
+- Modifica protetta con lock: richiede la password admin per cambiare le credenziali Gmail
+- Modal con campi: password admin, indirizzo Gmail, password per le app Google
+- Icona ⓘ con istruzioni per creare la password per le app
+- Endpoints: `GET /api/admin/settings/email-config`, `PUT /api/admin/settings/email-config`
+- `sendVerificationEmail()` invia email HTML brandizzata con codice 6 cifre
+- `sendEmail()` funzione generica per usi futuri
+- Se email fallisce, notifica admin come backup (non crasha)
 

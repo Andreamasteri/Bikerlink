@@ -4,6 +4,7 @@ import crypto from "crypto";
 import rateLimit from "express-rate-limit";
 import { registerSchema, loginSchema } from "@shared/schema";
 import { storage } from "../storage";
+import { sendVerificationEmail } from "../email";
 
 declare module "express-session" {
   interface SessionData {
@@ -100,11 +101,18 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     const emailVerifSetting = await storage.getAppSetting("email_verification_enabled");
     const emailVerificationEnabled = emailVerifSetting?.value === "true";
 
-    if (emailVerificationEnabled) {
+    if (emailVerificationEnabled && !isPrimal) {
       const token = crypto.randomBytes(3).toString("hex").toUpperCase();
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
       await storage.createEmailVerificationToken(user.id, token, expiresAt);
       console.log(`[EMAIL VERIFICATION] User: ${user.email}, Token: ${token}`);
+
+      const emailSent = await sendVerificationEmail(user.email, user.nickname, token);
+      if (emailSent) {
+        console.log(`[EMAIL VERIFICATION] Email inviata a ${user.email}`);
+      } else {
+        console.warn(`[EMAIL VERIFICATION] Email NON inviata a ${user.email} - fallback notifica admin`);
+      }
 
       try {
         const adminUser = await storage.getUserByNickname("admin");
@@ -112,7 +120,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
           await storage.createNotification({
             userId: adminUser.id,
             title: "Nuova registrazione - Verifica Email",
-            body: `L'utente ${user.nickname} (${user.email}) si è registrato. Codice verifica: ${token}`,
+            body: `L'utente ${user.nickname} (${user.email}) si è registrato. Codice verifica: ${token}${emailSent ? " (email inviata)" : " (email NON inviata - SMTP non configurato)"}`,
             notificationType: "system",
             referenceType: "user",
             referenceId: user.id,
@@ -124,6 +132,10 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
 
       const { password: _, ...safeUser } = user;
       return res.status(201).json({ ...safeUser, requiresEmailVerification: true });
+    }
+
+    if (isPrimal) {
+      await storage.markUserEmailVerified(user.id);
     }
 
     req.session.userId = user.id;
@@ -159,7 +171,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     }
 
     const emailVerifSetting = await storage.getAppSetting("email_verification_enabled");
-    if (emailVerifSetting?.value === "true" && !user.emailVerified) {
+    if (emailVerifSetting?.value === "true" && !user.emailVerified && !user.isPrimal) {
       return res.status(403).json({ message: "Verifica la tua email prima di accedere. Controlla la tua casella di posta." });
     }
 
@@ -330,6 +342,11 @@ router.post("/resend-verification", async (req: Request, res: Response) => {
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
     await storage.createEmailVerificationToken(user.id, token, expiresAt);
     console.log(`[EMAIL VERIFICATION] User: ${user.email}, Token: ${token}`);
+
+    const emailSent = await sendVerificationEmail(user.email, user.nickname, token);
+    if (!emailSent) {
+      console.warn(`[EMAIL VERIFICATION] Resend: email NON inviata a ${user.email}`);
+    }
 
     return res.json({ message: "Nuovo codice inviato" });
   } catch (error) {

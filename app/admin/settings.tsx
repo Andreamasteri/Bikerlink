@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Switch } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Switch, Modal } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -186,6 +186,45 @@ export default function AdminSettings() {
 
   const [paypalEmail, setPaypalEmail] = useState("");
   const [isSavingPaypal, setIsSavingPaypal] = useState(false);
+
+  const [emailConfigModalVisible, setEmailConfigModalVisible] = useState(false);
+  const [emailConfigAdminPass, setEmailConfigAdminPass] = useState("");
+  const [emailConfigGmail, setEmailConfigGmail] = useState("");
+  const [emailConfigAppPass, setEmailConfigAppPass] = useState("");
+  const [isSavingEmailConfig, setIsSavingEmailConfig] = useState(false);
+
+  const { data: emailConfigData } = useQuery<{ configured: boolean; maskedEmail: string }>({
+    queryKey: ["/api/admin/settings/email-config"],
+  });
+
+  async function handleSaveEmailConfig() {
+    if (!emailConfigAdminPass) {
+      Alert.alert("Errore", "Inserisci la password admin");
+      return;
+    }
+    if (!emailConfigGmail && !emailConfigAppPass) {
+      Alert.alert("Errore", "Inserisci almeno un campo da aggiornare");
+      return;
+    }
+    try {
+      setIsSavingEmailConfig(true);
+      await apiRequest("PUT", "/api/admin/settings/email-config", {
+        gmailUser: emailConfigGmail || undefined,
+        gmailAppPassword: emailConfigAppPass || undefined,
+        adminPassword: emailConfigAdminPass,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/email-config"] });
+      setEmailConfigModalVisible(false);
+      setEmailConfigAdminPass("");
+      setEmailConfigGmail("");
+      setEmailConfigAppPass("");
+      Alert.alert("Successo", "Configurazione email aggiornata");
+    } catch (error: any) {
+      Alert.alert("Errore", error.message || "Password admin non corretta o errore durante il salvataggio");
+    } finally {
+      setIsSavingEmailConfig(false);
+    }
+  }
 
   const { data: paypalData } = useQuery<{ email: string }>({
     queryKey: ["/api/settings/paypal"],
@@ -517,6 +556,116 @@ export default function AdminSettings() {
         </Text>
       </View>
 
+      <View style={styles.emailSmtpCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="send" size={20} color="#4285F4" />
+            <Text style={styles.synecoLabel}>Email SMTP (Gmail)</Text>
+            <TouchableOpacity
+              onPress={() => Alert.alert(
+                "Configurazione Email SMTP",
+                "Per inviare email dall'app (verifica email, notifiche) serve un account Gmail configurato.\n\n" +
+                "Come configurare:\n" +
+                "1. Crea un account Gmail dedicato\n" +
+                "2. Vai su myaccount.google.com → Sicurezza\n" +
+                "3. Attiva la verifica in due passaggi\n" +
+                "4. Vai su 'Password per le app'\n" +
+                "5. Crea una nuova password per 'Posta'\n" +
+                "6. Inserisci qui l'indirizzo Gmail e la password generata\n\n" +
+                "La modifica richiede la password admin per sicurezza."
+              )}
+              style={{ marginLeft: 6 }}
+            >
+              <Ionicons name="information-circle-outline" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 10, gap: 8 }}>
+          <View style={{
+            width: 10, height: 10, borderRadius: 5,
+            backgroundColor: emailConfigData?.configured ? "#4CAF50" : "#F44336",
+          }} />
+          <Text style={styles.synecoDesc}>
+            {emailConfigData?.configured
+              ? `Configurato: ${emailConfigData.maskedEmail}`
+              : "Non configurato — le email non verranno inviate"}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={[styles.saveBtn, { marginTop: 12, flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start" }]}
+          onPress={() => setEmailConfigModalVisible(true)}
+        >
+          <Ionicons name="lock-closed" size={16} color={Colors.background} />
+          <Text style={styles.saveBtnText}>Modifica</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Modal
+        visible={emailConfigModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEmailConfigModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Configura Email SMTP</Text>
+            <Text style={styles.modalSubtitle}>Inserisci la password admin per sbloccare la modifica</Text>
+
+            <Text style={styles.modalFieldLabel}>Password Admin</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="La tua password admin"
+              placeholderTextColor={Colors.textSecondary}
+              value={emailConfigAdminPass}
+              onChangeText={setEmailConfigAdminPass}
+              secureTextEntry
+            />
+
+            <Text style={styles.modalFieldLabel}>Indirizzo Gmail</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder={emailConfigData?.maskedEmail || "esempio@gmail.com"}
+              placeholderTextColor={Colors.textSecondary}
+              value={emailConfigGmail}
+              onChangeText={setEmailConfigGmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            <Text style={styles.modalFieldLabel}>Password per le App</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="xxxx xxxx xxxx xxxx"
+              placeholderTextColor={Colors.textSecondary}
+              value={emailConfigAppPass}
+              onChangeText={setEmailConfigAppPass}
+              secureTextEntry
+            />
+
+            <View style={styles.editActions}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => {
+                  setEmailConfigModalVisible(false);
+                  setEmailConfigAdminPass("");
+                  setEmailConfigGmail("");
+                  setEmailConfigAppPass("");
+                }}
+              >
+                <Text style={styles.cancelBtnText}>Annulla</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.saveBtn}
+                onPress={handleSaveEmailConfig}
+                disabled={isSavingEmailConfig}
+              >
+                <Text style={styles.saveBtnText}>{isSavingEmailConfig ? "..." : "Salva"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {isLoading ? (
         <Text style={styles.loadingText}>Caricamento...</Text>
       ) : (
@@ -704,5 +853,30 @@ const styles = StyleSheet.create({
   paypalCard: {
     backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginTop: 16,
     borderWidth: 1, borderColor: "#003087",
+  },
+  emailSmtpCard: {
+    backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 16,
+    borderWidth: 1, borderColor: "#4285F4",
+  },
+  modalOverlay: {
+    flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center", padding: 20,
+  },
+  modalContent: {
+    backgroundColor: Colors.surface, borderRadius: 16, padding: 24, width: "100%", maxWidth: 400,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  modalTitle: {
+    fontFamily: "Inter_700Bold", fontSize: 18, color: Colors.text, marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, marginBottom: 20,
+  },
+  modalFieldLabel: {
+    fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.text, marginBottom: 6, marginTop: 12,
+  },
+  modalInput: {
+    backgroundColor: Colors.background, borderRadius: 10, padding: 12,
+    fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.text,
+    borderWidth: 1, borderColor: Colors.border,
   },
 });
