@@ -542,7 +542,7 @@ export default function MapScreen() {
             filterBiker={filterBiker}
             filterZavorrina={filterZavorrina}
             filterCoppia={filterCoppia}
-            filterBarTopOffset={Platform.OS === "web" ? 12 : insets.top + 4}
+            filterBarTopOffset={Platform.OS === "web" ? 67 : insets.top}
             onToggleFilterBiker={() => setFilterBiker((p) => !p)}
             onToggleFilterZavorrina={() => setFilterZavorrina((p) => !p)}
             onToggleFilterCoppia={() => setFilterCoppia((p) => !p)}
@@ -552,7 +552,7 @@ export default function MapScreen() {
           <Pressable style={[styles.closeBtn, { top: Platform.OS === "web" ? 12 : insets.top + 4 }]} onPress={() => setMapFullscreen(false)}>
             <Ionicons name="close" size={28} color="#fff" />
           </Pressable>
-          <View style={[styles.fullscreenBottomStats, { bottom: Platform.OS === "web" ? 110 : 100 }]}>
+          <View style={[styles.fullscreenBottomStats, { bottom: Platform.OS === "web" ? 44 : 24 }]}>
             <View style={styles.statsChip}>
               <MaterialCommunityIcons name="motorbike" size={14} color={Colors.maleIcon} />
               <Text style={styles.statsChipText}>{bikerCount}</Text>
