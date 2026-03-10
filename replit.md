@@ -204,7 +204,7 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - **T013**: Rate limiting: login (5/15min), registrazione (3/h), recupero password (3/h) con `express-rate-limit`
 
 ### Fix & Miglioramenti
-- **T001**: Web blank page fix (`--base-url /web` nel build)
+- **T001**: Web blank page fix (serve web export files from root with `{ index: false }` so absolute asset paths like `/_expo/...` resolve correctly)
 - **T002**: Heartbeat middleware (aggiorna `lastLoginAt` ogni 5 min per utenti autenticati)
 - **T003**: Server build format `--format=cjs` (fix warning Node.js ESM)
 - **T006**: Suono notifica nuovi messaggi (migrato da `expo-av` deprecato a `expo-audio`)

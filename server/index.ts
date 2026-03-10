@@ -208,6 +208,7 @@ function configureExpoAndLanding(app: express.Application) {
 
   const webBuildDir = path.resolve(process.cwd(), "static-build", "web");
   app.use("/web", express.static(webBuildDir));
+  app.use(express.static(webBuildDir, { index: false }));
   app.use("/web", (_req: Request, res: Response) => {
     const indexPath = path.join(webBuildDir, "index.html");
     if (fs.existsSync(indexPath)) {
