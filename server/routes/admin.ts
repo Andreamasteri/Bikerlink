@@ -988,7 +988,7 @@ router.get("/users/:id/stats", async (req: Request, res: Response) => {
 
     const [proposalsResult, conversationsResult, messagesResult, adClicksResult, reportsResult, motorcyclesResult] = await Promise.all([
       pool.query(
-        `SELECT COUNT(*)::int as count FROM proposals WHERE creator_id = $1`,
+        `SELECT COUNT(*)::int as count FROM proposals WHERE user_id = $1`,
         [userId]
       ),
       pool.query(
