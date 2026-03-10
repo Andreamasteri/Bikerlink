@@ -542,17 +542,31 @@ export default function MapScreen() {
             filterBiker={filterBiker}
             filterZavorrina={filterZavorrina}
             filterCoppia={filterCoppia}
-            filterBarTopOffset={Platform.OS === "web" ? 76 : insets.top + 56}
+            filterBarTopOffset={Platform.OS === "web" ? 48 : insets.top + 40}
             onToggleFilterBiker={() => setFilterBiker((p) => !p)}
             onToggleFilterZavorrina={() => setFilterZavorrina((p) => !p)}
             onToggleFilterCoppia={() => setFilterCoppia((p) => !p)}
             onUserPress={handleUserPress}
             onEasterEggPress={handleEasterEggPress}
           />
-          <Pressable style={[styles.closeBtn, { top: Platform.OS === "web" ? 20 : insets.top + 8 }]} onPress={() => setMapFullscreen(false)}>
+          <Pressable style={[styles.closeBtn, { top: Platform.OS === "web" ? 12 : insets.top + 4 }]} onPress={() => setMapFullscreen(false)}>
             <Ionicons name="close" size={28} color="#fff" />
           </Pressable>
-          <View style={[styles.fullscreenSearchContainer, { top: Platform.OS === "web" ? 20 : insets.top + 8 }]}>
+          <View style={[styles.fullscreenOverlay, { top: Platform.OS === "web" ? 12 : insets.top + 4 }]}>
+            <View style={styles.statsChip}>
+              <MaterialCommunityIcons name="motorbike" size={14} color={Colors.maleIcon} />
+              <Text style={styles.statsChipText}>{bikerCount}</Text>
+            </View>
+            <View style={styles.statsChip}>
+              <MaterialCommunityIcons name="seat-passenger" size={14} color={Colors.femaleIcon} />
+              <Text style={styles.statsChipText}>{zavCount}</Text>
+            </View>
+            <View style={styles.statsChip}>
+              <Ionicons name="radio-button-on" size={12} color={Colors.success} />
+              <Text style={styles.statsChipText}>{onlineCount}</Text>
+            </View>
+          </View>
+          <View style={[styles.fullscreenSearchContainer, { top: Platform.OS === "web" ? 92 : insets.top + 80 }]}>
             <View style={styles.fullscreenSearchRow}>
               <Ionicons name="search" size={18} color={Colors.textSecondary} style={{ marginRight: 8 }} />
               <TextInput
@@ -589,18 +603,6 @@ export default function MapScreen() {
                     ))}
                   </ScrollView>
                 )}
-              </View>
-            )}
-          </View>
-          <View style={[styles.fullscreenOverlay, { top: Platform.OS === "web" ? 20 : insets.top + 8 }]}>
-            <View style={styles.statsChip}>
-              <Ionicons name="people" size={14} color={Colors.maleIcon} />
-              <Text style={styles.statsChipText}>{nearbyUsersList.length} vicini</Text>
-            </View>
-            {workshopsList.length > 0 && (
-              <View style={styles.statsChip}>
-                <Ionicons name="construct" size={14} color={synecoVisible ? Colors.syneco : Colors.textSecondary} />
-                <Text style={styles.statsChipText}>{workshopsList.length} officine</Text>
               </View>
             )}
           </View>
@@ -1074,9 +1076,12 @@ const styles = StyleSheet.create({
   },
   fullscreenOverlay: {
     position: "absolute",
-    left: 16,
+    left: 56,
+    right: 56,
     flexDirection: "row",
+    justifyContent: "center",
     gap: 8,
+    zIndex: 20,
   },
   statsChip: {
     flexDirection: "row",
