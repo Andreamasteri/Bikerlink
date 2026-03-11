@@ -102,6 +102,7 @@ var init_schema = __esm({
       deletionScheduledFor: (0, import_pg_core.timestamp)("deletion_scheduled_for"),
       invitationCode: (0, import_pg_core.varchar)("invitation_code", { length: 50 }),
       isFake: (0, import_pg_core.boolean)("is_fake").notNull().default(false),
+      isPrimal: (0, import_pg_core.boolean)("is_primal").notNull().default(false),
       lastLoginAt: (0, import_pg_core.timestamp)("last_login_at"),
       createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow(),
       updatedAt: (0, import_pg_core.timestamp)("updated_at").notNull().defaultNow()
@@ -806,6 +807,9 @@ var DatabaseStorage = class {
     const convIds = participantRows.map((p) => p.conversationId);
     return db.select().from(conversations).where((0, import_drizzle_orm2.inArray)(conversations.id, convIds)).orderBy((0, import_drizzle_orm2.desc)(conversations.updatedAt));
   }
+  async getAllConversations() {
+    return db.select().from(conversations).orderBy((0, import_drizzle_orm2.desc)(conversations.updatedAt));
+  }
   async getConversation(id) {
     const [conv] = await db.select().from(conversations).where((0, import_drizzle_orm2.eq)(conversations.id, id)).limit(1);
     return conv;
@@ -1086,6 +1090,10 @@ var DatabaseStorage = class {
     return result[0]?.count ?? 0;
   }
   async countActiveUsers(since) {
+    const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(users).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.status, "active"), (0, import_drizzle_orm2.eq)(users.isFake, false), (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)));
+    return result[0]?.count ?? 0;
+  }
+  async countOnlineUsers(since) {
     const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(users).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.status, "active"), (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)));
     return result[0]?.count ?? 0;
   }
@@ -1291,6 +1299,31 @@ var DatabaseStorage = class {
     ).limit(1);
     return match;
   }
+  async getAllExistingBikerZavarrinaMatchKeys() {
+    const rows = await db.select({
+      bikerId: bikerZavarrinaMatches.bikerId,
+      zavarrinaId: bikerZavarrinaMatches.zavarrinaId,
+      bikerMotorcycleId: bikerZavarrinaMatches.bikerMotorcycleId,
+      wishlistMotoId: bikerZavarrinaMatches.wishlistMotoId
+    }).from(bikerZavarrinaMatches);
+    const keys = /* @__PURE__ */ new Set();
+    for (const r of rows) {
+      keys.add(`${r.bikerId}:${r.zavarrinaId}:${r.bikerMotorcycleId}:${r.wishlistMotoId}`);
+    }
+    return keys;
+  }
+  async getAllExistingProposalMatchKeys() {
+    const rows = await db.select({
+      proposalId1: proposalMatches.proposalId1,
+      proposalId2: proposalMatches.proposalId2
+    }).from(proposalMatches);
+    const keys = /* @__PURE__ */ new Set();
+    for (const r of rows) {
+      keys.add(`${r.proposalId1}:${r.proposalId2}`);
+      keys.add(`${r.proposalId2}:${r.proposalId1}`);
+    }
+    return keys;
+  }
   async countAvailableBikers(since) {
     const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)(
       (0, import_drizzle_orm2.eq)(users.status, "active"),
@@ -1474,6 +1507,92 @@ var import_bcryptjs = __toESM(require("bcryptjs"));
 var import_crypto = __toESM(require("crypto"));
 var import_express_rate_limit = __toESM(require("express-rate-limit"));
 init_schema();
+
+// server/email.ts
+var import_nodemailer = __toESM(require("nodemailer"));
+async function getEmailCredentials() {
+  try {
+    const userSetting = await storage.getAppSetting("gmail_user");
+    const passSetting = await storage.getAppSetting("gmail_app_password");
+    if (userSetting?.value && passSetting?.value) {
+      return { user: userSetting.value, pass: passSetting.value };
+    }
+  } catch (e) {
+  }
+  const user = process.env.GMAIL_USER;
+  const pass = process.env.GMAIL_APP_PASSWORD;
+  if (user && pass) {
+    return { user, pass };
+  }
+  return null;
+}
+async function createTransporter() {
+  const creds = await getEmailCredentials();
+  if (!creds) {
+    console.warn("[EMAIL] Credenziali Gmail non configurate. Email non inviata.");
+    return null;
+  }
+  return import_nodemailer.default.createTransport({
+    service: "gmail",
+    auth: {
+      user: creds.user,
+      pass: creds.pass
+    }
+  });
+}
+async function sendEmail(to, subject, html) {
+  const transporter = await createTransporter();
+  if (!transporter) return false;
+  const creds = await getEmailCredentials();
+  if (!creds) return false;
+  try {
+    await transporter.sendMail({
+      from: `"BikerLink" <${creds.user}>`,
+      to,
+      subject,
+      html
+    });
+    console.log(`[EMAIL] Email inviata a ${to}: ${subject}`);
+    return true;
+  } catch (error) {
+    console.error(`[EMAIL] Errore invio email a ${to}:`, error);
+    return false;
+  }
+}
+async function sendVerificationEmail(to, nickname, token) {
+  const subject = "BikerLink - Codice di verifica email";
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
+      <div style="text-align: center; margin-bottom: 30px;">
+        <h1 style="color: #FF6B35; margin: 0; font-size: 28px;">\u{1F3CD}\uFE0F BikerLink</h1>
+        <p style="color: #888; font-size: 14px; margin-top: 4px;">U'll never ride alone</p>
+      </div>
+
+      <div style="background: #1a1a2e; border-radius: 12px; padding: 30px; color: #fff;">
+        <h2 style="margin-top: 0; font-size: 20px;">Ciao ${nickname}!</h2>
+        <p style="color: #ccc; line-height: 1.6;">
+          Benvenuto su BikerLink! Per completare la registrazione, inserisci il seguente codice di verifica nell'app:
+        </p>
+
+        <div style="background: #FF6B35; border-radius: 8px; padding: 20px; text-align: center; margin: 24px 0;">
+          <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #fff;">${token}</span>
+        </div>
+
+        <p style="color: #999; font-size: 13px; line-height: 1.5;">
+          Il codice scade tra 30 minuti.<br/>
+          Se non hai richiesto questa verifica, ignora questa email.
+        </p>
+      </div>
+
+      <p style="text-align: center; color: #666; font-size: 12px; margin-top: 20px;">
+        \xA9 ${(/* @__PURE__ */ new Date()).getFullYear()} BikerLink \u2014 Tutti i diritti riservati
+      </p>
+    </div>
+  `;
+  return sendEmail(to, subject, html);
+}
+
+// server/routes/auth.ts
 var router = (0, import_express.Router)();
 var loginLimiter = (0, import_express_rate_limit.default)({
   windowMs: 15 * 60 * 1e3,
@@ -1529,6 +1648,8 @@ router.post("/register", registerLimiter, async (req, res) => {
       await storage.incrementInvitationCodeUses(invitation.id);
     }
     const hashedPassword = await import_bcryptjs.default.hash(data.password, 12);
+    const primalSetting = await storage.getAppSetting("primal_user_enabled");
+    const isPrimal = primalSetting?.value === "true";
     const user = await storage.createUser({
       nickname: data.nickname,
       email: data.email,
@@ -1540,18 +1661,43 @@ router.post("/register", registerLimiter, async (req, res) => {
       birthYear: data.birthYear,
       region: data.region,
       eulaAccepted: data.eulaAccepted,
-      invitationCode: data.invitationCode
+      invitationCode: data.invitationCode,
+      isPrimal
     });
     await storage.createUserProfile({ userId: user.id });
     const emailVerifSetting = await storage.getAppSetting("email_verification_enabled");
     const emailVerificationEnabled = emailVerifSetting?.value === "true";
-    if (emailVerificationEnabled) {
+    if (emailVerificationEnabled && !isPrimal) {
       const token = import_crypto.default.randomBytes(3).toString("hex").toUpperCase();
       const expiresAt = new Date(Date.now() + 30 * 60 * 1e3);
       await storage.createEmailVerificationToken(user.id, token, expiresAt);
       console.log(`[EMAIL VERIFICATION] User: ${user.email}, Token: ${token}`);
+      const emailSent = await sendVerificationEmail(user.email, user.nickname, token);
+      if (emailSent) {
+        console.log(`[EMAIL VERIFICATION] Email inviata a ${user.email}`);
+      } else {
+        console.warn(`[EMAIL VERIFICATION] Email NON inviata a ${user.email} - fallback notifica admin`);
+      }
+      try {
+        const adminUser = await storage.getUserByNickname("admin");
+        if (adminUser) {
+          await storage.createNotification({
+            userId: adminUser.id,
+            title: "Nuova registrazione - Verifica Email",
+            body: `L'utente ${user.nickname} (${user.email}) si \xE8 registrato. Codice verifica: ${token}${emailSent ? " (email inviata)" : " (email NON inviata - SMTP non configurato)"}`,
+            notificationType: "system",
+            referenceType: "user",
+            referenceId: user.id
+          });
+        }
+      } catch (e) {
+        console.error("Failed to notify admin about email verification:", e);
+      }
       const { password: _2, ...safeUser2 } = user;
       return res.status(201).json({ ...safeUser2, requiresEmailVerification: true });
+    }
+    if (isPrimal) {
+      await storage.markUserEmailVerified(user.id);
     }
     req.session.userId = user.id;
     const { password: _, ...safeUser } = user;
@@ -1578,11 +1724,17 @@ router.post("/login", loginLimiter, async (req, res) => {
     if (user.status === "blocked" || user.status === "suspended") {
       return res.status(403).json({ message: "Account sospeso o bloccato" });
     }
+    const emailVerifSetting = await storage.getAppSetting("email_verification_enabled");
+    if (emailVerifSetting?.value === "true" && !user.emailVerified && !user.isPrimal && user.role !== "admin") {
+      return res.status(403).json({ message: "Verifica la tua email prima di accedere. Controlla la tua casella di posta." });
+    }
     const validPassword = await import_bcryptjs.default.compare(password, user.password);
     if (!validPassword) {
       return res.status(401).json({ message: "Credenziali non valide" });
     }
     await storage.updateUser(user.id, { lastLoginAt: /* @__PURE__ */ new Date() });
+    await storage.updateUserProfile(user.id, { isAvailable: true }).catch(() => {
+    });
     req.session.userId = user.id;
     const { password: _, ...safeUser } = user;
     return res.json(safeUser);
@@ -1717,6 +1869,10 @@ router.post("/resend-verification", async (req, res) => {
     const expiresAt = new Date(Date.now() + 30 * 60 * 1e3);
     await storage.createEmailVerificationToken(user.id, token, expiresAt);
     console.log(`[EMAIL VERIFICATION] User: ${user.email}, Token: ${token}`);
+    const emailSent = await sendVerificationEmail(user.email, user.nickname, token);
+    if (!emailSent) {
+      console.warn(`[EMAIL VERIFICATION] Resend: email NON inviata a ${user.email}`);
+    }
     return res.json({ message: "Nuovo codice inviato" });
   } catch (error) {
     console.error("Resend verification error:", error);
@@ -1970,7 +2126,7 @@ router2.get("/:id/public", requireAuth, async (req, res) => {
 router2.get("/online-count", requireAuth, async (req, res) => {
   try {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
-    const count = await storage.countActiveUsers(fifteenMinutesAgo);
+    const count = await storage.countOnlineUsers(fifteenMinutesAgo);
     return res.json({ count });
   } catch (error) {
     console.error("Online count error:", error);
@@ -3610,6 +3766,10 @@ var import_express10 = require("express");
 var router10 = (0, import_express10.Router)();
 router10.get("/active", async (req, res) => {
   try {
+    const adsSetting = await storage.getAppSetting("ads_enabled");
+    if (adsSetting?.value === "false") {
+      return res.json([]);
+    }
     const campaigns = await storage.getActiveCampaigns();
     const now = /* @__PURE__ */ new Date();
     const activeCampaigns = campaigns.filter((c) => {
@@ -3628,6 +3788,10 @@ router10.get("/active", async (req, res) => {
 });
 router10.get("/my-ads", async (req, res) => {
   try {
+    const adsSetting = await storage.getAppSetting("ads_enabled");
+    if (adsSetting?.value === "false") {
+      return res.json([]);
+    }
     const userId = req.session?.userId;
     if (!userId) {
       return res.status(401).json({ message: "Non autenticato" });
@@ -4025,7 +4189,7 @@ router11.get("/conversations", async (req, res) => {
           })
         );
         const myParticipant = participants.find((p) => p.userId === userId);
-        const unreadCount = lastMessage && myParticipant?.lastReadAt ? new Date(lastMessage.createdAt) > new Date(myParticipant.lastReadAt) ? 1 : 0 : lastMessage ? 1 : 0;
+        const unreadCount = lastMessage && lastMessage.senderId !== userId ? myParticipant?.lastReadAt ? new Date(lastMessage.createdAt) > new Date(myParticipant.lastReadAt) ? 1 : 0 : 1 : 0;
         return {
           ...conv,
           participants: participantUsers.filter(Boolean),
@@ -4638,6 +4802,28 @@ router16.put("/users/:id/password", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
+router16.put("/users/:id/primal", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { isPrimal } = req.body;
+    const user = await storage.updateUser(id, { isPrimal: !!isPrimal });
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId,
+      action: isPrimal ? "assign_primal" : "remove_primal",
+      targetType: "user",
+      targetId: id,
+      details: `Primal ${isPrimal ? "assegnato" : "rimosso"} a ${user.nickname}`
+    });
+    const { password: _pw, ...safeUser } = user;
+    return res.json(safeUser);
+  } catch (error) {
+    console.error("Admin toggle primal error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
 router16.delete("/users/:id", async (req, res) => {
   try {
     const id = req.params.id;
@@ -4978,8 +5164,9 @@ router16.get("/analytics", async (_req, res) => {
     const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const totalUsersResult = await pool2.query("SELECT count(*)::int as count FROM users WHERE is_fake = false");
     const totalUsers = totalUsersResult.rows[0]?.count ?? 0;
-    const [activeUsersMonth, activeUsersWeek, workshopContacts2, campaigns, pendingReports] = await Promise.all([
-      storage.countActiveUsers(thirtyDaysAgo),
+    const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1e3);
+    const [onlineUsersNow, activeUsersWeek, workshopContacts2, campaigns, pendingReports] = await Promise.all([
+      storage.countActiveUsers(fifteenMinutesAgo),
       storage.countActiveUsers(sevenDaysAgo),
       storage.getWorkshopContactsByPeriod(thirtyDaysAgo, now),
       storage.getAllCampaigns(),
@@ -4988,7 +5175,7 @@ router16.get("/analytics", async (_req, res) => {
     const totalAdClicks = campaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
     return res.json({
       totalUsers,
-      activeUsersMonth,
+      onlineUsersNow,
       activeUsersWeek,
       workshopContactsMonth: workshopContacts2.length,
       totalAdClicks,
@@ -5056,6 +5243,20 @@ router16.get("/analytics/active-users", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
+router16.get("/analytics/online-now", async (_req, res) => {
+  try {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
+    const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const result = await pool2.query(
+      `SELECT id, nickname, user_type as "userType", last_login_at as "lastLoginAt" FROM users WHERE is_fake = false AND status = 'active' AND last_login_at >= $1 ORDER BY last_login_at DESC`,
+      [fifteenMinutesAgo]
+    );
+    return res.json(result.rows);
+  } catch (error) {
+    console.error("Admin analytics online-now error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
 router16.get("/analytics/ad-clicks", async (_req, res) => {
   try {
     const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
@@ -5096,6 +5297,98 @@ router16.get("/settings", async (_req, res) => {
     return res.json(settings);
   } catch (error) {
     console.error("Admin get settings error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router16.get("/settings/email-config", async (_req, res) => {
+  try {
+    const userSetting = await storage.getAppSetting("gmail_user");
+    const gmailUser = userSetting?.value || "";
+    let masked = "";
+    if (gmailUser) {
+      const [local, domain] = gmailUser.split("@");
+      if (local && domain) {
+        masked = local.substring(0, 3) + "***@" + domain;
+      } else {
+        masked = gmailUser.substring(0, 3) + "***";
+      }
+    }
+    const passSetting = await storage.getAppSetting("gmail_app_password");
+    const configured = !!(gmailUser && passSetting?.value);
+    return res.json({ configured, maskedEmail: masked });
+  } catch (error) {
+    console.error("Get email config error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router16.put("/settings/email-config", async (req, res) => {
+  try {
+    const { gmailUser, gmailAppPassword, adminPassword } = req.body;
+    if (!adminPassword) {
+      return res.status(400).json({ message: "Password admin richiesta" });
+    }
+    const admin = req.currentUser;
+    if (!admin) {
+      return res.status(401).json({ message: "Non autenticato" });
+    }
+    const validPassword = await import_bcryptjs2.default.compare(adminPassword, admin.password);
+    if (!validPassword) {
+      return res.status(403).json({ message: "Password admin non corretta" });
+    }
+    if (gmailUser) {
+      await storage.upsertAppSetting("gmail_user", gmailUser);
+    }
+    if (gmailAppPassword) {
+      await storage.upsertAppSetting("gmail_app_password", gmailAppPassword);
+    }
+    return res.json({ message: "Configurazione email aggiornata" });
+  } catch (error) {
+    console.error("Update email config error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router16.post("/migrate/verify-real-users", async (_req, res) => {
+  try {
+    const allUsers = await storage.getAllUsers();
+    const realUsers = allUsers.filter((u) => !u.isFake && !u.emailVerified);
+    for (const user of realUsers) {
+      await storage.markUserEmailVerified(user.id);
+    }
+    return res.json({ message: `${realUsers.length} utenti reali marcati come verificati` });
+  } catch (error) {
+    console.error("Migrate verify real users error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router16.put("/settings/toggle-protected", async (req, res) => {
+  try {
+    const { key, value, adminPassword } = req.body;
+    const allowedKeys = ["email_verification_enabled", "ads_enabled", "syneco_branding_visible"];
+    if (!allowedKeys.includes(key)) {
+      return res.status(400).json({ message: "Chiave non valida" });
+    }
+    if (!adminPassword) {
+      return res.status(400).json({ message: "Password admin richiesta" });
+    }
+    const admin = await storage.getUser(req.session.userId);
+    if (!admin) {
+      return res.status(401).json({ message: "Non autenticato" });
+    }
+    const validPassword = await import_bcryptjs2.default.compare(adminPassword, admin.password);
+    if (!validPassword) {
+      return res.status(403).json({ message: "Password admin non valida" });
+    }
+    const result = await storage.upsertAppSetting(key, value);
+    await storage.createModeratorLog({
+      moderatorId: admin.id,
+      action: "update_setting",
+      targetType: "setting",
+      targetId: key,
+      details: `${key} = ${value}`
+    });
+    return res.json(result);
+  } catch (error) {
+    console.error("Admin toggle-protected error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -5416,6 +5709,87 @@ router16.post("/fake-users", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
+router16.get("/users/:id/stats", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const userResult = await pool2.query(
+      `SELECT u.id, u.nickname, u.email, u.user_type as "userType", u.role, u.status,
+              u.created_at as "createdAt", u.last_login_at as "lastLoginAt",
+              u.is_fake as "isFake", u.is_primal as "isPrimal",
+              up.total_km as "totalKm", up.total_rides as "totalRides",
+              up.is_available as "isAvailable", up.bio,
+              up.latitude, up.longitude
+       FROM users u
+       LEFT JOIN user_profiles up ON up.user_id = u.id
+       WHERE u.id = $1`,
+      [userId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    const user = userResult.rows[0];
+    const [proposalsResult, conversationsResult, messagesResult, adClicksResult, reportsResult, motorcyclesResult] = await Promise.all([
+      pool2.query(
+        `SELECT COUNT(*)::int as count FROM proposals WHERE user_id = $1`,
+        [userId]
+      ),
+      pool2.query(
+        `SELECT COUNT(*)::int as count FROM conversation_participants WHERE user_id = $1`,
+        [userId]
+      ),
+      pool2.query(
+        `SELECT COUNT(*)::int as count FROM messages WHERE sender_id = $1`,
+        [userId]
+      ),
+      pool2.query(
+        `SELECT ac.id, camp.name as "adTitle", ac.created_at as "clickedAt"
+         FROM ad_clicks ac
+         LEFT JOIN ad_campaigns camp ON ac.campaign_id = camp.id
+         WHERE ac.user_id = $1
+         ORDER BY ac.created_at DESC
+         LIMIT 20`,
+        [userId]
+      ),
+      pool2.query(
+        `SELECT COUNT(*)::int as "filed", 
+                (SELECT COUNT(*)::int FROM reports WHERE reported_user_id = $1) as "received"
+         FROM reports WHERE reporter_id = $1`,
+        [userId]
+      ),
+      pool2.query(
+        `SELECT brand, model, year, displacement, motorcycle_type as "motorcycleType", riding_style as "ridingStyle"
+         FROM user_motorcycles WHERE user_id = $1`,
+        [userId]
+      )
+    ]);
+    const loginHistory = await pool2.query(
+      `SELECT ml.action, ml.created_at as "createdAt", m.nickname as "moderatorNickname"
+       FROM moderator_logs ml
+       LEFT JOIN users m ON ml.moderator_id = m.id
+       WHERE ml.target_id = $1
+       ORDER BY ml.created_at DESC
+       LIMIT 20`,
+      [userId]
+    );
+    return res.json({
+      user,
+      stats: {
+        proposalsCreated: proposalsResult.rows[0]?.count ?? 0,
+        conversationsCount: conversationsResult.rows[0]?.count ?? 0,
+        messagesSent: messagesResult.rows[0]?.count ?? 0,
+        reportsFiled: reportsResult.rows[0]?.filed ?? 0,
+        reportsReceived: reportsResult.rows[0]?.received ?? 0
+      },
+      adClicks: adClicksResult.rows,
+      motorcycles: motorcyclesResult.rows,
+      moderatorLogs: loginHistory.rows
+    });
+  } catch (error) {
+    console.error("Admin user stats error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
 router16.put("/fake-users/toggle-all", async (req, res) => {
   try {
     const { enabled } = req.body;
@@ -5510,6 +5884,69 @@ router16.get("/fake-users/conversations/:convId/messages", async (req, res) => {
     return res.json(result);
   } catch (error) {
     console.error("Admin get fake user conversation messages error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router16.get("/chats", async (_req, res) => {
+  try {
+    const allConvs = await storage.getAllConversations();
+    const result = await Promise.all(
+      allConvs.map(async (conv) => {
+        const participants = await storage.getConversationParticipants(conv.id);
+        const participantUsers = await Promise.all(
+          participants.map(async (p) => {
+            const user = await storage.getUser(p.userId);
+            return user ? { id: user.id, nickname: user.nickname, avatarUrl: user.avatarUrl, userType: user.userType, isFake: user.isFake } : null;
+          })
+        );
+        const msgs = await storage.getMessages(conv.id, 1, 0);
+        const lastMessage = msgs[0] || null;
+        return {
+          ...conv,
+          participants: participantUsers.filter(Boolean),
+          lastMessage
+        };
+      })
+    );
+    return res.json(result);
+  } catch (error) {
+    console.error("Admin get chats error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router16.get("/chats/:id/messages", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
+    const conv = await storage.getConversation(id);
+    if (!conv) {
+      return res.status(404).json({ message: "Conversazione non trovata" });
+    }
+    const participants = await storage.getConversationParticipants(id);
+    const participantUsers = await Promise.all(
+      participants.map(async (p) => {
+        const user = await storage.getUser(p.userId);
+        return user ? { id: user.id, nickname: user.nickname, avatarUrl: user.avatarUrl, userType: user.userType, isFake: user.isFake } : null;
+      })
+    );
+    const msgs = await storage.getMessages(id, limit, offset);
+    const messagesWithSender = await Promise.all(
+      msgs.map(async (msg) => {
+        const sender = await storage.getUser(msg.senderId);
+        return {
+          ...msg,
+          sender: sender ? { id: sender.id, nickname: sender.nickname, avatarUrl: sender.avatarUrl, userType: sender.userType, isFake: sender.isFake } : null
+        };
+      })
+    );
+    return res.json({
+      conversation: conv,
+      participants: participantUsers.filter(Boolean),
+      messages: messagesWithSender
+    });
+  } catch (error) {
+    console.error("Admin get chat messages error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -5880,6 +6317,15 @@ async function registerRoutes(app2) {
       res.json({ enabled: false });
     }
   });
+  app2.get("/api/settings/ads-enabled", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("ads_enabled");
+      const enabled = setting?.value !== "false";
+      res.json({ enabled });
+    } catch {
+      res.json({ enabled: true });
+    }
+  });
   app2.get("/api/settings/syneco-branding", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("syneco_branding_visible");
@@ -5914,6 +6360,15 @@ async function registerRoutes(app2) {
       res.json({ enabled });
     } catch {
       res.json({ enabled: true });
+    }
+  });
+  app2.get("/api/settings/primal-user", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("primal_user_enabled");
+      const enabled = setting?.value === "true";
+      res.json({ enabled });
+    } catch {
+      res.json({ enabled: false });
     }
   });
   app2.get("/api/settings/paypal", async (_req, res) => {
@@ -6015,14 +6470,15 @@ function areCompatible(p1, p2) {
 async function runMatching() {
   try {
     const activeProposals = await storage.getActiveProposalsWithLocation();
+    if (activeProposals.length < 2) return 0;
+    const existingKeys = await storage.getAllExistingProposalMatchKeys();
     let matchCount = 0;
     for (let i = 0; i < activeProposals.length; i++) {
       for (let j = i + 1; j < activeProposals.length; j++) {
         const p1 = activeProposals[i];
         const p2 = activeProposals[j];
         if (!areCompatible(p1, p2)) continue;
-        const existing = await storage.findExistingMatch(p1.id, p2.id);
-        if (existing) continue;
+        if (existingKeys.has(`${p1.id}:${p2.id}`)) continue;
         await storage.createProposalMatch({
           proposalId1: p1.id,
           proposalId2: p2.id,
@@ -6032,6 +6488,8 @@ async function runMatching() {
           acceptedByUser1: false,
           acceptedByUser2: false
         });
+        existingKeys.add(`${p1.id}:${p2.id}`);
+        existingKeys.add(`${p2.id}:${p1.id}`);
         matchCount++;
       }
     }
@@ -6046,6 +6504,7 @@ async function runWishlistMatching() {
     const wishlistMotos = await storage.getAllWishlistMotosWithUsers();
     const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
     if (wishlistMotos.length === 0 || bikerMotorcycles.length === 0) return 0;
+    const existingKeys = await storage.getAllExistingBikerZavarrinaMatchKeys();
     let matchCount = 0;
     for (const wm of wishlistMotos) {
       const zavarrinaId = wm.userId;
@@ -6071,8 +6530,8 @@ async function runWishlistMatching() {
           }
         }
         if (!compatible) continue;
-        const existing = await storage.findExistingBikerZavarrinaMatch(bikerId, zavarrinaId, moto.id, wish.id);
-        if (existing) continue;
+        const key = `${bikerId}:${zavarrinaId}:${moto.id}:${wish.id}`;
+        if (existingKeys.has(key)) continue;
         await storage.createMatch({
           bikerId,
           zavarrinaId,
@@ -6080,6 +6539,7 @@ async function runWishlistMatching() {
           wishlistMotoId: wish.id,
           status: "new"
         });
+        existingKeys.add(key);
         matchCount++;
       }
     }
@@ -6104,9 +6564,35 @@ async function runFakeZavorrineRotation() {
     console.error("Fake zavorrine rotation error:", error);
   }
 }
+var BASE_INTERVAL_MS = 60 * 1e3;
+var MAX_INTERVAL_MS = 16 * 60 * 1e3;
+var LOAD_THRESHOLD = 0.85;
+var currentIntervalMs = BASE_INTERVAL_MS;
+var adminNotifiedAt = 0;
+async function notifyAdminOverload(intervalSec, cycleDurationSec) {
+  const now = Date.now();
+  if (now - adminNotifiedAt < 30 * 60 * 1e3) return;
+  try {
+    const adminUser = await storage.getUserByNickname("admin");
+    if (!adminUser) return;
+    await storage.createNotification({
+      userId: adminUser.id,
+      title: "Matching Engine sotto carico",
+      body: `Il ciclo di matching ha impiegato ${cycleDurationSec.toFixed(1)}s. L'intervallo \xE8 stato raddoppiato a ${intervalSec}s. \xC8 tempo di implementare una soluzione per i troppi calcoli!`,
+      notificationType: "system",
+      referenceType: "system",
+      referenceId: "matching-engine"
+    });
+    adminNotifiedAt = now;
+    console.warn(`[Matching] Notifica inviata all'admin: intervallo raddoppiato a ${intervalSec}s`);
+  } catch (err) {
+    console.error("[Matching] Errore invio notifica admin:", err);
+  }
+}
 function startMatchingEngine() {
-  console.log("Matching engine started (60s interval)");
+  console.log(`Matching engine started (${currentIntervalMs / 1e3}s interval)`);
   const run = async () => {
+    const cycleStart = Date.now();
     const expired = await runCleanup();
     if (expired > 0) console.log(`Expired ${expired} proposals`);
     try {
@@ -6125,9 +6611,24 @@ function startMatchingEngine() {
     } else {
       console.log("Auto matching disabled by admin, skipping");
     }
+    const cycleDuration = Date.now() - cycleStart;
+    const loadRatio = cycleDuration / currentIntervalMs;
+    console.log(`[Matching] Ciclo completato in ${(cycleDuration / 1e3).toFixed(1)}s (${(loadRatio * 100).toFixed(0)}% dell'intervallo di ${currentIntervalMs / 1e3}s)`);
+    if (loadRatio > LOAD_THRESHOLD && currentIntervalMs < MAX_INTERVAL_MS) {
+      const oldInterval = currentIntervalMs;
+      currentIntervalMs = Math.min(currentIntervalMs * 2, MAX_INTERVAL_MS);
+      console.warn(`[Matching] CARICO ELEVATO: ciclo ${(cycleDuration / 1e3).toFixed(1)}s > 85% di ${oldInterval / 1e3}s. Intervallo raddoppiato a ${currentIntervalMs / 1e3}s`);
+      await notifyAdminOverload(currentIntervalMs / 1e3, cycleDuration / 1e3);
+    } else if (loadRatio < 0.3 && currentIntervalMs > BASE_INTERVAL_MS) {
+      currentIntervalMs = Math.max(currentIntervalMs / 2, BASE_INTERVAL_MS);
+      console.log(`[Matching] Carico basso: intervallo ridotto a ${currentIntervalMs / 1e3}s`);
+    }
+    scheduleNext();
+  };
+  const scheduleNext = () => {
+    setTimeout(run, currentIntervalMs);
   };
   run();
-  setInterval(run, 60 * 1e3);
   runFakeZavorrineRotation();
   setInterval(runFakeZavorrineRotation, 5 * 60 * 1e3);
   console.log("Fake zavorrine availability rotation started (5min interval)");
@@ -6548,6 +7049,7 @@ function configureExpoAndLanding(app2) {
   app2.use(import_express19.default.static(path5.resolve(process.cwd(), "static-build")));
   const webBuildDir = path5.resolve(process.cwd(), "static-build", "web");
   app2.use("/web", import_express19.default.static(webBuildDir));
+  app2.use(import_express19.default.static(webBuildDir, { index: false }));
   app2.use("/web", (_req, res) => {
     const indexPath = path5.join(webBuildDir, "index.html");
     if (fs5.existsSync(indexPath)) {
@@ -6571,11 +7073,26 @@ function setupErrorHandler(app2) {
   });
 }
 (async () => {
+  app.set("trust proxy", 1);
+  app.get("/healthz", (_req, res) => {
+    res.status(200).send("ok");
+  });
   setupCors(app);
   setupBodyParsing(app);
   setupRequestLogging(app);
   configureExpoAndLanding(app);
   const server = await registerRoutes(app);
+  const webBuildIndex = path5.join(path5.resolve(process.cwd(), "static-build", "web"), "index.html");
+  app.use((req, res, next) => {
+    if (req.method !== "GET" && req.method !== "HEAD") return next();
+    if (req.path.startsWith("/api/")) return next();
+    if (req.path === "/" || req.path === "/manifest" || req.path === "/healthz") return next();
+    if (req.path.match(/\.\w+$/)) return next();
+    if (fs5.existsSync(webBuildIndex)) {
+      return res.sendFile(webBuildIndex);
+    }
+    next();
+  });
   setupErrorHandler(app);
   await autoSeedEssentialUsers();
   await autoSeedFakeUsers();
