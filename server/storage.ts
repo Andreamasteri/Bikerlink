@@ -160,6 +160,7 @@ export interface IStorage {
   deleteExpiredProposals(): Promise<number>;
 
   getConversations(userId: string): Promise<Conversation[]>;
+  getAllConversations(): Promise<Conversation[]>;
   getConversation(id: string): Promise<Conversation | undefined>;
   createConversation(conv: InsertConversation): Promise<Conversation>;
   deleteConversation(id: string): Promise<void>;
@@ -556,6 +557,10 @@ export class DatabaseStorage implements IStorage {
     if (participantRows.length === 0) return [];
     const convIds = participantRows.map((p) => p.conversationId);
     return db.select().from(conversations).where(inArray(conversations.id, convIds)).orderBy(desc(conversations.updatedAt));
+  }
+
+  async getAllConversations(): Promise<Conversation[]> {
+    return db.select().from(conversations).orderBy(desc(conversations.updatedAt));
   }
 
   async getConversation(id: string): Promise<Conversation | undefined> {

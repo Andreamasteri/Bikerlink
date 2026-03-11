@@ -22,6 +22,8 @@ export default function AdminLayout() {
       <Stack.Screen name="settings" options={{ title: "Impostazioni" }} />
       <Stack.Screen name="performance" options={{ title: "Record Performance" }} />
       <Stack.Screen name="fake-users" options={{ title: "Utenti Fake" }} />
+      <Stack.Screen name="chats" options={{ title: "Chat Utenti" }} />
+      <Stack.Screen name="chat-messages/[id]" options={{ title: "Messaggi" }} />
     </Stack>
   );
 }

@@ -1260,4 +1260,81 @@ router.get("/fake-users/conversations/:convId/messages", async (req: Request, re
   }
 });
 
+router.get("/chats", async (_req: Request, res: Response) => {
+  try {
+    const allConvs = await storage.getAllConversations();
+
+    const result = await Promise.all(
+      allConvs.map(async (conv) => {
+        const participants = await storage.getConversationParticipants(conv.id);
+        const participantUsers = await Promise.all(
+          participants.map(async (p) => {
+            const user = await storage.getUser(p.userId);
+            return user
+              ? { id: user.id, nickname: user.nickname, avatarUrl: user.avatarUrl, userType: user.userType, isFake: user.isFake }
+              : null;
+          })
+        );
+        const msgs = await storage.getMessages(conv.id, 1, 0);
+        const lastMessage = msgs[0] || null;
+
+        return {
+          ...conv,
+          participants: participantUsers.filter(Boolean),
+          lastMessage,
+        };
+      })
+    );
+
+    return res.json(result);
+  } catch (error) {
+    console.error("Admin get chats error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/chats/:id/messages", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const conv = await storage.getConversation(id);
+    if (!conv) {
+      return res.status(404).json({ message: "Conversazione non trovata" });
+    }
+
+    const participants = await storage.getConversationParticipants(id);
+    const participantUsers = await Promise.all(
+      participants.map(async (p) => {
+        const user = await storage.getUser(p.userId);
+        return user
+          ? { id: user.id, nickname: user.nickname, avatarUrl: user.avatarUrl, userType: user.userType, isFake: user.isFake }
+          : null;
+      })
+    );
+
+    const msgs = await storage.getMessages(id, limit, offset);
+
+    const messagesWithSender = await Promise.all(
+      msgs.map(async (msg) => {
+        const sender = await storage.getUser(msg.senderId);
+        return {
+          ...msg,
+          sender: sender ? { id: sender.id, nickname: sender.nickname, avatarUrl: sender.avatarUrl, userType: sender.userType, isFake: sender.isFake } : null,
+        };
+      })
+    );
+
+    return res.json({
+      conversation: conv,
+      participants: participantUsers.filter(Boolean),
+      messages: messagesWithSender,
+    });
+  } catch (error) {
+    console.error("Admin get chat messages error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 export default router;
