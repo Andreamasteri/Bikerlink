@@ -561,6 +561,16 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Lingua</Text>
+        <View style={styles.languageBar}>
+          <Pressable style={[styles.languageBtn, styles.languageBtnActive]}>
+            <Text style={styles.languageFlagText}>🇮🇹</Text>
+            <Text style={[styles.languageBtnText, styles.languageBtnTextActive]}>Italiano</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Menu</Text>
         <MenuItem
           icon={profile?.userType === "biker" || profile?.userType === "coppia" ? "build" : "heart"}
@@ -1082,5 +1092,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
     color: "#fff",
+  },
+  languageBar: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  languageBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  languageBtnActive: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent + "15",
+  },
+  languageFlagText: {
+    fontSize: 20,
+  },
+  languageBtnText: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+  },
+  languageBtnTextActive: {
+    color: Colors.accent,
+    fontFamily: "Inter_600SemiBold",
   },
 });
