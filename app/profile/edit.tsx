@@ -24,6 +24,7 @@ const SUPPORTED_LANGUAGES = [
   { code: "it", flag: "\u{1F1EE}\u{1F1F9}", label: "Italiano" },
   { code: "en", flag: "\u{1F1EC}\u{1F1E7}", label: "English" },
   { code: "de", flag: "\u{1F1E9}\u{1F1EA}", label: "Deutsch" },
+  { code: "el", flag: "\u{1F1EC}\u{1F1F7}", label: "\u0395\u03BB\u03BB\u03B7\u03BD\u03B9\u03BA\u03AC" },
   { code: "es", flag: "\u{1F1EA}\u{1F1F8}", label: "Español" },
   { code: "fr", flag: "\u{1F1EB}\u{1F1F7}", label: "Français" },
 ];
@@ -90,7 +91,7 @@ export default function EditProfileScreen() {
   const [birthYear, setBirthYear] = useState("");
   const [bio, setBio] = useState("");
   const [maxPickupDistance, setMaxPickupDistance] = useState("50");
-  const [language, setLanguage] = useState("en");
+  const [language, setLanguage] = useState("it");
   const [showRegionPicker, setShowRegionPicker] = useState(false);
   const [showAddMoto, setShowAddMoto] = useState(params.addMoto === "true");
 
@@ -107,7 +108,7 @@ export default function EditProfileScreen() {
       setPhone(profile.phone ?? "");
       setRegion(profile.region ?? "");
       setBirthYear(profile.birthYear ? String(profile.birthYear) : "");
-      setLanguage(profile.language ?? "en");
+      setLanguage(profile.language ?? "it");
       setBio(profile.profile?.bio ?? "");
       setMaxPickupDistance(
         profile.profile?.maxPickupDistance
@@ -162,7 +163,7 @@ export default function EditProfileScreen() {
     if (birthYear !== String(profile?.birthYear ?? "")) {
       data.birthYear = birthYear ? parseInt(birthYear, 10) : null;
     }
-    if (language !== (profile?.language ?? "en")) data.language = language;
+    if (language !== (profile?.language ?? "it")) data.language = language;
     if (bio !== (profile?.profile?.bio ?? "")) data.bio = bio || null;
     const dist = parseInt(maxPickupDistance, 10);
     if (!isNaN(dist) && dist !== (profile?.profile?.maxPickupDistance ?? 50)) {

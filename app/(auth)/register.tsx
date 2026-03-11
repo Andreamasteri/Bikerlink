@@ -17,7 +17,6 @@ import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getLocales } from "expo-localization";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
@@ -26,22 +25,10 @@ const SUPPORTED_LANGUAGES = [
   { code: "it", flag: "\u{1F1EE}\u{1F1F9}", label: "Italiano" },
   { code: "en", flag: "\u{1F1EC}\u{1F1E7}", label: "English" },
   { code: "de", flag: "\u{1F1E9}\u{1F1EA}", label: "Deutsch" },
+  { code: "el", flag: "\u{1F1EC}\u{1F1F7}", label: "\u0395\u03BB\u03BB\u03B7\u03BD\u03B9\u03BA\u03AC" },
   { code: "es", flag: "\u{1F1EA}\u{1F1F8}", label: "Español" },
   { code: "fr", flag: "\u{1F1EB}\u{1F1F7}", label: "Français" },
 ];
-
-function getDeviceLanguage(): string {
-  try {
-    const locales = getLocales();
-    if (locales && locales.length > 0) {
-      const langCode = locales[0].languageCode?.toLowerCase() || "en";
-      if (SUPPORTED_LANGUAGES.some((l) => l.code === langCode)) {
-        return langCode;
-      }
-    }
-  } catch {}
-  return "en";
-}
 
 const ITALIAN_REGIONS = [
   "Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna",
@@ -151,7 +138,7 @@ export default function RegisterScreen() {
   const [birthYear, setBirthYear] = useState("");
   const [region, setRegion] = useState("");
   const [showRegions, setShowRegions] = useState(false);
-  const [language, setLanguage] = useState(getDeviceLanguage());
+  const [language, setLanguage] = useState("it");
   const [eulaAccepted, setEulaAccepted] = useState(false);
 
   const totalSteps = 4;
