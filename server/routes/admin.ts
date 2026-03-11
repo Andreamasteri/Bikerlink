@@ -760,7 +760,7 @@ router.put("/settings/toggle-protected", async (req: Request, res: Response) => 
       return res.status(403).json({ message: "Password admin non valida" });
     }
 
-    const result = await storage.setAppSetting(key, value);
+    const result = await storage.upsertAppSetting(key, value);
     await storage.createModeratorLog({
       moderatorId: admin.id,
       action: "update_setting",
