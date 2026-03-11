@@ -87,7 +87,7 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
 
-    const allowedUserFields = ["nickname", "phone", "sex", "coupleSexConfig", "birthYear", "region", "avatarUrl"];
+    const allowedUserFields = ["nickname", "phone", "sex", "coupleSexConfig", "birthYear", "region", "avatarUrl", "language"];
     const userUpdate: Record<string, unknown> = {};
     for (const field of allowedUserFields) {
       if (req.body[field] !== undefined) {

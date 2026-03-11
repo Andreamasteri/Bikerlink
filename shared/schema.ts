@@ -37,6 +37,7 @@ export const users = pgTable("users", {
   invitationCode: varchar("invitation_code", { length: 50 }),
   isFake: boolean("is_fake").notNull().default(false),
   isPrimal: boolean("is_primal").notNull().default(false),
+  language: varchar("language", { length: 5 }).notNull().default("en"),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -732,6 +733,7 @@ export const registerSchema = z.object({
     errorMap: () => ({ message: "Devi accettare i termini di utilizzo" }),
   }),
   invitationCode: z.string().optional(),
+  language: z.enum(["it", "en", "de", "es", "fr"]).optional(),
 });
 
 export const loginSchema = z.object({
