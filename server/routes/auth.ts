@@ -94,7 +94,6 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       eulaAccepted: data.eulaAccepted,
       invitationCode: data.invitationCode,
       isPrimal,
-      language: data.language || "it",
     });
 
     await storage.createUserProfile({ userId: user.id });

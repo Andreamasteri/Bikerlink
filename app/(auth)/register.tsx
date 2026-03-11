@@ -21,15 +21,6 @@ import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 
-const SUPPORTED_LANGUAGES = [
-  { code: "it", flag: "\u{1F1EE}\u{1F1F9}", label: "Italiano" },
-  { code: "en", flag: "\u{1F1EC}\u{1F1E7}", label: "English" },
-  { code: "de", flag: "\u{1F1E9}\u{1F1EA}", label: "Deutsch" },
-  { code: "el", flag: "\u{1F1EC}\u{1F1F7}", label: "\u0395\u03BB\u03BB\u03B7\u03BD\u03B9\u03BA\u03AC" },
-  { code: "es", flag: "\u{1F1EA}\u{1F1F8}", label: "Español" },
-  { code: "fr", flag: "\u{1F1EB}\u{1F1F7}", label: "Français" },
-];
-
 const ITALIAN_REGIONS = [
   "Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna",
   "Friuli Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche",
@@ -138,7 +129,6 @@ export default function RegisterScreen() {
   const [birthYear, setBirthYear] = useState("");
   const [region, setRegion] = useState("");
   const [showRegions, setShowRegions] = useState(false);
-  const [language, setLanguage] = useState("it");
   const [eulaAccepted, setEulaAccepted] = useState(false);
 
   const totalSteps = 4;
@@ -229,7 +219,6 @@ export default function RegisterScreen() {
     }
     if (birthYear) data.birthYear = parseInt(birthYear, 10);
     if (region) data.region = region;
-    data.language = language;
 
     registerMutation.mutate(data, {
       onSuccess: (response: any) => {
@@ -532,20 +521,6 @@ export default function RegisterScreen() {
           </ScrollView>
         </View>
       )}
-
-      <Text style={styles.langLabel}>Lingua / Language</Text>
-      <View style={styles.langRow}>
-        {SUPPORTED_LANGUAGES.map((lang) => (
-          <TouchableOpacity
-            key={lang.code}
-            style={[styles.langBtn, language === lang.code && styles.langBtnSelected]}
-            onPress={() => setLanguage(lang.code)}
-          >
-            <Text style={styles.langFlag}>{lang.flag}</Text>
-            <Text style={[styles.langText, language === lang.code && styles.langTextSelected]}>{lang.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
 
       <Modal
         visible={showPrefixModal}
@@ -940,44 +915,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
   },
   regionTextSelected: {
-    color: Colors.accent,
-    fontFamily: "Inter_600SemiBold",
-  },
-  langLabel: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
-    marginTop: 4,
-  },
-  langRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  langBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
-  },
-  langBtnSelected: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.accent + "15",
-  },
-  langFlag: {
-    fontSize: 18,
-  },
-  langText: {
-    fontSize: 14,
-    fontFamily: "Inter_500Medium",
-    color: Colors.textSecondary,
-  },
-  langTextSelected: {
     color: Colors.accent,
     fontFamily: "Inter_600SemiBold",
   },

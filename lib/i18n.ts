@@ -144,8 +144,6 @@ const translations: Record<string, Record<string, string>> = {
   },
 };
 
-export const currentLanguage = "it";
-
 export function t(key: string): string {
-  return translations[currentLanguage]?.[key] ?? key;
+  return translations["it"][key] ?? key;
 }

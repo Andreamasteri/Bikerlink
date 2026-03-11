@@ -20,15 +20,6 @@ import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
-const SUPPORTED_LANGUAGES = [
-  { code: "it", flag: "\u{1F1EE}\u{1F1F9}", label: "Italiano" },
-  { code: "en", flag: "\u{1F1EC}\u{1F1E7}", label: "English" },
-  { code: "de", flag: "\u{1F1E9}\u{1F1EA}", label: "Deutsch" },
-  { code: "el", flag: "\u{1F1EC}\u{1F1F7}", label: "\u0395\u03BB\u03BB\u03B7\u03BD\u03B9\u03BA\u03AC" },
-  { code: "es", flag: "\u{1F1EA}\u{1F1F8}", label: "Español" },
-  { code: "fr", flag: "\u{1F1EB}\u{1F1F7}", label: "Français" },
-];
-
 interface ProfileData {
   id: string;
   nickname: string;
@@ -39,7 +30,6 @@ interface ProfileData {
   coupleSexConfig?: string;
   birthYear?: number;
   region?: string;
-  language?: string;
   avatarUrl?: string;
   profile?: {
     bio?: string;
@@ -91,7 +81,6 @@ export default function EditProfileScreen() {
   const [birthYear, setBirthYear] = useState("");
   const [bio, setBio] = useState("");
   const [maxPickupDistance, setMaxPickupDistance] = useState("50");
-  const [language, setLanguage] = useState("it");
   const [showRegionPicker, setShowRegionPicker] = useState(false);
   const [showAddMoto, setShowAddMoto] = useState(params.addMoto === "true");
 
@@ -108,7 +97,6 @@ export default function EditProfileScreen() {
       setPhone(profile.phone ?? "");
       setRegion(profile.region ?? "");
       setBirthYear(profile.birthYear ? String(profile.birthYear) : "");
-      setLanguage(profile.language ?? "it");
       setBio(profile.profile?.bio ?? "");
       setMaxPickupDistance(
         profile.profile?.maxPickupDistance
@@ -163,7 +151,6 @@ export default function EditProfileScreen() {
     if (birthYear !== String(profile?.birthYear ?? "")) {
       data.birthYear = birthYear ? parseInt(birthYear, 10) : null;
     }
-    if (language !== (profile?.language ?? "it")) data.language = language;
     if (bio !== (profile?.profile?.bio ?? "")) data.bio = bio || null;
     const dist = parseInt(maxPickupDistance, 10);
     if (!isNaN(dist) && dist !== (profile?.profile?.maxPickupDistance ?? 50)) {
@@ -327,22 +314,6 @@ export default function EditProfileScreen() {
                 </ScrollView>
               </View>
             )}
-          </View>
-        </View>
-
-        <View style={styles.fieldGroup}>
-          <Text style={styles.groupTitle}>Lingua / Language</Text>
-          <View style={styles.langRow}>
-            {SUPPORTED_LANGUAGES.map((lang) => (
-              <TouchableOpacity
-                key={lang.code}
-                style={[styles.langBtn, language === lang.code && styles.langBtnSelected]}
-                onPress={() => setLanguage(lang.code)}
-              >
-                <Text style={styles.langFlag}>{lang.flag}</Text>
-                <Text style={[styles.langText, language === lang.code && styles.langTextSelected]}>{lang.label}</Text>
-              </TouchableOpacity>
-            ))}
           </View>
         </View>
 
@@ -623,38 +594,6 @@ const styles = StyleSheet.create({
   pickerItemTextSelected: {
     color: Colors.accent,
     fontWeight: "600" as const,
-  },
-  langRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  langBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
-  },
-  langBtnSelected: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.accent + "15",
-  },
-  langFlag: {
-    fontSize: 18,
-  },
-  langText: {
-    fontSize: 14,
-    fontFamily: "Inter_500Medium",
-    color: Colors.textSecondary,
-  },
-  langTextSelected: {
-    color: Colors.accent,
-    fontFamily: "Inter_600SemiBold",
   },
   addMotoForm: {
     backgroundColor: Colors.surface,

@@ -11,7 +11,7 @@ Sponsor: Syneco Lubrificanti
 - **Database**: PostgreSQL con Drizzle ORM
 - **State Management**: React Query (@tanstack/react-query) + React Context
 - **Object Storage**: Replit Object Storage per foto utenti
-- **Lingua**: Selettore lingua utente (IT, EN, DE, ES, FR) — salva preferenza nel DB, auto-rileva lingua dispositivo. Traduzioni UI non ancora implementate (solo infrastruttura). I18n base via `lib/i18n.ts`.
+- **Lingua**: Italiano (i18n predisposta per EN/DE via `lib/i18n.ts`)
 
 ## Struttura Progetto
 
