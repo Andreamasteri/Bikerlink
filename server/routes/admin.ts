@@ -738,6 +738,44 @@ router.post("/migrate/verify-real-users", async (_req: Request, res: Response) =
   }
 });
 
+router.put("/settings/toggle-protected", async (req: Request, res: Response) => {
+  try {
+    const { key, value, adminPassword } = req.body;
+    const allowedKeys = ["email_verification_enabled", "ads_enabled", "syneco_branding_visible"];
+
+    if (!allowedKeys.includes(key)) {
+      return res.status(400).json({ message: "Chiave non valida" });
+    }
+    if (!adminPassword) {
+      return res.status(400).json({ message: "Password admin richiesta" });
+    }
+
+    const admin = await storage.getUser(req.session.userId!);
+    if (!admin) {
+      return res.status(401).json({ message: "Non autenticato" });
+    }
+
+    const validPassword = await bcrypt.compare(adminPassword, admin.password);
+    if (!validPassword) {
+      return res.status(403).json({ message: "Password admin non valida" });
+    }
+
+    const result = await storage.setAppSetting(key, value);
+    await storage.createModeratorLog({
+      moderatorId: admin.id,
+      action: "update_setting",
+      targetType: "setting",
+      targetId: key,
+      details: `${key} = ${value}`,
+    } as any);
+
+    return res.json(result);
+  } catch (error) {
+    console.error("Admin toggle-protected error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/settings/:key", async (req: Request, res: Response) => {
   try {
     const key = req.params.key as string;

@@ -171,7 +171,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     }
 
     const emailVerifSetting = await storage.getAppSetting("email_verification_enabled");
-    if (emailVerifSetting?.value === "true" && !user.emailVerified && !user.isPrimal) {
+    if (emailVerifSetting?.value === "true" && !user.emailVerified && !user.isPrimal && user.role !== "admin") {
       return res.status(403).json({ message: "Verifica la tua email prima di accedere. Controlla la tua casella di posta." });
     }
 

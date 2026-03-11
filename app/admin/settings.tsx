@@ -29,6 +29,8 @@ export default function AdminSettings() {
   const insets = useSafeAreaInsets();
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [protectedToggle, setProtectedToggle] = useState<{ key: string; value: boolean; label: string } | null>(null);
+  const [protectedPassword, setProtectedPassword] = useState("");
 
   const { data: settings = [], isLoading } = useQuery<AppSetting[]>({
     queryKey: ["/api/admin/settings"],
@@ -64,22 +66,32 @@ export default function AdminSettings() {
   });
   const customRoutesEnabled = customRoutesData?.enabled !== false;
 
-  const emailVerifMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
+  const protectedToggleMutation = useMutation({
+    mutationFn: async ({ key, value, adminPassword }: { key: string; value: string; adminPassword: string }) => {
       const baseUrl = getApiUrl();
-      const url = new URL("/api/admin/settings/email_verification_enabled", baseUrl);
+      const url = new URL("/api/admin/settings/toggle-protected", baseUrl);
       const res = await fetch(url.toString(), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        body: JSON.stringify({ key, value, adminPassword }),
         credentials: "include",
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Errore" }));
+        throw new Error(err.message);
+      }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/email-verification"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/syneco-branding"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/ads-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      setProtectedToggle(null);
+      setProtectedPassword("");
+    },
+    onError: (error: Error) => {
+      Alert.alert("Errore", error.message);
     },
   });
 
@@ -136,44 +148,6 @@ export default function AdminSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/primal-user"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-    },
-  });
-
-  const synecoBrandingMutation = useMutation({
-    mutationFn: async (visible: boolean) => {
-      const baseUrl = getApiUrl();
-      const url = new URL("/api/admin/settings/syneco_branding_visible", baseUrl);
-      const res = await fetch(url.toString(), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value: visible ? "true" : "false" }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/syneco-branding"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-    },
-  });
-
-  const adsEnabledMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const baseUrl = getApiUrl();
-      const url = new URL("/api/admin/settings/ads_enabled", baseUrl);
-      const res = await fetch(url.toString(), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value: enabled ? "true" : "false" }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/ads-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
   });
@@ -414,6 +388,7 @@ export default function AdminSettings() {
   }
 
   return (
+    <>
     <KeyboardAwareScrollViewCompat
       style={styles.container}
       contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}
@@ -473,10 +448,10 @@ export default function AdminSettings() {
           </View>
           <Switch
             value={synecoVisible}
-            onValueChange={(val) => synecoBrandingMutation.mutate(val)}
+            onValueChange={(val) => setProtectedToggle({ key: "syneco_branding_visible", value: val, label: "Branding Syneco" })}
             trackColor={{ false: Colors.border, true: Colors.syneco }}
             thumbColor={synecoVisible ? Colors.text : Colors.textSecondary}
-            disabled={synecoBrandingMutation.isPending}
+            disabled={protectedToggleMutation.isPending}
           />
         </View>
         <Text style={styles.synecoDesc}>
@@ -492,10 +467,10 @@ export default function AdminSettings() {
           </View>
           <Switch
             value={adsEnabled}
-            onValueChange={(val) => adsEnabledMutation.mutate(val)}
+            onValueChange={(val) => setProtectedToggle({ key: "ads_enabled", value: val, label: "Advertisement" })}
             trackColor={{ false: Colors.border, true: Colors.syneco }}
             thumbColor={adsEnabled ? Colors.text : Colors.textSecondary}
-            disabled={adsEnabledMutation.isPending}
+            disabled={protectedToggleMutation.isPending}
           />
         </View>
         <Text style={styles.synecoDesc}>
@@ -526,10 +501,10 @@ export default function AdminSettings() {
           </View>
           <Switch
             value={emailVerifEnabled}
-            onValueChange={(val) => emailVerifMutation.mutate(val)}
+            onValueChange={(val) => setProtectedToggle({ key: "email_verification_enabled", value: val, label: "Verifica Email" })}
             trackColor={{ false: Colors.border, true: Colors.accent }}
             thumbColor={emailVerifEnabled ? Colors.text : Colors.textSecondary}
-            disabled={emailVerifMutation.isPending}
+            disabled={protectedToggleMutation.isPending}
           />
         </View>
         <Text style={styles.synecoDesc}>
@@ -794,6 +769,59 @@ export default function AdminSettings() {
         </View>
       </View>
     </KeyboardAwareScrollViewCompat>
+
+      <Modal
+        visible={!!protectedToggle}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setProtectedToggle(null); setProtectedPassword(""); }}
+      >
+        <View style={styles.protectedOverlay}>
+          <View style={styles.protectedModal}>
+            <Text style={styles.protectedTitle}>Conferma Modifica</Text>
+            <Text style={styles.protectedSubtitle}>
+              {protectedToggle ? `${protectedToggle.value ? "Attivare" : "Disattivare"} "${protectedToggle.label}"` : ""}
+            </Text>
+            <Text style={styles.protectedDesc}>Inserisci la password admin per confermare</Text>
+            <TextInput
+              style={styles.protectedInput}
+              placeholder="Password admin"
+              placeholderTextColor={Colors.textSecondary}
+              secureTextEntry
+              value={protectedPassword}
+              onChangeText={setProtectedPassword}
+              autoFocus
+            />
+            <View style={styles.protectedButtons}>
+              <TouchableOpacity
+                style={styles.protectedCancel}
+                onPress={() => { setProtectedToggle(null); setProtectedPassword(""); }}
+              >
+                <Text style={styles.protectedCancelText}>Annulla</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.protectedConfirm, !protectedPassword && { opacity: 0.5 }]}
+                disabled={!protectedPassword || protectedToggleMutation.isPending}
+                onPress={() => {
+                  if (!protectedToggle) return;
+                  protectedToggleMutation.mutate({
+                    key: protectedToggle.key,
+                    value: protectedToggle.value ? "true" : "false",
+                    adminPassword: protectedPassword,
+                  });
+                }}
+              >
+                {protectedToggleMutation.isPending ? (
+                  <ActivityIndicator color={Colors.background} size="small" />
+                ) : (
+                  <Text style={styles.protectedConfirmText}>Conferma</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -878,5 +906,42 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background, borderRadius: 10, padding: 12,
     fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.text,
     borderWidth: 1, borderColor: Colors.border,
+  },
+  protectedOverlay: {
+    flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", padding: 24,
+  },
+  protectedModal: {
+    backgroundColor: Colors.surface, borderRadius: 16, padding: 24, width: "100%", maxWidth: 360,
+  },
+  protectedTitle: {
+    fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.text, textAlign: "center", marginBottom: 4,
+  },
+  protectedSubtitle: {
+    fontSize: 14, fontFamily: "Inter_600SemiBold", color: Colors.accent, textAlign: "center", marginBottom: 12,
+  },
+  protectedDesc: {
+    fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary, textAlign: "center", marginBottom: 16,
+  },
+  protectedInput: {
+    backgroundColor: Colors.background, borderRadius: 10, padding: 14,
+    fontFamily: "Inter_400Regular", fontSize: 15, color: Colors.text,
+    borderWidth: 1, borderColor: Colors.border, marginBottom: 20,
+  },
+  protectedButtons: {
+    flexDirection: "row", gap: 12,
+  },
+  protectedCancel: {
+    flex: 1, paddingVertical: 14, borderRadius: 10, alignItems: "center",
+    backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border,
+  },
+  protectedCancelText: {
+    fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary,
+  },
+  protectedConfirm: {
+    flex: 1, paddingVertical: 14, borderRadius: 10, alignItems: "center",
+    backgroundColor: Colors.accent,
+  },
+  protectedConfirmText: {
+    fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.background,
   },
 });
