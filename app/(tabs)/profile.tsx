@@ -561,16 +561,6 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Lingua</Text>
-        <View style={styles.languageBar}>
-          <Pressable style={[styles.languageBtn, styles.languageBtnActive]}>
-            <Text style={styles.languageFlagText}>🇮🇹</Text>
-            <Text style={[styles.languageBtnText, styles.languageBtnTextActive]}>Italiano</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Menu</Text>
         <MenuItem
           icon={profile?.userType === "biker" || profile?.userType === "coppia" ? "build" : "heart"}
@@ -591,6 +581,16 @@ export default function ProfileScreen() {
         <MenuItem icon="document-text-outline" label="Privacy Policy" onPress={() => router.push("/privacy-policy" as any)} />
         <MenuItem icon="log-out" label="Logout" onPress={handleLogout} color={Colors.accentRed} />
         <MenuItem icon="trash-outline" label="Elimina account" onPress={handleDeleteAccount} color={Colors.accentRed} />
+      </View>
+
+      <View style={[styles.section, { marginTop: 24 }]}>
+        <Text style={styles.sectionTitle}>Lingua</Text>
+        <View style={styles.languageBar}>
+          <Pressable style={[styles.languageBtn, styles.languageBtnActive]}>
+            <Text style={styles.languageFlagText}>🇮🇹</Text>
+            <Text style={[styles.languageBtnText, styles.languageBtnTextActive]}>Italiano</Text>
+          </Pressable>
+        </View>
       </View>
 
       <Modal visible={showLogoutModal} transparent animationType="fade" onRequestClose={() => setShowLogoutModal(false)}>
