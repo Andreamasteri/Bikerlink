@@ -308,6 +308,8 @@ export default function ReadyToRideScreen() {
                   setCustomRadius(num);
                   if (num) {
                     setSosRadiusKm(parseInt(num, 10));
+                  } else {
+                    setSosRadiusKm(10);
                   }
                 }}
                 keyboardType="numeric"
@@ -319,13 +321,26 @@ export default function ReadyToRideScreen() {
               disabled={!sosReason.trim() || createSosMutation.isPending}
               onPress={() => {
                 const finalRadius = customRadius ? parseInt(customRadius, 10) || 10 : sosRadiusKm;
-                const coords = location || { latitude: 42.5, longitude: 12.5 };
-                createSosMutation.mutate({
-                  reason: sosReason.trim(),
-                  latitude: coords.latitude,
-                  longitude: coords.longitude,
-                  radiusKm: finalRadius,
-                });
+                const sendSos = (coords: { latitude: number; longitude: number }) => {
+                  createSosMutation.mutate({
+                    reason: sosReason.trim(),
+                    latitude: coords.latitude,
+                    longitude: coords.longitude,
+                    radiusKm: finalRadius,
+                  });
+                };
+                if (location) {
+                  sendSos(location);
+                } else {
+                  Alert.alert(
+                    "GPS non disponibile",
+                    "La posizione verrà impostata approssimativamente al centro Italia. Continuare?",
+                    [
+                      { text: "Annulla", style: "cancel" },
+                      { text: "Invia comunque", onPress: () => sendSos({ latitude: 42.5, longitude: 12.5 }) },
+                    ]
+                  );
+                }
               }}
             >
               {createSosMutation.isPending ? (
