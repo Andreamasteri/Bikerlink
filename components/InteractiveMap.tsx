@@ -230,9 +230,9 @@ export default function InteractiveMap({
             <Circle
               center={{ latitude: sos.latitude, longitude: sos.longitude }}
               radius={(sos.radiusKm || 10) * 1000}
-              fillColor="rgba(255, 0, 0, 0.15)"
-              strokeColor="rgba(255, 0, 0, 0.9)"
-              strokeWidth={3}
+              fillColor="rgba(255, 0, 0, 0.30)"
+              strokeColor="rgba(255, 0, 0, 1)"
+              strokeWidth={4}
             />
             <Marker
               coordinate={{ latitude: sos.latitude, longitude: sos.longitude }}

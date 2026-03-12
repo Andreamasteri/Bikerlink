@@ -19,7 +19,7 @@ Sponsor: Syneco Lubrificanti
 app/
   _layout.tsx           # Root layout con auth redirect
   (auth)/               # Login, registrazione, splash screen
-  (tabs)/               # Tab principali: Mappa, Proposte, Chat, Contest, Profilo
+  (tabs)/               # Tab (sx→dx): Mappa, Proposte, Ride!, Match, Pic!, Chat, Profilo
   admin/                # Pannello admin (gestione utenti, officine, ads, easter eggs, analytics)
   moderator/            # Pannello moderatore (approvazione foto)
   chat/[id].tsx         # Schermata chat singola
