@@ -55,6 +55,7 @@ export default function MapScreen() {
   const [adIndex, setAdIndex] = useState(0);
   const [adImageError, setAdImageError] = useState<string | null>(null);
   const [showOfflineOnline, setShowOfflineOnline] = useState(false);
+  const [showSosDetail, setShowSosDetail] = useState(false);
   const [offlineCountdown, setOfflineCountdown] = useState<{ online: number }>({ online: 0 });
   const sosEnabled = useSetting("sosEnabled");
 
@@ -281,6 +282,23 @@ export default function MapScreen() {
     staleTime: 15000,
     refetchInterval: 15000,
     enabled: isAuthenticated && sosEnabled,
+  });
+
+  const acceptSosMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("PUT", `/api/sos/${id}/accept`);
+      return res.json();
+    },
+    onSuccess: (d: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sos/active"] });
+      setShowSosDetail(false);
+      if (d.conversationId) {
+        router.push(`/chat/${d.conversationId}` as any);
+      }
+    },
+    onError: (error: Error) => {
+      Alert.alert("Errore", error.message);
+    },
   });
 
   const myProposalsQuery = useQuery<any[]>({
@@ -831,17 +849,73 @@ export default function MapScreen() {
             )}
           </Pressable>
           {(activeSosQuery.data || []).length > 0 && (
-            <View style={styles.sosOverlay}>
+            <Pressable style={styles.sosOverlay} onPress={() => setShowSosDetail(true)}>
               <View style={styles.sosWarningContainer}>
                 <View style={styles.sosTriangleBorder} />
                 <View style={styles.sosTriangleFill} />
                 <Text style={styles.sosExclamation}>!</Text>
               </View>
-              <Text style={styles.sosOverlayLabel}>SOS ATTIVO</Text>
-            </View>
+              <Text style={styles.sosOverlayLabel}>SOS ATTIVO — Tocca per dettagli</Text>
+            </Pressable>
           )}
         </View>
       )}
+
+      <Modal visible={showSosDetail} transparent animationType="slide" onRequestClose={() => setShowSosDetail(false)}>
+        <Pressable style={styles.detailOverlay} onPress={() => setShowSosDetail(false)}>
+          <Pressable style={styles.sosDetailSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.detailHandle} />
+            <Pressable style={styles.sosDetailClose} onPress={() => setShowSosDetail(false)}>
+              <Ionicons name="close" size={24} color={Colors.textSecondary} />
+            </Pressable>
+            <View style={{ alignItems: "center", marginBottom: 20 }}>
+              <Image source={require("@/assets/images/sos-accept-icon.png")} style={styles.sosDetailIcon} resizeMode="contain" />
+              <Text style={styles.sosDetailTitle}>Richiesta di Soccorso</Text>
+            </View>
+            {(activeSosQuery.data || []).filter((r: any) => r.requesterId !== user?.id).length > 0 ? (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
+                {(activeSosQuery.data || []).filter((r: any) => r.requesterId !== user?.id).map((r: any) => (
+                  <View key={r.id} style={styles.sosDetailCard}>
+                    <View style={styles.sosDetailRow}>
+                      <Ionicons name="person" size={18} color="#003399" />
+                      <Text style={styles.sosDetailName}>{r.requesterNickname}</Text>
+                    </View>
+                    <View style={styles.sosDetailRow}>
+                      <Ionicons name="alert-circle" size={18} color="#CC0000" />
+                      <Text style={styles.sosDetailReason}>{r.reason}</Text>
+                    </View>
+                    <View style={styles.sosDetailRow}>
+                      <Ionicons name="time" size={18} color={Colors.textSecondary} />
+                      <Text style={styles.sosDetailTime}>
+                        {new Date(r.createdAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}
+                        {r.radiusKm ? `  •  Raggio: ${r.radiusKm} km` : ""}
+                      </Text>
+                    </View>
+                    <Pressable
+                      style={[styles.sosDetailAcceptBtn, acceptSosMutation.isPending && { opacity: 0.5 }]}
+                      onPress={() => acceptSosMutation.mutate(r.id)}
+                      disabled={acceptSosMutation.isPending}
+                    >
+                      {acceptSosMutation.isPending ? (
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                      ) : (
+                        <Text style={styles.sosDetailAcceptText}>Accetta richiesta di soccorso</Text>
+                      )}
+                    </Pressable>
+                  </View>
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={{ alignItems: "center", padding: 24 }}>
+                <Ionicons name="checkmark-circle-outline" size={40} color={Colors.textSecondary} />
+                <Text style={{ fontSize: 15, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 8 }}>
+                  Nessuna richiesta di soccorso disponibile
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal visible={!!selectedUser} transparent animationType="slide" onRequestClose={() => setSelectedUser(null)}>
         <Pressable style={styles.detailOverlay} onPress={() => setSelectedUser(null)}>
@@ -1424,7 +1498,75 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   sosOverlayLabel: {
-    fontSize: 18,
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    color: "#FFFFFF",
+  },
+  sosDetailSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 32,
+    maxHeight: "85%",
+  },
+  sosDetailClose: {
+    position: "absolute" as const,
+    top: 16,
+    right: 16,
+    zIndex: 10,
+    padding: 4,
+  },
+  sosDetailIcon: {
+    width: 80,
+    height: 80,
+    tintColor: "#003399",
+    marginBottom: 8,
+  },
+  sosDetailTitle: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    color: "#003399",
+  },
+  sosDetailCard: {
+    backgroundColor: Colors.background,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: "#003399",
+    gap: 10,
+  },
+  sosDetailRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 10,
+  },
+  sosDetailName: {
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
+  sosDetailReason: {
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    color: "#CC0000",
+    flex: 1,
+  },
+  sosDetailTime: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+  },
+  sosDetailAcceptBtn: {
+    backgroundColor: "#003399",
+    padding: 14,
+    borderRadius: 12,
+    alignItems: "center" as const,
+    marginTop: 6,
+  },
+  sosDetailAcceptText: {
+    fontSize: 16,
     fontFamily: "Inter_700Bold",
     color: "#FFFFFF",
   },
