@@ -38,6 +38,7 @@ interface InteractiveMapProps {
   users?: MapUser[];
   workshops?: MapWorkshop[];
   easterEggs?: MapEasterEgg[];
+  activeSosRequests?: any[];
   isAvailable: boolean;
   filterBiker: boolean;
   filterZavorrina: boolean;

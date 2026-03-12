@@ -15,7 +15,7 @@ router.use(requireAuth);
 router.post("/", async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const { reason, latitude, longitude } = req.body;
+    const { reason, latitude, longitude, radiusKm } = req.body;
 
     if (!reason || typeof reason !== "string" || reason.trim().length === 0) {
       return res.status(400).json({ message: "Motivo richiesto" });
@@ -23,6 +23,7 @@ router.post("/", async (req: Request, res: Response) => {
     if (typeof latitude !== "number" || typeof longitude !== "number") {
       return res.status(400).json({ message: "Posizione GPS richiesta" });
     }
+    const radius = typeof radiusKm === "number" && radiusKm > 0 ? radiusKm : 10;
 
     const sosEnabled = await storage.getAppSetting("sos_enabled");
     if (sosEnabled?.value === "false") {
@@ -39,6 +40,7 @@ router.post("/", async (req: Request, res: Response) => {
       reason: reason.trim(),
       latitude,
       longitude,
+      radiusKm: radius,
       status: "active",
     });
 

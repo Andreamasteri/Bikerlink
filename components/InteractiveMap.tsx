@@ -37,10 +37,20 @@ interface MapEasterEgg {
   longitude: number;
 }
 
+interface MapSosRequest {
+  id: string;
+  requesterNickname?: string;
+  reason: string;
+  latitude: number;
+  longitude: number;
+  radiusKm: number;
+}
+
 interface InteractiveMapProps {
   users?: MapUser[];
   workshops?: MapWorkshop[];
   easterEggs?: MapEasterEgg[];
+  activeSosRequests?: MapSosRequest[];
   isAvailable: boolean;
   searchRadiusKm?: number;
   filterBiker: boolean;
@@ -81,6 +91,7 @@ export default function InteractiveMap({
   users = [],
   workshops = [],
   easterEggs = [],
+  activeSosRequests = [],
   isAvailable,
   searchRadiusKm,
   filterBiker,
@@ -213,6 +224,24 @@ export default function InteractiveMap({
             strokeWidth={2}
           />
         )}
+
+        {activeSosRequests.map((sos) => (
+          <React.Fragment key={`sos-${sos.id}`}>
+            <Circle
+              center={{ latitude: sos.latitude, longitude: sos.longitude }}
+              radius={(sos.radiusKm || 10) * 1000}
+              fillColor="rgba(255, 0, 0, 0.15)"
+              strokeColor="rgba(255, 0, 0, 0.9)"
+              strokeWidth={3}
+            />
+            <Marker
+              coordinate={{ latitude: sos.latitude, longitude: sos.longitude }}
+              title={`SOS: ${sos.requesterNickname || "Utente"}`}
+              description={sos.reason}
+              pinColor="#FF0000"
+            />
+          </React.Fragment>
+        ))}
       </MapView>
 
       {locationLoading && (

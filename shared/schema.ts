@@ -726,6 +726,7 @@ export const sosRequests = pgTable("sos_requests", {
   status: varchar("status", { length: 20 }).notNull().default("active"),
   latitude: doublePrecision("latitude").notNull(),
   longitude: doublePrecision("longitude").notNull(),
+  radiusKm: integer("radius_km").notNull().default(10),
   conversationId: varchar("conversation_id", { length: 36 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

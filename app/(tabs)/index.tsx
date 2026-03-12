@@ -59,6 +59,7 @@ export default function MapScreen() {
   const [offlineCountdown, setOfflineCountdown] = useState<{ online: number }>({ online: 0 });
   const [showSosModal, setShowSosModal] = useState(false);
   const [sosReason, setSosReason] = useState("");
+  const [sosRadiusKm, setSosRadiusKm] = useState(10);
   const [showSosListModal, setShowSosListModal] = useState(false);
   const sosEnabled = useSetting("sosEnabled");
 
@@ -295,7 +296,7 @@ export default function MapScreen() {
   });
 
   const createSosMutation = useMutation({
-    mutationFn: async (data: { reason: string; latitude: number; longitude: number }) => {
+    mutationFn: async (data: { reason: string; latitude: number; longitude: number; radiusKm: number }) => {
       const res = await apiRequest("POST", "/api/sos", data);
       return res.json();
     },
@@ -304,6 +305,7 @@ export default function MapScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/sos/active"] });
       setShowSosModal(false);
       setSosReason("");
+      setSosRadiusKm(10);
     },
     onError: (error: Error) => {
       Alert.alert("Errore", error.message);
@@ -583,6 +585,7 @@ export default function MapScreen() {
           users={(nearbyUsersQuery.data ?? []).filter((u: any) => u.latitude != null && u.longitude != null && !isNaN(u.latitude) && !isNaN(u.longitude))}
           workshops={(workshopsQuery.data ?? []).filter((w: any) => w.latitude != null && w.longitude != null && !isNaN(w.latitude) && !isNaN(w.longitude))}
           easterEggs={(easterEggsQuery.data ?? []).filter((e: any) => e.latitude != null && e.longitude != null && !isNaN(e.latitude) && !isNaN(e.longitude))}
+          activeSosRequests={(activeSosQuery.data ?? []).filter((s: any) => s.latitude != null && s.longitude != null)}
           isAvailable={isAvailable}
           searchRadiusKm={mySearchRadius}
           filterBiker={filterBiker}
@@ -605,6 +608,7 @@ export default function MapScreen() {
             users={(nearbyUsersQuery.data ?? []).filter((u: any) => u.latitude != null && u.longitude != null && !isNaN(u.latitude) && !isNaN(u.longitude))}
             workshops={(workshopsQuery.data ?? []).filter((w: any) => w.latitude != null && w.longitude != null && !isNaN(w.latitude) && !isNaN(w.longitude))}
             easterEggs={(easterEggsQuery.data ?? []).filter((e: any) => e.latitude != null && e.longitude != null && !isNaN(e.latitude) && !isNaN(e.longitude))}
+            activeSosRequests={(activeSosQuery.data ?? []).filter((s: any) => s.latitude != null && s.longitude != null)}
             isAvailable={isAvailable}
             searchRadiusKm={mySearchRadius}
             filterBiker={filterBiker}
@@ -757,6 +761,20 @@ export default function MapScreen() {
               multiline
               maxLength={200}
             />
+            <Text style={styles.sosRadiusLabel}>Raggio d'azione</Text>
+            <View style={styles.sosRadiusRow}>
+              {[5, 10, 20, 50].map((km) => (
+                <Pressable
+                  key={km}
+                  style={[styles.sosRadiusChip, sosRadiusKm === km && styles.sosRadiusChipActive]}
+                  onPress={() => setSosRadiusKm(km)}
+                >
+                  <Text style={[styles.sosRadiusChipText, sosRadiusKm === km && styles.sosRadiusChipTextActive]}>
+                    {km} km
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
             <Pressable
               style={[styles.sosSubmitBtn, (!sosReason.trim() || createSosMutation.isPending) && { opacity: 0.5 }]}
               disabled={!sosReason.trim() || createSosMutation.isPending}
@@ -769,6 +787,7 @@ export default function MapScreen() {
                   reason: sosReason.trim(),
                   latitude: location.latitude,
                   longitude: location.longitude,
+                  radiusKm: sosRadiusKm,
                 });
               }}
             >
@@ -809,6 +828,7 @@ export default function MapScreen() {
                       <Text style={styles.sosListReason}>{r.reason}</Text>
                       <Text style={styles.sosListTime}>
                         {new Date(r.createdAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}
+                        {r.radiusKm ? `  •  ${r.radiusKm} km` : ""}
                       </Text>
                     </View>
                     <Pressable
@@ -1602,6 +1622,39 @@ const styles = StyleSheet.create({
     minHeight: 80,
     textAlignVertical: "top" as const,
     marginBottom: 16,
+  },
+  sosRadiusLabel: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  sosRadiusRow: {
+    flexDirection: "row" as const,
+    gap: 8,
+    marginBottom: 16,
+  },
+  sosRadiusChip: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.background,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    alignItems: "center" as const,
+  },
+  sosRadiusChipActive: {
+    backgroundColor: "#FF6600",
+    borderColor: "#FF6600",
+  },
+  sosRadiusChipText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary,
+  },
+  sosRadiusChipTextActive: {
+    color: Colors.background,
   },
   sosSubmitBtn: {
     backgroundColor: "#FF6600",
