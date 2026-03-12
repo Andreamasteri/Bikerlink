@@ -22,6 +22,7 @@ import easterEggRoutes from "./routes/easter-eggs";
 import adminRoutes from "./routes/admin";
 import moderatorRoutes from "./routes/moderator";
 import customRoutesRouter from "./routes/custom-routes";
+import sosRoutes from "./routes/sos";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const PgStore = connectPgSimple(session);
@@ -78,6 +79,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(customRoutesRouter);
   app.use("/api/admin", adminRoutes);
   app.use("/api/moderator", moderatorRoutes);
+  app.use("/api/sos", sosRoutes);
 
   app.get("/api/settings/privacy-policy", async (_req, res) => {
     try {
@@ -129,6 +131,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/sos-enabled", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("sos_enabled");
+      const enabled = setting?.value !== "false";
+      res.json({ enabled });
+    } catch {
+      res.json({ enabled: true });
+    }
+  });
+
   app.get("/api/settings/custom-routes", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("custom_routes_enabled");
@@ -171,13 +183,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/settings/all", async (_req, res) => {
     try {
-      const [syneco, emailVerification, chatbot, autoMatching, customRoutes, paypal] = await Promise.all([
+      const [syneco, emailVerification, chatbot, autoMatching, customRoutes, paypal, sosEnabled] = await Promise.all([
         storage.getAppSetting("syneco_branding_visible"),
         storage.getAppSetting("email_verification_enabled"),
         storage.getAppSetting("chatbot_enabled"),
         storage.getAppSetting("auto_matching_enabled"),
         storage.getAppSetting("custom_routes_enabled"),
         storage.getAppSetting("paypal_email"),
+        storage.getAppSetting("sos_enabled"),
       ]);
       res.json({
         synecoBranding: syneco?.value === "true",
@@ -186,6 +199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         autoMatching: autoMatching?.value !== "false",
         customRoutes: customRoutes?.value !== "false",
         paypalEmail: paypal?.value || "Andreamasteri81@gmail.com",
+        sosEnabled: sosEnabled?.value !== "false",
       });
     } catch {
       res.json({
@@ -195,6 +209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         autoMatching: true,
         customRoutes: true,
         paypalEmail: "Andreamasteri81@gmail.com",
+        sosEnabled: true,
       });
     }
   });

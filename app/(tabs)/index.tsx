@@ -24,7 +24,9 @@ import Colors from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import { useSynecoVisible } from "@/lib/syneco-context";
+import { useSetting } from "@/lib/settings-context";
 import InteractiveMap from "@/components/InteractiveMap";
+import HelmetIcon from "@/components/HelmetIcon";
 import { getRegionCoordinates } from "@/constants/regions";
 
 export default function MapScreen() {
@@ -55,6 +57,10 @@ export default function MapScreen() {
   const [adImageError, setAdImageError] = useState<string | null>(null);
   const [showOfflineOnline, setShowOfflineOnline] = useState(false);
   const [offlineCountdown, setOfflineCountdown] = useState<{ online: number }>({ online: 0 });
+  const [showSosModal, setShowSosModal] = useState(false);
+  const [sosReason, setSosReason] = useState("");
+  const [showSosListModal, setShowSosListModal] = useState(false);
+  const sosEnabled = useSetting("sosEnabled");
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -272,6 +278,68 @@ export default function MapScreen() {
     },
     staleTime: 15000,
     enabled: isAuthenticated && showZavorrinaList,
+  });
+
+  const mySosQuery = useQuery<any>({
+    queryKey: ["/api/sos/my"],
+    staleTime: 10000,
+    refetchInterval: 10000,
+    enabled: isAuthenticated && sosEnabled,
+  });
+
+  const activeSosQuery = useQuery<any[]>({
+    queryKey: ["/api/sos/active"],
+    staleTime: 15000,
+    refetchInterval: 15000,
+    enabled: isAuthenticated && sosEnabled,
+  });
+
+  const createSosMutation = useMutation({
+    mutationFn: async (data: { reason: string; latitude: number; longitude: number }) => {
+      const res = await apiRequest("POST", "/api/sos", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sos/my"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sos/active"] });
+      setShowSosModal(false);
+      setSosReason("");
+    },
+    onError: (error: Error) => {
+      Alert.alert("Errore", error.message);
+    },
+  });
+
+  const cancelSosMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("PUT", `/api/sos/${id}/cancel`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sos/my"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sos/active"] });
+    },
+    onError: (error: Error) => {
+      Alert.alert("Errore", error.message);
+    },
+  });
+
+  const acceptSosMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("PUT", `/api/sos/${id}/accept`);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sos/my"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sos/active"] });
+      setShowSosListModal(false);
+      if (data.conversationId) {
+        router.push(`/chat/${data.conversationId}` as any);
+      }
+    },
+    onError: (error: Error) => {
+      Alert.alert("Errore", error.message);
+    },
   });
 
   const myProposalsQuery = useQuery<any[]>({
@@ -626,6 +694,150 @@ export default function MapScreen() {
           <Text style={styles.statLabel}>Zavorrine Disponibili</Text>
         </Pressable>
       </View>
+
+      {sosEnabled && (
+        <View style={styles.sosRow}>
+          <Pressable
+            style={[styles.sosBtn, mySosQuery.data ? styles.sosBtnActive : null]}
+            onPress={() => {
+              if (mySosQuery.data) {
+                Alert.alert(
+                  "Annulla SOS",
+                  "Vuoi annullare la tua richiesta SOS?",
+                  [
+                    { text: "No", style: "cancel" },
+                    { text: "Sì, annulla", style: "destructive", onPress: () => cancelSosMutation.mutate(mySosQuery.data.id) },
+                  ]
+                );
+              } else {
+                setShowSosModal(true);
+              }
+            }}
+          >
+            <HelmetIcon size={52} active={!!mySosQuery.data} />
+            <Text style={[styles.sosLabel, mySosQuery.data ? styles.sosLabelActive : null]}>
+              {mySosQuery.data ? "SOS ATTIVO" : "SOS"}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.sosBtn}
+            onPress={() => setShowSosListModal(true)}
+          >
+            <View style={{ position: "relative" }}>
+              <HelmetIcon size={52} color="#FF6600" />
+              {(activeSosQuery.data || []).filter((r: any) => r.requesterId !== user?.id).length > 0 && (
+                <View style={styles.sosBadge}>
+                  <Text style={styles.sosBadgeText}>
+                    {(activeSosQuery.data || []).filter((r: any) => r.requesterId !== user?.id).length}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.sosLabel}>ACCOGLI SOS</Text>
+          </Pressable>
+        </View>
+      )}
+
+      <Modal visible={showSosModal} transparent animationType="fade" onRequestClose={() => setShowSosModal(false)}>
+        <Pressable style={styles.detailOverlay} onPress={() => setShowSosModal(false)}>
+          <Pressable style={styles.sosSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.detailHandle} />
+            <View style={{ alignItems: "center", marginBottom: 16 }}>
+              <HelmetIcon size={64} />
+              <Text style={styles.sosSheetTitle}>Richiesta SOS</Text>
+              <Text style={styles.sosSheetSubtitle}>Descrivi il problema</Text>
+            </View>
+            <TextInput
+              style={styles.sosInput}
+              placeholder="Foratura, batteria, sequestro mezzo..."
+              placeholderTextColor={Colors.textSecondary + "80"}
+              value={sosReason}
+              onChangeText={setSosReason}
+              multiline
+              maxLength={200}
+            />
+            <Pressable
+              style={[styles.sosSubmitBtn, (!sosReason.trim() || createSosMutation.isPending) && { opacity: 0.5 }]}
+              disabled={!sosReason.trim() || createSosMutation.isPending}
+              onPress={() => {
+                if (!location) {
+                  Alert.alert("Errore", "Posizione GPS non disponibile");
+                  return;
+                }
+                createSosMutation.mutate({
+                  reason: sosReason.trim(),
+                  latitude: location.latitude,
+                  longitude: location.longitude,
+                });
+              }}
+            >
+              {createSosMutation.isPending ? (
+                <ActivityIndicator color={Colors.background} />
+              ) : (
+                <Text style={styles.sosSubmitText}>Invia SOS</Text>
+              )}
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={showSosListModal} transparent animationType="slide" onRequestClose={() => setShowSosListModal(false)}>
+        <Pressable style={styles.detailOverlay} onPress={() => setShowSosListModal(false)}>
+          <Pressable style={styles.listSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.detailHandle} />
+            <View style={styles.listSheetHeader}>
+              <HelmetIcon size={24} />
+              <Text style={styles.listSheetTitle}>Richieste SOS attive</Text>
+              <Pressable onPress={() => setShowSosListModal(false)}>
+                <Ionicons name="close" size={24} color={Colors.textSecondary} />
+              </Pressable>
+            </View>
+            {activeSosQuery.isLoading ? (
+              <ActivityIndicator size="large" color="#FF6600" style={{ marginVertical: 40 }} />
+            ) : (activeSosQuery.data || []).filter((r: any) => r.requesterId !== user?.id).length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="checkmark-circle-outline" size={32} color={Colors.textSecondary} />
+                <Text style={styles.emptyText}>Nessuna richiesta SOS attiva</Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
+                {(activeSosQuery.data || []).filter((r: any) => r.requesterId !== user?.id).map((r: any) => (
+                  <View key={r.id} style={styles.sosListCard}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.sosListName}>{r.requesterNickname}</Text>
+                      <Text style={styles.sosListReason}>{r.reason}</Text>
+                      <Text style={styles.sosListTime}>
+                        {new Date(r.createdAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}
+                      </Text>
+                    </View>
+                    <Pressable
+                      style={styles.sosAcceptBtn}
+                      onPress={() => {
+                        Alert.alert(
+                          "Accogli SOS",
+                          `Vuoi aiutare ${r.requesterNickname}?\nMotivo: ${r.reason}`,
+                          [
+                            { text: "Annulla", style: "cancel" },
+                            { text: "Accogli", onPress: () => acceptSosMutation.mutate(r.id) },
+                          ]
+                        );
+                      }}
+                      disabled={acceptSosMutation.isPending}
+                    >
+                      {acceptSosMutation.isPending ? (
+                        <ActivityIndicator color={Colors.background} size="small" />
+                      ) : (
+                        <Text style={styles.sosAcceptText}>Accogli</Text>
+                      )}
+                    </Pressable>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal visible={showOnlineList} transparent animationType="slide" onRequestClose={() => setShowOnlineList(false)}>
         <Pressable style={styles.detailOverlay} onPress={() => setShowOnlineList(false)}>
@@ -1318,4 +1530,127 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   eggCollectBtnText: { fontSize: 16, fontFamily: "Inter_700Bold", color: Colors.background },
+  sosRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 40,
+    marginTop: 20,
+    marginBottom: 8,
+    paddingHorizontal: 16,
+  },
+  sosBtn: {
+    alignItems: "center",
+    gap: 6,
+  },
+  sosBtnActive: {
+    opacity: 1,
+  },
+  sosLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    color: "#FF6600",
+    textAlign: "center" as const,
+  },
+  sosLabelActive: {
+    color: "#FF3300",
+  },
+  sosBadge: {
+    position: "absolute" as const,
+    top: -4,
+    right: -8,
+    backgroundColor: "#FF3300",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    paddingHorizontal: 4,
+  },
+  sosBadgeText: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    color: "#fff",
+  },
+  sosSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 32,
+  },
+  sosSheetTitle: {
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+    color: "#FF6600",
+    marginTop: 8,
+  },
+  sosSheetSubtitle: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginTop: 4,
+  },
+  sosInput: {
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 14,
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    color: Colors.text,
+    minHeight: 80,
+    textAlignVertical: "top" as const,
+    marginBottom: 16,
+  },
+  sosSubmitBtn: {
+    backgroundColor: "#FF6600",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center" as const,
+  },
+  sosSubmitText: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    color: Colors.background,
+  },
+  sosListCard: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    gap: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: "#FF6600",
+  },
+  sosListName: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
+  sosListReason: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "#FF6600",
+    marginTop: 2,
+  },
+  sosListTime: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  sosAcceptBtn: {
+    backgroundColor: "#FF6600",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  sosAcceptText: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    color: Colors.background,
+  },
 });

@@ -95,6 +95,31 @@ export default function AdminSettings() {
     },
   });
 
+  const { data: sosData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/sos-enabled"],
+  });
+  const sosEnabled = sosData?.enabled !== false;
+
+  const sosMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/sos_enabled", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/sos-enabled"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
   const customRoutesMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       const baseUrl = getApiUrl();
@@ -437,6 +462,25 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {customRoutesEnabled ? "Gli utenti possono creare percorsi personalizzati" : "I percorsi personalizzati sono disattivati"}
+        </Text>
+      </View>
+
+      <View style={styles.synecoCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="warning" size={20} color="#FF6600" />
+            <Text style={styles.synecoLabel}>SOS Biker</Text>
+          </View>
+          <Switch
+            value={sosEnabled}
+            onValueChange={(val) => sosMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: "#FF6600" }}
+            thumbColor={sosEnabled ? Colors.text : Colors.textSecondary}
+            disabled={sosMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {sosEnabled ? "Gli utenti possono inviare e accogliere richieste SOS" : "La funzione SOS è disattivata per tutti"}
         </Text>
       </View>
 

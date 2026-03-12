@@ -713,6 +713,27 @@ export const fakeUserInteractions = pgTable("fake_user_interactions", {
   index("fake_interactions_real_user_idx").on(table.realUserId),
 ]);
 
+export const sosRequests = pgTable("sos_requests", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  requesterId: varchar("requester_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  helperId: varchar("helper_id", { length: 36 })
+    .references(() => users.id, { onDelete: "set null" }),
+  reason: text("reason").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  latitude: doublePrecision("latitude").notNull(),
+  longitude: doublePrecision("longitude").notNull(),
+  conversationId: varchar("conversation_id", { length: 36 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("sos_requests_requester_idx").on(table.requesterId),
+  index("sos_requests_status_idx").on(table.status),
+]);
+
 export const registerSchema = z.object({
   nickname: z.string().min(3).max(50),
   email: z.string().email(),
@@ -821,6 +842,9 @@ export type CustomRoute = typeof customRoutes.$inferSelect;
 export type InsertCustomRoute = typeof customRoutes.$inferInsert;
 export type CustomRouteWaypoint = typeof customRouteWaypoints.$inferSelect;
 export type InsertCustomRouteWaypoint = typeof customRouteWaypoints.$inferInsert;
+
+export type SosRequest = typeof sosRequests.$inferSelect;
+export type InsertSosRequest = typeof sosRequests.$inferInsert;
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

@@ -7,6 +7,7 @@ interface AppSettings {
   autoMatching: boolean;
   customRoutes: boolean;
   paypalEmail: string;
+  sosEnabled: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -16,6 +17,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoMatching: true,
   customRoutes: true,
   paypalEmail: "Andreamasteri81@gmail.com",
+  sosEnabled: true,
 };
 
 export function useAppSettings() {

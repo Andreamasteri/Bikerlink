@@ -119,6 +119,9 @@ import {
   type InsertCustomRoute,
   type CustomRouteWaypoint,
   type InsertCustomRouteWaypoint,
+  sosRequests,
+  type SosRequest,
+  type InsertSosRequest,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -320,6 +323,12 @@ export interface IStorage {
   createCustomRouteWaypoint(data: InsertCustomRouteWaypoint): Promise<CustomRouteWaypoint>;
   updateCustomRouteWaypoint(id: string, data: Partial<InsertCustomRouteWaypoint>): Promise<CustomRouteWaypoint | undefined>;
   deleteCustomRouteWaypoint(id: string): Promise<void>;
+
+  createSosRequest(data: InsertSosRequest): Promise<SosRequest>;
+  getSosRequest(id: string): Promise<SosRequest | undefined>;
+  getActiveSosRequestByUser(userId: string): Promise<SosRequest | undefined>;
+  getActiveSosRequests(): Promise<SosRequest[]>;
+  updateSosRequest(id: string, data: Partial<InsertSosRequest>): Promise<SosRequest | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1441,6 +1450,34 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCustomRouteWaypoint(id: string): Promise<void> {
     await db.delete(customRouteWaypoints).where(eq(customRouteWaypoints.id, id));
+  }
+
+  async createSosRequest(data: InsertSosRequest): Promise<SosRequest> {
+    const [req] = await db.insert(sosRequests).values(data).returning();
+    return req;
+  }
+
+  async getSosRequest(id: string): Promise<SosRequest | undefined> {
+    const [req] = await db.select().from(sosRequests).where(eq(sosRequests.id, id)).limit(1);
+    return req;
+  }
+
+  async getActiveSosRequestByUser(userId: string): Promise<SosRequest | undefined> {
+    const [req] = await db.select().from(sosRequests)
+      .where(and(eq(sosRequests.requesterId, userId), eq(sosRequests.status, "active")))
+      .limit(1);
+    return req;
+  }
+
+  async getActiveSosRequests(): Promise<SosRequest[]> {
+    return db.select().from(sosRequests)
+      .where(eq(sosRequests.status, "active"))
+      .orderBy(desc(sosRequests.createdAt));
+  }
+
+  async updateSosRequest(id: string, data: Partial<InsertSosRequest>): Promise<SosRequest | undefined> {
+    const [req] = await db.update(sosRequests).set({ ...data, updatedAt: new Date() }).where(eq(sosRequests.id, id)).returning();
+    return req;
   }
 }
 

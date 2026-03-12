@@ -38,6 +38,7 @@ components/
   TrackingMap.web.tsx    # Mappa tracking (web placeholder)
   SynecoAd.tsx          # Banner/carousel/card pubblicitari Syneco
   ErrorBoundary.tsx      # Error boundary globale
+  HelmetIcon.tsx         # Icona casco Shark Carbon SVG per SOS
 
 server/
   routes/
@@ -46,6 +47,7 @@ server/
     motorcycles.ts      # CRUD moto
     proposals.ts        # Proposte giri e richieste
     chat.ts             # Conversazioni e messaggi (filtro telefono)
+    sos.ts              # Sistema SOS emergenza stradale
     tracking.ts         # GPS tracking, percorsi, statistiche
     contest.ts          # Contest fotografico, voti, vincitori
     workshops.ts        # Officine Syneco
