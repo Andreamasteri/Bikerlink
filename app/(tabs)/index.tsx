@@ -472,7 +472,10 @@ export default function MapScreen() {
       contentContainerStyle={{ paddingTop: Platform.OS === "web" ? 67 : insets.top, paddingBottom: 16 }}
     >
       <View style={styles.header}>
-        <Text style={styles.title}>BikerLink</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>BikerLink</Text>
+          <Image source={require("@/assets/images/helmet-logo.png")} style={styles.helmetLogo} resizeMode="contain" />
+        </View>
         <Pressable onPress={() => router.push("/chat" as any)}>
           <Ionicons name="chatbubbles" size={24} color={Colors.accent} />
         </Pressable>
@@ -622,19 +625,25 @@ export default function MapScreen() {
 
       <View style={styles.statsRow}>
         <Pressable style={styles.statCard} onPress={() => setShowOnlineList(true)}>
-          <Ionicons name="radio-button-on" size={20} color={Colors.success} />
-          <Text style={styles.statNumber}>{onlineCount}</Text>
-          <Text style={styles.statLabel}>Utenti Online</Text>
+          <View style={styles.statTopRow}>
+            <Ionicons name="radio-button-on" size={18} color={Colors.success} />
+            <Text style={styles.statNumber}>{onlineCount}</Text>
+          </View>
+          <Text style={styles.statLabel}>{"Utenti\nOnline"}</Text>
         </Pressable>
         <Pressable style={styles.statCard} onPress={() => setShowBikerList(true)}>
-          <Ionicons name="hand-left" size={20} color={Colors.accent} />
-          <Text style={styles.statNumber}>{bikerCount}</Text>
-          <Text style={styles.statLabel}>Biker Disponibili</Text>
+          <View style={styles.statTopRow}>
+            <Ionicons name="hand-left" size={18} color={Colors.accent} />
+            <Text style={styles.statNumber}>{bikerCount}</Text>
+          </View>
+          <Text style={styles.statLabel}>{"Biker\nDisponibili"}</Text>
         </Pressable>
         <Pressable style={styles.statCard} onPress={() => setShowZavorrinaList(true)}>
-          <MaterialCommunityIcons name="seat-passenger" size={20} color={Colors.femaleIcon} />
-          <Text style={styles.statNumber}>{zavCount}</Text>
-          <Text style={styles.statLabel}>Zavorrine Disponibili</Text>
+          <View style={styles.statTopRow}>
+            <MaterialCommunityIcons name="seat-passenger" size={18} color={Colors.femaleIcon} />
+            <Text style={styles.statNumber}>{zavCount}</Text>
+          </View>
+          <Text style={styles.statLabel}>{"Zavorrine\nDisponibili"}</Text>
         </Pressable>
       </View>
 
@@ -796,30 +805,38 @@ export default function MapScreen() {
       </Modal>
 
       {adsGloballyEnabled && myAds.length > 0 && (
-        <Pressable style={styles.adBanner} onPress={() => handleAdClick(myAds[adIndex % myAds.length])}>
-          {(myAds[adIndex % myAds.length] as any)?.imageUrl && adImageError !== (myAds[adIndex % myAds.length] as any)?.id ? (
-            <Image
-              source={{ uri: `${getApiUrl()}${(myAds[adIndex % myAds.length] as any).imageUrl}` }}
-              style={styles.adImage}
-              resizeMode="cover"
-              onError={() => setAdImageError((myAds[adIndex % myAds.length] as any)?.id)}
-            />
-          ) : (
-            <View style={styles.adPlaceholder}>
-              <Text style={styles.adText}>{(myAds[adIndex % myAds.length] as any)?.name}</Text>
-              {(myAds[adIndex % myAds.length] as any)?.description && (
-                <Text style={styles.adSubText}>{(myAds[adIndex % myAds.length] as any).description}</Text>
-              )}
+        <View style={styles.adWrapper}>
+          <Pressable style={styles.adBanner} onPress={() => handleAdClick(myAds[adIndex % myAds.length])}>
+            {(myAds[adIndex % myAds.length] as any)?.imageUrl && adImageError !== (myAds[adIndex % myAds.length] as any)?.id ? (
+              <Image
+                source={{ uri: `${getApiUrl()}${(myAds[adIndex % myAds.length] as any).imageUrl}` }}
+                style={styles.adImage}
+                resizeMode="cover"
+                onError={() => setAdImageError((myAds[adIndex % myAds.length] as any)?.id)}
+              />
+            ) : (
+              <View style={styles.adPlaceholder}>
+                <Text style={styles.adText}>{(myAds[adIndex % myAds.length] as any)?.name}</Text>
+                {(myAds[adIndex % myAds.length] as any)?.description && (
+                  <Text style={styles.adSubText}>{(myAds[adIndex % myAds.length] as any).description}</Text>
+                )}
+              </View>
+            )}
+            {myAds.length > 1 && (
+              <View style={styles.adDots}>
+                {myAds.map((_: any, i: number) => (
+                  <View key={i} style={[styles.adDot, i === adIndex % myAds.length && styles.adDotActive]} />
+                ))}
+              </View>
+            )}
+          </Pressable>
+          {(activeSosQuery.data || []).length > 0 && (
+            <View style={styles.sosOverlay}>
+              <Ionicons name="warning" size={80} color="#FF3300" />
+              <Text style={styles.sosOverlayLabel}>SOS ATTIVO</Text>
             </View>
           )}
-          {myAds.length > 1 && (
-            <View style={styles.adDots}>
-              {myAds.map((_: any, i: number) => (
-                <View key={i} style={[styles.adDot, i === adIndex % myAds.length && styles.adDotActive]} />
-              ))}
-            </View>
-          )}
-        </Pressable>
+        </View>
       )}
 
       <Modal visible={!!selectedUser} transparent animationType="slide" onRequestClose={() => setSelectedUser(null)}>
@@ -984,7 +1001,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
+  titleRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+  },
   title: { fontSize: 24, fontFamily: "Inter_700Bold", color: Colors.accent },
+  helmetLogo: {
+    width: 32,
+    height: 32,
+    tintColor: Colors.accent,
+  },
   searchContainer: {
     marginHorizontal: 16,
     marginBottom: 8,
@@ -1113,17 +1140,23 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   statsChipText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.text },
-  statsRow: { flexDirection: "row", paddingHorizontal: 16, gap: 12, marginTop: 16 },
+  statsRow: { flexDirection: "row", paddingHorizontal: 16, gap: 8, marginTop: 12 },
   statCard: {
     flex: 1,
     backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
     alignItems: "center",
-    gap: 4,
+    gap: 2,
   },
-  statNumber: { fontSize: 24, fontFamily: "Inter_700Bold", color: Colors.text },
-  statLabel: { fontSize: 10, fontFamily: "Inter_400Regular", color: Colors.textSecondary, textAlign: "center" as const },
+  statTopRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+  },
+  statNumber: { fontSize: 22, fontFamily: "Inter_700Bold", color: Colors.text },
+  statLabel: { fontSize: 9, fontFamily: "Inter_400Regular", color: Colors.textSecondary, textAlign: "center" as const, lineHeight: 12 },
   emptyState: { alignItems: "center", padding: 24, gap: 8 },
   emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
   listSheet: {
@@ -1192,22 +1225,27 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   distanceText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.accent },
-  adBanner: {
+  adWrapper: {
     marginHorizontal: 16,
-    marginTop: 12,
+    marginTop: 8,
+    position: "relative" as const,
+  },
+  adBanner: {
     borderRadius: 12,
     overflow: "hidden",
     backgroundColor: Colors.surface,
   },
   adImage: {
     width: "100%",
-    height: 100,
+    height: 280,
     borderRadius: 12,
   },
   adPlaceholder: {
     backgroundColor: Colors.accent + "15",
     padding: 16,
+    height: 280,
     alignItems: "center",
+    justifyContent: "center",
   },
   adText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: Colors.accent },
   adSubText: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 4 },
@@ -1331,4 +1369,22 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   eggCollectBtnText: { fontSize: 16, fontFamily: "Inter_700Bold", color: Colors.background },
+  sosOverlay: {
+    position: "absolute" as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 12,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 8,
+    zIndex: 10,
+  },
+  sosOverlayLabel: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    color: "#FFFFFF",
+  },
 });
