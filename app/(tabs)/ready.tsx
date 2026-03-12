@@ -239,9 +239,9 @@ export default function ReadyToRideScreen() {
                 }
               }}
             >
-              <Image source={sosLaunchIcon} style={[styles.sosIcon, mySosQuery.data ? styles.sosIconActive : null]} resizeMode="contain" />
-              <Text style={[styles.sosLabel, mySosQuery.data ? styles.sosLabelActive : null]}>
-                {mySosQuery.data ? "SOS ATTIVO" : "SOS"}
+              <Image source={sosLaunchIcon} style={[styles.sosIconLeft, mySosQuery.data ? styles.sosIconLeftActive : null]} resizeMode="contain" />
+              <Text style={[styles.sosLabelLeft, mySosQuery.data ? styles.sosLabelLeftActive : null]}>
+                {mySosQuery.data ? "SOS ATTIVO" : "LANCIA SOS"}
               </Text>
             </Pressable>
 
@@ -250,7 +250,7 @@ export default function ReadyToRideScreen() {
               onPress={() => setShowSosListModal(true)}
             >
               <View style={{ position: "relative" }}>
-                <Image source={sosAcceptIcon} style={styles.sosIcon} resizeMode="contain" />
+                <Image source={sosAcceptIcon} style={styles.sosIconRight} resizeMode="contain" />
                 {(activeSosQuery.data || []).filter((r: any) => r.requesterId !== user?.id).length > 0 && (
                   <View style={styles.sosBadge}>
                     <Text style={styles.sosBadgeText}>
@@ -259,7 +259,7 @@ export default function ReadyToRideScreen() {
                   </View>
                 )}
               </View>
-              <Text style={styles.sosLabel}>ACCOGLI SOS</Text>
+              <Text style={styles.sosLabelRight}>ACCOGLI SOS</Text>
             </Pressable>
           </View>
         )}
@@ -446,33 +446,44 @@ const styles = StyleSheet.create({
   sosRow: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 40,
+    gap: 80,
     marginTop: 36,
     paddingHorizontal: 16,
   },
   sosBtn: {
     alignItems: "center",
-    gap: 6,
+    gap: 8,
   },
   sosBtnActive: {
     opacity: 1,
   },
-  sosIcon: {
-    width: 72,
-    height: 56,
-    tintColor: "#FF6600",
+  sosIconLeft: {
+    width: 144,
+    height: 112,
+    tintColor: "#CC0000",
   },
-  sosIconActive: {
-    tintColor: "#FF3300",
+  sosIconLeftActive: {
+    tintColor: "#990000",
   },
-  sosLabel: {
-    fontSize: 12,
+  sosIconRight: {
+    width: 144,
+    height: 112,
+    tintColor: "#003399",
+  },
+  sosLabelLeft: {
+    fontSize: 16,
     fontFamily: "Inter_700Bold",
-    color: "#FF6600",
+    color: "#CC0000",
     textAlign: "center" as const,
   },
-  sosLabelActive: {
-    color: "#FF3300",
+  sosLabelLeftActive: {
+    color: "#990000",
+  },
+  sosLabelRight: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    color: "#003399",
+    textAlign: "center" as const,
   },
   sosBadge: {
     position: "absolute" as const,
