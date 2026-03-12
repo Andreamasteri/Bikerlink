@@ -832,7 +832,11 @@ export default function MapScreen() {
           </Pressable>
           {(activeSosQuery.data || []).length > 0 && (
             <View style={styles.sosOverlay}>
-              <Ionicons name="warning" size={80} color="#FF3300" />
+              <View style={styles.sosWarningContainer}>
+                <View style={styles.sosTriangleBorder} />
+                <View style={styles.sosTriangleFill} />
+                <Text style={styles.sosExclamation}>!</Text>
+              </View>
               <Text style={styles.sosOverlayLabel}>SOS ATTIVO</Text>
             </View>
           )}
@@ -1379,8 +1383,45 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    gap: 8,
+    gap: 10,
     zIndex: 10,
+  },
+  sosWarningContainer: {
+    width: 100,
+    height: 90,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  sosTriangleBorder: {
+    position: "absolute" as const,
+    top: 0,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 52,
+    borderRightWidth: 52,
+    borderBottomWidth: 92,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderBottomColor: "#FFFFFF",
+  },
+  sosTriangleFill: {
+    position: "absolute" as const,
+    top: 10,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 44,
+    borderRightWidth: 44,
+    borderBottomWidth: 78,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderBottomColor: "#FF3300",
+  },
+  sosExclamation: {
+    position: "absolute" as const,
+    bottom: 6,
+    fontSize: 40,
+    fontFamily: "Inter_700Bold",
+    color: "#FFFFFF",
   },
   sosOverlayLabel: {
     fontSize: 18,
