@@ -93,6 +93,17 @@ Tocca il pulsante + per creare una nuova proposta. Dovrai specificare:
 - Numero massimo di partecipanti
 - La moto che userai (per i biker, selezionabile dal tuo garage)
 
+### 4.3 Filtrare le Proposte
+
+Puoi filtrare le proposte per trovare più facilmente quelle che ti interessano:
+
+- **Per categoria:** Seleziona una delle categorie (Giro tra Biker, Con Zavorrina, Passaggio al Volo, Richieste) per vedere solo quel tipo di proposta.
+- **Per data:** Filtra per data prevista per trovare giri nel periodo che preferisci.
+- **Per distanza:** Ordina le proposte in base alla vicinanza dal tuo punto di partenza.
+- **Per disponibilità:** Visualizza solo le proposte che hanno ancora posti liberi.
+
+I filtri si combinano tra loro, così puoi restringere la ricerca quanto vuoi.
+
 ---
 
 ## 5. Tab Ride!
