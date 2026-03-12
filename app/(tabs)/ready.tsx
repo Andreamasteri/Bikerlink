@@ -34,6 +34,7 @@ export default function ReadyToRideScreen() {
   const [showSosModal, setShowSosModal] = useState(false);
   const [sosReason, setSosReason] = useState("");
   const [sosRadiusKm, setSosRadiusKm] = useState(10);
+  const [customRadius, setCustomRadius] = useState("");
   const [showSosListModal, setShowSosListModal] = useState(false);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
@@ -112,6 +113,7 @@ export default function ReadyToRideScreen() {
       setShowSosModal(false);
       setSosReason("");
       setSosRadiusKm(10);
+      setCustomRadius("");
     },
     onError: (error: Error) => {
       Alert.alert("Errore", error.message);
@@ -285,31 +287,44 @@ export default function ReadyToRideScreen() {
             />
             <Text style={styles.sosRadiusLabel}>Raggio d'azione</Text>
             <View style={styles.sosRadiusRow}>
-              {[5, 10, 20, 50].map((km) => (
+              {[10, 20, 50].map((km) => (
                 <Pressable
                   key={km}
-                  style={[styles.sosRadiusChip, sosRadiusKm === km && styles.sosRadiusChipActive]}
-                  onPress={() => setSosRadiusKm(km)}
+                  style={[styles.sosRadiusChip, sosRadiusKm === km && !customRadius && styles.sosRadiusChipActive]}
+                  onPress={() => { setSosRadiusKm(km); setCustomRadius(""); }}
                 >
-                  <Text style={[styles.sosRadiusChipText, sosRadiusKm === km && styles.sosRadiusChipTextActive]}>
+                  <Text style={[styles.sosRadiusChipText, sosRadiusKm === km && !customRadius && styles.sosRadiusChipTextActive]}>
                     {km} km
                   </Text>
                 </Pressable>
               ))}
+              <TextInput
+                style={[styles.sosRadiusCustom, customRadius ? styles.sosRadiusCustomActive : null]}
+                placeholder="Altro"
+                placeholderTextColor={Colors.textSecondary + "80"}
+                value={customRadius}
+                onChangeText={(text) => {
+                  const num = text.replace(/[^0-9]/g, "");
+                  setCustomRadius(num);
+                  if (num) {
+                    setSosRadiusKm(parseInt(num, 10));
+                  }
+                }}
+                keyboardType="numeric"
+                maxLength={4}
+              />
             </View>
             <Pressable
               style={[styles.sosSubmitBtn, (!sosReason.trim() || createSosMutation.isPending) && { opacity: 0.5 }]}
               disabled={!sosReason.trim() || createSosMutation.isPending}
               onPress={() => {
-                if (!location) {
-                  Alert.alert("Errore", "Posizione GPS non disponibile");
-                  return;
-                }
+                const finalRadius = customRadius ? parseInt(customRadius, 10) || 10 : sosRadiusKm;
+                const coords = location || { latitude: 42.5, longitude: 12.5 };
                 createSosMutation.mutate({
                   reason: sosReason.trim(),
-                  latitude: location.latitude,
-                  longitude: location.longitude,
-                  radiusKm: sosRadiusKm,
+                  latitude: coords.latitude,
+                  longitude: coords.longitude,
+                  radiusKm: finalRadius,
                 });
               }}
             >
@@ -578,6 +593,24 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   sosRadiusChipTextActive: {
+    color: Colors.background,
+  },
+  sosRadiusCustom: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.background,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+    textAlign: "center" as const,
+  },
+  sosRadiusCustomActive: {
+    backgroundColor: "#FF6600",
+    borderColor: "#FF6600",
     color: Colors.background,
   },
   sosSubmitBtn: {
