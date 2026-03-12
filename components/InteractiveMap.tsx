@@ -238,8 +238,12 @@ export default function InteractiveMap({
               coordinate={{ latitude: sos.latitude, longitude: sos.longitude }}
               title={`SOS: ${sos.requesterNickname || "Utente"}`}
               description={sos.reason}
-              pinColor="#FF0000"
-            />
+            >
+              <View style={sosMarkerStyles.container}>
+                <MaterialCommunityIcons name="alert" size={22} color="#fff" />
+                <Text style={sosMarkerStyles.label}>SOS</Text>
+              </View>
+            </Marker>
           </React.Fragment>
         ))}
       </MapView>
@@ -409,5 +413,30 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 12,
     fontWeight: "600" as const,
+  },
+});
+
+const sosMarkerStyles = StyleSheet.create({
+  container: {
+    backgroundColor: "#FF0000",
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    borderWidth: 2,
+    borderColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  label: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "800" as const,
+    letterSpacing: 1,
   },
 });
