@@ -26,6 +26,7 @@
     "@types/nodemailer": "^7.0.11",
     "bcryptjs": "^3.0.3",
     "connect-pg-simple": "^10.0.0",
+    "docx": "^9.6.1",
     "drizzle-orm": "^0.39.3",
     "expo": "~54.0.33",
     "expo-constants": "~18.0.11",

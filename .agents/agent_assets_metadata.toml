@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "4Y78ngKHwO0VLy8lAIKVp"
+uri = "file://manuale-utente-bikerlink.docx"
+type = "word_document"
+title = "Manuale d'Uso BikerLink"
