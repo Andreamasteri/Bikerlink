@@ -34,7 +34,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tableName: "session",
         createTableIfMissing: true,
       }),
-      secret: process.env.SESSION_SECRET || "bikerlink-secret-key-change-in-production",
+      secret: process.env.SESSION_SECRET!,
       resave: false,
       saveUninitialized: false,
       cookie: {
@@ -174,10 +174,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/settings/paypal", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("paypal_email");
-      const email = setting?.value || "Andreamasteri81@gmail.com";
+      const email = setting?.value || "";
       res.json({ email });
     } catch {
-      res.json({ email: "Andreamasteri81@gmail.com" });
+      res.json({ email: "" });
     }
   });
 
@@ -198,7 +198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         chatbotEnabled: chatbot?.value !== "false",
         autoMatching: autoMatching?.value !== "false",
         customRoutes: customRoutes?.value !== "false",
-        paypalEmail: paypal?.value || "Andreamasteri81@gmail.com",
+        paypalEmail: paypal?.value || "",
         sosEnabled: sosEnabled?.value !== "false",
       });
     } catch {
@@ -208,7 +208,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         chatbotEnabled: true,
         autoMatching: true,
         customRoutes: true,
-        paypalEmail: "Andreamasteri81@gmail.com",
+        paypalEmail: "",
         sosEnabled: true,
       });
     }

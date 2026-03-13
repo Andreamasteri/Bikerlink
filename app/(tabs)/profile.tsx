@@ -551,7 +551,11 @@ export default function ProfileScreen() {
         <Pressable
           style={styles.donateBtn}
           onPress={() => {
-            const email = paypalData?.email || "Andreamasteri81@gmail.com";
+            const email = paypalData?.email;
+            if (!email) {
+              Alert.alert("Donazione", "Il servizio PayPal non è ancora configurato.");
+              return;
+            }
             Linking.openURL(`https://www.paypal.com/donate?business=${encodeURIComponent(email)}&currency_code=EUR`);
           }}
         >

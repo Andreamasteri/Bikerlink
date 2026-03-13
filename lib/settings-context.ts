@@ -16,7 +16,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   chatbotEnabled: true,
   autoMatching: true,
   customRoutes: true,
-  paypalEmail: "Andreamasteri81@gmail.com",
+  paypalEmail: "",
   sosEnabled: true,
 };
 

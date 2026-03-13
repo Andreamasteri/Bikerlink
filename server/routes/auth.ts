@@ -105,8 +105,6 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       const token = crypto.randomBytes(3).toString("hex").toUpperCase();
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
       await storage.createEmailVerificationToken(user.id, token, expiresAt);
-      console.log(`[EMAIL VERIFICATION] User: ${user.email}, Token: ${token}`);
-
       const emailSent = await sendVerificationEmail(user.email, user.nickname, token);
       if (emailSent) {
         console.log(`[EMAIL VERIFICATION] Email inviata a ${user.email}`);
@@ -244,11 +242,7 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res:
 
     await storage.createPasswordResetToken(user.id, token, expiresAt);
 
-    console.log(`\n========== PASSWORD RESET ==========`);
-    console.log(`User: ${user.nickname} (${user.email})`);
-    console.log(`Token: ${token}`);
-    console.log(`Expires: ${expiresAt.toISOString()}`);
-    console.log(`====================================\n`);
+    console.log(`[PASSWORD RESET] Richiesta reset per ${user.email}`);
 
     return res.json({ message: "Se l'email è registrata, riceverai un link di recupero" });
   } catch (error) {
@@ -341,8 +335,6 @@ router.post("/resend-verification", async (req: Request, res: Response) => {
     const token = crypto.randomBytes(3).toString("hex").toUpperCase();
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
     await storage.createEmailVerificationToken(user.id, token, expiresAt);
-    console.log(`[EMAIL VERIFICATION] User: ${user.email}, Token: ${token}`);
-
     const emailSent = await sendVerificationEmail(user.email, user.nickname, token);
     if (!emailSent) {
       console.warn(`[EMAIL VERIFICATION] Resend: email NON inviata a ${user.email}`);
