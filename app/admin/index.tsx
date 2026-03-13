@@ -15,6 +15,7 @@ const adminSections = [
   { key: "performance", label: "Record Performance", icon: "speedometer" as const, iconSet: "Ionicons", route: "/admin/performance" },
   { key: "analytics", label: "Analytics", icon: "analytics" as const, iconSet: "MaterialIcons", route: "/admin/analytics" },
   { key: "fake-users", label: "Utenti Fake", icon: "robot" as const, iconSet: "MaterialCommunityIcons", route: "/admin/fake-users" },
+  { key: "motoclubs", label: "Motoclub", icon: "shield" as const, iconSet: "Ionicons", route: "/admin/motoclubs" },
   { key: "chats", label: "Chat Utenti", icon: "chatbubbles" as const, iconSet: "Ionicons", route: "/admin/chats" },
   { key: "settings", label: "Impostazioni", icon: "settings" as const, iconSet: "MaterialIcons", route: "/admin/settings" },
 ];
