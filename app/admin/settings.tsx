@@ -193,27 +193,14 @@ export default function AdminSettings() {
   const donationEnabled = donationData?.enabled !== false;
 
   const [donationText, setDonationText] = useState("");
-  const [isSavingDonationText, setIsSavingDonationText] = useState(false);
+  const [donationTextPassword, setDonationTextPassword] = useState("");
+  const [showDonationTextPasswordModal, setShowDonationTextPasswordModal] = useState(false);
 
   React.useEffect(() => {
     if (donationData?.text !== undefined) {
       setDonationText(donationData.text);
     }
   }, [donationData?.text]);
-
-  async function handleSaveDonationText() {
-    try {
-      setIsSavingDonationText(true);
-      await apiRequest("PUT", "/api/admin/settings/donation_text", { value: donationText });
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/donation"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      Alert.alert("Successo", "Testo donazione salvato");
-    } catch (error: any) {
-      Alert.alert("Errore", error.message || "Errore durante il salvataggio");
-    } finally {
-      setIsSavingDonationText(false);
-    }
-  }
 
   const [emailConfigModalVisible, setEmailConfigModalVisible] = useState(false);
   const [emailConfigAdminPass, setEmailConfigAdminPass] = useState("");
@@ -835,10 +822,12 @@ export default function AdminSettings() {
           <View style={styles.editActions}>
             <TouchableOpacity
               style={styles.saveBtn}
-              onPress={handleSaveDonationText}
-              disabled={isSavingDonationText}
+              onPress={() => {
+                setDonationTextPassword("");
+                setShowDonationTextPasswordModal(true);
+              }}
             >
-              <Text style={styles.saveBtnText}>{isSavingDonationText ? "..." : "Salva"}</Text>
+              <Text style={styles.saveBtnText}>Salva</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -924,6 +913,61 @@ export default function AdminSettings() {
                     value: protectedToggle.value ? "true" : "false",
                     adminPassword: protectedPassword,
                   });
+                }}
+              >
+                {protectedToggleMutation.isPending ? (
+                  <ActivityIndicator color={Colors.background} size="small" />
+                ) : (
+                  <Text style={styles.protectedConfirmText}>Conferma</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showDonationTextPasswordModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setShowDonationTextPasswordModal(false); setDonationTextPassword(""); }}
+      >
+        <View style={styles.protectedOverlay}>
+          <View style={styles.protectedModal}>
+            <Text style={styles.protectedTitle}>Conferma Modifica</Text>
+            <Text style={styles.protectedSubtitle}>Salvare il testo donazione</Text>
+            <Text style={styles.protectedDesc}>Inserisci la password admin per confermare</Text>
+            <TextInput
+              style={styles.protectedInput}
+              placeholder="Password admin"
+              placeholderTextColor={Colors.textSecondary}
+              secureTextEntry
+              value={donationTextPassword}
+              onChangeText={setDonationTextPassword}
+              autoFocus
+            />
+            <View style={styles.protectedButtons}>
+              <TouchableOpacity
+                style={styles.protectedCancel}
+                onPress={() => { setShowDonationTextPasswordModal(false); setDonationTextPassword(""); }}
+              >
+                <Text style={styles.protectedCancelText}>Annulla</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.protectedConfirm, !donationTextPassword && { opacity: 0.5 }]}
+                disabled={!donationTextPassword || protectedToggleMutation.isPending}
+                onPress={() => {
+                  protectedToggleMutation.mutate(
+                    { key: "donation_text", value: donationText, adminPassword: donationTextPassword },
+                    {
+                      onSuccess: () => {
+                        setShowDonationTextPasswordModal(false);
+                        setDonationTextPassword("");
+                        queryClient.invalidateQueries({ queryKey: ["/api/settings/donation"] });
+                        Alert.alert("Successo", "Testo donazione salvato");
+                      },
+                    },
+                  );
                 }}
               >
                 {protectedToggleMutation.isPending ? (
