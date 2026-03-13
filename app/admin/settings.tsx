@@ -755,7 +755,7 @@ export default function AdminSettings() {
         </View>
         <TextInput
           style={[styles.input, { marginTop: 12 }]}
-          placeholder="Andreamasteri81@gmail.com"
+          placeholder="email@esempio.com"
           placeholderTextColor={Colors.textSecondary}
           value={paypalEmail}
           onChangeText={setPaypalEmail}
