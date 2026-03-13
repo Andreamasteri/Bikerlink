@@ -19,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import { showImagePickerMenu } from "@/lib/image-picker-utils";
 
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
@@ -214,18 +215,14 @@ export default function ContestScreen() {
     [voteMutation]
   );
 
-  const handlePickImage = useCallback(async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      setSelectedImage(result.assets[0].uri);
-      setShowUpload(true);
-    }
+  const handlePickImage = useCallback(() => {
+    showImagePickerMenu(
+      (uri) => {
+        setSelectedImage(uri);
+        setShowUpload(true);
+      },
+      { aspect: [4, 3], quality: 0.8 }
+    );
   }, []);
 
   const handleUpload = useCallback(() => {

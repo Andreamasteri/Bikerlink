@@ -20,6 +20,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
+import { showImagePickerMenu } from "@/lib/image-picker-utils";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
@@ -191,24 +192,21 @@ export default function ProfileScreen() {
 
   const [replacingSlot, setReplacingSlot] = useState<string | null>(null);
 
-  const pickImageForSlot = useCallback(async (existingPhotoId?: string) => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"] as any,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      if (existingPhotoId) {
-        setReplacingSlot(existingPhotoId);
-        try {
-          await apiRequest("DELETE", `/api/users/me/photos/${existingPhotoId}`);
-        } catch {}
-      }
-      uploadPhotoMutation.mutate(result.assets[0].uri, {
-        onSettled: () => setReplacingSlot(null),
-      });
-    }
+  const pickImageForSlot = useCallback((existingPhotoId?: string) => {
+    showImagePickerMenu(
+      async (uri) => {
+        if (existingPhotoId) {
+          setReplacingSlot(existingPhotoId);
+          try {
+            await apiRequest("DELETE", `/api/users/me/photos/${existingPhotoId}`);
+          } catch {}
+        }
+        uploadPhotoMutation.mutate(uri, {
+          onSettled: () => setReplacingSlot(null),
+        });
+      },
+      { aspect: [1, 1], quality: 0.8 }
+    );
   }, []);
 
   const handleDeletePhoto = useCallback((photoId: string) => {

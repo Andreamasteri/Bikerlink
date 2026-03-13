@@ -18,6 +18,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialIcons, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
+import { showImagePickerMenu } from "@/lib/image-picker-utils";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 
@@ -181,16 +182,13 @@ export default function AdminAds() {
     setFormImageUri(null);
   }
 
-  const pickImage = useCallback(async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [16, 9],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setFormImageUri(result.assets[0].uri);
-    }
+  const pickImage = useCallback(() => {
+    showImagePickerMenu(
+      (uri) => {
+        setFormImageUri(uri);
+      },
+      { aspect: [16, 9], quality: 0.8 }
+    );
   }, []);
 
   function handleCreate() {
