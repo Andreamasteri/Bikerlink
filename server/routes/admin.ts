@@ -5,7 +5,7 @@ import path from "path";
 import bcrypt from "bcryptjs";
 import { storage } from "../storage";
 import { db } from "../db";
-import { motoClubs, motoClubRequests, motoClubMembers, conversations, moderatorLogs } from "@shared/schema";
+import { motoClubs, motoClubRequests, motoClubMembers, conversations, moderatorLogs, users } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 
 const router = Router();
@@ -1483,6 +1483,58 @@ router.post("/motoclubs/requests/:id/reject", async (req: Request, res: Response
     });
 
     return res.json({ message: "Richiesta rifiutata" });
+  } catch (e) {
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+router.get("/motoclubs/:id", async (req: Request, res: Response) => {
+  try {
+    const clubId = req.params.id;
+    const [club] = await db.select().from(motoClubs).where(eq(motoClubs.id, clubId)).limit(1);
+    if (!club) return res.status(404).json({ message: "Club non trovato" });
+
+    const memberships = await db
+      .select({
+        membershipId: motoClubMembers.id,
+        userId: motoClubMembers.userId,
+        role: motoClubMembers.role,
+        status: motoClubMembers.status,
+        joinedAt: motoClubMembers.joinedAt,
+        nickname: users.nickname,
+        userType: users.userType,
+        avatarUrl: users.avatarUrl,
+        country: users.country,
+        isFake: users.isFake,
+      })
+      .from(motoClubMembers)
+      .innerJoin(users, eq(motoClubMembers.userId, users.id))
+      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active")))
+      .orderBy(motoClubMembers.joinedAt);
+
+    return res.json({ ...club, members: memberships });
+  } catch (e) {
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+router.delete("/motoclubs/:id/members/:userId", async (req: Request, res: Response) => {
+  try {
+    const adminId = req.session.userId!;
+    const { id: clubId, userId } = req.params;
+
+    await db.delete(motoClubMembers)
+      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.userId, userId)));
+
+    await db.insert(moderatorLogs).values({
+      moderatorId: adminId,
+      action: "remove_motoclub_member",
+      targetType: "motoclub",
+      targetId: clubId,
+      details: `Rimosso membro ${userId} dal club ${clubId}`,
+    });
+
+    return res.json({ message: "Membro rimosso" });
   } catch (e) {
     return res.status(500).json({ message: "Errore interno" });
   }
