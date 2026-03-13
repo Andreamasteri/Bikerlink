@@ -19,7 +19,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import * as ImagePicker from "expo-image-picker";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";

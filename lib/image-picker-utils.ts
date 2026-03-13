@@ -1,31 +1,13 @@
 import * as ImagePicker from "expo-image-picker";
 import { Alert, Platform, ActionSheetIOS } from "react-native";
 
-let cameraPermissionResolved = false;
-let cameraPermissionGranted = false;
+let cameraPermissionAsked = false;
 
 async function ensureCameraPermission(): Promise<boolean> {
-  if (cameraPermissionResolved) {
-    if (!cameraPermissionGranted) {
-      Alert.alert(
-        "Permesso fotocamera",
-        "Per scattare foto, abilita l'accesso alla fotocamera nelle impostazioni del dispositivo.",
-        [{ text: "OK" }]
-      );
-    }
-    return cameraPermissionGranted;
-  }
+  const { status: currentStatus } = await ImagePicker.getCameraPermissionsAsync();
+  if (currentStatus === "granted") return true;
 
-  const { status: existingStatus } = await ImagePicker.getCameraPermissionsAsync();
-  if (existingStatus === "granted") {
-    cameraPermissionResolved = true;
-    cameraPermissionGranted = true;
-    return true;
-  }
-
-  if (existingStatus === "denied") {
-    cameraPermissionResolved = true;
-    cameraPermissionGranted = false;
+  if (cameraPermissionAsked) {
     Alert.alert(
       "Permesso fotocamera",
       "Per scattare foto, abilita l'accesso alla fotocamera nelle impostazioni del dispositivo.",
@@ -35,17 +17,16 @@ async function ensureCameraPermission(): Promise<boolean> {
   }
 
   const { status } = await ImagePicker.requestCameraPermissionsAsync();
-  cameraPermissionResolved = true;
-  cameraPermissionGranted = status === "granted";
+  cameraPermissionAsked = true;
 
-  if (!cameraPermissionGranted) {
-    Alert.alert(
-      "Permesso fotocamera",
-      "Per scattare foto, abilita l'accesso alla fotocamera nelle impostazioni del dispositivo.",
-      [{ text: "OK" }]
-    );
-  }
-  return cameraPermissionGranted;
+  if (status === "granted") return true;
+
+  Alert.alert(
+    "Permesso fotocamera",
+    "Per scattare foto, abilita l'accesso alla fotocamera nelle impostazioni del dispositivo.",
+    [{ text: "OK" }]
+  );
+  return false;
 }
 
 export interface PickImageOptions {
