@@ -812,7 +812,7 @@ export default function AdminSettings() {
           </Text>
           <TextInput
             style={[styles.input, { minHeight: 120 }]}
-            placeholder="Scrivi qui il messaggio personalizzato per la sezione donazione..."
+            placeholder={"Sono un motociclista, non un programmatore professionista.\nSto sviluppando quest'app da solo, per biker e zavorrine, nel mio tempo libero e a titolo gratuito.\nTra sviluppo, debug, server e pubblicazione i costi sono molto più alti del previsto.\nSe l'app ti piace e vuoi che continui a crescere, puoi supportarla con una piccola donazione.\nAnche solo il costo di un caffè fa la differenza.\nOgni utente che contribuirà verrà inserito nella Hall of Fame dei ringraziamenti dell'app.\nSe ognuno mette poco, possiamo fare tanto.\nGrazie davvero.\nCi vediamo su strada."}
             placeholderTextColor={Colors.textSecondary}
             value={donationText}
             onChangeText={setDonationText}
