@@ -12,6 +12,7 @@ Sponsor: Syneco Lubrificanti
 - **State Management**: React Query (@tanstack/react-query) + React Context
 - **Object Storage**: Replit Object Storage per foto utenti
 - **Lingua**: Italiano (i18n predisposta per EN/DE via `lib/i18n.ts`)
+- **Pan-European**: Filtri country (ISO 3166-1 alpha-2), region (free text), language (BCP-47)
 
 ## Struttura Progetto
 
@@ -19,7 +20,7 @@ Sponsor: Syneco Lubrificanti
 app/
   _layout.tsx           # Root layout con auth redirect
   (auth)/               # Login, registrazione, splash screen
-  (tabs)/               # Tab (sx→dx): Mappa, Proposte, Ride!, Match, Pic!, Chat, Profilo
+  (tabs)/               # Tab (sx→dx): Mappa, Proposte, Ride!, Motoclub, Match, Pic!, Chat, Profilo
   admin/                # Pannello admin (gestione utenti, officine, ads, easter eggs, analytics)
   moderator/            # Pannello moderatore (approvazione foto)
   chat/[id].tsx         # Schermata chat singola
@@ -55,8 +56,9 @@ server/
     ads.ts              # Campagne pubblicitarie Syneco
     notifications.ts    # Notifiche utente
     reports.ts          # Segnalazioni utenti
-    admin.ts            # Pannello admin completo
+    admin.ts            # Pannello admin completo (include gestione motoclub)
     moderator.ts        # Moderazione foto
+    motoclubs.ts        # Motoclub: CRUD, join/leave, inviti, richieste, stats, seed 20 brand + 24 modelli
     feedback.ts         # Feedback e bug report
     invitations.ts      # Codici invito
   storage.ts            # Layer di accesso dati (Drizzle)

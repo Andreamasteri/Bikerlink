@@ -159,6 +159,10 @@ export default function ProfileScreen() {
     queryKey: ["/api/settings/paypal"],
   });
 
+  const { data: myClubs } = useQuery<{ id: string; name: string; brandName?: string | null; clubType: string }[]>({
+    queryKey: ["/api/motoclubs/me/clubs"],
+  });
+
   const searchPreference = profile?.profile?.searchPreference ?? "both";
 
   const searchPreferenceMutation = useMutation({
@@ -339,6 +343,16 @@ export default function ProfileScreen() {
               </View>
             </View>
           )}
+          {myClubs && myClubs.length > 0 && myClubs.slice(0, 2).map((c) => (
+            <View key={c.id} style={[styles.badge, { backgroundColor: Colors.accent + "22" }]}>
+              <View style={styles.regionBadge}>
+                <Ionicons name="shield" size={13} color={Colors.accent} />
+                <Text style={[styles.badgeText, { color: Colors.accent }]} numberOfLines={1}>
+                  {c.brandName || c.name}
+                </Text>
+              </View>
+            </View>
+          ))}
         </View>
       </View>
 

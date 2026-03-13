@@ -82,6 +82,7 @@ export default function CreateProposalScreen() {
   const [maxParticipants, setMaxParticipants] = useState("");
   const [departureLat, setDepartureLat] = useState<number | null>(null);
   const [departureLng, setDepartureLng] = useState<number | null>(null);
+  const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
   const [gpsSource, setGpsSource] = useState<"profile" | "live" | "map" | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
@@ -146,6 +147,12 @@ export default function CreateProposalScreen() {
     queryKey: ["/api/wishlist"],
     enabled: isZavorrina && !!searchType,
   });
+
+  const { data: myClubsData } = useQuery({
+    queryKey: ["/api/motoclubs/me/clubs"],
+    enabled: isBikerOrCoppia,
+  });
+  const myClubs = (myClubsData as any[]) || [];
 
   const motos = (motorcycles as any[]) || [];
   const wishlistMotos = (wishlistData as any)?.motos || [];
@@ -318,6 +325,7 @@ export default function CreateProposalScreen() {
       data.destinationLongitude = departureLng;
     }
     if (returnDeadline) data.returnDeadline = returnDeadline.toISOString();
+    if (selectedClubId) data.clubId = selectedClubId;
 
     createMutation.mutate(data);
   };
@@ -654,6 +662,41 @@ export default function CreateProposalScreen() {
               </>
             )}
 
+            {isBikerOrCoppia && myClubs.length > 0 && (
+              <>
+                <Text style={styles.sectionTitle}>Proposta Riservata al Club</Text>
+                <View style={styles.clubSelectorRow}>
+                  <TouchableOpacity
+                    style={[styles.clubChip, !selectedClubId && styles.clubChipActive]}
+                    onPress={() => setSelectedClubId(null)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.clubChipText, !selectedClubId && styles.clubChipTextActive]}>
+                      Pubblica
+                    </Text>
+                  </TouchableOpacity>
+                  {myClubs.map((c: any) => (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={[styles.clubChip, selectedClubId === c.id && styles.clubChipActive]}
+                      onPress={() => setSelectedClubId(c.id === selectedClubId ? null : c.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="shield" size={12} color={selectedClubId === c.id ? Colors.text : Colors.textSecondary} />
+                      <Text style={[styles.clubChipText, selectedClubId === c.id && styles.clubChipTextActive]} numberOfLines={1}>
+                        {c.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {selectedClubId && (
+                  <Text style={styles.clubNote}>
+                    Solo i membri del club vedranno questa proposta
+                  </Text>
+                )}
+              </>
+            )}
+
             <Text style={styles.sectionTitle}>Descrizione</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
@@ -845,4 +888,25 @@ const styles = StyleSheet.create({
     color: Colors.success,
     fontSize: 12,
   },
+  clubSelectorRow: {
+    flexDirection: "row" as const,
+    flexWrap: "wrap" as const,
+    gap: 8,
+    marginBottom: 8,
+  },
+  clubChip: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  clubChipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  clubChipText: { fontSize: 13, color: Colors.textSecondary, fontFamily: "Inter_500Medium" as const },
+  clubChipTextActive: { color: Colors.text },
+  clubNote: { fontSize: 12, color: Colors.accent, marginBottom: 8, fontFamily: "Inter_400Regular" as const },
 });

@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import path from "path";
 import fs from "fs";
 import { storage } from "../storage";
+import { createClubInvitesForMoto } from "./motoclubs";
 
 const router = Router();
 
@@ -93,6 +94,10 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
         });
         matches.push({ zavarrinaNickname: zavarrinaUser?.nickname, brand, model, ridingStyle });
       }
+    }
+
+    if (brand) {
+      createClubInvitesForMoto(userId, brand, model || "").catch(() => {});
     }
 
     return res.status(201).json({ motorcycle, matches });

@@ -1,5 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
+import { db } from "../db";
+import { motoClubMembers } from "@shared/schema";
+import { and, eq } from "drizzle-orm";
 
 const router = Router();
 
@@ -19,7 +22,18 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     const proposalType = req.query.type as string | undefined;
     const filter = req.query.filter as string | undefined;
 
+    const userId = req.session.userId!;
     let allProposals = await storage.getProposals(status ? { status } : undefined);
+
+    const userMemberships = await db.select({ clubId: motoClubMembers.clubId })
+      .from(motoClubMembers)
+      .where(and(eq(motoClubMembers.userId, userId), eq(motoClubMembers.status, "active")));
+    const memberClubIds = new Set(userMemberships.map(m => m.clubId));
+
+    allProposals = allProposals.filter(p => {
+      if (!p.clubId) return true;
+      return memberClubIds.has(p.clubId);
+    });
 
     if (proposalType) {
       allProposals = allProposals.filter((p) => p.proposalType === proposalType);

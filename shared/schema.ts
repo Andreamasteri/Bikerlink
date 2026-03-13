@@ -37,6 +37,9 @@ export const users = pgTable("users", {
   invitationCode: varchar("invitation_code", { length: 50 }),
   isFake: boolean("is_fake").notNull().default(false),
   isPrimal: boolean("is_primal").notNull().default(false),
+  country: varchar("country", { length: 2 }),
+  spokenLanguages: jsonb("spoken_languages").$type<string[]>().default([]),
+  autoJoinClubs: boolean("auto_join_clubs").notNull().default(true),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -129,6 +132,7 @@ export const proposals = pgTable("proposals", {
   maxParticipants: integer("max_participants"),
   expiresAt: timestamp("expires_at"),
   status: varchar("status", { length: 20 }).notNull().default("active"),
+  clubId: varchar("club_id", { length: 36 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
@@ -735,6 +739,83 @@ export const sosRequests = pgTable("sos_requests", {
   index("sos_requests_status_idx").on(table.status),
 ]);
 
+export const motoClubs = pgTable("moto_clubs", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 200 }).notNull(),
+  clubType: varchar("club_type", { length: 20 }).notNull(),
+  brandName: varchar("brand_name", { length: 100 }),
+  modelName: varchar("model_name", { length: 100 }),
+  description: text("description"),
+  logoUrl: text("logo_url"),
+  isApproved: boolean("is_approved").notNull().default(false),
+  activityScore: integer("activity_score").notNull().default(0),
+  conversationId: varchar("conversation_id", { length: 36 }),
+  createdBy: varchar("created_by", { length: 36 })
+    .references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("moto_clubs_type_idx").on(table.clubType),
+  index("moto_clubs_brand_idx").on(table.brandName),
+]);
+
+export const motoClubMembers = pgTable("moto_club_members", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  clubId: varchar("club_id", { length: 36 })
+    .notNull()
+    .references(() => motoClubs.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  role: varchar("role", { length: 20 }).notNull().default("member"),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  joinedAt: timestamp("joined_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("moto_club_members_unique_idx").on(table.clubId, table.userId),
+  index("moto_club_members_club_idx").on(table.clubId),
+  index("moto_club_members_user_idx").on(table.userId),
+]);
+
+export const motoClubInvites = pgTable("moto_club_invites", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  clubId: varchar("club_id", { length: 36 })
+    .notNull()
+    .references(() => motoClubs.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("moto_club_invites_unique_idx").on(table.clubId, table.userId),
+  index("moto_club_invites_user_idx").on(table.userId),
+]);
+
+export const motoClubRequests = pgTable("moto_club_requests", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 200 }).notNull(),
+  clubType: varchar("club_type", { length: 20 }).notNull(),
+  brandName: varchar("brand_name", { length: 100 }),
+  modelName: varchar("model_name", { length: 100 }),
+  requestedBy: varchar("requested_by", { length: 36 })
+    .references(() => users.id, { onDelete: "set null" }),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  reviewedBy: varchar("reviewed_by", { length: 36 })
+    .references(() => users.id, { onDelete: "set null" }),
+  reviewNote: text("review_note"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export const registerSchema = z.object({
   nickname: z.string().min(3).max(50),
   email: z.string().email(),
@@ -846,6 +927,15 @@ export type InsertCustomRouteWaypoint = typeof customRouteWaypoints.$inferInsert
 
 export type SosRequest = typeof sosRequests.$inferSelect;
 export type InsertSosRequest = typeof sosRequests.$inferInsert;
+
+export type MotoClub = typeof motoClubs.$inferSelect;
+export type InsertMotoClub = typeof motoClubs.$inferInsert;
+export type MotoClubMember = typeof motoClubMembers.$inferSelect;
+export type InsertMotoClubMember = typeof motoClubMembers.$inferInsert;
+export type MotoClubInvite = typeof motoClubInvites.$inferSelect;
+export type InsertMotoClubInvite = typeof motoClubInvites.$inferInsert;
+export type MotoClubRequest = typeof motoClubRequests.$inferSelect;
+export type InsertMotoClubRequest = typeof motoClubRequests.$inferInsert;
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

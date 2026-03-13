@@ -4,6 +4,9 @@ import fs from "fs";
 import path from "path";
 import bcrypt from "bcryptjs";
 import { storage } from "../storage";
+import { db } from "../db";
+import { motoClubs, motoClubRequests, motoClubMembers, conversations, moderatorLogs } from "@shared/schema";
+import { eq, and, desc } from "drizzle-orm";
 
 const router = Router();
 
@@ -1372,6 +1375,116 @@ router.get("/chats/:id/messages", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Admin get chat messages error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/motoclubs", async (_req: Request, res: Response) => {
+  try {
+    const clubs = await db.select().from(motoClubs).orderBy(desc(motoClubs.createdAt));
+    const result = await Promise.all(clubs.map(async (c) => {
+      const members = await db.select().from(motoClubMembers)
+        .where(and(eq(motoClubMembers.clubId, c.id), eq(motoClubMembers.status, "active")));
+      return { ...c, memberCount: members.length };
+    }));
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+router.delete("/motoclubs/:id", async (req: Request, res: Response) => {
+  try {
+    const adminId = req.session.userId!;
+    const clubId = req.params.id;
+    await db.delete(motoClubs).where(eq(motoClubs.id, clubId));
+    await db.insert(moderatorLogs).values({
+      moderatorId: adminId,
+      action: "delete_motoclub",
+      targetType: "motoclub",
+      targetId: clubId,
+      details: "Club eliminato dall'admin",
+    });
+    return res.json({ message: "Club eliminato" });
+  } catch (e) {
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+router.get("/motoclubs/requests", async (_req: Request, res: Response) => {
+  try {
+    const requests = await db.select().from(motoClubRequests).orderBy(desc(motoClubRequests.createdAt));
+    return res.json(requests);
+  } catch (e) {
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+router.post("/motoclubs/requests/:id/approve", async (req: Request, res: Response) => {
+  try {
+    const adminId = req.session.userId!;
+    const requestId = req.params.id;
+
+    const [request] = await db.select().from(motoClubRequests).where(eq(motoClubRequests.id, requestId)).limit(1);
+    if (!request) return res.status(404).json({ message: "Richiesta non trovata" });
+
+    await db.update(motoClubRequests)
+      .set({ status: "approved", reviewedBy: adminId, updatedAt: new Date() })
+      .where(eq(motoClubRequests.id, requestId));
+
+    const [newClub] = await db.insert(motoClubs).values({
+      name: request.name,
+      clubType: request.clubType,
+      brandName: request.brandName,
+      modelName: request.modelName,
+      isApproved: true,
+      createdBy: request.requestedBy ?? null,
+    }).returning();
+
+    const [conv] = await db.insert(conversations).values({
+      conversationType: "motoclub",
+      title: `Club ${request.name}`,
+    }).returning();
+
+    await db.update(motoClubs)
+      .set({ conversationId: conv.id })
+      .where(eq(motoClubs.id, newClub.id));
+
+    await db.insert(moderatorLogs).values({
+      moderatorId: adminId,
+      action: "approve_motoclub_request",
+      targetType: "motoclub_request",
+      targetId: requestId,
+      details: `Approvata richiesta: ${request.name}`,
+    });
+
+    return res.json({ message: "Richiesta approvata", club: newClub });
+  } catch (e) {
+    console.error("[approve motoclub request]", e);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+router.post("/motoclubs/requests/:id/reject", async (req: Request, res: Response) => {
+  try {
+    const adminId = req.session.userId!;
+    const requestId = req.params.id;
+    const { note } = req.body as { note?: string };
+
+    await db.update(motoClubRequests)
+      .set({ status: "rejected", reviewedBy: adminId, reviewNote: note ?? null, updatedAt: new Date() })
+      .where(eq(motoClubRequests.id, requestId));
+
+    await db.insert(moderatorLogs).values({
+      moderatorId: adminId,
+      action: "reject_motoclub_request",
+      targetType: "motoclub_request",
+      targetId: requestId,
+      details: note ?? "Richiesta rifiutata",
+    });
+
+    return res.json({ message: "Richiesta rifiutata" });
+  } catch (e) {
+    return res.status(500).json({ message: "Errore interno" });
   }
 });
 

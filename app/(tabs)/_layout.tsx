@@ -108,6 +108,16 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="motoclub"
+        options={{
+          title: "Motoclub",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="shield" size={size} color={color} />
+          ),
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
         name="match"
         options={{
           title: "Match",
