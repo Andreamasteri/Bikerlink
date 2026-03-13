@@ -747,7 +747,7 @@ router.post("/migrate/verify-real-users", async (_req: Request, res: Response) =
 router.put("/settings/toggle-protected", async (req: Request, res: Response) => {
   try {
     const { key, value, adminPassword } = req.body;
-    const allowedKeys = ["email_verification_enabled", "ads_enabled", "syneco_branding_visible", "donation_enabled", "donation_text"];
+    const allowedKeys = ["email_verification_enabled", "ads_enabled", "syneco_branding_visible", "donation_enabled", "donation_text", "gps_required"];
 
     if (!allowedKeys.includes(key)) {
       return res.status(400).json({ message: "Chiave non valida" });

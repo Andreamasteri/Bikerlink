@@ -183,6 +183,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/gps-required", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("gps_required");
+      res.json({ required: setting?.value !== "false" });
+    } catch {
+      res.json({ required: true });
+    }
+  });
+
   app.get("/api/settings/donation", async (_req, res) => {
     try {
       const [enabledSetting, textSetting, paypalSetting] = await Promise.all([

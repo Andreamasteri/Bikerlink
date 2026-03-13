@@ -87,6 +87,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/syneco-branding"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/ads-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/donation"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/gps-required"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
       setProtectedToggle(null);
       setProtectedPassword("");
@@ -201,6 +202,11 @@ export default function AdminSettings() {
       setDonationText(donationData.text);
     }
   }, [donationData?.text]);
+
+  const { data: gpsRequiredData } = useQuery<{ required: boolean }>({
+    queryKey: ["/api/settings/gps-required"],
+  });
+  const gpsRequired = gpsRequiredData?.required !== false;
 
   const [emailConfigModalVisible, setEmailConfigModalVisible] = useState(false);
   const [emailConfigAdminPass, setEmailConfigAdminPass] = useState("");
@@ -831,6 +837,27 @@ export default function AdminSettings() {
             </TouchableOpacity>
           </View>
         </View>
+      </View>
+
+      <View style={styles.paypalCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="navigate" size={20} color="#4CAF50" />
+            <Text style={styles.synecoLabel}>GPS Obbligatorio</Text>
+          </View>
+          <Switch
+            value={gpsRequired}
+            onValueChange={(val) => setProtectedToggle({ key: "gps_required", value: val, label: "GPS Obbligatorio" })}
+            trackColor={{ false: Colors.border, true: "#4CAF50" }}
+            thumbColor={gpsRequired ? Colors.text : Colors.textSecondary}
+            disabled={protectedToggleMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {gpsRequired
+            ? "Senza permesso GPS, l'utente vede solo Profilo e Garage. Le altre tab sono nascoste."
+            : "GPS non obbligatorio: tutte le tab sono sempre visibili, anche senza permesso di localizzazione."}
+        </Text>
       </View>
 
       <View style={styles.privacyCard}>
