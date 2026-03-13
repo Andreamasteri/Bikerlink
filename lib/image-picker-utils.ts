@@ -40,7 +40,7 @@ export function showImagePickerMenu(
 
   const launchGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"] as any,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing,
       aspect,
       quality,
