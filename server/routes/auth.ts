@@ -4,7 +4,7 @@ import crypto from "crypto";
 import rateLimit from "express-rate-limit";
 import { registerSchema, loginSchema } from "@shared/schema";
 import { storage } from "../storage";
-import { sendVerificationEmail } from "../email";
+import { sendVerificationEmail, sendPasswordResetEmail } from "../email";
 
 declare module "express-session" {
   interface SessionData {
@@ -242,7 +242,12 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res:
 
     await storage.createPasswordResetToken(user.id, token, expiresAt);
 
-    console.log(`[PASSWORD RESET] Richiesta reset per ${user.email}`);
+    const emailSent = await sendPasswordResetEmail(user.email, user.nickname, token);
+    if (emailSent) {
+      console.log(`[PASSWORD RESET] Email di reset inviata a ${user.email}`);
+    } else {
+      console.warn(`[PASSWORD RESET] Email NON inviata a ${user.email}`);
+    }
 
     return res.json({ message: "Se l'email è registrata, riceverai un link di recupero" });
   } catch (error) {
