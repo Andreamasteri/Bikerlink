@@ -1,29 +1,51 @@
 import * as ImagePicker from "expo-image-picker";
 import { Alert, Platform, ActionSheetIOS } from "react-native";
 
+let cameraPermissionResolved = false;
 let cameraPermissionGranted = false;
 
 async function ensureCameraPermission(): Promise<boolean> {
-  if (cameraPermissionGranted) return true;
+  if (cameraPermissionResolved) {
+    if (!cameraPermissionGranted) {
+      Alert.alert(
+        "Permesso fotocamera",
+        "Per scattare foto, abilita l'accesso alla fotocamera nelle impostazioni del dispositivo.",
+        [{ text: "OK" }]
+      );
+    }
+    return cameraPermissionGranted;
+  }
 
   const { status: existingStatus } = await ImagePicker.getCameraPermissionsAsync();
   if (existingStatus === "granted") {
+    cameraPermissionResolved = true;
     cameraPermissionGranted = true;
     return true;
+  }
+
+  if (existingStatus === "denied") {
+    cameraPermissionResolved = true;
+    cameraPermissionGranted = false;
+    Alert.alert(
+      "Permesso fotocamera",
+      "Per scattare foto, abilita l'accesso alla fotocamera nelle impostazioni del dispositivo.",
+      [{ text: "OK" }]
+    );
+    return false;
   }
 
   const { status } = await ImagePicker.requestCameraPermissionsAsync();
-  if (status === "granted") {
-    cameraPermissionGranted = true;
-    return true;
-  }
+  cameraPermissionResolved = true;
+  cameraPermissionGranted = status === "granted";
 
-  Alert.alert(
-    "Permesso fotocamera",
-    "Per scattare foto, abilita l'accesso alla fotocamera nelle impostazioni del dispositivo.",
-    [{ text: "OK" }]
-  );
-  return false;
+  if (!cameraPermissionGranted) {
+    Alert.alert(
+      "Permesso fotocamera",
+      "Per scattare foto, abilita l'accesso alla fotocamera nelle impostazioni del dispositivo.",
+      [{ text: "OK" }]
+    );
+  }
+  return cameraPermissionGranted;
 }
 
 export interface PickImageOptions {
