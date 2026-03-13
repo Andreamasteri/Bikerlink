@@ -183,6 +183,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/donation", async (_req, res) => {
+    try {
+      const [enabledSetting, textSetting, paypalSetting] = await Promise.all([
+        storage.getAppSetting("donation_enabled"),
+        storage.getAppSetting("donation_text"),
+        storage.getAppSetting("paypal_email"),
+      ]);
+      res.json({
+        enabled: enabledSetting?.value !== "false",
+        text: textSetting?.value || "",
+        paypalEmail: paypalSetting?.value || "",
+      });
+    } catch {
+      res.json({ enabled: true, text: "", paypalEmail: "" });
+    }
+  });
+
   app.get("/api/settings/all", async (_req, res) => {
     try {
       const [syneco, emailVerification, chatbot, autoMatching, customRoutes, paypal, sosEnabled] = await Promise.all([

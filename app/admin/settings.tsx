@@ -86,6 +86,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/email-verification"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/syneco-branding"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/ads-enabled"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/donation"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
       setProtectedToggle(null);
       setProtectedPassword("");
@@ -186,6 +187,34 @@ export default function AdminSettings() {
   const [paypalEmail, setPaypalEmail] = useState("");
   const [isSavingPaypal, setIsSavingPaypal] = useState(false);
 
+  const { data: donationData } = useQuery<{ enabled: boolean; text: string; paypalEmail: string }>({
+    queryKey: ["/api/settings/donation"],
+  });
+  const donationEnabled = donationData?.enabled !== false;
+
+  const [donationText, setDonationText] = useState("");
+  const [isSavingDonationText, setIsSavingDonationText] = useState(false);
+
+  React.useEffect(() => {
+    if (donationData?.text !== undefined) {
+      setDonationText(donationData.text);
+    }
+  }, [donationData?.text]);
+
+  async function handleSaveDonationText() {
+    try {
+      setIsSavingDonationText(true);
+      await apiRequest("PUT", "/api/admin/settings/donation_text", { value: donationText });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/donation"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      Alert.alert("Successo", "Testo donazione salvato");
+    } catch (error: any) {
+      Alert.alert("Errore", error.message || "Errore durante il salvataggio");
+    } finally {
+      setIsSavingDonationText(false);
+    }
+  }
+
   const [emailConfigModalVisible, setEmailConfigModalVisible] = useState(false);
   const [emailConfigAdminPass, setEmailConfigAdminPass] = useState("");
   const [emailConfigGmail, setEmailConfigGmail] = useState("");
@@ -240,6 +269,7 @@ export default function AdminSettings() {
       setIsSavingPaypal(true);
       await apiRequest("PUT", "/api/admin/settings/paypal_email", { value: paypalEmail });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/paypal"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/donation"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
       Alert.alert("Successo", "Email PayPal salvata con successo");
     } catch (error: any) {
@@ -747,29 +777,70 @@ export default function AdminSettings() {
       )}
 
       <View style={styles.paypalCard}>
-        <View style={styles.privacyHeader}>
+        <View style={styles.synecoHeader}>
           <View style={styles.synecoInfo}>
-            <Ionicons name="logo-paypal" size={20} color="#003087" />
-            <Text style={styles.synecoLabel}>Email PayPal Donazioni</Text>
+            <Ionicons name="heart" size={20} color="#E91E63" />
+            <Text style={styles.synecoLabel}>Donazione PayPal</Text>
+          </View>
+          <Switch
+            value={donationEnabled}
+            onValueChange={(val) => setProtectedToggle({ key: "donation_enabled", value: val, label: "Donazione PayPal" })}
+            trackColor={{ false: Colors.border, true: "#E91E63" }}
+            thumbColor={donationEnabled ? Colors.text : Colors.textSecondary}
+            disabled={protectedToggleMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {donationEnabled
+            ? "Il blocco 'Supporta BikerLink' è visibile nel profilo utente"
+            : "Il blocco donazione è nascosto dal profilo utente"}
+        </Text>
+
+        <View style={{ marginTop: 16 }}>
+          <Text style={styles.settingLabel}>Email PayPal</Text>
+          <TextInput
+            style={[styles.input, { marginTop: 8 }]}
+            placeholder="email@esempio.com"
+            placeholderTextColor={Colors.textSecondary}
+            value={paypalEmail}
+            onChangeText={setPaypalEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <View style={styles.editActions}>
+            <TouchableOpacity
+              style={styles.saveBtn}
+              onPress={handleSavePaypal}
+              disabled={isSavingPaypal}
+            >
+              <Text style={styles.saveBtnText}>{isSavingPaypal ? "..." : "Salva"}</Text>
+            </TouchableOpacity>
           </View>
         </View>
-        <TextInput
-          style={[styles.input, { marginTop: 12 }]}
-          placeholder="email@esempio.com"
-          placeholderTextColor={Colors.textSecondary}
-          value={paypalEmail}
-          onChangeText={setPaypalEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        <View style={styles.editActions}>
-          <TouchableOpacity
-            style={styles.saveBtn}
-            onPress={handleSavePaypal}
-            disabled={isSavingPaypal}
-          >
-            <Text style={styles.saveBtnText}>{isSavingPaypal ? "..." : "Salva"}</Text>
-          </TouchableOpacity>
+
+        <View style={{ marginTop: 16 }}>
+          <Text style={styles.settingLabel}>Testo Messaggio Donazione</Text>
+          <Text style={[styles.synecoDesc, { marginTop: 2, marginBottom: 8 }]}>
+            Se vuoto, viene usato il testo predefinito.
+          </Text>
+          <TextInput
+            style={[styles.input, { minHeight: 120 }]}
+            placeholder="Scrivi qui il messaggio personalizzato per la sezione donazione..."
+            placeholderTextColor={Colors.textSecondary}
+            value={donationText}
+            onChangeText={setDonationText}
+            multiline
+            numberOfLines={6}
+          />
+          <View style={styles.editActions}>
+            <TouchableOpacity
+              style={styles.saveBtn}
+              onPress={handleSaveDonationText}
+              disabled={isSavingDonationText}
+            >
+              <Text style={styles.saveBtnText}>{isSavingDonationText ? "..." : "Salva"}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 

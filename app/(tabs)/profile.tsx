@@ -155,8 +155,8 @@ export default function ProfileScreen() {
     },
   });
 
-  const { data: paypalData } = useQuery<{ email: string }>({
-    queryKey: ["/api/settings/paypal"],
+  const { data: donationData } = useQuery<{ enabled: boolean; text: string; paypalEmail: string }>({
+    queryKey: ["/api/settings/donation"],
   });
 
   const { data: myClubs } = useQuery<{ id: string; name: string; brandName?: string | null; clubType: string }[]>({
@@ -543,37 +543,41 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      <View style={styles.donationSection}>
-        <View style={styles.donationIconRow}>
-          <Ionicons name="heart" size={28} color={Colors.accentRed} />
+      {donationData?.enabled !== false && (
+        <View style={styles.donationSection}>
+          <View style={styles.donationIconRow}>
+            <Ionicons name="heart" size={28} color={Colors.accentRed} />
+          </View>
+          <Text style={styles.donationTitle}>Supporta BikerLink</Text>
+          <Text style={styles.donationText}>
+            {donationData?.text || (
+              "Sono un motociclista, non un programmatore professionista.\n" +
+              "Sto sviluppando quest'app da solo, per biker e zavorrine, nel mio tempo libero e a titolo gratuito.\n" +
+              "Tra sviluppo, debug, server e pubblicazione i costi sono molto più alti del previsto.\n" +
+              "Se l'app ti piace e vuoi che continui a crescere, puoi supportarla con una piccola donazione.\n" +
+              "Anche solo il costo di un caffè fa la differenza.\n" +
+              "Ogni utente che contribuirà verrà inserito nella Hall of Fame dei ringraziamenti dell'app.\n" +
+              "Se ognuno mette poco, possiamo fare tanto.\n" +
+              "Grazie davvero.\n" +
+              "Ci vediamo su strada."
+            )}
+          </Text>
+          <Pressable
+            style={styles.donateBtn}
+            onPress={() => {
+              const email = donationData?.paypalEmail;
+              if (!email) {
+                Alert.alert("Donazione", "Il servizio PayPal non è ancora configurato.");
+                return;
+              }
+              Linking.openURL(`https://www.paypal.com/donate?business=${encodeURIComponent(email)}&currency_code=EUR`);
+            }}
+          >
+            <Ionicons name="logo-paypal" size={22} color="#fff" />
+            <Text style={styles.donateBtnText}>Dona con PayPal</Text>
+          </Pressable>
         </View>
-        <Text style={styles.donationTitle}>Supporta BikerLink</Text>
-        <Text style={styles.donationText}>
-          Sono un motociclista, non un programmatore professionista.{"\n"}
-          Sto sviluppando quest'app da solo, per biker e zavorrine, nel mio tempo libero e a titolo gratuito.{"\n"}
-          Tra sviluppo, debug, server e pubblicazione i costi sono molto più alti del previsto.{"\n"}
-          Se l'app ti piace e vuoi che continui a crescere, puoi supportarla con una piccola donazione.{"\n"}
-          Anche solo il costo di un caffè fa la differenza.{"\n"}
-          Ogni utente che contribuirà verrà inserito nella Hall of Fame dei ringraziamenti dell'app.{"\n"}
-          Se ognuno mette poco, possiamo fare tanto.{"\n"}
-          Grazie davvero.{"\n"}
-          Ci vediamo su strada.
-        </Text>
-        <Pressable
-          style={styles.donateBtn}
-          onPress={() => {
-            const email = paypalData?.email;
-            if (!email) {
-              Alert.alert("Donazione", "Il servizio PayPal non è ancora configurato.");
-              return;
-            }
-            Linking.openURL(`https://www.paypal.com/donate?business=${encodeURIComponent(email)}&currency_code=EUR`);
-          }}
-        >
-          <Ionicons name="logo-paypal" size={22} color="#fff" />
-          <Text style={styles.donateBtnText}>Dona con PayPal</Text>
-        </Pressable>
-      </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Menu</Text>

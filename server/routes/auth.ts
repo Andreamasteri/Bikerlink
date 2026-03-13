@@ -60,6 +60,11 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       return res.status(409).json({ message: "Email già registrata" });
     }
 
+    const reservedNicknames = ["admin", "administrator", "administrators", "amministratore", "amministratori", "mod", "moderator", "moderatore"];
+    if (reservedNicknames.includes(data.nickname.toLowerCase())) {
+      return res.status(400).json({ message: "Nickname non disponibile" });
+    }
+
     const existingNickname = await storage.getUserByNickname(data.nickname);
     if (existingNickname) {
       return res.status(409).json({ message: "Nickname già in uso" });

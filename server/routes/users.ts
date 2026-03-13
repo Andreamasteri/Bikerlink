@@ -97,6 +97,10 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
 
     if (Object.keys(userUpdate).length > 0) {
       if (userUpdate.nickname) {
+        const reservedNicknames = ["admin", "administrator", "administrators", "amministratore", "amministratori", "mod", "moderator", "moderatore"];
+        if (reservedNicknames.includes((userUpdate.nickname as string).toLowerCase())) {
+          return res.status(400).json({ message: "Nickname non disponibile" });
+        }
         const existing = await storage.getUserByNickname(userUpdate.nickname as string);
         if (existing && existing.id !== userId) {
           return res.status(409).json({ message: "Nickname già in uso" });

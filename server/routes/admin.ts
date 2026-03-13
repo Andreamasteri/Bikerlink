@@ -171,6 +171,9 @@ router.delete("/users/:id", async (req: Request, res: Response) => {
     if (!user) {
       return res.status(404).json({ message: "Utente non trovato" });
     }
+    if (user.role === "admin" || user.role === "moderator") {
+      return res.status(403).json({ message: "Impossibile eliminare un utente di sistema" });
+    }
     await storage.deleteUser(id);
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -744,7 +747,7 @@ router.post("/migrate/verify-real-users", async (_req: Request, res: Response) =
 router.put("/settings/toggle-protected", async (req: Request, res: Response) => {
   try {
     const { key, value, adminPassword } = req.body;
-    const allowedKeys = ["email_verification_enabled", "ads_enabled", "syneco_branding_visible"];
+    const allowedKeys = ["email_verification_enabled", "ads_enabled", "syneco_branding_visible", "donation_enabled"];
 
     if (!allowedKeys.includes(key)) {
       return res.status(400).json({ message: "Chiave non valida" });
