@@ -14,7 +14,8 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { apiRequest } from "@/lib/query-client";
+import { useRouter } from "expo-router";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 
 type Club = {
@@ -52,6 +53,20 @@ type Invite = {
   status: string;
   clubId: string;
   createdAt: string;
+};
+
+type MarketplaceMoto = {
+  id: string;
+  brand: string;
+  model: string;
+  displacement?: number | null;
+  motorcycleType?: string;
+  saleDescription?: string | null;
+  seller: {
+    id: string;
+    nickname: string;
+    avatarUrl?: string | null;
+  };
 };
 
 const COUNTRY_LABELS: Record<string, string> = {
@@ -223,7 +238,7 @@ export default function MotoclubScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
 
-  const [tab, setTab] = useState<"all" | "mine">("all");
+  const [tab, setTab] = useState<"all" | "mine" | "market">("all");
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"" | "brand" | "model" | "custom">("");
   const [filterCountry, setFilterCountry] = useState("");
@@ -253,6 +268,32 @@ export default function MotoclubScreen() {
 
   const { data: invites = [] } = useQuery<Invite[]>({
     queryKey: ["/api/motoclubs/invites"],
+  });
+
+  const { data: marketplaceData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/marketplace-enabled"],
+  });
+  const marketplaceEnabled = marketplaceData?.enabled !== false;
+
+  const { data: marketplaceMotos = {}, refetch: refetchMarket } = useQuery<Record<string, MarketplaceMoto[]>>({
+    queryKey: ["/api/motoclubs/marketplace-all", myClubs.map(c => c.id).join(",")],
+    queryFn: async () => {
+      if (!myClubs.length) return {};
+      const results: Record<string, MarketplaceMoto[]> = {};
+      await Promise.all(
+        myClubs.map(async (club) => {
+          try {
+            const res = await fetch(new URL(`/api/motoclubs/${club.id}/marketplace`, getApiUrl()).toString(), { credentials: "include" });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.length > 0) results[club.id] = data;
+            }
+          } catch {}
+        })
+      );
+      return results;
+    },
+    enabled: marketplaceEnabled && myClubs.length > 0 && tab === "market",
   });
 
   const pendingInvites = invites.filter((i) => i.status === "pending");
@@ -426,7 +467,7 @@ export default function MotoclubScreen() {
             onPress={() => setTab("all")}
           >
             <Text style={[styles.segText, tab === "all" && styles.segTextActive]}>
-              Tutti i Club
+              Tutti
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -434,13 +475,30 @@ export default function MotoclubScreen() {
             onPress={() => setTab("mine")}
           >
             <Text style={[styles.segText, tab === "mine" && styles.segTextActive]}>
-              I Miei Club
+              I Miei
             </Text>
           </TouchableOpacity>
+          {marketplaceEnabled && (
+            <TouchableOpacity
+              style={[styles.seg, tab === "market" && styles.segActive]}
+              onPress={() => setTab("market")}
+            >
+              <Text style={[styles.segText, tab === "market" && styles.segTextActive]}>
+                Mercatino
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      {loadingClubs ? (
+      {tab === "market" && marketplaceEnabled ? (
+        <MarketplaceTab
+          myClubs={myClubs}
+          marketplaceMotos={marketplaceMotos}
+          onRefresh={() => { refetchMarket(); }}
+          bottomInset={Platform.OS === "web" ? 34 : insets.bottom}
+        />
+      ) : loadingClubs ? (
         <View style={styles.loader}>
           <ActivityIndicator color={Colors.accent} size="large" />
         </View>
@@ -497,6 +555,91 @@ export default function MotoclubScreen() {
         />
       )}
     </View>
+  );
+}
+
+function MarketplaceTab({
+  myClubs,
+  marketplaceMotos,
+  onRefresh,
+  bottomInset,
+}: {
+  myClubs: UserClub[];
+  marketplaceMotos: Record<string, MarketplaceMoto[]>;
+  onRefresh: () => void;
+  bottomInset: number;
+}) {
+  const router = useRouter();
+  const clubsWithMotos = myClubs.filter((c) => (marketplaceMotos[c.id] || []).length > 0);
+  const totalMotos = Object.values(marketplaceMotos).reduce((sum, arr) => sum + arr.length, 0);
+
+  return (
+    <FlatList
+      data={clubsWithMotos}
+      keyExtractor={(c) => c.id}
+      contentContainerStyle={{ padding: 16, paddingBottom: 32 + bottomInset }}
+      refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} tintColor={Colors.accent} />}
+      ListHeaderComponent={
+        totalMotos > 0 ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 16 }}>
+            <Ionicons name="pricetag" size={18} color="#FF9800" />
+            <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.textSecondary }}>
+              {totalMotos} {totalMotos === 1 ? "moto in vendita" : "moto in vendita"} nei tuoi club
+            </Text>
+          </View>
+        ) : null
+      }
+      ListEmptyComponent={
+        <View style={styles.empty}>
+          <Ionicons name="pricetag-outline" size={48} color={Colors.border} />
+          <Text style={styles.emptyText}>
+            {myClubs.length === 0
+              ? "Iscriviti a un club per vedere il mercatino"
+              : "Nessuna moto in vendita nei tuoi club"}
+          </Text>
+        </View>
+      }
+      renderItem={({ item: club }) => {
+        const motos = marketplaceMotos[club.id] || [];
+        return (
+          <View style={{ marginBottom: 20 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <Ionicons name="shield-checkmark" size={16} color={Colors.accent} />
+              <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.accent }}>{club.name}</Text>
+            </View>
+            {motos.map((moto) => (
+              <TouchableOpacity
+                key={moto.id}
+                style={styles.marketCard}
+                activeOpacity={0.7}
+                onPress={() => router.push(`/profile/${moto.seller.id}`)}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.surfaceLight, alignItems: "center", justifyContent: "center" }}>
+                    <Ionicons name="bicycle" size={20} color="#FF9800" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.text }}>
+                      {moto.brand} {moto.model}
+                      {moto.displacement ? ` (${moto.displacement}cc)` : ""}
+                    </Text>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 }}>
+                      di {moto.seller.nickname}
+                    </Text>
+                    {!!moto.saleDescription && (
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic", marginTop: 4 }} numberOfLines={2}>
+                        {moto.saleDescription}
+                      </Text>
+                    )}
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        );
+      }}
+    />
   );
 }
 
@@ -685,4 +828,12 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   rejectText: { fontSize: 12, color: Colors.textSecondary, fontFamily: "Inter_600SemiBold" },
+  marketCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: "#FF9800",
+  },
 });

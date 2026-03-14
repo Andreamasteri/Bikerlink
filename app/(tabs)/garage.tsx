@@ -19,6 +19,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Switch } from "react-native";
 
 const MOTO_TYPES = [
   { value: "sportiva", label: "Sportiva" },
@@ -355,7 +356,14 @@ function GarageContent() {
     motorcycleType: "",
     ridingStyle: "",
     isDefault: false,
+    isForSale: false,
+    saleDescription: "",
   });
+
+  const { data: marketplaceData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/marketplace-enabled"],
+  });
+  const marketplaceEnabled = marketplaceData?.enabled !== false;
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["/api/motorcycles"],
@@ -404,7 +412,7 @@ function GarageContent() {
   });
 
   const resetForm = () => {
-    setForm({ brand: "", model: "", displacement: "", motorcycleType: "", ridingStyle: "", isDefault: false });
+    setForm({ brand: "", model: "", displacement: "", motorcycleType: "", ridingStyle: "", isDefault: false, isForSale: false, saleDescription: "" });
     setEditingId(null);
   };
 
@@ -422,6 +430,8 @@ function GarageContent() {
       motorcycleType: moto.motorcycleType || "",
       ridingStyle: moto.ridingStyle || "",
       isDefault: moto.isDefault || false,
+      isForSale: moto.isForSale || false,
+      saleDescription: moto.saleDescription || "",
     });
     setShowForm(true);
   };
@@ -474,11 +484,19 @@ function GarageContent() {
           <Ionicons name="bicycle" size={28} color={Colors.accent} />
           <View style={styles.cardInfo}>
             <Text style={styles.motoName}>{displayName}</Text>
-            {item.isDefault && (
-              <View style={styles.defaultBadge}>
-                <Text style={styles.defaultBadgeText}>Predefinita</Text>
-              </View>
-            )}
+            <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+              {item.isDefault && (
+                <View style={styles.defaultBadge}>
+                  <Text style={styles.defaultBadgeText}>Predefinita</Text>
+                </View>
+              )}
+              {marketplaceEnabled && item.isForSale && (
+                <View style={[styles.defaultBadge, { backgroundColor: "#FF980020" }]}>
+                  <Ionicons name="pricetag" size={10} color="#FF9800" />
+                  <Text style={[styles.defaultBadgeText, { color: "#FF9800" }]}> In Vendita</Text>
+                </View>
+              )}
+            </View>
           </View>
           <Pressable onPress={() => handleDelete(item.id, displayName)} hitSlop={10}>
             <Ionicons name="trash-outline" size={20} color={Colors.accentRed} />
@@ -591,6 +609,39 @@ function GarageContent() {
                 </View>
                 <Text style={styles.defaultLabel}>Moto predefinita</Text>
               </Pressable>
+
+              {marketplaceEnabled && (
+                <>
+                  <View style={[styles.defaultRow, { marginTop: 12, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 16 }]}>
+                    <Switch
+                      value={form.isForSale}
+                      onValueChange={(val) => setForm(p => ({ ...p, isForSale: val, saleDescription: val ? p.saleDescription : "" }))}
+                      trackColor={{ false: Colors.border, true: "#FF9800" }}
+                      thumbColor={form.isForSale ? Colors.text : Colors.textSecondary}
+                    />
+                    <View style={{ marginLeft: 10, flex: 1 }}>
+                      <Text style={styles.defaultLabel}>Questa moto è in vendita</Text>
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 }}>
+                        Verrà mostrata nel tuo profilo e nel mercatino del motoclub
+                      </Text>
+                    </View>
+                  </View>
+                  {form.isForSale && (
+                    <>
+                      <Text style={[styles.label, { marginTop: 12 }]}>Descrizione vendita</Text>
+                      <TextInput
+                        style={[styles.input, { minHeight: 80 }]}
+                        placeholder='Prezzo, condizioni, note...'
+                        placeholderTextColor={Colors.textSecondary}
+                        value={form.saleDescription}
+                        onChangeText={(v) => setForm(p => ({ ...p, saleDescription: v }))}
+                        multiline
+                        numberOfLines={3}
+                      />
+                    </>
+                  )}
+                </>
+              )}
 
               <Pressable style={styles.saveBtn} onPress={handleSave} disabled={saveMutation.isPending}>
                 {saveMutation.isPending ? (

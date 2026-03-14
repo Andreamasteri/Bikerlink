@@ -12,6 +12,7 @@ import {
   routes,
   users,
   userProfiles,
+  userMotorcycles,
 } from "@shared/schema";
 import { eq, and, ilike, or, sql, desc, ne } from "drizzle-orm";
 
@@ -345,6 +346,55 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
 
     return res.json({ ...club, members, memberCount: members.length });
   } catch (e) {
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+router.get("/:id/marketplace", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const clubId = req.params.id;
+    const userId = req.session.userId!;
+
+    const [isMember] = await db.select({ userId: motoClubMembers.userId })
+      .from(motoClubMembers)
+      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.userId, userId), eq(motoClubMembers.status, "active")))
+      .limit(1);
+    if (!isMember) return res.status(403).json({ message: "Devi essere membro del club" });
+
+    const memberIds = await db.select({ userId: motoClubMembers.userId })
+      .from(motoClubMembers)
+      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active")));
+
+    if (memberIds.length === 0) return res.json([]);
+
+    const ids = memberIds.map(m => m.userId);
+    const motos = await db.select({
+      moto: userMotorcycles,
+      user: { id: users.id, nickname: users.nickname, avatarUrl: users.avatarUrl },
+    })
+      .from(userMotorcycles)
+      .innerJoin(users, eq(users.id, userMotorcycles.userId))
+      .where(and(
+        eq(userMotorcycles.isForSale, true),
+        sql`${userMotorcycles.userId} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`
+      ))
+      .orderBy(desc(userMotorcycles.createdAt));
+
+    const result = motos.map(r => ({
+      id: r.moto.id,
+      brand: r.moto.brand,
+      model: r.moto.model,
+      year: r.moto.year,
+      displacement: r.moto.displacement,
+      motorcycleType: r.moto.motorcycleType,
+      photoUrl: r.moto.photoUrl,
+      saleDescription: r.moto.saleDescription,
+      seller: r.user,
+    }));
+
+    return res.json(result);
+  } catch (e) {
+    console.error("Club marketplace error:", e);
     return res.status(500).json({ message: "Errore interno" });
   }
 });

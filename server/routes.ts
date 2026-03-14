@@ -183,6 +183,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/marketplace-enabled", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("marketplace_enabled");
+      res.json({ enabled: setting?.value !== "false" });
+    } catch {
+      res.json({ enabled: true });
+    }
+  });
+
   app.get("/api/settings/gps-required", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("gps_required");

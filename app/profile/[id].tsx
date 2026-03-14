@@ -24,6 +24,11 @@ export default function PublicProfileScreen() {
   const { user } = useAuth();
   const baseUrl = getApiUrl();
 
+  const { data: marketplaceData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/marketplace-enabled"],
+  });
+  const marketplaceEnabled = marketplaceData?.enabled !== false;
+
   const { data: profile, isLoading } = useQuery({
     queryKey: ["/api/users", id, "public"],
     queryFn: async () => {
@@ -144,6 +149,15 @@ export default function PublicProfileScreen() {
                   {!!m.year && <Text style={styles.motoDetail}>Anno: {m.year}</Text>}
                   {!!m.engineSize && <Text style={styles.motoDetail}>{m.engineSize}cc</Text>}
                   {!!m.ridingStyle && <Text style={styles.motoDetail}>Stile: {m.ridingStyle}</Text>}
+                  {marketplaceEnabled && m.isForSale && (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4, backgroundColor: "#FF980015", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, alignSelf: "flex-start" }}>
+                      <Ionicons name="pricetag" size={12} color="#FF9800" />
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#FF9800" }}>In Vendita</Text>
+                    </View>
+                  )}
+                  {marketplaceEnabled && m.isForSale && !!m.saleDescription && (
+                    <Text style={[styles.motoDetail, { fontStyle: "italic", marginTop: 4 }]}>{m.saleDescription}</Text>
+                  )}
                 </View>
               </View>
             ))}

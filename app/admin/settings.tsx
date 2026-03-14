@@ -88,6 +88,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/ads-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/donation"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/gps-required"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/marketplace-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
       setProtectedToggle(null);
       setProtectedPassword("");
@@ -207,6 +208,11 @@ export default function AdminSettings() {
     queryKey: ["/api/settings/gps-required"],
   });
   const gpsRequired = gpsRequiredData?.required !== false;
+
+  const { data: marketplaceData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/marketplace-enabled"],
+  });
+  const marketplaceEnabled = marketplaceData?.enabled !== false;
 
   const [emailConfigModalVisible, setEmailConfigModalVisible] = useState(false);
   const [emailConfigAdminPass, setEmailConfigAdminPass] = useState("");
@@ -837,6 +843,27 @@ export default function AdminSettings() {
             </TouchableOpacity>
           </View>
         </View>
+      </View>
+
+      <View style={styles.paypalCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="pricetag" size={20} color="#FF9800" />
+            <Text style={styles.synecoLabel}>Mercatino Moto</Text>
+          </View>
+          <Switch
+            value={marketplaceEnabled}
+            onValueChange={(val) => setProtectedToggle({ key: "marketplace_enabled", value: val, label: "Mercatino Moto" })}
+            trackColor={{ false: Colors.border, true: "#FF9800" }}
+            thumbColor={marketplaceEnabled ? Colors.text : Colors.textSecondary}
+            disabled={protectedToggleMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {marketplaceEnabled
+            ? "I biker possono mettere in vendita le moto dal garage. Le moto in vendita appaiono nel profilo e nel motoclub."
+            : "Il mercatino moto è disattivato. La funzione 'In Vendita' non è visibile."}
+        </Text>
       </View>
 
       <View style={styles.paypalCard}>
