@@ -23,9 +23,21 @@ export function useLocationGate() {
 
 const GPS_CHECK_INTERVAL = 4000;
 
+function isWebPermissionsAvailable(): boolean {
+  try {
+    return Platform.OS === "web"
+      && typeof navigator !== "undefined"
+      && !!navigator.permissions
+      && typeof navigator.permissions.query === "function";
+  } catch {
+    return false;
+  }
+}
+
 export function LocationProvider({ children }: { children: React.ReactNode }) {
   const [hasPermission, setHasPermission] = useState(true);
   const appState = useRef(AppState.currentState);
+  const permissionStatusRef = useRef<PermissionStatus | null>(null);
 
   const { data: gpsData } = useQuery<{ required: boolean }>({
     queryKey: ["/api/settings/gps-required"],
@@ -36,8 +48,9 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const checkPermission = useCallback(async () => {
     try {
       if (Platform.OS === "web") {
-        if (navigator.permissions) {
+        if (isWebPermissionsAvailable()) {
           const result = await navigator.permissions.query({ name: "geolocation" as PermissionName });
+          permissionStatusRef.current = result;
           setHasPermission(result.state === "granted");
         } else {
           setHasPermission(true);
@@ -54,6 +67,10 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const requestPermission = useCallback(async (): Promise<boolean> => {
     try {
       if (Platform.OS === "web") {
+        if (typeof navigator === "undefined" || !navigator.geolocation) {
+          setHasPermission(true);
+          return true;
+        }
         return new Promise((resolve) => {
           navigator.geolocation.getCurrentPosition(
             () => { setHasPermission(true); resolve(true); },
@@ -68,8 +85,8 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
         return granted;
       }
     } catch {
-      setHasPermission(false);
-      return false;
+      setHasPermission(true);
+      return true;
     }
   }, []);
 
@@ -79,12 +96,15 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!gpsRequired) return;
+    if (Platform.OS === "web") return;
 
     const interval = setInterval(checkPermission, GPS_CHECK_INTERVAL);
     return () => clearInterval(interval);
   }, [gpsRequired, checkPermission]);
 
   useEffect(() => {
+    if (Platform.OS === "web") return;
+
     const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
       if (appState.current.match(/inactive|background/) && nextState === "active") {
         checkPermission();
@@ -95,17 +115,26 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   }, [checkPermission]);
 
   useEffect(() => {
-    if (Platform.OS === "web" && navigator.permissions) {
-      let cleanup: (() => void) | null = null;
-      navigator.permissions.query({ name: "geolocation" as PermissionName }).then((result) => {
-        const handler = () => {
-          setHasPermission(result.state === "granted");
-        };
-        result.addEventListener("change", handler);
-        cleanup = () => result.removeEventListener("change", handler);
-      }).catch(() => {});
-      return () => { if (cleanup) cleanup(); };
-    }
+    if (!isWebPermissionsAvailable()) return;
+
+    let cleanup: (() => void) | null = null;
+    let cancelled = false;
+
+    navigator.permissions.query({ name: "geolocation" as PermissionName }).then((result) => {
+      if (cancelled) return;
+      const handler = () => {
+        setHasPermission(result.state === "granted");
+      };
+      result.addEventListener("change", handler);
+      cleanup = () => result.removeEventListener("change", handler);
+    }).catch(() => {
+      if (!cancelled) setHasPermission(true);
+    });
+
+    return () => {
+      cancelled = true;
+      if (cleanup) cleanup();
+    };
   }, []);
 
   const isGpsGateActive = gpsRequired && !hasPermission;
