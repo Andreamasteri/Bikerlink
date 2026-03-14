@@ -872,6 +872,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(users.status, "active"),
+          eq(userProfiles.isAvailable, true),
           sql`${userProfiles.latitude} IS NOT NULL`,
           sql`${userProfiles.longitude} IS NOT NULL`
         )
@@ -1352,6 +1353,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async toggleFakeZavorrineAvailability(): Promise<void> {
+    const globalToggle = await this.getAppSetting("fake_users_enabled");
+    if (globalToggle && globalToggle.value === "false") {
+      return;
+    }
+
     const fakeZavorrine = await db.select({ id: users.id, profileUserId: userProfiles.userId, adminOverrideUntil: userProfiles.adminOverrideUntil })
       .from(users)
       .innerJoin(userProfiles, eq(userProfiles.userId, users.id))

@@ -1210,6 +1210,7 @@ router.put("/fake-users/toggle-all", async (req: Request, res: Response) => {
     const { db } = await import("../db");
     const { users: usersTable, userProfiles } = await import("../../shared/schema");
     const { eq } = await import("drizzle-orm");
+    await storage.upsertAppSetting("fake_users_enabled", enabled ? "true" : "false");
     const fakeUsers = await db.select().from(usersTable).where(eq(usersTable.isFake, true));
     const newLoginAt = enabled ? new Date() : new Date("2020-01-01");
     for (const fakeUser of fakeUsers) {
