@@ -352,6 +352,12 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
 
 router.get("/:id/marketplace", requireAuth, async (req: Request, res: Response) => {
   try {
+    const { storage } = await import("../storage");
+    const marketplaceSetting = await storage.getAppSetting("marketplace_enabled");
+    if (marketplaceSetting?.value === "false") {
+      return res.json([]);
+    }
+
     const clubId = req.params.id;
     const userId = req.session.userId!;
 
