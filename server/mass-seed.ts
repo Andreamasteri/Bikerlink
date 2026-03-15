@@ -7,7 +7,7 @@ import {
   type User, type UserProfile, type UserMotorcycle, type Conversation,
   type ConversationParticipant, type Message,
 } from "@shared/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import {
   REGIONS, REGION_COORDS, MALE_NAMES, FEMALE_NAMES, SURNAMES, MOTORCYCLES,
   randOffset, randBirthYear, pickRandom, pickRandomN, getMotoYear, getBio, getWelcomeMessage,
@@ -174,7 +174,7 @@ async function ensureOfficialAccount(): Promise<string> {
     sex: "M",
     role: "user",
     status: "active",
-    isFake: false,
+    isFake: true,
     region: "Lombardia",
     birthYear: 2000,
     emailVerified: false,
@@ -195,7 +195,7 @@ export async function massSeedFakeUsers(): Promise<void> {
   try {
     const [fakeCountResult] = await db.select({ count: sql<number>`count(*)::int` })
       .from(users)
-      .where(and(eq(users.isFake, true), eq(users.nickname, users.nickname)));
+      .where(eq(users.isFake, true));
     const existingFakeCount = fakeCountResult?.count ?? 0;
 
     if (existingFakeCount >= allSpecs.length) {
