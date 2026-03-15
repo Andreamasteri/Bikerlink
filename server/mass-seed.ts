@@ -136,8 +136,8 @@ function buildSpecs(): UserSpec[] {
 async function ensureOfficialAccount(): Promise<string> {
   const existing = await storage.getUserByNickname("BikerLink_Official");
   if (existing) {
-    if (existing.isFake) {
-      await storage.updateUser(existing.id, { isFake: false });
+    if (!existing.isFake) {
+      await storage.updateUser(existing.id, { isFake: true });
     }
     return existing.id;
   }
@@ -151,7 +151,7 @@ async function ensureOfficialAccount(): Promise<string> {
     sex: "M",
     role: "user",
     status: "active",
-    isFake: false,
+    isFake: true,
     region: "Lombardia",
     birthYear: 2000,
     emailVerified: false,
@@ -274,24 +274,48 @@ export async function massSeedFakeUsers(): Promise<void> {
     await storage.upsertAppSetting("skip_fake_user_seed", "false");
     const officialId = await ensureOfficialAccount();
 
-    const [taggedCountResult] = await db.select({ count: sql<number>`count(*)::int` })
+    const existingTagged = await db.select({
+      userType: users.userType,
+      sex: users.sex,
+      coupleSexConfig: users.coupleSexConfig,
+      region: users.region,
+    })
       .from(users)
       .where(eq(users.invitationCode, SEED_TAG));
-    const existingTaggedCount = taggedCountResult?.count ?? 0;
 
-    if (existingTaggedCount > 0) {
-      console.log(`[mass-seed] Reconciling ${existingTaggedCount} existing tagged users...`);
+    if (existingTagged.length > 0) {
+      console.log(`[mass-seed] Found ${existingTagged.length} existing tagged users, reconciling...`);
       await reconcileExistingUsers(officialId);
     }
 
-    if (existingTaggedCount >= TARGET) {
-      massSeedStatus = { running: false, created: existingTaggedCount, total: TARGET, error: null };
+    const existingCounts = new Map<string, number>();
+    for (const u of existingTagged) {
+      const csc = u.coupleSexConfig ?? "none";
+      const key = `${u.userType}_${u.sex}_${csc}_${u.region}`;
+      existingCounts.set(key, (existingCounts.get(key) ?? 0) + 1);
+    }
+
+    const specsToCreate: UserSpec[] = [];
+    const specCountNeeded = new Map<string, number>();
+    for (const spec of allSpecs) {
+      const csc = spec.coupleSexConfig ?? "none";
+      const catRegionKey = `${spec.userType}_${spec.sex}_${csc}_${spec.region}`;
+      const alreadyCreated = existingCounts.get(catRegionKey) ?? 0;
+      const alreadyAccounted = specCountNeeded.get(catRegionKey) ?? 0;
+      if (alreadyAccounted < alreadyCreated) {
+        specCountNeeded.set(catRegionKey, alreadyAccounted + 1);
+      } else {
+        specsToCreate.push(spec);
+        specCountNeeded.set(catRegionKey, alreadyAccounted + 1);
+      }
+    }
+
+    if (specsToCreate.length === 0) {
+      massSeedStatus = { running: false, created: existingTagged.length, total: TARGET, error: null };
       return;
     }
 
-    const needed = TARGET - existingTaggedCount;
-    const specsToCreate = allSpecs.slice(existingTaggedCount);
-    massSeedStatus.total = needed;
+    massSeedStatus.total = specsToCreate.length;
 
     const existingUsers = await db.select({ nickname: users.nickname, email: users.email }).from(users);
     for (const u of existingUsers) {

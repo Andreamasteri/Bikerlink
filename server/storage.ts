@@ -1326,7 +1326,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFakeUserStats(): Promise<any[]> {
-    const fakeUsers = await db.select().from(users).where(eq(users.isFake, true)).orderBy(desc(users.createdAt));
+    const fakeUsers = await db.select().from(users).where(
+      and(eq(users.isFake, true), sql`${users.nickname} != 'BikerLink_Official'`)
+    ).orderBy(desc(users.createdAt));
     const stats = [];
     for (const u of fakeUsers) {
       const profile = await this.getUserProfile(u.id);
@@ -1346,7 +1348,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFakeUsers(): Promise<User[]> {
-    return db.select().from(users).where(eq(users.isFake, true)).orderBy(desc(users.createdAt));
+    return db.select().from(users).where(
+      and(eq(users.isFake, true), sql`${users.nickname} != 'BikerLink_Official'`)
+    ).orderBy(desc(users.createdAt));
   }
 
   async deleteFakeUser(id: string): Promise<void> {
@@ -1354,7 +1358,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteAllFakeUsers(): Promise<number> {
-    const deleted = await db.delete(users).where(eq(users.isFake, true)).returning({ id: users.id });
+    const deleted = await db.delete(users).where(
+      and(eq(users.isFake, true), sql`${users.nickname} != 'BikerLink_Official'`)
+    ).returning({ id: users.id });
     return deleted.length;
   }
 
