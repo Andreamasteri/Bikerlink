@@ -4,8 +4,7 @@ import { storage } from "./storage";
 import {
   users, userProfiles, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos,
   conversations, conversationParticipants, messages,
-  type User, type UserProfile, type UserMotorcycle, type Conversation,
-  type ConversationParticipant, type Message,
+  type User,
 } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import {
@@ -13,6 +12,8 @@ import {
   randOffset, randBirthYear, pickRandom, pickRandomN, getMotoYear, getBio, getWelcomeMessage,
   distributeUniformly,
 } from "./mass-seed-data";
+
+const SEED_TAG = "mass_seed_2420";
 
 interface MassSeedStatus {
   running: boolean;
@@ -53,6 +54,7 @@ interface UserRow {
   country: string;
   spokenLanguages: string[];
   lastLoginAt: Date;
+  invitationCode: string;
 }
 
 interface ProfileRow {
@@ -174,7 +176,7 @@ async function ensureOfficialAccount(): Promise<string> {
     sex: "M",
     role: "user",
     status: "active",
-    isFake: true,
+    isFake: false,
     region: "Lombardia",
     birthYear: 2000,
     emailVerified: false,
@@ -183,36 +185,110 @@ async function ensureOfficialAccount(): Promise<string> {
   return user.id;
 }
 
+async function reconcileExistingUsers(officialId: string): Promise<void> {
+  const taggedUsers = await db.select({ id: users.id, userType: users.userType, sex: users.sex })
+    .from(users)
+    .where(eq(users.invitationCode, SEED_TAG));
+
+  for (const u of taggedUsers) {
+    const [profileExists] = await db.select({ id: userProfiles.id })
+      .from(userProfiles)
+      .where(eq(userProfiles.userId, u.id))
+      .limit(1);
+
+    if (!profileExists) {
+      try {
+        const region = pickRandom(REGIONS);
+        const coords = REGION_COORDS[region];
+        await db.insert(userProfiles).values({
+          userId: u.id,
+          isAvailable: Math.random() > 0.3,
+          latitude: coords.lat + randOffset(),
+          longitude: coords.lng + randOffset(),
+          maxPickupDistance: 20 + Math.floor(Math.random() * 80),
+          bio: getBio(u.userType, u.sex),
+        }).onConflictDoNothing();
+      } catch (err: unknown) {
+        logSeedError(`reconcile-profile-${u.id}`, err);
+      }
+    }
+
+    if (u.userType === "biker" || u.userType === "coppia") {
+      const existingMotos = await db.select({ id: userMotorcycles.id })
+        .from(userMotorcycles)
+        .where(eq(userMotorcycles.userId, u.id));
+      if (existingMotos.length < 2) {
+        const needed = 2 - existingMotos.length;
+        const motos = pickRandomN(MOTORCYCLES, needed);
+        for (const moto of motos) {
+          try {
+            await db.insert(userMotorcycles).values({
+              userId: u.id,
+              brand: moto.brand,
+              model: moto.model,
+              year: getMotoYear(),
+              displacement: moto.displacement,
+              motorcycleType: moto.type,
+              ridingStyle: moto.style,
+            });
+          } catch (err: unknown) {
+            logSeedError(`reconcile-moto-${u.id}`, err);
+          }
+        }
+      }
+    }
+
+    if (u.userType === "zavorrina") {
+      const existingWl = await storage.getWishlist(u.id);
+      if (!existingWl) {
+        try {
+          const wishlist = await storage.createOrUpdateWishlist(u.id, "Cerco un biker per bei giri in moto");
+          const desiredMotos = pickRandomN(MOTORCYCLES, 2 + Math.floor(Math.random() * 2));
+          const wishlistMotoValues: WishlistMotoRow[] = desiredMotos.map(m => ({
+            wishlistId: wishlist.id,
+            brand: m.brand,
+            model: m.model,
+            motorcycleType: m.type,
+            ridingStyle: m.style,
+          }));
+          await db.insert(zavarrinaWishlistMotos).values(wishlistMotoValues);
+        } catch (err: unknown) {
+          logSeedError(`reconcile-wishlist-${u.id}`, err);
+        }
+      }
+    }
+  }
+}
+
 export async function massSeedFakeUsers(): Promise<void> {
   if (massSeedStatus.running) return;
 
   seedErrors.length = 0;
   const allSpecs = buildSpecs();
-  massSeedStatus = { running: true, created: 0, total: allSpecs.length, error: null };
+  const TARGET = allSpecs.length;
+  massSeedStatus = { running: true, created: 0, total: TARGET, error: null };
   usedNicknames = new Set<string>();
   usedEmails = new Set<string>();
 
   try {
     await storage.upsertAppSetting("skip_fake_user_seed", "false");
-
     const officialId = await ensureOfficialAccount();
 
-    const [fakeCountResult] = await db.select({ count: sql<number>`count(*)::int` })
+    const [taggedCountResult] = await db.select({ count: sql<number>`count(*)::int` })
       .from(users)
-      .where(sql`${users.isFake} = true AND ${users.nickname} != 'BikerLink_Official'`);
-    const existingSeededCount = fakeCountResult?.count ?? 0;
+      .where(eq(users.invitationCode, SEED_TAG));
+    const existingTaggedCount = taggedCountResult?.count ?? 0;
 
-    if (existingSeededCount >= allSpecs.length) {
-      massSeedStatus = {
-        running: false,
-        created: existingSeededCount,
-        total: allSpecs.length,
-        error: null,
-      };
+    if (existingTaggedCount > 0) {
+      await reconcileExistingUsers(officialId);
+    }
+
+    if (existingTaggedCount >= TARGET) {
+      massSeedStatus = { running: false, created: existingTaggedCount, total: TARGET, error: null };
       return;
     }
 
-    const needed = allSpecs.length - existingSeededCount;
+    const needed = TARGET - existingTaggedCount;
     const specs = allSpecs.slice(0, needed);
     massSeedStatus.total = needed;
 
@@ -221,6 +297,7 @@ export async function massSeedFakeUsers(): Promise<void> {
       usedNicknames.add(u.nickname.toLowerCase());
       usedEmails.add(u.email.toLowerCase());
     }
+
     const hashedPw = await bcrypt.hash("FakeUser2024!", 10);
 
     for (let batchStart = 0; batchStart < specs.length; batchStart += BATCH_SIZE) {
@@ -249,6 +326,7 @@ export async function massSeedFakeUsers(): Promise<void> {
           country: "IT",
           spokenLanguages: ["Italiano"],
           lastLoginAt: new Date(Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)),
+          invitationCode: SEED_TAG,
         });
         specMeta.push({ nickname, email, spec });
       }
