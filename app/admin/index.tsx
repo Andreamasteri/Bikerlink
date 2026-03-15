@@ -1,10 +1,9 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { t } from "@/lib/i18n";
 
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
 type MaterialCommunityIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -20,12 +19,15 @@ type AdminItem = {
   | { iconSet: "Ionicons"; icon: IoniconsName }
 );
 
-interface AdminGroup {
+type AdminGroupHeader =
+  | { headerIconSet: "MaterialIcons"; headerIcon: MaterialIconName }
+  | { headerIconSet: "MaterialCommunityIcons"; headerIcon: MaterialCommunityIconName }
+  | { headerIconSet: "Ionicons"; headerIcon: IoniconsName };
+
+type AdminGroup = AdminGroupHeader & {
   title: string;
   items: AdminItem[];
-  headerIcon: AdminItem["icon"];
-  headerIconSet: AdminItem["iconSet"];
-}
+};
 
 const adminGroups: AdminGroup[] = [
   {
@@ -81,8 +83,14 @@ function renderIcon(item: AdminItem, size = 28, color = Colors.accent) {
 }
 
 function renderGroupHeaderIcon(group: AdminGroup) {
-  const fakeItem = { iconSet: group.headerIconSet, icon: group.headerIcon } as AdminItem;
-  return renderIcon(fakeItem, 20, Colors.textSecondary);
+  switch (group.headerIconSet) {
+    case "MaterialCommunityIcons":
+      return <MaterialCommunityIcons name={group.headerIcon} size={20} color={Colors.textSecondary} />;
+    case "Ionicons":
+      return <Ionicons name={group.headerIcon} size={20} color={Colors.textSecondary} />;
+    case "MaterialIcons":
+      return <MaterialIcons name={group.headerIcon} size={20} color={Colors.textSecondary} />;
+  }
 }
 
 export default function AdminDashboard() {
