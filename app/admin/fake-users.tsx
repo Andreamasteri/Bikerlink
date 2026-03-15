@@ -481,7 +481,7 @@ export default function FakeUsersAdmin() {
             ) : (
               <>
                 <Ionicons name="flash" size={18} color="#000" />
-                <Text style={styles.massSeedBtnText}>Avvia Generazione</Text>
+                <Text style={styles.massSeedBtnText}>Genera 2420 utenti</Text>
               </>
             )}
           </TouchableOpacity>
