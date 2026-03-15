@@ -117,6 +117,11 @@ export default function FakeUsersAdmin() {
     },
   });
 
+  const { data: fakeUsersEnabledData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/fake-users-enabled"],
+  });
+  const allEnabled = fakeUsersEnabledData?.enabled !== false;
+
   const toggleAllMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       const baseUrl = getApiUrl();
@@ -132,6 +137,7 @@ export default function FakeUsersAdmin() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/fake-users-enabled"] });
     },
   });
 
@@ -144,8 +150,6 @@ export default function FakeUsersAdmin() {
       return res.json();
     },
   });
-
-  const allEnabled = users.length > 0 && users.every((u) => u.profile?.isAvailable);
 
   const toggleAvailableMutation = useMutation({
     mutationFn: (id: number) => apiRequest("PUT", `/api/admin/fake-users/${id}/toggle-available`),
@@ -166,6 +170,7 @@ export default function FakeUsersAdmin() {
     mutationFn: () => apiRequest("DELETE", "/api/admin/fake-users"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/fake-users-enabled"] });
       Alert.alert("Fatto", "Tutti gli utenti fake sono stati eliminati");
     },
     onError: (error: Error) => {
@@ -332,6 +337,11 @@ export default function FakeUsersAdmin() {
           <Text style={styles.controlDesc}>
             {allEnabled ? "Tutti gli utenti fake sono attivi e visibili" : "Gli utenti fake sono disattivati"}
           </Text>
+          {users.length === 0 && (
+            <Text style={styles.controlDesc}>
+              Nessun utente fake nel sistema. Usa il form in basso per aggiungerne.
+            </Text>
+          )}
 
           <View style={[styles.controlDivider]} />
 
