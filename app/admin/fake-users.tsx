@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -177,6 +177,71 @@ export default function FakeUsersAdmin() {
       Alert.alert("Errore", error.message || "Errore durante l'eliminazione");
     },
   });
+
+  const [massSeedRunning, setMassSeedRunning] = useState(false);
+  const [massSeedCreated, setMassSeedCreated] = useState(0);
+  const [massSeedTotal, setMassSeedTotal] = useState(0);
+  const [massSeedError, setMassSeedError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPolling = () => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  };
+
+  const pollStatus = async () => {
+    try {
+      const url = getApiUrl() + "/api/admin/mass-seed-status";
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) return;
+      const data = await res.json();
+      setMassSeedRunning(data.running);
+      setMassSeedCreated(data.created);
+      setMassSeedTotal(data.total);
+      setMassSeedError(data.error);
+      if (!data.running) {
+        stopPolling();
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] });
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    pollStatus();
+    return stopPolling;
+  }, []);
+
+  const startMassSeed = async () => {
+    try {
+      setMassSeedError(null);
+      const url = getApiUrl() + "/api/admin/mass-seed-fake-users";
+      const res = await fetch(url, { method: "POST", credentials: "include" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        Alert.alert("Errore", data.message || "Impossibile avviare");
+        return;
+      }
+      setMassSeedRunning(true);
+      setMassSeedCreated(0);
+      setMassSeedTotal(2420);
+      pollRef.current = setInterval(pollStatus, 3000);
+    } catch (e: any) {
+      Alert.alert("Errore", e.message || "Errore di rete");
+    }
+  };
+
+  const handleStartMassSeed = () => {
+    Alert.alert(
+      "Generazione Massiva",
+      "Verranno generati 2420 utenti fake distribuiti uniformemente in tutte le 20 regioni italiane.\n\nQuesto processo richiederà qualche minuto.",
+      [
+        { text: "Annulla", style: "cancel" },
+        { text: "Genera", onPress: startMassSeed },
+      ]
+    );
+  };
 
   const createMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/admin/fake-users", data),
@@ -376,6 +441,47 @@ export default function FakeUsersAdmin() {
               <>
                 <Ionicons name="trash" size={18} color="#fff" />
                 <Text style={styles.deleteAllBtnText}>Elimina tutti ({users.length})</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.massSeedCard}>
+          <View style={styles.massSeedHeader}>
+            <Ionicons name="flash" size={22} color={Colors.accent} />
+            <Text style={styles.massSeedTitle}>Generazione Massiva</Text>
+          </View>
+          <Text style={styles.massSeedDesc}>
+            Genera 2420 utenti fake (1500 biker M, 200 biker F, 170 coppie, 500 zav F, 50 zav M) distribuiti uniformemente nelle 20 regioni italiane.
+          </Text>
+          {massSeedRunning && (
+            <View style={styles.massSeedProgress}>
+              <View style={styles.progressBarBg}>
+                <View style={[styles.progressBarFill, { width: `${massSeedTotal > 0 ? Math.round((massSeedCreated / massSeedTotal) * 100) : 0}%` }]} />
+              </View>
+              <Text style={styles.massSeedProgressText}>
+                {massSeedCreated} / {massSeedTotal} ({massSeedTotal > 0 ? Math.round((massSeedCreated / massSeedTotal) * 100) : 0}%)
+              </Text>
+            </View>
+          )}
+          {!!massSeedError && (
+            <Text style={styles.massSeedErrorText}>Errore: {massSeedError}</Text>
+          )}
+          {!massSeedRunning && massSeedCreated > 0 && !massSeedError && (
+            <Text style={styles.massSeedSuccessText}>Completato: {massSeedCreated} utenti creati</Text>
+          )}
+          <TouchableOpacity
+            style={[styles.massSeedBtn, massSeedRunning && styles.massSeedBtnDisabled]}
+            onPress={handleStartMassSeed}
+            disabled={massSeedRunning}
+            activeOpacity={0.7}
+          >
+            {massSeedRunning ? (
+              <ActivityIndicator size="small" color="#000" />
+            ) : (
+              <>
+                <Ionicons name="flash" size={18} color="#000" />
+                <Text style={styles.massSeedBtnText}>Avvia Generazione</Text>
               </>
             )}
           </TouchableOpacity>
@@ -1139,6 +1245,82 @@ const styles = StyleSheet.create({
   createBtnText: {
     fontFamily: "Inter_700Bold",
     fontSize: 16,
+    color: "#000",
+  },
+  massSeedCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+  },
+  massSeedHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  massSeedTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    color: Colors.text,
+  },
+  massSeedDesc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  massSeedProgress: {
+    marginBottom: 12,
+  },
+  progressBarBg: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.border,
+    overflow: "hidden" as const,
+    marginBottom: 6,
+  },
+  progressBarFill: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.accent,
+  },
+  massSeedProgressText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.text,
+    textAlign: "center" as const,
+  },
+  massSeedErrorText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.error,
+    marginBottom: 8,
+  },
+  massSeedSuccessText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.success,
+    marginBottom: 8,
+  },
+  massSeedBtn: {
+    backgroundColor: Colors.accent,
+    borderRadius: 10,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  massSeedBtnDisabled: {
+    opacity: 0.6,
+  },
+  massSeedBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
     color: "#000",
   },
 });

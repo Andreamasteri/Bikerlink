@@ -1562,4 +1562,29 @@ router.delete("/motoclubs/:id/members/:userId", async (req: Request, res: Respon
   }
 });
 
+router.post("/mass-seed-fake-users", async (_req: Request, res: Response) => {
+  try {
+    const { getMassSeedStatus, massSeedFakeUsers } = await import("../mass-seed");
+    const status = getMassSeedStatus();
+    if (status.running) {
+      return res.status(409).json({ message: "Generazione già in corso", ...status });
+    }
+    massSeedFakeUsers().catch((err) => console.error("[mass-seed] background error:", err));
+    return res.json({ started: true });
+  } catch (error) {
+    console.error("Admin mass seed error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/mass-seed-status", async (_req: Request, res: Response) => {
+  try {
+    const { getMassSeedStatus } = await import("../mass-seed");
+    return res.json(getMassSeedStatus());
+  } catch (error) {
+    console.error("Admin mass seed status error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 export default router;
