@@ -441,6 +441,72 @@ export default function AdminSettings() {
     updateMutation.mutate({ key: editingKey, value: editValue });
   }
 
+  function renderSettingCard(setting: typeof defaultSettings[number]) {
+    return (
+      <View key={setting.key} style={styles.settingCard}>
+        <View style={styles.settingHeader}>
+          <Text style={styles.settingLabel}>{setting.label}</Text>
+          <View style={styles.settingActions}>
+            {setting.key === "eula_text" && editingKey !== setting.key && (
+              <TouchableOpacity
+                style={styles.uploadBtn}
+                onPress={handleUploadEula}
+                disabled={isUploadingEula}
+              >
+                {isUploadingEula ? (
+                  <ActivityIndicator size="small" color={Colors.accent} />
+                ) : (
+                  <Ionicons name="cloud-upload" size={20} color={Colors.accent} />
+                )}
+              </TouchableOpacity>
+            )}
+            {editingKey !== setting.key && (
+              <TouchableOpacity onPress={() => startEditing(setting.key)}>
+                <Ionicons name="create" size={20} color={Colors.accent} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+        {editingKey === setting.key ? (
+          <View>
+            <TextInput
+              style={styles.input}
+              placeholder={setting.placeholder}
+              placeholderTextColor={Colors.textSecondary}
+              value={editValue}
+              onChangeText={setEditValue}
+              multiline={setting.key === "eula_text"}
+              numberOfLines={setting.key === "eula_text" ? 6 : 1}
+            />
+            <View style={styles.editActions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditingKey(null)}>
+                <Text style={styles.cancelBtnText}>Annulla</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.saveBtn}
+                onPress={handleSave}
+                disabled={updateMutation.isPending}
+              >
+                <Text style={styles.saveBtnText}>{updateMutation.isPending ? "..." : "Salva"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.settingValue}>
+            {getSettingValue(setting.key) || setting.placeholder}
+          </Text>
+        )}
+      </View>
+    );
+  }
+
+  const eulaSettingDef = defaultSettings.find(s => s.key === "eula_text")!;
+  const splashSetting = defaultSettings.find(s => s.key === "splash_message")!;
+  const maintenanceSetting = defaultSettings.find(s => s.key === "maintenance_mode")!;
+  const minAppVersionSetting = defaultSettings.find(s => s.key === "min_app_version")!;
+  const maxPhotosSetting = defaultSettings.find(s => s.key === "max_photos_zavorrina")!;
+  const maxVotesSetting = defaultSettings.find(s => s.key === "max_daily_votes")!;
+
   return (
     <>
     <KeyboardAwareScrollViewCompat
@@ -448,13 +514,11 @@ export default function AdminSettings() {
       contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}
       bottomOffset={20}
     >
-      <View style={styles.paidSectionHeader}>
-        <Ionicons name="card" size={22} color={Colors.warning} />
-        <Text style={styles.paidSectionTitle}>A Pagamento</Text>
+
+      <View style={[styles.sectionHeaderRow, { marginTop: 0 }]}>
+        <Ionicons name="apps" size={20} color={Colors.accent} />
+        <Text style={styles.sectionTitle}>Funzionalità App</Text>
       </View>
-      <Text style={styles.paidSectionDesc}>
-        Funzioni premium che verranno attivate a pagamento in futuro.
-      </Text>
 
       <View style={styles.paidCard}>
         <View style={styles.synecoHeader}>
@@ -513,42 +577,51 @@ export default function AdminSettings() {
         </Text>
       </View>
 
-      <View style={styles.synecoCard}>
+      <View style={styles.paypalCard}>
         <View style={styles.synecoHeader}>
           <View style={styles.synecoInfo}>
-            <Ionicons name="megaphone" size={20} color={Colors.syneco} />
-            <Text style={styles.synecoLabel}>Branding Syneco</Text>
+            <Ionicons name="pricetag" size={20} color="#FF9800" />
+            <Text style={styles.synecoLabel}>Mercatino Moto</Text>
           </View>
           <Switch
-            value={synecoVisible}
-            onValueChange={(val) => setProtectedToggle({ key: "syneco_branding_visible", value: val, label: "Branding Syneco" })}
-            trackColor={{ false: Colors.border, true: Colors.syneco }}
-            thumbColor={synecoVisible ? Colors.text : Colors.textSecondary}
+            value={marketplaceEnabled}
+            onValueChange={(val) => setProtectedToggle({ key: "marketplace_enabled", value: val, label: "Mercatino Moto" })}
+            trackColor={{ false: Colors.border, true: "#FF9800" }}
+            thumbColor={marketplaceEnabled ? Colors.text : Colors.textSecondary}
             disabled={protectedToggleMutation.isPending}
           />
         </View>
         <Text style={styles.synecoDesc}>
-          {synecoVisible ? "Il branding Syneco è visibile nell'app" : "Il branding Syneco è nascosto"}
+          {marketplaceEnabled
+            ? "I biker possono mettere in vendita le moto dal garage. Le moto in vendita appaiono nel profilo e nel motoclub."
+            : "Il mercatino moto è disattivato. La funzione 'In Vendita' non è visibile."}
         </Text>
       </View>
 
-      <View style={styles.synecoCard}>
+      <View style={styles.paypalCard}>
         <View style={styles.synecoHeader}>
           <View style={styles.synecoInfo}>
-            <Ionicons name="volume-high" size={20} color={Colors.syneco} />
-            <Text style={styles.synecoLabel}>Advertisement</Text>
+            <Ionicons name="navigate" size={20} color="#4CAF50" />
+            <Text style={styles.synecoLabel}>GPS Obbligatorio</Text>
           </View>
           <Switch
-            value={adsEnabled}
-            onValueChange={(val) => setProtectedToggle({ key: "ads_enabled", value: val, label: "Advertisement" })}
-            trackColor={{ false: Colors.border, true: Colors.syneco }}
-            thumbColor={adsEnabled ? Colors.text : Colors.textSecondary}
+            value={gpsRequired}
+            onValueChange={(val) => setProtectedToggle({ key: "gps_required", value: val, label: "GPS Obbligatorio" })}
+            trackColor={{ false: Colors.border, true: "#4CAF50" }}
+            thumbColor={gpsRequired ? Colors.text : Colors.textSecondary}
             disabled={protectedToggleMutation.isPending}
           />
         </View>
         <Text style={styles.synecoDesc}>
-          {adsEnabled ? "Gli advertisement sono attivi nell'app" : "Gli advertisement sono disattivati"}
+          {gpsRequired
+            ? "Senza permesso GPS, l'utente vede solo Profilo e Garage. Le altre tab sono nascoste."
+            : "GPS non obbligatorio: tutte le tab sono sempre visibili, anche senza permesso di localizzazione."}
         </Text>
+      </View>
+
+      <View style={styles.sectionHeaderRow}>
+        <Ionicons name="people" size={20} color={Colors.accent} />
+        <Text style={styles.sectionTitle}>Gestione Utenti</Text>
       </View>
 
       <View style={styles.emailVerifCard}>
@@ -602,6 +675,124 @@ export default function AdminSettings() {
         <Text style={styles.synecoDesc}>
           {primalEnabled ? "I nuovi utenti registrati saranno marcati come 'Primal'" : "La marcatura Primal è disattivata"}
         </Text>
+      </View>
+
+      <View style={styles.sectionHeaderRow}>
+        <Ionicons name="cash" size={20} color={Colors.accent} />
+        <Text style={styles.sectionTitle}>Monetizzazione</Text>
+      </View>
+
+      <View style={styles.synecoCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="volume-high" size={20} color={Colors.syneco} />
+            <Text style={styles.synecoLabel}>Advertisement</Text>
+          </View>
+          <Switch
+            value={adsEnabled}
+            onValueChange={(val) => setProtectedToggle({ key: "ads_enabled", value: val, label: "Advertisement" })}
+            trackColor={{ false: Colors.border, true: Colors.syneco }}
+            thumbColor={adsEnabled ? Colors.text : Colors.textSecondary}
+            disabled={protectedToggleMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {adsEnabled ? "Gli advertisement sono attivi nell'app" : "Gli advertisement sono disattivati"}
+        </Text>
+      </View>
+
+      <View style={styles.synecoCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="megaphone" size={20} color={Colors.syneco} />
+            <Text style={styles.synecoLabel}>Branding Syneco</Text>
+          </View>
+          <Switch
+            value={synecoVisible}
+            onValueChange={(val) => setProtectedToggle({ key: "syneco_branding_visible", value: val, label: "Branding Syneco" })}
+            trackColor={{ false: Colors.border, true: Colors.syneco }}
+            thumbColor={synecoVisible ? Colors.text : Colors.textSecondary}
+            disabled={protectedToggleMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {synecoVisible ? "Il branding Syneco è visibile nell'app" : "Il branding Syneco è nascosto"}
+        </Text>
+      </View>
+
+      <View style={styles.paypalCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="heart" size={20} color="#E91E63" />
+            <Text style={styles.synecoLabel}>Donazione PayPal</Text>
+          </View>
+          <Switch
+            value={donationEnabled}
+            onValueChange={(val) => setProtectedToggle({ key: "donation_enabled", value: val, label: "Donazione PayPal" })}
+            trackColor={{ false: Colors.border, true: "#E91E63" }}
+            thumbColor={donationEnabled ? Colors.text : Colors.textSecondary}
+            disabled={protectedToggleMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {donationEnabled
+            ? "Il blocco 'Supporta BikerLink' è visibile nel profilo utente"
+            : "Il blocco donazione è nascosto dal profilo utente"}
+        </Text>
+
+        <View style={{ marginTop: 16 }}>
+          <Text style={styles.settingLabel}>Email PayPal</Text>
+          <TextInput
+            style={[styles.input, { marginTop: 8 }]}
+            placeholder="email@esempio.com"
+            placeholderTextColor={Colors.textSecondary}
+            value={paypalEmail}
+            onChangeText={setPaypalEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <View style={styles.editActions}>
+            <TouchableOpacity
+              style={styles.saveBtn}
+              onPress={handleSavePaypal}
+              disabled={isSavingPaypal}
+            >
+              <Text style={styles.saveBtnText}>{isSavingPaypal ? "..." : "Salva"}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={{ marginTop: 16 }}>
+          <Text style={styles.settingLabel}>Testo Messaggio Donazione</Text>
+          <Text style={[styles.synecoDesc, { marginTop: 2, marginBottom: 8 }]}>
+            Se vuoto, viene usato il testo predefinito.
+          </Text>
+          <TextInput
+            style={[styles.input, { minHeight: 120 }]}
+            placeholder={"Sono un motociclista, non un programmatore professionista.\nSto sviluppando quest'app da solo, per biker e zavorrine, nel mio tempo libero e a titolo gratuito.\nTra sviluppo, debug, server e pubblicazione i costi sono molto più alti del previsto.\nSe l'app ti piace e vuoi che continui a crescere, puoi supportarla con una piccola donazione.\nAnche solo il costo di un caffè fa la differenza.\nOgni utente che contribuirà verrà inserito nella Hall of Fame dei ringraziamenti dell'app.\nSe ognuno mette poco, possiamo fare tanto.\nGrazie davvero.\nCi vediamo su strada."}
+            placeholderTextColor={Colors.textSecondary}
+            value={donationText}
+            onChangeText={setDonationText}
+            multiline
+            numberOfLines={6}
+          />
+          <View style={styles.editActions}>
+            <TouchableOpacity
+              style={styles.saveBtn}
+              onPress={() => {
+                setDonationTextPassword("");
+                setShowDonationTextPasswordModal(true);
+              }}
+            >
+              <Text style={styles.saveBtnText}>Salva</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.sectionHeaderRow}>
+        <Ionicons name="construct" size={20} color={Colors.accent} />
+        <Text style={styles.sectionTitle}>Configurazione Tecnica</Text>
       </View>
 
       <View style={styles.emailSmtpCard}>
@@ -717,175 +908,22 @@ export default function AdminSettings() {
       {isLoading ? (
         <Text style={styles.loadingText}>Caricamento...</Text>
       ) : (
-        defaultSettings.map((setting) => (
-          <View key={setting.key} style={styles.settingCard}>
-            <View style={styles.settingHeader}>
-              <Text style={styles.settingLabel}>{setting.label}</Text>
-              <View style={styles.settingActions}>
-                {setting.key === "eula_text" && editingKey !== setting.key && (
-                  <TouchableOpacity
-                    style={styles.uploadBtn}
-                    onPress={handleUploadEula}
-                    disabled={isUploadingEula}
-                  >
-                    {isUploadingEula ? (
-                      <ActivityIndicator size="small" color={Colors.accent} />
-                    ) : (
-                      <Ionicons name="cloud-upload" size={20} color={Colors.accent} />
-                    )}
-                  </TouchableOpacity>
-                )}
-                {editingKey !== setting.key && (
-                  <TouchableOpacity onPress={() => startEditing(setting.key)}>
-                    <Ionicons name="create" size={20} color={Colors.accent} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-            {editingKey === setting.key ? (
-              <View>
-                <TextInput
-                  style={styles.input}
-                  placeholder={setting.placeholder}
-                  placeholderTextColor={Colors.textSecondary}
-                  value={editValue}
-                  onChangeText={setEditValue}
-                  multiline={setting.key === "eula_text"}
-                  numberOfLines={setting.key === "eula_text" ? 6 : 1}
-                />
-                <View style={styles.editActions}>
-                  <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditingKey(null)}>
-                    <Text style={styles.cancelBtnText}>Annulla</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.saveBtn}
-                    onPress={handleSave}
-                    disabled={updateMutation.isPending}
-                  >
-                    <Text style={styles.saveBtnText}>{updateMutation.isPending ? "..." : "Salva"}</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : (
-              <Text style={styles.settingValue}>
-                {getSettingValue(setting.key) || setting.placeholder}
-              </Text>
-            )}
-          </View>
-        ))
+        <>
+          {renderSettingCard(maintenanceSetting)}
+          {renderSettingCard(minAppVersionSetting)}
+        </>
       )}
 
-      <View style={styles.paypalCard}>
-        <View style={styles.synecoHeader}>
-          <View style={styles.synecoInfo}>
-            <Ionicons name="heart" size={20} color="#E91E63" />
-            <Text style={styles.synecoLabel}>Donazione PayPal</Text>
-          </View>
-          <Switch
-            value={donationEnabled}
-            onValueChange={(val) => setProtectedToggle({ key: "donation_enabled", value: val, label: "Donazione PayPal" })}
-            trackColor={{ false: Colors.border, true: "#E91E63" }}
-            thumbColor={donationEnabled ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending}
-          />
-        </View>
-        <Text style={styles.synecoDesc}>
-          {donationEnabled
-            ? "Il blocco 'Supporta BikerLink' è visibile nel profilo utente"
-            : "Il blocco donazione è nascosto dal profilo utente"}
-        </Text>
-
-        <View style={{ marginTop: 16 }}>
-          <Text style={styles.settingLabel}>Email PayPal</Text>
-          <TextInput
-            style={[styles.input, { marginTop: 8 }]}
-            placeholder="email@esempio.com"
-            placeholderTextColor={Colors.textSecondary}
-            value={paypalEmail}
-            onChangeText={setPaypalEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          <View style={styles.editActions}>
-            <TouchableOpacity
-              style={styles.saveBtn}
-              onPress={handleSavePaypal}
-              disabled={isSavingPaypal}
-            >
-              <Text style={styles.saveBtnText}>{isSavingPaypal ? "..." : "Salva"}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={{ marginTop: 16 }}>
-          <Text style={styles.settingLabel}>Testo Messaggio Donazione</Text>
-          <Text style={[styles.synecoDesc, { marginTop: 2, marginBottom: 8 }]}>
-            Se vuoto, viene usato il testo predefinito.
-          </Text>
-          <TextInput
-            style={[styles.input, { minHeight: 120 }]}
-            placeholder={"Sono un motociclista, non un programmatore professionista.\nSto sviluppando quest'app da solo, per biker e zavorrine, nel mio tempo libero e a titolo gratuito.\nTra sviluppo, debug, server e pubblicazione i costi sono molto più alti del previsto.\nSe l'app ti piace e vuoi che continui a crescere, puoi supportarla con una piccola donazione.\nAnche solo il costo di un caffè fa la differenza.\nOgni utente che contribuirà verrà inserito nella Hall of Fame dei ringraziamenti dell'app.\nSe ognuno mette poco, possiamo fare tanto.\nGrazie davvero.\nCi vediamo su strada."}
-            placeholderTextColor={Colors.textSecondary}
-            value={donationText}
-            onChangeText={setDonationText}
-            multiline
-            numberOfLines={6}
-          />
-          <View style={styles.editActions}>
-            <TouchableOpacity
-              style={styles.saveBtn}
-              onPress={() => {
-                setDonationTextPassword("");
-                setShowDonationTextPasswordModal(true);
-              }}
-            >
-              <Text style={styles.saveBtnText}>Salva</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+      <View style={styles.sectionHeaderRow}>
+        <Ionicons name="document-text" size={20} color={Colors.accent} />
+        <Text style={styles.sectionTitle}>Documenti Legali</Text>
       </View>
 
-      <View style={styles.paypalCard}>
-        <View style={styles.synecoHeader}>
-          <View style={styles.synecoInfo}>
-            <Ionicons name="pricetag" size={20} color="#FF9800" />
-            <Text style={styles.synecoLabel}>Mercatino Moto</Text>
-          </View>
-          <Switch
-            value={marketplaceEnabled}
-            onValueChange={(val) => setProtectedToggle({ key: "marketplace_enabled", value: val, label: "Mercatino Moto" })}
-            trackColor={{ false: Colors.border, true: "#FF9800" }}
-            thumbColor={marketplaceEnabled ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending}
-          />
-        </View>
-        <Text style={styles.synecoDesc}>
-          {marketplaceEnabled
-            ? "I biker possono mettere in vendita le moto dal garage. Le moto in vendita appaiono nel profilo e nel motoclub."
-            : "Il mercatino moto è disattivato. La funzione 'In Vendita' non è visibile."}
-        </Text>
-      </View>
-
-      <View style={styles.paypalCard}>
-        <View style={styles.synecoHeader}>
-          <View style={styles.synecoInfo}>
-            <Ionicons name="navigate" size={20} color="#4CAF50" />
-            <Text style={styles.synecoLabel}>GPS Obbligatorio</Text>
-          </View>
-          <Switch
-            value={gpsRequired}
-            onValueChange={(val) => setProtectedToggle({ key: "gps_required", value: val, label: "GPS Obbligatorio" })}
-            trackColor={{ false: Colors.border, true: "#4CAF50" }}
-            thumbColor={gpsRequired ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending}
-          />
-        </View>
-        <Text style={styles.synecoDesc}>
-          {gpsRequired
-            ? "Senza permesso GPS, l'utente vede solo Profilo e Garage. Le altre tab sono nascoste."
-            : "GPS non obbligatorio: tutte le tab sono sempre visibili, anche senza permesso di localizzazione."}
-        </Text>
-      </View>
+      {isLoading ? (
+        <Text style={styles.loadingText}>Caricamento...</Text>
+      ) : (
+        renderSettingCard(eulaSettingDef)
+      )}
 
       <View style={styles.privacyCard}>
         <View style={styles.privacyHeader}>
@@ -926,6 +964,22 @@ export default function AdminSettings() {
           </TouchableOpacity>
         </View>
       </View>
+
+      <View style={styles.sectionHeaderRow}>
+        <Ionicons name="options" size={20} color={Colors.accent} />
+        <Text style={styles.sectionTitle}>Parametri</Text>
+      </View>
+
+      {isLoading ? (
+        <Text style={styles.loadingText}>Caricamento...</Text>
+      ) : (
+        <>
+          {renderSettingCard(splashSetting)}
+          {renderSettingCard(maxPhotosSetting)}
+          {renderSettingCard(maxVotesSetting)}
+        </>
+      )}
+
     </KeyboardAwareScrollViewCompat>
 
       <Modal
@@ -1041,6 +1095,13 @@ export default function AdminSettings() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 16 },
+  sectionHeaderRow: {
+    flexDirection: "row", alignItems: "center", gap: 8, marginTop: 20, marginBottom: 12,
+  },
+  sectionTitle: {
+    fontFamily: "Inter_700Bold", fontSize: 16, color: Colors.textSecondary,
+    textTransform: "uppercase", letterSpacing: 0.5,
+  },
   synecoCard: {
     backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 16,
     borderWidth: 1, borderColor: Colors.syneco,
@@ -1053,15 +1114,6 @@ const styles = StyleSheet.create({
   emailVerifCard: {
     backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 16,
     borderWidth: 1, borderColor: Colors.accent,
-  },
-  paidSectionHeader: {
-    flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4, marginTop: 8,
-  },
-  paidSectionTitle: {
-    fontFamily: "Inter_700Bold", fontSize: 20, color: Colors.warning,
-  },
-  paidSectionDesc: {
-    fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, marginBottom: 16,
   },
   paidCard: {
     backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 16,
