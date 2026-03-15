@@ -208,8 +208,24 @@ export default function FakeUsersAdmin() {
     } catch {}
   };
 
+  const checkAndStartPolling = async () => {
+    try {
+      const url = getApiUrl() + "/api/admin/mass-seed-status";
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) return;
+      const data = await res.json();
+      setMassSeedRunning(data.running);
+      setMassSeedCreated(data.created);
+      setMassSeedTotal(data.total);
+      setMassSeedError(data.error);
+      if (data.running && !pollRef.current) {
+        pollRef.current = setInterval(pollStatus, 3000);
+      }
+    } catch {}
+  };
+
   useEffect(() => {
-    pollStatus();
+    checkAndStartPolling();
     return stopPolling;
   }, []);
 

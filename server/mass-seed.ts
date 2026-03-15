@@ -315,11 +315,11 @@ export async function massSeedFakeUsers(): Promise<void> {
     }
 
     if (specsToCreate.length === 0) {
-      massSeedStatus = { running: false, created: existingTagged.length, total: TARGET, error: null };
+      massSeedStatus = { running: false, created: TARGET, total: TARGET, error: null };
       return;
     }
 
-    massSeedStatus.total = specsToCreate.length;
+    massSeedStatus.created = existingTagged.length;
 
     const existingUsers = await db.select({ nickname: users.nickname, email: users.email }).from(users);
     for (const u of existingUsers) {
