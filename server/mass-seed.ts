@@ -8,9 +8,9 @@ import {
 } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import {
-  REGIONS, REGION_COORDS, MALE_NAMES, FEMALE_NAMES, SURNAMES, MOTORCYCLES,
+  REGIONS, REGION_COORDS, MOTORCYCLES,
   randOffset, randBirthYear, pickRandom, pickRandomN, getMotoYear, getBio, getWelcomeMessage,
-  distributeUniformly,
+  distributeUniformly, generateUniqueNickname, generateUniqueEmail,
 } from "./mass-seed-data";
 
 const SEED_TAG = "mass_seed_2420";
@@ -35,6 +35,7 @@ interface UserSpec {
   sex: "M" | "F";
   coupleSexConfig: string | null;
   region: string;
+  specKey: string;
 }
 
 interface UserRow {
@@ -113,59 +114,33 @@ function buildSpecs(): UserSpec[] {
 
   for (const cat of categories) {
     const distribution = distributeUniformly(cat.count, REGIONS.length);
+    let catIndex = 0;
     for (let r = 0; r < REGIONS.length; r++) {
       for (let i = 0; i < distribution[r]; i++) {
+        const csc = cat.coupleSexConfig ?? "none";
         specs.push({
           userType: cat.userType,
           sex: cat.sex,
           coupleSexConfig: cat.coupleSexConfig,
           region: REGIONS[r],
+          specKey: `${cat.userType}_${cat.sex}_${csc}_${REGIONS[r]}_${catIndex}`,
         });
+        catIndex++;
       }
     }
   }
 
-  return specs.sort(() => Math.random() - 0.5);
-}
-
-let usedNicknames = new Set<string>();
-let usedEmails = new Set<string>();
-
-function generateUniqueNickname(sex: string): string {
-  const names = sex === "F" ? FEMALE_NAMES : MALE_NAMES;
-  for (let attempt = 0; attempt < 100; attempt++) {
-    const name = pickRandom(names);
-    const surname = pickRandom(SURNAMES);
-    const suffix = Math.floor(Math.random() * 999);
-    const nick = `${name}${surname}${suffix}`;
-    if (!usedNicknames.has(nick.toLowerCase())) {
-      usedNicknames.add(nick.toLowerCase());
-      return nick;
-    }
-  }
-  const fallback = `User${Date.now()}${Math.floor(Math.random() * 9999)}`;
-  usedNicknames.add(fallback.toLowerCase());
-  return fallback;
-}
-
-function generateUniqueEmail(nickname: string): string {
-  const domains = ["gmail.com", "yahoo.it", "libero.it", "hotmail.it", "outlook.com", "alice.it", "tiscali.it"];
-  for (let attempt = 0; attempt < 50; attempt++) {
-    const suffix = attempt === 0 ? "" : `${Math.floor(Math.random() * 9999)}`;
-    const email = `${nickname.toLowerCase()}${suffix}@${pickRandom(domains)}`;
-    if (!usedEmails.has(email)) {
-      usedEmails.add(email);
-      return email;
-    }
-  }
-  const email = `${nickname.toLowerCase()}.${Date.now()}@${pickRandom(domains)}`;
-  usedEmails.add(email);
-  return email;
+  return specs;
 }
 
 async function ensureOfficialAccount(): Promise<string> {
   const existing = await storage.getUserByNickname("BikerLink_Official");
-  if (existing) return existing.id;
+  if (existing) {
+    if (!existing.isFake) {
+      await storage.updateUser(existing.id, { isFake: true });
+    }
+    return existing.id;
+  }
 
   const noLoginPw = await bcrypt.hash(`__system_nologin__${Date.now()}__${Math.random()}`, 12);
   const user = await storage.createUser({
@@ -176,7 +151,7 @@ async function ensureOfficialAccount(): Promise<string> {
     sex: "M",
     role: "user",
     status: "active",
-    isFake: false,
+    isFake: true,
     region: "Lombardia",
     birthYear: 2000,
     emailVerified: false,
@@ -186,7 +161,9 @@ async function ensureOfficialAccount(): Promise<string> {
 }
 
 async function reconcileExistingUsers(officialId: string): Promise<void> {
-  const taggedUsers = await db.select({ id: users.id, userType: users.userType, sex: users.sex })
+  const taggedUsers = await db.select({
+    id: users.id, userType: users.userType, sex: users.sex, nickname: users.nickname,
+  })
     .from(users)
     .where(eq(users.invitationCode, SEED_TAG));
 
@@ -257,6 +234,29 @@ async function reconcileExistingUsers(officialId: string): Promise<void> {
         }
       }
     }
+
+    const [hasConv] = await db.select({ id: conversationParticipants.id })
+      .from(conversationParticipants)
+      .where(eq(conversationParticipants.userId, u.id))
+      .limit(1);
+
+    if (!hasConv) {
+      try {
+        const [conv] = await db.insert(conversations).values({ conversationType: "private" }).returning();
+        await db.insert(conversationParticipants).values([
+          { conversationId: conv.id, userId: officialId },
+          { conversationId: conv.id, userId: u.id },
+        ]).onConflictDoNothing();
+        await db.insert(messages).values({
+          conversationId: conv.id,
+          senderId: officialId,
+          content: getWelcomeMessage(u.userType, u.sex),
+          messageType: "text",
+        });
+      } catch (err: unknown) {
+        logSeedError(`reconcile-conv-${u.id}`, err);
+      }
+    }
   }
 }
 
@@ -267,8 +267,8 @@ export async function massSeedFakeUsers(): Promise<void> {
   const allSpecs = buildSpecs();
   const TARGET = allSpecs.length;
   massSeedStatus = { running: true, created: 0, total: TARGET, error: null };
-  usedNicknames = new Set<string>();
-  usedEmails = new Set<string>();
+  const usedNicknames = new Set<string>();
+  const usedEmails = new Set<string>();
 
   try {
     await storage.upsertAppSetting("skip_fake_user_seed", "false");
@@ -280,6 +280,7 @@ export async function massSeedFakeUsers(): Promise<void> {
     const existingTaggedCount = taggedCountResult?.count ?? 0;
 
     if (existingTaggedCount > 0) {
+      console.log(`[mass-seed] Reconciling ${existingTaggedCount} existing tagged users...`);
       await reconcileExistingUsers(officialId);
     }
 
@@ -289,7 +290,7 @@ export async function massSeedFakeUsers(): Promise<void> {
     }
 
     const needed = TARGET - existingTaggedCount;
-    const specs = allSpecs.slice(0, needed);
+    const specsToCreate = allSpecs.slice(existingTaggedCount);
     massSeedStatus.total = needed;
 
     const existingUsers = await db.select({ nickname: users.nickname, email: users.email }).from(users);
@@ -300,15 +301,15 @@ export async function massSeedFakeUsers(): Promise<void> {
 
     const hashedPw = await bcrypt.hash("FakeUser2024!", 10);
 
-    for (let batchStart = 0; batchStart < specs.length; batchStart += BATCH_SIZE) {
-      const batch = specs.slice(batchStart, batchStart + BATCH_SIZE);
+    for (let batchStart = 0; batchStart < specsToCreate.length; batchStart += BATCH_SIZE) {
+      const batch = specsToCreate.slice(batchStart, batchStart + BATCH_SIZE);
 
       const userRows: UserRow[] = [];
       const specMeta: SpecMeta[] = [];
 
       for (const spec of batch) {
-        const nickname = generateUniqueNickname(spec.sex);
-        const email = generateUniqueEmail(nickname);
+        const nickname = generateUniqueNickname(spec.sex, usedNicknames);
+        const email = generateUniqueEmail(nickname, usedEmails);
         userRows.push({
           nickname,
           email,
@@ -499,7 +500,5 @@ export async function massSeedFakeUsers(): Promise<void> {
     console.error("[mass-seed] Fatal error:", error);
   } finally {
     massSeedStatus.running = false;
-    usedNicknames.clear();
-    usedEmails.clear();
   }
 }

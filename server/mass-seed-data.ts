@@ -303,3 +303,35 @@ export function distributeUniformly(total: number, regionCount: number): number[
   const remainder = total % regionCount;
   return Array.from({ length: regionCount }, (_, i) => base + (i < remainder ? 1 : 0));
 }
+
+export function generateUniqueNickname(sex: string, usedNicknames: Set<string>): string {
+  const names = sex === "F" ? FEMALE_NAMES : MALE_NAMES;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const name = pickRandom(names);
+    const surname = pickRandom(SURNAMES);
+    const suffix = Math.floor(Math.random() * 999);
+    const nick = `${name}${surname}${suffix}`;
+    if (!usedNicknames.has(nick.toLowerCase())) {
+      usedNicknames.add(nick.toLowerCase());
+      return nick;
+    }
+  }
+  const fallback = `User${Date.now()}${Math.floor(Math.random() * 9999)}`;
+  usedNicknames.add(fallback.toLowerCase());
+  return fallback;
+}
+
+export function generateUniqueEmail(nickname: string, usedEmails: Set<string>): string {
+  const domains = ["gmail.com", "yahoo.it", "libero.it", "hotmail.it", "outlook.com", "alice.it", "tiscali.it"];
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const suffix = attempt === 0 ? "" : `${Math.floor(Math.random() * 9999)}`;
+    const email = `${nickname.toLowerCase()}${suffix}@${pickRandom(domains)}`;
+    if (!usedEmails.has(email)) {
+      usedEmails.add(email);
+      return email;
+    }
+  }
+  const email = `${nickname.toLowerCase()}.${Date.now()}@${pickRandom(domains)}`;
+  usedEmails.add(email);
+  return email;
+}
