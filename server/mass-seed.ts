@@ -193,22 +193,26 @@ export async function massSeedFakeUsers(): Promise<void> {
   usedEmails = new Set<string>();
 
   try {
+    await storage.upsertAppSetting("skip_fake_user_seed", "false");
+
+    const officialId = await ensureOfficialAccount();
+
     const [fakeCountResult] = await db.select({ count: sql<number>`count(*)::int` })
       .from(users)
-      .where(eq(users.isFake, true));
-    const existingFakeCount = fakeCountResult?.count ?? 0;
+      .where(sql`${users.isFake} = true AND ${users.nickname} != 'BikerLink_Official'`);
+    const existingSeededCount = fakeCountResult?.count ?? 0;
 
-    if (existingFakeCount >= allSpecs.length) {
+    if (existingSeededCount >= allSpecs.length) {
       massSeedStatus = {
         running: false,
-        created: 0,
+        created: existingSeededCount,
         total: allSpecs.length,
-        error: `Ci sono già ${existingFakeCount} utenti fake nel sistema (target: ${allSpecs.length}). Elimina quelli esistenti prima di rigenerare.`,
+        error: null,
       };
       return;
     }
 
-    const needed = allSpecs.length - existingFakeCount;
+    const needed = allSpecs.length - existingSeededCount;
     const specs = allSpecs.slice(0, needed);
     massSeedStatus.total = needed;
 
@@ -217,10 +221,6 @@ export async function massSeedFakeUsers(): Promise<void> {
       usedNicknames.add(u.nickname.toLowerCase());
       usedEmails.add(u.email.toLowerCase());
     }
-
-    await storage.upsertAppSetting("skip_fake_user_seed", "false");
-
-    const officialId = await ensureOfficialAccount();
     const hashedPw = await bcrypt.hash("FakeUser2024!", 10);
 
     for (let batchStart = 0; batchStart < specs.length; batchStart += BATCH_SIZE) {
