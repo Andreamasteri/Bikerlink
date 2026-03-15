@@ -1227,6 +1227,7 @@ router.put("/fake-users/toggle-all", async (req: Request, res: Response) => {
 router.delete("/fake-users", async (req: Request, res: Response) => {
   try {
     const count = await storage.deleteAllFakeUsers();
+    await storage.upsertAppSetting("skip_fake_user_seed", "true");
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
       action: "delete_all_fake_users",

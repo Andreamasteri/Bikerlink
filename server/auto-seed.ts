@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { db } from "./db";
-import { users, userProfiles, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos } from "@shared/schema";
+import { users, userProfiles, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos, appSettings } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const essentialUsers = [
@@ -149,6 +149,17 @@ const fakeCoppie = [
 
 export async function autoSeedFakeUsers() {
   try {
+    const skipSetting = await db
+      .select()
+      .from(appSettings)
+      .where(eq(appSettings.key, "skip_fake_user_seed"))
+      .limit(1);
+
+    if (skipSetting.length > 0 && skipSetting[0].value === "true") {
+      console.log("Auto-seed fake users skipped (admin deleted all fake users)");
+      return;
+    }
+
     const existingFakes = await db
       .select()
       .from(users)
