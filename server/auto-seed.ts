@@ -160,6 +160,17 @@ export async function autoSeedFakeUsers() {
       return;
     }
 
+    const massSeedTagged = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.invitationCode, "mass_seed_2420"))
+      .limit(1);
+
+    if (massSeedTagged.length > 0) {
+      console.log("Auto-seed fake users skipped (mass-seeded population exists)");
+      return;
+    }
+
     const existingFakes = await db
       .select()
       .from(users)

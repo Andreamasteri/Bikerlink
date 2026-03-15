@@ -235,12 +235,16 @@ async function reconcileExistingUsers(officialId: string): Promise<void> {
       }
     }
 
-    const [hasConv] = await db.select({ id: conversationParticipants.id })
+    const officialConvs = await db.select({ convId: conversationParticipants.conversationId })
       .from(conversationParticipants)
-      .where(eq(conversationParticipants.userId, u.id))
-      .limit(1);
+      .where(eq(conversationParticipants.userId, officialId));
+    const userConvs = await db.select({ convId: conversationParticipants.conversationId })
+      .from(conversationParticipants)
+      .where(eq(conversationParticipants.userId, u.id));
+    const officialConvSet = new Set(officialConvs.map(c => c.convId));
+    const hasOfficialConv = userConvs.some(c => officialConvSet.has(c.convId));
 
-    if (!hasConv) {
+    if (!hasOfficialConv) {
       try {
         const [conv] = await db.insert(conversations).values({ conversationType: "private" }).returning();
         await db.insert(conversationParticipants).values([
