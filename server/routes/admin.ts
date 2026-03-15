@@ -1224,7 +1224,7 @@ router.put("/fake-users/toggle-all", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/fake-users/all", async (req: Request, res: Response) => {
+router.delete("/fake-users", async (req: Request, res: Response) => {
   try {
     const count = await storage.deleteAllFakeUsers();
     await storage.createModeratorLog({

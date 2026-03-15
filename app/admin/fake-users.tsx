@@ -163,7 +163,7 @@ export default function FakeUsersAdmin() {
   });
 
   const deleteAllMutation = useMutation({
-    mutationFn: () => apiRequest("DELETE", "/api/admin/fake-users/all"),
+    mutationFn: () => apiRequest("DELETE", "/api/admin/fake-users"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] });
       Alert.alert("Fatto", "Tutti gli utenti fake sono stati eliminati");
