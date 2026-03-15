@@ -136,8 +136,8 @@ function buildSpecs(): UserSpec[] {
 async function ensureOfficialAccount(): Promise<string> {
   const existing = await storage.getUserByNickname("BikerLink_Official");
   if (existing) {
-    if (!existing.isFake) {
-      await storage.updateUser(existing.id, { isFake: true });
+    if (existing.isFake) {
+      await storage.updateUser(existing.id, { isFake: false });
     }
     return existing.id;
   }
@@ -151,7 +151,7 @@ async function ensureOfficialAccount(): Promise<string> {
     sex: "M",
     role: "user",
     status: "active",
-    isFake: true,
+    isFake: false,
     region: "Lombardia",
     birthYear: 2000,
     emailVerified: false,
