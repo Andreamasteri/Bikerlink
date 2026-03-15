@@ -310,6 +310,7 @@ export interface IStorage {
   getFakeUserStats(): Promise<any[]>;
   getFakeUsers(): Promise<User[]>;
   deleteFakeUser(id: string): Promise<void>;
+  deleteAllFakeUsers(): Promise<number>;
   toggleFakeZavorrineAvailability(): Promise<void>;
   getFakeUserConversations(fakeUserId: string): Promise<any[]>;
 
@@ -1350,6 +1351,11 @@ export class DatabaseStorage implements IStorage {
 
   async deleteFakeUser(id: string): Promise<void> {
     await db.delete(users).where(and(eq(users.id, id), eq(users.isFake, true)));
+  }
+
+  async deleteAllFakeUsers(): Promise<number> {
+    const deleted = await db.delete(users).where(eq(users.isFake, true)).returning({ id: users.id });
+    return deleted.length;
   }
 
   async toggleFakeZavorrineAvailability(): Promise<void> {

@@ -162,6 +162,17 @@ export default function FakeUsersAdmin() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] }),
   });
 
+  const deleteAllMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", "/api/admin/fake-users/all"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] });
+      Alert.alert("Fatto", "Tutti gli utenti fake sono stati eliminati");
+    },
+    onError: (error: Error) => {
+      Alert.alert("Errore", error.message || "Errore durante l'eliminazione");
+    },
+  });
+
   const createMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/admin/fake-users", data),
     onSuccess: () => {
@@ -203,6 +214,21 @@ export default function FakeUsersAdmin() {
       { text: "Annulla", style: "cancel" },
       { text: "Elimina", style: "destructive", onPress: () => deleteMutation.mutate(id) },
     ]);
+  };
+
+  const handleDeleteAll = () => {
+    if (users.length === 0) {
+      Alert.alert("Info", "Non ci sono utenti fake da eliminare");
+      return;
+    }
+    Alert.alert(
+      "Elimina tutti gli utenti fake",
+      `Stai per eliminare definitivamente ${users.length} utenti fake e tutti i loro dati associati (profili, moto, wishlist, interazioni, conversazioni).\n\nQuesta azione non può essere annullata.`,
+      [
+        { text: "Annulla", style: "cancel" },
+        { text: "Elimina tutti", style: "destructive", onPress: () => deleteAllMutation.mutate() },
+      ]
+    );
   };
 
   const handleViewChat = async (userId: number) => {
@@ -325,6 +351,24 @@ export default function FakeUsersAdmin() {
           <Text style={styles.controlDesc}>
             {chatbotEnabled ? "Il bot risponde automaticamente per gli utenti fittizi" : "Il bot è disattivato, gli utenti fittizi non rispondono"}
           </Text>
+
+          <View style={[styles.controlDivider]} />
+
+          <TouchableOpacity
+            style={styles.deleteAllBtn}
+            onPress={handleDeleteAll}
+            disabled={deleteAllMutation.isPending || users.length === 0}
+            activeOpacity={0.7}
+          >
+            {deleteAllMutation.isPending ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="trash" size={18} color="#fff" />
+                <Text style={styles.deleteAllBtnText}>Elimina tutti ({users.length})</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
 
         <View style={styles.summaryRow}>
@@ -711,6 +755,21 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: Colors.border,
     marginVertical: 14,
+  },
+  deleteAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.error,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  deleteAllBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: "#fff",
   },
   summaryRow: {
     flexDirection: "row",

@@ -1224,6 +1224,23 @@ router.put("/fake-users/toggle-all", async (req: Request, res: Response) => {
   }
 });
 
+router.delete("/fake-users/all", async (req: Request, res: Response) => {
+  try {
+    const count = await storage.deleteAllFakeUsers();
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "delete_all_fake_users",
+      targetType: "user",
+      targetId: "",
+      details: `Eliminati tutti gli utenti fake (${count})`,
+    });
+    return res.json({ message: `${count} utenti fake eliminati`, count });
+  } catch (error) {
+    console.error("Admin delete all fake users error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.delete("/fake-users/:id", async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
