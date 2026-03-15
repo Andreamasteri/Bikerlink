@@ -6,56 +6,83 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 
-const adminGroups = [
+type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
+type MaterialCommunityIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
+
+type AdminItem = {
+  key: string;
+  label: string;
+  route: string;
+} & (
+  | { iconSet: "MaterialIcons"; icon: MaterialIconName }
+  | { iconSet: "MaterialCommunityIcons"; icon: MaterialCommunityIconName }
+  | { iconSet: "Ionicons"; icon: IoniconsName }
+);
+
+interface AdminGroup {
+  title: string;
+  items: AdminItem[];
+  headerIcon: AdminItem["icon"];
+  headerIconSet: AdminItem["iconSet"];
+}
+
+const adminGroups: AdminGroup[] = [
   {
     title: "Utenti",
-    icon: "people" as const,
-    iconSet: "MaterialIcons",
+    headerIcon: "people",
+    headerIconSet: "MaterialIcons",
     items: [
-      { key: "users", label: "Utenti", icon: "people" as const, iconSet: "MaterialIcons", route: "/admin/users" },
-      { key: "fake-users", label: "Utenti Fake", icon: "robot" as const, iconSet: "MaterialCommunityIcons", route: "/admin/fake-users" },
-      { key: "reports", label: "Segnalazioni", icon: "flag" as const, iconSet: "MaterialIcons", route: "/admin/reports" },
-      { key: "chats", label: "Chat Utenti", icon: "chatbubbles" as const, iconSet: "Ionicons", route: "/admin/chats" },
+      { key: "users", label: "Utenti", icon: "people", iconSet: "MaterialIcons", route: "/admin/users" },
+      { key: "fake-users", label: "Utenti Fake", icon: "robot", iconSet: "MaterialCommunityIcons", route: "/admin/fake-users" },
+      { key: "reports", label: "Segnalazioni", icon: "flag", iconSet: "MaterialIcons", route: "/admin/reports" },
+      { key: "chats", label: "Chat Utenti", icon: "chatbubbles", iconSet: "Ionicons", route: "/admin/chats" },
     ],
   },
   {
     title: "Contenuti",
-    icon: "layers" as const,
-    iconSet: "MaterialIcons",
+    headerIcon: "layers",
+    headerIconSet: "MaterialIcons",
     items: [
-      { key: "workshops", label: "Officine", icon: "store" as const, iconSet: "MaterialIcons", route: "/admin/workshops" },
-      { key: "motoclubs", label: "Motoclub", icon: "shield" as const, iconSet: "Ionicons", route: "/admin/motoclubs" },
-      { key: "easter-eggs", label: "Easter Eggs", icon: "egg-easter" as const, iconSet: "MaterialCommunityIcons", route: "/admin/easter-eggs" },
-      { key: "ads", label: "Advertisement", icon: "campaign" as const, iconSet: "MaterialIcons", route: "/admin/ads" },
+      { key: "workshops", label: "Officine", icon: "store", iconSet: "MaterialIcons", route: "/admin/workshops" },
+      { key: "motoclubs", label: "Motoclub", icon: "shield", iconSet: "Ionicons", route: "/admin/motoclubs" },
+      { key: "easter-eggs", label: "Easter Eggs", icon: "egg-easter", iconSet: "MaterialCommunityIcons", route: "/admin/easter-eggs" },
+      { key: "ads", label: "Advertisement", icon: "campaign", iconSet: "MaterialIcons", route: "/admin/ads" },
     ],
   },
   {
     title: "Monitoraggio",
-    icon: "bar-chart" as const,
-    iconSet: "Ionicons",
+    headerIcon: "bar-chart",
+    headerIconSet: "Ionicons",
     items: [
-      { key: "analytics", label: "Analytics", icon: "analytics" as const, iconSet: "MaterialIcons", route: "/admin/analytics" },
-      { key: "performance", label: "Performance", icon: "speedometer" as const, iconSet: "Ionicons", route: "/admin/performance" },
+      { key: "analytics", label: "Analytics", icon: "analytics", iconSet: "MaterialIcons", route: "/admin/analytics" },
+      { key: "performance", label: "Performance", icon: "speedometer", iconSet: "Ionicons", route: "/admin/performance" },
     ],
   },
   {
     title: "Sistema",
-    icon: "settings" as const,
-    iconSet: "MaterialIcons",
+    headerIcon: "settings",
+    headerIconSet: "MaterialIcons",
     items: [
-      { key: "settings", label: "Impostazioni", icon: "settings" as const, iconSet: "MaterialIcons", route: "/admin/settings" },
+      { key: "settings", label: "Impostazioni", icon: "settings", iconSet: "MaterialIcons", route: "/admin/settings" },
     ],
   },
 ];
 
-function getIcon(iconSet: string, icon: string, size = 28, color = Colors.accent) {
-  if (iconSet === "MaterialCommunityIcons") {
-    return <MaterialCommunityIcons name={icon as any} size={size} color={color} />;
+function renderIcon(item: AdminItem, size = 28, color = Colors.accent) {
+  switch (item.iconSet) {
+    case "MaterialCommunityIcons":
+      return <MaterialCommunityIcons name={item.icon} size={size} color={color} />;
+    case "Ionicons":
+      return <Ionicons name={item.icon} size={size} color={color} />;
+    case "MaterialIcons":
+      return <MaterialIcons name={item.icon} size={size} color={color} />;
   }
-  if (iconSet === "Ionicons") {
-    return <Ionicons name={icon as any} size={size} color={color} />;
-  }
-  return <MaterialIcons name={icon as any} size={size} color={color} />;
+}
+
+function renderGroupHeaderIcon(group: AdminGroup) {
+  const fakeItem = { iconSet: group.headerIconSet, icon: group.headerIcon } as AdminItem;
+  return renderIcon(fakeItem, 20, Colors.textSecondary);
 }
 
 export default function AdminDashboard() {
@@ -75,7 +102,7 @@ export default function AdminDashboard() {
       {adminGroups.map((group) => (
         <View key={group.title} style={styles.groupContainer}>
           <View style={styles.groupHeader}>
-            {getIcon(group.iconSet, group.icon, 20, Colors.textSecondary)}
+            {renderGroupHeaderIcon(group)}
             <Text style={styles.groupTitle}>{group.title}</Text>
           </View>
           <View style={styles.grid}>
@@ -83,11 +110,11 @@ export default function AdminDashboard() {
               <TouchableOpacity
                 key={section.key}
                 style={styles.card}
-                onPress={() => router.push(section.route as any)}
+                onPress={() => router.push(section.route)}
                 activeOpacity={0.7}
               >
                 <View style={styles.cardIcon}>
-                  {getIcon(section.iconSet, section.icon)}
+                  {renderIcon(section)}
                 </View>
                 <Text style={styles.cardLabel}>{section.label}</Text>
               </TouchableOpacity>
