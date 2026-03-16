@@ -21,6 +21,7 @@ interface Stats {
 const categories: Record<string, Stats> = {};
 let chatbotSent = 0;
 let chatbotReplied = 0;
+const errorLog: Array<{ time: string; cat: string; msg: string }> = [];
 
 function getStat(cat: string): Stats {
   if (!categories[cat]) categories[cat] = { calls: 0, ok: 0, fail: 0, latencies: [] };
@@ -134,7 +135,9 @@ async function tracked(cat: string, label: string, fn: () => Promise<any>): Prom
     const ms = Date.now() - t0;
     stat.fail++;
     stat.latencies.push(ms);
-    log("✗", cat, `${label} — ${e.message || e}`, ms);
+    const errMsg = `${label} — ${e.message || e}`;
+    log("✗", cat, errMsg, ms);
+    if (errorLog.length < 200) errorLog.push({ time: ts(), cat, msg: errMsg });
     return null;
   }
 }
@@ -348,7 +351,7 @@ async function actionChatFakeUser(): Promise<void> {
     chatbotSent++;
   });
 
-  await sleep(4000);
+  await sleep(5000);
 
   const msg2 = pick(MOTO_MSGS);
   await tracked("CHAT", `send-msg-2 "${msg2.slice(0, 30)}"`, async () => {
@@ -358,7 +361,7 @@ async function actionChatFakeUser(): Promise<void> {
     chatbotSent++;
   });
 
-  await sleep(4000);
+  await sleep(5000);
 
   if (numMessages >= 3) {
     const msg3 = pick([...CHAT_MSGS, ...FOLLOWUP_MSGS]);
@@ -369,7 +372,7 @@ async function actionChatFakeUser(): Promise<void> {
       chatbotSent++;
     });
 
-    await sleep(4000);
+    await sleep(5000);
   }
 
   await tracked("CHAT", `check-bot-replies conv=${convId.slice(0, 8)}`, async () => {
@@ -779,6 +782,17 @@ function printReport() {
   console.log(`    Messaggi inviati a fake users: ${chatbotSent}`);
   console.log(`    Risposte ricevute dal bot:     ${chatbotReplied}`);
   console.log(`    Tasso di risposta:             ${chatbotSent > 0 ? ((chatbotReplied / chatbotSent) * 100).toFixed(1) + "%" : "N/A"}`);
+
+  if (errorLog.length > 0) {
+    console.log(`\n  Errori (${errorLog.length} totali, ultimi 50):`);
+    const showErrors = errorLog.slice(-50);
+    for (const err of showErrors) {
+      console.log(`    [${err.time}] [${err.cat}] ${err.msg}`);
+    }
+  } else {
+    console.log("\n  Errori: nessuno");
+  }
+
   console.log("=".repeat(80) + "\n");
 }
 
