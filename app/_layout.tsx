@@ -11,11 +11,18 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef } from "react";
 import { Platform, AppState } from "react-native";
 
-if (Platform.OS === "web" && typeof document !== "undefined") {
+if (Platform.OS === "web" && typeof window !== "undefined") {
   const link = document.createElement("link");
   link.rel = "stylesheet";
   link.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap";
   document.head.appendChild(link);
+
+  window.addEventListener("unhandledrejection", (event) => {
+    const msg: string = event?.reason?.message ?? "";
+    if (msg.includes("timeout exceeded") || msg.includes("fontfaceobserver")) {
+      event.preventDefault();
+    }
+  });
 }
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
