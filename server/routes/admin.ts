@@ -1251,6 +1251,7 @@ router.put("/fake-users/toggle-all", async (req: Request, res: Response) => {
 });
 
 router.delete("/fake-users", async (req: Request, res: Response) => {
+  console.log("[Admin] DELETE /fake-users ricevuto");
   try {
     const count = await storage.deleteAllFakeUsers();
     await storage.upsertAppSetting("skip_fake_user_seed", "true");
@@ -1261,9 +1262,10 @@ router.delete("/fake-users", async (req: Request, res: Response) => {
       targetId: "",
       details: `Eliminati tutti gli utenti fake (${count})`,
     });
+    console.log(`[Admin] DELETE /fake-users completato: ${count} eliminati`);
     return res.json({ message: `${count} utenti fake eliminati`, count });
   } catch (error) {
-    console.error("Admin delete all fake users error:", error);
+    console.error("[Admin] DELETE /fake-users ERRORE:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

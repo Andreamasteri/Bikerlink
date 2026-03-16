@@ -1554,10 +1554,23 @@ var init_storage = __esm({
         await db.delete(users).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.id, id), (0, import_drizzle_orm2.eq)(users.isFake, true)));
       }
       async deleteAllFakeUsers() {
-        const deleted = await db.delete(users).where(
-          (0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.isFake, true), import_drizzle_orm2.sql`${users.nickname} != 'BikerLink_Official'`)
-        ).returning({ id: users.id });
-        return deleted.length;
+        const condition = (0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.isFake, true), import_drizzle_orm2.sql`${users.nickname} != 'BikerLink_Official'`);
+        const [{ count }] = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(users).where(condition);
+        console.log(`[Admin] deleteAllFakeUsers: trovati ${count} utenti fake da eliminare`);
+        if (count === 0) return 0;
+        await db.delete(users).where(condition);
+        console.log(`[Admin] deleteAllFakeUsers: eliminati ${count} utenti fake`);
+        const orphaned = await db.execute(import_drizzle_orm2.sql`
+      DELETE FROM conversations
+      WHERE id IN (
+        SELECT c.id FROM conversations c
+        LEFT JOIN conversation_participants cp ON cp.conversation_id = c.id
+        GROUP BY c.id
+        HAVING count(cp.id) <= 1
+      )
+    `);
+        console.log(`[Admin] deleteAllFakeUsers: pulizia conversation orfane completata`);
+        return count;
       }
       async toggleFakeZavorrineAvailability() {
         const globalToggle = await this.getAppSetting("fake_users_enabled");
@@ -7880,6 +7893,7 @@ router17.put("/fake-users/toggle-all", async (req, res) => {
   }
 });
 router17.delete("/fake-users", async (req, res) => {
+  console.log("[Admin] DELETE /fake-users ricevuto");
   try {
     const count = await storage.deleteAllFakeUsers();
     await storage.upsertAppSetting("skip_fake_user_seed", "true");
@@ -7890,9 +7904,10 @@ router17.delete("/fake-users", async (req, res) => {
       targetId: "",
       details: `Eliminati tutti gli utenti fake (${count})`
     });
+    console.log(`[Admin] DELETE /fake-users completato: ${count} eliminati`);
     return res.json({ message: `${count} utenti fake eliminati`, count });
   } catch (error) {
-    console.error("Admin delete all fake users error:", error);
+    console.error("[Admin] DELETE /fake-users ERRORE:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

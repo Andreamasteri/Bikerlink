@@ -520,12 +520,6 @@ export default function FakeUsersAdmin() {
               {(usersError as Error).message}
             </Text>
           )}
-          {!!deleteAllResultMsg && (
-            <Text style={[styles.controlDesc, { color: deleteAllResultMsg.type === "success" ? Colors.success : (Colors.error ?? "#e53935") }]}>
-              {deleteAllResultMsg.text}
-            </Text>
-          )}
-
           <View style={[styles.controlDivider]} />
 
           <View style={styles.controlRow}>
@@ -548,13 +542,16 @@ export default function FakeUsersAdmin() {
           <View style={[styles.controlDivider]} />
 
           <TouchableOpacity
-            style={styles.deleteAllBtn}
+            style={[styles.deleteAllBtn, deleteAllMutation.isPending && { opacity: 0.7 }]}
             onPress={handleDeleteAll}
             disabled={deleteAllMutation.isPending || totalCount === 0}
             activeOpacity={0.7}
           >
             {deleteAllMutation.isPending ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <ActivityIndicator size="small" color="#fff" />
+                <Text style={styles.deleteAllBtnText}>Eliminazione in corso...</Text>
+              </View>
             ) : (
               <>
                 <Ionicons name="trash" size={18} color="#fff" />
@@ -562,6 +559,12 @@ export default function FakeUsersAdmin() {
               </>
             )}
           </TouchableOpacity>
+
+          {!!deleteAllResultMsg && (
+            <Text style={[styles.controlDesc, { color: deleteAllResultMsg.type === "success" ? Colors.success : (Colors.error ?? "#e53935"), marginTop: 8, fontWeight: "600" as const }]}>
+              {deleteAllResultMsg.text}
+            </Text>
+          )}
         </View>
 
         <View style={styles.massSeedCard}>

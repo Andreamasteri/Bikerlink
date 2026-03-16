@@ -1425,10 +1425,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteAllFakeUsers(): Promise<number> {
-    const deleted = await db.delete(users).where(
-      and(eq(users.isFake, true), sql`${users.nickname} != 'BikerLink_Official'`)
-    ).returning({ id: users.id });
-    return deleted.length;
+    const condition = and(eq(users.isFake, true), sql`${users.nickname} != 'BikerLink_Official'`);
+    const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(condition);
+    console.log(`[Admin] deleteAllFakeUsers: trovati ${count} utenti fake da eliminare`);
+    if (count === 0) return 0;
+
+    await db.delete(users).where(condition);
+    console.log(`[Admin] deleteAllFakeUsers: eliminati ${count} utenti fake`);
+
+    const orphaned = await db.execute(sql`
+      DELETE FROM conversations
+      WHERE id IN (
+        SELECT c.id FROM conversations c
+        LEFT JOIN conversation_participants cp ON cp.conversation_id = c.id
+        GROUP BY c.id
+        HAVING count(cp.id) <= 1
+      )
+    `);
+    console.log(`[Admin] deleteAllFakeUsers: pulizia conversation orfane completata`);
+
+    return count;
   }
 
   async toggleFakeZavorrineAvailability(): Promise<void> {
