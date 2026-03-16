@@ -18,6 +18,14 @@ kill_port() {
   echo "Attenzione: porta $PORT ancora occupata dopo 10s"
 }
 
+echo "Fermando Metro/Expo per liberare RAM prima della compilazione..."
+pkill -f "expo start" 2>/dev/null || true
+pkill -f "react-native start" 2>/dev/null || true
+pkill -f "metro" 2>/dev/null || true
+lsof -ti:8081 2>/dev/null | xargs kill -9 2>/dev/null || true
+sleep 3
+echo "Processi Metro terminati. Avvio compilazione esbuild..."
+
 echo "Compilazione TypeScript server..."
 npm run server:build
 if [ $? -ne 0 ]; then
