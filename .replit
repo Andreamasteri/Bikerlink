@@ -104,3 +104,7 @@ args = "bash scripts/run-stress-test.sh"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 120000
