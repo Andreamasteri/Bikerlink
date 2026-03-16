@@ -300,22 +300,25 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
     const includeOffline = req.query.includeOffline === "true";
-    const onlineResults = await storage.getOnlineUsersList(fifteenMinutesAgo, lat, lng);
+    const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
+    const onlineResults = await storage.getOnlineUsersList(fifteenMinutesAgo, lat, lng, countriesParam);
     let allResults = onlineResults;
     const onlineIdSet = new Set(onlineResults.map((r: any) => r.user.id));
     if (includeOffline) {
       const { db } = await import("../db");
       const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
-      const { eq, and, lt, or, isNull } = await import("drizzle-orm");
+      const { eq, and, lt, or, isNull, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null
         ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
         : sqlTag<number>`0`.as("distance");
+      const offlineConds: any[] = [eq(usersTable.status, "active"), or(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt))];
+      if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
       const offlineResults = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
         .from(usersTable)
         .leftJoin(profilesTable, eq(profilesTable.userId, usersTable.id))
-        .where(and(eq(usersTable.status, "active"), or(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt))))
+        .where(and(...offlineConds))
         .orderBy(sqlTag`distance`);
       const offlineOnly = offlineResults.filter((r: any) => !onlineIdSet.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
@@ -419,21 +422,24 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
     const includeOffline = req.query.includeOffline === "true";
-    const onlineResults = await storage.getAvailableBikersList(fifteenMinutesAgo, lat, lng);
+    const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
+    const onlineResults = await storage.getAvailableBikersList(fifteenMinutesAgo, lat, lng, countriesParam);
     let allResults = onlineResults;
     if (includeOffline) {
       const { db } = await import("../db");
       const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
-      const { eq, and, or } = await import("drizzle-orm");
+      const { eq, and, or, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null
         ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
         : sqlTag<number>`0`.as("distance");
+      const bikerConds: any[] = [eq(usersTable.status, "active"), or(eq(usersTable.userType, "biker"), eq(usersTable.userType, "coppia"))];
+      if (countriesParam && countriesParam.length > 0) bikerConds.push(inArr(usersTable.country, countriesParam));
       const allBikers = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
         .from(profilesTable)
         .innerJoin(usersTable, eq(usersTable.id, profilesTable.userId))
-        .where(and(eq(usersTable.status, "active"), or(eq(usersTable.userType, "biker"), eq(usersTable.userType, "coppia"))))
+        .where(and(...bikerConds))
         .orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r: any) => r.user.id));
       const offlineOnly = allBikers.filter((r: any) => !onlineIds.has(r.user.id));
@@ -478,21 +484,24 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
     const includeOffline = req.query.includeOffline === "true";
-    const onlineResults = await storage.getAvailableZavorrinaList(fifteenMinutesAgo, lat, lng);
+    const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
+    const onlineResults = await storage.getAvailableZavorrinaList(fifteenMinutesAgo, lat, lng, countriesParam);
     let allResults = onlineResults;
     if (includeOffline) {
       const { db } = await import("../db");
       const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
-      const { eq, and } = await import("drizzle-orm");
+      const { eq, and, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null
         ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
         : sqlTag<number>`0`.as("distance");
+      const zavConds: any[] = [eq(usersTable.status, "active"), eq(usersTable.userType, "zavorrina")];
+      if (countriesParam && countriesParam.length > 0) zavConds.push(inArr(usersTable.country, countriesParam));
       const allZav = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
         .from(profilesTable)
         .innerJoin(usersTable, eq(usersTable.id, profilesTable.userId))
-        .where(and(eq(usersTable.status, "active"), eq(usersTable.userType, "zavorrina")))
+        .where(and(...zavConds))
         .orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r: any) => r.user.id));
       const offlineOnly = allZav.filter((r: any) => !onlineIds.has(r.user.id));
@@ -536,12 +545,13 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
     const lat = parseFloat(req.query.lat as string);
     const lng = parseFloat(req.query.lng as string);
     const radius = parseFloat(req.query.radius as string) || 50;
+    const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
 
     if (isNaN(lat) || isNaN(lng)) {
       return res.status(400).json({ message: "Parametri lat e lng richiesti" });
     }
 
-    const nearbyUsers = await storage.getNearbyUsers(lat, lng, radius);
+    const nearbyUsers = await storage.getNearbyUsers(lat, lng, radius, countriesParam);
 
     const results = nearbyUsers
       .map((item) => {

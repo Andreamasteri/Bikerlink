@@ -27,8 +27,9 @@ import { useSynecoVisible } from "@/lib/syneco-context";
 import { useSetting } from "@/lib/settings-context";
 import InteractiveMap from "@/components/InteractiveMap";
 import { getRegionCoordinates } from "@/constants/regions";
-import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
+import { getCountryFlag, getCountryName, EUROPEAN_COUNTRIES } from "@/lib/countries-regions";
 import { useT, useLocale } from "@/lib/language-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function MapScreen() {
   const router = useRouter();
@@ -63,6 +64,9 @@ export default function MapScreen() {
   const [offlineCountdown, setOfflineCountdown] = useState<{ online: number }>({ online: 0 });
   const sosEnabled = useSetting("sosEnabled");
   const [mapReady, setMapReady] = useState(false);
+  const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
+  const [showAreaModal, setShowAreaModal] = useState(false);
+  const [countriesLoaded, setCountriesLoaded] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -75,6 +79,62 @@ export default function MapScreen() {
     const t = setTimeout(() => setMapReady(true), 5000);
     return () => clearTimeout(t);
   }, [mapReady]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem("map_area_countries");
+        if (stored) {
+          setSelectedCountries(JSON.parse(stored));
+        } else if (user?.country) {
+          setSelectedCountries([user.country]);
+        } else {
+          setSelectedCountries(["IT"]);
+        }
+      } catch {
+        if (user?.country) {
+          setSelectedCountries([user.country]);
+        } else {
+          setSelectedCountries(["IT"]);
+        }
+      }
+      setCountriesLoaded(true);
+    })();
+  }, [user?.country]);
+
+  const countriesQueryParam = useMemo(() => {
+    if (!countriesLoaded || selectedCountries.length === 0) return "";
+    return selectedCountries.join(",");
+  }, [selectedCountries, countriesLoaded]);
+
+  const saveCountries = useCallback(async (countries: string[]) => {
+    setSelectedCountries(countries);
+    try {
+      await AsyncStorage.setItem("map_area_countries", JSON.stringify(countries));
+    } catch {}
+    queryClient.invalidateQueries({ queryKey: ["/api/users/nearby"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/users/online-list"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-list"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-list"] });
+  }, []);
+
+  const toggleCountry = useCallback((code: string) => {
+    setSelectedCountries((prev) => {
+      if (prev.includes(code)) {
+        if (prev.length === 1) return prev;
+        return prev.filter((c) => c !== code);
+      }
+      return [...prev, code];
+    });
+  }, []);
+
+  const sortedCountries = useMemo(() => {
+    const itIndex = EUROPEAN_COUNTRIES.findIndex((c) => c.code === "IT");
+    if (itIndex < 0) return EUROPEAN_COUNTRIES;
+    const copy = [...EUROPEAN_COUNTRIES];
+    const [it] = copy.splice(itIndex, 1);
+    return [it, ...copy];
+  }, []);
 
   const getRegionFallback = useCallback(() => {
     if (user?.region) {
@@ -164,12 +224,13 @@ export default function MapScreen() {
 
   // --- LIVELLO 2: si attivano dopo che la mappa è pronta ---
   const nearbyUsersQuery = useQuery<any[]>({
-    queryKey: ["/api/users/nearby", location?.latitude, location?.longitude],
+    queryKey: ["/api/users/nearby", location?.latitude, location?.longitude, countriesQueryParam],
     queryFn: async () => {
       if (!location) return [];
       const url = new URL("/api/users/nearby", baseUrl);
       url.searchParams.set("lat", String(location.latitude));
       url.searchParams.set("lng", String(location.longitude));
+      if (countriesQueryParam) url.searchParams.set("countries", countriesQueryParam);
       const res = await fetch(url.toString(), { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
@@ -177,7 +238,7 @@ export default function MapScreen() {
     retry: false,
     staleTime: 300000,
     refetchInterval: 300000,
-    enabled: isAuthenticated && !!location && mapReady,
+    enabled: isAuthenticated && !!location && mapReady && countriesLoaded,
   });
 
   const nearbyLoaded = nearbyUsersQuery.isFetched || nearbyUsersQuery.isError;
@@ -249,7 +310,7 @@ export default function MapScreen() {
   const isAvailable = (profileQuery.data as any)?.isAvailable || false;
 
   const onlineListQuery = useQuery<any[]>({
-    queryKey: ["/api/users/online-list", location?.latitude, location?.longitude, showOfflineOnline],
+    queryKey: ["/api/users/online-list", location?.latitude, location?.longitude, showOfflineOnline, countriesQueryParam],
     queryFn: async () => {
       const url = new URL("/api/users/online-list", getApiUrl());
       if (location) {
@@ -257,6 +318,7 @@ export default function MapScreen() {
         url.searchParams.set("lng", String(location.longitude));
       }
       if (showOfflineOnline) url.searchParams.set("includeOffline", "true");
+      if (countriesQueryParam) url.searchParams.set("countries", countriesQueryParam);
       const res = await fetch(url.toString(), { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
@@ -266,13 +328,14 @@ export default function MapScreen() {
   });
 
   const bikerListQuery = useQuery<any[]>({
-    queryKey: ["/api/users/biker-available-list", location?.latitude, location?.longitude],
+    queryKey: ["/api/users/biker-available-list", location?.latitude, location?.longitude, countriesQueryParam],
     queryFn: async () => {
       const url = new URL("/api/users/biker-available-list", getApiUrl());
       if (location) {
         url.searchParams.set("lat", String(location.latitude));
         url.searchParams.set("lng", String(location.longitude));
       }
+      if (countriesQueryParam) url.searchParams.set("countries", countriesQueryParam);
       const res = await fetch(url.toString(), { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
@@ -282,13 +345,14 @@ export default function MapScreen() {
   });
 
   const zavListQuery = useQuery<any[]>({
-    queryKey: ["/api/users/zavorrine-available-list", location?.latitude, location?.longitude],
+    queryKey: ["/api/users/zavorrine-available-list", location?.latitude, location?.longitude, countriesQueryParam],
     queryFn: async () => {
       const url = new URL("/api/users/zavorrine-available-list", getApiUrl());
       if (location) {
         url.searchParams.set("lat", String(location.latitude));
         url.searchParams.set("lng", String(location.longitude));
       }
+      if (countriesQueryParam) url.searchParams.set("countries", countriesQueryParam);
       const res = await fetch(url.toString(), { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
@@ -605,6 +669,17 @@ export default function MapScreen() {
           <Pressable style={[styles.closeBtn, { top: Platform.OS === "web" ? 12 : insets.top + 4 }]} onPress={() => setMapFullscreen(false)}>
             <Ionicons name="close" size={28} color="#fff" />
           </Pressable>
+          <Pressable
+            style={[styles.defineAreaBtn, { bottom: Platform.OS === "web" ? 44 : 24 }]}
+            onPress={() => setShowAreaModal(true)}
+          >
+            <Ionicons name="globe-outline" size={16} color={Colors.text} />
+            <Text style={styles.defineAreaBtnText}>
+              {selectedCountries.length === 1
+                ? `${getCountryFlag(selectedCountries[0])} 1 ${t("home.defineAreaCountry")}`
+                : `${selectedCountries.length} ${t("home.defineAreaCountries")}`}
+            </Text>
+          </Pressable>
           <View style={[styles.fullscreenBottomStats, { bottom: Platform.OS === "web" ? 44 : 24 }]}>
             <View style={styles.statsChip}>
               <MaterialCommunityIcons name="motorbike" size={14} color={Colors.maleIcon} />
@@ -661,6 +736,19 @@ export default function MapScreen() {
           </View>
         </View>
       </Modal>
+
+      <Pressable
+        style={styles.defineAreaBtnInline}
+        onPress={() => setShowAreaModal(true)}
+      >
+        <Ionicons name="globe-outline" size={14} color={Colors.accent} />
+        <Text style={styles.defineAreaBtnInlineText}>
+          {t("home.defineArea")} — {selectedCountries.length === 1
+            ? `${getCountryFlag(selectedCountries[0])} 1 ${t("home.defineAreaCountry")}`
+            : `${selectedCountries.length} ${t("home.defineAreaCountries")}`}
+        </Text>
+        <Ionicons name="chevron-forward" size={14} color={Colors.accent} />
+      </Pressable>
 
       <View style={styles.statsRow}>
         <Pressable style={styles.statCard} onPress={() => setShowOnlineList(true)}>
@@ -1049,6 +1137,50 @@ export default function MapScreen() {
                 </View>
               </ScrollView>
             )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={showAreaModal} transparent animationType="slide" onRequestClose={() => setShowAreaModal(false)}>
+        <Pressable style={styles.detailOverlay} onPress={() => { saveCountries(selectedCountries); setShowAreaModal(false); }}>
+          <Pressable style={styles.areaSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.detailHandle} />
+            <View style={styles.listSheetHeader}>
+              <Ionicons name="globe-outline" size={20} color={Colors.accent} />
+              <Text style={styles.listSheetTitle}>{t("home.defineArea")}</Text>
+              <Pressable onPress={() => { saveCountries(selectedCountries); setShowAreaModal(false); }}>
+                <Ionicons name="close" size={24} color={Colors.textSecondary} />
+              </Pressable>
+            </View>
+            <Text style={styles.areaSubtitle}>{t("home.defineAreaDesc")}</Text>
+            <FlatList
+              data={sortedCountries}
+              keyExtractor={(item) => item.code}
+              style={{ maxHeight: 420 }}
+              renderItem={({ item }) => {
+                const isSelected = selectedCountries.includes(item.code);
+                return (
+                  <Pressable
+                    style={[styles.countryRow, isSelected && styles.countryRowSelected]}
+                    onPress={() => toggleCountry(item.code)}
+                  >
+                    <Text style={styles.countryFlag}>{item.flag}</Text>
+                    <Text style={[styles.countryName, isSelected && { color: Colors.accent }]}>{item.name}</Text>
+                    <Ionicons
+                      name={isSelected ? "checkbox" : "square-outline"}
+                      size={22}
+                      color={isSelected ? Colors.accent : Colors.textSecondary}
+                    />
+                  </Pressable>
+                );
+              }}
+            />
+            <Pressable
+              style={styles.areaSaveBtn}
+              onPress={() => { saveCountries(selectedCountries); setShowAreaModal(false); }}
+            >
+              <Text style={styles.areaSaveBtnText}>{t("common.confirm")} ({selectedCountries.length})</Text>
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
@@ -1590,5 +1722,87 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Inter_700Bold",
     color: "#FFFFFF",
+  },
+  defineAreaBtn: {
+    position: "absolute" as const,
+    right: 16,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    backgroundColor: Colors.surface + "E6",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    zIndex: 20,
+  },
+  defineAreaBtnText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
+  defineAreaBtnInline: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    marginHorizontal: 16,
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.accent + "30",
+  },
+  defineAreaBtnInlineText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: Colors.accent,
+  },
+  areaSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: "80%",
+  },
+  areaSubtitle: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginBottom: 12,
+  },
+  countryRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 2,
+    gap: 10,
+  },
+  countryRowSelected: {
+    backgroundColor: Colors.accent + "15",
+  },
+  countryFlag: {
+    fontSize: 20,
+  },
+  countryName: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: "Inter_500Medium",
+    color: Colors.text,
+  },
+  areaSaveBtn: {
+    backgroundColor: Colors.accent,
+    padding: 14,
+    borderRadius: 12,
+    alignItems: "center" as const,
+    marginTop: 12,
+  },
+  areaSaveBtnText: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    color: Colors.background,
   },
 });

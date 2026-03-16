@@ -239,7 +239,7 @@ export interface IStorage {
   upsertAppSetting(key: string, value?: string, valueJson?: unknown): Promise<AppSetting>;
 
   createVerificationCode(code: InsertVerificationCode): Promise<VerificationCode>;
-  getNearbyUsers(lat: number, lng: number, radiusKm: number): Promise<Array<{
+  getNearbyUsers(lat: number, lng: number, radiusKm: number, countries?: string[]): Promise<Array<{
     user: User;
     profile: UserProfile;
     distance: number;
@@ -270,8 +270,8 @@ export interface IStorage {
 
   countAvailableBikers(since: Date): Promise<number>;
   countAvailableZavorrine(since: Date): Promise<number>;
-  getAvailableBikersList(since: Date, lat?: number, lng?: number): Promise<any[]>;
-  getAvailableZavorrinaList(since: Date, lat?: number, lng?: number): Promise<any[]>;
+  getAvailableBikersList(since: Date, lat?: number, lng?: number, countries?: string[]): Promise<any[]>;
+  getAvailableZavorrinaList(since: Date, lat?: number, lng?: number, countries?: string[]): Promise<any[]>;
 
   getMotorcyclePhotos(motorcycleId: string): Promise<MotorcyclePhoto[]>;
   addMotorcyclePhoto(data: InsertMotorcyclePhoto): Promise<MotorcyclePhoto>;
@@ -890,7 +890,16 @@ export class DatabaseStorage implements IStorage {
     return code;
   }
 
-  async getNearbyUsers(lat: number, lng: number, radiusKm: number): Promise<Array<{ user: User; profile: UserProfile; distance: number }>> {
+  async getNearbyUsers(lat: number, lng: number, radiusKm: number, countries?: string[]): Promise<Array<{ user: User; profile: UserProfile; distance: number }>> {
+    const conditions = [
+      eq(users.status, "active"),
+      eq(userProfiles.isAvailable, true),
+      sql`${userProfiles.latitude} IS NOT NULL`,
+      sql`${userProfiles.longitude} IS NOT NULL`,
+    ];
+    if (countries && countries.length > 0) {
+      conditions.push(inArray(users.country, countries));
+    }
     const results = await db
       .select({
         user: users,
@@ -899,14 +908,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(userProfiles)
       .innerJoin(users, eq(users.id, userProfiles.userId))
-      .where(
-        and(
-          eq(users.status, "active"),
-          eq(userProfiles.isAvailable, true),
-          sql`${userProfiles.latitude} IS NOT NULL`,
-          sql`${userProfiles.longitude} IS NOT NULL`
-        )
-      )
+      .where(and(...conditions))
       .orderBy(sql`distance`);
     return results;
   }
@@ -975,15 +977,19 @@ export class DatabaseStorage implements IStorage {
     return result[0]?.count ?? 0;
   }
 
-  async getOnlineUsersList(since: Date, lat?: number, lng?: number): Promise<any[]> {
+  async getOnlineUsersList(since: Date, lat?: number, lng?: number, countries?: string[]): Promise<any[]> {
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
+    const conditions: any[] = [eq(users.status, "active"), gte(users.lastLoginAt, since)];
+    if (countries && countries.length > 0) {
+      conditions.push(inArray(users.country, countries));
+    }
     const results = await db
       .select({ user: users, profile: userProfiles, distance: distanceExpr })
       .from(users)
       .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-      .where(and(eq(users.status, "active"), gte(users.lastLoginAt, since)))
+      .where(and(...conditions))
       .orderBy(sql`distance`);
     return results;
   }
@@ -1279,37 +1285,45 @@ export class DatabaseStorage implements IStorage {
     return result[0]?.count ?? 0;
   }
 
-  async getAvailableBikersList(since: Date, lat?: number, lng?: number): Promise<any[]> {
+  async getAvailableBikersList(since: Date, lat?: number, lng?: number, countries?: string[]): Promise<any[]> {
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
+    const conditions: any[] = [
+      eq(users.status, "active"),
+      eq(userProfiles.isAvailable, true),
+      gte(users.lastLoginAt, since),
+      or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
+    ];
+    if (countries && countries.length > 0) {
+      conditions.push(inArray(users.country, countries));
+    }
     return db
       .select({ user: users, profile: userProfiles, distance: distanceExpr })
       .from(userProfiles)
       .innerJoin(users, eq(users.id, userProfiles.userId))
-      .where(and(
-        eq(users.status, "active"),
-        eq(userProfiles.isAvailable, true),
-        gte(users.lastLoginAt, since),
-        or(eq(users.userType, "biker"), eq(users.userType, "coppia"))
-      ))
+      .where(and(...conditions))
       .orderBy(sql`distance`);
   }
 
-  async getAvailableZavorrinaList(since: Date, lat?: number, lng?: number): Promise<any[]> {
+  async getAvailableZavorrinaList(since: Date, lat?: number, lng?: number, countries?: string[]): Promise<any[]> {
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
+    const conditions: any[] = [
+      eq(users.status, "active"),
+      eq(userProfiles.isAvailable, true),
+      gte(users.lastLoginAt, since),
+      eq(users.userType, "zavorrina"),
+    ];
+    if (countries && countries.length > 0) {
+      conditions.push(inArray(users.country, countries));
+    }
     return db
       .select({ user: users, profile: userProfiles, distance: distanceExpr })
       .from(userProfiles)
       .innerJoin(users, eq(users.id, userProfiles.userId))
-      .where(and(
-        eq(users.status, "active"),
-        eq(userProfiles.isAvailable, true),
-        gte(users.lastLoginAt, since),
-        eq(users.userType, "zavorrina")
-      ))
+      .where(and(...conditions))
       .orderBy(sql`distance`);
   }
 
