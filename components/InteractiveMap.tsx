@@ -62,6 +62,7 @@ interface InteractiveMapProps {
   onToggleFilterCoppia: () => void;
   onUserPress?: (user: MapUser) => void;
   onEasterEggPress?: (egg: MapEasterEgg) => void;
+  onReady?: () => void;
 }
 
 const ITALY_REGION: Region = {
@@ -103,6 +104,7 @@ export default function InteractiveMap({
   onToggleFilterCoppia,
   onUserPress,
   onEasterEggPress,
+  onReady,
 }: InteractiveMapProps) {
   const mapRef = useRef<MapView>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -185,6 +187,7 @@ export default function InteractiveMap({
         showsMyLocationButton={false}
         provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
         customMapStyle={darkMapStyle}
+        onMapReady={onReady}
       >
         {filteredUsers.map((u) => (
           <Marker

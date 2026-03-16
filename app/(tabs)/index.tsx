@@ -58,12 +58,19 @@ export default function MapScreen() {
   const [showSosDetail, setShowSosDetail] = useState(false);
   const [offlineCountdown, setOfflineCountdown] = useState<{ online: number }>({ online: 0 });
   const sosEnabled = useSetting("sosEnabled");
+  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace("/welcome");
     }
   }, [authLoading, isAuthenticated]);
+
+  useEffect(() => {
+    if (mapReady) return;
+    const t = setTimeout(() => setMapReady(true), 5000);
+    return () => clearTimeout(t);
+  }, [mapReady]);
 
   const getRegionFallback = useCallback(() => {
     if (user?.region) {
@@ -151,6 +158,7 @@ export default function MapScreen() {
     return () => clearInterval(interval);
   }, [hasActiveCountdown]);
 
+  // --- LIVELLO 2: si attivano dopo che la mappa è pronta ---
   const nearbyUsersQuery = useQuery<any[]>({
     queryKey: ["/api/users/nearby", location?.latitude, location?.longitude],
     queryFn: async () => {
@@ -163,15 +171,41 @@ export default function MapScreen() {
       return res.json();
     },
     retry: false,
-    staleTime: 30000,
-    enabled: isAuthenticated && !!location,
+    staleTime: 300000,
+    refetchInterval: 300000,
+    enabled: isAuthenticated && !!location && mapReady,
   });
 
+  const nearbyLoaded = nearbyUsersQuery.isFetched || nearbyUsersQuery.isError;
+
+  // --- LIVELLO 2: contatori (dopo mappa pronta, refresh 5 minuti) ---
+  const onlineCountQuery = useQuery<{ count: number }>({
+    queryKey: ["/api/users/online-count"],
+    staleTime: 300000,
+    refetchInterval: 300000,
+    enabled: isAuthenticated && mapReady,
+  });
+
+  const bikerCountQuery = useQuery<{ count: number }>({
+    queryKey: ["/api/users/biker-available-count"],
+    staleTime: 300000,
+    refetchInterval: 300000,
+    enabled: isAuthenticated && mapReady,
+  });
+
+  const zavCountQuery = useQuery<{ count: number }>({
+    queryKey: ["/api/users/zavorrine-available-count"],
+    staleTime: 300000,
+    refetchInterval: 300000,
+    enabled: isAuthenticated && mapReady,
+  });
+
+  // --- LIVELLO 3: dati secondari (dopo utenti vicini caricati) ---
   const workshopsQuery = useQuery<any[]>({
     queryKey: ["/api/workshops"],
     retry: false,
     staleTime: 60000,
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && nearbyLoaded,
   });
 
   const easterEggsQuery = useQuery<any[]>({
@@ -188,38 +222,20 @@ export default function MapScreen() {
     retry: false,
     staleTime: 60000,
     refetchInterval: 60000,
-    enabled: isAuthenticated && !!location,
+    enabled: isAuthenticated && !!location && nearbyLoaded,
   });
 
   const { data: adsEnabledData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/ads-enabled"],
     staleTime: 30000,
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && nearbyLoaded,
   });
   const adsGloballyEnabled = adsEnabledData?.enabled !== false;
 
   const myAdsQuery = useQuery<any[]>({
     queryKey: ["/api/ads/my-ads"],
     staleTime: 60000,
-    enabled: isAuthenticated && adsGloballyEnabled,
-  });
-
-  const onlineCountQuery = useQuery<{ count: number }>({
-    queryKey: ["/api/users/online-count"],
-    staleTime: 30000,
-    enabled: isAuthenticated,
-  });
-
-  const bikerCountQuery = useQuery<{ count: number }>({
-    queryKey: ["/api/users/biker-available-count"],
-    staleTime: 30000,
-    enabled: isAuthenticated,
-  });
-
-  const zavCountQuery = useQuery<{ count: number }>({
-    queryKey: ["/api/users/zavorrine-available-count"],
-    staleTime: 30000,
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && adsGloballyEnabled && nearbyLoaded,
   });
 
   const profileQuery = useQuery({
@@ -281,7 +297,7 @@ export default function MapScreen() {
     queryKey: ["/api/sos/active"],
     staleTime: 15000,
     refetchInterval: 15000,
-    enabled: isAuthenticated && sosEnabled,
+    enabled: isAuthenticated && sosEnabled && nearbyLoaded,
   });
 
   const acceptSosMutation = useMutation({
@@ -304,7 +320,7 @@ export default function MapScreen() {
   const myProposalsQuery = useQuery<any[]>({
     queryKey: ["/api/proposals?status=active"],
     staleTime: 60000,
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && nearbyLoaded,
   });
   const mySearchRadius = useMemo(() => {
     const myActive = (myProposalsQuery.data || []).filter(
@@ -556,6 +572,7 @@ export default function MapScreen() {
           onToggleFilterCoppia={() => setFilterCoppia((p) => !p)}
           onUserPress={handleUserPress}
           onEasterEggPress={handleEasterEggPress}
+          onReady={() => setMapReady(true)}
         />
         <View style={styles.expandHint}>
           <Ionicons name="expand" size={16} color={Colors.text} />
