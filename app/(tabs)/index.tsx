@@ -96,6 +96,7 @@ export default function MapScreen() {
 
       if (user?.country) {
         setSelectedCountries([user.country]);
+        try { await AsyncStorage.setItem("map_area_countries", JSON.stringify([user.country])); } catch {}
         setCountriesLoaded(true);
         return;
       }
@@ -138,6 +139,7 @@ export default function MapScreen() {
 
       const validCountry = EUROPEAN_COUNTRIES.some((c) => c.code === detectedCountry) ? detectedCountry : "IT";
       setSelectedCountries([validCountry]);
+      try { await AsyncStorage.setItem("map_area_countries", JSON.stringify([validCountry])); } catch {}
       setCountriesLoaded(true);
     })();
   }, [user?.country]);
