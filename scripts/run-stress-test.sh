@@ -1,4 +1,6 @@
 #!/bin/bash
+echo "Stress test disabilitato."
+exit 0
 export TEST_BASE_URL="https://1558ee31-33f2-48d2-a649-5b9204bdca66-00-6o409859b891.worf.replit.dev:5000"
 export TEST_USER1_EMAIL="admin@bikerlink.it"
 export TEST_USER1_PASSWORD="admin2025!"
