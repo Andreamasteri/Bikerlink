@@ -604,12 +604,14 @@ export default function ProfileScreen() {
       </View>
 
       <View style={[styles.section, { marginTop: 16 }]}>
-        <Text style={styles.sectionTitle}>Lingua / Language / Sprache</Text>
+        <Text style={styles.sectionTitle}>Lingua / Language / Sprache / Idioma / Langue</Text>
         <View style={styles.languageBar}>
           {([
             { code: "it" as AppLanguage, flag: "🇮🇹", label: "IT" },
             { code: "en" as AppLanguage, flag: "🇬🇧", label: "EN" },
             { code: "de" as AppLanguage, flag: "🇩🇪", label: "DE" },
+            { code: "es" as AppLanguage, flag: "🇪🇸", label: "ES" },
+            { code: "fr" as AppLanguage, flag: "🇫🇷", label: "FR" },
           ]).map((lang) => {
             const isActive = language === lang.code;
             return (
