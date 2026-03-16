@@ -25,7 +25,7 @@ import { t } from "@/lib/i18n";
 import { type AppLanguage } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
-import { getCountryFlag } from "@/lib/countries-regions";
+import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 
 interface ProfileData {
@@ -345,7 +345,8 @@ export default function ProfileScreen() {
               <View style={styles.regionBadge}>
                 <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
                 <Text style={styles.badgeText}>
-                  {profile?.country ? getCountryFlag(profile.country) + " " : ""}
+                  {profile?.country ? getCountryFlag(profile.country) + " " + getCountryName(profile.country) : ""}
+                  {profile?.country && profile?.region ? " · " : ""}
                   {profile?.region || ""}
                 </Text>
               </View>
