@@ -249,7 +249,7 @@ export default function ProfileScreen() {
         Linking.openURL(url);
       } else {
         const url = new URL("/api/manual/download", getApiUrl()).toString();
-        const fileUri = FileSystem.documentDirectory + "BikerLink-Manual.pdf";
+        const fileUri = (FileSystem.cacheDirectory || FileSystem.documentDirectory) + "BikerLink-Manual.pdf";
         const result = await FileSystem.downloadAsync(url, fileUri);
         if (result.status === 200) {
           const canShare = await Sharing.isAvailableAsync();
@@ -642,7 +642,7 @@ export default function ProfileScreen() {
 
         <MenuItem icon="document-text-outline" label="Privacy Policy" onPress={() => router.push("/privacy-policy" as any)} />
         <MenuItem
-          icon="book-outline"
+          icon="document-text"
           label={isDownloadingManual ? "Download..." : t("profile.downloadManual")}
           onPress={handleDownloadManual}
           color={Colors.accent}
