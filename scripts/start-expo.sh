@@ -1,7 +1,9 @@
 #!/bin/bash
 
 PORT=8081
+BACKEND_PORT=5000
 MAX_RETRIES=3
+BACKEND_WAIT_SECONDS=120
 
 kill_port() {
   pkill -9 -f "metro" 2>/dev/null || true
@@ -19,6 +21,23 @@ kill_port() {
   done
   echo "Attenzione: porta $PORT ancora occupata dopo 10s"
 }
+
+wait_for_backend() {
+  echo "Attendo che il backend sia pronto sulla porta $BACKEND_PORT..."
+  for i in $(seq 1 $BACKEND_WAIT_SECONDS); do
+    if lsof -ti:$BACKEND_PORT >/dev/null 2>&1; then
+      echo "Backend pronto dopo ${i}s (porta $BACKEND_PORT attiva)."
+      return 0
+    fi
+    if [ $((i % 10)) -eq 0 ]; then
+      echo "  ...ancora in attesa del backend (${i}s / ${BACKEND_WAIT_SECONDS}s)..."
+    fi
+    sleep 1
+  done
+  echo "Attenzione: backend non risponde dopo ${BACKEND_WAIT_SECONDS}s, avvio Metro comunque."
+}
+
+wait_for_backend
 
 for retry in $(seq 1 $MAX_RETRIES); do
   echo "=== Tentativo $retry/$MAX_RETRIES ==="
