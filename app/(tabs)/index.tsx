@@ -85,19 +85,59 @@ export default function MapScreen() {
       try {
         const stored = await AsyncStorage.getItem("map_area_countries");
         if (stored) {
-          setSelectedCountries(JSON.parse(stored));
-        } else if (user?.country) {
-          setSelectedCountries([user.country]);
-        } else {
-          setSelectedCountries(["IT"]);
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setSelectedCountries(parsed);
+            setCountriesLoaded(true);
+            return;
+          }
         }
-      } catch {
-        if (user?.country) {
-          setSelectedCountries([user.country]);
-        } else {
-          setSelectedCountries(["IT"]);
-        }
+      } catch {}
+
+      if (user?.country) {
+        setSelectedCountries([user.country]);
+        setCountriesLoaded(true);
+        return;
       }
+
+      let detectedCountry = "IT";
+      try {
+        if (Platform.OS === "web") {
+          const pos = await new Promise<GeolocationPosition | null>((resolve) => {
+            if (navigator.geolocation) {
+              navigator.geolocation.getCurrentPosition(
+                (p) => resolve(p),
+                () => resolve(null),
+                { timeout: 5000 }
+              );
+            } else resolve(null);
+          });
+          if (pos) {
+            const geocode = await Location.reverseGeocodeAsync({
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+            });
+            if (geocode?.[0]?.isoCountryCode) {
+              detectedCountry = geocode[0].isoCountryCode;
+            }
+          }
+        } else {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === "granted") {
+            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
+            const geocode = await Location.reverseGeocodeAsync({
+              latitude: loc.coords.latitude,
+              longitude: loc.coords.longitude,
+            });
+            if (geocode?.[0]?.isoCountryCode) {
+              detectedCountry = geocode[0].isoCountryCode;
+            }
+          }
+        }
+      } catch {}
+
+      const validCountry = EUROPEAN_COUNTRIES.some((c) => c.code === detectedCountry) ? detectedCountry : "IT";
+      setSelectedCountries([validCountry]);
       setCountriesLoaded(true);
     })();
   }, [user?.country]);
@@ -129,11 +169,9 @@ export default function MapScreen() {
   }, []);
 
   const sortedCountries = useMemo(() => {
-    const itIndex = EUROPEAN_COUNTRIES.findIndex((c) => c.code === "IT");
-    if (itIndex < 0) return EUROPEAN_COUNTRIES;
-    const copy = [...EUROPEAN_COUNTRIES];
-    const [it] = copy.splice(itIndex, 1);
-    return [it, ...copy];
+    const itEntry = EUROPEAN_COUNTRIES.find((c) => c.code === "IT");
+    const rest = EUROPEAN_COUNTRIES.filter((c) => c.code !== "IT").sort((a, b) => a.name.localeCompare(b.name));
+    return itEntry ? [itEntry, ...rest] : rest;
   }, []);
 
   const getRegionFallback = useCallback(() => {
