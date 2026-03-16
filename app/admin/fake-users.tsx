@@ -972,19 +972,27 @@ export default function FakeUsersAdmin() {
             <Text style={styles.confirmTitle}>Elimina tutti gli utenti fake?</Text>
             <Text style={styles.confirmDesc}>Questa azione elimina permanentemente tutti i {totalCount} utenti fake e non può essere annullata.</Text>
             <View style={styles.confirmBtns}>
-              <TouchableOpacity style={styles.confirmCancelBtn} onPress={() => setDeleteAllConfirmVisible(false)}>
+              <TouchableOpacity
+                style={[styles.confirmCancelBtn, deleteAllMutation.isPending && { opacity: 0.4 }]}
+                onPress={() => setDeleteAllConfirmVisible(false)}
+                disabled={deleteAllMutation.isPending}
+              >
                 <Text style={styles.confirmCancelBtnText}>Annulla</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.confirmDeleteBtn, deleteAllMutation.isPending && { opacity: 0.6 }]}
                 disabled={deleteAllMutation.isPending}
                 onPress={() => {
-                  setDeleteAllConfirmVisible(false);
-                  deleteAllMutation.mutate();
+                  deleteAllMutation.mutate(undefined, {
+                    onSettled: () => setDeleteAllConfirmVisible(false),
+                  });
                 }}
               >
                 {deleteAllMutation.isPending ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <ActivityIndicator size="small" color="#fff" />
+                    <Text style={styles.confirmDeleteBtnText}>Eliminazione...</Text>
+                  </View>
                 ) : (
                   <Text style={styles.confirmDeleteBtnText}>Elimina tutti</Text>
                 )}
