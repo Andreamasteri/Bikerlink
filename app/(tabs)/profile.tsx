@@ -604,7 +604,7 @@ export default function ProfileScreen() {
       </View>
 
       <View style={[styles.section, { marginTop: 16 }]}>
-        <Text style={styles.sectionTitle}>{t("language.title")}</Text>
+        <Text style={styles.sectionTitle}>Lingua / Language / Sprache</Text>
         <View style={styles.languageBar}>
           {([
             { code: "it" as AppLanguage, flag: "🇮🇹", label: "IT" },

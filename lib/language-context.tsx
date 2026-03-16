@@ -32,6 +32,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setLanguage = useCallback((lang: AppLanguage) => {
+    if (lang === getAppLanguage()) return;
     setAppLanguage(lang);
     setLanguageState(lang);
     setRenderKey((k) => k + 1);
