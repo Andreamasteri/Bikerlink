@@ -1771,7 +1771,7 @@ var init_mass_seed_data = __esm({
       { region: "Stockholm", country: "SE", lat: 59.33, lng: 18.07, spokenLanguages: ["English"] },
       { region: "G\xF6teborg", country: "SE", lat: 57.71, lng: 11.97, spokenLanguages: ["English"] },
       { region: "Lisboa", country: "PT", lat: 38.72, lng: -9.14, spokenLanguages: ["Portugu\xEAs"] },
-      { region: "Attiki", country: "GR", lat: 37.98, lng: 23.73, spokenLanguages: ["English"] },
+      { region: "Attiki", country: "GR", lat: 37.98, lng: 23.73, spokenLanguages: ["Greek"] },
       { region: "Praha", country: "CZ", lat: 50.08, lng: 14.44, spokenLanguages: ["English"] },
       { region: "Budapest", country: "HU", lat: 47.5, lng: 19.04, spokenLanguages: ["English"] },
       { region: "Bucure\u0219ti", country: "RO", lat: 44.43, lng: 26.1, spokenLanguages: ["English"] },
