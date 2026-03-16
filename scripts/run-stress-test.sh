@@ -17,10 +17,30 @@ mkdir -p "$(dirname "$LOG_FILE")"
   echo "================================================================================"
 } | tee -a "$LOG_FILE"
 
+sysmon_loop() {
+  while true; do
+    TS=$(date '+%Y-%m-%d %H:%M:%S')
+    RAM_LINE=$(free -m | grep '^Mem:')
+    RAM_TOT=$(echo $RAM_LINE | awk '{printf "%.1fGB", $2/1024}')
+    RAM_USED=$(echo $RAM_LINE | awk '{printf "%.1fGB", $3/1024}')
+    RAM_AVAIL=$(echo $RAM_LINE | awk '{printf "%.1fGB", $7/1024}')
+    DISK_LINE=$(df -h /home/runner/workspace | tail -1)
+    DISK_USED=$(echo $DISK_LINE | awk '{print $3}')
+    DISK_TOT=$(echo $DISK_LINE | awk '{print $2}')
+    DISK_PCT=$(echo $DISK_LINE | awk '{print $5}')
+    echo "[$TS] [SYS] RAM: ${RAM_USED}/${RAM_TOT} usata | Disponibile: ${RAM_AVAIL} | Disco: ${DISK_USED}/${DISK_TOT} (${DISK_PCT})" | tee -a "$LOG_FILE"
+    sleep 30
+  done
+}
+
+sysmon_loop &
+SYSMON_PID=$!
+trap "kill $SYSMON_PID 2>/dev/null" EXIT
+
 echo "[run-stress] Compilazione stress test..."
 node_modules/.bin/esbuild scripts/stress-test.ts \
   --platform=node --packages=external --bundle --format=cjs \
   --outfile=/tmp/stress-test-compiled.js
 
 echo "[run-stress] Avvio test a $(date)" | tee -a "$LOG_FILE"
-exec node /tmp/stress-test-compiled.js 2>&1 | tee -a "$LOG_FILE"
+node /tmp/stress-test-compiled.js 2>&1 | tee -a "$LOG_FILE"
