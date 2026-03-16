@@ -224,8 +224,13 @@ export interface IStorage {
 
   getInvitationCodes(): Promise<InvitationCode[]>;
   getInvitationCode(code: string): Promise<InvitationCode | undefined>;
+  getInvitationCodeById(id: string): Promise<InvitationCode | undefined>;
   createInvitationCode(code: InsertInvitationCode): Promise<InvitationCode>;
+  updateInvitationCode(id: string, data: Partial<InsertInvitationCode>): Promise<InvitationCode>;
+  deleteInvitationCode(id: string): Promise<void>;
   incrementInvitationCodeUses(id: string): Promise<void>;
+  countUsersWithInvitationCode(): Promise<number>;
+  countUsersByInvitationCode(code: string): Promise<number>;
 
   getFeedbackTickets(): Promise<FeedbackTicket[]>;
   createFeedbackTicket(ticket: InsertFeedbackTicket): Promise<FeedbackTicket>;
@@ -825,13 +830,37 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
+  async getInvitationCodeById(id: string): Promise<InvitationCode | undefined> {
+    const [row] = await db.select().from(invitationCodes).where(eq(invitationCodes.id, id)).limit(1);
+    return row;
+  }
+
   async createInvitationCode(data: InsertInvitationCode): Promise<InvitationCode> {
     const [code] = await db.insert(invitationCodes).values(data).returning();
     return code;
   }
 
+  async updateInvitationCode(id: string, data: Partial<InsertInvitationCode>): Promise<InvitationCode> {
+    const [updated] = await db.update(invitationCodes).set(data).where(eq(invitationCodes.id, id)).returning();
+    return updated;
+  }
+
+  async deleteInvitationCode(id: string): Promise<void> {
+    await db.delete(invitationCodes).where(eq(invitationCodes.id, id));
+  }
+
   async incrementInvitationCodeUses(id: string): Promise<void> {
     await db.update(invitationCodes).set({ currentUses: sql`${invitationCodes.currentUses} + 1` }).where(eq(invitationCodes.id, id));
+  }
+
+  async countUsersWithInvitationCode(): Promise<number> {
+    const [row] = await db.select({ count: sql<number>`count(*)` }).from(users).where(sql`${users.invitationCode} IS NOT NULL AND ${users.invitationCode} != ''`);
+    return Number(row?.count ?? 0);
+  }
+
+  async countUsersByInvitationCode(code: string): Promise<number> {
+    const [row] = await db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.invitationCode, code));
+    return Number(row?.count ?? 0);
   }
 
   async getFeedbackTickets(): Promise<FeedbackTicket[]> {

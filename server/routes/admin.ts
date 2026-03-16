@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import { storage } from "../storage";
 import { db } from "../db";
 import { motoClubs, motoClubRequests, motoClubMembers, conversations, moderatorLogs, users } from "@shared/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -1609,6 +1609,96 @@ router.get("/mass-seed-status", async (_req: Request, res: Response) => {
     return res.json(getMassSeedStatus());
   } catch (error) {
     console.error("Admin mass seed status error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/invitation-codes/stats", async (_req: Request, res: Response) => {
+  try {
+    const totalUsers = await db.select({ count: sql<number>`count(*)` }).from(users).then(r => Number(r[0]?.count ?? 0));
+    const usersWithCode = await storage.countUsersWithInvitationCode();
+    const codes = await storage.getInvitationCodes();
+    const perCode = await Promise.all(
+      codes.map(async (c) => ({
+        code: c.code,
+        label: c.label ?? c.code,
+        count: await storage.countUsersByInvitationCode(c.code),
+        isActive: c.isActive,
+        currentUses: c.currentUses,
+        maxUses: c.maxUses,
+      }))
+    );
+    return res.json({ totalUsers, usersWithCode, perCode });
+  } catch (error) {
+    console.error("Admin invitation stats error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/invitation-codes", async (_req: Request, res: Response) => {
+  try {
+    const codes = await storage.getInvitationCodes();
+    return res.json(codes);
+  } catch (error) {
+    console.error("Admin invitation list error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/invitation-codes", async (req: Request, res: Response) => {
+  try {
+    const { code, label, giftMessage, maxUses, expiresAt } = req.body;
+    if (!code || typeof code !== "string" || code.trim().length < 2) {
+      return res.status(400).json({ message: "Codice non valido (minimo 2 caratteri)" });
+    }
+    const created = await storage.createInvitationCode({
+      code: code.trim().toUpperCase(),
+      label: label?.trim() || null,
+      giftMessage: giftMessage?.trim() || null,
+      createdBy: (req as any).currentUser?.id ?? null,
+      maxUses: Number(maxUses) || 100,
+      expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+    });
+    return res.status(201).json(created);
+  } catch (error: any) {
+    if (error?.code === "23505") {
+      return res.status(409).json({ message: "Codice già esistente" });
+    }
+    console.error("Admin invitation create error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.put("/invitation-codes/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { label, giftMessage, maxUses, isActive, expiresAt } = req.body;
+    const existing = await storage.getInvitationCodeById(id);
+    if (!existing) return res.status(404).json({ message: "Codice non trovato" });
+
+    const updated = await storage.updateInvitationCode(id, {
+      ...(label !== undefined && { label: label?.trim() || null }),
+      ...(giftMessage !== undefined && { giftMessage: giftMessage?.trim() || null }),
+      ...(maxUses !== undefined && { maxUses: Number(maxUses) }),
+      ...(isActive !== undefined && { isActive: Boolean(isActive) }),
+      ...(expiresAt !== undefined && { expiresAt: expiresAt ? new Date(expiresAt) : undefined }),
+    });
+    return res.json(updated);
+  } catch (error) {
+    console.error("Admin invitation update error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/invitation-codes/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const existing = await storage.getInvitationCodeById(id);
+    if (!existing) return res.status(404).json({ message: "Codice non trovato" });
+    await storage.deleteInvitationCode(id);
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("Admin invitation delete error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

@@ -540,6 +540,8 @@ export const invitationCodes = pgTable("invitation_codes", {
     .primaryKey()
     .default(sql`gen_random_uuid()`),
   code: varchar("code", { length: 50 }).notNull().unique(),
+  label: varchar("label", { length: 100 }),
+  giftMessage: text("gift_message"),
   createdBy: varchar("created_by", { length: 36 })
     .references(() => users.id, { onDelete: "set null" }),
   usedBy: varchar("used_by", { length: 36 })

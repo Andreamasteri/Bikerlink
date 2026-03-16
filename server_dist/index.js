@@ -460,6 +460,8 @@ var init_schema = __esm({
     invitationCodes = (0, import_pg_core.pgTable)("invitation_codes", {
       id: (0, import_pg_core.varchar)("id", { length: 36 }).primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
       code: (0, import_pg_core.varchar)("code", { length: 50 }).notNull().unique(),
+      label: (0, import_pg_core.varchar)("label", { length: 100 }),
+      giftMessage: (0, import_pg_core.text)("gift_message"),
       createdBy: (0, import_pg_core.varchar)("created_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
       usedBy: (0, import_pg_core.varchar)("used_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
       maxUses: (0, import_pg_core.integer)("max_uses").notNull().default(1),
@@ -1091,12 +1093,31 @@ var init_storage = __esm({
         const [row] = await db.select().from(invitationCodes).where((0, import_drizzle_orm2.eq)(invitationCodes.code, code)).limit(1);
         return row;
       }
+      async getInvitationCodeById(id) {
+        const [row] = await db.select().from(invitationCodes).where((0, import_drizzle_orm2.eq)(invitationCodes.id, id)).limit(1);
+        return row;
+      }
       async createInvitationCode(data) {
         const [code] = await db.insert(invitationCodes).values(data).returning();
         return code;
       }
+      async updateInvitationCode(id, data) {
+        const [updated] = await db.update(invitationCodes).set(data).where((0, import_drizzle_orm2.eq)(invitationCodes.id, id)).returning();
+        return updated;
+      }
+      async deleteInvitationCode(id) {
+        await db.delete(invitationCodes).where((0, import_drizzle_orm2.eq)(invitationCodes.id, id));
+      }
       async incrementInvitationCodeUses(id) {
         await db.update(invitationCodes).set({ currentUses: import_drizzle_orm2.sql`${invitationCodes.currentUses} + 1` }).where((0, import_drizzle_orm2.eq)(invitationCodes.id, id));
+      }
+      async countUsersWithInvitationCode() {
+        const [row] = await db.select({ count: import_drizzle_orm2.sql`count(*)` }).from(users).where(import_drizzle_orm2.sql`${users.invitationCode} IS NOT NULL AND ${users.invitationCode} != ''`);
+        return Number(row?.count ?? 0);
+      }
+      async countUsersByInvitationCode(code) {
+        const [row] = await db.select({ count: import_drizzle_orm2.sql`count(*)` }).from(users).where((0, import_drizzle_orm2.eq)(users.invitationCode, code));
+        return Number(row?.count ?? 0);
       }
       async getFeedbackTickets() {
         return db.select().from(feedbackTickets).orderBy((0, import_drizzle_orm2.desc)(feedbackTickets.createdAt));
@@ -3107,6 +3128,7 @@ router.post("/register", registerLimiter, async (req, res) => {
     if (existingNickname) {
       return res.status(409).json({ message: "Nickname gi\xE0 in uso" });
     }
+    let invitationGiftMessage = null;
     if (data.invitationCode) {
       const invitation = await storage.getInvitationCode(data.invitationCode);
       if (!invitation || !invitation.isActive || invitation.currentUses >= invitation.maxUses) {
@@ -3116,6 +3138,7 @@ router.post("/register", registerLimiter, async (req, res) => {
         return res.status(400).json({ message: "Codice invito scaduto" });
       }
       await storage.incrementInvitationCodeUses(invitation.id);
+      invitationGiftMessage = invitation.giftMessage ?? null;
     }
     const hashedPassword = await import_bcryptjs.default.hash(data.password, 12);
     const primalSetting = await storage.getAppSetting("primal_user_enabled");
@@ -3163,14 +3186,14 @@ router.post("/register", registerLimiter, async (req, res) => {
         console.error("Failed to notify admin about email verification:", e);
       }
       const { password: _2, ...safeUser2 } = user;
-      return res.status(201).json({ ...safeUser2, requiresEmailVerification: true });
+      return res.status(201).json({ ...safeUser2, requiresEmailVerification: true, giftMessage: invitationGiftMessage });
     }
     if (isPrimal) {
       await storage.markUserEmailVerified(user.id);
     }
     req.session.userId = user.id;
     const { password: _, ...safeUser } = user;
-    return res.status(201).json(safeUser);
+    return res.status(201).json({ ...safeUser, giftMessage: invitationGiftMessage });
   } catch (error) {
     console.error("Register error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -5558,6 +5581,30 @@ router9.get("/placeholders", async (_req, res) => {
     ]
   });
 });
+router9.get("/preview/:code", async (req, res) => {
+  try {
+    const { code } = req.params;
+    if (!code) return res.status(400).json({ message: "Codice mancante" });
+    const invitation = await storage.getInvitationCode(code.toUpperCase());
+    if (!invitation || !invitation.isActive) {
+      return res.status(404).json({ message: "Codice non valido" });
+    }
+    if (invitation.currentUses >= invitation.maxUses) {
+      return res.status(404).json({ message: "Codice esaurito" });
+    }
+    if (invitation.expiresAt && new Date(invitation.expiresAt) < /* @__PURE__ */ new Date()) {
+      return res.status(404).json({ message: "Codice scaduto" });
+    }
+    return res.json({
+      code: invitation.code,
+      label: invitation.label ?? null,
+      giftMessage: invitation.giftMessage ?? null
+    });
+  } catch (error) {
+    console.error("Invite preview error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
 var invitations_default = router9;
 
 // server/routes/contest.ts
@@ -7010,7 +7057,7 @@ router17.get("/easter-eggs-stats", async (_req, res) => {
   try {
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { collectedEasterEggs: collectedEasterEggs2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { count, sql: sql5 } = await import("drizzle-orm");
+    const { count, sql: sql6 } = await import("drizzle-orm");
     const rows = await db2.select({
       easterEggId: collectedEasterEggs2.easterEggId,
       collectionsCount: count()
@@ -8086,6 +8133,90 @@ router17.get("/mass-seed-status", async (_req, res) => {
     return res.json(getMassSeedStatus2());
   } catch (error) {
     console.error("Admin mass seed status error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router17.get("/invitation-codes/stats", async (_req, res) => {
+  try {
+    const totalUsers = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(users).then((r) => Number(r[0]?.count ?? 0));
+    const usersWithCode = await storage.countUsersWithInvitationCode();
+    const codes = await storage.getInvitationCodes();
+    const perCode = await Promise.all(
+      codes.map(async (c) => ({
+        code: c.code,
+        label: c.label ?? c.code,
+        count: await storage.countUsersByInvitationCode(c.code),
+        isActive: c.isActive,
+        currentUses: c.currentUses,
+        maxUses: c.maxUses
+      }))
+    );
+    return res.json({ totalUsers, usersWithCode, perCode });
+  } catch (error) {
+    console.error("Admin invitation stats error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router17.get("/invitation-codes", async (_req, res) => {
+  try {
+    const codes = await storage.getInvitationCodes();
+    return res.json(codes);
+  } catch (error) {
+    console.error("Admin invitation list error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router17.post("/invitation-codes", async (req, res) => {
+  try {
+    const { code, label, giftMessage, maxUses, expiresAt } = req.body;
+    if (!code || typeof code !== "string" || code.trim().length < 2) {
+      return res.status(400).json({ message: "Codice non valido (minimo 2 caratteri)" });
+    }
+    const created = await storage.createInvitationCode({
+      code: code.trim().toUpperCase(),
+      label: label?.trim() || null,
+      giftMessage: giftMessage?.trim() || null,
+      createdBy: req.currentUser?.id ?? null,
+      maxUses: Number(maxUses) || 100,
+      expiresAt: expiresAt ? new Date(expiresAt) : void 0
+    });
+    return res.status(201).json(created);
+  } catch (error) {
+    if (error?.code === "23505") {
+      return res.status(409).json({ message: "Codice gi\xE0 esistente" });
+    }
+    console.error("Admin invitation create error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router17.put("/invitation-codes/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { label, giftMessage, maxUses, isActive, expiresAt } = req.body;
+    const existing = await storage.getInvitationCodeById(id);
+    if (!existing) return res.status(404).json({ message: "Codice non trovato" });
+    const updated = await storage.updateInvitationCode(id, {
+      ...label !== void 0 && { label: label?.trim() || null },
+      ...giftMessage !== void 0 && { giftMessage: giftMessage?.trim() || null },
+      ...maxUses !== void 0 && { maxUses: Number(maxUses) },
+      ...isActive !== void 0 && { isActive: Boolean(isActive) },
+      ...expiresAt !== void 0 && { expiresAt: expiresAt ? new Date(expiresAt) : void 0 }
+    });
+    return res.json(updated);
+  } catch (error) {
+    console.error("Admin invitation update error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router17.delete("/invitation-codes/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await storage.getInvitationCodeById(id);
+    if (!existing) return res.status(404).json({ message: "Codice non trovato" });
+    await storage.deleteInvitationCode(id);
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("Admin invitation delete error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

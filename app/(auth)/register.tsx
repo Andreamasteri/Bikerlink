@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -13,13 +13,14 @@ import {
   FlatList,
   Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
+import { getApiUrl } from "@/lib/query-client";
 
 const ITALIAN_REGIONS = [
   "Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna",
@@ -105,6 +106,7 @@ export default function RegisterScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { registerMutation } = useAuth();
+  const params = useLocalSearchParams<{ inviteCode?: string }>();
 
   const { data: emailVerifData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/email-verification"],
@@ -130,6 +132,50 @@ export default function RegisterScreen() {
   const [region, setRegion] = useState("");
   const [showRegions, setShowRegions] = useState(false);
   const [eulaAccepted, setEulaAccepted] = useState(false);
+
+  const [inviteCode, setInviteCode] = useState(params.inviteCode ?? "");
+  const [invitePreview, setInvitePreview] = useState<{ code: string; label: string | null; giftMessage: string | null } | null>(null);
+  const [invitePreviewLoading, setInvitePreviewLoading] = useState(false);
+  const [showGiftModal, setShowGiftModal] = useState(false);
+  const [giftModalMessage, setGiftModalMessage] = useState("");
+  const [giftModalCode, setGiftModalCode] = useState("");
+  const [pendingNavigation, setPendingNavigation] = useState<"tabs" | "verify" | null>(null);
+  const [verifyEmail, setVerifyEmail] = useState("");
+  const inviteDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (inviteDebounceRef.current) clearTimeout(inviteDebounceRef.current);
+    const code = inviteCode.trim().toUpperCase();
+    if (!code) { setInvitePreview(null); return; }
+    inviteDebounceRef.current = setTimeout(async () => {
+      setInvitePreviewLoading(true);
+      try {
+        const url = new URL(`/api/invitations/preview/${encodeURIComponent(code)}`, getApiUrl());
+        const res = await fetch(url.toString());
+        if (res.ok) {
+          const data = await res.json();
+          setInvitePreview(data);
+        } else {
+          setInvitePreview(null);
+        }
+      } catch {
+        setInvitePreview(null);
+      } finally {
+        setInvitePreviewLoading(false);
+      }
+    }, 600);
+    return () => { if (inviteDebounceRef.current) clearTimeout(inviteDebounceRef.current); };
+  }, [inviteCode]);
+
+  const handleGiftModalClose = () => {
+    setShowGiftModal(false);
+    if (pendingNavigation === "verify") {
+      router.replace({ pathname: "/(auth)/verify-email", params: { email: verifyEmail } });
+    } else {
+      router.replace("/(tabs)");
+    }
+    setPendingNavigation(null);
+  };
 
   const totalSteps = 4;
 
@@ -219,10 +265,21 @@ export default function RegisterScreen() {
     }
     if (birthYear) data.birthYear = parseInt(birthYear, 10);
     if (region) data.region = region;
+    if (inviteCode.trim()) data.invitationCode = inviteCode.trim().toUpperCase();
 
     registerMutation.mutate(data, {
       onSuccess: (response: any) => {
-        if (response?.requiresEmailVerification) {
+        if (response?.giftMessage) {
+          setGiftModalMessage(response.giftMessage);
+          setGiftModalCode(inviteCode.trim().toUpperCase());
+          if (response?.requiresEmailVerification) {
+            setPendingNavigation("verify");
+            setVerifyEmail(data.email);
+          } else {
+            setPendingNavigation("tabs");
+          }
+          setShowGiftModal(true);
+        } else if (response?.requiresEmailVerification) {
           router.replace({ pathname: "/(auth)/verify-email", params: { email: data.email } });
         } else {
           router.replace("/(tabs)");
@@ -522,6 +579,44 @@ export default function RegisterScreen() {
         </View>
       )}
 
+      <View style={styles.inviteSection}>
+        <View style={styles.inputWrapper}>
+          <Ionicons name="gift-outline" size={20} color={Colors.accent} style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="Codice invito (opzionale)"
+            placeholderTextColor={Colors.textSecondary}
+            value={inviteCode}
+            onChangeText={(v) => setInviteCode(v.toUpperCase())}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            testID="reg-invite-code"
+          />
+          {invitePreviewLoading && <ActivityIndicator size="small" color={Colors.accent} style={{ marginRight: 8 }} />}
+          {!invitePreviewLoading && inviteCode.trim().length > 0 && (
+            <Ionicons
+              name={invitePreview ? "checkmark-circle" : "close-circle"}
+              size={20}
+              color={invitePreview ? "#4CAF50" : Colors.textSecondary}
+              style={{ marginRight: 8 }}
+            />
+          )}
+        </View>
+
+        {invitePreview && (
+          <View style={styles.inviteBanner}>
+            <Ionicons name="gift" size={28} color={Colors.accent} />
+            <View style={styles.inviteBannerText}>
+              <Text style={styles.inviteBannerTitle}>Omaggio disponibile!</Text>
+              {invitePreview.label && <Text style={styles.inviteBannerLabel}>{invitePreview.label}</Text>}
+              {invitePreview.giftMessage && (
+                <Text style={styles.inviteBannerMessage} numberOfLines={3}>{invitePreview.giftMessage}</Text>
+              )}
+            </View>
+          </View>
+        )}
+      </View>
+
       <Modal
         visible={showPrefixModal}
         transparent
@@ -651,6 +746,28 @@ export default function RegisterScreen() {
           </View>
         )}
       </ScrollView>
+
+      <Modal
+        visible={showGiftModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.giftModalOverlay}>
+          <View style={styles.giftModalCard}>
+            <Ionicons name="gift" size={56} color={Colors.accent} style={{ marginBottom: 16 }} />
+            <Text style={styles.giftModalTitle}>🎁 Omaggio sbloccato!</Text>
+            <Text style={styles.giftModalMessage}>{giftModalMessage}</Text>
+            <View style={styles.giftModalCodeBox}>
+              <Text style={styles.giftModalCodeLabel}>Il tuo codice</Text>
+              <Text style={styles.giftModalCode}>{giftModalCode}</Text>
+            </View>
+            <TouchableOpacity style={styles.giftModalButton} onPress={handleGiftModalClose}>
+              <Text style={styles.giftModalButtonText}>Ho capito!</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -1015,5 +1132,105 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     textAlign: "center" as const,
     textDecorationLine: "underline" as const,
+  },
+  inviteSection: {
+    marginTop: 8,
+    gap: 8,
+  },
+  inviteBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "rgba(255, 152, 0, 0.12)",
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    borderRadius: 12,
+    padding: 14,
+    gap: 12,
+  },
+  inviteBannerText: {
+    flex: 1,
+    gap: 3,
+  },
+  inviteBannerTitle: {
+    color: Colors.accent,
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+  },
+  inviteBannerLabel: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+  },
+  inviteBannerMessage: {
+    color: Colors.text,
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 18,
+  },
+  giftModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  giftModalCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    padding: 32,
+    alignItems: "center",
+    width: "100%",
+    maxWidth: 360,
+  },
+  giftModalTitle: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  giftModalMessage: {
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  giftModalCodeBox: {
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: "center",
+    marginBottom: 28,
+    width: "100%",
+    borderWidth: 1,
+    borderColor: Colors.accent,
+  },
+  giftModalCodeLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+    textTransform: "uppercase" as const,
+    letterSpacing: 1.5,
+    marginBottom: 6,
+  },
+  giftModalCode: {
+    fontSize: 36,
+    fontFamily: "Inter_700Bold",
+    color: Colors.accent,
+    letterSpacing: 4,
+  },
+  giftModalButton: {
+    backgroundColor: Colors.accent,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+  },
+  giftModalButtonText: {
+    color: Colors.background,
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
   },
 });

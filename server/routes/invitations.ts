@@ -79,4 +79,31 @@ router.get("/placeholders", async (_req: Request, res: Response) => {
   });
 });
 
+router.get("/preview/:code", async (req: Request, res: Response) => {
+  try {
+    const { code } = req.params;
+    if (!code) return res.status(400).json({ message: "Codice mancante" });
+
+    const invitation = await storage.getInvitationCode(code.toUpperCase());
+    if (!invitation || !invitation.isActive) {
+      return res.status(404).json({ message: "Codice non valido" });
+    }
+    if (invitation.currentUses >= invitation.maxUses) {
+      return res.status(404).json({ message: "Codice esaurito" });
+    }
+    if (invitation.expiresAt && new Date(invitation.expiresAt) < new Date()) {
+      return res.status(404).json({ message: "Codice scaduto" });
+    }
+
+    return res.json({
+      code: invitation.code,
+      label: invitation.label ?? null,
+      giftMessage: invitation.giftMessage ?? null,
+    });
+  } catch (error) {
+    console.error("Invite preview error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 export default router;

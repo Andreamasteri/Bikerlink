@@ -70,6 +70,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       return res.status(409).json({ message: "Nickname già in uso" });
     }
 
+    let invitationGiftMessage: string | null = null;
     if (data.invitationCode) {
       const invitation = await storage.getInvitationCode(data.invitationCode);
       if (!invitation || !invitation.isActive || invitation.currentUses >= invitation.maxUses) {
@@ -79,6 +80,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
         return res.status(400).json({ message: "Codice invito scaduto" });
       }
       await storage.incrementInvitationCodeUses(invitation.id);
+      invitationGiftMessage = invitation.giftMessage ?? null;
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 12);
@@ -134,7 +136,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       }
 
       const { password: _, ...safeUser } = user;
-      return res.status(201).json({ ...safeUser, requiresEmailVerification: true });
+      return res.status(201).json({ ...safeUser, requiresEmailVerification: true, giftMessage: invitationGiftMessage });
     }
 
     if (isPrimal) {
@@ -144,7 +146,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     req.session.userId = user.id;
 
     const { password: _, ...safeUser } = user;
-    return res.status(201).json(safeUser);
+    return res.status(201).json({ ...safeUser, giftMessage: invitationGiftMessage });
   } catch (error) {
     console.error("Register error:", error);
     return res.status(500).json({ message: "Errore interno del server" });

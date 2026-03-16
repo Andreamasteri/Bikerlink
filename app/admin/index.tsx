@@ -67,6 +67,7 @@ const adminGroups: AdminGroup[] = [
     headerIconSet: "MaterialIcons",
     items: [
       { key: "settings", label: "Impostazioni", icon: "settings", iconSet: "MaterialIcons", route: "/admin/settings" },
+      { key: "invite-codes", label: "Codici Invito", icon: "gift", iconSet: "Ionicons", route: "/admin/invite-codes" },
     ],
   },
 ];
