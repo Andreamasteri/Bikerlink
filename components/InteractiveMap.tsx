@@ -12,12 +12,15 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
+import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 
 interface MapUser {
   id: string;
   nickname: string;
   userType: "biker" | "zavorrina" | "coppia";
   sex?: string | null;
+  country?: string | null;
+  region?: string | null;
   latitude: number;
   longitude: number;
 }
@@ -194,6 +197,7 @@ export default function InteractiveMap({
             key={`user-${u.id}`}
             coordinate={{ latitude: u.latitude, longitude: u.longitude }}
             title={u.nickname}
+            description={u.country ? `${getCountryFlag(u.country)} ${getCountryName(u.country)}${u.region ? ` · ${u.region}` : ""}` : u.region || undefined}
             pinColor={getUserMarkerColor(u.userType, u.sex)}
             onPress={() => onUserPress?.(u)}
           />

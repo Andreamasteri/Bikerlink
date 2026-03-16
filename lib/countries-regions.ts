@@ -582,6 +582,23 @@ export const EUROPEAN_COUNTRIES: CountryData[] = [
       { name: "Lankaran", latitude: 38.7539, longitude: 48.8511 },
     ],
   },
+  {
+    code: "RU", name: "Russia", flag: "🇷🇺",
+    regions: [
+      { name: "Mosca", latitude: 55.7558, longitude: 37.6173 },
+      { name: "San Pietroburgo", latitude: 59.9343, longitude: 30.3351 },
+      { name: "Kaliningrad", latitude: 54.7104, longitude: 20.4522 },
+      { name: "Krasnodar", latitude: 45.0353, longitude: 38.9753 },
+      { name: "Kazan", latitude: 55.7879, longitude: 49.1233 },
+      { name: "Nizhny Novgorod", latitude: 56.2965, longitude: 43.9361 },
+      { name: "Novosibirsk", latitude: 55.0084, longitude: 82.9357 },
+      { name: "Ekaterinburg", latitude: 56.8389, longitude: 60.6057 },
+      { name: "Sochi", latitude: 43.5855, longitude: 39.7231 },
+      { name: "Rostov-on-Don", latitude: 47.2357, longitude: 39.7015 },
+      { name: "Samara", latitude: 53.1959, longitude: 50.1002 },
+      { name: "Volgograd", latitude: 48.7080, longitude: 44.5133 },
+    ],
+  },
 ];
 
 export function getCountryByCode(code: string): CountryData | undefined {
