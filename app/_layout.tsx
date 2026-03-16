@@ -10,6 +10,13 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef } from "react";
 import { Platform, AppState } from "react-native";
+
+if (Platform.OS === "web" && typeof document !== "undefined") {
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap";
+  document.head.appendChild(link);
+}
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -81,12 +88,11 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-  });
+  const [fontsLoaded, fontError] = useFonts(
+    Platform.OS === "web"
+      ? {}
+      : { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold }
+  );
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
