@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  FlatList,
   ScrollView,
   Platform,
   Modal,
   TextInput,
-  Alert,
   ActivityIndicator,
   Switch,
 } from "react-native";
@@ -16,7 +16,7 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 
@@ -33,7 +33,7 @@ const RIDING_STYLES = ["Allegra", "Tranquilla", "Sportiva", "Turistica"];
 type FilterType = "tutti" | "biker" | "zavorrina" | "coppia";
 
 interface FakeUser {
-  id: number;
+  id: string;
   nickname: string;
   userType: string;
   sex: string;
@@ -45,6 +45,13 @@ interface FakeUser {
   profileViews: number;
   chatRequests: number;
   chatMessages: number;
+}
+
+interface FakeUsersPage {
+  users: FakeUser[];
+  total: number;
+  hasMore: boolean;
+  stats: { total: number; biker: number; zavorrina: number; coppia: number };
 }
 
 interface Conversation {
@@ -67,13 +74,18 @@ export default function FakeUsersAdmin() {
     ? { top: 67, bottom: 34, left: rawInsets.left, right: rawInsets.right }
     : rawInsets;
 
+  const flatListRef = useRef<FlatList<FakeUser>>(null);
   const [filter, setFilter] = useState<FilterType>("tutti");
+  const [deleteAllConfirmVisible, setDeleteAllConfirmVisible] = useState(false);
+  const [deleteAllResultMsg, setDeleteAllResultMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [deleteSingleTarget, setDeleteSingleTarget] = useState<{ id: string; nickname: string } | null>(null);
   const [togglePwdVisible, setTogglePwdVisible] = useState(false);
   const [togglePwdInput, setTogglePwdInput] = useState("");
+  const [togglePwdError, setTogglePwdError] = useState<string | null>(null);
   const [pendingToggleVal, setPendingToggleVal] = useState<boolean | null>(null);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [chatModalVisible, setChatModalVisible] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [selectedConvId, setSelectedConvId] = useState<number | null>(null);
@@ -143,31 +155,51 @@ export default function FakeUsersAdmin() {
     },
   });
 
-  const { data: users = [], isLoading, error: usersError } = useQuery<FakeUser[]>({
-    queryKey: ["/api/admin/fake-users"],
-    queryFn: async () => {
-      const url = new URL("/api/admin/fake-users", getApiUrl()).toString();
-      const res = await fetch(url, { credentials: "include" });
+  const PAGE_SIZE = 50;
+  const {
+    data: usersData,
+    isLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    error: usersError,
+  } = useInfiniteQuery<FakeUsersPage>({
+    queryKey: ["/api/admin/fake-users", filter],
+    queryFn: async ({ pageParam = 0 }) => {
+      const url = new URL("/api/admin/fake-users", getApiUrl());
+      url.searchParams.set("limit", String(PAGE_SIZE));
+      url.searchParams.set("offset", String((pageParam as number) * PAGE_SIZE));
+      url.searchParams.set("type", filter);
+      const res = await fetch(url.toString(), { credentials: "include" });
       if (res.status === 401) throw new Error("Sessione scaduta — effettua di nuovo il login come admin");
       if (!res.ok) throw new Error("Errore caricamento utenti fake");
       return res.json();
     },
+    getNextPageParam: (lastPage, allPages) => lastPage.hasMore ? allPages.length : undefined,
+    initialPageParam: 0,
     retry: 1,
   });
 
+  const users: FakeUser[] = usersData?.pages.flatMap(p => p.users) ?? [];
+  const totalCount = usersData?.pages[0]?.total ?? 0;
+  const pageStats = usersData?.pages[0]?.stats ?? { total: 0, biker: 0, zavorrina: 0, coppia: 0 };
+
   const toggleAvailableMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("PUT", `/api/admin/fake-users/${id}/toggle-available`),
+    mutationFn: (id: string) => apiRequest("PUT", `/api/admin/fake-users/${id}/toggle-available`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] }),
   });
 
   const toggleOnlineMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("PUT", `/api/admin/fake-users/${id}/toggle-online`),
+    mutationFn: (id: string) => apiRequest("PUT", `/api/admin/fake-users/${id}/toggle-online`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/admin/fake-users/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] }),
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/fake-users/${id}`),
+    onSuccess: () => {
+      setDeleteSingleTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] });
+    },
   });
 
   const deleteAllMutation = useMutation({
@@ -175,10 +207,10 @@ export default function FakeUsersAdmin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/fake-users-enabled"] });
-      Alert.alert("Fatto", "Tutti gli utenti fake sono stati eliminati");
+      setDeleteAllResultMsg({ type: "success", text: "Tutti gli utenti fake eliminati." });
     },
     onError: (error: Error) => {
-      Alert.alert("Errore", error.message || "Errore durante l'eliminazione");
+      setDeleteAllResultMsg({ type: "error", text: error.message || "Errore durante l'eliminazione" });
     },
   });
 
@@ -241,7 +273,7 @@ export default function FakeUsersAdmin() {
       const res = await fetch(url, { method: "POST", credentials: "include" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        Alert.alert("Errore", data.message || "Impossibile avviare");
+        setMassSeedError(data.message || "Impossibile avviare");
         return;
       }
       setMassSeedRunning(true);
@@ -249,7 +281,7 @@ export default function FakeUsersAdmin() {
       setMassSeedTotal(2420);
       pollRef.current = setInterval(pollStatus, 3000);
     } catch (e: any) {
-      Alert.alert("Errore", e.message || "Errore di rete");
+      setMassSeedError(e.message || "Errore di rete");
     }
   };
 
@@ -284,45 +316,32 @@ export default function FakeUsersAdmin() {
     setFormDesiredModel("");
   };
 
-  const filteredUsers = users.filter((u) => {
-    if (filter === "tutti") return true;
-    return u.userType === filter;
-  });
+  useEffect(() => {
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [filter]);
 
-  const bikerCount = users.filter((u) => u.userType === "biker").length;
-  const zavorrinaCount = users.filter((u) => u.userType === "zavorrina").length;
-  const coppiaCount = users.filter((u) => u.userType === "coppia").length;
+  const handleLoadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const handleDelete = (id: number, nickname: string) => {
-    Alert.alert("Conferma", `Eliminare l'utente fake "${nickname}"?`, [
-      { text: "Annulla", style: "cancel" },
-      { text: "Elimina", style: "destructive", onPress: () => deleteMutation.mutate(id) },
-    ]);
+  const handleDelete = (id: string, nickname: string) => {
+    setDeleteSingleTarget({ id, nickname });
   };
 
   const handleDeleteAll = () => {
-    if (users.length === 0) {
-      Alert.alert("Info", "Non ci sono utenti fake da eliminare");
-      return;
-    }
-    Alert.alert(
-      "Elimina tutti gli utenti fake",
-      `Stai per eliminare definitivamente ${users.length} utenti fake e tutti i loro dati associati (profili, moto, wishlist, interazioni, conversazioni).\n\nQuesta azione non può essere annullata.`,
-      [
-        { text: "Annulla", style: "cancel" },
-        { text: "Elimina tutti", style: "destructive", onPress: () => deleteAllMutation.mutate() },
-      ]
-    );
+    if (totalCount === 0) return;
+    setDeleteAllResultMsg(null);
+    setDeleteAllConfirmVisible(true);
   };
 
-  const handleViewChat = async (userId: number) => {
+  const handleViewChat = async (userId: string) => {
     setSelectedUserId(userId);
     setSelectedConvId(null);
     setChatMessages([]);
     setLoadingChat(true);
     setChatModalVisible(true);
     try {
-      const url = getApiUrl() + `/api/admin/fake-users/${userId}/conversations`;
+      const url = new URL(`/api/admin/fake-users/${userId}/conversations`, getApiUrl()).toString();
       const res = await fetch(url, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
@@ -338,7 +357,7 @@ export default function FakeUsersAdmin() {
     setSelectedConvId(convId);
     setLoadingChat(true);
     try {
-      const url = getApiUrl() + `/api/admin/fake-users/conversations/${convId}/messages`;
+      const url = new URL(`/api/admin/fake-users/conversations/${convId}/messages`, getApiUrl()).toString();
       const res = await fetch(url, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
@@ -396,10 +415,86 @@ export default function FakeUsersAdmin() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <KeyboardAwareScrollViewCompat contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 80 }]} bottomOffset={20}>
-        <Text style={styles.title}>Utenti Fake</Text>
+      <FlatList
+        ref={flatListRef}
+        data={users}
+        keyExtractor={(item) => item.id}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.3}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 80 }]}
+        renderItem={({ item: user }) => (
+          <View style={styles.userCard}>
+            <View style={styles.userCardHeader}>
+              <View style={styles.userIconWrap}>{getUserIcon(user.userType)}</View>
+              <View style={styles.userInfo}>
+                <View style={styles.userNameRow}>
+                  <Text style={styles.userNickname}>{user.nickname}</Text>
+                  <View style={[styles.onlineDot, { backgroundColor: isOnline(user) ? Colors.success : "#666" }]} />
+                </View>
+                <Text style={styles.userMeta}>{user.region} · {user.sex}</Text>
+              </View>
+            </View>
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Ionicons name="eye" size={16} color={Colors.textSecondary} />
+                <Text style={styles.statText}>{user.profileViews}</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Ionicons name="chatbubble" size={16} color={Colors.textSecondary} />
+                <Text style={styles.statText}>{user.chatRequests}</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Ionicons name="mail" size={16} color={Colors.textSecondary} />
+                <Text style={styles.statText}>{user.chatMessages}</Text>
+              </View>
+            </View>
+            <View style={styles.togglesRow}>
+              <View style={styles.toggleItem}>
+                <Text style={styles.toggleLabel}>Disponibile</Text>
+                <Switch
+                  value={!!user.profile?.isAvailable}
+                  onValueChange={() => toggleAvailableMutation.mutate(user.id)}
+                  trackColor={{ false: "#555", true: Colors.success }}
+                  thumbColor="#fff"
+                />
+              </View>
+              <View style={styles.toggleItem}>
+                <Text style={styles.toggleLabel}>Online</Text>
+                <Switch
+                  value={isOnline(user)}
+                  onValueChange={() => toggleOnlineMutation.mutate(user.id)}
+                  trackColor={{ false: "#555", true: Colors.success }}
+                  thumbColor="#fff"
+                />
+              </View>
+            </View>
+            <View style={styles.actionsRow}>
+              <TouchableOpacity style={styles.chatBtn} onPress={() => handleViewChat(user.id)}>
+                <Ionicons name="chatbubbles" size={16} color={Colors.accent} />
+                <Text style={styles.chatBtnText}>Vedi Chat</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDelete(user.id, user.nickname)}>
+                <Ionicons name="trash" size={22} color={Colors.error} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        ListFooterComponent={
+          <View>
+            {isFetchingNextPage && <ActivityIndicator color={Colors.accent} style={{ marginVertical: 16 }} />}
+            {!isLoading && !isFetchingNextPage && users.length === 0 && (
+              <Text style={styles.emptyText}>Nessun utente fake trovato</Text>
+            )}
+            {users.length > 0 && !isFetchingNextPage && (
+              <Text style={styles.paginationInfo}>Visualizzati {users.length} / {totalCount}</Text>
+            )}
+          </View>
+        }
+        ListHeaderComponent={
+          <View>
+            <Text style={styles.title}>Utenti Fake</Text>
 
-        <View style={styles.controlsCard}>
+            <View style={styles.controlsCard}>
           <View style={styles.controlRow}>
             <View style={styles.controlInfo}>
               <Ionicons name="people" size={20} color={Colors.accent} />
@@ -420,19 +515,14 @@ export default function FakeUsersAdmin() {
           <Text style={styles.controlDesc}>
             {allEnabled ? "Tutti gli utenti fake sono attivi e visibili" : "Gli utenti fake sono disattivati"}
           </Text>
-          {isLoading && (
-            <Text style={[styles.controlDesc, { color: Colors.accent }]}>
-              Caricamento utenti fake...
-            </Text>
-          )}
           {!!usersError && (
             <Text style={[styles.controlDesc, { color: Colors.error ?? "#e53935" }]}>
               {(usersError as Error).message}
             </Text>
           )}
-          {!isLoading && !usersError && users.length === 0 && (
-            <Text style={styles.controlDesc}>
-              Nessun utente fake nel sistema. Usa il form in basso per aggiungerne.
+          {!!deleteAllResultMsg && (
+            <Text style={[styles.controlDesc, { color: deleteAllResultMsg.type === "success" ? Colors.success : (Colors.error ?? "#e53935") }]}>
+              {deleteAllResultMsg.text}
             </Text>
           )}
 
@@ -460,7 +550,7 @@ export default function FakeUsersAdmin() {
           <TouchableOpacity
             style={styles.deleteAllBtn}
             onPress={handleDeleteAll}
-            disabled={deleteAllMutation.isPending || users.length === 0}
+            disabled={deleteAllMutation.isPending || totalCount === 0}
             activeOpacity={0.7}
           >
             {deleteAllMutation.isPending ? (
@@ -468,7 +558,7 @@ export default function FakeUsersAdmin() {
             ) : (
               <>
                 <Ionicons name="trash" size={18} color="#fff" />
-                <Text style={styles.deleteAllBtnText}>Elimina tutti ({users.length})</Text>
+                <Text style={styles.deleteAllBtnText}>Elimina tutti ({totalCount})</Text>
               </>
             )}
           </TouchableOpacity>
@@ -517,19 +607,19 @@ export default function FakeUsersAdmin() {
 
         <View style={styles.summaryRow}>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryCount}>{users.length}</Text>
+            <Text style={styles.summaryCount}>{pageStats.total}</Text>
             <Text style={styles.summaryLabel}>Totale</Text>
           </View>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryCount}>{bikerCount}</Text>
+            <Text style={styles.summaryCount}>{pageStats.biker}</Text>
             <Text style={styles.summaryLabel}>Biker</Text>
           </View>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryCount}>{zavorrinaCount}</Text>
+            <Text style={styles.summaryCount}>{pageStats.zavorrina}</Text>
             <Text style={styles.summaryLabel}>Zavorrine</Text>
           </View>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryCount}>{coppiaCount}</Text>
+            <Text style={styles.summaryCount}>{pageStats.coppia}</Text>
             <Text style={styles.summaryLabel}>Coppie</Text>
           </View>
         </View>
@@ -549,72 +639,9 @@ export default function FakeUsersAdmin() {
         </View>
 
         {isLoading && <ActivityIndicator color={Colors.accent} style={{ marginTop: 40 }} />}
-
-        {filteredUsers.map((user) => (
-          <View key={user.id} style={styles.userCard}>
-            <View style={styles.userCardHeader}>
-              <View style={styles.userIconWrap}>{getUserIcon(user.userType)}</View>
-              <View style={styles.userInfo}>
-                <View style={styles.userNameRow}>
-                  <Text style={styles.userNickname}>{user.nickname}</Text>
-                  <View style={[styles.onlineDot, { backgroundColor: isOnline(user) ? Colors.success : "#666" }]} />
-                </View>
-                <Text style={styles.userMeta}>{user.region} · {user.sex}</Text>
-              </View>
-            </View>
-
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Ionicons name="eye" size={16} color={Colors.textSecondary} />
-                <Text style={styles.statText}>{user.profileViews}</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Ionicons name="chatbubble" size={16} color={Colors.textSecondary} />
-                <Text style={styles.statText}>{user.chatRequests}</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Ionicons name="mail" size={16} color={Colors.textSecondary} />
-                <Text style={styles.statText}>{user.chatMessages}</Text>
-              </View>
-            </View>
-
-            <View style={styles.togglesRow}>
-              <View style={styles.toggleItem}>
-                <Text style={styles.toggleLabel}>Disponibile</Text>
-                <Switch
-                  value={!!user.profile?.isAvailable}
-                  onValueChange={() => toggleAvailableMutation.mutate(user.id)}
-                  trackColor={{ false: "#555", true: Colors.success }}
-                  thumbColor="#fff"
-                />
-              </View>
-              <View style={styles.toggleItem}>
-                <Text style={styles.toggleLabel}>Online</Text>
-                <Switch
-                  value={isOnline(user)}
-                  onValueChange={() => toggleOnlineMutation.mutate(user.id)}
-                  trackColor={{ false: "#555", true: Colors.success }}
-                  thumbColor="#fff"
-                />
-              </View>
-            </View>
-
-            <View style={styles.actionsRow}>
-              <TouchableOpacity style={styles.chatBtn} onPress={() => handleViewChat(user.id)}>
-                <Ionicons name="chatbubbles" size={16} color={Colors.accent} />
-                <Text style={styles.chatBtnText}>Vedi Chat</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleDelete(user.id, user.nickname)}>
-                <Ionicons name="trash" size={22} color={Colors.error} />
-              </TouchableOpacity>
-            </View>
           </View>
-        ))}
-
-        {!isLoading && filteredUsers.length === 0 && (
-          <Text style={styles.emptyText}>Nessun utente fake trovato</Text>
-        )}
-      </KeyboardAwareScrollViewCompat>
+        }
+      />
 
       <TouchableOpacity
         style={[styles.fab, { bottom: insets.bottom + 20 }]}
@@ -888,13 +915,18 @@ export default function FakeUsersAdmin() {
               placeholderTextColor={Colors.textSecondary}
               secureTextEntry
               value={togglePwdInput}
-              onChangeText={setTogglePwdInput}
+              onChangeText={(v) => { setTogglePwdInput(v); setTogglePwdError(null); }}
               autoFocus
             />
+            {!!togglePwdError && (
+              <Text style={{ fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.error ?? "#e53935", marginTop: 6 }}>
+                {togglePwdError}
+              </Text>
+            )}
             <View style={styles.pwdModalButtons}>
               <TouchableOpacity
                 style={[styles.pwdBtn, styles.pwdBtnCancel]}
-                onPress={() => { setTogglePwdVisible(false); setTogglePwdInput(""); }}
+                onPress={() => { setTogglePwdVisible(false); setTogglePwdInput(""); setTogglePwdError(null); }}
               >
                 <Text style={styles.pwdBtnText}>Annulla</Text>
               </TouchableOpacity>
@@ -912,17 +944,78 @@ export default function FakeUsersAdmin() {
                     if (res.ok) {
                       setTogglePwdVisible(false);
                       setTogglePwdInput("");
+                      setTogglePwdError(null);
                       if (pendingToggleVal !== null) toggleAllMutation.mutate(pendingToggleVal);
                     } else {
                       setTogglePwdInput("");
-                      Alert.alert("Errore", "Password non corretta.");
+                      setTogglePwdError("Password non corretta.");
                     }
                   } catch {
-                    Alert.alert("Errore", "Errore di connessione.");
+                    setTogglePwdError("Errore di connessione.");
                   }
                 }}
               >
                 <Text style={styles.pwdBtnText}>Conferma</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={deleteAllConfirmVisible} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmBox}>
+            <Ionicons name="warning" size={36} color={Colors.error} style={{ marginBottom: 12 }} />
+            <Text style={styles.confirmTitle}>Elimina tutti gli utenti fake?</Text>
+            <Text style={styles.confirmDesc}>Questa azione elimina permanentemente tutti i {totalCount} utenti fake e non può essere annullata.</Text>
+            <View style={styles.confirmBtns}>
+              <TouchableOpacity style={styles.confirmCancelBtn} onPress={() => setDeleteAllConfirmVisible(false)}>
+                <Text style={styles.confirmCancelBtnText}>Annulla</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmDeleteBtn, deleteAllMutation.isPending && { opacity: 0.6 }]}
+                disabled={deleteAllMutation.isPending}
+                onPress={() => {
+                  setDeleteAllConfirmVisible(false);
+                  deleteAllMutation.mutate();
+                }}
+              >
+                {deleteAllMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.confirmDeleteBtnText}>Elimina tutti</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={!!deleteSingleTarget} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmBox}>
+            <Ionicons name="trash" size={36} color={Colors.error} style={{ marginBottom: 12 }} />
+            <Text style={styles.confirmTitle}>Elimina utente?</Text>
+            <Text style={styles.confirmDesc}>Eliminare definitivamente "{deleteSingleTarget?.nickname}"?</Text>
+            <View style={styles.confirmBtns}>
+              <TouchableOpacity style={styles.confirmCancelBtn} onPress={() => setDeleteSingleTarget(null)}>
+                <Text style={styles.confirmCancelBtnText}>Annulla</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmDeleteBtn, deleteMutation.isPending && { opacity: 0.6 }]}
+                disabled={deleteMutation.isPending}
+                onPress={() => {
+                  if (deleteSingleTarget) {
+                    deleteMutation.mutate(deleteSingleTarget.id);
+                    setDeleteSingleTarget(null);
+                  }
+                }}
+              >
+                {deleteMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.confirmDeleteBtnText}>Elimina</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -1151,6 +1244,62 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "center",
     marginTop: 40,
+  },
+  paginationInfo: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginVertical: 12,
+  },
+  confirmBox: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 24,
+    margin: 32,
+    alignItems: "center",
+  },
+  confirmTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    color: Colors.text,
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  confirmDesc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  confirmBtns: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  confirmCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: Colors.border,
+    alignItems: "center",
+  },
+  confirmCancelBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: Colors.text,
+  },
+  confirmDeleteBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: Colors.error,
+    alignItems: "center",
+  },
+  confirmDeleteBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: "#fff",
   },
   fab: {
     position: "absolute",
@@ -1432,7 +1581,7 @@ const styles = StyleSheet.create({
     color: "#000",
   },
   pwdModalContainer: {
-    backgroundColor: Colors.card,
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: 24,
     marginHorizontal: 32,

@@ -307,7 +307,7 @@ export interface IStorage {
   deleteUser(userId: string): Promise<void>;
 
   recordFakeUserInteraction(fakeUserId: string, realUserId: string, interactionType: string): Promise<void>;
-  getFakeUserStats(): Promise<any[]>;
+  getFakeUserStats(limit?: number, offset?: number, type?: string): Promise<{ users: any[]; total: number; hasMore: boolean; stats: { total: number; biker: number; zavorrina: number; coppia: number } }>;
   getFakeUsers(): Promise<User[]>;
   deleteFakeUser(id: string): Promise<void>;
   deleteAllFakeUsers(): Promise<number>;
@@ -1325,26 +1325,64 @@ export class DatabaseStorage implements IStorage {
     await db.insert(fakeUserInteractions).values({ fakeUserId, realUserId, interactionType });
   }
 
-  async getFakeUserStats(): Promise<any[]> {
-    const fakeUsers = await db.select().from(users).where(
-      and(eq(users.isFake, true), sql`${users.nickname} != 'BikerLink_Official'`)
-    ).orderBy(desc(users.createdAt));
-    const stats = [];
-    for (const u of fakeUsers) {
-      const profile = await this.getUserProfile(u.id);
-      const [views] = await db.select({ count: sql<number>`count(*)::int` }).from(fakeUserInteractions).where(and(eq(fakeUserInteractions.fakeUserId, u.id), eq(fakeUserInteractions.interactionType, "profile_view")));
-      const [chats] = await db.select({ count: sql<number>`count(*)::int` }).from(fakeUserInteractions).where(and(eq(fakeUserInteractions.fakeUserId, u.id), eq(fakeUserInteractions.interactionType, "chat_request")));
-      const [msgs] = await db.select({ count: sql<number>`count(*)::int` }).from(fakeUserInteractions).where(and(eq(fakeUserInteractions.fakeUserId, u.id), eq(fakeUserInteractions.interactionType, "chat_message")));
+  async getFakeUserStats(limit = 50, offset = 0, type = "tutti"): Promise<{ users: any[]; total: number; hasMore: boolean; stats: { total: number; biker: number; zavorrina: number; coppia: number } }> {
+    const baseCondition = and(eq(users.isFake, true), sql`${users.nickname} != 'BikerLink_Official'`);
+    const typeCondition = type !== "tutti"
+      ? and(eq(users.isFake, true), sql`${users.nickname} != 'BikerLink_Official'`, eq(users.userType, type))
+      : baseCondition;
+
+    const [[{ total }], [statsRow], fakeUsers] = await Promise.all([
+      db.select({ total: sql<number>`count(*)::int` }).from(users).where(typeCondition),
+      db.select({
+        total: sql<number>`count(*)::int`,
+        biker: sql<number>`count(*) filter (where ${users.userType} = 'biker')::int`,
+        zavorrina: sql<number>`count(*) filter (where ${users.userType} = 'zavorrina')::int`,
+        coppia: sql<number>`count(*) filter (where ${users.userType} = 'coppia')::int`,
+      }).from(users).where(baseCondition),
+      db.select().from(users).where(typeCondition).orderBy(desc(users.createdAt)).limit(limit).offset(offset),
+    ]);
+
+    const userIds = fakeUsers.map(u => u.id);
+    const [profiles, interactionCounts] = await Promise.all([
+      userIds.length > 0
+        ? db.select().from(userProfiles).where(inArray(userProfiles.userId, userIds))
+        : Promise.resolve([]),
+      userIds.length > 0
+        ? db.select({
+            fakeUserId: fakeUserInteractions.fakeUserId,
+            profileViews: sql<number>`count(*) filter (where ${fakeUserInteractions.interactionType} = 'profile_view')::int`,
+            chatRequests: sql<number>`count(*) filter (where ${fakeUserInteractions.interactionType} = 'chat_request')::int`,
+            chatMessages: sql<number>`count(*) filter (where ${fakeUserInteractions.interactionType} = 'chat_message')::int`,
+          }).from(fakeUserInteractions).where(inArray(fakeUserInteractions.fakeUserId, userIds)).groupBy(fakeUserInteractions.fakeUserId)
+        : Promise.resolve([]),
+    ]);
+
+    const profileMap = new Map(profiles.map(p => [p.userId, p]));
+    const countsMap = new Map(interactionCounts.map(r => [r.fakeUserId, r]));
+
+    const result = fakeUsers.map(u => {
       const { password: _, ...safeUser } = u;
-      stats.push({
+      const counts = countsMap.get(u.id);
+      return {
         ...safeUser,
-        profile,
-        profileViews: views?.count ?? 0,
-        chatRequests: chats?.count ?? 0,
-        chatMessages: msgs?.count ?? 0,
-      });
-    }
-    return stats;
+        profile: profileMap.get(u.id) ?? null,
+        profileViews: counts?.profileViews ?? 0,
+        chatRequests: counts?.chatRequests ?? 0,
+        chatMessages: counts?.chatMessages ?? 0,
+      };
+    });
+
+    return {
+      users: result,
+      total,
+      hasMore: offset + fakeUsers.length < total,
+      stats: {
+        total: statsRow?.total ?? 0,
+        biker: statsRow?.biker ?? 0,
+        zavorrina: statsRow?.zavorrina ?? 0,
+        coppia: statsRow?.coppia ?? 0,
+      },
+    };
   }
 
   async getFakeUsers(): Promise<User[]> {

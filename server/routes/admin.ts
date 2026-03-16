@@ -1048,10 +1048,13 @@ router.get("/logs", async (_req: Request, res: Response) => {
   }
 });
 
-router.get("/fake-users", async (_req: Request, res: Response) => {
+router.get("/fake-users", async (req: Request, res: Response) => {
   try {
-    const stats = await storage.getFakeUserStats();
-    return res.json(stats);
+    const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10) || 50, 200);
+    const offset = parseInt(String(req.query.offset ?? "0"), 10) || 0;
+    const type = String(req.query.type ?? "tutti");
+    const result = await storage.getFakeUserStats(limit, offset, type);
+    return res.json(result);
   } catch (error) {
     console.error("Admin get fake users error:", error);
     return res.status(500).json({ message: "Errore interno del server" });

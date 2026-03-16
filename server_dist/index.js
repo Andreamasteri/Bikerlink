@@ -1475,26 +1475,53 @@ var init_storage = __esm({
       async recordFakeUserInteraction(fakeUserId, realUserId, interactionType) {
         await db.insert(fakeUserInteractions).values({ fakeUserId, realUserId, interactionType });
       }
-      async getFakeUserStats() {
-        const fakeUsers = await db.select().from(users).where(
-          (0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.isFake, true), import_drizzle_orm2.sql`${users.nickname} != 'BikerLink_Official'`)
-        ).orderBy((0, import_drizzle_orm2.desc)(users.createdAt));
-        const stats = [];
-        for (const u of fakeUsers) {
-          const profile = await this.getUserProfile(u.id);
-          const [views] = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(fakeUserInteractions).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(fakeUserInteractions.fakeUserId, u.id), (0, import_drizzle_orm2.eq)(fakeUserInteractions.interactionType, "profile_view")));
-          const [chats] = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(fakeUserInteractions).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(fakeUserInteractions.fakeUserId, u.id), (0, import_drizzle_orm2.eq)(fakeUserInteractions.interactionType, "chat_request")));
-          const [msgs] = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(fakeUserInteractions).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(fakeUserInteractions.fakeUserId, u.id), (0, import_drizzle_orm2.eq)(fakeUserInteractions.interactionType, "chat_message")));
+      async getFakeUserStats(limit = 50, offset = 0, type = "tutti") {
+        const baseCondition = (0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.isFake, true), import_drizzle_orm2.sql`${users.nickname} != 'BikerLink_Official'`);
+        const typeCondition = type !== "tutti" ? (0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.isFake, true), import_drizzle_orm2.sql`${users.nickname} != 'BikerLink_Official'`, (0, import_drizzle_orm2.eq)(users.userType, type)) : baseCondition;
+        const [[{ total }], [statsRow], fakeUsers] = await Promise.all([
+          db.select({ total: import_drizzle_orm2.sql`count(*)::int` }).from(users).where(typeCondition),
+          db.select({
+            total: import_drizzle_orm2.sql`count(*)::int`,
+            biker: import_drizzle_orm2.sql`count(*) filter (where ${users.userType} = 'biker')::int`,
+            zavorrina: import_drizzle_orm2.sql`count(*) filter (where ${users.userType} = 'zavorrina')::int`,
+            coppia: import_drizzle_orm2.sql`count(*) filter (where ${users.userType} = 'coppia')::int`
+          }).from(users).where(baseCondition),
+          db.select().from(users).where(typeCondition).orderBy((0, import_drizzle_orm2.desc)(users.createdAt)).limit(limit).offset(offset)
+        ]);
+        const userIds = fakeUsers.map((u) => u.id);
+        const [profiles, interactionCounts] = await Promise.all([
+          userIds.length > 0 ? db.select().from(userProfiles).where((0, import_drizzle_orm2.inArray)(userProfiles.userId, userIds)) : Promise.resolve([]),
+          userIds.length > 0 ? db.select({
+            fakeUserId: fakeUserInteractions.fakeUserId,
+            profileViews: import_drizzle_orm2.sql`count(*) filter (where ${fakeUserInteractions.interactionType} = 'profile_view')::int`,
+            chatRequests: import_drizzle_orm2.sql`count(*) filter (where ${fakeUserInteractions.interactionType} = 'chat_request')::int`,
+            chatMessages: import_drizzle_orm2.sql`count(*) filter (where ${fakeUserInteractions.interactionType} = 'chat_message')::int`
+          }).from(fakeUserInteractions).where((0, import_drizzle_orm2.inArray)(fakeUserInteractions.fakeUserId, userIds)).groupBy(fakeUserInteractions.fakeUserId) : Promise.resolve([])
+        ]);
+        const profileMap = new Map(profiles.map((p) => [p.userId, p]));
+        const countsMap = new Map(interactionCounts.map((r) => [r.fakeUserId, r]));
+        const result = fakeUsers.map((u) => {
           const { password: _, ...safeUser } = u;
-          stats.push({
+          const counts = countsMap.get(u.id);
+          return {
             ...safeUser,
-            profile,
-            profileViews: views?.count ?? 0,
-            chatRequests: chats?.count ?? 0,
-            chatMessages: msgs?.count ?? 0
-          });
-        }
-        return stats;
+            profile: profileMap.get(u.id) ?? null,
+            profileViews: counts?.profileViews ?? 0,
+            chatRequests: counts?.chatRequests ?? 0,
+            chatMessages: counts?.chatMessages ?? 0
+          };
+        });
+        return {
+          users: result,
+          total,
+          hasMore: offset + fakeUsers.length < total,
+          stats: {
+            total: statsRow?.total ?? 0,
+            biker: statsRow?.biker ?? 0,
+            zavorrina: statsRow?.zavorrina ?? 0,
+            coppia: statsRow?.coppia ?? 0
+          }
+        };
       }
       async getFakeUsers() {
         return db.select().from(users).where(
@@ -7554,10 +7581,13 @@ router17.get("/logs", async (_req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-router17.get("/fake-users", async (_req, res) => {
+router17.get("/fake-users", async (req, res) => {
   try {
-    const stats = await storage.getFakeUserStats();
-    return res.json(stats);
+    const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10) || 50, 200);
+    const offset = parseInt(String(req.query.offset ?? "0"), 10) || 0;
+    const type = String(req.query.type ?? "tutti");
+    const result = await storage.getFakeUserStats(limit, offset, type);
+    return res.json(result);
   } catch (error) {
     console.error("Admin get fake users error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
