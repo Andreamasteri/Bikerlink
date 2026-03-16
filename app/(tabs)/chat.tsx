@@ -17,8 +17,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
+import { useT } from "@/lib/language-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
 interface ConversationItem {
@@ -44,7 +44,7 @@ interface ConversationItem {
   unreadCount: number;
 }
 
-function getConversationTitle(conv: ConversationItem, userId: string): string {
+function getConversationTitle(conv: ConversationItem, userId: string, t: (key: string) => string): string {
   if (conv.title) return conv.title;
   if (conv.conversationType === "contact") {
     const others = conv.participants.filter((p) => p.id !== userId);
@@ -94,8 +94,8 @@ function getConversationIcon(conv: ConversationItem): { name: keyof typeof Ionic
   return { name: "person", bg: Colors.maleIcon };
 }
 
-function ConversationRow({ item, userId, onPress, onDelete }: { item: ConversationItem; userId: string; onPress: () => void; onDelete: (id: string) => void }) {
-  const title = getConversationTitle(item, userId);
+function ConversationRow({ item, userId, onPress, onDelete, t }: { item: ConversationItem; userId: string; onPress: () => void; onDelete: (id: string) => void; t: (key: string) => string }) {
+  const title = getConversationTitle(item, userId, t);
   const preview = getLastMessagePreview(item.lastMessage);
   const time = item.lastMessage ? formatTime(item.lastMessage.createdAt) : "";
   const other = item.participants.find((p) => p.id !== userId);
@@ -155,6 +155,7 @@ export default function ChatScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const t = useT();
   const userId = user?.id || "";
   const [showNewChat, setShowNewChat] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -230,9 +231,10 @@ export default function ChatScreen() {
         userId={userId}
         onPress={() => handleConversationPress(item.id)}
         onDelete={handleDeleteConversation}
+        t={t}
       />
     ),
-    [userId, handleConversationPress, handleDeleteConversation]
+    [userId, handleConversationPress, handleDeleteConversation, t]
   );
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;

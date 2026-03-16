@@ -21,10 +21,9 @@ import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
 import Colors from "@/constants/colors";
-import { t } from "@/lib/i18n";
 import { type AppLanguage } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
-import { useLanguage } from "@/lib/language-context";
+import { useLanguage, useT } from "@/lib/language-context";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 
@@ -105,7 +104,9 @@ export default function ProfileScreen() {
   const { user, logoutMutation } = useAuth();
   const router = useRouter();
   const { language, setLanguage } = useLanguage();
+  const t = useT();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -610,33 +611,65 @@ export default function ProfileScreen() {
       </View>
 
       <View style={[styles.section, { marginTop: 16 }]}>
-        <Text style={styles.sectionTitle}>Lingua / Language / Sprache / Idioma / Langue</Text>
-        <View style={styles.languageBar}>
-          {([
-            { code: "it" as AppLanguage, flag: "🇮🇹", label: "IT" },
-            { code: "en" as AppLanguage, flag: "🇬🇧", label: "EN" },
-            { code: "de" as AppLanguage, flag: "🇩🇪", label: "DE" },
-            { code: "es" as AppLanguage, flag: "🇪🇸", label: "ES" },
-            { code: "fr" as AppLanguage, flag: "🇫🇷", label: "FR" },
-          ]).map((lang) => {
-            const isActive = language === lang.code;
-            return (
-              <Pressable
-                key={lang.code}
-                style={[styles.languageBtn, isActive && styles.languageBtnActive]}
-                onPress={() => setLanguage(lang.code)}
-              >
-                <Text style={styles.languageFlagText}>{lang.flag}</Text>
-                <Text style={[styles.languageBtnText, isActive && styles.languageBtnTextActive]}>{lang.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <Text style={styles.sectionTitle}>{t("language.title")}</Text>
+        <Pressable
+          style={styles.langDropdownTrigger}
+          onPress={() => setShowLanguageDropdown(!showLanguageDropdown)}
+        >
+          <Text style={styles.langDropdownFlag}>
+            {({ it: "🇮🇹", en: "🇬🇧", de: "🇩🇪", es: "🇪🇸", fr: "🇫🇷" } as Record<string, string>)[language]}
+          </Text>
+          <Text style={styles.langDropdownLabel}>
+            {({ it: "Italiano", en: "English", de: "Deutsch", es: "Español", fr: "Français" } as Record<string, string>)[language]}
+          </Text>
+          <Ionicons
+            name={showLanguageDropdown ? "chevron-up" : "chevron-down"}
+            size={20}
+            color={Colors.textSecondary}
+          />
+        </Pressable>
+        {showLanguageDropdown && (
+          <View style={styles.langDropdownList}>
+            {([
+              { code: "it" as AppLanguage, flag: "🇮🇹", label: "Italiano" },
+              { code: "en" as AppLanguage, flag: "🇬🇧", label: "English" },
+              { code: "de" as AppLanguage, flag: "🇩🇪", label: "Deutsch" },
+              { code: "es" as AppLanguage, flag: "🇪🇸", label: "Español" },
+              { code: "fr" as AppLanguage, flag: "🇫🇷", label: "Français" },
+            ]).map((lang) => {
+              const isActive = language === lang.code;
+              return (
+                <Pressable
+                  key={lang.code}
+                  style={[styles.langDropdownItem, isActive && styles.langDropdownItemActive]}
+                  onPress={() => {
+                    setLanguage(lang.code);
+                    setShowLanguageDropdown(false);
+                  }}
+                >
+                  <Text style={styles.langDropdownItemFlag}>{lang.flag}</Text>
+                  <Text style={[styles.langDropdownItemLabel, isActive && styles.langDropdownItemLabelActive]}>
+                    {lang.label}
+                  </Text>
+                  {isActive && (
+                    <Ionicons name="checkmark" size={20} color={Colors.accent} />
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
       </View>
 
       <View style={styles.section}>
-        <MenuItem icon="log-out" label="Logout" onPress={handleLogout} color={Colors.accentRed} />
-        <MenuItem icon="trash-outline" label="Elimina account" onPress={handleDeleteAccount} color={Colors.accentRed} />
+        <MenuItem icon="trash-outline" label={t("common.delete") + " account"} onPress={handleDeleteAccount} color={Colors.accentRed} />
+      </View>
+
+      <View style={[styles.section, { marginTop: 8 }]}>
+        <Pressable style={styles.logoutBtn} onPress={handleLogout}>
+          <Ionicons name="log-out" size={22} color="#fff" />
+          <Text style={styles.logoutBtnText}>{t("auth.logout")}</Text>
+        </Pressable>
       </View>
 
       <Modal visible={showLogoutModal} transparent animationType="fade" onRequestClose={() => setShowLogoutModal(false)}>
@@ -1139,36 +1172,66 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     color: "#fff",
   },
-  languageBar: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  languageBtn: {
+  langDropdownTrigger: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 10,
     backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    borderRadius: 12,
+    padding: 14,
+    gap: 10,
   },
-  languageBtnActive: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.accent + "15",
+  langDropdownFlag: {
+    fontSize: 22,
   },
-  languageFlagText: {
+  langDropdownLabel: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: "Inter_500Medium",
+    color: Colors.text,
+  },
+  langDropdownList: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    marginTop: 4,
+    overflow: "hidden",
+  },
+  langDropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border + "44",
+  },
+  langDropdownItemActive: {
+    backgroundColor: Colors.accent + "12",
+  },
+  langDropdownItemFlag: {
     fontSize: 20,
   },
-  languageBtnText: {
-    fontSize: 14,
+  langDropdownItemLabel: {
+    flex: 1,
+    fontSize: 15,
     fontFamily: "Inter_500Medium",
-    color: Colors.textSecondary,
+    color: Colors.text,
   },
-  languageBtnTextActive: {
+  langDropdownItemLabelActive: {
     color: Colors.accent,
     fontFamily: "Inter_600SemiBold",
+  },
+  logoutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.accentRed,
+    borderRadius: 12,
+    paddingVertical: 16,
+    gap: 10,
+  },
+  logoutBtnText: {
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
   },
 });

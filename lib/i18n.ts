@@ -755,3 +755,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
 export function t(key: string): string {
   return translations[currentLanguage]?.[key] ?? translations.it[key] ?? key;
 }
+
+export function tWithLang(key: string, lang: AppLanguage): string {
+  return translations[lang]?.[key] ?? translations.it[key] ?? key;
+}

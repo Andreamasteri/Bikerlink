@@ -21,7 +21,7 @@ import { useRouter } from "expo-router";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
 
 import Colors from "@/constants/colors";
-import { t } from "@/lib/i18n";
+import { useT } from "@/lib/language-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -164,6 +164,7 @@ function ContestEntryCard({
 export default function ContestScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const t = useT();
   const [showUpload, setShowUpload] = useState(false);
   const [caption, setCaption] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);

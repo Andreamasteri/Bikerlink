@@ -15,8 +15,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
+import { useT } from "@/lib/language-context";
 
 interface ProposalItem {
   id: string;
@@ -181,6 +181,7 @@ export default function ProposalsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const t = useT();
   const [activeFilter, setActiveFilter] = useState("all");
 
   const queryKey =
