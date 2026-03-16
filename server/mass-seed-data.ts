@@ -51,7 +51,7 @@ export const EUROPEAN_ZONES: EuropeanZone[] = [
 
   { region: "Lisboa", country: "PT", lat: 38.72, lng: -9.14, spokenLanguages: ["Português"] },
 
-  { region: "Attiki", country: "GR", lat: 37.98, lng: 23.73, spokenLanguages: ["English"] },
+  { region: "Attiki", country: "GR", lat: 37.98, lng: 23.73, spokenLanguages: ["Greek"] },
 
   { region: "Praha", country: "CZ", lat: 50.08, lng: 14.44, spokenLanguages: ["English"] },
 
