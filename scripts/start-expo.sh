@@ -25,8 +25,8 @@ kill_port() {
 wait_for_backend() {
   echo "Attendo che il backend sia pronto sulla porta $BACKEND_PORT..."
   for i in $(seq 1 $BACKEND_WAIT_SECONDS); do
-    if lsof -ti:$BACKEND_PORT >/dev/null 2>&1; then
-      echo "Backend pronto dopo ${i}s (porta $BACKEND_PORT attiva)."
+    if curl -s --max-time 1 "http://localhost:$BACKEND_PORT/api/auth/me" >/dev/null 2>&1; then
+      echo "Backend pronto dopo ${i}s."
       return 0
     fi
     if [ $((i % 10)) -eq 0 ]; then
