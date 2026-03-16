@@ -146,7 +146,7 @@ export default function FakeUsersAdmin() {
   const { data: users = [], isLoading, error: usersError } = useQuery<FakeUser[]>({
     queryKey: ["/api/admin/fake-users"],
     queryFn: async () => {
-      const url = getApiUrl() + "/api/admin/fake-users";
+      const url = new URL("/api/admin/fake-users", getApiUrl()).toString();
       const res = await fetch(url, { credentials: "include" });
       if (res.status === 401) throw new Error("Sessione scaduta — effettua di nuovo il login come admin");
       if (!res.ok) throw new Error("Errore caricamento utenti fake");
@@ -197,7 +197,7 @@ export default function FakeUsersAdmin() {
 
   const pollStatus = async () => {
     try {
-      const url = getApiUrl() + "/api/admin/mass-seed-status";
+      const url = new URL("/api/admin/mass-seed-status", getApiUrl()).toString();
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return;
       const data = await res.json();
@@ -214,7 +214,7 @@ export default function FakeUsersAdmin() {
 
   const checkAndStartPolling = async () => {
     try {
-      const url = getApiUrl() + "/api/admin/mass-seed-status";
+      const url = new URL("/api/admin/mass-seed-status", getApiUrl()).toString();
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return;
       const data = await res.json();
@@ -236,7 +236,7 @@ export default function FakeUsersAdmin() {
   const startMassSeed = async () => {
     try {
       setMassSeedError(null);
-      const url = getApiUrl() + "/api/admin/mass-seed-fake-users";
+      const url = new URL("/api/admin/mass-seed-fake-users", getApiUrl()).toString();
       const res = await fetch(url, { method: "POST", credentials: "include" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
