@@ -18,6 +18,14 @@ kill_port() {
   echo "Attenzione: porta $PORT ancora occupata dopo 10s"
 }
 
+echo "Compilazione TypeScript server..."
+npm run server:build
+if [ $? -ne 0 ]; then
+  echo "ERRORE: compilazione server fallita"
+  exit 1
+fi
+echo "Compilazione completata."
+
 for retry in $(seq 1 $MAX_RETRIES); do
   echo "=== Tentativo $retry/$MAX_RETRIES ==="
   echo "Pulizia porta $PORT..."
@@ -30,7 +38,7 @@ for retry in $(seq 1 $MAX_RETRIES); do
   fi
 
   echo "Porta $PORT libera, avvio backend..."
-  npm run server:dev &
+  NODE_ENV=production node server_dist/index.js &
   SERVER_PID=$!
 
   sleep 5

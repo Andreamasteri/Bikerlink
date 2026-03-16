@@ -27,6 +27,27 @@ function requireAdmin(req: Request, res: Response, next: Function) {
 
 router.use(requireAdmin);
 
+router.post("/verify-password", async (req: Request, res: Response) => {
+  try {
+    const { password } = req.body;
+    if (!password || typeof password !== "string") {
+      return res.status(400).json({ message: "Password mancante" });
+    }
+    const user = (req as any).currentUser;
+    const fullUser = await storage.getUser(user.id);
+    if (!fullUser || !fullUser.password) {
+      return res.status(403).json({ message: "Utente non trovato" });
+    }
+    const valid = await bcrypt.compare(password, fullUser.password);
+    if (!valid) {
+      return res.status(401).json({ message: "Password non corretta" });
+    }
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({ message: "Errore verifica password" });
+  }
+});
+
 router.get("/users", async (_req: Request, res: Response) => {
   try {
     const users = await storage.getAllUsers();

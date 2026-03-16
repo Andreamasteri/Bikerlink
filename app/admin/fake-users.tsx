@@ -68,6 +68,9 @@ export default function FakeUsersAdmin() {
     : rawInsets;
 
   const [filter, setFilter] = useState<FilterType>("tutti");
+  const [togglePwdVisible, setTogglePwdVisible] = useState(false);
+  const [togglePwdInput, setTogglePwdInput] = useState("");
+  const [pendingToggleVal, setPendingToggleVal] = useState<boolean | null>(null);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [chatModalVisible, setChatModalVisible] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
@@ -410,7 +413,11 @@ export default function FakeUsersAdmin() {
             </View>
             <Switch
               value={allEnabled}
-              onValueChange={(val) => toggleAllMutation.mutate(val)}
+              onValueChange={(val) => {
+                setPendingToggleVal(val);
+                setTogglePwdInput("");
+                setTogglePwdVisible(true);
+              }}
               trackColor={{ false: Colors.border, true: Colors.success }}
               thumbColor={allEnabled ? Colors.text : Colors.textSecondary}
               disabled={toggleAllMutation.isPending}
@@ -846,6 +853,61 @@ export default function FakeUsersAdmin() {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+      <Modal visible={togglePwdVisible} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.pwdModalContainer}>
+            <Text style={styles.pwdModalTitle}>
+              {pendingToggleVal ? "Abilita utenti fake" : "Disabilita utenti fake"}
+            </Text>
+            <Text style={styles.pwdModalDesc}>
+              Inserisci la password admin per confermare questa operazione.
+            </Text>
+            <TextInput
+              style={styles.pwdInput}
+              placeholder="Password admin"
+              placeholderTextColor={Colors.textSecondary}
+              secureTextEntry
+              value={togglePwdInput}
+              onChangeText={setTogglePwdInput}
+              autoFocus
+            />
+            <View style={styles.pwdModalButtons}>
+              <TouchableOpacity
+                style={[styles.pwdBtn, styles.pwdBtnCancel]}
+                onPress={() => { setTogglePwdVisible(false); setTogglePwdInput(""); }}
+              >
+                <Text style={styles.pwdBtnText}>Annulla</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.pwdBtn, styles.pwdBtnConfirm]}
+                onPress={async () => {
+                  try {
+                    const url = new URL("/api/admin/verify-password", getApiUrl());
+                    const res = await fetch(url.toString(), {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      credentials: "include",
+                      body: JSON.stringify({ password: togglePwdInput }),
+                    });
+                    if (res.ok) {
+                      setTogglePwdVisible(false);
+                      setTogglePwdInput("");
+                      if (pendingToggleVal !== null) toggleAllMutation.mutate(pendingToggleVal);
+                    } else {
+                      setTogglePwdInput("");
+                      Alert.alert("Errore", "Password non corretta.");
+                    }
+                  } catch {
+                    Alert.alert("Errore", "Errore di connessione.");
+                  }
+                }}
+              >
+                <Text style={styles.pwdBtnText}>Conferma</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -1349,5 +1411,57 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 14,
     color: "#000",
+  },
+  pwdModalContainer: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    padding: 24,
+    marginHorizontal: 32,
+    gap: 12,
+  },
+  pwdModalTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    color: Colors.text,
+    textAlign: "center" as const,
+  },
+  pwdModalDesc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: "center" as const,
+  },
+  pwdInput: {
+    backgroundColor: Colors.background,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: Colors.text,
+    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  pwdModalButtons: {
+    flexDirection: "row" as const,
+    gap: 10,
+    marginTop: 4,
+  },
+  pwdBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center" as const,
+  },
+  pwdBtnCancel: {
+    backgroundColor: Colors.border,
+  },
+  pwdBtnConfirm: {
+    backgroundColor: Colors.accent,
+  },
+  pwdBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.text,
   },
 });
