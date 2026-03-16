@@ -7455,7 +7455,7 @@ router17.post("/migrate/verify-real-users", async (_req, res) => {
 router17.put("/settings/toggle-protected", async (req, res) => {
   try {
     const { key, value, adminPassword } = req.body;
-    const allowedKeys = ["email_verification_enabled", "ads_enabled", "syneco_branding_visible", "donation_enabled", "donation_text", "gps_required", "marketplace_enabled"];
+    const allowedKeys = ["email_verification_enabled", "ads_enabled", "syneco_branding_visible", "donation_enabled", "donation_text", "gps_required", "marketplace_enabled", "fake_users_enabled"];
     if (!allowedKeys.includes(key)) {
       return res.status(400).json({ message: "Chiave non valida" });
     }
@@ -7887,9 +7887,20 @@ router17.get("/users/:id/stats", async (req, res) => {
 });
 router17.put("/fake-users/toggle-all", async (req, res) => {
   try {
-    const { enabled } = req.body;
+    const { enabled, adminPassword } = req.body;
     if (typeof enabled !== "boolean") {
       return res.status(400).json({ message: "Il campo 'enabled' deve essere un booleano" });
+    }
+    if (!adminPassword) {
+      return res.status(400).json({ message: "Password admin richiesta" });
+    }
+    const admin = await storage.getUser(req.session.userId);
+    if (!admin) {
+      return res.status(401).json({ message: "Non autenticato" });
+    }
+    const validPassword = await import_bcryptjs3.default.compare(adminPassword, admin.password);
+    if (!validPassword) {
+      return res.status(403).json({ message: "Password admin non valida" });
     }
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { users: usersTable, userProfiles: userProfiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));

@@ -137,16 +137,19 @@ export default function FakeUsersAdmin() {
   const allEnabled = fakeUsersEnabledData?.enabled !== false;
 
   const toggleAllMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
+    mutationFn: async ({ enabled, adminPassword }: { enabled: boolean; adminPassword: string }) => {
       const baseUrl = getApiUrl();
       const url = new URL("/api/admin/fake-users/toggle-all", baseUrl);
       const res = await fetch(url.toString(), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled }),
+        body: JSON.stringify({ enabled, adminPassword }),
         credentials: "include",
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Errore" }));
+        throw new Error(err.message);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -935,30 +938,30 @@ export default function FakeUsersAdmin() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.pwdBtn, styles.pwdBtnConfirm]}
-                onPress={async () => {
-                  try {
-                    const url = new URL("/api/admin/verify-password", getApiUrl());
-                    const res = await fetch(url.toString(), {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      credentials: "include",
-                      body: JSON.stringify({ password: togglePwdInput }),
-                    });
-                    if (res.ok) {
-                      setTogglePwdVisible(false);
-                      setTogglePwdInput("");
-                      setTogglePwdError(null);
-                      if (pendingToggleVal !== null) toggleAllMutation.mutate(pendingToggleVal);
-                    } else {
-                      setTogglePwdInput("");
-                      setTogglePwdError("Password non corretta.");
+                disabled={!togglePwdInput || toggleAllMutation.isPending}
+                onPress={() => {
+                  if (pendingToggleVal === null) return;
+                  toggleAllMutation.mutate(
+                    { enabled: pendingToggleVal, adminPassword: togglePwdInput },
+                    {
+                      onSuccess: () => {
+                        setTogglePwdVisible(false);
+                        setTogglePwdInput("");
+                        setTogglePwdError(null);
+                      },
+                      onError: (err: Error) => {
+                        setTogglePwdInput("");
+                        setTogglePwdError(err.message || "Password non corretta.");
+                      },
                     }
-                  } catch {
-                    setTogglePwdError("Errore di connessione.");
-                  }
+                  );
                 }}
               >
-                <Text style={styles.pwdBtnText}>Conferma</Text>
+                {toggleAllMutation.isPending ? (
+                  <ActivityIndicator color={Colors.background} size="small" />
+                ) : (
+                  <Text style={styles.pwdBtnText}>Conferma</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
