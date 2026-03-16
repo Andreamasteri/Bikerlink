@@ -149,6 +149,11 @@ const CHAT_MSGS = [
   "Conosci qualche bella strada nella tua zona?", "Da quanto tempo guidi?",
   "Io abito in Lazio", "Mi piacerebbe fare un giro in Toscana",
 ];
+const FOLLOWUP_MSGS = [
+  "E tu?", "Dimmi di più", "Ah capisco, e poi?", "Interessante!",
+  "Ma davvero?", "Bello! Racconta", "Si vero, anche io",
+  "Ah ok, e che altro mi dici?", "Dai continua",
+];
 const SOS_REASONS = [
   "Gomma a terra sulla provinciale", "Problema alla catena, serve aiuto",
   "Batteria scarica, qualcuno ha i cavi?", "Incidente lieve, serve assistenza",
@@ -208,7 +213,7 @@ async function actionDiscovery(): Promise<void> {
   const lng = randLng();
 
   await tracked("DISCOVERY", "online-list", async () => {
-    const r = await session.get(`/api/users/online-list?lat=${lat}&lng=${lng}`);
+    const r = await session.get(`/api/users/online-list?lat=${lat}&lng=${lng}&includeOffline=true`);
     if (!r.ok) throw new Error(`${r.status}`);
     return `${r.data.length} utenti`;
   });
@@ -217,6 +222,18 @@ async function actionDiscovery(): Promise<void> {
     const r = await session.get(`/api/users/available-list?lat=${lat}&lng=${lng}`);
     if (!r.ok) throw new Error(`${r.status}`);
     return `${r.data.length} disponibili`;
+  });
+
+  await tracked("DISCOVERY", "biker-available-list", async () => {
+    const r = await session.get(`/api/users/biker-available-list?lat=${lat}&lng=${lng}&includeOffline=true`);
+    if (!r.ok) throw new Error(`${r.status}`);
+    return `${r.data.length} biker`;
+  });
+
+  await tracked("DISCOVERY", "zavorrine-available-list", async () => {
+    const r = await session.get(`/api/users/zavorrine-available-list?lat=${lat}&lng=${lng}&includeOffline=true`);
+    if (!r.ok) throw new Error(`${r.status}`);
+    return `${r.data.length} zavorrine`;
   });
 
   await tracked("DISCOVERY", "biker-available-count", async () => {
@@ -230,12 +247,30 @@ async function actionDiscovery(): Promise<void> {
     if (!r.ok) throw new Error(`${r.status}`);
     return `count=${r.data.count}`;
   });
+
+  await tracked("DISCOVERY", "online-count", async () => {
+    const r = await session.get("/api/users/online-count");
+    if (!r.ok) throw new Error(`${r.status}`);
+    return `count=${r.data.count}`;
+  });
+
+  await tracked("DISCOVERY", "available-count", async () => {
+    const r = await session.get("/api/users/available-count");
+    if (!r.ok) throw new Error(`${r.status}`);
+    return `count=${r.data.count}`;
+  });
 }
 
 async function actionProfile(): Promise<void> {
   const session = Math.random() < 0.5 ? s1 : s2;
-  const fakeId = randomFakeId();
 
+  await tracked("PROFILE", "get-me", async () => {
+    const r = await session.get("/api/users/me");
+    if (!r.ok) throw new Error(`${r.status}`);
+    return r.data.nickname;
+  });
+
+  const fakeId = randomFakeId();
   if (fakeId) {
     await tracked("PROFILE", `view-public ${fakeId.slice(0, 8)}`, async () => {
       const r = await session.get(`/api/users/${fakeId}/public`);
@@ -253,6 +288,22 @@ async function actionProfile(): Promise<void> {
     const isAvailable = Math.random() > 0.3;
     const r = await session.put("/api/users/me/availability", { isAvailable, latitude: randLat(), longitude: randLng() });
     if (!r.ok) throw new Error(`${r.status}`);
+  });
+
+  await tracked("PROFILE", "update-dynamic-profile", async () => {
+    const r = await session.put("/api/users/profile/dynamic", {
+      isAvailable: Math.random() > 0.5,
+      latitude: randLat(),
+      longitude: randLng(),
+      searchPreference: pick(["biker", "zavorrina", "both"]),
+    });
+    if (!r.ok) throw new Error(`${r.status}`);
+  });
+
+  await tracked("PROFILE", "get-all-users", async () => {
+    const r = await session.get("/api/users");
+    if (!r.ok) throw new Error(`${r.status}`);
+    return `${r.data.length} utenti totali`;
   });
 }
 
@@ -272,17 +323,38 @@ async function actionChatFakeUser(): Promise<void> {
   if (!convRes) return;
 
   const convId = convRes.id;
-  const msg = pick([...GREETINGS, ...MOTO_MSGS, ...CHAT_MSGS]);
+  const numMessages = 2 + Math.floor(Math.random() * 2);
 
-  await tracked("CHAT", `send-msg "${msg.slice(0, 30)}"`, async () => {
-    const r = await session.post(`/api/chat/conversations/${convId}/messages`, { content: msg, messageType: "text" });
+  const msg1 = pick(GREETINGS);
+  await tracked("CHAT", `send-msg-1 "${msg1.slice(0, 30)}"`, async () => {
+    const r = await session.post(`/api/chat/conversations/${convId}/messages`, { content: msg1, messageType: "text" });
     if (!r.ok) throw new Error(`${r.status}`);
     chatbotSent++;
   });
 
-  await sleep(6000);
+  await sleep(4000);
 
-  await tracked("CHAT", `check-bot-reply conv=${convId.slice(0, 8)}`, async () => {
+  const msg2 = pick(MOTO_MSGS);
+  await tracked("CHAT", `send-msg-2 "${msg2.slice(0, 30)}"`, async () => {
+    const r = await session.post(`/api/chat/conversations/${convId}/messages`, { content: msg2, messageType: "text" });
+    if (!r.ok) throw new Error(`${r.status}`);
+    chatbotSent++;
+  });
+
+  await sleep(4000);
+
+  if (numMessages >= 3) {
+    const msg3 = pick([...CHAT_MSGS, ...FOLLOWUP_MSGS]);
+    await tracked("CHAT", `send-msg-3 "${msg3.slice(0, 30)}"`, async () => {
+      const r = await session.post(`/api/chat/conversations/${convId}/messages`, { content: msg3, messageType: "text" });
+      if (!r.ok) throw new Error(`${r.status}`);
+      chatbotSent++;
+    });
+
+    await sleep(4000);
+  }
+
+  await tracked("CHAT", `check-bot-replies conv=${convId.slice(0, 8)}`, async () => {
     const r = await session.get(`/api/chat/conversations/${convId}/messages`);
     if (!r.ok) throw new Error(`${r.status}`);
     const msgs = r.data;
@@ -290,8 +362,8 @@ async function actionChatFakeUser(): Promise<void> {
       ? msgs.filter((m: any) => m.senderId === fakeId)
       : [];
     if (botReplies.length > 0) {
-      chatbotReplied++;
-      return `Bot replied: "${(botReplies[botReplies.length - 1] as any).content?.slice(0, 40)}"`;
+      chatbotReplied += botReplies.length;
+      return `Bot replied ${botReplies.length}x: "${(botReplies[botReplies.length - 1] as any).content?.slice(0, 40)}"`;
     }
     return "No bot reply yet";
   });
@@ -328,13 +400,22 @@ async function actionChatUserToUser(): Promise<void> {
     if (!r.ok) throw new Error(`${r.status}`);
     return `${r.data.length} msgs`;
   });
+
+  await tracked("CHAT_U2U", "mark-read", async () => {
+    const r = await s1.put(`/api/chat/conversations/${convId}/read`);
+    if (!r.ok) throw new Error(`${r.status}`);
+  });
 }
 
 async function actionSOS(): Promise<void> {
   const existing = await s1.get("/api/sos/my");
   if (existing.ok && existing.data) {
-    log("ℹ", "SOS", "User1 ha già un SOS attivo, skip");
-    return;
+    await tracked("SOS", "cancel-existing SOS", async () => {
+      const r = await s1.put(`/api/sos/${existing.data.id}/cancel`);
+      if (!r.ok && r.status !== 400) throw new Error(`${r.status} ${JSON.stringify(r.data)}`);
+      return r.status === 400 ? "already closed" : "cancelled";
+    });
+    await sleep(2000);
   }
 
   const reason = pick(SOS_REASONS);
@@ -371,6 +452,14 @@ async function actionSOS(): Promise<void> {
       return `${r.data.length} msgs in SOS chat`;
     });
   }
+
+  await sleep(5000);
+
+  await tracked("SOS", "user1 checks my SOS after accept", async () => {
+    const r = await s1.get("/api/sos/my");
+    if (!r.ok) throw new Error(`${r.status}`);
+    return r.data ? `status=${r.data.status}` : "no active SOS (cleaned up)";
+  });
 }
 
 async function actionProposals(): Promise<void> {
@@ -404,25 +493,87 @@ async function actionProposals(): Promise<void> {
     return `${r.data.length} proposte`;
   });
 
+  await tracked("PROPOSALS", "user2 reads proposals filtered=giro", async () => {
+    const r = await s2.get("/api/proposals?filter=giro");
+    if (!r.ok) throw new Error(`${r.status}`);
+    return `${r.data.length} proposte giro`;
+  });
+
   if (proposalRes) {
     await tracked("PROPOSALS", `user2 joins proposal ${proposalRes.id?.slice(0, 8)}`, async () => {
       const r = await s2.post(`/api/proposals/${proposalRes.id}/join`);
       if (!r.ok && r.status !== 409) throw new Error(`${r.status} ${JSON.stringify(r.data)}`);
       return r.status === 409 ? "già iscritto" : "joined";
     });
+
+    await tracked("PROPOSALS", `get proposal detail ${proposalRes.id?.slice(0, 8)}`, async () => {
+      const r = await s2.get(`/api/proposals/${proposalRes.id}`);
+      if (!r.ok) throw new Error(`${r.status}`);
+      return `participants=${r.data.participants?.length || 0}`;
+    });
   }
 
-  await tracked("PROPOSALS", "user1 reads matches", async () => {
+  const matchesRes = await tracked("PROPOSALS", "user1 reads matches", async () => {
     const r = await s1.get("/api/proposals/matches");
     if (!r.ok) throw new Error(`${r.status}`);
-    return `${r.data.length} matches`;
+    return r.data;
   });
 
-  await tracked("PROPOSALS", "user2 reads garage-matches", async () => {
+  if (Array.isArray(matchesRes) && matchesRes.length > 0) {
+    const pendingMatches = matchesRes.filter((m: any) => m.status === "pending");
+    if (pendingMatches.length > 0) {
+      const matchToHandle = pendingMatches[0];
+      const shouldAccept = Math.random() > 0.3;
+      if (shouldAccept) {
+        await tracked("PROPOSALS", `accept match ${matchToHandle.id?.slice(0, 8)}`, async () => {
+          const r = await s1.post(`/api/proposals/matches/${matchToHandle.id}/accept`);
+          if (!r.ok) throw new Error(`${r.status} ${JSON.stringify(r.data)}`);
+          return `accepted, status=${r.data.status}`;
+        });
+      } else {
+        await tracked("PROPOSALS", `reject match ${matchToHandle.id?.slice(0, 8)}`, async () => {
+          const r = await s1.post(`/api/proposals/matches/${matchToHandle.id}/reject`);
+          if (!r.ok) throw new Error(`${r.status} ${JSON.stringify(r.data)}`);
+          return "rejected";
+        });
+      }
+    }
+  }
+
+  const garageRes = await tracked("PROPOSALS", "user2 reads garage-matches", async () => {
     const r = await s2.get("/api/proposals/garage-matches");
     if (!r.ok) throw new Error(`${r.status}`);
-    return `${r.data.length} garage-matches`;
+    return r.data;
   });
+
+  if (Array.isArray(garageRes) && garageRes.length > 0) {
+    const newGarageMatches = garageRes.filter((m: any) => m.status === "new");
+    if (newGarageMatches.length > 0) {
+      const gMatch = newGarageMatches[0];
+      const shouldAccept = Math.random() > 0.3;
+      if (shouldAccept) {
+        await tracked("PROPOSALS", `accept garage-match ${gMatch.id?.slice(0, 8)}`, async () => {
+          const r = await s2.post(`/api/proposals/garage-matches/${gMatch.id}/accept`);
+          if (!r.ok) throw new Error(`${r.status} ${JSON.stringify(r.data)}`);
+          return "accepted";
+        });
+      } else {
+        await tracked("PROPOSALS", `reject garage-match ${gMatch.id?.slice(0, 8)}`, async () => {
+          const r = await s2.post(`/api/proposals/garage-matches/${gMatch.id}/reject`);
+          if (!r.ok) throw new Error(`${r.status} ${JSON.stringify(r.data)}`);
+          return "rejected";
+        });
+      }
+    }
+  }
+
+  if (proposalRes && Math.random() < 0.3) {
+    await tracked("PROPOSALS", `cleanup: delete proposal ${proposalRes.id?.slice(0, 8)}`, async () => {
+      const r = await s1.del(`/api/proposals/${proposalRes.id}`);
+      if (!r.ok) throw new Error(`${r.status}`);
+      return "deleted";
+    });
+  }
 }
 
 async function actionCustomRoutes(): Promise<void> {
@@ -437,8 +588,9 @@ async function actionCustomRoutes(): Promise<void> {
   });
 
   if (routeRes) {
+    const waypointIds: string[] = [];
     for (let i = 0; i < 3; i++) {
-      await tracked("ROUTES", `add waypoint ${i + 1}`, async () => {
+      const wp = await tracked("ROUTES", `add waypoint ${i + 1}`, async () => {
         const r = await s1.post(`/api/custom-routes/${routeRes.id}/waypoints`, {
           name: pick(WAYPOINT_NAMES),
           latitude: randLat(),
@@ -447,8 +599,33 @@ async function actionCustomRoutes(): Promise<void> {
           orderIndex: i,
         });
         if (!r.ok) throw new Error(`${r.status}`);
+        return r.data;
+      });
+      if (wp) waypointIds.push(wp.id);
+    }
+
+    await tracked("ROUTES", `get route detail ${routeRes.id.slice(0, 8)}`, async () => {
+      const r = await s1.get(`/api/custom-routes/${routeRes.id}`);
+      if (!r.ok) throw new Error(`${r.status}`);
+      return `waypoints=${r.data.waypoints?.length || 0}`;
+    });
+
+    if (waypointIds.length > 0) {
+      await tracked("ROUTES", "update waypoint", async () => {
+        const r = await s1.put(`/api/custom-routes/${routeRes.id}/waypoints/${waypointIds[0]}`, {
+          name: "Punto aggiornato",
+          description: "Waypoint modificato dallo stress test",
+        });
+        if (!r.ok) throw new Error(`${r.status}`);
       });
     }
+
+    await tracked("ROUTES", "update route distance", async () => {
+      const r = await s1.put(`/api/custom-routes/${routeRes.id}`, {
+        totalDistanceKm: Math.round(Math.random() * 200 + 20),
+      });
+      if (!r.ok) throw new Error(`${r.status}`);
+    });
   }
 
   await tracked("ROUTES", "user2 reads routes", async () => {
@@ -462,7 +639,15 @@ async function actionNotifications(): Promise<void> {
   await tracked("NOTIF", "user1 reads notifications", async () => {
     const r = await s1.get("/api/notifications");
     if (!r.ok) throw new Error(`${r.status}`);
-    return `${r.data.length} notifiche`;
+    const notifs = r.data;
+    if (Array.isArray(notifs) && notifs.length > 0) {
+      const unread = notifs.filter((n: any) => !n.readAt);
+      if (unread.length > 0) {
+        await s1.put(`/api/notifications/${unread[0].id}/read`);
+        log("✓", "NOTIF", `marked notification ${unread[0].id.slice(0, 8)} as read`);
+      }
+    }
+    return `${notifs.length} notifiche`;
   });
 
   await tracked("NOTIF", "user1 unread chat total", async () => {
@@ -475,6 +660,18 @@ async function actionNotifications(): Promise<void> {
     const r = await s1.get("/api/chat/conversations");
     if (!r.ok) throw new Error(`${r.status}`);
     return `${r.data.length} conversazioni`;
+  });
+
+  await tracked("NOTIF", "user2 reads notifications", async () => {
+    const r = await s2.get("/api/notifications");
+    if (!r.ok) throw new Error(`${r.status}`);
+    return `${r.data.length} notifiche`;
+  });
+
+  await tracked("NOTIF", "user2 unread chat total", async () => {
+    const r = await s2.get("/api/chat/unread-total");
+    if (!r.ok) throw new Error(`${r.status}`);
+    return `unread=${r.data.count}`;
   });
 }
 
@@ -504,13 +701,12 @@ function pickWeighted(): ActionEntry {
 const lastRun: Record<string, number> = {};
 const MAX_GAP_MS = 10 * 60 * 1000;
 
-function getOverdueAction(): ActionEntry | null {
+function getAllOverdueActions(): ActionEntry[] {
   const now = Date.now();
-  for (const a of ACTIONS) {
+  return ACTIONS.filter((a) => {
     const last = lastRun[a.name] || 0;
-    if (now - last > MAX_GAP_MS) return a;
-  }
-  return null;
+    return now - last > MAX_GAP_MS;
+  });
 }
 
 function printReport() {
@@ -616,20 +812,26 @@ async function main() {
       await login();
     }
 
-    const numActions = 3 + Math.floor(Math.random() * 3);
     const selectedActions: ActionEntry[] = [];
-
-    const overdue = getOverdueAction();
-    if (overdue) {
-      selectedActions.push(overdue);
+    const overdueActions = getAllOverdueActions();
+    for (const a of overdueActions) {
+      selectedActions.push(a);
     }
 
-    while (selectedActions.length < numActions) {
-      const a = pickWeighted();
-      if (!selectedActions.some((s) => s.name === a.name)) {
-        selectedActions.push(a);
+    const targetCount = Math.max(selectedActions.length, 3 + Math.floor(Math.random() * 3));
+    while (selectedActions.length < targetCount) {
+      let added = false;
+      for (let tries = 0; tries < 30 && !added; tries++) {
+        const a = pickWeighted();
+        if (!selectedActions.some((s) => s.name === a.name)) {
+          selectedActions.push(a);
+          added = true;
+        }
       }
+      if (!added) break;
     }
+
+    log("ℹ", "CYCLE", `Running ${selectedActions.length} actions: ${selectedActions.map((a) => a.name).join(", ")}`);
 
     for (const action of selectedActions) {
       try {
