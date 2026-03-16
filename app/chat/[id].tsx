@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,9 +7,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  KeyboardAvoidingView,
+  Switch,
   Platform,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -66,7 +67,55 @@ function getUserTypeColor(userType: string, sex?: string | null): string {
   return Colors.textSecondary;
 }
 
+function parseHashtagsFromInput(input: string): string[] {
+  return input
+    .split(/\s+/)
+    .map((w) => w.trim().toLowerCase())
+    .filter((w) => w.startsWith("#") && w.length > 1);
+}
+
+function messageMatchesHashtags(content: string | null, hashtags: string[]): boolean {
+  if (!content || hashtags.length === 0) return true;
+  const lower = content.toLowerCase();
+  return hashtags.some((tag) => lower.includes(tag));
+}
+
+function TextWithHashtags({
+  text,
+  isOwn,
+  style,
+}: {
+  text: string;
+  isOwn: boolean;
+  style: object;
+}) {
+  const parts = text.split(/(\s+)/);
+  return (
+    <Text style={style}>
+      {parts.map((part, i) => {
+        const isHashtag = /^#[a-zA-Z0-9_àèéìíîòóùúÀÈÉÌÍÎÒÓÙÚ]+$/.test(part);
+        if (isHashtag) {
+          return (
+            <Text
+              key={i}
+              style={{ color: isOwn ? "#FFD580" : Colors.accent, fontFamily: "Inter_600SemiBold" }}
+            >
+              {part}
+            </Text>
+          );
+        }
+        return <Text key={i}>{part}</Text>;
+      })}
+    </Text>
+  );
+}
+
 function MessageBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolean }) {
+  const hasHashtag =
+    message.messageType === "text" &&
+    message.content &&
+    /#[a-zA-Z0-9_àèéìíîòóùúÀÈÉÌÍÎÒÓÙÚ]+/.test(message.content);
+
   return (
     <View style={[styles.bubbleContainer, isOwn ? styles.bubbleRight : styles.bubbleLeft]}>
       {!isOwn && message.sender && (
@@ -89,6 +138,12 @@ function MessageBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolea
               {message.content || "Foto"}
             </Text>
           </View>
+        ) : hasHashtag ? (
+          <TextWithHashtags
+            text={message.content!}
+            isOwn={isOwn}
+            style={[styles.messageText, isOwn ? styles.ownText : styles.otherText]}
+          />
         ) : (
           <Text style={[styles.messageText, isOwn ? styles.ownText : styles.otherText]}>
             {message.content}
@@ -103,6 +158,18 @@ function MessageBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolea
   );
 }
 
+function MotoclubWelcomeBanner({ clubName }: { clubName: string | null }) {
+  return (
+    <View style={styles.welcomeBanner}>
+      <Ionicons name="information-circle" size={18} color={Colors.accent} />
+      <Text style={styles.welcomeText}>
+        Usa gli hashtag della tua regione per organizzare i messaggi del club.{"\n"}
+        <Text style={{ color: Colors.accent, fontFamily: "Inter_600SemiBold" }}>Esempio: #veneto #lombardia</Text>
+      </Text>
+    </View>
+  );
+}
+
 export default function ChatConversationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -112,17 +179,30 @@ export default function ChatConversationScreen() {
   const [inputText, setInputText] = useState("");
   const flatListRef = useRef<FlatList>(null);
 
+  const [showHashtagPanel, setShowHashtagPanel] = useState(false);
+  const [hashtagInput, setHashtagInput] = useState("");
+  const [autoHashtag, setAutoHashtag] = useState(false);
+
   const { data: conversations } = useQuery<ConversationDetail[]>({
     queryKey: ["/api/chat/conversations"],
   });
 
   const conversation = conversations?.find((c) => c.id === id);
+  const isMotoclub = conversation?.conversationType === "motoclub";
 
   const { data: messages, isLoading } = useQuery<ChatMessage[]>({
     queryKey: ["/api/chat/conversations", id, "messages"],
     refetchInterval: 5000,
     enabled: !!id,
   });
+
+  const activeHashtags = useMemo(() => parseHashtagsFromInput(hashtagInput), [hashtagInput]);
+
+  const filteredMessages = useMemo(() => {
+    if (!messages) return [];
+    if (activeHashtags.length === 0) return messages;
+    return messages.filter((m) => messageMatchesHashtags(m.content, activeHashtags));
+  }, [messages, activeHashtags]);
 
   const sendMutation = useMutation({
     mutationFn: async (data: { messageType: string; content?: string; latitude?: number; longitude?: number }) => {
@@ -136,11 +216,17 @@ export default function ChatConversationScreen() {
   });
 
   const handleSend = useCallback(() => {
-    const text = inputText.trim();
+    let text = inputText.trim();
     if (!text) return;
+    if (isMotoclub && autoHashtag && activeHashtags.length > 0) {
+      const suffix = " " + activeHashtags.join(" ");
+      if (!text.toLowerCase().includes(activeHashtags[0])) {
+        text = text + suffix;
+      }
+    }
     setInputText("");
     sendMutation.mutate({ messageType: "text", content: text });
-  }, [inputText, sendMutation]);
+  }, [inputText, sendMutation, isMotoclub, autoHashtag, activeHashtags]);
 
   const handleSendLocation = useCallback(async () => {
     if (Platform.OS === "web") {
@@ -175,6 +261,7 @@ export default function ChatConversationScreen() {
 
   const getTitle = (): string => {
     if (conversation?.title) return conversation.title;
+    if (conversation?.conversationType === "motoclub") return "MotoClub";
     if (conversation?.conversationType === "contact") {
       const others = conversation.participants.filter((p) => p.id !== userId);
       if (others.length === 0) return "Chat di contatto";
@@ -194,6 +281,10 @@ export default function ChatConversationScreen() {
   );
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
+  const isGroupLike =
+    conversation?.conversationType === "group" ||
+    conversation?.conversationType === "contact" ||
+    conversation?.conversationType === "motoclub";
 
   return (
     <KeyboardAvoidingView
@@ -207,13 +298,22 @@ export default function ChatConversationScreen() {
         </TouchableOpacity>
         <View style={styles.topBarInfo}>
           <Text style={styles.topBarTitle} numberOfLines={1}>{getTitle()}</Text>
-          {(conversation?.conversationType === "group" || conversation?.conversationType === "contact") && (
+          {isGroupLike && conversation && (
             <Text style={styles.topBarSubtitle}>
               {conversation.participants.length} partecipanti
             </Text>
           )}
         </View>
-        {conversation?.conversationType !== "group" && (() => {
+        {isMotoclub && (
+          <TouchableOpacity
+            onPress={() => setShowHashtagPanel((v) => !v)}
+            style={[styles.hashtagBtn, showHashtagPanel && styles.hashtagBtnActive]}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.hashtagBtnText, showHashtagPanel && styles.hashtagBtnTextActive]}>#</Text>
+          </TouchableOpacity>
+        )}
+        {!isMotoclub && conversation?.conversationType !== "group" && (() => {
           const otherUser = conversation?.participants.find((p: any) => p.id !== userId);
           if (!otherUser) return null;
           return (
@@ -224,6 +324,50 @@ export default function ChatConversationScreen() {
         })()}
       </View>
 
+      {isMotoclub && showHashtagPanel && (
+        <View style={styles.hashtagPanel}>
+          <View style={styles.hashtagInputRow}>
+            <Ionicons name="search" size={16} color={Colors.textSecondary} />
+            <TextInput
+              style={styles.hashtagTextInput}
+              value={hashtagInput}
+              onChangeText={setHashtagInput}
+              placeholder="#veneto #liguria #lombardia..."
+              placeholderTextColor={Colors.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+            />
+            {hashtagInput.length > 0 && (
+              <TouchableOpacity onPress={() => setHashtagInput("")} style={styles.hashtagClearBtn}>
+                <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {activeHashtags.length > 0 && (
+            <Text style={styles.hashtagCounter}>
+              {filteredMessages.length} di {messages?.length ?? 0} messaggi
+            </Text>
+          )}
+
+          <View style={styles.autoHashtagRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.autoHashtagLabel}>Aggiungi automaticamente a fine frase</Text>
+              {autoHashtag && activeHashtags.length > 0 && (
+                <Text style={styles.autoHashtagSub}>{activeHashtags.join(" ")}</Text>
+              )}
+            </View>
+            <Switch
+              value={autoHashtag}
+              onValueChange={setAutoHashtag}
+              trackColor={{ false: Colors.border, true: Colors.accent + "88" }}
+              thumbColor={autoHashtag ? Colors.accent : Colors.textSecondary}
+            />
+          </View>
+        </View>
+      )}
+
       {isLoading ? (
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={Colors.accent} />
@@ -232,11 +376,14 @@ export default function ChatConversationScreen() {
         <View style={styles.emptyChatOuter}>
           <Ionicons name="chatbubble-outline" size={40} color={Colors.textSecondary} />
           <Text style={styles.emptyChatText}>Inizia la conversazione!</Text>
+          {isMotoclub && (
+            <MotoclubWelcomeBanner clubName={conversation?.title ?? null} />
+          )}
         </View>
       ) : (
         <FlatList
           ref={flatListRef}
-          data={messages}
+          data={filteredMessages}
           renderItem={renderMessage}
           keyExtractor={(item) => item.id}
           inverted
@@ -244,6 +391,18 @@ export default function ChatConversationScreen() {
           showsVerticalScrollIndicator={false}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
+          ListFooterComponent={
+            isMotoclub ? <MotoclubWelcomeBanner clubName={conversation?.title ?? null} /> : null
+          }
+          ListEmptyComponent={
+            activeHashtags.length > 0 ? (
+              <View style={styles.noHashtagResults}>
+                <Text style={styles.noHashtagResultsText}>
+                  Nessun messaggio con {activeHashtags.join(" ")}
+                </Text>
+              </View>
+            ) : null
+          }
         />
       )}
 
@@ -256,7 +415,11 @@ export default function ChatConversationScreen() {
             style={styles.textInput}
             value={inputText}
             onChangeText={setInputText}
-            placeholder={t("chat.typeMessage")}
+            placeholder={
+              isMotoclub && autoHashtag && activeHashtags.length > 0
+                ? `Scrivi... (${activeHashtags.join(" ")} in auto)`
+                : t("chat.typeMessage")
+            }
             placeholderTextColor={Colors.textSecondary}
             multiline
             maxLength={2000}
@@ -301,6 +464,30 @@ const styles = StyleSheet.create({
     padding: 4,
     marginLeft: 8,
   },
+  hashtagBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surfaceLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  hashtagBtnActive: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
+  hashtagBtnText: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    color: Colors.textSecondary,
+    lineHeight: 22,
+  },
+  hashtagBtnTextActive: {
+    color: "#fff",
+  },
   topBarInfo: {
     flex: 1,
   },
@@ -315,6 +502,78 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 1,
   },
+  hashtagPanel: {
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 12,
+    gap: 8,
+  },
+  hashtagInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  hashtagTextInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: Colors.text,
+  },
+  hashtagClearBtn: {
+    padding: 2,
+  },
+  hashtagCounter: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.accent,
+  },
+  autoHashtagRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderTopWidth: 0.5,
+    borderTopColor: Colors.border,
+    paddingTop: 8,
+  },
+  autoHashtagLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: Colors.text,
+  },
+  autoHashtagSub: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: Colors.accent,
+    marginTop: 2,
+  },
+  welcomeBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: Colors.accent + "18",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.accent + "33",
+    padding: 12,
+    marginHorizontal: 16,
+    marginVertical: 12,
+  },
+  welcomeText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    lineHeight: 19,
+  },
   centerContent: {
     flex: 1,
     justifyContent: "center",
@@ -324,22 +583,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  emptyChat: {
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 40,
-  },
   emptyChatOuter: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+    paddingHorizontal: 20,
   },
   emptyChatText: {
     fontSize: 14,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
+  },
+  noHashtagResults: {
+    alignItems: "center",
+    paddingVertical: 32,
+  },
+  noHashtagResultsText: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center",
   },
   bubbleContainer: {
     maxWidth: "80%",

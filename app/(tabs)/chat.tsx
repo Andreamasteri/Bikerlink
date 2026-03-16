@@ -46,6 +46,7 @@ interface ConversationItem {
 
 function getConversationTitle(conv: ConversationItem, userId: string, t: (key: string) => string): string {
   if (conv.title) return conv.title;
+  if (conv.conversationType === "motoclub") return conv.title ?? "MotoClub";
   if (conv.conversationType === "contact") {
     const others = conv.participants.filter((p) => p.id !== userId);
     if (others.length === 0) return "Chat di contatto";
@@ -89,6 +90,7 @@ function getUserTypeColor(userType: string, sex?: string | null): string {
 }
 
 function getConversationIcon(conv: ConversationItem): { name: keyof typeof Ionicons.glyphMap; bg: string } {
+  if (conv.conversationType === "motoclub") return { name: "shield", bg: Colors.accent };
   if (conv.conversationType === "contact") return { name: "people-circle", bg: Colors.success };
   if (conv.conversationType === "group") return { name: "people", bg: Colors.accent };
   return { name: "person", bg: Colors.maleIcon };

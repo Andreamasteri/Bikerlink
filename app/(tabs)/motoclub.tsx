@@ -46,6 +46,7 @@ type UserClub = {
   memberCount?: number;
   joinedAt?: string;
   role?: string;
+  conversationId?: string | null;
 };
 
 type Invite = {
@@ -116,17 +117,65 @@ function ClubCard({
   myClubIds,
   onJoin,
   onLeave,
+  onOpenChat,
   joinedAt,
   role,
+  conversationId,
 }: {
   club: Club;
   myClubIds: Set<string>;
   onJoin: (id: string) => void;
   onLeave: (id: string, name: string) => void;
+  onOpenChat?: (conversationId: string) => void;
   joinedAt?: string;
   role?: string;
+  conversationId?: string | null;
 }) {
   const isMember = myClubIds.has(club.id);
+
+  const cardBodyContent = (
+    <>
+      <View style={styles.cardTitleRow}>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {club.name}
+        </Text>
+        {club.isFeatured && (
+          <View style={styles.featuredPill}>
+            <Text style={styles.featuredText}>⭐ Mese</Text>
+          </View>
+        )}
+        {isMember && conversationId && (
+          <Ionicons name="chatbubbles" size={14} color={Colors.accent} />
+        )}
+      </View>
+      <Text style={styles.cardSub} numberOfLines={1}>
+        {club.clubType === "brand"
+          ? `Club ufficiale ${club.brandName}`
+          : club.clubType === "model"
+          ? `${club.brandName} ${club.modelName}`
+          : "Club custom"}
+        {club.country ? `  ${countryFlag(club.country)}` : ""}
+      </Text>
+      <View style={styles.cardStats}>
+        <Ionicons name="people" size={12} color={Colors.textSecondary} />
+        <Text style={styles.statText}>{club.memberCount ?? 0} membri</Text>
+        {isMember && joinedAt && (
+          <>
+            <Text style={styles.dotSep}>·</Text>
+            <Text style={styles.statText}>
+              Dal {new Date(joinedAt).toLocaleDateString("it-IT", { month: "short", year: "numeric" })}
+            </Text>
+          </>
+        )}
+        {isMember && role === "admin" && (
+          <>
+            <Text style={styles.dotSep}>·</Text>
+            <Text style={[styles.statText, { color: Colors.accent }]}>Admin</Text>
+          </>
+        )}
+      </View>
+    </>
+  );
 
   return (
     <View style={styles.card}>
@@ -138,44 +187,17 @@ function ClubCard({
           </View>
         )}
       </View>
-      <View style={styles.cardBody}>
-        <View style={styles.cardTitleRow}>
-          <Text style={styles.cardTitle} numberOfLines={1}>
-            {club.name}
-          </Text>
-          {club.isFeatured && (
-            <View style={styles.featuredPill}>
-              <Text style={styles.featuredText}>⭐ Mese</Text>
-            </View>
-          )}
-        </View>
-        <Text style={styles.cardSub} numberOfLines={1}>
-          {club.clubType === "brand"
-            ? `Club ufficiale ${club.brandName}`
-            : club.clubType === "model"
-            ? `${club.brandName} ${club.modelName}`
-            : "Club custom"}
-          {club.country ? `  ${countryFlag(club.country)}` : ""}
-        </Text>
-        <View style={styles.cardStats}>
-          <Ionicons name="people" size={12} color={Colors.textSecondary} />
-          <Text style={styles.statText}>{club.memberCount ?? 0} membri</Text>
-          {isMember && joinedAt && (
-            <>
-              <Text style={styles.dotSep}>·</Text>
-              <Text style={styles.statText}>
-                Dal {new Date(joinedAt).toLocaleDateString("it-IT", { month: "short", year: "numeric" })}
-              </Text>
-            </>
-          )}
-          {isMember && role === "admin" && (
-            <>
-              <Text style={styles.dotSep}>·</Text>
-              <Text style={[styles.statText, { color: Colors.accent }]}>Admin</Text>
-            </>
-          )}
-        </View>
-      </View>
+      {isMember && conversationId && onOpenChat ? (
+        <TouchableOpacity
+          style={styles.cardBody}
+          onPress={() => onOpenChat(conversationId)}
+          activeOpacity={0.7}
+        >
+          {cardBodyContent}
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.cardBody}>{cardBodyContent}</View>
+      )}
       <TouchableOpacity
         style={[styles.joinBtn, isMember && styles.leaveBtn]}
         onPress={() =>
@@ -237,6 +259,7 @@ function FeaturedBanner({ club, myClubIds, onJoin }: { club: Club; myClubIds: Se
 export default function MotoclubScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const [tab, setTab] = useState<"all" | "mine" | "market">("all");
   const [search, setSearch] = useState("");
@@ -344,6 +367,13 @@ export default function MotoclubScreen() {
       ]);
     },
     [leaveMut]
+  );
+
+  const handleOpenChat = useCallback(
+    (conversationId: string) => {
+      router.push(`/chat/${conversationId}` as any);
+    },
+    [router]
   );
 
   const displayedClubs = tab === "mine"
@@ -547,8 +577,10 @@ export default function MotoclubScreen() {
                 myClubIds={myClubIds}
                 onJoin={handleJoin}
                 onLeave={handleLeave}
+                onOpenChat={handleOpenChat}
                 joinedAt={myData?.joinedAt}
                 role={myData?.role}
+                conversationId={myData?.conversationId}
               />
             );
           }}
