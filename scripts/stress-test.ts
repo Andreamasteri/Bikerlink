@@ -259,6 +259,20 @@ async function actionDiscovery(): Promise<void> {
     if (!r.ok) throw new Error(`${r.status}`);
     return `count=${r.data.count}`;
   });
+
+  await tracked("DISCOVERY", "nearby", async () => {
+    const r = await session.get(`/api/users/nearby?lat=${lat}&lng=${lng}&radius=50`);
+    if (!r.ok) throw new Error(`${r.status}`);
+    return `${r.data.length} nearby`;
+  });
+
+  const searchTerms = ["Rider", "Moto", "Roma", "Milano", "Ducati", "Biker"];
+  await tracked("DISCOVERY", `search q="${pick(searchTerms)}"`, async () => {
+    const q = pick(searchTerms);
+    const r = await session.get(`/api/users/search?q=${encodeURIComponent(q)}`);
+    if (!r.ok) throw new Error(`${r.status}`);
+    return `${r.data.length} risultati per "${q}"`;
+  });
 }
 
 async function actionProfile(): Promise<void> {
@@ -324,11 +338,13 @@ async function actionChatFakeUser(): Promise<void> {
 
   const convId = convRes.id;
   const numMessages = 2 + Math.floor(Math.random() * 2);
+  let messagesSentThisConv = 0;
 
   const msg1 = pick(GREETINGS);
   await tracked("CHAT", `send-msg-1 "${msg1.slice(0, 30)}"`, async () => {
     const r = await session.post(`/api/chat/conversations/${convId}/messages`, { content: msg1, messageType: "text" });
     if (!r.ok) throw new Error(`${r.status}`);
+    messagesSentThisConv++;
     chatbotSent++;
   });
 
@@ -338,6 +354,7 @@ async function actionChatFakeUser(): Promise<void> {
   await tracked("CHAT", `send-msg-2 "${msg2.slice(0, 30)}"`, async () => {
     const r = await session.post(`/api/chat/conversations/${convId}/messages`, { content: msg2, messageType: "text" });
     if (!r.ok) throw new Error(`${r.status}`);
+    messagesSentThisConv++;
     chatbotSent++;
   });
 
@@ -348,6 +365,7 @@ async function actionChatFakeUser(): Promise<void> {
     await tracked("CHAT", `send-msg-3 "${msg3.slice(0, 30)}"`, async () => {
       const r = await session.post(`/api/chat/conversations/${convId}/messages`, { content: msg3, messageType: "text" });
       if (!r.ok) throw new Error(`${r.status}`);
+      messagesSentThisConv++;
       chatbotSent++;
     });
 
@@ -361,9 +379,10 @@ async function actionChatFakeUser(): Promise<void> {
     const botReplies = Array.isArray(msgs)
       ? msgs.filter((m: any) => m.senderId === fakeId)
       : [];
-    if (botReplies.length > 0) {
-      chatbotReplied += botReplies.length;
-      return `Bot replied ${botReplies.length}x: "${(botReplies[botReplies.length - 1] as any).content?.slice(0, 40)}"`;
+    const replyCount = Math.min(botReplies.length, messagesSentThisConv);
+    if (replyCount > 0) {
+      chatbotReplied += replyCount;
+      return `Bot replied ${replyCount}/${messagesSentThisConv}: "${(botReplies[botReplies.length - 1] as any).content?.slice(0, 40)}"`;
     }
     return "No bot reply yet";
   });
@@ -399,11 +418,6 @@ async function actionChatUserToUser(): Promise<void> {
     const r = await s1.get(`/api/chat/conversations/${convId}/messages`);
     if (!r.ok) throw new Error(`${r.status}`);
     return `${r.data.length} msgs`;
-  });
-
-  await tracked("CHAT_U2U", "mark-read", async () => {
-    const r = await s1.put(`/api/chat/conversations/${convId}/read`);
-    if (!r.ok) throw new Error(`${r.status}`);
   });
 }
 
@@ -453,12 +467,19 @@ async function actionSOS(): Promise<void> {
     });
   }
 
-  await sleep(5000);
+  await sleep(10000);
 
   await tracked("SOS", "user1 checks my SOS after accept", async () => {
     const r = await s1.get("/api/sos/my");
     if (!r.ok) throw new Error(`${r.status}`);
-    return r.data ? `status=${r.data.status}` : "no active SOS (cleaned up)";
+    return r.data ? `status=${r.data.status}` : "no active SOS";
+  });
+
+  await tracked("SOS", `cancel/close SOS ${sosRes.id.slice(0, 8)}`, async () => {
+    const r = await s1.put(`/api/sos/${sosRes.id}/cancel`);
+    if (r.ok) return "cancelled successfully";
+    if (r.status === 400) return "already closed (accepted status)";
+    throw new Error(`${r.status} ${JSON.stringify(r.data)}`);
   });
 }
 
@@ -815,10 +836,10 @@ async function main() {
     const selectedActions: ActionEntry[] = [];
     const overdueActions = getAllOverdueActions();
     for (const a of overdueActions) {
-      selectedActions.push(a);
+      if (selectedActions.length < 5) selectedActions.push(a);
     }
 
-    const targetCount = Math.max(selectedActions.length, 3 + Math.floor(Math.random() * 3));
+    const targetCount = Math.min(5, Math.max(selectedActions.length, 3 + Math.floor(Math.random() * 3)));
     while (selectedActions.length < targetCount) {
       let added = false;
       for (let tries = 0; tries < 30 && !added; tries++) {
