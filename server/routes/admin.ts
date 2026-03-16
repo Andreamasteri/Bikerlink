@@ -20,6 +20,8 @@ function requireAdmin(req: Request, res: Response, next: Function) {
     }
     (req as any).currentUser = user;
     next();
+  }).catch(() => {
+    return res.status(500).json({ message: "Errore autenticazione admin" });
   });
 }
 

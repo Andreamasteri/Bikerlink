@@ -141,14 +141,16 @@ export default function FakeUsersAdmin() {
     },
   });
 
-  const { data: users = [], isLoading } = useQuery<FakeUser[]>({
+  const { data: users = [], isLoading, error: usersError } = useQuery<FakeUser[]>({
     queryKey: ["/api/admin/fake-users"],
     queryFn: async () => {
       const url = getApiUrl() + "/api/admin/fake-users";
       const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch");
+      if (res.status === 401) throw new Error("Sessione scaduta — effettua di nuovo il login come admin");
+      if (!res.ok) throw new Error("Errore caricamento utenti fake");
       return res.json();
     },
+    retry: 1,
   });
 
   const toggleAvailableMutation = useMutation({
@@ -418,7 +420,17 @@ export default function FakeUsersAdmin() {
           <Text style={styles.controlDesc}>
             {allEnabled ? "Tutti gli utenti fake sono attivi e visibili" : "Gli utenti fake sono disattivati"}
           </Text>
-          {users.length === 0 && (
+          {isLoading && (
+            <Text style={[styles.controlDesc, { color: Colors.accent }]}>
+              Caricamento utenti fake...
+            </Text>
+          )}
+          {!!usersError && (
+            <Text style={[styles.controlDesc, { color: Colors.error ?? "#e53935" }]}>
+              {(usersError as Error).message}
+            </Text>
+          )}
+          {!isLoading && !usersError && users.length === 0 && (
             <Text style={styles.controlDesc}>
               Nessun utente fake nel sistema. Usa il form in basso per aggiungerne.
             </Text>

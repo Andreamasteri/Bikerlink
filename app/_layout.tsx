@@ -23,6 +23,14 @@ if (Platform.OS === "web" && typeof window !== "undefined") {
       event.preventDefault();
     }
   });
+
+  window.addEventListener("error", (event) => {
+    const msg: string = event?.message ?? "";
+    if (msg.includes("timeout exceeded") || msg.includes("fontfaceobserver")) {
+      event.preventDefault();
+      return true;
+    }
+  });
 }
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
