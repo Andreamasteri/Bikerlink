@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { db } from "./db";
 import { users, userProfiles, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos, appSettings } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 const essentialUsers = [
   {
@@ -163,7 +163,7 @@ export async function autoSeedFakeUsers() {
     const massSeedTagged = await db
       .select({ id: users.id })
       .from(users)
-      .where(eq(users.invitationCode, "mass_seed_2420"))
+      .where(sql`${users.invitationCode} IN ('mass_seed_2420', 'mass_seed_eu_v1')`)
       .limit(1);
 
     if (massSeedTagged.length > 0) {

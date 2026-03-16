@@ -1,32 +1,80 @@
-export const REGIONS = [
-  "Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna",
-  "Friuli Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche",
-  "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia", "Toscana",
-  "Trentino-Alto Adige", "Umbria", "Valle d'Aosta", "Veneto",
-];
+export interface EuropeanZone {
+  region: string;
+  country: string;
+  lat: number;
+  lng: number;
+  spokenLanguages: string[];
+}
 
-export const REGION_COORDS: Record<string, { lat: number; lng: number }> = {
-  "Abruzzo": { lat: 42.19, lng: 13.73 },
-  "Basilicata": { lat: 40.64, lng: 15.97 },
-  "Calabria": { lat: 38.91, lng: 16.59 },
-  "Campania": { lat: 40.85, lng: 14.27 },
-  "Emilia-Romagna": { lat: 44.49, lng: 11.34 },
-  "Friuli Venezia Giulia": { lat: 46.07, lng: 13.23 },
-  "Lazio": { lat: 41.90, lng: 12.50 },
-  "Liguria": { lat: 44.41, lng: 8.95 },
-  "Lombardia": { lat: 45.46, lng: 9.19 },
-  "Marche": { lat: 43.62, lng: 13.52 },
-  "Molise": { lat: 41.56, lng: 14.67 },
-  "Piemonte": { lat: 45.07, lng: 7.69 },
-  "Puglia": { lat: 41.13, lng: 16.86 },
-  "Sardegna": { lat: 39.22, lng: 9.12 },
-  "Sicilia": { lat: 37.60, lng: 14.02 },
-  "Toscana": { lat: 43.77, lng: 11.25 },
-  "Trentino-Alto Adige": { lat: 46.07, lng: 11.13 },
-  "Umbria": { lat: 43.00, lng: 12.64 },
-  "Valle d'Aosta": { lat: 45.74, lng: 7.32 },
-  "Veneto": { lat: 45.44, lng: 12.33 },
-};
+export const EUROPEAN_ZONES: EuropeanZone[] = [
+  { region: "Lombardia", country: "IT", lat: 45.46, lng: 9.19, spokenLanguages: ["Italiano"] },
+  { region: "Lazio", country: "IT", lat: 41.90, lng: 12.50, spokenLanguages: ["Italiano"] },
+  { region: "Campania", country: "IT", lat: 40.85, lng: 14.27, spokenLanguages: ["Italiano"] },
+  { region: "Sicilia", country: "IT", lat: 37.60, lng: 14.02, spokenLanguages: ["Italiano"] },
+  { region: "Sardegna", country: "IT", lat: 39.22, lng: 9.12, spokenLanguages: ["Italiano"] },
+
+  { region: "Bayern", country: "DE", lat: 48.14, lng: 11.58, spokenLanguages: ["Deutsch"] },
+  { region: "Nordrhein-Westfalen", country: "DE", lat: 51.23, lng: 6.78, spokenLanguages: ["Deutsch"] },
+  { region: "Baden-Württemberg", country: "DE", lat: 48.78, lng: 9.18, spokenLanguages: ["Deutsch"] },
+  { region: "Berlin", country: "DE", lat: 52.52, lng: 13.41, spokenLanguages: ["Deutsch"] },
+  { region: "Hamburg", country: "DE", lat: 53.55, lng: 9.99, spokenLanguages: ["Deutsch"] },
+
+  { region: "Île-de-France", country: "FR", lat: 48.86, lng: 2.35, spokenLanguages: ["Français"] },
+  { region: "Provence-Alpes-Côte d'Azur", country: "FR", lat: 43.30, lng: 5.37, spokenLanguages: ["Français"] },
+  { region: "Occitanie", country: "FR", lat: 43.60, lng: 1.44, spokenLanguages: ["Français"] },
+  { region: "Bretagne", country: "FR", lat: 48.11, lng: -1.68, spokenLanguages: ["Français"] },
+  { region: "Grand Est", country: "FR", lat: 48.57, lng: 7.75, spokenLanguages: ["Français"] },
+
+  { region: "Cataluña", country: "ES", lat: 41.39, lng: 2.17, spokenLanguages: ["Español"] },
+  { region: "Comunidad de Madrid", country: "ES", lat: 40.42, lng: -3.70, spokenLanguages: ["Español"] },
+  { region: "Andalucía", country: "ES", lat: 37.39, lng: -5.98, spokenLanguages: ["Español"] },
+  { region: "País Vasco", country: "ES", lat: 43.26, lng: -2.93, spokenLanguages: ["Español"] },
+
+  { region: "Mazowieckie", country: "PL", lat: 52.23, lng: 21.01, spokenLanguages: ["English"] },
+  { region: "Małopolskie", country: "PL", lat: 50.06, lng: 19.94, spokenLanguages: ["English"] },
+  { region: "Śląskie", country: "PL", lat: 50.26, lng: 19.03, spokenLanguages: ["English"] },
+
+  { region: "Noord-Holland", country: "NL", lat: 52.37, lng: 4.90, spokenLanguages: ["Nederlands"] },
+  { region: "Zuid-Holland", country: "NL", lat: 51.92, lng: 4.48, spokenLanguages: ["Nederlands"] },
+
+  { region: "Bruxelles", country: "BE", lat: 50.85, lng: 4.35, spokenLanguages: ["Français"] },
+  { region: "Antwerpen", country: "BE", lat: 51.22, lng: 4.40, spokenLanguages: ["Nederlands"] },
+
+  { region: "Zürich", country: "CH", lat: 47.38, lng: 8.54, spokenLanguages: ["Deutsch"] },
+  { region: "Genève", country: "CH", lat: 46.20, lng: 6.15, spokenLanguages: ["Français"] },
+
+  { region: "Wien", country: "AT", lat: 48.21, lng: 16.37, spokenLanguages: ["Deutsch"] },
+  { region: "Tirol", country: "AT", lat: 47.26, lng: 11.39, spokenLanguages: ["Deutsch"] },
+
+  { region: "Stockholm", country: "SE", lat: 59.33, lng: 18.07, spokenLanguages: ["English"] },
+  { region: "Göteborg", country: "SE", lat: 57.71, lng: 11.97, spokenLanguages: ["English"] },
+
+  { region: "Lisboa", country: "PT", lat: 38.72, lng: -9.14, spokenLanguages: ["Português"] },
+
+  { region: "Attiki", country: "GR", lat: 37.98, lng: 23.73, spokenLanguages: ["English"] },
+
+  { region: "Praha", country: "CZ", lat: 50.08, lng: 14.44, spokenLanguages: ["English"] },
+
+  { region: "Budapest", country: "HU", lat: 47.50, lng: 19.04, spokenLanguages: ["English"] },
+
+  { region: "București", country: "RO", lat: 44.43, lng: 26.10, spokenLanguages: ["English"] },
+
+  { region: "Zagreb", country: "HR", lat: 45.81, lng: 15.98, spokenLanguages: ["English"] },
+
+  { region: "København", country: "DK", lat: 55.68, lng: 12.57, spokenLanguages: ["English"] },
+
+  { region: "Helsinki", country: "FI", lat: 60.17, lng: 24.94, spokenLanguages: ["English"] },
+
+  { region: "Oslo", country: "NO", lat: 59.91, lng: 10.75, spokenLanguages: ["English"] },
+
+  { region: "Bratislava", country: "SK", lat: 48.15, lng: 17.11, spokenLanguages: ["English"] },
+
+  { region: "Ljubljana", country: "SI", lat: 46.06, lng: 14.51, spokenLanguages: ["English"] },
+
+  { region: "Beograd", country: "RS", lat: 44.79, lng: 20.45, spokenLanguages: ["English"] },
+
+  { region: "Dublin", country: "IE", lat: 53.35, lng: -6.26, spokenLanguages: ["English"] },
+];
 
 export const MALE_NAMES = [
   "Marco", "Luca", "Andrea", "Giuseppe", "Francesco", "Alessandro", "Antonio", "Giovanni",
@@ -233,7 +281,7 @@ const COUPLE_BIOS = [
   "Due cuori e una moto. Cerchiamo compagni per giri di gruppo",
   "La moto ci ha fatto incontrare e non ci ha più separato!",
   "Coppia on the road: cerchiamo altri per condividere avventure su due ruote",
-  "Sempre insieme in sella. Le strade italiane sono il nostro parco giochi",
+  "Sempre insieme in sella. Le strade europee sono il nostro parco giochi",
   "La nostra storia d'amore è iniziata su una moto. Il resto è storia!",
   "Due persone, una moto, mille avventure. Chi si unisce?",
 ];

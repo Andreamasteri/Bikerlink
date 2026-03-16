@@ -1733,54 +1733,57 @@ function generateUniqueEmail(nickname, usedEmails) {
   usedEmails.add(email);
   return email;
 }
-var REGIONS, REGION_COORDS, MALE_NAMES, FEMALE_NAMES, SURNAMES, MOTORCYCLES, BIKER_M_BIOS, BIKER_F_BIOS, ZAV_F_BIOS, ZAV_M_BIOS, COUPLE_BIOS, WELCOME_MESSAGES;
+var EUROPEAN_ZONES, MALE_NAMES, FEMALE_NAMES, SURNAMES, MOTORCYCLES, BIKER_M_BIOS, BIKER_F_BIOS, ZAV_F_BIOS, ZAV_M_BIOS, COUPLE_BIOS, WELCOME_MESSAGES;
 var init_mass_seed_data = __esm({
   "server/mass-seed-data.ts"() {
     "use strict";
-    REGIONS = [
-      "Abruzzo",
-      "Basilicata",
-      "Calabria",
-      "Campania",
-      "Emilia-Romagna",
-      "Friuli Venezia Giulia",
-      "Lazio",
-      "Liguria",
-      "Lombardia",
-      "Marche",
-      "Molise",
-      "Piemonte",
-      "Puglia",
-      "Sardegna",
-      "Sicilia",
-      "Toscana",
-      "Trentino-Alto Adige",
-      "Umbria",
-      "Valle d'Aosta",
-      "Veneto"
+    EUROPEAN_ZONES = [
+      { region: "Lombardia", country: "IT", lat: 45.46, lng: 9.19, spokenLanguages: ["Italiano"] },
+      { region: "Lazio", country: "IT", lat: 41.9, lng: 12.5, spokenLanguages: ["Italiano"] },
+      { region: "Campania", country: "IT", lat: 40.85, lng: 14.27, spokenLanguages: ["Italiano"] },
+      { region: "Sicilia", country: "IT", lat: 37.6, lng: 14.02, spokenLanguages: ["Italiano"] },
+      { region: "Sardegna", country: "IT", lat: 39.22, lng: 9.12, spokenLanguages: ["Italiano"] },
+      { region: "Bayern", country: "DE", lat: 48.14, lng: 11.58, spokenLanguages: ["Deutsch"] },
+      { region: "Nordrhein-Westfalen", country: "DE", lat: 51.23, lng: 6.78, spokenLanguages: ["Deutsch"] },
+      { region: "Baden-W\xFCrttemberg", country: "DE", lat: 48.78, lng: 9.18, spokenLanguages: ["Deutsch"] },
+      { region: "Berlin", country: "DE", lat: 52.52, lng: 13.41, spokenLanguages: ["Deutsch"] },
+      { region: "Hamburg", country: "DE", lat: 53.55, lng: 9.99, spokenLanguages: ["Deutsch"] },
+      { region: "\xCEle-de-France", country: "FR", lat: 48.86, lng: 2.35, spokenLanguages: ["Fran\xE7ais"] },
+      { region: "Provence-Alpes-C\xF4te d'Azur", country: "FR", lat: 43.3, lng: 5.37, spokenLanguages: ["Fran\xE7ais"] },
+      { region: "Occitanie", country: "FR", lat: 43.6, lng: 1.44, spokenLanguages: ["Fran\xE7ais"] },
+      { region: "Bretagne", country: "FR", lat: 48.11, lng: -1.68, spokenLanguages: ["Fran\xE7ais"] },
+      { region: "Grand Est", country: "FR", lat: 48.57, lng: 7.75, spokenLanguages: ["Fran\xE7ais"] },
+      { region: "Catalu\xF1a", country: "ES", lat: 41.39, lng: 2.17, spokenLanguages: ["Espa\xF1ol"] },
+      { region: "Comunidad de Madrid", country: "ES", lat: 40.42, lng: -3.7, spokenLanguages: ["Espa\xF1ol"] },
+      { region: "Andaluc\xEDa", country: "ES", lat: 37.39, lng: -5.98, spokenLanguages: ["Espa\xF1ol"] },
+      { region: "Pa\xEDs Vasco", country: "ES", lat: 43.26, lng: -2.93, spokenLanguages: ["Espa\xF1ol"] },
+      { region: "Mazowieckie", country: "PL", lat: 52.23, lng: 21.01, spokenLanguages: ["English"] },
+      { region: "Ma\u0142opolskie", country: "PL", lat: 50.06, lng: 19.94, spokenLanguages: ["English"] },
+      { region: "\u015Al\u0105skie", country: "PL", lat: 50.26, lng: 19.03, spokenLanguages: ["English"] },
+      { region: "Noord-Holland", country: "NL", lat: 52.37, lng: 4.9, spokenLanguages: ["Nederlands"] },
+      { region: "Zuid-Holland", country: "NL", lat: 51.92, lng: 4.48, spokenLanguages: ["Nederlands"] },
+      { region: "Bruxelles", country: "BE", lat: 50.85, lng: 4.35, spokenLanguages: ["Fran\xE7ais"] },
+      { region: "Antwerpen", country: "BE", lat: 51.22, lng: 4.4, spokenLanguages: ["Nederlands"] },
+      { region: "Z\xFCrich", country: "CH", lat: 47.38, lng: 8.54, spokenLanguages: ["Deutsch"] },
+      { region: "Gen\xE8ve", country: "CH", lat: 46.2, lng: 6.15, spokenLanguages: ["Fran\xE7ais"] },
+      { region: "Wien", country: "AT", lat: 48.21, lng: 16.37, spokenLanguages: ["Deutsch"] },
+      { region: "Tirol", country: "AT", lat: 47.26, lng: 11.39, spokenLanguages: ["Deutsch"] },
+      { region: "Stockholm", country: "SE", lat: 59.33, lng: 18.07, spokenLanguages: ["English"] },
+      { region: "G\xF6teborg", country: "SE", lat: 57.71, lng: 11.97, spokenLanguages: ["English"] },
+      { region: "Lisboa", country: "PT", lat: 38.72, lng: -9.14, spokenLanguages: ["Portugu\xEAs"] },
+      { region: "Attiki", country: "GR", lat: 37.98, lng: 23.73, spokenLanguages: ["English"] },
+      { region: "Praha", country: "CZ", lat: 50.08, lng: 14.44, spokenLanguages: ["English"] },
+      { region: "Budapest", country: "HU", lat: 47.5, lng: 19.04, spokenLanguages: ["English"] },
+      { region: "Bucure\u0219ti", country: "RO", lat: 44.43, lng: 26.1, spokenLanguages: ["English"] },
+      { region: "Zagreb", country: "HR", lat: 45.81, lng: 15.98, spokenLanguages: ["English"] },
+      { region: "K\xF8benhavn", country: "DK", lat: 55.68, lng: 12.57, spokenLanguages: ["English"] },
+      { region: "Helsinki", country: "FI", lat: 60.17, lng: 24.94, spokenLanguages: ["English"] },
+      { region: "Oslo", country: "NO", lat: 59.91, lng: 10.75, spokenLanguages: ["English"] },
+      { region: "Bratislava", country: "SK", lat: 48.15, lng: 17.11, spokenLanguages: ["English"] },
+      { region: "Ljubljana", country: "SI", lat: 46.06, lng: 14.51, spokenLanguages: ["English"] },
+      { region: "Beograd", country: "RS", lat: 44.79, lng: 20.45, spokenLanguages: ["English"] },
+      { region: "Dublin", country: "IE", lat: 53.35, lng: -6.26, spokenLanguages: ["English"] }
     ];
-    REGION_COORDS = {
-      "Abruzzo": { lat: 42.19, lng: 13.73 },
-      "Basilicata": { lat: 40.64, lng: 15.97 },
-      "Calabria": { lat: 38.91, lng: 16.59 },
-      "Campania": { lat: 40.85, lng: 14.27 },
-      "Emilia-Romagna": { lat: 44.49, lng: 11.34 },
-      "Friuli Venezia Giulia": { lat: 46.07, lng: 13.23 },
-      "Lazio": { lat: 41.9, lng: 12.5 },
-      "Liguria": { lat: 44.41, lng: 8.95 },
-      "Lombardia": { lat: 45.46, lng: 9.19 },
-      "Marche": { lat: 43.62, lng: 13.52 },
-      "Molise": { lat: 41.56, lng: 14.67 },
-      "Piemonte": { lat: 45.07, lng: 7.69 },
-      "Puglia": { lat: 41.13, lng: 16.86 },
-      "Sardegna": { lat: 39.22, lng: 9.12 },
-      "Sicilia": { lat: 37.6, lng: 14.02 },
-      "Toscana": { lat: 43.77, lng: 11.25 },
-      "Trentino-Alto Adige": { lat: 46.07, lng: 11.13 },
-      "Umbria": { lat: 43, lng: 12.64 },
-      "Valle d'Aosta": { lat: 45.74, lng: 7.32 },
-      "Veneto": { lat: 45.44, lng: 12.33 }
-    };
     MALE_NAMES = [
       "Marco",
       "Luca",
@@ -2502,7 +2505,7 @@ var init_mass_seed_data = __esm({
       "Due cuori e una moto. Cerchiamo compagni per giri di gruppo",
       "La moto ci ha fatto incontrare e non ci ha pi\xF9 separato!",
       "Coppia on the road: cerchiamo altri per condividere avventure su due ruote",
-      "Sempre insieme in sella. Le strade italiane sono il nostro parco giochi",
+      "Sempre insieme in sella. Le strade europee sono il nostro parco giochi",
       "La nostra storia d'amore \xE8 iniziata su una moto. Il resto \xE8 storia!",
       "Due persone, una moto, mille avventure. Chi si unisce?"
     ];
@@ -2557,18 +2560,24 @@ function buildSpecs() {
     { userType: "zavorrina", sex: "F", coupleSexConfig: null, count: 500 },
     { userType: "zavorrina", sex: "M", coupleSexConfig: null, count: 50 }
   ];
+  const zoneCount = EUROPEAN_ZONES.length;
   for (const cat of categories) {
-    const distribution = distributeUniformly(cat.count, REGIONS.length);
+    const distribution = distributeUniformly(cat.count, zoneCount);
     let catIndex = 0;
-    for (let r = 0; r < REGIONS.length; r++) {
+    for (let r = 0; r < zoneCount; r++) {
+      const zone = EUROPEAN_ZONES[r];
       for (let i = 0; i < distribution[r]; i++) {
         const csc = cat.coupleSexConfig ?? "none";
         specs.push({
           userType: cat.userType,
           sex: cat.sex,
           coupleSexConfig: cat.coupleSexConfig,
-          region: REGIONS[r],
-          specKey: `${cat.userType}_${cat.sex}_${csc}_${REGIONS[r]}_${catIndex}`
+          region: zone.region,
+          country: zone.country,
+          lat: zone.lat,
+          lng: zone.lng,
+          spokenLanguages: zone.spokenLanguages,
+          specKey: `${cat.userType}_${cat.sex}_${csc}_${zone.region}_${catIndex}`
         });
         catIndex++;
       }
@@ -2601,6 +2610,37 @@ async function ensureOfficialAccount() {
   });
   return user.id;
 }
+async function cleanupOldSeedUsers() {
+  const oldTaggedUsers = await db.select({ id: users.id }).from(users).where((0, import_drizzle_orm5.eq)(users.invitationCode, OLD_SEED_TAG));
+  if (oldTaggedUsers.length === 0) return;
+  console.log(`[mass-seed] Cleaning up ${oldTaggedUsers.length} old Italian-only seed users...`);
+  const CLEANUP_BATCH = 100;
+  for (let i = 0; i < oldTaggedUsers.length; i += CLEANUP_BATCH) {
+    const batch = oldTaggedUsers.slice(i, i + CLEANUP_BATCH);
+    const ids = batch.map((u) => u.id);
+    for (const uid of ids) {
+      try {
+        await db.delete(zavarrinaWishlistMotos).where(import_drizzle_orm5.sql`${zavarrinaWishlistMotos.wishlistId} IN (SELECT id FROM zavorrina_wishlists WHERE user_id = ${uid})`);
+        await db.delete(zavarrinaWishlists).where((0, import_drizzle_orm5.eq)(zavarrinaWishlists.userId, uid));
+        await db.delete(userMotorcycles).where((0, import_drizzle_orm5.eq)(userMotorcycles.userId, uid));
+        const userConvs = await db.select({ convId: conversationParticipants.conversationId }).from(conversationParticipants).where((0, import_drizzle_orm5.eq)(conversationParticipants.userId, uid));
+        for (const c of userConvs) {
+          await db.delete(messages).where((0, import_drizzle_orm5.eq)(messages.conversationId, c.convId));
+          await db.delete(conversationParticipants).where((0, import_drizzle_orm5.eq)(conversationParticipants.conversationId, c.convId));
+          await db.delete(conversations).where((0, import_drizzle_orm5.eq)(conversations.id, c.convId));
+        }
+        await db.delete(userProfiles).where((0, import_drizzle_orm5.eq)(userProfiles.userId, uid));
+        await db.delete(users).where((0, import_drizzle_orm5.eq)(users.id, uid));
+      } catch (err) {
+        logSeedError(`cleanup-old-user-${uid}`, err);
+      }
+    }
+    if (i % (CLEANUP_BATCH * 5) === 0 && i > 0) {
+      console.log(`[mass-seed] Cleanup progress: ${i}/${oldTaggedUsers.length}`);
+    }
+  }
+  console.log(`[mass-seed] Cleanup complete: removed ${oldTaggedUsers.length} old seed users`);
+}
 async function reconcileExistingUsers(officialId) {
   const taggedUsers = await db.select({
     id: users.id,
@@ -2612,13 +2652,12 @@ async function reconcileExistingUsers(officialId) {
     const [profileExists] = await db.select({ id: userProfiles.id }).from(userProfiles).where((0, import_drizzle_orm5.eq)(userProfiles.userId, u.id)).limit(1);
     if (!profileExists) {
       try {
-        const region = pickRandom(REGIONS);
-        const coords = REGION_COORDS[region];
+        const zone = pickRandom(EUROPEAN_ZONES);
         await db.insert(userProfiles).values({
           userId: u.id,
           isAvailable: Math.random() > 0.3,
-          latitude: coords.lat + randOffset(),
-          longitude: coords.lng + randOffset(),
+          latitude: zone.lat + randOffset(),
+          longitude: zone.lng + randOffset(),
           maxPickupDistance: 20 + Math.floor(Math.random() * 80),
           bio: getBio(u.userType, u.sex)
         }).onConflictDoNothing();
@@ -2700,6 +2739,7 @@ async function massSeedFakeUsers() {
   const usedEmails = /* @__PURE__ */ new Set();
   try {
     await storage.upsertAppSetting("skip_fake_user_seed", "false");
+    await cleanupOldSeedUsers();
     const officialId = await ensureOfficialAccount();
     const existingTagged = await db.select({
       userType: users.userType,
@@ -2763,8 +2803,8 @@ async function massSeedFakeUsers() {
           birthYear: randBirthYear(),
           emailVerified: true,
           eulaAccepted: true,
-          country: "IT",
-          spokenLanguages: ["Italiano"],
+          country: spec.country,
+          spokenLanguages: spec.spokenLanguages,
           lastLoginAt: new Date(Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1e3)),
           invitationCode: SEED_TAG
         });
@@ -2793,12 +2833,11 @@ async function massSeedFakeUsers() {
         const meta = specMeta.find((m) => m.nickname === newUser.nickname);
         const spec = meta?.spec;
         if (!spec) continue;
-        const coords = REGION_COORDS[spec.region];
         profileRows.push({
           userId: newUser.id,
           isAvailable: Math.random() > 0.3,
-          latitude: coords.lat + randOffset(),
-          longitude: coords.lng + randOffset(),
+          latitude: spec.lat + randOffset(),
+          longitude: spec.lng + randOffset(),
           maxPickupDistance: 20 + Math.floor(Math.random() * 80),
           bio: getBio(spec.userType, spec.sex)
         });
@@ -2928,7 +2967,7 @@ async function massSeedFakeUsers() {
     massSeedStatus.running = false;
   }
 }
-var import_bcryptjs2, import_drizzle_orm5, SEED_TAG, massSeedStatus, BATCH_SIZE, seedErrors;
+var import_bcryptjs2, import_drizzle_orm5, SEED_TAG, OLD_SEED_TAG, massSeedStatus, BATCH_SIZE, seedErrors;
 var init_mass_seed = __esm({
   "server/mass-seed.ts"() {
     "use strict";
@@ -2938,7 +2977,8 @@ var init_mass_seed = __esm({
     init_schema();
     import_drizzle_orm5 = require("drizzle-orm");
     init_mass_seed_data();
-    SEED_TAG = "mass_seed_2420";
+    SEED_TAG = "mass_seed_eu_v1";
+    OLD_SEED_TAG = "mass_seed_2420";
     massSeedStatus = { running: false, created: 0, total: 0, error: null };
     BATCH_SIZE = 50;
     seedErrors = [];
@@ -7066,7 +7106,7 @@ router17.get("/easter-eggs-stats", async (_req, res) => {
   try {
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { collectedEasterEggs: collectedEasterEggs2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { count, sql: sql6 } = await import("drizzle-orm");
+    const { count, sql: sql7 } = await import("drizzle-orm");
     const rows = await db2.select({
       easterEggId: collectedEasterEggs2.easterEggId,
       collectionsCount: count()
@@ -9259,7 +9299,7 @@ async function autoSeedFakeUsers() {
       console.log("Auto-seed fake users skipped (admin deleted all fake users)");
       return;
     }
-    const massSeedTagged = await db.select({ id: users.id }).from(users).where((0, import_drizzle_orm7.eq)(users.invitationCode, "mass_seed_2420")).limit(1);
+    const massSeedTagged = await db.select({ id: users.id }).from(users).where(import_drizzle_orm7.sql`${users.invitationCode} IN ('mass_seed_2420', 'mass_seed_eu_v1')`).limit(1);
     if (massSeedTagged.length > 0) {
       console.log("Auto-seed fake users skipped (mass-seeded population exists)");
       return;

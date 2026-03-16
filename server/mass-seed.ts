@@ -8,12 +8,13 @@ import {
 } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import {
-  REGIONS, REGION_COORDS, MOTORCYCLES,
+  EUROPEAN_ZONES, MOTORCYCLES,
   randOffset, randBirthYear, pickRandom, pickRandomN, getMotoYear, getBio, getWelcomeMessage,
   distributeUniformly, generateUniqueNickname, generateUniqueEmail,
 } from "./mass-seed-data";
 
-const SEED_TAG = "mass_seed_2420";
+const SEED_TAG = "mass_seed_eu_v1";
+const OLD_SEED_TAG = "mass_seed_2420";
 
 interface MassSeedStatus {
   running: boolean;
@@ -35,6 +36,10 @@ interface UserSpec {
   sex: "M" | "F";
   coupleSexConfig: string | null;
   region: string;
+  country: string;
+  lat: number;
+  lng: number;
+  spokenLanguages: string[];
   specKey: string;
 }
 
@@ -112,18 +117,25 @@ function buildSpecs(): UserSpec[] {
     { userType: "zavorrina", sex: "M", coupleSexConfig: null, count: 50 },
   ];
 
+  const zoneCount = EUROPEAN_ZONES.length;
+
   for (const cat of categories) {
-    const distribution = distributeUniformly(cat.count, REGIONS.length);
+    const distribution = distributeUniformly(cat.count, zoneCount);
     let catIndex = 0;
-    for (let r = 0; r < REGIONS.length; r++) {
+    for (let r = 0; r < zoneCount; r++) {
+      const zone = EUROPEAN_ZONES[r];
       for (let i = 0; i < distribution[r]; i++) {
         const csc = cat.coupleSexConfig ?? "none";
         specs.push({
           userType: cat.userType,
           sex: cat.sex,
           coupleSexConfig: cat.coupleSexConfig,
-          region: REGIONS[r],
-          specKey: `${cat.userType}_${cat.sex}_${csc}_${REGIONS[r]}_${catIndex}`,
+          region: zone.region,
+          country: zone.country,
+          lat: zone.lat,
+          lng: zone.lng,
+          spokenLanguages: zone.spokenLanguages,
+          specKey: `${cat.userType}_${cat.sex}_${csc}_${zone.region}_${catIndex}`,
         });
         catIndex++;
       }
@@ -160,6 +172,51 @@ async function ensureOfficialAccount(): Promise<string> {
   return user.id;
 }
 
+async function cleanupOldSeedUsers(): Promise<void> {
+  const oldTaggedUsers = await db.select({ id: users.id })
+    .from(users)
+    .where(eq(users.invitationCode, OLD_SEED_TAG));
+
+  if (oldTaggedUsers.length === 0) return;
+
+  console.log(`[mass-seed] Cleaning up ${oldTaggedUsers.length} old Italian-only seed users...`);
+
+  const CLEANUP_BATCH = 100;
+  for (let i = 0; i < oldTaggedUsers.length; i += CLEANUP_BATCH) {
+    const batch = oldTaggedUsers.slice(i, i + CLEANUP_BATCH);
+    const ids = batch.map(u => u.id);
+
+    for (const uid of ids) {
+      try {
+        await db.delete(zavarrinaWishlistMotos)
+          .where(sql`${zavarrinaWishlistMotos.wishlistId} IN (SELECT id FROM zavorrina_wishlists WHERE user_id = ${uid})`);
+        await db.delete(zavarrinaWishlists).where(eq(zavarrinaWishlists.userId, uid));
+        await db.delete(userMotorcycles).where(eq(userMotorcycles.userId, uid));
+
+        const userConvs = await db.select({ convId: conversationParticipants.conversationId })
+          .from(conversationParticipants)
+          .where(eq(conversationParticipants.userId, uid));
+        for (const c of userConvs) {
+          await db.delete(messages).where(eq(messages.conversationId, c.convId));
+          await db.delete(conversationParticipants).where(eq(conversationParticipants.conversationId, c.convId));
+          await db.delete(conversations).where(eq(conversations.id, c.convId));
+        }
+
+        await db.delete(userProfiles).where(eq(userProfiles.userId, uid));
+        await db.delete(users).where(eq(users.id, uid));
+      } catch (err: unknown) {
+        logSeedError(`cleanup-old-user-${uid}`, err);
+      }
+    }
+
+    if (i % (CLEANUP_BATCH * 5) === 0 && i > 0) {
+      console.log(`[mass-seed] Cleanup progress: ${i}/${oldTaggedUsers.length}`);
+    }
+  }
+
+  console.log(`[mass-seed] Cleanup complete: removed ${oldTaggedUsers.length} old seed users`);
+}
+
 async function reconcileExistingUsers(officialId: string): Promise<void> {
   const taggedUsers = await db.select({
     id: users.id, userType: users.userType, sex: users.sex, nickname: users.nickname,
@@ -175,13 +232,12 @@ async function reconcileExistingUsers(officialId: string): Promise<void> {
 
     if (!profileExists) {
       try {
-        const region = pickRandom(REGIONS);
-        const coords = REGION_COORDS[region];
+        const zone = pickRandom(EUROPEAN_ZONES);
         await db.insert(userProfiles).values({
           userId: u.id,
           isAvailable: Math.random() > 0.3,
-          latitude: coords.lat + randOffset(),
-          longitude: coords.lng + randOffset(),
+          latitude: zone.lat + randOffset(),
+          longitude: zone.lng + randOffset(),
           maxPickupDistance: 20 + Math.floor(Math.random() * 80),
           bio: getBio(u.userType, u.sex),
         }).onConflictDoNothing();
@@ -276,6 +332,9 @@ export async function massSeedFakeUsers(): Promise<void> {
 
   try {
     await storage.upsertAppSetting("skip_fake_user_seed", "false");
+
+    await cleanupOldSeedUsers();
+
     const officialId = await ensureOfficialAccount();
 
     const existingTagged = await db.select({
@@ -352,8 +411,8 @@ export async function massSeedFakeUsers(): Promise<void> {
           birthYear: randBirthYear(),
           emailVerified: true,
           eulaAccepted: true,
-          country: "IT",
-          spokenLanguages: ["Italiano"],
+          country: spec.country,
+          spokenLanguages: spec.spokenLanguages,
           lastLoginAt: new Date(Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)),
           invitationCode: SEED_TAG,
         });
@@ -386,12 +445,11 @@ export async function massSeedFakeUsers(): Promise<void> {
         const spec = meta?.spec;
         if (!spec) continue;
 
-        const coords = REGION_COORDS[spec.region];
         profileRows.push({
           userId: newUser.id,
           isAvailable: Math.random() > 0.3,
-          latitude: coords.lat + randOffset(),
-          longitude: coords.lng + randOffset(),
+          latitude: spec.lat + randOffset(),
+          longitude: spec.lng + randOffset(),
           maxPickupDistance: 20 + Math.floor(Math.random() * 80),
           bio: getBio(spec.userType, spec.sex),
         });
