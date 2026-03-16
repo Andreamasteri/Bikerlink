@@ -186,6 +186,7 @@ export default function FakeUsersAdmin() {
   const [massSeedCreated, setMassSeedCreated] = useState(0);
   const [massSeedTotal, setMassSeedTotal] = useState(0);
   const [massSeedError, setMassSeedError] = useState<string | null>(null);
+  const [massSeedConfirmVisible, setMassSeedConfirmVisible] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = () => {
@@ -253,14 +254,7 @@ export default function FakeUsersAdmin() {
   };
 
   const handleStartMassSeed = () => {
-    Alert.alert(
-      "Generazione Massiva",
-      "Verranno generati 2420 utenti fake distribuiti uniformemente in tutte le 20 regioni italiane.\n\nQuesto processo richiederà qualche minuto.",
-      [
-        { text: "Annulla", style: "cancel" },
-        { text: "Genera", onPress: startMassSeed },
-      ]
-    );
+    setMassSeedConfirmVisible(true);
   };
 
   const createMutation = useMutation({
@@ -854,6 +848,31 @@ export default function FakeUsersAdmin() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      <Modal visible={massSeedConfirmVisible} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.pwdModalContainer}>
+            <Text style={styles.pwdModalTitle}>Generazione Massiva</Text>
+            <Text style={styles.pwdModalDesc}>
+              Verranno generati 2420 utenti fake distribuiti uniformemente in tutte le 20 regioni italiane.{"\n\n"}Questo processo richiederà qualche minuto.
+            </Text>
+            <View style={styles.pwdModalButtons}>
+              <TouchableOpacity
+                style={[styles.pwdBtn, styles.pwdBtnCancel]}
+                onPress={() => setMassSeedConfirmVisible(false)}
+              >
+                <Text style={styles.pwdBtnText}>Annulla</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.pwdBtn, styles.pwdBtnConfirm]}
+                onPress={() => { setMassSeedConfirmVisible(false); startMassSeed(); }}
+              >
+                <Text style={styles.pwdBtnText}>Genera</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <Modal visible={togglePwdVisible} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.pwdModalContainer}>
