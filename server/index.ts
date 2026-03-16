@@ -9,6 +9,8 @@ import * as path from "path";
 const app = express();
 const log = console.log;
 
+app.set("trust proxy", 1);
+
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;

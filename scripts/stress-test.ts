@@ -73,6 +73,7 @@ class Session {
         hostname: url.hostname,
         port: url.port || (isHttps ? 443 : 80),
         path: url.pathname + url.search,
+        timeout: 30000,
         headers: {
           "Content-Type": "application/json",
           ...(this.cookie ? { Cookie: this.cookie } : {}),
@@ -101,6 +102,9 @@ class Session {
         });
       });
       req.on("error", reject);
+      req.on("timeout", () => {
+        req.destroy(new Error("Request timeout (30s)"));
+      });
       if (payload) req.write(payload);
       req.end();
     });
@@ -830,6 +834,14 @@ async function main() {
     console.log("\n\nInterrotto dall'utente (Ctrl+C)\n");
     printReport();
     process.exit(0);
+  });
+
+  process.on("uncaughtException", (err) => {
+    console.error(`[${ts()}] ✗ [CRASH] uncaughtException: ${err.message}`);
+  });
+
+  process.on("unhandledRejection", (reason: any) => {
+    console.error(`[${ts()}] ✗ [CRASH] unhandledRejection: ${reason?.message || reason}`);
   });
 
   while (Date.now() - startTime < DURATION_MS) {

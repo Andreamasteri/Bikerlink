@@ -8684,7 +8684,7 @@ async function registerRoutes(app2) {
       cookie: {
         maxAge: 30 * 24 * 60 * 60 * 1e3,
         httpOnly: true,
-        secure: !!process.env.REPL_SLUG,
+        secure: process.env.NODE_ENV === "production",
         sameSite: "lax"
       }
     })
@@ -9393,6 +9393,7 @@ var fs5 = __toESM(require("fs"));
 var path5 = __toESM(require("path"));
 var app = (0, import_express21.default)();
 var log = console.log;
+app.set("trust proxy", 1);
 function setupCors(app2) {
   app2.use((req, res, next) => {
     const origins = /* @__PURE__ */ new Set();
