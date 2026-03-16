@@ -14,9 +14,9 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { t } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
+import { useT, useLocale } from "@/lib/language-context";
 
 interface Participant {
   id: string;
@@ -70,13 +70,13 @@ function getTypeIcon(type: string): { name: string; color: string } {
   }
 }
 
-function getTypeLabel(type: string): string {
+function getTypeLabelKey(type: string): string {
   switch (type) {
-    case "giro": return t("proposals.ride");
-    case "raduno": return t("proposals.rally");
-    case "con_zavorrina": return t("proposals.withPassenger");
-    case "passaggio_al_volo": return "Passaggio al volo";
-    case "richiesta": return t("proposals.request");
+    case "giro": return "proposals.ride";
+    case "raduno": return "proposals.rally";
+    case "con_zavorrina": return "proposals.withPassenger";
+    case "passaggio_al_volo": return "proposals.detail.quickride";
+    case "richiesta": return "proposals.request";
     default: return type;
   }
 }
@@ -95,6 +95,8 @@ export default function ProposalDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const t = useT();
+  const locale = useLocale();
 
   const { data: proposal, isLoading } = useQuery<ProposalDetail>({
     queryKey: ["/api/proposals", id],
@@ -122,7 +124,7 @@ export default function ProposalDetailScreen() {
     proposal?.status === "active" && !isParticipant && !isCreator;
 
   const scheduledDate = proposal?.scheduledAt
-    ? new Date(proposal.scheduledAt).toLocaleDateString("it-IT", {
+    ? new Date(proposal.scheduledAt).toLocaleDateString(locale, {
         weekday: "long",
         day: "numeric",
         month: "long",
@@ -133,7 +135,7 @@ export default function ProposalDetailScreen() {
     : null;
 
   const createdDate = proposal?.createdAt
-    ? new Date(proposal.createdAt).toLocaleDateString("it-IT", {
+    ? new Date(proposal.createdAt).toLocaleDateString(locale, {
         day: "numeric",
         month: "short",
         year: "numeric",
@@ -172,7 +174,7 @@ export default function ProposalDetailScreen() {
           }}
         />
         <View style={[styles.centered, { paddingTop: webTopInset }]}>
-          <Text style={styles.errorText}>Proposta non trovata</Text>
+          <Text style={styles.errorText}>{t("proposals.detail.notFound")}</Text>
         </View>
       </>
     );
@@ -185,7 +187,7 @@ export default function ProposalDetailScreen() {
       <Stack.Screen
         options={{
           headerShown: true,
-          title: getTypeLabel(proposal.proposalType),
+          title: t(getTypeLabelKey(proposal.proposalType)),
           headerStyle: { backgroundColor: Colors.surface },
           headerTintColor: Colors.text,
         }}
@@ -204,7 +206,7 @@ export default function ProposalDetailScreen() {
             color={typeInfo.color}
           />
           <Text style={[styles.typeBannerLabel, { color: typeInfo.color }]}>
-            {getTypeLabel(proposal.proposalType)}
+            {t(getTypeLabelKey(proposal.proposalType))}
           </Text>
           {proposal.status !== "active" && (
             <View style={styles.statusBadge}>
@@ -238,7 +240,7 @@ export default function ProposalDetailScreen() {
 
         {proposal.description && (
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Descrizione</Text>
+            <Text style={styles.sectionLabel}>{t("proposals.detail.description")}</Text>
             <Text style={styles.descriptionText}>{proposal.description}</Text>
           </View>
         )}
@@ -261,7 +263,7 @@ export default function ProposalDetailScreen() {
               <View style={styles.infoRow}>
                 <Ionicons name="people" size={18} color={Colors.accent} />
                 <Text style={styles.infoText}>
-                  Max {proposal.maxParticipants} partecipanti
+                  Max {proposal.maxParticipants} {t("proposals.detail.participants").toLowerCase()}
                 </Text>
               </View>
             )}
@@ -270,7 +272,7 @@ export default function ProposalDetailScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>
-            Partecipanti ({proposal.participants.length}
+            {t("proposals.detail.participants")} ({proposal.participants.length}
             {proposal.maxParticipants ? `/${proposal.maxParticipants}` : ""})
           </Text>
           {proposal.participants.map((p) => (
@@ -322,14 +324,14 @@ export default function ProposalDetailScreen() {
         {isParticipant && !isCreator && (
           <View style={styles.joinedBanner}>
             <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
-            <Text style={styles.joinedText}>Sei iscritto a questa proposta</Text>
+            <Text style={styles.joinedText}>{t("proposals.detail.joined")}</Text>
           </View>
         )}
 
         {isCreator && (
           <View style={styles.joinedBanner}>
             <MaterialCommunityIcons name="crown" size={20} color={Colors.accent} />
-            <Text style={styles.joinedText}>Sei il creatore di questa proposta</Text>
+            <Text style={styles.joinedText}>{t("proposals.detail.creator")}</Text>
           </View>
         )}
 
@@ -343,20 +345,20 @@ export default function ProposalDetailScreen() {
                   queryClient.invalidateQueries({ queryKey: ["/api/proposals"] });
                   router.back();
                 } catch (e: any) {
-                  Alert.alert("Errore", e.message || "Impossibile eliminare la proposta");
+                  Alert.alert(t("common.error"), e.message || t("proposals.detail.cannotDelete"));
                 }
               };
               if (Platform.OS === "web") {
-                if (window.confirm("Sei sicuro di voler eliminare questa proposta? L'azione è irreversibile.")) {
+                if (window.confirm(t("proposals.detail.deleteConfirm"))) {
                   await doDelete();
                 }
               } else {
                 Alert.alert(
-                  "Elimina proposta",
-                  "Sei sicuro di voler eliminare questa proposta? L'azione è irreversibile.",
+                  t("proposals.detail.deleteProposal"),
+                  t("proposals.detail.deleteConfirm"),
                   [
-                    { text: "Annulla", style: "cancel" },
-                    { text: "Elimina", style: "destructive", onPress: doDelete },
+                    { text: t("common.cancel"), style: "cancel" },
+                    { text: t("common.delete"), style: "destructive", onPress: doDelete },
                   ]
                 );
               }
@@ -364,7 +366,7 @@ export default function ProposalDetailScreen() {
             activeOpacity={0.8}
           >
             <Ionicons name="trash" size={20} color="#fff" />
-            <Text style={styles.deleteButtonText}>Elimina proposta</Text>
+            <Text style={styles.deleteButtonText}>{t("proposals.detail.deleteProposal")}</Text>
           </TouchableOpacity>
         )}
 
@@ -383,13 +385,13 @@ export default function ProposalDetailScreen() {
                 const conv = await res.json();
                 router.push(`/chat/${conv.id}` as any);
               } catch (e: any) {
-                Alert.alert("Errore", e.message || "Impossibile aprire la chat");
+                Alert.alert(t("common.error"), e.message || t("proposals.detail.cannotOpenChat"));
               }
             }}
             activeOpacity={0.8}
           >
             <Ionicons name="chatbubbles" size={22} color={Colors.background} />
-            <Text style={styles.groupChatText}>Chat del Gruppo</Text>
+            <Text style={styles.groupChatText}>{t("proposals.detail.groupChat")}</Text>
           </TouchableOpacity>
         )}
       </ScrollView>

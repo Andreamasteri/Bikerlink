@@ -18,21 +18,21 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import Colors from "@/constants/colors";
-import { t } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
+import { useT } from "@/lib/language-context";
 import MapPickerContent from "@/components/MapPickerModal";
 
 const BIKER_SEARCH_TYPES = [
-  { key: "find_a_friend", label: "FindAFriend", subtitle: "Cerco altri biker", icon: "account-group", color: Colors.maleIcon },
-  { key: "find_a_guest", label: "Trova Zavorrina", subtitle: "Sella libera per zavorre", icon: "seat-passenger", color: Colors.femaleIcon },
-  { key: "hitcher", label: "Hitcher", subtitle: "Ho la sella libera per un passaggio", icon: "motorbike", color: Colors.accent },
-  { key: "hitchhiker", label: "HitchHiker", subtitle: "Cerco un passaggio", icon: "thumb-up", color: Colors.success },
+  { key: "find_a_friend", label: "FindAFriend", subtitleKey: "proposals.sub.findFriend", icon: "account-group", color: Colors.maleIcon },
+  { key: "find_a_guest", labelKey: "proposals.searchType.findPassenger", subtitleKey: "proposals.sub.findPassenger", icon: "seat-passenger", color: Colors.femaleIcon },
+  { key: "hitcher", label: "Hitcher", subtitleKey: "proposals.sub.hitcher", icon: "motorbike", color: Colors.accent },
+  { key: "hitchhiker", label: "HitchHiker", subtitleKey: "proposals.sub.hitchhiker", icon: "thumb-up", color: Colors.success },
 ];
 
 const ZAVORRINA_SEARCH_TYPES = [
-  { key: "find_a_biker", label: "FindABiker", subtitle: "Giro in moto con rientro", icon: "motorbike", color: Colors.maleIcon },
-  { key: "hitchhiker", label: "HitchHiker", subtitle: "Mi serve un passaggio", icon: "thumb-up", color: Colors.accent },
+  { key: "find_a_biker", label: "FindABiker", subtitleKey: "proposals.sub.bikerSearch", icon: "motorbike", color: Colors.maleIcon },
+  { key: "hitchhiker", label: "HitchHiker", subtitleKey: "proposals.sub.hitchhikerZav", icon: "thumb-up", color: Colors.accent },
 ];
 
 function formatDateInput(val: string): string {
@@ -62,6 +62,7 @@ export default function CreateProposalScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const t = useT();
 
   const [searchType, setSearchType] = useState("");
   const [title, setTitle] = useState("");
@@ -114,7 +115,7 @@ export default function CreateProposalScreen() {
       } else {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
-          Alert.alert("Permesso negato", "Attiva la localizzazione per usare la posizione attuale");
+          Alert.alert(t("proposals.create.permDenied"), t("proposals.create.enableLocation"));
           return;
         }
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
@@ -123,7 +124,7 @@ export default function CreateProposalScreen() {
         setGpsSource("live");
       }
     } catch {
-      Alert.alert("Errore GPS", "Non è stato possibile rilevare la posizione");
+      Alert.alert(t("proposals.create.gpsError"), t("proposals.create.gpsErrorDesc"));
     } finally {
       setGpsLoading(false);
     }
@@ -176,7 +177,7 @@ export default function CreateProposalScreen() {
       router.back();
     },
     onError: (error: Error) => {
-      Alert.alert("Errore", error.message);
+      Alert.alert(t("common.error"), error.message);
     },
   });
 
@@ -193,31 +194,31 @@ export default function CreateProposalScreen() {
 
   const handleSubmit = async () => {
     if (!searchType) {
-      Alert.alert("Errore", "Seleziona cosa cerchi");
+      Alert.alert(t("common.error"), t("proposals.create.selectSearch"));
       return;
     }
     if (!title.trim()) {
-      Alert.alert("Errore", "Inserisci un titolo");
+      Alert.alert(t("common.error"), t("proposals.create.enterTitle"));
       return;
     }
     if (!departureAddress.trim()) {
-      Alert.alert("Errore", "Inserisci il punto di partenza");
+      Alert.alert(t("common.error"), t("proposals.create.enterDeparture"));
       return;
     }
     if (!dateStr || !timeFrom) {
-      Alert.alert("Errore", "Inserisci data e orario di partenza");
+      Alert.alert(t("common.error"), t("proposals.create.enterDateTime"));
       return;
     }
     if (needsMotoSelection && !selectedMotoId) {
-      Alert.alert("Errore", "Seleziona la moto dal garage");
+      Alert.alert(t("common.error"), t("proposals.create.selectMoto"));
       return;
     }
     if (needsWishlistMoto && !selectedWishlistMotoId && !anyMotoOk) {
-      Alert.alert("Errore", "Seleziona il tipo di moto o scegli 'Qualsiasi moto'");
+      Alert.alert(t("common.error"), t("proposals.create.selectMotoType"));
       return;
     }
     if (needsDestination && !destinationAddress.trim()) {
-      Alert.alert("Errore", "Inserisci la destinazione");
+      Alert.alert(t("common.error"), t("proposals.create.enterDest"));
       return;
     }
 
@@ -225,7 +226,7 @@ export default function CreateProposalScreen() {
     if (fromParts.length === 2) {
       const fH = parseInt(fromParts[0]), fM = parseInt(fromParts[1]);
       if (fH < 0 || fH > 23 || fM < 0 || fM > 59) {
-        Alert.alert("Errore", "Orario 'Dalle' non valido (HH:MM, 00:00-23:59)");
+        Alert.alert(t("common.error"), t("proposals.create.invalidTimeFrom"));
         return;
       }
     }
@@ -234,13 +235,13 @@ export default function CreateProposalScreen() {
       if (toParts.length === 2) {
         const tH = parseInt(toParts[0]), tM = parseInt(toParts[1]);
         if (tH < 0 || tH > 23 || tM < 0 || tM > 59) {
-          Alert.alert("Errore", "Orario 'Alle' non valido (HH:MM, 00:00-23:59)");
+          Alert.alert(t("common.error"), t("proposals.create.invalidTimeTo"));
           return;
         }
         const fromMinutes = parseInt(fromParts[0]) * 60 + parseInt(fromParts[1]);
         const toMinutes = tH * 60 + tM;
         if (toMinutes <= fromMinutes) {
-          Alert.alert("Errore", "L'orario 'Alle' deve essere successivo all'orario 'Dalle'");
+          Alert.alert(t("common.error"), t("proposals.create.timeToAfter"));
           return;
         }
       }
@@ -248,7 +249,7 @@ export default function CreateProposalScreen() {
 
     const departureTimeFrom = parseDateAndTime(dateStr, timeFrom);
     if (!departureTimeFrom) {
-      Alert.alert("Errore", "Data o orario non validi (GG/MM/AAAA e HH:MM)");
+      Alert.alert(t("common.error"), t("proposals.create.invalidDateTime"));
       return;
     }
 
@@ -261,7 +262,7 @@ export default function CreateProposalScreen() {
     if (returnDeadlineEnabled && returnDeadlineTime) {
       returnDeadline = parseDateAndTime(dateStr, returnDeadlineTime);
       if (returnDeadline && departureTimeFrom && returnDeadline <= departureTimeFrom) {
-        Alert.alert("Errore", "L'orario di rientro deve essere successivo all'orario di partenza");
+        Alert.alert(t("common.error"), t("proposals.create.returnAfterDep"));
         return;
       }
     }
@@ -285,15 +286,15 @@ export default function CreateProposalScreen() {
             setDepartureLng(finalLng);
             setGpsSource("profile");
           } else {
-            Alert.alert("Indirizzo non trovato", "Non è stato possibile trovare le coordinate per l'indirizzo inserito. Prova a essere più specifico o usa il GPS.");
+            Alert.alert(t("proposals.create.addressNotFound"), t("proposals.create.addressNotFoundDesc"));
             return;
           }
         } catch {
-          Alert.alert("Errore geocoding", "Impossibile risolvere l'indirizzo. Usa il bottone GPS.");
+          Alert.alert(t("proposals.create.geocodingError"), t("proposals.create.geocodingErrorDesc"));
           return;
         }
       } else {
-        Alert.alert("Posizione mancante", "Inserisci un indirizzo o usa il bottone GPS");
+        Alert.alert(t("proposals.create.missingLocation"), t("proposals.create.missingLocationDesc"));
         return;
       }
     }
@@ -372,9 +373,9 @@ export default function CreateProposalScreen() {
                 color={searchType === st.key ? st.color : Colors.textSecondary}
               />
               <Text style={[styles.typeCardLabel, searchType === st.key && { color: st.color }]}>
-                {st.label}
+                {(st as any).labelKey ? t((st as any).labelKey) : st.label}
               </Text>
-              <Text style={styles.typeCardSub}>{st.subtitle}</Text>
+              <Text style={styles.typeCardSub}>{t(st.subtitleKey)}</Text>
             </TouchableOpacity>
           ))}
         </View>

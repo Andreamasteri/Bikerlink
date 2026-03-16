@@ -16,7 +16,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { t } from "@/lib/i18n";
+import { t, getCurrentLocale } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
@@ -55,7 +55,7 @@ interface ConversationDetail {
 
 function formatMessageTime(dateStr: string): string {
   const date = new Date(dateStr);
-  return date.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString(getCurrentLocale(), { hour: "2-digit", minute: "2-digit" });
 }
 
 function getUserTypeColor(userType: string, sex?: string | null): string {

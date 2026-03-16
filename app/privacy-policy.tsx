@@ -13,10 +13,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { getCurrentLocale } from "@/lib/i18n";
 
 const DEFAULT_PRIVACY_POLICY = `INFORMATIVA SULLA PRIVACY
 
-Ultimo aggiornamento: ${new Date().toLocaleDateString("it-IT")}
+Ultimo aggiornamento: ${new Date().toLocaleDateString(getCurrentLocale())}
 
 1. TITOLARE DEL TRATTAMENTO
 

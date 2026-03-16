@@ -17,10 +17,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { queryClient, getApiUrl, apiRequest } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
+import { useT, useLocale } from "@/lib/language-context";
 
-const SEARCH_TYPE_LABELS: Record<string, string> = {
+const SEARCH_TYPE_I18N: Record<string, string> = {
   find_a_friend: "FindAFriend",
-  find_a_guest: "FindAGuest",
+  find_a_guest: "proposals.searchType.findPassenger",
   hitcher: "Hitcher",
   hitchhiker: "HitchHiker",
   find_a_biker: "FindABiker",
@@ -37,7 +38,7 @@ function getSearchTypeIcon(searchType?: string | null): keyof typeof Ionicons.gl
   }
 }
 
-function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress, isPending }: { match: any; currentUserId: string; onAccept: () => void; onReject: () => void; onChatPress?: () => void; isPending: boolean }) {
+function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress, isPending, t, locale }: { match: any; currentUserId: string; onAccept: () => void; onReject: () => void; onChatPress?: () => void; isPending: boolean; t: (key: string) => string; locale: string }) {
   const isBiker = match.bikerId === currentUserId;
   const otherNickname = isBiker ? match.zavarrinaNickname : match.bikerNickname;
   const otherType = isBiker ? "zavorrina" : "biker";
@@ -49,11 +50,11 @@ function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress
   const isRejected = match.status === "rejected";
 
   const statusColor = isAccepted ? Colors.success : isRejected ? Colors.accentRed : Colors.accent;
-  const statusLabel = isAccepted ? "Accettato" : isRejected ? "Rifiutato" : "Match Garage";
+  const statusLabel = isAccepted ? t("match.accepted") : isRejected ? t("match.rejected") : t("match.garage");
   const statusIcon: keyof typeof Ionicons.glyphMap = isAccepted ? "checkmark-circle" : isRejected ? "close-circle" : "bicycle";
 
   const createdDate = match.createdAt
-    ? new Date(match.createdAt).toLocaleDateString("it-IT", {
+    ? new Date(match.createdAt).toLocaleDateString(locale, {
         day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
       })
     : null;
@@ -80,7 +81,7 @@ function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress
           <View style={{ flex: 1 }}>
             <Text style={[styles.matchNickname, { color: otherColor }]}>{otherNickname}</Text>
             <Text style={styles.matchUserType}>
-              {otherType === "biker" ? "Biker" : "Zavorrina"}
+              {t(`userType.${otherType}`)}
             </Text>
           </View>
         </View>
@@ -89,22 +90,22 @@ function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress
       {isAccepted && onChatPress && (
         <TouchableOpacity style={styles.chatBtn} onPress={onChatPress}>
           <Ionicons name="chatbubble" size={18} color={Colors.background} />
-          <Text style={styles.chatBtnText}>Manda un messaggio privato</Text>
+          <Text style={styles.chatBtnText}>{t("match.sendMessage")}</Text>
         </TouchableOpacity>
       )}
 
       <View style={styles.matchProposals}>
         <View style={[styles.proposalMini, { flex: 1 }]}>
-          <Text style={styles.proposalMiniLabel}>Moto</Text>
+          <Text style={styles.proposalMiniLabel}>{t("match.moto")}</Text>
           <Text style={styles.proposalMiniTitle} numberOfLines={1}>
-            {motoInfo ? `${motoInfo.brand || ""} ${motoInfo.model || ""}`.trim() || motoInfo.motorcycleType || "Moto" : "Moto"}
+            {motoInfo ? `${motoInfo.brand || ""} ${motoInfo.model || ""}`.trim() || motoInfo.motorcycleType || t("match.moto") : t("match.moto")}
           </Text>
         </View>
         <Ionicons name="swap-horizontal" size={18} color={Colors.accent} style={{ marginHorizontal: 4 }} />
         <View style={[styles.proposalMini, { flex: 1 }]}>
-          <Text style={[styles.proposalMiniLabel, { color: Colors.accent }]}>Wishlist</Text>
+          <Text style={[styles.proposalMiniLabel, { color: Colors.accent }]}>{t("match.wishlist")}</Text>
           <Text style={styles.proposalMiniTitle} numberOfLines={1}>
-            {wishInfo ? `${wishInfo.brand || ""} ${wishInfo.model || ""}`.trim() || wishInfo.motorcycleType || "Qualsiasi" : "Qualsiasi"}
+            {wishInfo ? `${wishInfo.brand || ""} ${wishInfo.model || ""}`.trim() || wishInfo.motorcycleType || t("match.any") : t("match.any")}
           </Text>
         </View>
       </View>
@@ -117,7 +118,7 @@ function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress
             disabled={isPending}
           >
             <Ionicons name="close" size={20} color="#fff" />
-            <Text style={styles.actionBtnText}>Rifiuta</Text>
+            <Text style={styles.actionBtnText}>{t("match.reject")}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionBtn, styles.acceptBtn]}
@@ -129,7 +130,7 @@ function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress
             ) : (
               <>
                 <Ionicons name="checkmark" size={20} color="#fff" />
-                <Text style={styles.actionBtnText}>Accetta</Text>
+                <Text style={styles.actionBtnText}>{t("match.accept")}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -141,13 +142,15 @@ function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress
 
 type TabKey = "pending" | "accepted" | "garage" | "history";
 
-function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, isPending }: {
+function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, isPending, t, locale }: {
   match: any;
   currentUserId: string;
   onAccept: () => void;
   onReject: () => void;
   onChatPress?: () => void;
   isPending: boolean;
+  t: (key: string) => string;
+  locale: string;
 }) {
   const isUser1 = match.userId1 === currentUserId;
   const myProposal = isUser1 ? match.proposal1 : match.proposal2;
@@ -161,17 +164,17 @@ function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, 
   const isExpired = match.status === "expired";
 
   const statusColor = isAccepted ? Colors.success : isRejected ? Colors.accentRed : isExpired ? Colors.textSecondary : Colors.accent;
-  const statusLabel = isAccepted ? "Accettato" : isRejected ? "Rifiutato" : isExpired ? "Scaduto" : "In attesa";
+  const statusLabel = isAccepted ? t("match.accepted") : isRejected ? t("match.rejected") : isExpired ? t("match.expired") : t("match.pending");
   const statusIcon: keyof typeof Ionicons.glyphMap = isAccepted ? "checkmark-circle" : isRejected ? "close-circle" : isExpired ? "time" : "hourglass";
 
   const scheduledDate = otherProposal?.scheduledAt
-    ? new Date(otherProposal.scheduledAt).toLocaleDateString("it-IT", {
+    ? new Date(otherProposal.scheduledAt).toLocaleDateString(locale, {
         day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
       })
     : null;
 
   const createdDate = match.createdAt
-    ? new Date(match.createdAt).toLocaleDateString("it-IT", {
+    ? new Date(match.createdAt).toLocaleDateString(locale, {
         day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
       })
     : null;
@@ -198,7 +201,7 @@ function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, 
           <View style={{ flex: 1 }}>
             <Text style={[styles.matchNickname, { color: otherColor }]}>{otherNickname}</Text>
             <Text style={styles.matchUserType}>
-              {otherType === "biker" ? "Biker" : otherType === "zavorrina" ? "Zavorrina" : "Coppia"}
+              {t(`userType.${otherType}`)}
             </Text>
           </View>
         </View>
@@ -206,26 +209,26 @@ function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, 
 
       <View style={styles.matchProposals}>
         <View style={styles.proposalMini}>
-          <Text style={styles.proposalMiniLabel}>La tua proposta</Text>
+          <Text style={styles.proposalMiniLabel}>{t("match.yourProposal")}</Text>
           <View style={styles.proposalMiniContent}>
             <Ionicons name={getSearchTypeIcon(myProposal?.searchType)} size={16} color={Colors.textSecondary} />
             <Text style={styles.proposalMiniTitle} numberOfLines={1}>{myProposal?.title || "—"}</Text>
           </View>
           {myProposal?.searchType && (
-            <Text style={styles.proposalMiniSub}>{SEARCH_TYPE_LABELS[myProposal.searchType] || myProposal.searchType}</Text>
+            <Text style={styles.proposalMiniSub}>{SEARCH_TYPE_I18N[myProposal.searchType]?.includes(".") ? t(SEARCH_TYPE_I18N[myProposal.searchType]) : SEARCH_TYPE_I18N[myProposal.searchType] || myProposal.searchType}</Text>
           )}
         </View>
 
         <Ionicons name="swap-horizontal" size={18} color={Colors.accent} style={{ marginHorizontal: 4 }} />
 
         <View style={styles.proposalMini}>
-          <Text style={[styles.proposalMiniLabel, { color: otherColor }]}>Proposta di {otherNickname}</Text>
+          <Text style={[styles.proposalMiniLabel, { color: otherColor }]}>{t("match.proposalOf")} {otherNickname}</Text>
           <View style={styles.proposalMiniContent}>
             <Ionicons name={getSearchTypeIcon(otherProposal?.searchType)} size={16} color={Colors.textSecondary} />
             <Text style={styles.proposalMiniTitle} numberOfLines={1}>{otherProposal?.title || "—"}</Text>
           </View>
           {otherProposal?.searchType && (
-            <Text style={styles.proposalMiniSub}>{SEARCH_TYPE_LABELS[otherProposal.searchType] || otherProposal.searchType}</Text>
+            <Text style={styles.proposalMiniSub}>{SEARCH_TYPE_I18N[otherProposal.searchType]?.includes(".") ? t(SEARCH_TYPE_I18N[otherProposal.searchType]) : SEARCH_TYPE_I18N[otherProposal.searchType] || otherProposal.searchType}</Text>
           )}
         </View>
       </View>
@@ -252,7 +255,7 @@ function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, 
             disabled={isPending}
           >
             <Ionicons name="close" size={18} color={Colors.accentRed} />
-            <Text style={[styles.actionBtnText, { color: Colors.accentRed }]}>Rifiuta</Text>
+            <Text style={[styles.actionBtnText, { color: Colors.accentRed }]}>{t("match.reject")}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionBtn, styles.acceptBtn]}
@@ -264,7 +267,7 @@ function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, 
             ) : (
               <>
                 <Ionicons name="checkmark" size={18} color="#000" />
-                <Text style={[styles.actionBtnText, { color: "#000" }]}>Accetta</Text>
+                <Text style={[styles.actionBtnText, { color: "#000" }]}>{t("match.accept")}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -274,7 +277,7 @@ function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, 
       {isAccepted && match.conversationId && onChatPress && (
         <TouchableOpacity style={styles.chatBtn} onPress={onChatPress}>
           <Ionicons name="chatbubbles" size={18} color={Colors.background} />
-          <Text style={styles.chatBtnText}>Apri Chat</Text>
+          <Text style={styles.chatBtnText}>{t("match.openChat")}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -284,6 +287,8 @@ function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, 
 export default function MatchScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const t = useT();
+  const locale = useLocale();
   const [activeTab, setActiveTab] = useState<TabKey>("pending");
   const [pendingMatchId, setPendingMatchId] = useState<string | null>(null);
 
@@ -323,9 +328,9 @@ export default function MatchScreen() {
     }
     if (totalNewMatches > prevMatchCountRef.current) {
       if (Platform.OS === "web") {
-        window.alert("EHI, HAI DEI MATCH!\nCONTROLLA NELLA TAB!!!");
+        window.alert(`${t("match.newMatchAlert")}\n${t("match.checkTab")}`);
       } else {
-        Alert.alert("EHI, HAI DEI MATCH!", "CONTROLLA NELLA TAB!!!");
+        Alert.alert(t("match.newMatchAlert"), t("match.checkTab"));
       }
     }
     prevMatchCountRef.current = totalNewMatches;
@@ -341,8 +346,8 @@ export default function MatchScreen() {
         credentials: "include",
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Errore" }));
-        throw new Error(err.message || "Errore nell'accettazione");
+        const err = await res.json().catch(() => ({ message: t("match.error") }));
+        throw new Error(err.message || t("match.errorAccept"));
       }
       return res.json();
     },
@@ -352,7 +357,7 @@ export default function MatchScreen() {
     },
     onError: (err: Error) => {
       setPendingMatchId(null);
-      Alert.alert("Errore", err.message);
+      Alert.alert(t("match.error"), err.message);
     },
   });
 
@@ -364,15 +369,15 @@ export default function MatchScreen() {
         credentials: "include",
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Errore" }));
-        throw new Error(err.message || "Errore nel rifiuto");
+        const err = await res.json().catch(() => ({ message: t("match.error") }));
+        throw new Error(err.message || t("match.errorReject"));
       }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches"] });
     },
-    onError: (err: Error) => Alert.alert("Errore", err.message),
+    onError: (err: Error) => Alert.alert(t("match.error"), err.message),
   });
 
   const acceptGarageMutation = useMutation({
@@ -380,8 +385,8 @@ export default function MatchScreen() {
       const url = new URL(`/api/proposals/garage-matches/${matchId}/accept`, getApiUrl());
       const res = await globalThis.fetch(url.toString(), { method: "POST", credentials: "include" });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Errore" }));
-        throw new Error(err.message || "Errore nell'accettazione");
+        const err = await res.json().catch(() => ({ message: t("match.error") }));
+        throw new Error(err.message || t("match.errorAccept"));
       }
       return res.json();
     },
@@ -391,7 +396,7 @@ export default function MatchScreen() {
     },
     onError: (err: Error) => {
       setPendingMatchId(null);
-      Alert.alert("Errore", err.message);
+      Alert.alert(t("match.error"), err.message);
     },
   });
 
@@ -400,15 +405,15 @@ export default function MatchScreen() {
       const url = new URL(`/api/proposals/garage-matches/${matchId}/reject`, getApiUrl());
       const res = await globalThis.fetch(url.toString(), { method: "POST", credentials: "include" });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Errore" }));
-        throw new Error(err.message || "Errore nel rifiuto");
+        const err = await res.json().catch(() => ({ message: t("match.error") }));
+        throw new Error(err.message || t("match.errorReject"));
       }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
     },
-    onError: (err: Error) => Alert.alert("Errore", err.message),
+    onError: (err: Error) => Alert.alert(t("match.error"), err.message),
   });
 
   const startGarageChatMutation = useMutation({
@@ -423,7 +428,7 @@ export default function MatchScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
       router.push(`/chat/${conv.id}` as any);
     },
-    onError: (err: Error) => Alert.alert("Errore", err.message),
+    onError: (err: Error) => Alert.alert(t("match.error"), err.message),
   });
 
   const renderItem = useCallback(({ item }: { item: any }) => {
@@ -441,6 +446,8 @@ export default function MatchScreen() {
           onReject={() => rejectGarageMutation.mutate(item.id)}
           onChatPress={item.status === "accepted" ? () => startGarageChatMutation.mutate(otherUserId) : undefined}
           isPending={pendingMatchId === item.id}
+          t={t}
+          locale={locale}
         />
       );
     }
@@ -455,15 +462,17 @@ export default function MatchScreen() {
         onReject={() => rejectMutation.mutate(item.id)}
         onChatPress={item.conversationId ? () => router.push(`/chat/${item.conversationId}` as any) : undefined}
         isPending={pendingMatchId === item.id}
+        t={t}
+        locale={locale}
       />
     );
   }, [user?.id, pendingMatchId, acceptMutation, rejectMutation, acceptGarageMutation, rejectGarageMutation, startGarageChatMutation, router]);
 
   const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; count: number }[] = [
-    { key: "pending", label: "In attesa", icon: "hourglass", count: pendingMatches.length },
-    { key: "accepted", label: "Accettati", icon: "checkmark-circle", count: acceptedMatches.length },
-    { key: "garage", label: "Garage", icon: "bicycle", count: garageMatchesTagged.length },
-    { key: "history", label: "Cronologia", icon: "time", count: historyMatches.length },
+    { key: "pending", label: t("match.tabPending"), icon: "hourglass", count: pendingMatches.length },
+    { key: "accepted", label: t("match.tabAccepted"), icon: "checkmark-circle", count: acceptedMatches.length },
+    { key: "garage", label: t("match.tabGarage"), icon: "bicycle", count: garageMatchesTagged.length },
+    { key: "history", label: t("match.tabHistory"), icon: "time", count: historyMatches.length },
   ];
 
   return (
@@ -503,7 +512,7 @@ export default function MatchScreen() {
       <View style={styles.infoBanner}>
         <Ionicons name="information-circle" size={16} color={Colors.accent} />
         <Text style={styles.infoBannerText}>
-          Il sistema è sempre in cerca di match, sia tra altri Biker che zavorrine. Se vuoi ricevere subito notifiche, non chiudere l'app.
+          {t("match.infoBanner")}
         </Text>
       </View>
 
@@ -529,16 +538,16 @@ export default function MatchScreen() {
                 color={Colors.textSecondary}
               />
               <Text style={styles.emptyTitle}>
-                {activeTab === "pending" ? "Nessun match in attesa" : activeTab === "accepted" ? "Nessun match accettato" : activeTab === "garage" ? "Nessun match garage" : "Nessun match nella cronologia"}
+                {activeTab === "pending" ? t("match.emptyPendingTitle") : activeTab === "accepted" ? t("match.emptyAcceptedTitle") : activeTab === "garage" ? t("match.emptyGarageTitle") : t("match.emptyHistoryTitle")}
               </Text>
               <Text style={styles.emptyDesc}>
                 {activeTab === "pending"
-                  ? "Crea una proposta nella tab Proposte e il sistema troverà automaticamente biker o zavorrine compatibili!"
+                  ? t("match.emptyPendingDesc")
                   : activeTab === "accepted"
-                  ? "Quando accetti un match, apparirà qui con il link alla chat."
+                  ? t("match.emptyAcceptedDesc")
                   : activeTab === "garage"
-                  ? "Il sistema incrocia le moto dei biker con la wishlist delle zavorrine. Aggiungi moto al garage o alla wishlist per trovare match!"
-                  : "I match rifiutati o scaduti appariranno qui."}
+                  ? t("match.emptyGarageDesc")
+                  : t("match.emptyHistoryDesc")}
               </Text>
             </View>
           }

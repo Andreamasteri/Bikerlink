@@ -20,6 +20,7 @@ import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Switch } from "react-native";
+import { useT } from "@/lib/language-context";
 
 const MOTO_TYPES = [
   { value: "sportiva", label: "Sportiva" },
@@ -41,6 +42,7 @@ const RIDING_STYLES = [
 
 function WishlistScreen() {
   const { user } = useAuth();
+  const t = useT();
   const insets = useSafeAreaInsets();
   const [showMotoForm, setShowMotoForm] = useState(false);
   const [editingMotoId, setEditingMotoId] = useState<string | null>(null);
@@ -86,7 +88,7 @@ function WishlistScreen() {
         Alert.alert("Here Comes Your Chance!!", matchInfo);
       }
     },
-    onError: (err: any) => Alert.alert("Errore", err.message),
+    onError: (err: any) => Alert.alert(t("common.error"), err.message),
   });
 
   const updateMotoMutation = useMutation({
@@ -120,7 +122,7 @@ function WishlistScreen() {
     const hasBrandModel = motoForm.brand.trim() && motoForm.model.trim();
     const hasType = !!motoForm.motorcycleType;
     if (!hasBrandModel && !hasType) {
-      Alert.alert("Errore", "Specifica marca e modello oppure il tipo moto");
+      Alert.alert(t("common.error"), t("garage.errorSpecify"));
       return;
     }
     if (editingMotoId) {
@@ -133,11 +135,11 @@ function WishlistScreen() {
   const handleDeleteMoto = (id: string, brand: string, model: string, motorcycleType?: string) => {
     const name = brand && model ? `${brand} ${model}` : getMotoTypeLabel(motorcycleType || "");
     if (Platform.OS === "web") {
-      if (window.confirm(`Eliminare "${name}" dalla wishlist?`)) deleteMotoMutation.mutate(id);
+      if (window.confirm(`${t("garage.deleteFromWishlist")} "${name}"`)) deleteMotoMutation.mutate(id);
     } else {
-      Alert.alert("Elimina", `Eliminare "${name}" dalla wishlist?`, [
-        { text: "Annulla", style: "cancel" },
-        { text: "Elimina", style: "destructive", onPress: () => deleteMotoMutation.mutate(id) },
+      Alert.alert(t("common.delete"), `${t("garage.deleteFromWishlist")} "${name}"`, [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("common.delete"), style: "destructive", onPress: () => deleteMotoMutation.mutate(id) },
       ]);
     }
   };
@@ -167,11 +169,11 @@ function WishlistScreen() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="person-circle-outline" size={28} color={Colors.accent} />
-            <Text style={styles.motoName}>Chi Sono</Text>
+            <Text style={styles.motoName}>{t("garage.whoAmI")}</Text>
           </View>
           <TextInput
             style={[styles.input, { marginTop: 12, minHeight: 80, textAlignVertical: "top" }]}
-            placeholder="Descrivi te stessa, i tuoi desideri e le tue abitudini di viaggio..."
+            placeholder={t("garage.descPlaceholder")}
             placeholderTextColor={Colors.textSecondary}
             value={description}
             onChangeText={setDescription}
@@ -186,7 +188,7 @@ function WishlistScreen() {
             {descMutation.isPending ? (
               <ActivityIndicator color={Colors.background} />
             ) : (
-              <Text style={styles.saveBtnText}>Salva Descrizione</Text>
+              <Text style={styles.saveBtnText}>{t("garage.saveDesc")}</Text>
             )}
           </Pressable>
         </View>
@@ -195,7 +197,7 @@ function WishlistScreen() {
           <View style={styles.cardHeader}>
             <Ionicons name="heart-outline" size={28} color={Colors.accent} />
             <View style={styles.cardInfo}>
-              <Text style={styles.motoName}>Moto Desiderate ({motos.length}/5)</Text>
+              <Text style={styles.motoName}>{t("garage.desiredMotos")} ({motos.length}/5)</Text>
             </View>
             {motos.length < 5 && (
               <Pressable onPress={() => { setEditingMotoId(null); setMotoForm({ brand: "", model: "", motorcycleType: "", ridingStyle: "" }); setShowMotoForm(true); }} hitSlop={10}>
@@ -207,14 +209,14 @@ function WishlistScreen() {
           <View style={wStyles.warningBox}>
             <Ionicons name="information-circle-outline" size={16} color={Colors.accent} />
             <Text style={wStyles.warningText}>
-              Puoi cercare per marca e modello oppure per tipo moto + stile guida
+              {t("garage.searchInfo")}
             </Text>
           </View>
 
           {motos.length === 0 ? (
             <View style={{ alignItems: "center", paddingVertical: 20 }}>
               <Ionicons name="heart-outline" size={40} color={Colors.textSecondary} />
-              <Text style={styles.emptySubtext}>Nessuna moto nella wishlist</Text>
+              <Text style={styles.emptySubtext}>{t("garage.noWishlistMoto")}</Text>
             </View>
           ) : (
             motos.map((moto: any) => (
@@ -251,7 +253,7 @@ function WishlistScreen() {
         <View style={styles.fullscreenModal}>
           <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }} bottomOffset={20}>
               <View style={[styles.modalHeader, { paddingTop: Platform.OS === "web" ? 67 : insets.top + 8 }]}>
-                  <Text style={styles.modalTitle}>{editingMotoId ? "Modifica Moto" : "Aggiungi Moto Desiderata"}</Text>
+                  <Text style={styles.modalTitle}>{editingMotoId ? t("garage.editMoto") : t("garage.addDesiredMoto")}</Text>
                 <Pressable onPress={() => setShowMotoForm(false)}>
                   <Ionicons name="close" size={24} color={Colors.textSecondary} />
                 </Pressable>
@@ -260,36 +262,36 @@ function WishlistScreen() {
               <View style={wStyles.warningBox}>
                 <Ionicons name="information-circle-outline" size={16} color={Colors.accent} />
                 <Text style={wStyles.warningText}>
-                  Opzione 1: marca e modello specifici. Opzione 2: solo tipo moto.
+                  {t("garage.formInfo")}
                 </Text>
               </View>
 
-              <Text style={styles.label}>Marca</Text>
+              <Text style={styles.label}>{t("garage.brand")}</Text>
               <TextInput
                 style={styles.input}
-                placeholder='es. "Ducati" (opzionale)'
+                placeholder={t("garage.brandPlaceholder")}
                 placeholderTextColor={Colors.textSecondary}
                 value={motoForm.brand}
                 onChangeText={(v) => setMotoForm(p => ({ ...p, brand: v }))}
               />
 
-              <Text style={styles.label}>Modello</Text>
+              <Text style={styles.label}>{t("garage.model")}</Text>
               <TextInput
                 style={styles.input}
-                placeholder='es. "Monster 821" (opzionale)'
+                placeholder={t("garage.modelPlaceholder")}
                 placeholderTextColor={Colors.textSecondary}
                 value={motoForm.model}
                 onChangeText={(v) => setMotoForm(p => ({ ...p, model: v }))}
               />
 
-              <Text style={styles.label}>Tipo Moto</Text>
+              <Text style={styles.label}>{t("garage.motoType")}</Text>
               <View style={styles.optionRow}>
-                {MOTO_TYPES.map(t => (
-                  <OptionButton key={t.value} label={t.label} selected={motoForm.motorcycleType === t.value} onPress={() => setMotoForm(p => ({ ...p, motorcycleType: p.motorcycleType === t.value ? "" : t.value }))} />
+                {MOTO_TYPES.map(mt => (
+                  <OptionButton key={mt.value} label={mt.label} selected={motoForm.motorcycleType === mt.value} onPress={() => setMotoForm(p => ({ ...p, motorcycleType: p.motorcycleType === mt.value ? "" : mt.value }))} />
                 ))}
               </View>
 
-              <Text style={styles.label}>Stile Guida</Text>
+              <Text style={styles.label}>{t("garage.ridingStyle")}</Text>
               <View style={styles.optionRow}>
                 {RIDING_STYLES.map(s => (
                   <OptionButton key={s.value} label={s.label} selected={motoForm.ridingStyle === s.value} onPress={() => setMotoForm(p => ({ ...p, ridingStyle: s.value }))} />
@@ -300,7 +302,7 @@ function WishlistScreen() {
                 {(addMotoMutation.isPending || updateMotoMutation.isPending) ? (
                   <ActivityIndicator color={Colors.background} />
                 ) : (
-                  <Text style={styles.saveBtnText}>{editingMotoId ? "Salva Modifiche" : "Aggiungi alla Wishlist"}</Text>
+                  <Text style={styles.saveBtnText}>{editingMotoId ? t("garage.saveChanges") : t("garage.addToWishlist")}</Text>
                 )}
               </Pressable>
           </KeyboardAwareScrollViewCompat>
@@ -346,6 +348,7 @@ export default function GarageScreen() {
 
 function GarageContent() {
   const { user } = useAuth();
+  const t = useT();
   const insets = useSafeAreaInsets();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -446,13 +449,13 @@ function GarageContent() {
 
   const handleDelete = (id: string, displayName: string) => {
     if (Platform.OS === "web") {
-      if (window.confirm(`Eliminare "${displayName}"?`)) {
+      if (window.confirm(`${t("garage.deleteMoto")} "${displayName}"?`)) {
         deleteMutation.mutate(id);
       }
     } else {
-      Alert.alert("Elimina Moto", `Eliminare "${displayName}"?`, [
-        { text: "Annulla", style: "cancel" },
-        { text: "Elimina", style: "destructive", onPress: () => deleteMutation.mutate(id) },
+      Alert.alert(t("garage.deleteMoto"), `${t("garage.deleteMoto")} "${displayName}"?`, [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("common.delete"), style: "destructive", onPress: () => deleteMutation.mutate(id) },
       ]);
     }
   };
@@ -532,8 +535,8 @@ function GarageContent() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="bicycle" size={64} color={Colors.textSecondary} />
-              <Text style={styles.emptyText}>Nessuna moto nel garage</Text>
-              <Text style={styles.emptySubtext}>Aggiungi la tua prima moto!</Text>
+              <Text style={styles.emptyText}>{t("garage.noMotoInGarage")}</Text>
+              <Text style={styles.emptySubtext}>{t("garage.addFirstMoto")}</Text>
             </View>
           }
           scrollEnabled={motorcycles.length > 0}
@@ -548,7 +551,7 @@ function GarageContent() {
         <View style={styles.fullscreenModal}>
           <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }} bottomOffset={20}>
               <View style={[styles.modalHeader, { paddingTop: Platform.OS === "web" ? 67 : insets.top + 8 }]}>
-                <Text style={styles.modalTitle}>{editingId ? "Modifica Moto" : "Aggiungi Moto"}</Text>
+                <Text style={styles.modalTitle}>{editingId ? t("garage.editMoto") : t("garage.addMoto")}</Text>
                 <Pressable onPress={() => { setShowForm(false); resetForm(); }}>
                   <Ionicons name="close" size={24} color={Colors.textSecondary} />
                 </Pressable>
@@ -557,46 +560,46 @@ function GarageContent() {
               <View style={styles.warningBox}>
                 <Ionicons name="warning-outline" size={16} color={Colors.warning} />
                 <Text style={styles.warningText}>
-                  Attenzione: specificare marca e modello precisi per usufruire del matching automatico
+                  {t("garage.warningMatchingPrecision")}
                 </Text>
               </View>
 
-              <Text style={styles.label}>Marca *</Text>
+              <Text style={styles.label}>{t("garage.brand")} *</Text>
               <TextInput
                 style={styles.input}
-                placeholder='es. "Ducati"'
+                placeholder={t("garage.brandPlaceholder")}
                 placeholderTextColor={Colors.textSecondary}
                 value={form.brand}
                 onChangeText={(v) => setForm(p => ({ ...p, brand: v }))}
               />
 
-              <Text style={styles.label}>Modello *</Text>
+              <Text style={styles.label}>{t("garage.model")} *</Text>
               <TextInput
                 style={styles.input}
-                placeholder='es. "Monster 821"'
+                placeholder={t("garage.modelPlaceholder")}
                 placeholderTextColor={Colors.textSecondary}
                 value={form.model}
                 onChangeText={(v) => setForm(p => ({ ...p, model: v }))}
               />
 
-              <Text style={styles.label}>Cilindrata cc</Text>
+              <Text style={styles.label}>{t("garage.displacement")}</Text>
               <TextInput
                 style={styles.input}
-                placeholder='es. "821"'
+                placeholder={t("garage.displacementPlaceholder")}
                 placeholderTextColor={Colors.textSecondary}
                 value={form.displacement}
                 onChangeText={(v) => setForm(p => ({ ...p, displacement: v.replace(/[^0-9]/g, "") }))}
                 keyboardType="numeric"
               />
 
-              <Text style={styles.label}>Tipo Moto *</Text>
+              <Text style={styles.label}>{t("garage.motoType")} *</Text>
               <View style={styles.optionRow}>
                 {MOTO_TYPES.map(t => (
                   <OptionButton key={t.value} label={t.label} selected={form.motorcycleType === t.value} onPress={() => setForm(p => ({ ...p, motorcycleType: t.value }))} />
                 ))}
               </View>
 
-              <Text style={styles.label}>Stile Guida *</Text>
+              <Text style={styles.label}>{t("garage.ridingStyle")} *</Text>
               <View style={styles.optionRow}>
                 {RIDING_STYLES.map(s => (
                   <OptionButton key={s.value} label={s.label} selected={form.ridingStyle === s.value} onPress={() => setForm(p => ({ ...p, ridingStyle: s.value }))} />
@@ -607,7 +610,7 @@ function GarageContent() {
                 <View style={[styles.checkbox, form.isDefault && styles.checkboxChecked]}>
                   {form.isDefault && <Text style={styles.checkmark}>✓</Text>}
                 </View>
-                <Text style={styles.defaultLabel}>Moto predefinita</Text>
+                <Text style={styles.defaultLabel}>{t("garage.defaultMoto")}</Text>
               </Pressable>
 
               {marketplaceEnabled && (
@@ -620,18 +623,18 @@ function GarageContent() {
                       thumbColor={form.isForSale ? Colors.text : Colors.textSecondary}
                     />
                     <View style={{ marginLeft: 10, flex: 1 }}>
-                      <Text style={styles.defaultLabel}>Questa moto è in vendita</Text>
+                      <Text style={styles.defaultLabel}>{t("garage.motoForSale")}</Text>
                       <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 }}>
-                        Verrà mostrata nel tuo profilo e nel mercatino del motoclub
+                        {t("garage.motoForSaleDesc")}
                       </Text>
                     </View>
                   </View>
                   {form.isForSale && (
                     <>
-                      <Text style={[styles.label, { marginTop: 12 }]}>Descrizione vendita</Text>
+                      <Text style={[styles.label, { marginTop: 12 }]}>{t("garage.saleDescription")}</Text>
                       <TextInput
                         style={[styles.input, { minHeight: 80 }]}
-                        placeholder='Prezzo, condizioni, note...'
+                        placeholder={t("garage.salePlaceholder")}
                         placeholderTextColor={Colors.textSecondary}
                         value={form.saleDescription}
                         onChangeText={(v) => setForm(p => ({ ...p, saleDescription: v }))}
@@ -647,7 +650,7 @@ function GarageContent() {
                 {saveMutation.isPending ? (
                   <ActivityIndicator color={Colors.background} />
                 ) : (
-                  <Text style={styles.saveBtnText}>{editingId ? "Salva Modifiche" : "Aggiungi al Garage"}</Text>
+                  <Text style={styles.saveBtnText}>{editingId ? t("garage.saveChanges") : t("garage.addToGarage")}</Text>
                 )}
               </Pressable>
           </KeyboardAwareScrollViewCompat>

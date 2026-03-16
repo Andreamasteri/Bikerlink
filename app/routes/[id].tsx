@@ -18,6 +18,7 @@ import RouteDetailMap from "@/components/RouteDetailMap";
 import { apiRequest, getQueryFn } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import Colors from "@/constants/colors";
+import { getCurrentLocale } from "@/lib/i18n";
 
 interface Waypoint {
   id: string;
@@ -131,7 +132,7 @@ export default function CustomRouteDetailScreen() {
   );
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
-    return d.toLocaleDateString("it-IT", {
+    return d.toLocaleDateString(getCurrentLocale(), {
       day: "2-digit",
       month: "short",
       year: "numeric",

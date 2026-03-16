@@ -16,7 +16,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
-import { useT } from "@/lib/language-context";
+import { useT, useLocale } from "@/lib/language-context";
 
 interface ProposalItem {
   id: string;
@@ -41,17 +41,17 @@ interface ProposalItem {
   motoInfo?: { brand: string; model: string; motorcycleType: string; ridingStyle: string } | null;
 }
 
-const FILTER_TYPES = [
-  { key: "all", label: "Tutti" },
-  { key: "giro", label: "Giro tra Biker" },
-  { key: "con_zavorrina", label: "Con Zavorrina" },
-  { key: "passaggio_al_volo", label: "Passaggio al volo" },
-  { key: "richieste", label: "Richieste" },
+const FILTER_KEYS = [
+  { key: "all", i18nKey: "proposals.filter.all" },
+  { key: "giro", i18nKey: "proposals.filter.bikers" },
+  { key: "con_zavorrina", i18nKey: "proposals.filter.passenger" },
+  { key: "passaggio_al_volo", i18nKey: "proposals.filter.ride" },
+  { key: "richieste", i18nKey: "proposals.filter.requests" },
 ];
 
-const SEARCH_TYPE_LABELS: Record<string, string> = {
+const SEARCH_TYPE_I18N: Record<string, string> = {
   find_a_friend: "FindAFriend",
-  find_a_guest: "Trova Zavorrina",
+  find_a_guest: "proposals.searchType.findPassenger",
   hitcher: "Hitcher",
   hitchhiker: "HitchHiker",
   find_a_biker: "FindABiker",
@@ -72,25 +72,25 @@ function getTypeIcon(type: string): { name: keyof typeof Ionicons.glyphMap; colo
   }
 }
 
-function getTypeLabel(type: string): string {
+function getTypeLabelKey(type: string): string {
   switch (type) {
     case "giro":
-    case "find_a_friend": return "Giro tra Biker";
+    case "find_a_friend": return "proposals.type.bikers";
     case "con_zavorrina":
-    case "find_a_guest": return "Con Zavorrina";
+    case "find_a_guest": return "proposals.type.passenger";
     case "passaggio_al_volo":
     case "hitcher":
-    case "hitchhiker": return "Passaggio al volo";
-    case "richieste": return "Richieste";
-    case "find_a_biker": return "Cerco Biker";
+    case "hitchhiker": return "proposals.type.quickride";
+    case "richieste": return "proposals.type.requests";
+    case "find_a_biker": return "proposals.type.bikerSearch";
     default: return type;
   }
 }
 
-function ProposalCard({ item, onPress }: { item: ProposalItem; onPress: () => void }) {
+function ProposalCard({ item, onPress, t, locale }: { item: ProposalItem; onPress: () => void; t: (key: string) => string; locale: string }) {
   const typeInfo = getTypeIcon(item.proposalType);
   const scheduledDate = item.scheduledAt
-    ? new Date(item.scheduledAt).toLocaleDateString("it-IT", {
+    ? new Date(item.scheduledAt).toLocaleDateString(locale, {
         day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
       })
     : null;
@@ -114,12 +114,12 @@ function ProposalCard({ item, onPress }: { item: ProposalItem; onPress: () => vo
         <View style={styles.cardHeaderInfo}>
           <Text style={styles.nickname}>{item.creatorNickname}</Text>
           <Text style={styles.type}>
-            {item.searchType ? SEARCH_TYPE_LABELS[item.searchType] || item.searchType : getTypeLabel(item.proposalType)}
+            {item.searchType ? (SEARCH_TYPE_I18N[item.searchType]?.includes(".") ? t(SEARCH_TYPE_I18N[item.searchType]) : SEARCH_TYPE_I18N[item.searchType] || item.searchType) : t(getTypeLabelKey(item.proposalType))}
           </Text>
         </View>
         <View style={[styles.badge, { backgroundColor: (typeInfo.dual ? Colors.femaleIcon : typeInfo.color) + "30" }]}>
           <Text style={[styles.badgeText, { color: typeInfo.dual ? Colors.femaleIcon : typeInfo.color }]}>
-            {getTypeLabel(item.proposalType)}
+            {t(getTypeLabelKey(item.proposalType))}
           </Text>
         </View>
       </View>
@@ -182,6 +182,7 @@ export default function ProposalsScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const t = useT();
+  const locale = useLocale();
   const [activeFilter, setActiveFilter] = useState("all");
 
   const queryKey =
@@ -215,14 +216,14 @@ export default function ProposalsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.filterRow}>
-        {FILTER_TYPES.map((f) => (
+        {FILTER_KEYS.map((f) => (
           <Pressable
             key={f.key}
             style={[styles.filterBtn, activeFilter === f.key && styles.filterBtnActive]}
             onPress={() => setActiveFilter(f.key)}
           >
             <Text style={[styles.filterText, activeFilter === f.key && styles.filterTextActive]}>
-              {f.label}
+              {t(f.i18nKey)}
             </Text>
             {f.key === "all" && pendingMatchCount > 0 && (
               <View style={styles.matchBadge}>
@@ -255,7 +256,7 @@ export default function ProposalsScreen() {
                 >
                   <Ionicons name="flash" size={20} color={Colors.accent} />
                   <Text style={styles.matchBannerText}>
-                    Hai {pendingMatchCount} match in attesa!
+                    {pendingMatchCount} {t("match.pendingBanner")}
                   </Text>
                   <Ionicons name="chevron-forward" size={18} color={Colors.accent} />
                 </TouchableOpacity>
@@ -265,7 +266,7 @@ export default function ProposalsScreen() {
               return (
                 <View style={styles.sectionHeader}>
                   <Ionicons name="megaphone" size={18} color={Colors.text} />
-                  <Text style={styles.sectionTitle}>Proposte</Text>
+                  <Text style={styles.sectionTitle}>{t("proposals.title")}</Text>
                 </View>
               );
             }
@@ -273,6 +274,8 @@ export default function ProposalsScreen() {
               <ProposalCard
                 item={item.data}
                 onPress={() => handleProposalPress(item.data.id)}
+                t={t}
+                locale={locale}
               />
             );
           }}

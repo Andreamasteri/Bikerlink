@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
+import { getCurrentLocale } from "@/lib/i18n";
 
 type Club = {
   id: string;
@@ -163,7 +164,7 @@ function ClubCard({
           <>
             <Text style={styles.dotSep}>·</Text>
             <Text style={styles.statText}>
-              Dal {new Date(joinedAt).toLocaleDateString("it-IT", { month: "short", year: "numeric" })}
+              {new Date(joinedAt).toLocaleDateString(getCurrentLocale(), { month: "short", year: "numeric" })}
             </Text>
           </>
         )}
@@ -403,7 +404,7 @@ export default function MotoclubScreen() {
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={styles.inviteClubName}>{club?.name ?? "Club"}</Text>
                   <Text style={styles.inviteDate}>
-                    {new Date(item.createdAt).toLocaleDateString("it-IT")}
+                    {new Date(item.createdAt).toLocaleDateString(getCurrentLocale())}
                   </Text>
                 </View>
                 <TouchableOpacity

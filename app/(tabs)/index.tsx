@@ -28,10 +28,13 @@ import { useSetting } from "@/lib/settings-context";
 import InteractiveMap from "@/components/InteractiveMap";
 import { getRegionCoordinates } from "@/constants/regions";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
+import { useT, useLocale } from "@/lib/language-context";
 
 export default function MapScreen() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const t = useT();
+  const locale = useLocale();
   const insets = useSafeAreaInsets();
   const baseUrl = getApiUrl();
   const synecoVisible = useSynecoVisible();
@@ -314,7 +317,7 @@ export default function MapScreen() {
       }
     },
     onError: (error: Error) => {
-      Alert.alert("Errore", error.message);
+      Alert.alert(t("common.error"), error.message);
     },
   });
 
@@ -348,7 +351,7 @@ export default function MapScreen() {
       setSelectedEgg(null);
     },
     onError: (err: any) => {
-      Alert.alert("Errore", err.message || "Impossibile raccogliere");
+      Alert.alert(t("common.error"), err.message || t("home.cannotCollect"));
     },
   });
 
@@ -487,9 +490,9 @@ export default function MapScreen() {
   };
 
   const getUserTypeLabel = (u: any) => {
-    if (u.userType?.startsWith("biker")) return "Biker";
-    if (u.userType?.startsWith("zavorrina")) return "Zavorrina/o";
-    return "Coppia";
+    if (u.userType?.startsWith("biker")) return t("profile.bikerType");
+    if (u.userType?.startsWith("zavorrina")) return t("profile.zavorrinaType");
+    return t("profile.coupleType");
   };
 
   const getUserIcon = (u: any): keyof typeof Ionicons.glyphMap => {
@@ -521,7 +524,7 @@ export default function MapScreen() {
           <Ionicons name="search" size={18} color={Colors.textSecondary} style={{ marginRight: 8 }} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Cerca per nickname o email..."
+            placeholder={t("home.searchPlaceholder")}
             placeholderTextColor={Colors.textSecondary}
             value={searchText}
             onChangeText={handleSearch}
@@ -547,7 +550,7 @@ export default function MapScreen() {
                     <Ionicons name={getUserIcon(u)} size={22} color={getUserColor(u)} style={{ marginRight: 10 }} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.searchResultName}>{u.nickname}</Text>
-                      <Text style={styles.searchResultDetail}>{getUserTypeLabel(u)}{u.country ? ` · ${getCountryFlag(u.country)} ${getCountryName(u.country)}` : ""}{u.region ? ` · ${u.region}` : ""}{!u.latitude ? " · Posizione non disponibile" : ""}</Text>
+                      <Text style={styles.searchResultDetail}>{getUserTypeLabel(u)}{u.country ? ` · ${getCountryFlag(u.country)} ${getCountryName(u.country)}` : ""}{u.region ? ` · ${u.region}` : ""}{!u.latitude ? ` · ${t("home.locationUnavailable")}` : ""}</Text>
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -621,7 +624,7 @@ export default function MapScreen() {
               <Ionicons name="search" size={18} color={Colors.textSecondary} style={{ marginRight: 8 }} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Cerca per nickname o email..."
+                placeholder={t("home.searchPlaceholder")}
                 placeholderTextColor={Colors.textSecondary}
                 value={searchText}
                 onChangeText={handleSearch}
@@ -647,7 +650,7 @@ export default function MapScreen() {
                         <Ionicons name={getUserIcon(u)} size={22} color={getUserColor(u)} style={{ marginRight: 10 }} />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.searchResultName}>{u.nickname}</Text>
-                          <Text style={styles.searchResultDetail}>{getUserTypeLabel(u)}{u.country ? ` · ${getCountryFlag(u.country)} ${getCountryName(u.country)}` : ""}{u.region ? ` · ${u.region}` : ""}{!u.latitude ? " · Posizione non disponibile" : ""}</Text>
+                          <Text style={styles.searchResultDetail}>{getUserTypeLabel(u)}{u.country ? ` · ${getCountryFlag(u.country)} ${getCountryName(u.country)}` : ""}{u.region ? ` · ${u.region}` : ""}{!u.latitude ? ` · ${t("home.locationUnavailable")}` : ""}</Text>
                         </View>
                       </TouchableOpacity>
                     ))}
@@ -665,21 +668,21 @@ export default function MapScreen() {
             <Ionicons name="radio-button-on" size={18} color={Colors.success} />
             <Text style={styles.statNumber}>{onlineCount}</Text>
           </View>
-          <Text style={styles.statLabel}>{"Utenti\nOnline"}</Text>
+          <Text style={styles.statLabel}>{`${t("home.users")}\nOnline`}</Text>
         </Pressable>
         <Pressable style={styles.statCard} onPress={() => setShowBikerList(true)}>
           <View style={styles.statTopRow}>
             <Ionicons name="hand-left" size={18} color={Colors.accent} />
             <Text style={styles.statNumber}>{bikerCount}</Text>
           </View>
-          <Text style={styles.statLabel}>{"Biker\nDisponibili"}</Text>
+          <Text style={styles.statLabel}>{`${t("profile.bikerType")}\n${t("home.available")}`}</Text>
         </Pressable>
         <Pressable style={styles.statCard} onPress={() => setShowZavorrinaList(true)}>
           <View style={styles.statTopRow}>
             <MaterialCommunityIcons name="seat-passenger" size={18} color={Colors.femaleIcon} />
             <Text style={styles.statNumber}>{zavCount}</Text>
           </View>
-          <Text style={styles.statLabel}>{"Zavorrine\nDisponibili"}</Text>
+          <Text style={styles.statLabel}>{`${t("profile.zavorrinaType")}\n${t("home.available")}`}</Text>
         </Pressable>
       </View>
 
@@ -711,7 +714,7 @@ export default function MapScreen() {
             >
               <Ionicons name={showOfflineOnline ? "eye" : "eye-off"} size={16} color={showOfflineOnline ? Colors.accent : Colors.textSecondary} />
               <Text style={[styles.offlineToggleText, showOfflineOnline && { color: Colors.accent }]}>
-                {showOfflineOnline ? `Anche offline (${offlineCountdown.online}s)` : "Mostra anche offline"}
+                {showOfflineOnline ? `${t("home.alsoOffline")} (${offlineCountdown.online}s)` : t("home.showOffline")}
               </Text>
             </Pressable>
             {onlineListQuery.isLoading ? (
@@ -719,7 +722,7 @@ export default function MapScreen() {
             ) : (onlineListQuery.data || []).length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="people-outline" size={32} color={Colors.textSecondary} />
-                <Text style={styles.emptyText}>Nessun utente online</Text>
+                <Text style={styles.emptyText}>{t("home.noUsersOnline")}</Text>
               </View>
             ) : (
               <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
@@ -755,7 +758,7 @@ export default function MapScreen() {
             <View style={styles.detailHandle} />
             <View style={styles.listSheetHeader}>
               <Ionicons name="hand-left" size={20} color={Colors.accent} />
-              <Text style={styles.listSheetTitle}>Biker Disponibili</Text>
+              <Text style={styles.listSheetTitle}>{t("profile.bikerType")} {t("home.available")}</Text>
               <Pressable onPress={() => setShowBikerList(false)}>
                 <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </Pressable>
@@ -801,7 +804,7 @@ export default function MapScreen() {
             <View style={styles.detailHandle} />
             <View style={styles.listSheetHeader}>
               <MaterialCommunityIcons name="seat-passenger" size={20} color={Colors.femaleIcon} />
-              <Text style={styles.listSheetTitle}>Zavorrine Disponibili</Text>
+              <Text style={styles.listSheetTitle}>{t("profile.zavorrinaType")} {t("home.available")}</Text>
               <Pressable onPress={() => setShowZavorrinaList(false)}>
                 <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </Pressable>
@@ -873,7 +876,7 @@ export default function MapScreen() {
                 <View style={styles.sosTriangleFill} />
                 <Text style={styles.sosExclamation}>!</Text>
               </View>
-              <Text style={styles.sosOverlayLabel}>SOS ATTIVO — Tocca per dettagli</Text>
+              <Text style={styles.sosOverlayLabel}>{t("home.sosActive")}</Text>
             </Pressable>
           )}
         </View>
@@ -905,8 +908,8 @@ export default function MapScreen() {
                     <View style={styles.sosDetailRow}>
                       <Ionicons name="time" size={18} color={Colors.textSecondary} />
                       <Text style={styles.sosDetailTime}>
-                        {new Date(r.createdAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}
-                        {r.radiusKm ? `  •  Raggio: ${r.radiusKm} km` : ""}
+                        {new Date(r.createdAt).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}
+                        {r.radiusKm ? `  •  ${t("home.radius")}: ${r.radiusKm} km` : ""}
                       </Text>
                     </View>
                     <Pressable
@@ -917,7 +920,7 @@ export default function MapScreen() {
                       {acceptSosMutation.isPending ? (
                         <ActivityIndicator color="#FFFFFF" size="small" />
                       ) : (
-                        <Text style={styles.sosDetailAcceptText}>Accetta richiesta di soccorso</Text>
+                        <Text style={styles.sosDetailAcceptText}>{t("home.acceptSos")}</Text>
                       )}
                     </Pressable>
                   </View>
@@ -978,7 +981,7 @@ export default function MapScreen() {
 
                 {selectedUserDetail?.motorcycles && selectedUserDetail.motorcycles.length > 0 && (
                   <View style={styles.detailSection}>
-                    <Text style={styles.detailSectionTitle}>Garage</Text>
+                    <Text style={styles.detailSectionTitle}>{t("home.garage")}</Text>
                     {selectedUserDetail.motorcycles.map((m: any) => (
                       <View key={m.id} style={styles.detailMotoCard}>
                         <Ionicons name="bicycle" size={18} color={Colors.accent} />
@@ -993,7 +996,7 @@ export default function MapScreen() {
 
                 {selectedUserProposals.length > 0 && (
                   <View style={styles.detailSection}>
-                    <Text style={styles.detailSectionTitle}>Proposte Giri</Text>
+                    <Text style={styles.detailSectionTitle}>{t("home.rideProposals")}</Text>
                     {selectedUserProposals.map((p: any) => (
                       <Pressable
                         key={p.id}
@@ -1030,7 +1033,7 @@ export default function MapScreen() {
                         setSelectedUser(null);
                         router.push(`/chat/${conv.id}` as any);
                       } catch (e: any) {
-                        Alert.alert("Errore", e.message || "Impossibile aprire la chat");
+                        Alert.alert(t("common.error"), e.message || t("home.cannotOpenChat"));
                       }
                     }}
                   >
@@ -1041,7 +1044,7 @@ export default function MapScreen() {
                     style={styles.detailProfileBtn}
                     onPress={() => { setSelectedUser(null); router.push(`/profile/${selectedUser?.id}` as any); }}
                   >
-                    <Text style={styles.detailProfileBtnText}>Vai al Profilo</Text>
+                    <Text style={styles.detailProfileBtnText}>{t("home.goToProfile")}</Text>
                   </Pressable>
                 </View>
               </ScrollView>

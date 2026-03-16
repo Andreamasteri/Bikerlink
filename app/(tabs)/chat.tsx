@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useT } from "@/lib/language-context";
+import { getCurrentLocale } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
 interface ConversationItem {
@@ -71,13 +72,14 @@ function formatTime(dateStr: string): string {
   const diff = now.getTime() - date.getTime();
   const dayMs = 86400000;
 
+  const loc = getCurrentLocale();
   if (diff < dayMs) {
-    return date.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+    return date.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
   }
   if (diff < 7 * dayMs) {
-    return date.toLocaleDateString("it-IT", { weekday: "short" });
+    return date.toLocaleDateString(loc, { weekday: "short" });
   }
-  return date.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
+  return date.toLocaleDateString(loc, { day: "2-digit", month: "2-digit" });
 }
 
 function getUserTypeColor(userType: string, sex?: string | null): string {

@@ -23,7 +23,7 @@ import { showImagePickerMenu } from "@/lib/image-picker-utils";
 import Colors from "@/constants/colors";
 import { type AppLanguage } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
-import { useLanguage, useT } from "@/lib/language-context";
+import { useLanguage, useT, useLocale } from "@/lib/language-context";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
@@ -88,16 +88,12 @@ function getUserTypeIcon(userType: string): keyof typeof Ionicons.glyphMap {
   return "bicycle";
 }
 
-function getUserTypeLabel(userType: string): string {
+function getUserTypeLabelKey(userType: string): string {
   switch (userType) {
-    case "biker":
-      return "Biker";
-    case "zavorrina":
-      return "Zavorrina/o";
-    case "coppia":
-      return "Coppia";
-    default:
-      return userType;
+    case "biker": return "profile.bikerType";
+    case "zavorrina": return "profile.zavorrinaType";
+    case "coppia": return "profile.coupleType";
+    default: return userType;
   }
 }
 
@@ -107,6 +103,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { language, setLanguage } = useLanguage();
   const t = useT();
+  const locale = useLocale();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [isDownloadingManual, setIsDownloadingManual] = useState(false);
@@ -188,7 +185,7 @@ export default function ProfileScreen() {
       await apiRequest("POST", "/api/users/me/request-deletion");
     },
     onSuccess: () => {
-      Alert.alert("Account programmato per la cancellazione");
+      Alert.alert(t("profile.accountScheduledDeletion"));
       logoutMutation.mutate();
     },
   });
@@ -222,7 +219,7 @@ export default function ProfileScreen() {
   }, []);
 
   const handleDeletePhoto = useCallback((photoId: string) => {
-    Alert.alert("Elimina foto", "Sei sicuro di voler eliminare questa foto?", [
+    Alert.alert(t("profile.deletePhoto"), t("profile.deletePhotoConfirm"), [
       { text: t("common.cancel"), style: "cancel" },
       {
         text: t("common.delete"),
@@ -272,17 +269,17 @@ export default function ProfileScreen() {
 
   const handleDeleteAccount = useCallback(() => {
     if (Platform.OS === "web") {
-      if (confirm("Il tuo account sarà cancellato definitivamente tra 30 giorni. Durante questo periodo puoi annullare la cancellazione effettuando il login. Vuoi procedere?")) {
+      if (confirm(t("profile.deleteAccountDesc"))) {
         handleRequestDeletion();
       }
     } else {
       Alert.alert(
-        "Elimina Account",
-        "Il tuo account sarà cancellato definitivamente tra 30 giorni. Durante questo periodo puoi annullare la cancellazione effettuando il login. Vuoi procedere?",
+        t("profile.deleteAccount"),
+        t("profile.deleteAccountDesc"),
         [
-          { text: "Annulla", style: "cancel" },
+          { text: t("common.cancel"), style: "cancel" },
           {
-            text: "Elimina",
+            text: t("common.delete"),
             style: "destructive",
             onPress: handleRequestDeletion,
           },
@@ -295,10 +292,10 @@ export default function ProfileScreen() {
     if (Platform.OS === "web") {
       setShowLogoutModal(true);
     } else {
-      Alert.alert("Logout", "Sei sicuro di voler uscire?", [
-        { text: "Annulla", style: "cancel" },
+      Alert.alert(t("profile.logoutConfirmTitle"), t("profile.logoutConfirmDesc"), [
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Esci",
+          text: t("profile.logout"),
           style: "destructive",
           onPress: doLogout,
         },
@@ -371,7 +368,7 @@ export default function ProfileScreen() {
         <View style={styles.badges}>
           <View style={[styles.badge, { backgroundColor: typeColor + "20" }]}>
             <Text style={[styles.badgeText, { color: typeColor }]}>
-              {getUserTypeLabel(currentUserType)}
+              {t(getUserTypeLabelKey(currentUserType))}
             </Text>
           </View>
           {(profile?.country || profile?.region) && (
@@ -424,15 +421,13 @@ export default function ProfileScreen() {
         <View style={styles.deletionBanner}>
           <Ionicons name="warning" size={20} color="#000" />
           <Text style={styles.deletionBannerText}>
-            Il tuo account sarà eliminato il{" "}
-            {new Date(new Date(profile.deletionRequestedAt).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("it-IT")}.
-            {" "}Puoi annullare questa richiesta.
+            {t("profile.deletionScheduled")} {new Date(new Date(profile.deletionRequestedAt).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(locale)}.
           </Text>
           <Pressable
             style={styles.deletionCancelBtn}
             onPress={() => cancelDeletionMutation.mutate()}
           >
-            <Text style={styles.deletionCancelBtnText}>Annulla cancellazione</Text>
+            <Text style={styles.deletionCancelBtnText}>{t("profile.cancelDeletion")}</Text>
           </Pressable>
         </View>
       )}
@@ -591,33 +586,23 @@ export default function ProfileScreen() {
           <View style={styles.donationIconRow}>
             <Ionicons name="heart" size={28} color={Colors.accentRed} />
           </View>
-          <Text style={styles.donationTitle}>Supporta BikerLink</Text>
+          <Text style={styles.donationTitle}>{t("profile.donate")} BikerLink</Text>
           <Text style={styles.donationText}>
-            {donationData?.text || (
-              "Sono un motociclista, non un programmatore professionista.\n" +
-              "Sto sviluppando quest'app da solo, per biker e zavorrine, nel mio tempo libero e a titolo gratuito.\n" +
-              "Tra sviluppo, debug, server e pubblicazione i costi sono molto più alti del previsto.\n" +
-              "Se l'app ti piace e vuoi che continui a crescere, puoi supportarla con una piccola donazione.\n" +
-              "Anche solo il costo di un caffè fa la differenza.\n" +
-              "Ogni utente che contribuirà verrà inserito nella Hall of Fame dei ringraziamenti dell'app.\n" +
-              "Se ognuno mette poco, possiamo fare tanto.\n" +
-              "Grazie davvero.\n" +
-              "Ci vediamo su strada."
-            )}
+            {donationData?.text || t("profile.donationText")}
           </Text>
           <Pressable
             style={styles.donateBtn}
             onPress={() => {
               const email = donationData?.paypalEmail;
               if (!email) {
-                Alert.alert("Donazione", "Il servizio PayPal non è ancora configurato.");
+                Alert.alert(t("profile.donationTitle"), t("profile.paypalNotConfigured"));
                 return;
               }
               Linking.openURL(`https://www.paypal.com/donate?business=${encodeURIComponent(email)}&currency_code=EUR`);
             }}
           >
             <Ionicons name="logo-paypal" size={22} color="#fff" />
-            <Text style={styles.donateBtnText}>Dona con PayPal</Text>
+            <Text style={styles.donateBtnText}>{t("profile.donatePaypal")}</Text>
           </Pressable>
         </View>
       )}
@@ -715,13 +700,13 @@ export default function ProfileScreen() {
         <Pressable style={styles.modalOverlay} onPress={() => setShowLogoutModal(false)}>
           <View style={styles.modalContent}>
             <Ionicons name="log-out" size={32} color={Colors.accentRed} />
-            <Text style={styles.modalTitle}>Sei sicuro di voler uscire?</Text>
+            <Text style={styles.modalTitle}>{t("profile.logoutConfirmDesc")}</Text>
             <View style={styles.modalButtons}>
               <Pressable style={styles.modalBtnCancel} onPress={() => setShowLogoutModal(false)}>
-                <Text style={styles.modalBtnCancelText}>Annulla</Text>
+                <Text style={styles.modalBtnCancelText}>{t("common.cancel")}</Text>
               </Pressable>
               <Pressable style={styles.modalBtnConfirm} onPress={() => { setShowLogoutModal(false); doLogout(); }}>
-                <Text style={styles.modalBtnConfirmText}>Esci</Text>
+                <Text style={styles.modalBtnConfirmText}>{t("profile.logout")}</Text>
               </Pressable>
             </View>
           </View>

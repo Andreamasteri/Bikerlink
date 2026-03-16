@@ -21,6 +21,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
 import * as Location from "expo-location";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { getCurrentLocale } from "@/lib/i18n";
 
 interface RouteRecord {
   id: string;
@@ -767,7 +768,7 @@ function RecordCard({ item, onPublish }: { item: RouteRecord; onPublish: () => v
       <View style={styles.recordHeader}>
         <Ionicons name="flag" size={16} color={Colors.accent} />
         <Text style={[styles.recordDate, { flex: 1 }]}>
-          {new Date(item.createdAt).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}
+          {new Date(item.createdAt).toLocaleDateString(getCurrentLocale(), { day: "2-digit", month: "short", year: "numeric" })}
         </Text>
         <TouchableOpacity onPress={onPublish} style={styles.publishIconBtn} activeOpacity={0.7}>
           <Ionicons name="share-outline" size={18} color={Colors.accent} />

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { type AppLanguage, setAppLanguage, getAppLanguage, tWithLang } from "@/lib/i18n";
+import { type AppLanguage, setAppLanguage, getAppLanguage, tWithLang, langToLocale } from "@/lib/i18n";
 
 const STORAGE_KEY = "@bikerlink_language";
 
@@ -55,4 +55,9 @@ export function useLanguage() {
 export function useT() {
   const { language } = useContext(LanguageContext);
   return useMemo(() => (key: string) => tWithLang(key, language), [language]);
+}
+
+export function useLocale() {
+  const { language } = useContext(LanguageContext);
+  return useMemo(() => langToLocale(language), [language]);
 }

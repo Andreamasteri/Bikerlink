@@ -21,7 +21,7 @@ import { useRouter } from "expo-router";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
 
 import Colors from "@/constants/colors";
-import { useT } from "@/lib/language-context";
+import { useT, useLocale } from "@/lib/language-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -70,6 +70,7 @@ function formatPerfTime(seconds: number): string {
 }
 
 function PerformanceCard({ data }: { data: PerformanceData }) {
+  const locale = useLocale();
   const dur = data.durationSeconds || 0;
   const net = Math.max(dur - (data.idleTimeSeconds || 0), 0);
 
@@ -99,7 +100,7 @@ function PerformanceCard({ data }: { data: PerformanceData }) {
       </View>
       {data.date ? (
         <Text style={styles.perfDate}>
-          {new Date(data.date).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}
+          {new Date(data.date).toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" })}
         </Text>
       ) : null}
     </View>

@@ -15,7 +15,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import RouteMap from "@/components/RouteMap";
 import { apiRequest, getQueryFn } from "@/lib/query-client";
 import Colors from "@/constants/colors";
-import { t } from "@/lib/i18n";
+import { t, getCurrentLocale } from "@/lib/i18n";
 
 interface RouteDetail {
   id: string;
@@ -72,7 +72,7 @@ export default function RouteDetailScreen() {
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
-    return d.toLocaleDateString("it-IT", {
+    return d.toLocaleDateString(getCurrentLocale(), {
       day: "2-digit",
       month: "short",
       year: "numeric",
