@@ -601,17 +601,15 @@ export default function ProfileScreen() {
         )}
 
         <MenuItem icon="document-text-outline" label="Privacy Policy" onPress={() => router.push("/privacy-policy" as any)} />
-        <MenuItem icon="log-out" label="Logout" onPress={handleLogout} color={Colors.accentRed} />
-        <MenuItem icon="trash-outline" label="Elimina account" onPress={handleDeleteAccount} color={Colors.accentRed} />
       </View>
 
-      <View style={[styles.section, { marginTop: 24 }]}>
+      <View style={[styles.section, { marginTop: 16 }]}>
         <Text style={styles.sectionTitle}>{t("language.title")}</Text>
         <View style={styles.languageBar}>
           {([
-            { code: "it" as AppLanguage, flag: "🇮🇹", label: "Italiano" },
-            { code: "en" as AppLanguage, flag: "🇬🇧", label: "English" },
-            { code: "de" as AppLanguage, flag: "🇩🇪", label: "Deutsch" },
+            { code: "it" as AppLanguage, flag: "🇮🇹", label: "IT" },
+            { code: "en" as AppLanguage, flag: "🇬🇧", label: "EN" },
+            { code: "de" as AppLanguage, flag: "🇩🇪", label: "DE" },
           ]).map((lang) => {
             const isActive = language === lang.code;
             return (
@@ -626,6 +624,11 @@ export default function ProfileScreen() {
             );
           })}
         </View>
+      </View>
+
+      <View style={styles.section}>
+        <MenuItem icon="log-out" label="Logout" onPress={handleLogout} color={Colors.accentRed} />
+        <MenuItem icon="trash-outline" label="Elimina account" onPress={handleDeleteAccount} color={Colors.accentRed} />
       </View>
 
       <Modal visible={showLogoutModal} transparent animationType="fade" onRequestClose={() => setShowLogoutModal(false)}>
