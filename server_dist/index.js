@@ -1558,30 +1558,32 @@ var init_storage = __esm({
         const [{ count }] = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(users).where(condition);
         console.log(`[Admin] deleteAllFakeUsers: trovati ${count} utenti fake da eliminare`);
         if (count === 0) return 0;
-        await db.delete(users).where(condition);
-        console.log(`[Admin] deleteAllFakeUsers: eliminati ${count} utenti fake`);
-        await db.execute(import_drizzle_orm2.sql`
-      DELETE FROM conversations
-      WHERE id IN (
-        SELECT c.id FROM conversations c
-        LEFT JOIN conversation_participants cp ON cp.conversation_id = c.id
-        GROUP BY c.id
-        HAVING count(cp.id) = 0
-      )
-    `);
-        const officialUser = await db.select({ id: users.id }).from(users).where(import_drizzle_orm2.sql`${users.nickname} = 'BikerLink_Official'`).limit(1);
-        if (officialUser.length > 0) {
-          await db.execute(import_drizzle_orm2.sql`
+        await db.transaction(async (tx) => {
+          await tx.delete(users).where(condition);
+          console.log(`[Admin] deleteAllFakeUsers: eliminati ${count} utenti fake`);
+          await tx.execute(import_drizzle_orm2.sql`
         DELETE FROM conversations
         WHERE id IN (
           SELECT c.id FROM conversations c
-          INNER JOIN conversation_participants cp ON cp.conversation_id = c.id
+          LEFT JOIN conversation_participants cp ON cp.conversation_id = c.id
           GROUP BY c.id
-          HAVING count(cp.id) = 1
-            AND max(cp.user_id) = ${officialUser[0].id}
+          HAVING count(cp.id) = 0
         )
       `);
-        }
+          const officialUser = await tx.select({ id: users.id }).from(users).where(import_drizzle_orm2.sql`${users.nickname} = 'BikerLink_Official'`).limit(1);
+          if (officialUser.length > 0) {
+            await tx.execute(import_drizzle_orm2.sql`
+          DELETE FROM conversations
+          WHERE id IN (
+            SELECT c.id FROM conversations c
+            INNER JOIN conversation_participants cp ON cp.conversation_id = c.id
+            GROUP BY c.id
+            HAVING count(cp.id) = 1
+              AND max(cp.user_id) = ${officialUser[0].id}
+          )
+        `);
+          }
+        });
         console.log(`[Admin] deleteAllFakeUsers: pulizia conversation orfane completata`);
         return count;
       }
