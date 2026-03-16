@@ -24,6 +24,154 @@ const defaultSettings = [
   { key: "max_daily_votes", label: "Max voti giornalieri", placeholder: "10" },
 ];
 
+function ManualAdminSection() {
+  const [uploading, setUploading] = useState(false);
+
+  const { data: manualInfo, refetch } = useQuery<{
+    available: boolean;
+    fileName?: string;
+    fileSize?: number;
+    lastModified?: string;
+  }>({
+    queryKey: ["/api/manual/info"],
+  });
+
+  const handleDownload = () => {
+    const url = new URL("/api/manual/download", getApiUrl()).toString();
+    const { Linking } = require("react-native");
+    Linking.openURL(url);
+  };
+
+  const handleUpload = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: "application/pdf" });
+      if (result.canceled || !result.assets?.[0]) return;
+      setUploading(true);
+      const file = result.assets[0];
+      const formData = new FormData();
+      formData.append("file", {
+        uri: file.uri,
+        name: file.name || "manual.pdf",
+        type: "application/pdf",
+      } as any);
+
+      const res = await fetch(new URL("/api/admin/manual/upload", getApiUrl()).toString(), {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        Alert.alert("Successo", data.message || "Manuale aggiornato");
+        refetch();
+      } else {
+        Alert.alert("Errore", data.message || "Errore upload");
+      }
+    } catch (e: any) {
+      Alert.alert("Errore", e.message || "Errore upload");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const formatSize = (bytes?: number) => {
+    if (!bytes) return "—";
+    if (bytes < 1024) return `${bytes} B`;
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  };
+
+  return (
+    <View style={manualStyles.card}>
+      <View style={manualStyles.row}>
+        <Ionicons name="document-text" size={32} color={Colors.accent} />
+        <View style={{ flex: 1, marginLeft: 12 }}>
+          <Text style={manualStyles.title}>BikerLink-Manual.pdf</Text>
+          <Text style={manualStyles.subtitle}>
+            {manualInfo?.available
+              ? `${formatSize(manualInfo.fileSize)} — ${manualInfo.lastModified ? new Date(manualInfo.lastModified).toLocaleDateString("it-IT") : ""}`
+              : "Nessun manuale caricato"}
+          </Text>
+        </View>
+      </View>
+      <View style={manualStyles.actions}>
+        {manualInfo?.available && (
+          <TouchableOpacity style={manualStyles.downloadBtn} onPress={handleDownload}>
+            <Ionicons name="download-outline" size={18} color="#fff" />
+            <Text style={manualStyles.btnText}>Scarica</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={[manualStyles.uploadBtn, uploading && { opacity: 0.6 }]}
+          onPress={handleUpload}
+          disabled={uploading}
+        >
+          {uploading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="cloud-upload-outline" size={18} color="#fff" />
+              <Text style={manualStyles.btnText}>Carica nuovo PDF</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const manualStyles = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  title: {
+    color: Colors.text,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  subtitle: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  actions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 14,
+  },
+  downloadBtn: {
+    backgroundColor: Colors.accent,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  uploadBtn: {
+    backgroundColor: Colors.warning,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  btnText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+});
+
 export default function AdminSettings() {
   const insets = useSafeAreaInsets();
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -788,6 +936,13 @@ export default function AdminSettings() {
           </View>
         </View>
       </View>
+
+      <View style={styles.sectionHeaderRow}>
+        <Ionicons name="book" size={20} color={Colors.accent} />
+        <Text style={styles.sectionTitle}>Manuale Utente PDF</Text>
+      </View>
+
+      <ManualAdminSection />
 
       <View style={styles.sectionHeaderRow}>
         <Ionicons name="construct" size={20} color={Colors.accent} />

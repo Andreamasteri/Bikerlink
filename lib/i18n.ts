@@ -157,6 +157,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "map.title": "Mappa",
 
     "language.title": "Lingua",
+    "profile.downloadManual": "Scarica Manuale Utente",
   },
 
   en: {
@@ -305,6 +306,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "map.title": "Map",
 
     "language.title": "Language",
+    "profile.downloadManual": "Download User Manual",
   },
 
   de: {
@@ -453,6 +455,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "map.title": "Karte",
 
     "language.title": "Sprache",
+    "profile.downloadManual": "Benutzerhandbuch herunterladen",
   },
 
   es: {
@@ -601,6 +604,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "map.title": "Mapa",
 
     "language.title": "Idioma",
+    "profile.downloadManual": "Descargar Manual de Usuario",
   },
 
   fr: {
@@ -749,6 +753,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "map.title": "Carte",
 
     "language.title": "Langue",
+    "profile.downloadManual": "Télécharger le Manuel Utilisateur",
   },
 };
 

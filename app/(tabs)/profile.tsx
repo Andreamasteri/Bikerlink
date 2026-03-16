@@ -25,6 +25,8 @@ import { type AppLanguage } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage, useT } from "@/lib/language-context";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 
 interface ProfileData {
@@ -107,6 +109,7 @@ export default function ProfileScreen() {
   const t = useT();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [isDownloadingManual, setIsDownloadingManual] = useState(false);
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -236,6 +239,31 @@ export default function ProfileScreen() {
   const handleRequestDeletion = useCallback(() => {
     requestDeletionMutation.mutate();
   }, []);
+
+  const handleDownloadManual = useCallback(async () => {
+    if (isDownloadingManual) return;
+    setIsDownloadingManual(true);
+    try {
+      if (Platform.OS === "web") {
+        const url = new URL("/api/manual/download", getApiUrl()).toString();
+        Linking.openURL(url);
+      } else {
+        const url = new URL("/api/manual/download", getApiUrl()).toString();
+        const fileUri = FileSystem.documentDirectory + "BikerLink-Manual.pdf";
+        const result = await FileSystem.downloadAsync(url, fileUri);
+        if (result.status === 200) {
+          const canShare = await Sharing.isAvailableAsync();
+          if (canShare) {
+            await Sharing.shareAsync(fileUri, { mimeType: "application/pdf" });
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Manual download error:", e);
+    } finally {
+      setIsDownloadingManual(false);
+    }
+  }, [isDownloadingManual]);
 
   const handleDeleteAccount = useCallback(() => {
     if (Platform.OS === "web") {
@@ -608,6 +636,12 @@ export default function ProfileScreen() {
         )}
 
         <MenuItem icon="document-text-outline" label="Privacy Policy" onPress={() => router.push("/privacy-policy" as any)} />
+        <MenuItem
+          icon="book-outline"
+          label={isDownloadingManual ? "Download..." : t("profile.downloadManual")}
+          onPress={handleDownloadManual}
+          color={Colors.accent}
+        />
       </View>
 
       <View style={[styles.section, { marginTop: 16 }]}>

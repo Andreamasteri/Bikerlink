@@ -1,7 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "node:http";
+import path from "node:path";
+import fs from "node:fs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
+import multer from "multer";
 import { pool } from "./db";
 import { storage } from "./storage";
 import authRoutes from "./routes/auth";
@@ -259,6 +262,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sosEnabled: true,
       });
     }
+  });
+
+  const MANUAL_PATH = path.resolve(__dirname, "public/bikerlink-manual.pdf");
+  const MANUAL_DIR = path.dirname(MANUAL_PATH);
+
+  app.get("/api/manual/download", (_req, res) => {
+    if (!fs.existsSync(MANUAL_PATH)) {
+      return res.status(404).json({ message: "Manuale non disponibile" });
+    }
+    res.setHeader("Content-Disposition", 'attachment; filename="BikerLink-Manual.pdf"');
+    res.setHeader("Content-Type", "application/pdf");
+    const stream = fs.createReadStream(MANUAL_PATH);
+    stream.pipe(res);
+  });
+
+  app.get("/api/manual/info", (_req, res) => {
+    if (!fs.existsSync(MANUAL_PATH)) {
+      return res.json({ available: false });
+    }
+    const stats = fs.statSync(MANUAL_PATH);
+    res.json({
+      available: true,
+      fileName: "BikerLink-Manual.pdf",
+      fileSize: stats.size,
+      lastModified: stats.mtime.toISOString(),
+    });
+  });
+
+  const manualUpload = multer({
+    storage: multer.diskStorage({
+      destination: (_req, _file, cb) => {
+        if (!fs.existsSync(MANUAL_DIR)) fs.mkdirSync(MANUAL_DIR, { recursive: true });
+        cb(null, MANUAL_DIR);
+      },
+      filename: (_req, _file, cb) => cb(null, "bikerlink-manual.pdf"),
+    }),
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype === "application/pdf") cb(null, true);
+      else cb(new Error("Solo file PDF consentiti"));
+    },
+    limits: { fileSize: 20 * 1024 * 1024 },
+  });
+
+  app.post("/api/admin/manual/upload", async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Non autenticato" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== "admin") return res.status(403).json({ message: "Accesso non autorizzato" });
+
+    manualUpload.single("file")(req, res, (err: any) => {
+      if (err) return res.status(400).json({ message: err.message || "Errore upload" });
+      if (!req.file) return res.status(400).json({ message: "Nessun file caricato" });
+      const stats = fs.statSync(MANUAL_PATH);
+      res.json({
+        message: "Manuale aggiornato con successo",
+        fileName: "BikerLink-Manual.pdf",
+        fileSize: stats.size,
+        lastModified: stats.mtime.toISOString(),
+      });
+    });
   });
 
   const httpServer = createServer(app);

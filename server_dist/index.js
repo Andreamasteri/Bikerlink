@@ -3018,8 +3018,11 @@ var import_express21 = __toESM(require("express"));
 
 // server/routes.ts
 var import_node_http = require("node:http");
+var import_node_path = __toESM(require("node:path"));
+var import_node_fs = __toESM(require("node:fs"));
 var import_express_session = __toESM(require("express-session"));
 var import_connect_pg_simple = __toESM(require("connect-pg-simple"));
+var import_multer3 = __toESM(require("multer"));
 init_db();
 init_storage();
 
@@ -9072,6 +9075,59 @@ async function registerRoutes(app2) {
       });
     }
   });
+  const MANUAL_PATH = import_node_path.default.resolve(__dirname, "public/bikerlink-manual.pdf");
+  const MANUAL_DIR = import_node_path.default.dirname(MANUAL_PATH);
+  app2.get("/api/manual/download", (_req, res) => {
+    if (!import_node_fs.default.existsSync(MANUAL_PATH)) {
+      return res.status(404).json({ message: "Manuale non disponibile" });
+    }
+    res.setHeader("Content-Disposition", 'attachment; filename="BikerLink-Manual.pdf"');
+    res.setHeader("Content-Type", "application/pdf");
+    const stream = import_node_fs.default.createReadStream(MANUAL_PATH);
+    stream.pipe(res);
+  });
+  app2.get("/api/manual/info", (_req, res) => {
+    if (!import_node_fs.default.existsSync(MANUAL_PATH)) {
+      return res.json({ available: false });
+    }
+    const stats = import_node_fs.default.statSync(MANUAL_PATH);
+    res.json({
+      available: true,
+      fileName: "BikerLink-Manual.pdf",
+      fileSize: stats.size,
+      lastModified: stats.mtime.toISOString()
+    });
+  });
+  const manualUpload = (0, import_multer3.default)({
+    storage: import_multer3.default.diskStorage({
+      destination: (_req, _file, cb) => {
+        if (!import_node_fs.default.existsSync(MANUAL_DIR)) import_node_fs.default.mkdirSync(MANUAL_DIR, { recursive: true });
+        cb(null, MANUAL_DIR);
+      },
+      filename: (_req, _file, cb) => cb(null, "bikerlink-manual.pdf")
+    }),
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype === "application/pdf") cb(null, true);
+      else cb(new Error("Solo file PDF consentiti"));
+    },
+    limits: { fileSize: 20 * 1024 * 1024 }
+  });
+  app2.post("/api/admin/manual/upload", async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Non autenticato" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== "admin") return res.status(403).json({ message: "Accesso non autorizzato" });
+    manualUpload.single("file")(req, res, (err) => {
+      if (err) return res.status(400).json({ message: err.message || "Errore upload" });
+      if (!req.file) return res.status(400).json({ message: "Nessun file caricato" });
+      const stats = import_node_fs.default.statSync(MANUAL_PATH);
+      res.json({
+        message: "Manuale aggiornato con successo",
+        fileName: "BikerLink-Manual.pdf",
+        fileSize: stats.size,
+        lastModified: stats.mtime.toISOString()
+      });
+    });
+  });
   const httpServer = (0, import_node_http.createServer)(app2);
   return httpServer;
 }
@@ -9574,8 +9630,8 @@ async function autoSeedFakeUsers() {
 }
 
 // server/index.ts
-var fs5 = __toESM(require("fs"));
-var path5 = __toESM(require("path"));
+var fs6 = __toESM(require("fs"));
+var path6 = __toESM(require("path"));
 var app = (0, import_express21.default)();
 var log = console.log;
 app.set("trust proxy", 1);
@@ -9621,7 +9677,7 @@ function setupBodyParsing(app2) {
 function setupRequestLogging(app2) {
   app2.use((req, res, next) => {
     const start = Date.now();
-    const path6 = req.path;
+    const path7 = req.path;
     let capturedJsonResponse = void 0;
     const originalResJson = res.json;
     res.json = function(bodyJson, ...args) {
@@ -9629,9 +9685,9 @@ function setupRequestLogging(app2) {
       return originalResJson.apply(res, [bodyJson, ...args]);
     };
     res.on("finish", () => {
-      if (!path6.startsWith("/api")) return;
+      if (!path7.startsWith("/api")) return;
       const duration = Date.now() - start;
-      let logLine = `${req.method} ${path6} ${res.statusCode} in ${duration}ms`;
+      let logLine = `${req.method} ${path7} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse && res.statusCode !== 304) {
         const jsonStr = JSON.stringify(capturedJsonResponse);
         logLine += ` :: ${jsonStr.length > 200 ? jsonStr.slice(0, 197) + "..." : jsonStr}`;
@@ -9646,8 +9702,8 @@ function setupRequestLogging(app2) {
 }
 function getAppName() {
   try {
-    const appJsonPath = path5.resolve(process.cwd(), "app.json");
-    const appJsonContent = fs5.readFileSync(appJsonPath, "utf-8");
+    const appJsonPath = path6.resolve(process.cwd(), "app.json");
+    const appJsonContent = fs6.readFileSync(appJsonPath, "utf-8");
     const appJson = JSON.parse(appJsonContent);
     return appJson.expo?.name || "App Landing Page";
   } catch {
@@ -9655,19 +9711,19 @@ function getAppName() {
   }
 }
 function serveExpoManifest(platform, res) {
-  const manifestPath = path5.resolve(
+  const manifestPath = path6.resolve(
     process.cwd(),
     "static-build",
     platform,
     "manifest.json"
   );
-  if (!fs5.existsSync(manifestPath)) {
+  if (!fs6.existsSync(manifestPath)) {
     return res.status(404).json({ error: `Manifest not found for platform: ${platform}` });
   }
   res.setHeader("expo-protocol-version", "1");
   res.setHeader("expo-sfv-version", "0");
   res.setHeader("content-type", "application/json");
-  const manifest = fs5.readFileSync(manifestPath, "utf-8");
+  const manifest = fs6.readFileSync(manifestPath, "utf-8");
   res.send(manifest);
 }
 function serveLandingPage({
@@ -9689,13 +9745,13 @@ function serveLandingPage({
   res.status(200).send(html);
 }
 function configureExpoAndLanding(app2) {
-  const templatePath = path5.resolve(
+  const templatePath = path6.resolve(
     process.cwd(),
     "server",
     "templates",
     "landing-page.html"
   );
-  const landingPageTemplate = fs5.readFileSync(templatePath, "utf-8");
+  const landingPageTemplate = fs6.readFileSync(templatePath, "utf-8");
   const appName = getAppName();
   log("Serving static Expo files with dynamic manifest routing");
   app2.use((req, res, next) => {
@@ -9719,10 +9775,10 @@ function configureExpoAndLanding(app2) {
     }
     next();
   });
-  app2.use("/assets", import_express21.default.static(path5.resolve(process.cwd(), "assets")));
-  app2.use("/uploads", import_express21.default.static(path5.resolve(process.cwd(), "uploads")));
-  app2.use(import_express21.default.static(path5.resolve(process.cwd(), "static-build")));
-  const webBuildDir = path5.resolve(process.cwd(), "static-build", "web");
+  app2.use("/assets", import_express21.default.static(path6.resolve(process.cwd(), "assets")));
+  app2.use("/uploads", import_express21.default.static(path6.resolve(process.cwd(), "uploads")));
+  app2.use(import_express21.default.static(path6.resolve(process.cwd(), "static-build")));
+  const webBuildDir = path6.resolve(process.cwd(), "static-build", "web");
   const noCacheHtml = (res, filePath) => {
     if (filePath.endsWith(".html")) {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
@@ -9733,8 +9789,8 @@ function configureExpoAndLanding(app2) {
   app2.use("/web", import_express21.default.static(webBuildDir, { setHeaders: noCacheHtml }));
   app2.use(import_express21.default.static(webBuildDir, { index: false, setHeaders: noCacheHtml }));
   app2.use("/web", (_req, res) => {
-    const indexPath = path5.join(webBuildDir, "index.html");
-    if (fs5.existsSync(indexPath)) {
+    const indexPath = path6.join(webBuildDir, "index.html");
+    if (fs6.existsSync(indexPath)) {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");
@@ -9767,13 +9823,13 @@ function setupErrorHandler(app2) {
   setupRequestLogging(app);
   configureExpoAndLanding(app);
   const server = await registerRoutes(app);
-  const webBuildIndex = path5.join(path5.resolve(process.cwd(), "static-build", "web"), "index.html");
+  const webBuildIndex = path6.join(path6.resolve(process.cwd(), "static-build", "web"), "index.html");
   app.use((req, res, next) => {
     if (req.method !== "GET" && req.method !== "HEAD") return next();
     if (req.path.startsWith("/api/")) return next();
     if (req.path === "/" || req.path === "/manifest" || req.path === "/healthz") return next();
     if (req.path.match(/\.\w+$/)) return next();
-    if (fs5.existsSync(webBuildIndex)) {
+    if (fs6.existsSync(webBuildIndex)) {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");
