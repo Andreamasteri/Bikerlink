@@ -255,15 +255,20 @@ export default function ProfileScreen() {
           const canShare = await Sharing.isAvailableAsync();
           if (canShare) {
             await Sharing.shareAsync(fileUri, { mimeType: "application/pdf" });
+          } else {
+            Alert.alert("Download", t("profile.downloadManual") + " ✓");
           }
+        } else {
+          Alert.alert("Errore", "Download non riuscito. Riprova più tardi.");
         }
       }
     } catch (e) {
       console.error("Manual download error:", e);
+      Alert.alert("Errore", "Impossibile scaricare il manuale. Controlla la connessione.");
     } finally {
       setIsDownloadingManual(false);
     }
-  }, [isDownloadingManual]);
+  }, [isDownloadingManual, t]);
 
   const handleDeleteAccount = useCallback(() => {
     if (Platform.OS === "web") {

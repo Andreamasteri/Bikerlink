@@ -264,7 +264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const MANUAL_PATH = path.resolve(__dirname, "public/bikerlink-manual.pdf");
+  const MANUAL_PATH = path.resolve(process.cwd(), "server/public/bikerlink-manual.pdf");
   const MANUAL_DIR = path.dirname(MANUAL_PATH);
 
   app.get("/api/manual/download", (_req, res) => {

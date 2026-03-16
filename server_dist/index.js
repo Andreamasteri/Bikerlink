@@ -9075,7 +9075,7 @@ async function registerRoutes(app2) {
       });
     }
   });
-  const MANUAL_PATH = import_node_path.default.resolve(__dirname, "public/bikerlink-manual.pdf");
+  const MANUAL_PATH = import_node_path.default.resolve(process.cwd(), "server/public/bikerlink-manual.pdf");
   const MANUAL_DIR = import_node_path.default.dirname(MANUAL_PATH);
   app2.get("/api/manual/download", (_req, res) => {
     if (!import_node_fs.default.existsSync(MANUAL_PATH)) {
