@@ -25,6 +25,7 @@ import { t } from "@/lib/i18n";
 import { type AppLanguage } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
+import { getCountryFlag } from "@/lib/countries-regions";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 
 interface ProfileData {
@@ -37,6 +38,7 @@ interface ProfileData {
   coupleSexConfig?: string;
   birthYear?: number;
   region?: string;
+  country?: string;
   avatarUrl?: string;
   role: string;
   status: string;
@@ -338,11 +340,14 @@ export default function ProfileScreen() {
               {getUserTypeLabel(currentUserType)}
             </Text>
           </View>
-          {profile?.region && (
+          {(profile?.country || profile?.region) && (
             <View style={styles.badge}>
               <View style={styles.regionBadge}>
                 <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
-                <Text style={styles.badgeText}>{profile.region}</Text>
+                <Text style={styles.badgeText}>
+                  {profile?.country ? getCountryFlag(profile.country) + " " : ""}
+                  {profile?.region || ""}
+                </Text>
               </View>
             </View>
           )}

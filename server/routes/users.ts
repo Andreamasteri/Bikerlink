@@ -87,7 +87,7 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
 
-    const allowedUserFields = ["nickname", "phone", "sex", "coupleSexConfig", "birthYear", "region", "avatarUrl"];
+    const allowedUserFields = ["nickname", "phone", "sex", "coupleSexConfig", "birthYear", "region", "country", "avatarUrl"];
     const userUpdate: Record<string, unknown> = {};
     for (const field of allowedUserFields) {
       if (req.body[field] !== undefined) {
@@ -260,6 +260,7 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
       coupleSexConfig: targetUser.coupleSexConfig,
       birthYear: targetUser.birthYear,
       region: targetUser.region,
+      country: targetUser.country,
       avatarUrl: targetUser.avatarUrl,
       bio: profile?.bio || null,
       motorcycles,
@@ -335,6 +336,7 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
           userType: item.user.userType,
           sex: item.user.sex,
           region: item.user.region,
+          country: item.user.country,
           birthYear: item.user.birthYear,
           bio: item.profile?.bio || null,
           moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
@@ -373,6 +375,7 @@ router.get("/available-list", requireAuth, async (req: Request, res: Response) =
           userType: item.user.userType,
           sex: item.user.sex,
           region: item.user.region,
+          country: item.user.country,
           birthYear: item.user.birthYear,
           bio: item.profile?.bio || null,
           moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
@@ -452,6 +455,7 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
         userType: item.user.userType,
         sex: item.user.sex,
         region: item.user.region,
+        country: item.user.country,
         birthYear: item.user.birthYear,
         bio: item.profile?.bio || null,
         moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
@@ -510,6 +514,7 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
         userType: item.user.userType,
         sex: item.user.sex,
         region: item.user.region,
+        country: item.user.country,
         birthYear: item.user.birthYear,
         bio: item.profile?.bio || null,
         moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
@@ -547,6 +552,7 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
           sex: item.user.sex,
           birthYear: item.user.birthYear,
           region: item.user.region,
+          country: item.user.country,
           avatarUrl: item.user.avatarUrl,
           latitude: item.profile?.latitude,
           longitude: item.profile?.longitude,
@@ -579,6 +585,7 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
         sex: item.user.sex,
         birthYear: item.user.birthYear,
         region: item.user.region,
+        country: item.user.country,
         avatarUrl: item.user.avatarUrl,
         latitude: item.profile?.latitude || null,
         longitude: item.profile?.longitude || null,

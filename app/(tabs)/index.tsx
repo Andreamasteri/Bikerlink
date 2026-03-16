@@ -27,6 +27,7 @@ import { useSynecoVisible } from "@/lib/syneco-context";
 import { useSetting } from "@/lib/settings-context";
 import InteractiveMap from "@/components/InteractiveMap";
 import { getRegionCoordinates } from "@/constants/regions";
+import { getCountryFlag } from "@/lib/countries-regions";
 
 export default function MapScreen() {
   const router = useRouter();
@@ -74,10 +75,10 @@ export default function MapScreen() {
 
   const getRegionFallback = useCallback(() => {
     if (user?.region) {
-      return getRegionCoordinates(user.region);
+      return getRegionCoordinates(user.region, user?.country);
     }
     return { latitude: 41.9028, longitude: 12.4964 };
-  }, [user?.region]);
+  }, [user?.region, user?.country]);
 
   const fetchGPSLocation = useCallback(async (): Promise<{ latitude: number; longitude: number } | null> => {
     try {
@@ -546,7 +547,7 @@ export default function MapScreen() {
                     <Ionicons name={getUserIcon(u)} size={22} color={getUserColor(u)} style={{ marginRight: 10 }} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.searchResultName}>{u.nickname}</Text>
-                      <Text style={styles.searchResultDetail}>{getUserTypeLabel(u)}{u.region ? ` · ${u.region}` : ""}{!u.latitude ? " · Posizione non disponibile" : ""}</Text>
+                      <Text style={styles.searchResultDetail}>{getUserTypeLabel(u)}{u.country ? ` · ${getCountryFlag(u.country)}` : ""}{u.region ? ` ${u.region}` : ""}{!u.latitude ? " · Posizione non disponibile" : ""}</Text>
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -646,7 +647,7 @@ export default function MapScreen() {
                         <Ionicons name={getUserIcon(u)} size={22} color={getUserColor(u)} style={{ marginRight: 10 }} />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.searchResultName}>{u.nickname}</Text>
-                          <Text style={styles.searchResultDetail}>{getUserTypeLabel(u)}{u.region ? ` · ${u.region}` : ""}{!u.latitude ? " · Posizione non disponibile" : ""}</Text>
+                          <Text style={styles.searchResultDetail}>{getUserTypeLabel(u)}{u.country ? ` · ${getCountryFlag(u.country)}` : ""}{u.region ? ` ${u.region}` : ""}{!u.latitude ? " · Posizione non disponibile" : ""}</Text>
                         </View>
                       </TouchableOpacity>
                     ))}
@@ -730,7 +731,7 @@ export default function MapScreen() {
                     </View>
                     <View style={styles.userListInfo}>
                       <Text style={styles.userListName}>{u.nickname}</Text>
-                      <Text style={styles.userListDetail}>{getUserTypeLabel(u)}{u.sex ? ` · ${u.sex === "M" ? "M" : "F"}` : ""}{u.region ? ` · ${u.region}` : ""}</Text>
+                      <Text style={styles.userListDetail}>{getUserTypeLabel(u)}{u.sex ? ` · ${u.sex === "M" ? "M" : "F"}` : ""}{u.country ? ` · ${getCountryFlag(u.country)}` : ""}{u.region ? ` ${u.region}` : ""}</Text>
                       {!!u.moto && <Text style={styles.userListDetail}>{u.moto}{u.ridingStyle ? ` · ${u.ridingStyle}` : ""}</Text>}
                       {!!u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
                       {!!u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
@@ -776,7 +777,7 @@ export default function MapScreen() {
                     </View>
                     <View style={styles.userListInfo}>
                       <Text style={styles.userListName}>{u.nickname}</Text>
-                      <Text style={styles.userListDetail}>{getUserTypeLabel(u)}{u.sex ? ` · ${u.sex === "M" ? "M" : "F"}` : ""}{u.region ? ` · ${u.region}` : ""}</Text>
+                      <Text style={styles.userListDetail}>{getUserTypeLabel(u)}{u.sex ? ` · ${u.sex === "M" ? "M" : "F"}` : ""}{u.country ? ` · ${getCountryFlag(u.country)}` : ""}{u.region ? ` ${u.region}` : ""}</Text>
                       {!!u.moto && <Text style={styles.userListDetail}>{u.moto}{u.ridingStyle ? ` · ${u.ridingStyle}` : ""}</Text>}
                       {!!u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
                       {!!u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
@@ -822,7 +823,7 @@ export default function MapScreen() {
                     </View>
                     <View style={styles.userListInfo}>
                       <Text style={styles.userListName}>{u.nickname}</Text>
-                      <Text style={styles.userListDetail}>{getUserTypeLabel(u)}{u.sex ? ` · ${u.sex === "M" ? "M" : "F"}` : ""}{u.region ? ` · ${u.region}` : ""}</Text>
+                      <Text style={styles.userListDetail}>{getUserTypeLabel(u)}{u.sex ? ` · ${u.sex === "M" ? "M" : "F"}` : ""}{u.country ? ` · ${getCountryFlag(u.country)}` : ""}{u.region ? ` ${u.region}` : ""}</Text>
                       {!!u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
                       {!!u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
                     </View>

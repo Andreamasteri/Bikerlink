@@ -11,8 +11,8 @@ Sponsor: Syneco Lubrificanti
 - **Database**: PostgreSQL con Drizzle ORM
 - **State Management**: React Query (@tanstack/react-query) + React Context
 - **Object Storage**: Replit Object Storage per foto utenti
-- **Lingua**: Italiano (i18n predisposta per EN/DE via `lib/i18n.ts`)
-- **Pan-European**: Filtri country (ISO 3166-1 alpha-2), region (free text), language (BCP-47)
+- **Lingua**: 5 lingue (IT/EN/DE/ES/FR) via `lib/i18n.ts` + `lib/language-context.tsx`
+- **Pan-European**: Selezione paese europeo + regione (`lib/countries-regions.ts`), colonna `country` varchar(2) ISO 3166-1 in tabella `users`, retrocompatibilità con `findCountryByRegion()`
 
 ## Struttura Progetto
 

@@ -657,6 +657,7 @@ var init_schema = __esm({
       coupleSexConfig: import_zod.z.enum(["M+M", "M+F", "F+F"]).optional(),
       birthYear: import_zod.z.number().int().min(1940).max(2010).optional(),
       region: import_zod.z.string().max(100).optional(),
+      country: import_zod.z.string().max(2).optional(),
       eulaAccepted: import_zod.z.literal(true, {
         errorMap: () => ({ message: "Devi accettare i termini di utilizzo" })
       }),
@@ -3153,6 +3154,7 @@ router.post("/register", registerLimiter, async (req, res) => {
       coupleSexConfig: data.coupleSexConfig,
       birthYear: data.birthYear,
       region: data.region,
+      country: data.country,
       eulaAccepted: data.eulaAccepted,
       invitationCode: data.invitationCode,
       isPrimal
@@ -3449,7 +3451,7 @@ router2.get("/me", requireAuth, async (req, res) => {
 router2.put("/me", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId;
-    const allowedUserFields = ["nickname", "phone", "sex", "coupleSexConfig", "birthYear", "region", "avatarUrl"];
+    const allowedUserFields = ["nickname", "phone", "sex", "coupleSexConfig", "birthYear", "region", "country", "avatarUrl"];
     const userUpdate = {};
     for (const field of allowedUserFields) {
       if (req.body[field] !== void 0) {
@@ -3608,6 +3610,7 @@ router2.get("/:id/public", requireAuth, async (req, res) => {
       coupleSexConfig: targetUser.coupleSexConfig,
       birthYear: targetUser.birthYear,
       region: targetUser.region,
+      country: targetUser.country,
       avatarUrl: targetUser.avatarUrl,
       bio: profile?.bio || null,
       motorcycles,
@@ -3672,6 +3675,7 @@ router2.get("/online-list", requireAuth, async (req, res) => {
         userType: item.user.userType,
         sex: item.user.sex,
         region: item.user.region,
+        country: item.user.country,
         birthYear: item.user.birthYear,
         bio: item.profile?.bio || null,
         moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
@@ -3708,6 +3712,7 @@ router2.get("/available-list", requireAuth, async (req, res) => {
         userType: item.user.userType,
         sex: item.user.sex,
         region: item.user.region,
+        country: item.user.country,
         birthYear: item.user.birthYear,
         bio: item.profile?.bio || null,
         moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
@@ -3777,6 +3782,7 @@ router2.get("/biker-available-list", requireAuth, async (req, res) => {
         userType: item.user.userType,
         sex: item.user.sex,
         region: item.user.region,
+        country: item.user.country,
         birthYear: item.user.birthYear,
         bio: item.profile?.bio || null,
         moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
@@ -3827,6 +3833,7 @@ router2.get("/zavorrine-available-list", requireAuth, async (req, res) => {
         userType: item.user.userType,
         sex: item.user.sex,
         region: item.user.region,
+        country: item.user.country,
         birthYear: item.user.birthYear,
         bio: item.profile?.bio || null,
         moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
@@ -3859,6 +3866,7 @@ router2.get("/nearby", requireAuth, async (req, res) => {
         sex: item.user.sex,
         birthYear: item.user.birthYear,
         region: item.user.region,
+        country: item.user.country,
         avatarUrl: item.user.avatarUrl,
         latitude: item.profile?.latitude,
         longitude: item.profile?.longitude,
@@ -3888,6 +3896,7 @@ router2.get("/search", requireAuth, async (req, res) => {
         sex: item.user.sex,
         birthYear: item.user.birthYear,
         region: item.user.region,
+        country: item.user.country,
         avatarUrl: item.user.avatarUrl,
         latitude: item.profile?.latitude || null,
         longitude: item.profile?.longitude || null,

@@ -13,6 +13,7 @@ import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { getCountryFlag } from "@/lib/countries-regions";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
@@ -121,11 +122,12 @@ export default function PublicProfileScreen() {
             {getUserTypeLabel(profile.userType)}
             {profile.sex ? ` · ${profile.sex === "M" ? "Maschio" : "Femmina"}` : ""}
           </Text>
-          {!!profile.region && (
+          {(!!profile.country || !!profile.region) && (
             <View style={styles.locationRow}>
               <Ionicons name="location" size={14} color={Colors.textSecondary} />
               <Text style={styles.locationText}>
-                {profile.city ? `${profile.city}, ` : ""}{profile.region}
+                {profile.country ? getCountryFlag(profile.country) + " " : ""}
+                {profile.city ? `${profile.city}, ` : ""}{profile.region || ""}
               </Text>
             </View>
           )}

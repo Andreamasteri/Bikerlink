@@ -22,12 +22,7 @@ import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { getApiUrl } from "@/lib/query-client";
 
-const ITALIAN_REGIONS = [
-  "Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna",
-  "Friuli Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche",
-  "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia",
-  "Toscana", "Trentino-Alto Adige", "Umbria", "Valle d'Aosta", "Veneto",
-];
+import { EUROPEAN_COUNTRIES, getRegionsForCountry } from "@/lib/countries-regions";
 
 const PHONE_PREFIXES = [
   { code: "+39", country: "Italia" },
@@ -129,6 +124,8 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [birthYear, setBirthYear] = useState("");
+  const [country, setCountry] = useState("");
+  const [showCountries, setShowCountries] = useState(false);
   const [region, setRegion] = useState("");
   const [showRegions, setShowRegions] = useState(false);
   const [eulaAccepted, setEulaAccepted] = useState(false);
@@ -264,6 +261,7 @@ export default function RegisterScreen() {
       data.sex = sex;
     }
     if (birthYear) data.birthYear = parseInt(birthYear, 10);
+    if (country) data.country = country;
     if (region) data.region = region;
     if (inviteCode.trim()) data.invitationCode = inviteCode.trim().toUpperCase();
 
@@ -553,30 +551,62 @@ export default function RegisterScreen() {
 
       <TouchableOpacity
         style={styles.inputWrapper}
-        onPress={() => setShowRegions(!showRegions)}
-        testID="reg-region-toggle"
+        onPress={() => { setShowCountries(!showCountries); setShowRegions(false); }}
+        testID="reg-country-toggle"
       >
-        <Ionicons name="location-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
-        <Text style={[styles.input, { lineHeight: 52 }, !region && { color: Colors.textSecondary }]}>
-          {region || `${t("auth.region")} (opzionale)`}
+        <Ionicons name="globe-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
+        <Text style={[styles.input, { lineHeight: 52 }, !country && { color: Colors.textSecondary }]}>
+          {country ? `${EUROPEAN_COUNTRIES.find(c => c.code === country)?.flag} ${EUROPEAN_COUNTRIES.find(c => c.code === country)?.name}` : "Paese (opzionale)"}
         </Text>
-        <Ionicons name={showRegions ? "chevron-up" : "chevron-down"} size={20} color={Colors.textSecondary} />
+        <Ionicons name={showCountries ? "chevron-up" : "chevron-down"} size={20} color={Colors.textSecondary} />
       </TouchableOpacity>
 
-      {showRegions && (
+      {showCountries && (
         <View style={styles.regionList}>
           <ScrollView style={styles.regionScroll} nestedScrollEnabled>
-            {ITALIAN_REGIONS.map((r) => (
+            {EUROPEAN_COUNTRIES.map((c) => (
               <TouchableOpacity
-                key={r}
-                style={[styles.regionItem, region === r && styles.regionItemSelected]}
-                onPress={() => { setRegion(r); setShowRegions(false); }}
+                key={c.code}
+                style={[styles.regionItem, country === c.code && styles.regionItemSelected]}
+                onPress={() => { setCountry(c.code); setRegion(""); setShowCountries(false); }}
               >
-                <Text style={[styles.regionText, region === r && styles.regionTextSelected]}>{r}</Text>
+                <Text style={[styles.regionText, country === c.code && styles.regionTextSelected]}>{c.flag} {c.name}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
+      )}
+
+      {country && (
+        <>
+          <TouchableOpacity
+            style={styles.inputWrapper}
+            onPress={() => { setShowRegions(!showRegions); setShowCountries(false); }}
+            testID="reg-region-toggle"
+          >
+            <Ionicons name="location-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
+            <Text style={[styles.input, { lineHeight: 52 }, !region && { color: Colors.textSecondary }]}>
+              {region || `${t("auth.region")} (opzionale)`}
+            </Text>
+            <Ionicons name={showRegions ? "chevron-up" : "chevron-down"} size={20} color={Colors.textSecondary} />
+          </TouchableOpacity>
+
+          {showRegions && (
+            <View style={styles.regionList}>
+              <ScrollView style={styles.regionScroll} nestedScrollEnabled>
+                {getRegionsForCountry(country).map((r) => (
+                  <TouchableOpacity
+                    key={r.name}
+                    style={[styles.regionItem, region === r.name && styles.regionItemSelected]}
+                    onPress={() => { setRegion(r.name); setShowRegions(false); }}
+                  >
+                    <Text style={[styles.regionText, region === r.name && styles.regionTextSelected]}>{r.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </>
       )}
 
       <View style={styles.inviteSection}>

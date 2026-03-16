@@ -98,6 +98,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       coupleSexConfig: data.coupleSexConfig,
       birthYear: data.birthYear,
       region: data.region,
+      country: data.country,
       eulaAccepted: data.eulaAccepted,
       invitationCode: data.invitationCode,
       isPrimal,

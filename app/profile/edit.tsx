@@ -19,6 +19,7 @@ import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
+import { EUROPEAN_COUNTRIES, getRegionsForCountry, findCountryByRegion } from "@/lib/countries-regions";
 
 interface ProfileData {
   id: string;
@@ -30,6 +31,7 @@ interface ProfileData {
   coupleSexConfig?: string;
   birthYear?: number;
   region?: string;
+  country?: string;
   avatarUrl?: string;
   profile?: {
     bio?: string;
@@ -45,13 +47,6 @@ interface ProfileData {
     ridingStyle?: string;
   }>;
 }
-
-const REGIONS = [
-  "Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna",
-  "Friuli Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche",
-  "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia",
-  "Toscana", "Trentino-Alto Adige", "Umbria", "Valle d'Aosta", "Veneto",
-];
 
 const MOTO_TYPES = [
   "Naked", "Sport", "Touring", "Adventure", "Enduro",
@@ -77,6 +72,8 @@ export default function EditProfileScreen() {
 
   const [nickname, setNickname] = useState("");
   const [phone, setPhone] = useState("");
+  const [country, setCountry] = useState("");
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [region, setRegion] = useState("");
   const [birthYear, setBirthYear] = useState("");
   const [bio, setBio] = useState("");
@@ -95,6 +92,12 @@ export default function EditProfileScreen() {
     if (profile) {
       setNickname(profile.nickname ?? "");
       setPhone(profile.phone ?? "");
+      if (profile.country) {
+        setCountry(profile.country);
+      } else if (profile.region) {
+        const guessed = findCountryByRegion(profile.region);
+        if (guessed) setCountry(guessed);
+      }
       setRegion(profile.region ?? "");
       setBirthYear(profile.birthYear ? String(profile.birthYear) : "");
       setBio(profile.profile?.bio ?? "");
@@ -147,6 +150,7 @@ export default function EditProfileScreen() {
     const data: Record<string, unknown> = {};
     if (nickname && nickname !== profile?.nickname) data.nickname = nickname;
     if (phone !== (profile?.phone ?? "")) data.phone = phone || null;
+    if (country !== (profile?.country ?? "")) data.country = country || null;
     if (region !== (profile?.region ?? "")) data.region = region || null;
     if (birthYear !== String(profile?.birthYear ?? "")) {
       data.birthYear = birthYear ? parseInt(birthYear, 10) : null;
@@ -262,52 +266,53 @@ export default function EditProfileScreen() {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.fieldLabel}>{t("auth.region")}</Text>
+            <Text style={styles.fieldLabel}>Paese</Text>
             <TouchableOpacity
               style={styles.selectInput}
-              onPress={() => setShowRegionPicker(!showRegionPicker)}
+              onPress={() => { setShowCountryPicker(!showCountryPicker); setShowRegionPicker(false); }}
               activeOpacity={0.7}
             >
               <Text
                 style={[
                   styles.selectText,
-                  !region && { color: Colors.textSecondary },
+                  !country && { color: Colors.textSecondary },
                 ]}
               >
-                {region || "Seleziona regione"}
+                {country ? `${EUROPEAN_COUNTRIES.find(c => c.code === country)?.flag} ${EUROPEAN_COUNTRIES.find(c => c.code === country)?.name}` : "Seleziona paese"}
               </Text>
               <Feather
-                name={showRegionPicker ? "chevron-up" : "chevron-down"}
+                name={showCountryPicker ? "chevron-up" : "chevron-down"}
                 size={18}
                 color={Colors.textSecondary}
               />
             </TouchableOpacity>
-            {showRegionPicker && (
+            {showCountryPicker && (
               <View style={styles.pickerList}>
                 <ScrollView
                   style={{ maxHeight: 200 }}
                   nestedScrollEnabled
                   showsVerticalScrollIndicator
                 >
-                  {REGIONS.map((r) => (
+                  {EUROPEAN_COUNTRIES.map((c) => (
                     <TouchableOpacity
-                      key={r}
+                      key={c.code}
                       style={[
                         styles.pickerItem,
-                        region === r && styles.pickerItemSelected,
+                        country === c.code && styles.pickerItemSelected,
                       ]}
                       onPress={() => {
-                        setRegion(r);
-                        setShowRegionPicker(false);
+                        setCountry(c.code);
+                        setRegion("");
+                        setShowCountryPicker(false);
                       }}
                     >
                       <Text
                         style={[
                           styles.pickerItemText,
-                          region === r && styles.pickerItemTextSelected,
+                          country === c.code && styles.pickerItemTextSelected,
                         ]}
                       >
-                        {r}
+                        {c.flag} {c.name}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -315,6 +320,63 @@ export default function EditProfileScreen() {
               </View>
             )}
           </View>
+
+          {country && (
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>{t("auth.region")}</Text>
+              <TouchableOpacity
+                style={styles.selectInput}
+                onPress={() => { setShowRegionPicker(!showRegionPicker); setShowCountryPicker(false); }}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.selectText,
+                    !region && { color: Colors.textSecondary },
+                  ]}
+                >
+                  {region || "Seleziona regione"}
+                </Text>
+                <Feather
+                  name={showRegionPicker ? "chevron-up" : "chevron-down"}
+                  size={18}
+                  color={Colors.textSecondary}
+                />
+              </TouchableOpacity>
+              {showRegionPicker && (
+                <View style={styles.pickerList}>
+                  <ScrollView
+                    style={{ maxHeight: 200 }}
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator
+                  >
+                    {getRegionsForCountry(country).map((r) => (
+                      <TouchableOpacity
+                        key={r.name}
+                        style={[
+                          styles.pickerItem,
+                          region === r.name && styles.pickerItemSelected,
+                        ]}
+                        onPress={() => {
+                          setRegion(r.name);
+                          setShowRegionPicker(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.pickerItemText,
+                            region === r.name && styles.pickerItemTextSelected,
+                          ]}
+                        >
+                          {r.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+          )}
         </View>
 
         <View style={styles.fieldGroup}>

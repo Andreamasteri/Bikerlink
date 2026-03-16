@@ -835,6 +835,7 @@ export const registerSchema = z.object({
   coupleSexConfig: z.enum(["M+M", "M+F", "F+F"]).optional(),
   birthYear: z.number().int().min(1940).max(2010).optional(),
   region: z.string().max(100).optional(),
+  country: z.string().max(2).optional(),
   eulaAccepted: z.literal(true, {
     errorMap: () => ({ message: "Devi accettare i termini di utilizzo" }),
   }),
