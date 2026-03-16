@@ -29,18 +29,18 @@ sysmon_loop() {
     DISK_TOT=$(echo $DISK_LINE | awk '{print $2}')
     DISK_PCT=$(echo $DISK_LINE | awk '{print $5}')
     echo "[$TS] [SYS] RAM: ${RAM_USED}/${RAM_TOT} usata | Disponibile: ${RAM_AVAIL} | Disco: ${DISK_USED}/${DISK_TOT} (${DISK_PCT})" | tee -a "$LOG_FILE"
-    sleep 30
+    sleep "${TEST_CYCLE_S:-30}"
   done
 }
-
-sysmon_loop &
-SYSMON_PID=$!
-trap "kill $SYSMON_PID 2>/dev/null" EXIT
 
 echo "[run-stress] Compilazione stress test..."
 node_modules/.bin/esbuild scripts/stress-test.ts \
   --platform=node --packages=external --bundle --format=cjs \
   --outfile=/tmp/stress-test-compiled.js
+
+sysmon_loop &
+SYSMON_PID=$!
+trap "kill $SYSMON_PID 2>/dev/null" EXIT
 
 echo "[run-stress] Avvio test a $(date)" | tee -a "$LOG_FILE"
 node /tmp/stress-test-compiled.js 2>&1 | tee -a "$LOG_FILE"
