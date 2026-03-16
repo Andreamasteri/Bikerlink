@@ -1199,8 +1199,10 @@ var init_storage = __esm({
         const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(users).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.status, "active"), (0, import_drizzle_orm2.eq)(users.isFake, false), (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)));
         return result[0]?.count ?? 0;
       }
-      async countOnlineUsers(since) {
-        const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(users).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.status, "active"), (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)));
+      async countOnlineUsers(since, countries) {
+        const conditions = [(0, import_drizzle_orm2.eq)(users.status, "active"), (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)];
+        if (countries && countries.length > 0) conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
+        const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(users).where((0, import_drizzle_orm2.and)(...conditions));
         return result[0]?.count ?? 0;
       }
       async countAvailableUsers(since) {
@@ -1434,22 +1436,26 @@ var init_storage = __esm({
         }
         return keys;
       }
-      async countAvailableBikers(since) {
-        const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)(
+      async countAvailableBikers(since, countries) {
+        const conditions = [
           (0, import_drizzle_orm2.eq)(users.status, "active"),
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           (0, import_drizzle_orm2.gte)(users.lastLoginAt, since),
           (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.userType, "biker"), (0, import_drizzle_orm2.eq)(users.userType, "coppia"))
-        ));
+        ];
+        if (countries && countries.length > 0) conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
+        const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)(...conditions));
         return result[0]?.count ?? 0;
       }
-      async countAvailableZavorrine(since) {
-        const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)(
+      async countAvailableZavorrine(since, countries) {
+        const conditions = [
           (0, import_drizzle_orm2.eq)(users.status, "active"),
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           (0, import_drizzle_orm2.gte)(users.lastLoginAt, since),
           (0, import_drizzle_orm2.eq)(users.userType, "zavorrina")
-        ));
+        ];
+        if (countries && countries.length > 0) conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
+        const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)(...conditions));
         return result[0]?.count ?? 0;
       }
       async getAvailableBikersList(since, lat, lng, countries) {
@@ -3709,7 +3715,8 @@ router2.get("/:id/public", requireAuth, async (req, res) => {
 router2.get("/online-count", requireAuth, async (req, res) => {
   try {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
-    const count = await storage.countOnlineUsers(fifteenMinutesAgo);
+    const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
+    const count = await storage.countOnlineUsers(fifteenMinutesAgo, countriesParam);
     return res.json({ count });
   } catch (error) {
     console.error("Online count error:", error);
@@ -3818,7 +3825,8 @@ router2.get("/available-list", requireAuth, async (req, res) => {
 router2.get("/biker-available-count", requireAuth, async (req, res) => {
   try {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
-    const count = await storage.countAvailableBikers(fifteenMinutesAgo);
+    const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
+    const count = await storage.countAvailableBikers(fifteenMinutesAgo, countriesParam);
     return res.json({ count });
   } catch (error) {
     console.error("Biker available count error:", error);
@@ -3828,7 +3836,8 @@ router2.get("/biker-available-count", requireAuth, async (req, res) => {
 router2.get("/zavorrine-available-count", requireAuth, async (req, res) => {
   try {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
-    const count = await storage.countAvailableZavorrine(fifteenMinutesAgo);
+    const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
+    const count = await storage.countAvailableZavorrine(fifteenMinutesAgo, countriesParam);
     return res.json({ count });
   } catch (error) {
     console.error("Zavorrine available count error:", error);

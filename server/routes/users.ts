@@ -275,7 +275,8 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
 router.get("/online-count", requireAuth, async (req: Request, res: Response) => {
   try {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    const count = await storage.countOnlineUsers(fifteenMinutesAgo);
+    const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
+    const count = await storage.countOnlineUsers(fifteenMinutesAgo, countriesParam);
     return res.json({ count });
   } catch (error) {
     console.error("Online count error:", error);
@@ -397,7 +398,8 @@ router.get("/available-list", requireAuth, async (req: Request, res: Response) =
 router.get("/biker-available-count", requireAuth, async (req: Request, res: Response) => {
   try {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    const count = await storage.countAvailableBikers(fifteenMinutesAgo);
+    const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
+    const count = await storage.countAvailableBikers(fifteenMinutesAgo, countriesParam);
     return res.json({ count });
   } catch (error) {
     console.error("Biker available count error:", error);
@@ -408,7 +410,8 @@ router.get("/biker-available-count", requireAuth, async (req: Request, res: Resp
 router.get("/zavorrine-available-count", requireAuth, async (req: Request, res: Response) => {
   try {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    const count = await storage.countAvailableZavorrine(fifteenMinutesAgo);
+    const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
+    const count = await storage.countAvailableZavorrine(fifteenMinutesAgo, countriesParam);
     return res.json({ count });
   } catch (error) {
     console.error("Zavorrine available count error:", error);

@@ -285,24 +285,27 @@ export default function MapScreen() {
 
   // --- LIVELLO 2: contatori (dopo mappa pronta, refresh 5 minuti) ---
   const onlineCountQuery = useQuery<{ count: number }>({
-    queryKey: ["/api/users/online-count"],
+    queryKey: ["/api/users/online-count", countriesQueryParam],
+    queryFn: () => fetch(new URL(`/api/users/online-count${countriesQueryParam ? `?countries=${countriesQueryParam}` : ""}`, getApiUrl()).toString(), { credentials: "include" }).then(r => r.json()),
     staleTime: 300000,
     refetchInterval: 300000,
-    enabled: isAuthenticated && mapReady,
+    enabled: isAuthenticated && mapReady && countriesLoaded,
   });
 
   const bikerCountQuery = useQuery<{ count: number }>({
-    queryKey: ["/api/users/biker-available-count"],
+    queryKey: ["/api/users/biker-available-count", countriesQueryParam],
+    queryFn: () => fetch(new URL(`/api/users/biker-available-count${countriesQueryParam ? `?countries=${countriesQueryParam}` : ""}`, getApiUrl()).toString(), { credentials: "include" }).then(r => r.json()),
     staleTime: 300000,
     refetchInterval: 300000,
-    enabled: isAuthenticated && mapReady,
+    enabled: isAuthenticated && mapReady && countriesLoaded,
   });
 
   const zavCountQuery = useQuery<{ count: number }>({
-    queryKey: ["/api/users/zavorrine-available-count"],
+    queryKey: ["/api/users/zavorrine-available-count", countriesQueryParam],
+    queryFn: () => fetch(new URL(`/api/users/zavorrine-available-count${countriesQueryParam ? `?countries=${countriesQueryParam}` : ""}`, getApiUrl()).toString(), { credentials: "include" }).then(r => r.json()),
     staleTime: 300000,
     refetchInterval: 300000,
-    enabled: isAuthenticated && mapReady,
+    enabled: isAuthenticated && mapReady && countriesLoaded,
   });
 
   // --- LIVELLO 3: dati secondari (dopo utenti vicini caricati) ---

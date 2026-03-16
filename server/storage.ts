@@ -257,7 +257,7 @@ export interface IStorage {
   getWorkshopContactsByPeriod(startDate: Date, endDate: Date): Promise<WorkshopContact[]>;
   countUsers(): Promise<number>;
   countActiveUsers(since: Date): Promise<number>;
-  countOnlineUsers(since: Date): Promise<number>;
+  countOnlineUsers(since: Date, countries?: string[]): Promise<number>;
   countAvailableUsers(): Promise<number>;
   getUnapprovedUserPhotos(): Promise<UserPhoto[]>;
   updateUserPhotoApproval(id: string, approved: boolean): Promise<UserPhoto | undefined>;
@@ -268,8 +268,8 @@ export interface IStorage {
   getPhoneSharedCount(conversationId: string, userId: string): Promise<number>;
   incrementPhoneSharedCount(conversationId: string, userId: string): Promise<void>;
 
-  countAvailableBikers(since: Date): Promise<number>;
-  countAvailableZavorrine(since: Date): Promise<number>;
+  countAvailableBikers(since: Date, countries?: string[]): Promise<number>;
+  countAvailableZavorrine(since: Date, countries?: string[]): Promise<number>;
   getAvailableBikersList(since: Date, lat?: number, lng?: number, countries?: string[]): Promise<any[]>;
   getAvailableZavorrinaList(since: Date, lat?: number, lng?: number, countries?: string[]): Promise<any[]>;
 
@@ -965,8 +965,10 @@ export class DatabaseStorage implements IStorage {
     return result[0]?.count ?? 0;
   }
 
-  async countOnlineUsers(since: Date): Promise<number> {
-    const result = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(and(eq(users.status, "active"), gte(users.lastLoginAt, since)));
+  async countOnlineUsers(since: Date, countries?: string[]): Promise<number> {
+    const conditions: any[] = [eq(users.status, "active"), gte(users.lastLoginAt, since)];
+    if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
+    const result = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(and(...conditions));
     return result[0]?.count ?? 0;
   }
 
@@ -1259,29 +1261,33 @@ export class DatabaseStorage implements IStorage {
     return keys;
   }
 
-  async countAvailableBikers(since: Date): Promise<number> {
+  async countAvailableBikers(since: Date, countries?: string[]): Promise<number> {
+    const conditions: any[] = [
+      eq(users.status, "active"),
+      eq(userProfiles.isAvailable, true),
+      gte(users.lastLoginAt, since),
+      or(eq(users.userType, "biker"), eq(users.userType, "coppia"))
+    ];
+    if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const result = await db.select({ count: sql<number>`count(*)::int` })
       .from(userProfiles)
       .innerJoin(users, eq(users.id, userProfiles.userId))
-      .where(and(
-        eq(users.status, "active"),
-        eq(userProfiles.isAvailable, true),
-        gte(users.lastLoginAt, since),
-        or(eq(users.userType, "biker"), eq(users.userType, "coppia"))
-      ));
+      .where(and(...conditions));
     return result[0]?.count ?? 0;
   }
 
-  async countAvailableZavorrine(since: Date): Promise<number> {
+  async countAvailableZavorrine(since: Date, countries?: string[]): Promise<number> {
+    const conditions: any[] = [
+      eq(users.status, "active"),
+      eq(userProfiles.isAvailable, true),
+      gte(users.lastLoginAt, since),
+      eq(users.userType, "zavorrina")
+    ];
+    if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const result = await db.select({ count: sql<number>`count(*)::int` })
       .from(userProfiles)
       .innerJoin(users, eq(users.id, userProfiles.userId))
-      .where(and(
-        eq(users.status, "active"),
-        eq(userProfiles.isAvailable, true),
-        gte(users.lastLoginAt, since),
-        eq(users.userType, "zavorrina")
-      ));
+      .where(and(...conditions));
     return result[0]?.count ?? 0;
   }
 
