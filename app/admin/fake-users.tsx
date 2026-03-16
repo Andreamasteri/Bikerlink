@@ -17,7 +17,6 @@ import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollV
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { fetch } from "expo/fetch";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 

@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
 import Colors from "@/constants/colors";
 import { getApiUrl, queryClient, apiRequest } from "@/lib/query-client";
-import { fetch } from "expo/fetch";
 
 interface AppSetting {
   id: string;
