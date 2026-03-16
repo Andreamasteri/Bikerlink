@@ -9084,6 +9084,14 @@ async function registerRoutes(app2) {
     res.setHeader("Content-Disposition", 'attachment; filename="BikerLink-Manual.pdf"');
     res.setHeader("Content-Type", "application/pdf");
     const stream = import_node_fs.default.createReadStream(MANUAL_PATH);
+    stream.on("error", (err) => {
+      console.error("Manual stream error:", err);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Errore lettura file" });
+      } else {
+        res.end();
+      }
+    });
     stream.pipe(res);
   });
   app2.get("/api/manual/info", (_req, res) => {

@@ -25,7 +25,7 @@ import { type AppLanguage } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage, useT } from "@/lib/language-context";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 

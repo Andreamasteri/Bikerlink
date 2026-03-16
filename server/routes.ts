@@ -274,6 +274,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader("Content-Disposition", 'attachment; filename="BikerLink-Manual.pdf"');
     res.setHeader("Content-Type", "application/pdf");
     const stream = fs.createReadStream(MANUAL_PATH);
+    stream.on("error", (err) => {
+      console.error("Manual stream error:", err);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Errore lettura file" });
+      } else {
+        res.end();
+      }
+    });
     stream.pipe(res);
   });
 
