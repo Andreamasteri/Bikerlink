@@ -154,6 +154,8 @@ const translations: Record<AppLanguage, Record<string, string>> = {
 
     "syneco.sponsor": "Sponsorizzato da Syneco Lubrificanti",
 
+    "map.title": "Mappa",
+
     "language.title": "Lingua",
   },
 
@@ -300,6 +302,8 @@ const translations: Record<AppLanguage, Record<string, string>> = {
 
     "syneco.sponsor": "Sponsored by Syneco Lubricants",
 
+    "map.title": "Map",
+
     "language.title": "Language",
   },
 
@@ -445,6 +449,8 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "validation.passwordMismatch": "Die Passwörter stimmen nicht überein",
 
     "syneco.sponsor": "Gesponsert von Syneco Schmierstoffe",
+
+    "map.title": "Karte",
 
     "language.title": "Sprache",
   },
