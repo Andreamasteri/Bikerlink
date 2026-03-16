@@ -38,6 +38,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient, apiRequest } from "@/lib/query-client";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { LocationProvider } from "@/lib/location-context";
+import { LanguageProvider, useLanguage } from "@/lib/language-context";
 import Colors from "@/constants/colors";
 
 SplashScreen.preventAutoHideAsync();
@@ -76,6 +77,21 @@ function AppStateHandler() {
   }, [user]);
 
   return null;
+}
+
+function LanguageKeyedRoot() {
+  const { renderKey } = useLanguage();
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }} key={renderKey}>
+      {Platform.OS === "web" ? (
+        <RootLayoutNav />
+      ) : (
+        <KeyboardProvider>
+          <RootLayoutNav />
+        </KeyboardProvider>
+      )}
+    </GestureHandlerRootView>
+  );
 }
 
 function RootLayoutNav() {
@@ -119,22 +135,16 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <LocationProvider>
-            <AppStateHandler />
-            <GestureHandlerRootView style={{ flex: 1 }}>
-              {Platform.OS === "web" ? (
-                <RootLayoutNav />
-              ) : (
-                <KeyboardProvider>
-                  <RootLayoutNav />
-                </KeyboardProvider>
-              )}
-            </GestureHandlerRootView>
-          </LocationProvider>
-        </AuthProvider>
-      </QueryClientProvider>
+      <LanguageProvider>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <LocationProvider>
+              <AppStateHandler />
+              <LanguageKeyedRoot />
+            </LocationProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      </LanguageProvider>
     </ErrorBoundary>
   );
 }

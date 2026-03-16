@@ -22,7 +22,9 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
+import { type AppLanguage } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
+import { useLanguage } from "@/lib/language-context";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 
 interface ProfileData {
@@ -100,6 +102,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, logoutMutation } = useAuth();
   const router = useRouter();
+  const { language, setLanguage } = useLanguage();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const profileQuery = useQuery<ProfileData>({
@@ -603,12 +606,25 @@ export default function ProfileScreen() {
       </View>
 
       <View style={[styles.section, { marginTop: 24 }]}>
-        <Text style={styles.sectionTitle}>Lingua</Text>
+        <Text style={styles.sectionTitle}>{t("language.title")}</Text>
         <View style={styles.languageBar}>
-          <Pressable style={[styles.languageBtn, styles.languageBtnActive]}>
-            <Text style={styles.languageFlagText}>🇮🇹</Text>
-            <Text style={[styles.languageBtnText, styles.languageBtnTextActive]}>Italiano</Text>
-          </Pressable>
+          {([
+            { code: "it" as AppLanguage, flag: "🇮🇹", label: "Italiano" },
+            { code: "en" as AppLanguage, flag: "🇬🇧", label: "English" },
+            { code: "de" as AppLanguage, flag: "🇩🇪", label: "Deutsch" },
+          ]).map((lang) => {
+            const isActive = language === lang.code;
+            return (
+              <Pressable
+                key={lang.code}
+                style={[styles.languageBtn, isActive && styles.languageBtnActive]}
+                onPress={() => setLanguage(lang.code)}
+              >
+                <Text style={styles.languageFlagText}>{lang.flag}</Text>
+                <Text style={[styles.languageBtnText, isActive && styles.languageBtnTextActive]}>{lang.label}</Text>
+              </Pressable>
+            );
+          })}
         </View>
       </View>
 
