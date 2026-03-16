@@ -207,11 +207,21 @@ function configureExpoAndLanding(app: express.Application) {
   app.use(express.static(path.resolve(process.cwd(), "static-build")));
 
   const webBuildDir = path.resolve(process.cwd(), "static-build", "web");
-  app.use("/web", express.static(webBuildDir));
-  app.use(express.static(webBuildDir, { index: false }));
+  const noCacheHtml = (res: express.Response, filePath: string) => {
+    if (filePath.endsWith(".html")) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+    }
+  };
+  app.use("/web", express.static(webBuildDir, { setHeaders: noCacheHtml }));
+  app.use(express.static(webBuildDir, { index: false, setHeaders: noCacheHtml }));
   app.use("/web", (_req: Request, res: Response) => {
     const indexPath = path.join(webBuildDir, "index.html");
     if (fs.existsSync(indexPath)) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
       res.sendFile(indexPath);
     } else {
       res.status(404).send("Web build not available");
@@ -264,6 +274,9 @@ function setupErrorHandler(app: express.Application) {
     if (req.path === "/" || req.path === "/manifest" || req.path === "/healthz") return next();
     if (req.path.match(/\.\w+$/)) return next();
     if (fs.existsSync(webBuildIndex)) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
       return res.sendFile(webBuildIndex);
     }
     next();
