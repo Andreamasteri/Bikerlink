@@ -1,5 +1,41 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
+import { sendEmail } from "../email";
+
+const ADMIN_EMAIL = "bikerlinkapp@gmail.com";
+
+const TICKET_TYPE_LABELS: Record<string, string> = {
+  bug: "Bug Report",
+  suggestion: "Suggerimento",
+  feedback: "Feedback",
+  other: "Altro",
+};
+
+function buildFeedbackEmailHtml(nickname: string, ticketType: string, subject: string, message: string): string {
+  const typeLabel = TICKET_TYPE_LABELS[ticketType] || ticketType;
+  const typeBadgeColor = ticketType === "bug" ? "#e74c3c" : ticketType === "suggestion" ? "#2ecc71" : "#FF6B35";
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
+      <div style="text-align: center; margin-bottom: 30px;">
+        <h1 style="color: #FF6B35; margin: 0; font-size: 28px;">&#x1F6E1;&#xFE0F; BikerLink</h1>
+        <p style="color: #888; font-size: 14px; margin-top: 4px;">Nuovo ticket ricevuto</p>
+      </div>
+      <div style="background: #1a1a2e; border-radius: 12px; padding: 30px; color: #fff;">
+        <div style="display: inline-block; background: ${typeBadgeColor}; border-radius: 6px; padding: 4px 12px; margin-bottom: 16px;">
+          <span style="color: #fff; font-size: 13px; font-weight: bold;">${typeLabel}</span>
+        </div>
+        <h2 style="margin-top: 0; font-size: 20px; color: #FF6B35;">${subject}</h2>
+        <p style="color: #aaa; font-size: 13px; margin-bottom: 4px;">Da: <strong style="color: #fff;">${nickname}</strong></p>
+        <div style="background: #16162a; border-radius: 8px; padding: 16px; margin-top: 16px;">
+          <p style="color: #ccc; line-height: 1.6; margin: 0; white-space: pre-wrap;">${message}</p>
+        </div>
+      </div>
+      <p style="text-align: center; color: #666; font-size: 12px; margin-top: 20px;">
+        &copy; ${new Date().getFullYear()} BikerLink &mdash; Notifica automatica
+      </p>
+    </div>
+  `;
+}
 
 const router = Router();
 
@@ -21,6 +57,19 @@ router.post("/", async (req: Request, res: Response) => {
       subject,
       message,
     });
+
+    try {
+      const user = await storage.getUser(req.session.userId);
+      const nickname = user?.nickname || "Utente sconosciuto";
+      const type = ticketType || "feedback";
+      const emailSubject = `[BikerLink] ${TICKET_TYPE_LABELS[type] || type}: ${subject}`;
+      const html = buildFeedbackEmailHtml(nickname, type, subject, message);
+      sendEmail(ADMIN_EMAIL, emailSubject, html).catch((err) =>
+        console.error("[EMAIL] Errore invio notifica feedback:", err)
+      );
+    } catch (emailErr) {
+      console.error("[EMAIL] Errore preparazione notifica feedback:", emailErr);
+    }
 
     return res.status(201).json(ticket);
   } catch (error) {
