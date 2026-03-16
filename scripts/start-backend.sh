@@ -26,10 +26,23 @@ lsof -ti:8081 2>/dev/null | xargs kill -9 2>/dev/null || true
 sleep 3
 echo "Processi Metro terminati. Avvio compilazione esbuild..."
 
-echo "Compilazione TypeScript server..."
-npm run server:build
-if [ $? -ne 0 ]; then
-  echo "ERRORE: compilazione server fallita"
+BUILD_MAX_RETRIES=3
+BUILD_OK=0
+for build_try in $(seq 1 $BUILD_MAX_RETRIES); do
+  echo "Compilazione TypeScript server (tentativo $build_try/$BUILD_MAX_RETRIES)..."
+  npm run server:build
+  if [ $? -eq 0 ]; then
+    BUILD_OK=1
+    break
+  fi
+  echo "Compilazione fallita al tentativo $build_try"
+  if [ $build_try -lt $BUILD_MAX_RETRIES ]; then
+    echo "Attendo 5 secondi per liberare RAM prima di riprovare..."
+    sleep 5
+  fi
+done
+if [ $BUILD_OK -ne 1 ]; then
+  echo "ERRORE: compilazione server fallita dopo $BUILD_MAX_RETRIES tentativi"
   exit 1
 fi
 echo "Compilazione completata."
