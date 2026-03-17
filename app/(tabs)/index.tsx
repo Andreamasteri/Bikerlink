@@ -222,6 +222,22 @@ export default function MapScreen() {
 
   useEffect(() => {
     (async () => {
+      if (user?.region) {
+        setLocation(getRegionCoordinates(user.country, user.region));
+        setLocationLoading(false);
+        fetchGPSLocation();
+        return;
+      }
+
+      const savedLat = (user as any)?.profileLatitude;
+      const savedLng = (user as any)?.profileLongitude;
+      if (savedLat != null && savedLng != null && !isNaN(savedLat) && !isNaN(savedLng)) {
+        setLocation({ latitude: Number(savedLat), longitude: Number(savedLng) });
+        setLocationLoading(false);
+        fetchGPSLocation();
+        return;
+      }
+
       const gps = await fetchGPSLocation();
       if (gps) {
         setLocation(gps);
@@ -230,7 +246,7 @@ export default function MapScreen() {
       }
       setLocationLoading(false);
     })();
-  }, [fetchGPSLocation, getRegionFallback]);
+  }, [fetchGPSLocation, getRegionFallback, user?.region, user?.country]);
 
   const handleCenterPosition = useCallback(async () => {
     const gps = await fetchGPSLocation();
