@@ -290,7 +290,7 @@ const en: Record<string, string> = {
   "match.emptyGarageDesc": "The system matches bikers' motorcycles with pillions' wishlists. Add motorcycles to your garage or wishlist to find matches!",
   "match.emptyHistoryDesc": "Rejected or expired matches will appear here.",
   "match.removeAccepted": "Remove",
-  "match.removeMatchConfirm": "Remove this match? This action cannot be undone.",
+  "match.removeMatchConfirm": "The match will return to the Pending tab for review.",
   "match.resetRejected": "Reset rejected",
   "match.resetRejectedConfirm": "Delete all rejected matches? The system will rematch them in the next cycle.",
   "match.proposalOf": "Proposal by",

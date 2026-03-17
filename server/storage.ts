@@ -299,6 +299,7 @@ export interface IStorage {
   getGarageMatch(id: string): Promise<BikerZavarrinaMatch | undefined>;
   updateGarageMatch(id: string, data: Partial<InsertBikerZavarrinaMatch>): Promise<BikerZavarrinaMatch | undefined>;
   deleteGarageMatch(id: string, userId: string): Promise<boolean>;
+  resetGarageMatchToNew(id: string, userId: string): Promise<boolean>;
   deleteRejectedGarageMatches(userId: string): Promise<number>;
   getAllWishlistMotosWithUsers(): Promise<{ wishlistMoto: any; userId: string }[]>;
   getAllBikerMotorcyclesWithUsers(): Promise<{ motorcycle: any; userId: string }[]>;
@@ -1240,6 +1241,14 @@ export class DatabaseStorage implements IStorage {
     if (!match) return false;
     if (match.bikerId !== userId && match.zavarrinaId !== userId) return false;
     await db.delete(bikerZavarrinaMatches).where(eq(bikerZavarrinaMatches.id, id));
+    return true;
+  }
+
+  async resetGarageMatchToNew(id: string, userId: string): Promise<boolean> {
+    const [match] = await db.select().from(bikerZavarrinaMatches).where(eq(bikerZavarrinaMatches.id, id));
+    if (!match) return false;
+    if (match.bikerId !== userId && match.zavarrinaId !== userId) return false;
+    await db.update(bikerZavarrinaMatches).set({ status: "new" }).where(eq(bikerZavarrinaMatches.id, id));
     return true;
   }
 

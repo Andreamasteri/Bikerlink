@@ -1421,6 +1421,13 @@ var init_storage = __esm({
         await db.delete(bikerZavarrinaMatches).where((0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.id, id));
         return true;
       }
+      async resetGarageMatchToNew(id, userId) {
+        const [match] = await db.select().from(bikerZavarrinaMatches).where((0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.id, id));
+        if (!match) return false;
+        if (match.bikerId !== userId && match.zavarrinaId !== userId) return false;
+        await db.update(bikerZavarrinaMatches).set({ status: "new" }).where((0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.id, id));
+        return true;
+      }
       async deleteRejectedGarageMatches(userId) {
         const rejected = await db.select().from(bikerZavarrinaMatches).where(
           (0, import_drizzle_orm2.and)(
@@ -5280,11 +5287,11 @@ router5.delete("/garage-matches/rejected", requireAuth4, async (req, res) => {
 router5.delete("/garage-matches/:matchId", requireAuth4, async (req, res) => {
   try {
     const userId = req.session.userId;
-    const ok = await storage.deleteGarageMatch(req.params.matchId, userId);
+    const ok = await storage.resetGarageMatchToNew(req.params.matchId, userId);
     if (!ok) return res.status(404).json({ message: "Match non trovato o non autorizzato" });
     return res.json({ deleted: true });
   } catch (error) {
-    console.error("Delete garage match error:", error);
+    console.error("Reset garage match error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

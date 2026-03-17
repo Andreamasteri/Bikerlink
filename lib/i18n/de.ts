@@ -290,7 +290,7 @@ const de: Record<string, string> = {
   "match.emptyGarageDesc": "Das System vergleicht die Motorräder der Biker mit den Wunschlisten der Sozias. Füge Motorräder zur Garage oder Wunschliste hinzu!",
   "match.emptyHistoryDesc": "Abgelehnte oder abgelaufene Matches erscheinen hier.",
   "match.removeAccepted": "Entfernen",
-  "match.removeMatchConfirm": "Diesen Match entfernen? Diese Aktion kann nicht rückgängig gemacht werden.",
+  "match.removeMatchConfirm": "Der Match kehrt zum Tab Ausstehend zurück und kann neu bewertet werden.",
   "match.resetRejected": "Abgelehnte zurücksetzen",
   "match.resetRejectedConfirm": "Alle abgelehnten Matches löschen? Das System wird sie im nächsten Zyklus neu zuordnen.",
   "match.proposalOf": "Vorschlag von",

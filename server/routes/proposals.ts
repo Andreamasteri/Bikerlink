@@ -520,11 +520,11 @@ router.delete("/garage-matches/rejected", requireAuth, async (req: Request, res:
 router.delete("/garage-matches/:matchId", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const ok = await storage.deleteGarageMatch(req.params.matchId, userId);
+    const ok = await storage.resetGarageMatchToNew(req.params.matchId, userId);
     if (!ok) return res.status(404).json({ message: "Match non trovato o non autorizzato" });
     return res.json({ deleted: true });
   } catch (error) {
-    console.error("Delete garage match error:", error);
+    console.error("Reset garage match error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
