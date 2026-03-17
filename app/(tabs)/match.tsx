@@ -39,8 +39,10 @@ function getSearchTypeIcon(searchType?: string | null): keyof typeof Ionicons.gl
 }
 
 function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress, isPending, t, locale }: { match: any; currentUserId: string; onAccept: () => void; onReject: () => void; onChatPress?: () => void; isPending: boolean; t: (key: string) => string; locale: string }) {
+  const cardRouter = useRouter();
   const isBiker = match.bikerId === currentUserId;
   const otherNickname = isBiker ? match.zavarrinaNickname : match.bikerNickname;
+  const otherUserId = isBiker ? match.zavarrinaId : match.bikerId;
   const otherType = isBiker ? "zavorrina" : "biker";
   const otherColor = otherType === "biker" ? Colors.maleIcon : Colors.femaleIcon;
   const motoInfo = match.bikerMoto;
@@ -71,7 +73,11 @@ function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress
         {createdDate && <Text style={styles.matchDate}>{createdDate}</Text>}
       </View>
 
-      <View style={styles.matchUserRow}>
+      <TouchableOpacity
+        style={styles.matchUserRow}
+        onPress={() => otherUserId && cardRouter.push(`/profile/${otherUserId}` as any)}
+        activeOpacity={0.7}
+      >
         <View style={styles.matchUserInfo}>
           <Ionicons
             name={otherType === "biker" ? "bicycle" : "person"}
@@ -84,8 +90,9 @@ function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress
               {t(`userType.${otherType}`)}
             </Text>
           </View>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
         </View>
-      </View>
+      </TouchableOpacity>
 
       {isAccepted && onChatPress && (
         <TouchableOpacity style={styles.chatBtn} onPress={onChatPress}>
@@ -152,10 +159,12 @@ function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, 
   t: (key: string) => string;
   locale: string;
 }) {
+  const cardRouter = useRouter();
   const isUser1 = match.userId1 === currentUserId;
   const myProposal = isUser1 ? match.proposal1 : match.proposal2;
   const otherProposal = isUser1 ? match.proposal2 : match.proposal1;
   const otherNickname = isUser1 ? match.user2Nickname : match.user1Nickname;
+  const otherUserId = isUser1 ? match.userId2 : match.userId1;
   const otherType = isUser1 ? match.user2Type : match.user1Type;
 
   const otherColor = otherType === "biker" ? Colors.maleIcon : otherType === "zavorrina" ? Colors.femaleIcon : Colors.accent;
@@ -191,7 +200,11 @@ function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, 
         {createdDate && <Text style={styles.matchDate}>{createdDate}</Text>}
       </View>
 
-      <View style={styles.matchUserRow}>
+      <TouchableOpacity
+        style={styles.matchUserRow}
+        onPress={() => otherUserId && cardRouter.push(`/profile/${otherUserId}` as any)}
+        activeOpacity={0.7}
+      >
         <View style={styles.matchUserInfo}>
           <Ionicons
             name={otherType === "biker" ? "bicycle" : otherType === "zavorrina" ? "person" : "people"}
@@ -204,8 +217,9 @@ function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, 
               {t(`userType.${otherType}`)}
             </Text>
           </View>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
         </View>
-      </View>
+      </TouchableOpacity>
 
       <View style={styles.matchProposals}>
         <View style={styles.proposalMini}>
