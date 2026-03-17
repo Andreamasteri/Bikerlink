@@ -551,7 +551,8 @@ var init_schema = __esm({
       createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow()
     }, (table) => [
       (0, import_pg_core.index)("matches_biker_id_idx").on(table.bikerId),
-      (0, import_pg_core.index)("matches_zavorrina_id_idx").on(table.zavarrinaId)
+      (0, import_pg_core.index)("matches_zavorrina_id_idx").on(table.zavarrinaId),
+      (0, import_pg_core.uniqueIndex)("matches_unique_combo_idx").on(table.bikerId, table.zavarrinaId, table.bikerMotorcycleId, table.wishlistMotoId)
     ]);
     emailVerificationTokens = (0, import_pg_core.pgTable)("email_verification_tokens", {
       id: (0, import_pg_core.varchar)("id", { length: 36 }).primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
@@ -1400,7 +1401,7 @@ var init_storage = __esm({
       async getMatchesForUser(userId) {
         return db.select().from(bikerZavarrinaMatches).where(
           (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.bikerId, userId), (0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.zavarrinaId, userId))
-        ).orderBy((0, import_drizzle_orm2.desc)(bikerZavarrinaMatches.createdAt));
+        ).orderBy((0, import_drizzle_orm2.desc)(bikerZavarrinaMatches.status), (0, import_drizzle_orm2.desc)(bikerZavarrinaMatches.createdAt)).limit(200);
       }
       async getGarageMatch(id) {
         const [match] = await db.select().from(bikerZavarrinaMatches).where((0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.id, id));
@@ -9417,40 +9418,46 @@ async function runWishlistMatching() {
     if (wishlistMotos.length === 0 || bikerMotorcycles.length === 0) return 0;
     const existingKeys = await storage.getAllExistingBikerZavarrinaMatchKeys();
     let matchCount = 0;
-    for (const wm of wishlistMotos) {
-      const zavarrinaId = wm.userId;
-      const wish = wm.wishlistMoto;
-      for (const bm of bikerMotorcycles) {
-        const bikerId = bm.userId;
-        const moto = bm.motorcycle;
-        if (bikerId === zavarrinaId) continue;
-        let compatible = false;
-        if (wish.brand && wish.model) {
-          if (moto.brand && moto.model && wish.brand.toLowerCase() === moto.brand.toLowerCase() && (moto.model.toLowerCase().includes(wish.model.toLowerCase()) || wish.model.toLowerCase().includes(moto.model.toLowerCase()))) {
-            compatible = true;
+    const MAX_MATCHES_PER_RUN = 500;
+    outer:
+      for (const wm of wishlistMotos) {
+        const zavarrinaId = wm.userId;
+        const wish = wm.wishlistMoto;
+        for (const bm of bikerMotorcycles) {
+          if (matchCount >= MAX_MATCHES_PER_RUN) break outer;
+          const bikerId = bm.userId;
+          const moto = bm.motorcycle;
+          if (bikerId === zavarrinaId) continue;
+          let compatible = false;
+          if (wish.brand && wish.model) {
+            if (moto.brand && moto.model && wish.brand.toLowerCase() === moto.brand.toLowerCase() && (moto.model.toLowerCase().includes(wish.model.toLowerCase()) || wish.model.toLowerCase().includes(moto.model.toLowerCase()))) {
+              compatible = true;
+            }
+          } else if (wish.brand) {
+            if (moto.brand && wish.brand.toLowerCase() === moto.brand.toLowerCase()) {
+              compatible = true;
+            }
+          } else if (wish.motorcycleType) {
+            if (moto.motorcycleType && wish.motorcycleType.toLowerCase() === moto.motorcycleType.toLowerCase()) {
+              compatible = true;
+            }
           }
-        } else if (wish.brand) {
-          if (moto.brand && wish.brand.toLowerCase() === moto.brand.toLowerCase()) {
-            compatible = true;
-          }
-        } else if (wish.motorcycleType) {
-          if (moto.motorcycleType && wish.motorcycleType.toLowerCase() === moto.motorcycleType.toLowerCase()) {
-            compatible = true;
-          }
+          if (!compatible) continue;
+          const key = `${bikerId}:${zavarrinaId}:${moto.id}:${wish.id}`;
+          if (existingKeys.has(key)) continue;
+          await storage.createMatch({
+            bikerId,
+            zavarrinaId,
+            bikerMotorcycleId: moto.id,
+            wishlistMotoId: wish.id,
+            status: "new"
+          });
+          existingKeys.add(key);
+          matchCount++;
         }
-        if (!compatible) continue;
-        const key = `${bikerId}:${zavarrinaId}:${moto.id}:${wish.id}`;
-        if (existingKeys.has(key)) continue;
-        await storage.createMatch({
-          bikerId,
-          zavarrinaId,
-          bikerMotorcycleId: moto.id,
-          wishlistMotoId: wish.id,
-          status: "new"
-        });
-        existingKeys.add(key);
-        matchCount++;
       }
+    if (matchCount >= MAX_MATCHES_PER_RUN) {
+      console.log(`[Matching] Cap raggiunto (${MAX_MATCHES_PER_RUN} match/ciclo). Riprender\xE0 al prossimo run.`);
     }
     return matchCount;
   } catch (error) {

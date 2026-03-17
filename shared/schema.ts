@@ -680,6 +680,7 @@ export const bikerZavarrinaMatches = pgTable("biker_zavorrina_matches", {
 }, (table) => [
   index("matches_biker_id_idx").on(table.bikerId),
   index("matches_zavorrina_id_idx").on(table.zavarrinaId),
+  uniqueIndex("matches_unique_combo_idx").on(table.bikerId, table.zavarrinaId, table.bikerMotorcycleId, table.wishlistMotoId),
 ]);
 
 export const emailVerificationTokens = pgTable("email_verification_tokens", {

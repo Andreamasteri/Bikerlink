@@ -124,12 +124,16 @@ async function runWishlistMatching(): Promise<number> {
 
     const existingKeys = await storage.getAllExistingBikerZavarrinaMatchKeys();
     let matchCount = 0;
+    const MAX_MATCHES_PER_RUN = 500;
 
+    outer:
     for (const wm of wishlistMotos) {
       const zavarrinaId = wm.userId;
       const wish = wm.wishlistMoto;
 
       for (const bm of bikerMotorcycles) {
+        if (matchCount >= MAX_MATCHES_PER_RUN) break outer;
+
         const bikerId = bm.userId;
         const moto = bm.motorcycle;
 
@@ -176,6 +180,10 @@ async function runWishlistMatching(): Promise<number> {
         existingKeys.add(key);
         matchCount++;
       }
+    }
+
+    if (matchCount >= MAX_MATCHES_PER_RUN) {
+      console.log(`[Matching] Cap raggiunto (${MAX_MATCHES_PER_RUN} match/ciclo). Riprenderà al prossimo run.`);
     }
 
     return matchCount;

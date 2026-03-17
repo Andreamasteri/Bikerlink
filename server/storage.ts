@@ -1219,7 +1219,7 @@ export class DatabaseStorage implements IStorage {
   async getMatchesForUser(userId: string): Promise<BikerZavarrinaMatch[]> {
     return db.select().from(bikerZavarrinaMatches).where(
       or(eq(bikerZavarrinaMatches.bikerId, userId), eq(bikerZavarrinaMatches.zavarrinaId, userId))
-    ).orderBy(desc(bikerZavarrinaMatches.createdAt));
+    ).orderBy(desc(bikerZavarrinaMatches.status), desc(bikerZavarrinaMatches.createdAt)).limit(200);
   }
 
   async getGarageMatch(id: string): Promise<BikerZavarrinaMatch | undefined> {
