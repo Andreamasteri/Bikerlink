@@ -38,7 +38,17 @@ function getSearchTypeIcon(searchType?: string | null): keyof typeof Ionicons.gl
   }
 }
 
-function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress, isPending, t, locale }: { match: any; currentUserId: string; onAccept: () => void; onReject: () => void; onChatPress?: () => void; isPending: boolean; t: (key: string) => string; locale: string }) {
+function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress, onRemove, isPending, t, locale }: {
+  match: any;
+  currentUserId: string;
+  onAccept: () => void;
+  onReject: () => void;
+  onChatPress?: () => void;
+  onRemove?: () => void;
+  isPending: boolean;
+  t: (key: string) => string;
+  locale: string;
+}) {
   const cardRouter = useRouter();
   const isBiker = match.bikerId === currentUserId;
   const otherNickname = isBiker ? match.zavarrinaNickname : match.bikerNickname;
@@ -71,6 +81,11 @@ function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress
         <Ionicons name={statusIcon} size={16} color={statusColor} />
         <Text style={[styles.statusLabel, { color: statusColor }]}>{statusLabel}</Text>
         {createdDate && <Text style={styles.matchDate}>{createdDate}</Text>}
+        {isAccepted && onRemove && (
+          <TouchableOpacity onPress={onRemove} style={styles.removeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="trash-outline" size={16} color={Colors.accentRed} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <TouchableOpacity
@@ -147,14 +162,15 @@ function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress
   );
 }
 
-type TabKey = "pending" | "accepted" | "garage" | "history";
+type TabKey = "pending" | "accepted" | "garage";
 
-function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, isPending, t, locale }: {
+function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, onRemove, isPending, t, locale }: {
   match: any;
   currentUserId: string;
   onAccept: () => void;
   onReject: () => void;
   onChatPress?: () => void;
+  onRemove?: () => void;
   isPending: boolean;
   t: (key: string) => string;
   locale: string;
@@ -198,6 +214,11 @@ function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, 
         <Ionicons name={statusIcon} size={18} color={statusColor} />
         <Text style={[styles.matchStatusText, { color: statusColor }]}>{statusLabel}</Text>
         {createdDate && <Text style={styles.matchDate}>{createdDate}</Text>}
+        {isAccepted && onRemove && (
+          <TouchableOpacity onPress={onRemove} style={styles.removeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="trash-outline" size={16} color={Colors.accentRed} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <TouchableOpacity
@@ -303,6 +324,7 @@ export default function MatchScreen() {
   const { user } = useAuth();
   const t = useT();
   const locale = useLocale();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>("pending");
   const [pendingMatchId, setPendingMatchId] = useState<string | null>(null);
 
@@ -322,16 +344,18 @@ export default function MatchScreen() {
   const allGarageMatches = garageMatches || [];
   const pendingProposalMatches = allMatches.filter((m: any) => m.status === "pending");
   const acceptedProposalMatches = allMatches.filter((m: any) => m.status === "accepted");
-  const historyProposalMatches = allMatches.filter((m: any) => m.status === "rejected" || m.status === "expired");
 
   const garageMatchesTagged = allGarageMatches.map((m: any) => ({ ...m, _isGarage: true }));
   const newGarageMatches = garageMatchesTagged.filter((m: any) => m.status === "new");
   const acceptedGarageMatches = garageMatchesTagged.filter((m: any) => m.status === "accepted");
-  const rejectedGarageMatches = garageMatchesTagged.filter((m: any) => m.status === "rejected");
+  const visibleGarageMatches = garageMatchesTagged.filter((m: any) => m.status !== "rejected");
 
   const pendingMatches = [...pendingProposalMatches, ...newGarageMatches];
   const acceptedMatches = [...acceptedProposalMatches, ...acceptedGarageMatches];
-  const historyMatches = [...historyProposalMatches, ...rejectedGarageMatches];
+
+  const hasRejected =
+    allMatches.some((m: any) => m.status === "rejected") ||
+    allGarageMatches.some((m: any) => m.status === "rejected");
 
   const totalNewMatches = pendingMatches.length;
 
@@ -350,7 +374,10 @@ export default function MatchScreen() {
     prevMatchCountRef.current = totalNewMatches;
   }, [totalNewMatches]);
 
-  const currentList = activeTab === "pending" ? pendingMatches : activeTab === "accepted" ? acceptedMatches : activeTab === "garage" ? garageMatchesTagged : historyMatches;
+  const currentList =
+    activeTab === "pending" ? pendingMatches :
+    activeTab === "accepted" ? acceptedMatches :
+    visibleGarageMatches;
 
   const acceptMutation = useMutation({
     mutationFn: async (matchId: string) => {
@@ -430,6 +457,67 @@ export default function MatchScreen() {
     onError: (err: Error) => Alert.alert(t("match.error"), err.message),
   });
 
+  const removeProposalMatchMutation = useMutation({
+    mutationFn: async (matchId: string) => {
+      const url = new URL(`/api/proposals/matches/${matchId}`, getApiUrl());
+      const res = await globalThis.fetch(url.toString(), { method: "DELETE", credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: t("match.error") }));
+        throw new Error(err.message || t("match.error"));
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches"] });
+    },
+    onError: (err: Error) => Alert.alert(t("match.error"), err.message),
+  });
+
+  const removeGarageMatchMutation = useMutation({
+    mutationFn: async (matchId: string) => {
+      const url = new URL(`/api/proposals/garage-matches/${matchId}`, getApiUrl());
+      const res = await globalThis.fetch(url.toString(), { method: "DELETE", credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: t("match.error") }));
+        throw new Error(err.message || t("match.error"));
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
+    },
+    onError: (err: Error) => Alert.alert(t("match.error"), err.message),
+  });
+
+  const resetRejectedMutation = useMutation({
+    mutationFn: async () => {
+      const url1 = new URL("/api/proposals/matches/rejected", getApiUrl());
+      const url2 = new URL("/api/proposals/garage-matches/rejected", getApiUrl());
+      await Promise.all([
+        globalThis.fetch(url1.toString(), { method: "DELETE", credentials: "include" }),
+        globalThis.fetch(url2.toString(), { method: "DELETE", credentials: "include" }),
+      ]);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
+    },
+    onError: (err: Error) => Alert.alert(t("match.error"), err.message),
+  });
+
+  const handleResetRejected = useCallback(() => {
+    if (Platform.OS === "web") {
+      if (window.confirm(t("match.resetRejectedConfirm"))) {
+        resetRejectedMutation.mutate();
+      }
+    } else {
+      Alert.alert(t("match.resetRejected"), t("match.resetRejectedConfirm"), [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("common.confirm"), style: "destructive", onPress: () => resetRejectedMutation.mutate() },
+      ]);
+    }
+  }, [resetRejectedMutation, t]);
+
   const startGarageChatMutation = useMutation({
     mutationFn: async (otherUserId: string) => {
       const res = await apiRequest("POST", "/api/chat/conversations", {
@@ -459,6 +547,7 @@ export default function MatchScreen() {
           }}
           onReject={() => rejectGarageMutation.mutate(item.id)}
           onChatPress={item.status === "accepted" ? () => startGarageChatMutation.mutate(otherUserId) : undefined}
+          onRemove={item.status === "accepted" ? () => removeGarageMatchMutation.mutate(item.id) : undefined}
           isPending={pendingMatchId === item.id}
           t={t}
           locale={locale}
@@ -475,22 +564,22 @@ export default function MatchScreen() {
         }}
         onReject={() => rejectMutation.mutate(item.id)}
         onChatPress={item.conversationId ? () => router.push(`/chat/${item.conversationId}` as any) : undefined}
+        onRemove={item.status === "accepted" ? () => removeProposalMatchMutation.mutate(item.id) : undefined}
         isPending={pendingMatchId === item.id}
         t={t}
         locale={locale}
       />
     );
-  }, [user?.id, pendingMatchId, acceptMutation, rejectMutation, acceptGarageMutation, rejectGarageMutation, startGarageChatMutation, router]);
+  }, [user?.id, pendingMatchId, acceptMutation, rejectMutation, acceptGarageMutation, rejectGarageMutation, startGarageChatMutation, removeProposalMatchMutation, removeGarageMatchMutation, router]);
 
   const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; count: number }[] = [
     { key: "pending", label: t("match.tabPending"), icon: "hourglass", count: pendingMatches.length },
     { key: "accepted", label: t("match.tabAccepted"), icon: "checkmark-circle", count: acceptedMatches.length },
-    { key: "garage", label: t("match.tabGarage"), icon: "bicycle", count: garageMatchesTagged.length },
-    { key: "history", label: t("match.tabHistory"), icon: "time", count: historyMatches.length },
+    { key: "garage", label: t("match.tabGarage"), icon: "bicycle", count: visibleGarageMatches.length },
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, Platform.OS === "web" && { paddingTop: insets.top + 67, paddingBottom: 34 }]}>
       <View style={styles.tabRow}>
         {tabs.map((tab) => (
           <TouchableOpacity
@@ -521,6 +610,19 @@ export default function MatchScreen() {
             )}
           </TouchableOpacity>
         ))}
+        {hasRejected && (
+          <TouchableOpacity
+            style={styles.resetBtn}
+            onPress={handleResetRejected}
+            disabled={resetRejectedMutation.isPending}
+          >
+            {resetRejectedMutation.isPending ? (
+              <ActivityIndicator size="small" color={Colors.accentRed} />
+            ) : (
+              <Ionicons name="refresh" size={16} color={Colors.accentRed} />
+            )}
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.infoBanner}>
@@ -539,6 +641,7 @@ export default function MatchScreen() {
           data={currentList}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
+          extraData={currentList}
           contentContainerStyle={styles.list}
           refreshControl={
             <RefreshControl refreshing={isRefetching} onRefresh={() => { refetch(); garageRefetch(); }} tintColor={Colors.accent} />
@@ -547,21 +650,19 @@ export default function MatchScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons
-                name={activeTab === "pending" ? "flash-outline" : activeTab === "accepted" ? "checkmark-done-outline" : activeTab === "garage" ? "bicycle-outline" as any : "archive-outline"}
+                name={activeTab === "pending" ? "flash-outline" : activeTab === "accepted" ? "checkmark-done-outline" : "bicycle-outline" as any}
                 size={48}
                 color={Colors.textSecondary}
               />
               <Text style={styles.emptyTitle}>
-                {activeTab === "pending" ? t("match.emptyPendingTitle") : activeTab === "accepted" ? t("match.emptyAcceptedTitle") : activeTab === "garage" ? t("match.emptyGarageTitle") : t("match.emptyHistoryTitle")}
+                {activeTab === "pending" ? t("match.emptyPendingTitle") : activeTab === "accepted" ? t("match.emptyAcceptedTitle") : t("match.emptyGarageTitle")}
               </Text>
               <Text style={styles.emptyDesc}>
                 {activeTab === "pending"
                   ? t("match.emptyPendingDesc")
                   : activeTab === "accepted"
                   ? t("match.emptyAcceptedDesc")
-                  : activeTab === "garage"
-                  ? t("match.emptyGarageDesc")
-                  : t("match.emptyHistoryDesc")}
+                  : t("match.emptyGarageDesc")}
               </Text>
             </View>
           }
@@ -601,6 +702,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingVertical: 8,
     gap: 4,
+    alignItems: "center" as const,
   },
   tab: {
     flex: 1,
@@ -639,6 +741,20 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700" as const,
   },
+  resetBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: Colors.accentRed + "15",
+    borderWidth: 1,
+    borderColor: Colors.accentRed + "30",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  removeBtn: {
+    marginLeft: 4,
+    padding: 2,
+  },
   loading: {
     flex: 1,
     justifyContent: "center" as const,
@@ -669,6 +785,11 @@ const styles = StyleSheet.create({
     alignItems: "center" as const,
     gap: 6,
     marginBottom: 10,
+  },
+  statusLabel: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    flex: 1,
   },
   matchStatusText: {
     fontSize: 14,
@@ -744,6 +865,11 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   actionRow: {
+    flexDirection: "row" as const,
+    gap: 10,
+    marginTop: 12,
+  },
+  matchActions: {
     flexDirection: "row" as const,
     gap: 10,
     marginTop: 12,

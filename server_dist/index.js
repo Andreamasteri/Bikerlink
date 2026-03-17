@@ -840,6 +840,29 @@ var init_storage = __esm({
         const [match] = await db.update(proposalMatches).set(data).where((0, import_drizzle_orm2.eq)(proposalMatches.id, id)).returning();
         return match;
       }
+      async deleteProposalMatch(id, userId) {
+        const [match] = await db.select().from(proposalMatches).where((0, import_drizzle_orm2.eq)(proposalMatches.id, id));
+        if (!match) return false;
+        if (match.userId1 !== userId && match.userId2 !== userId) return false;
+        await db.delete(proposalMatches).where((0, import_drizzle_orm2.eq)(proposalMatches.id, id));
+        return true;
+      }
+      async deleteRejectedProposalMatches(userId) {
+        const rejected = await db.select().from(proposalMatches).where(
+          (0, import_drizzle_orm2.and)(
+            (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(proposalMatches.userId1, userId), (0, import_drizzle_orm2.eq)(proposalMatches.userId2, userId)),
+            (0, import_drizzle_orm2.eq)(proposalMatches.status, "rejected")
+          )
+        );
+        if (rejected.length === 0) return 0;
+        await db.delete(proposalMatches).where(
+          (0, import_drizzle_orm2.and)(
+            (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(proposalMatches.userId1, userId), (0, import_drizzle_orm2.eq)(proposalMatches.userId2, userId)),
+            (0, import_drizzle_orm2.eq)(proposalMatches.status, "rejected")
+          )
+        );
+        return rejected.length;
+      }
       async findExistingMatch(proposalId1, proposalId2) {
         const [match] = await db.select().from(proposalMatches).where(
           (0, import_drizzle_orm2.or)(
@@ -1386,6 +1409,29 @@ var init_storage = __esm({
       async updateGarageMatch(id, data) {
         const [updated] = await db.update(bikerZavarrinaMatches).set(data).where((0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.id, id)).returning();
         return updated;
+      }
+      async deleteGarageMatch(id, userId) {
+        const [match] = await db.select().from(bikerZavarrinaMatches).where((0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.id, id));
+        if (!match) return false;
+        if (match.bikerId !== userId && match.zavarrinaId !== userId) return false;
+        await db.delete(bikerZavarrinaMatches).where((0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.id, id));
+        return true;
+      }
+      async deleteRejectedGarageMatches(userId) {
+        const rejected = await db.select().from(bikerZavarrinaMatches).where(
+          (0, import_drizzle_orm2.and)(
+            (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.bikerId, userId), (0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.zavarrinaId, userId)),
+            (0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.status, "rejected")
+          )
+        );
+        if (rejected.length === 0) return 0;
+        await db.delete(bikerZavarrinaMatches).where(
+          (0, import_drizzle_orm2.and)(
+            (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.bikerId, userId), (0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.zavarrinaId, userId)),
+            (0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.status, "rejected")
+          )
+        );
+        return rejected.length;
       }
       async getAllWishlistMotosWithUsers() {
         const results = await db.select({
@@ -5193,6 +5239,48 @@ router5.post("/:id/join", requireAuth4, async (req, res) => {
     return res.status(201).json(participant);
   } catch (error) {
     console.error("Join proposal error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router5.delete("/matches/rejected", requireAuth4, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const count = await storage.deleteRejectedProposalMatches(userId);
+    return res.json({ deleted: count });
+  } catch (error) {
+    console.error("Delete rejected proposal matches error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router5.delete("/matches/:matchId", requireAuth4, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const ok = await storage.deleteProposalMatch(req.params.matchId, userId);
+    if (!ok) return res.status(404).json({ message: "Match non trovato o non autorizzato" });
+    return res.json({ deleted: true });
+  } catch (error) {
+    console.error("Delete proposal match error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router5.delete("/garage-matches/rejected", requireAuth4, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const count = await storage.deleteRejectedGarageMatches(userId);
+    return res.json({ deleted: count });
+  } catch (error) {
+    console.error("Delete rejected garage matches error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router5.delete("/garage-matches/:matchId", requireAuth4, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const ok = await storage.deleteGarageMatch(req.params.matchId, userId);
+    if (!ok) return res.status(404).json({ message: "Match non trovato o non autorizzato" });
+    return res.json({ deleted: true });
+  } catch (error) {
+    console.error("Delete garage match error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

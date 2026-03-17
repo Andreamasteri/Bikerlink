@@ -159,6 +159,8 @@ export interface IStorage {
   createProposalMatch(match: InsertProposalMatch): Promise<ProposalMatch>;
   updateProposalMatch(id: string, data: Partial<InsertProposalMatch>): Promise<ProposalMatch | undefined>;
   findExistingMatch(proposalId1: string, proposalId2: string): Promise<ProposalMatch | undefined>;
+  deleteProposalMatch(id: string, userId: string): Promise<boolean>;
+  deleteRejectedProposalMatches(userId: string): Promise<number>;
   expireOldProposals(): Promise<number>;
   deleteExpiredProposals(): Promise<number>;
 
@@ -296,6 +298,8 @@ export interface IStorage {
   getMatchesForUser(userId: string): Promise<BikerZavarrinaMatch[]>;
   getGarageMatch(id: string): Promise<BikerZavarrinaMatch | undefined>;
   updateGarageMatch(id: string, data: Partial<InsertBikerZavarrinaMatch>): Promise<BikerZavarrinaMatch | undefined>;
+  deleteGarageMatch(id: string, userId: string): Promise<boolean>;
+  deleteRejectedGarageMatches(userId: string): Promise<number>;
   getAllWishlistMotosWithUsers(): Promise<{ wishlistMoto: any; userId: string }[]>;
   getAllBikerMotorcyclesWithUsers(): Promise<{ motorcycle: any; userId: string }[]>;
   findExistingBikerZavarrinaMatch(bikerId: string, zavarrinaId: string, bikerMotorcycleId: string, wishlistMotoId: string): Promise<BikerZavarrinaMatch | undefined>;
@@ -501,6 +505,31 @@ export class DatabaseStorage implements IStorage {
   async updateProposalMatch(id: string, data: Partial<InsertProposalMatch>): Promise<ProposalMatch | undefined> {
     const [match] = await db.update(proposalMatches).set(data).where(eq(proposalMatches.id, id)).returning();
     return match;
+  }
+
+  async deleteProposalMatch(id: string, userId: string): Promise<boolean> {
+    const [match] = await db.select().from(proposalMatches).where(eq(proposalMatches.id, id));
+    if (!match) return false;
+    if (match.userId1 !== userId && match.userId2 !== userId) return false;
+    await db.delete(proposalMatches).where(eq(proposalMatches.id, id));
+    return true;
+  }
+
+  async deleteRejectedProposalMatches(userId: string): Promise<number> {
+    const rejected = await db.select().from(proposalMatches).where(
+      and(
+        or(eq(proposalMatches.userId1, userId), eq(proposalMatches.userId2, userId)),
+        eq(proposalMatches.status, "rejected")
+      )
+    );
+    if (rejected.length === 0) return 0;
+    await db.delete(proposalMatches).where(
+      and(
+        or(eq(proposalMatches.userId1, userId), eq(proposalMatches.userId2, userId)),
+        eq(proposalMatches.status, "rejected")
+      )
+    );
+    return rejected.length;
   }
 
   async findExistingMatch(proposalId1: string, proposalId2: string): Promise<ProposalMatch | undefined> {
@@ -1201,6 +1230,31 @@ export class DatabaseStorage implements IStorage {
   async updateGarageMatch(id: string, data: Partial<InsertBikerZavarrinaMatch>): Promise<BikerZavarrinaMatch | undefined> {
     const [updated] = await db.update(bikerZavarrinaMatches).set(data).where(eq(bikerZavarrinaMatches.id, id)).returning();
     return updated;
+  }
+
+  async deleteGarageMatch(id: string, userId: string): Promise<boolean> {
+    const [match] = await db.select().from(bikerZavarrinaMatches).where(eq(bikerZavarrinaMatches.id, id));
+    if (!match) return false;
+    if (match.bikerId !== userId && match.zavarrinaId !== userId) return false;
+    await db.delete(bikerZavarrinaMatches).where(eq(bikerZavarrinaMatches.id, id));
+    return true;
+  }
+
+  async deleteRejectedGarageMatches(userId: string): Promise<number> {
+    const rejected = await db.select().from(bikerZavarrinaMatches).where(
+      and(
+        or(eq(bikerZavarrinaMatches.bikerId, userId), eq(bikerZavarrinaMatches.zavarrinaId, userId)),
+        eq(bikerZavarrinaMatches.status, "rejected")
+      )
+    );
+    if (rejected.length === 0) return 0;
+    await db.delete(bikerZavarrinaMatches).where(
+      and(
+        or(eq(bikerZavarrinaMatches.bikerId, userId), eq(bikerZavarrinaMatches.zavarrinaId, userId)),
+        eq(bikerZavarrinaMatches.status, "rejected")
+      )
+    );
+    return rejected.length;
   }
 
   async getAllWishlistMotosWithUsers(): Promise<{ wishlistMoto: any; userId: string }[]> {

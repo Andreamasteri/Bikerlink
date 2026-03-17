@@ -483,6 +483,52 @@ router.post("/:id/join", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+router.delete("/matches/rejected", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const count = await storage.deleteRejectedProposalMatches(userId);
+    return res.json({ deleted: count });
+  } catch (error) {
+    console.error("Delete rejected proposal matches error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/matches/:matchId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const ok = await storage.deleteProposalMatch(req.params.matchId, userId);
+    if (!ok) return res.status(404).json({ message: "Match non trovato o non autorizzato" });
+    return res.json({ deleted: true });
+  } catch (error) {
+    console.error("Delete proposal match error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/garage-matches/rejected", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const count = await storage.deleteRejectedGarageMatches(userId);
+    return res.json({ deleted: count });
+  } catch (error) {
+    console.error("Delete rejected garage matches error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/garage-matches/:matchId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const ok = await storage.deleteGarageMatch(req.params.matchId, userId);
+    if (!ok) return res.status(404).json({ message: "Match non trovato o non autorizzato" });
+    return res.json({ deleted: true });
+  } catch (error) {
+    console.error("Delete garage match error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const proposalId = req.params.id;
