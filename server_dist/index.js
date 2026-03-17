@@ -9323,6 +9323,9 @@ async function registerRoutes(app2) {
       });
     });
   });
+  app2.get("/api/health", (_req, res) => {
+    res.json({ status: "ok" });
+  });
   const httpServer = (0, import_node_http.createServer)(app2);
   return httpServer;
 }

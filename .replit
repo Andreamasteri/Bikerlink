@@ -52,6 +52,10 @@ args = "Start Backend"
 task = "workflow.run"
 args = "Stress Test"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Watchdog"
+
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -101,6 +105,17 @@ outputType = "console"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/run-stress-test.sh"
+
+[[workflows.workflow]]
+name = "Watchdog"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/watchdog.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
