@@ -137,24 +137,25 @@ async function runWishlistMatching(): Promise<number> {
 
         let compatible = false;
 
-        if (wish.motorcycleType && moto.motorcycleType) {
-          if (wish.motorcycleType.toLowerCase() === moto.motorcycleType.toLowerCase()) {
-            compatible = true;
-          }
-        }
-
-        if (wish.brand && moto.brand) {
-          if (wish.brand.toLowerCase() === moto.brand.toLowerCase()) {
-            compatible = true;
-          }
-        }
-
-        if (wish.brand && wish.model && moto.brand && moto.model) {
+        if (wish.brand && wish.model) {
+          // Wish specifica marca + modello: devono combaciare entrambi
           if (
+            moto.brand &&
+            moto.model &&
             wish.brand.toLowerCase() === moto.brand.toLowerCase() &&
             (moto.model.toLowerCase().includes(wish.model.toLowerCase()) ||
              wish.model.toLowerCase().includes(moto.model.toLowerCase()))
           ) {
+            compatible = true;
+          }
+        } else if (wish.brand) {
+          // Wish specifica solo marca: basta che la marca combaci
+          if (moto.brand && wish.brand.toLowerCase() === moto.brand.toLowerCase()) {
+            compatible = true;
+          }
+        } else if (wish.motorcycleType) {
+          // Wish specifica solo tipo moto: basta che il tipo combaci
+          if (moto.motorcycleType && wish.motorcycleType.toLowerCase() === moto.motorcycleType.toLowerCase()) {
             compatible = true;
           }
         }

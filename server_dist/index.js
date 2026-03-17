@@ -9337,18 +9337,16 @@ async function runWishlistMatching() {
         const moto = bm.motorcycle;
         if (bikerId === zavarrinaId) continue;
         let compatible = false;
-        if (wish.motorcycleType && moto.motorcycleType) {
-          if (wish.motorcycleType.toLowerCase() === moto.motorcycleType.toLowerCase()) {
+        if (wish.brand && wish.model) {
+          if (moto.brand && moto.model && wish.brand.toLowerCase() === moto.brand.toLowerCase() && (moto.model.toLowerCase().includes(wish.model.toLowerCase()) || wish.model.toLowerCase().includes(moto.model.toLowerCase()))) {
             compatible = true;
           }
-        }
-        if (wish.brand && moto.brand) {
-          if (wish.brand.toLowerCase() === moto.brand.toLowerCase()) {
+        } else if (wish.brand) {
+          if (moto.brand && wish.brand.toLowerCase() === moto.brand.toLowerCase()) {
             compatible = true;
           }
-        }
-        if (wish.brand && wish.model && moto.brand && moto.model) {
-          if (wish.brand.toLowerCase() === moto.brand.toLowerCase() && (moto.model.toLowerCase().includes(wish.model.toLowerCase()) || wish.model.toLowerCase().includes(moto.model.toLowerCase()))) {
+        } else if (wish.motorcycleType) {
+          if (moto.motorcycleType && wish.motorcycleType.toLowerCase() === moto.motorcycleType.toLowerCase()) {
             compatible = true;
           }
         }
