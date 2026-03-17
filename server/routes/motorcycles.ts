@@ -123,12 +123,21 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Non autorizzato" });
     }
 
-    const allowedFields = ["brand", "model", "year", "displacement", "motorcycleType", "ridingStyle", "photoUrl", "isForSale", "saleDescription"];
+    const allowedFields = ["brand", "model", "year", "displacement", "motorcycleType", "ridingStyle", "photoUrl", "isForSale", "saleDescription", "isDefault"];
     const updateData: Record<string, unknown> = {};
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {
         updateData[field] = req.body[field];
       }
+    }
+
+    if (updateData.isDefault === true) {
+      const allMotos = await storage.getUserMotorcycles(userId);
+      await Promise.all(
+        allMotos
+          .filter((m) => m.id !== motoId)
+          .map((m) => storage.updateUserMotorcycle(m.id, { isDefault: false } as any))
+      );
     }
 
     const motorcycle = await storage.updateUserMotorcycle(motoId, updateData as any);

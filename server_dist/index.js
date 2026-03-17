@@ -135,6 +135,7 @@ var init_schema = __esm({
       motorcycleType: (0, import_pg_core.varchar)("motorcycle_type", { length: 50 }),
       ridingStyle: (0, import_pg_core.varchar)("riding_style", { length: 50 }),
       photoUrl: (0, import_pg_core.text)("photo_url"),
+      isDefault: (0, import_pg_core.boolean)("is_default").notNull().default(false),
       isForSale: (0, import_pg_core.boolean)("is_for_sale").notNull().default(false),
       saleDescription: (0, import_pg_core.text)("sale_description"),
       createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow()
@@ -4636,12 +4637,18 @@ router4.put("/:id", requireAuth3, async (req, res) => {
     if (existing.userId !== userId) {
       return res.status(403).json({ message: "Non autorizzato" });
     }
-    const allowedFields = ["brand", "model", "year", "displacement", "motorcycleType", "ridingStyle", "photoUrl", "isForSale", "saleDescription"];
+    const allowedFields = ["brand", "model", "year", "displacement", "motorcycleType", "ridingStyle", "photoUrl", "isForSale", "saleDescription", "isDefault"];
     const updateData = {};
     for (const field of allowedFields) {
       if (req.body[field] !== void 0) {
         updateData[field] = req.body[field];
       }
+    }
+    if (updateData.isDefault === true) {
+      const allMotos = await storage.getUserMotorcycles(userId);
+      await Promise.all(
+        allMotos.filter((m) => m.id !== motoId).map((m) => storage.updateUserMotorcycle(m.id, { isDefault: false }))
+      );
     }
     const motorcycle = await storage.updateUserMotorcycle(motoId, updateData);
     return res.json(motorcycle);

@@ -115,6 +115,11 @@ export default function AdminAds() {
     queryKey: ["/api/admin/advertisements"],
   });
 
+  const { data: adsEnabledData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/ads-enabled"],
+  });
+  const adsEnabled = adsEnabledData?.enabled !== false;
+
   const campaigns = allCampaigns.filter((c) => c.targetUserType === activeTab);
 
   const createMutation = useMutation({
@@ -266,6 +271,15 @@ export default function AdminAds() {
         })}
       </View>
 
+      {adsEnabled && (
+        <View style={styles.adsBanner}>
+          <MaterialIcons name="warning" size={16} color={Colors.warning} />
+          <Text style={styles.adsBannerText}>
+            Disabilita gli annunci nelle impostazioni prima di aggiungere nuove campagne
+          </Text>
+        </View>
+      )}
+
       <View style={styles.toolbar}>
         <Text style={styles.countText}>{campaigns.length} campagn{campaigns.length === 1 ? "a" : "e"}</Text>
         <TouchableOpacity onPress={openRotationSettings} style={styles.toolbarBtn}>
@@ -301,8 +315,9 @@ export default function AdminAds() {
       )}
 
       <TouchableOpacity
-        style={[styles.fab, { backgroundColor: currentTab.color, bottom: insets.bottom + 16 }]}
-        onPress={() => setShowCreateModal(true)}
+        style={[styles.fab, { backgroundColor: adsEnabled ? Colors.textSecondary : currentTab.color, bottom: insets.bottom + 16 }]}
+        onPress={() => { if (!adsEnabled) setShowCreateModal(true); }}
+        disabled={adsEnabled}
       >
         <MaterialIcons name="add" size={28} color={Colors.background} />
       </TouchableOpacity>
@@ -465,6 +480,26 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  adsBanner: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    backgroundColor: Colors.warning + "20",
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.warning,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  adsBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.warning,
+  },
   card: {
     backgroundColor: Colors.surface,
     borderRadius: 14,

@@ -74,6 +74,7 @@ export const userMotorcycles = pgTable("user_motorcycles", {
   motorcycleType: varchar("motorcycle_type", { length: 50 }),
   ridingStyle: varchar("riding_style", { length: 50 }),
   photoUrl: text("photo_url"),
+  isDefault: boolean("is_default").notNull().default(false),
   isForSale: boolean("is_for_sale").notNull().default(false),
   saleDescription: text("sale_description"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
