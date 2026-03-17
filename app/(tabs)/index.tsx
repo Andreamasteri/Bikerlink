@@ -601,6 +601,15 @@ export default function MapScreen() {
           <Text style={styles.title}>BikerLink</Text>
           <Image source={require("@/assets/images/helmet-logo.png")} style={styles.helmetLogo} resizeMode="contain" />
         </View>
+        <Pressable style={styles.defineAreaBtnInline} onPress={() => setShowAreaModal(true)}>
+          <Ionicons name="globe-outline" size={14} color={Colors.accent} />
+          <Text style={styles.defineAreaBtnInlineText}>
+            {selectedCountries.length === 1
+              ? `${getCountryFlag(selectedCountries[0])} 1 ${t("home.defineAreaCountry")}`
+              : `${selectedCountries.length} ${t("home.defineAreaCountries")}`}
+          </Text>
+          <Ionicons name="chevron-down" size={14} color={Colors.accent} />
+        </Pressable>
         <Pressable onPress={() => router.push("/chat" as any)}>
           <Ionicons name="chatbubbles" size={24} color={Colors.accent} />
         </Pressable>
@@ -759,19 +768,6 @@ export default function MapScreen() {
           </View>
         </View>
       </Modal>
-
-      <Pressable
-        style={styles.defineAreaBtnInline}
-        onPress={() => setShowAreaModal(true)}
-      >
-        <Ionicons name="globe-outline" size={14} color={Colors.accent} />
-        <Text style={styles.defineAreaBtnInlineText}>
-          {t("home.defineArea")} — {selectedCountries.length === 1
-            ? `${getCountryFlag(selectedCountries[0])} 1 ${t("home.defineAreaCountry")}`
-            : `${selectedCountries.length} ${t("home.defineAreaCountries")}`}
-        </Text>
-        <Ionicons name="chevron-forward" size={14} color={Colors.accent} />
-      </Pressable>
 
       <View style={styles.statsRow}>
         <Pressable style={styles.statCard} onPress={() => setShowOnlineList(true)}>
@@ -1766,21 +1762,20 @@ const styles = StyleSheet.create({
   defineAreaBtnInline: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: 6,
-    marginHorizontal: 16,
-    marginTop: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     backgroundColor: Colors.surface,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: Colors.accent + "30",
+    maxWidth: 140,
   },
   defineAreaBtnInlineText: {
-    flex: 1,
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "Inter_500Medium",
     color: Colors.accent,
+    flexShrink: 1,
   },
   areaSheet: {
     backgroundColor: Colors.surface,
