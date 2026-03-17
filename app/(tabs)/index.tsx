@@ -100,55 +100,11 @@ export default function MapScreen() {
         }
       } catch {}
 
-      if (user?.country) {
-        setSelectedCountries([user.country]);
-        try { await AsyncStorage.setItem("map_area_countries", JSON.stringify([user.country])); } catch {}
-        setCountriesLoaded(true);
-        return;
-      }
-
-      let detectedCountry = "IT";
-      try {
-        if (Platform.OS === "web") {
-          const pos = await new Promise<GeolocationPosition | null>((resolve) => {
-            if (navigator.geolocation) {
-              navigator.geolocation.getCurrentPosition(
-                (p) => resolve(p),
-                () => resolve(null),
-                { timeout: 5000 }
-              );
-            } else resolve(null);
-          });
-          if (pos) {
-            const geocode = await Location.reverseGeocodeAsync({
-              latitude: pos.coords.latitude,
-              longitude: pos.coords.longitude,
-            });
-            if (geocode?.[0]?.isoCountryCode) {
-              detectedCountry = geocode[0].isoCountryCode;
-            }
-          }
-        } else {
-          const { status } = await Location.requestForegroundPermissionsAsync();
-          if (status === "granted") {
-            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
-            const geocode = await Location.reverseGeocodeAsync({
-              latitude: loc.coords.latitude,
-              longitude: loc.coords.longitude,
-            });
-            if (geocode?.[0]?.isoCountryCode) {
-              detectedCountry = geocode[0].isoCountryCode;
-            }
-          }
-        }
-      } catch {}
-
-      const validCountry = EUROPEAN_COUNTRIES.some((c) => c.code === detectedCountry) ? detectedCountry : "IT";
-      setSelectedCountries([validCountry]);
-      try { await AsyncStorage.setItem("map_area_countries", JSON.stringify([validCountry])); } catch {}
+      setSelectedCountries(["IT"]);
+      try { await AsyncStorage.setItem("map_area_countries", JSON.stringify(["IT"])); } catch {}
       setCountriesLoaded(true);
     })();
-  }, [user?.country]);
+  }, []);
 
   const countriesQueryParam = useMemo(() => {
     if (!countriesLoaded || selectedCountries.length === 0) return "";
