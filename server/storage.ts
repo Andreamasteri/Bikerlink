@@ -1248,7 +1248,7 @@ export class DatabaseStorage implements IStorage {
     const [match] = await db.select().from(bikerZavarrinaMatches).where(eq(bikerZavarrinaMatches.id, id));
     if (!match) return false;
     if (match.bikerId !== userId && match.zavarrinaId !== userId) return false;
-    await db.update(bikerZavarrinaMatches).set({ status: "new" }).where(eq(bikerZavarrinaMatches.id, id));
+    await this.updateGarageMatch(id, { status: "new" });
     return true;
   }
 

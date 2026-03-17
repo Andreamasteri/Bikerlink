@@ -1425,7 +1425,7 @@ var init_storage = __esm({
         const [match] = await db.select().from(bikerZavarrinaMatches).where((0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.id, id));
         if (!match) return false;
         if (match.bikerId !== userId && match.zavarrinaId !== userId) return false;
-        await db.update(bikerZavarrinaMatches).set({ status: "new" }).where((0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.id, id));
+        await this.updateGarageMatch(id, { status: "new" });
         return true;
       }
       async deleteRejectedGarageMatches(userId) {
