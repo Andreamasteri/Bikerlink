@@ -136,7 +136,7 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
       await Promise.all(
         allMotos
           .filter((m) => m.id !== motoId)
-          .map((m) => storage.updateUserMotorcycle(m.id, { isDefault: false } as any))
+          .map((m) => storage.updateUserMotorcycle(m.id, { isDefault: false }))
       );
     }
 
