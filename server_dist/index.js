@@ -8579,6 +8579,137 @@ router17.get("/email-status", async (_req, res) => {
     return res.status(500).json({ configured: false, maskedEmail: null });
   }
 });
+router17.get("/db-stats", async (_req, res) => {
+  try {
+    const {
+      users: usersTable,
+      userProfiles: userProfiles2,
+      conversations: conversations2,
+      messages: messages2,
+      motoClubs: motoClubs2,
+      motoClubMembers: motoClubMembers2,
+      motoClubRequests: motoClubRequests2,
+      workshops: workshops2,
+      reports: reports2,
+      invitationCodes: invitationCodes2,
+      proposals: proposals2,
+      userMotorcycles: userMotorcycles2,
+      easterEggs: easterEggs2,
+      collectedEasterEggs: collectedEasterEggs2,
+      adCampaigns: adCampaigns2,
+      moderatorLogs: moderatorLogs2,
+      notifications: notifications2,
+      routes: routes2,
+      feedbackTickets: feedbackTickets2
+    } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+    const { count: countFn, desc: descFn } = await import("drizzle-orm");
+    const [
+      [usersCount],
+      usersRecent,
+      [userProfilesCount],
+      userProfilesRecent,
+      [conversationsCount],
+      conversationsRecent,
+      [messagesCount],
+      messagesRecent,
+      [motoClubsCount],
+      motoClubsRecent,
+      [motoClubMembersCount],
+      motoClubMembersRecent,
+      [motoClubRequestsCount],
+      motoClubRequestsRecent,
+      [workshopsCount],
+      workshopsRecent,
+      [reportsCount],
+      reportsRecent,
+      [invitationCodesCount],
+      invitationCodesRecent,
+      [proposalsCount],
+      proposalsRecent,
+      [userMotorcyclesCount],
+      userMotorcyclesRecent,
+      [easterEggsCount],
+      easterEggsRecent,
+      [collectedEasterEggsCount],
+      collectedEasterEggsRecent,
+      [adCampaignsCount],
+      adCampaignsRecent,
+      [moderatorLogsCount],
+      moderatorLogsRecent,
+      [notificationsCount],
+      notificationsRecent,
+      [routesCount],
+      routesRecent,
+      [feedbackTicketsCount],
+      feedbackTicketsRecent
+    ] = await Promise.all([
+      db.select({ total: countFn() }).from(usersTable),
+      db.select({ id: usersTable.id, createdAt: usersTable.createdAt, label: usersTable.nickname, email: usersTable.email, role: usersTable.role, status: usersTable.status }).from(usersTable).orderBy(descFn(usersTable.createdAt)).limit(5),
+      db.select({ total: countFn() }).from(userProfiles2),
+      db.select({ id: userProfiles2.id, createdAt: userProfiles2.updatedAt, label: userProfiles2.userId }).from(userProfiles2).orderBy(descFn(userProfiles2.updatedAt)).limit(5),
+      db.select({ total: countFn() }).from(conversations2),
+      db.select({ id: conversations2.id, createdAt: conversations2.createdAt, label: conversations2.title, conversationType: conversations2.conversationType }).from(conversations2).orderBy(descFn(conversations2.createdAt)).limit(5),
+      db.select({ total: countFn() }).from(messages2),
+      db.select({ id: messages2.id, createdAt: messages2.createdAt, label: messages2.content, messageType: messages2.messageType }).from(messages2).orderBy(descFn(messages2.createdAt)).limit(5),
+      db.select({ total: countFn() }).from(motoClubs2),
+      db.select({ id: motoClubs2.id, createdAt: motoClubs2.createdAt, label: motoClubs2.name, clubType: motoClubs2.clubType, isApproved: motoClubs2.isApproved }).from(motoClubs2).orderBy(descFn(motoClubs2.createdAt)).limit(5),
+      db.select({ total: countFn() }).from(motoClubMembers2),
+      db.select({ id: motoClubMembers2.id, createdAt: motoClubMembers2.joinedAt, label: motoClubMembers2.userId, clubId: motoClubMembers2.clubId, role: motoClubMembers2.role }).from(motoClubMembers2).orderBy(descFn(motoClubMembers2.joinedAt)).limit(5),
+      db.select({ total: countFn() }).from(motoClubRequests2),
+      db.select({ id: motoClubRequests2.id, createdAt: motoClubRequests2.createdAt, label: motoClubRequests2.name, status: motoClubRequests2.status }).from(motoClubRequests2).orderBy(descFn(motoClubRequests2.createdAt)).limit(5),
+      db.select({ total: countFn() }).from(workshops2),
+      db.select({ id: workshops2.id, createdAt: workshops2.createdAt, label: workshops2.name, isApproved: workshops2.isApproved }).from(workshops2).orderBy(descFn(workshops2.createdAt)).limit(5),
+      db.select({ total: countFn() }).from(reports2),
+      db.select({ id: reports2.id, createdAt: reports2.createdAt, label: reports2.reason, status: reports2.status }).from(reports2).orderBy(descFn(reports2.createdAt)).limit(5),
+      db.select({ total: countFn() }).from(invitationCodes2),
+      db.select({ id: invitationCodes2.id, createdAt: invitationCodes2.createdAt, label: invitationCodes2.code, isActive: invitationCodes2.isActive }).from(invitationCodes2).orderBy(descFn(invitationCodes2.createdAt)).limit(5),
+      db.select({ total: countFn() }).from(proposals2),
+      db.select({ id: proposals2.id, createdAt: proposals2.createdAt, label: proposals2.title, status: proposals2.status }).from(proposals2).orderBy(descFn(proposals2.createdAt)).limit(5),
+      db.select({ total: countFn() }).from(userMotorcycles2),
+      db.select({ id: userMotorcycles2.id, createdAt: userMotorcycles2.createdAt, label: userMotorcycles2.brand, model: userMotorcycles2.model }).from(userMotorcycles2).orderBy(descFn(userMotorcycles2.createdAt)).limit(5),
+      db.select({ total: countFn() }).from(easterEggs2),
+      db.select({ id: easterEggs2.id, createdAt: easterEggs2.createdAt, label: easterEggs2.name, isActive: easterEggs2.isActive }).from(easterEggs2).orderBy(descFn(easterEggs2.createdAt)).limit(5),
+      db.select({ total: countFn() }).from(collectedEasterEggs2),
+      db.select({ id: collectedEasterEggs2.id, createdAt: collectedEasterEggs2.collectedAt, label: collectedEasterEggs2.easterEggId, userId: collectedEasterEggs2.userId }).from(collectedEasterEggs2).orderBy(descFn(collectedEasterEggs2.collectedAt)).limit(5),
+      db.select({ total: countFn() }).from(adCampaigns2),
+      db.select({ id: adCampaigns2.id, createdAt: adCampaigns2.createdAt, label: adCampaigns2.name, isActive: adCampaigns2.isActive }).from(adCampaigns2).orderBy(descFn(adCampaigns2.createdAt)).limit(5),
+      db.select({ total: countFn() }).from(moderatorLogs2),
+      db.select({ id: moderatorLogs2.id, createdAt: moderatorLogs2.createdAt, label: moderatorLogs2.action, targetType: moderatorLogs2.targetType }).from(moderatorLogs2).orderBy(descFn(moderatorLogs2.createdAt)).limit(5),
+      db.select({ total: countFn() }).from(notifications2),
+      db.select({ id: notifications2.id, createdAt: notifications2.createdAt, label: notifications2.title, notificationType: notifications2.notificationType }).from(notifications2).orderBy(descFn(notifications2.createdAt)).limit(5),
+      db.select({ total: countFn() }).from(routes2),
+      db.select({ id: routes2.id, createdAt: routes2.createdAt, label: routes2.title, status: routes2.status }).from(routes2).orderBy(descFn(routes2.createdAt)).limit(5),
+      db.select({ total: countFn() }).from(feedbackTickets2),
+      db.select({ id: feedbackTickets2.id, createdAt: feedbackTickets2.createdAt, label: feedbackTickets2.subject, status: feedbackTickets2.status, ticketType: feedbackTickets2.ticketType }).from(feedbackTickets2).orderBy(descFn(feedbackTickets2.createdAt)).limit(5)
+    ]);
+    return res.json({
+      tables: [
+        { name: "users", label: "Utenti", total: Number(usersCount?.total ?? 0), recent: usersRecent },
+        { name: "userProfiles", label: "Profili Utente", total: Number(userProfilesCount?.total ?? 0), recent: userProfilesRecent },
+        { name: "conversations", label: "Conversazioni", total: Number(conversationsCount?.total ?? 0), recent: conversationsRecent },
+        { name: "messages", label: "Messaggi", total: Number(messagesCount?.total ?? 0), recent: messagesRecent },
+        { name: "motoClubs", label: "Motoclub", total: Number(motoClubsCount?.total ?? 0), recent: motoClubsRecent },
+        { name: "motoClubMembers", label: "Membri Motoclub", total: Number(motoClubMembersCount?.total ?? 0), recent: motoClubMembersRecent },
+        { name: "motoClubRequests", label: "Richieste Motoclub", total: Number(motoClubRequestsCount?.total ?? 0), recent: motoClubRequestsRecent },
+        { name: "workshops", label: "Officine", total: Number(workshopsCount?.total ?? 0), recent: workshopsRecent },
+        { name: "reports", label: "Segnalazioni", total: Number(reportsCount?.total ?? 0), recent: reportsRecent },
+        { name: "invitationCodes", label: "Codici Invito", total: Number(invitationCodesCount?.total ?? 0), recent: invitationCodesRecent },
+        { name: "proposals", label: "Proposte", total: Number(proposalsCount?.total ?? 0), recent: proposalsRecent },
+        { name: "userMotorcycles", label: "Moto Utenti", total: Number(userMotorcyclesCount?.total ?? 0), recent: userMotorcyclesRecent },
+        { name: "easterEggs", label: "Easter Eggs", total: Number(easterEggsCount?.total ?? 0), recent: easterEggsRecent },
+        { name: "collectedEasterEggs", label: "Easter Eggs Raccolti", total: Number(collectedEasterEggsCount?.total ?? 0), recent: collectedEasterEggsRecent },
+        { name: "adCampaigns", label: "Campagne Ad", total: Number(adCampaignsCount?.total ?? 0), recent: adCampaignsRecent },
+        { name: "moderatorLogs", label: "Log Moderatori", total: Number(moderatorLogsCount?.total ?? 0), recent: moderatorLogsRecent },
+        { name: "notifications", label: "Notifiche", total: Number(notificationsCount?.total ?? 0), recent: notificationsRecent },
+        { name: "routes", label: "Percorsi", total: Number(routesCount?.total ?? 0), recent: routesRecent },
+        { name: "feedbackTickets", label: "Feedback Ticket", total: Number(feedbackTicketsCount?.total ?? 0), recent: feedbackTicketsRecent }
+      ]
+    });
+  } catch (error) {
+    console.error("Admin db-stats error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
 router17.post("/fake-users/wake-all", async (_req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
