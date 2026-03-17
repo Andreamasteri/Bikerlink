@@ -493,10 +493,13 @@ export default function MatchScreen() {
     mutationFn: async () => {
       const url1 = new URL("/api/proposals/matches/rejected", getApiUrl());
       const url2 = new URL("/api/proposals/garage-matches/rejected", getApiUrl());
-      await Promise.all([
+      const [res1, res2] = await Promise.all([
         globalThis.fetch(url1.toString(), { method: "DELETE", credentials: "include" }),
         globalThis.fetch(url2.toString(), { method: "DELETE", credentials: "include" }),
       ]);
+      if (!res1.ok || !res2.ok) {
+        throw new Error(t("match.error"));
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches"] });
@@ -517,6 +520,32 @@ export default function MatchScreen() {
       ]);
     }
   }, [resetRejectedMutation, t]);
+
+  const confirmRemoveProposalMatch = useCallback((matchId: string) => {
+    if (Platform.OS === "web") {
+      if (window.confirm(t("match.removeAccepted") + "?")) {
+        removeProposalMatchMutation.mutate(matchId);
+      }
+    } else {
+      Alert.alert(t("match.removeAccepted"), t("match.removeMatchConfirm") || t("match.removeAccepted") + "?", [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("match.removeAccepted"), style: "destructive", onPress: () => removeProposalMatchMutation.mutate(matchId) },
+      ]);
+    }
+  }, [removeProposalMatchMutation, t]);
+
+  const confirmRemoveGarageMatch = useCallback((matchId: string) => {
+    if (Platform.OS === "web") {
+      if (window.confirm(t("match.removeAccepted") + "?")) {
+        removeGarageMatchMutation.mutate(matchId);
+      }
+    } else {
+      Alert.alert(t("match.removeAccepted"), t("match.removeMatchConfirm") || t("match.removeAccepted") + "?", [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("match.removeAccepted"), style: "destructive", onPress: () => removeGarageMatchMutation.mutate(matchId) },
+      ]);
+    }
+  }, [removeGarageMatchMutation, t]);
 
   const startGarageChatMutation = useMutation({
     mutationFn: async (otherUserId: string) => {
@@ -547,7 +576,7 @@ export default function MatchScreen() {
           }}
           onReject={() => rejectGarageMutation.mutate(item.id)}
           onChatPress={item.status === "accepted" ? () => startGarageChatMutation.mutate(otherUserId) : undefined}
-          onRemove={item.status === "accepted" ? () => removeGarageMatchMutation.mutate(item.id) : undefined}
+          onRemove={item.status === "accepted" ? () => confirmRemoveGarageMatch(item.id) : undefined}
           isPending={pendingMatchId === item.id}
           t={t}
           locale={locale}
@@ -564,13 +593,13 @@ export default function MatchScreen() {
         }}
         onReject={() => rejectMutation.mutate(item.id)}
         onChatPress={item.conversationId ? () => router.push(`/chat/${item.conversationId}` as any) : undefined}
-        onRemove={item.status === "accepted" ? () => removeProposalMatchMutation.mutate(item.id) : undefined}
+        onRemove={item.status === "accepted" ? () => confirmRemoveProposalMatch(item.id) : undefined}
         isPending={pendingMatchId === item.id}
         t={t}
         locale={locale}
       />
     );
-  }, [user?.id, pendingMatchId, acceptMutation, rejectMutation, acceptGarageMutation, rejectGarageMutation, startGarageChatMutation, removeProposalMatchMutation, removeGarageMatchMutation, router]);
+  }, [user?.id, pendingMatchId, acceptMutation, rejectMutation, acceptGarageMutation, rejectGarageMutation, startGarageChatMutation, confirmRemoveProposalMatch, confirmRemoveGarageMatch, router]);
 
   const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; count: number }[] = [
     { key: "pending", label: t("match.tabPending"), icon: "hourglass", count: pendingMatches.length },
@@ -619,7 +648,10 @@ export default function MatchScreen() {
             {resetRejectedMutation.isPending ? (
               <ActivityIndicator size="small" color={Colors.accentRed} />
             ) : (
-              <Ionicons name="refresh" size={16} color={Colors.accentRed} />
+              <>
+                <Ionicons name="refresh" size={13} color={Colors.accentRed} />
+                <Text style={styles.resetBtnText}>{t("match.resetRejected")}</Text>
+              </>
             )}
           </TouchableOpacity>
         )}
@@ -742,7 +774,7 @@ const styles = StyleSheet.create({
     fontWeight: "700" as const,
   },
   resetBtn: {
-    width: 36,
+    flexDirection: "row" as const,
     height: 36,
     borderRadius: 10,
     backgroundColor: Colors.accentRed + "15",
@@ -750,6 +782,13 @@ const styles = StyleSheet.create({
     borderColor: Colors.accentRed + "30",
     justifyContent: "center" as const,
     alignItems: "center" as const,
+    paddingHorizontal: 8,
+    gap: 4,
+  },
+  resetBtnText: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.accentRed,
   },
   removeBtn: {
     marginLeft: 4,

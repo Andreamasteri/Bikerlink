@@ -290,6 +290,7 @@ const es: Record<string, string> = {
   "match.emptyGarageDesc": "El sistema cruza las motos de los bikers con la lista de deseos de las pasajeras. ¡Añade motos al garaje o a la lista de deseos!",
   "match.emptyHistoryDesc": "Los matches rechazados o caducados aparecerán aquí.",
   "match.removeAccepted": "Eliminar",
+  "match.removeMatchConfirm": "¿Eliminar este match? Esta acción no se puede deshacer.",
   "match.resetRejected": "Reiniciar rechazados",
   "match.resetRejectedConfirm": "¿Eliminar todos los matches rechazados? El sistema los volverá a procesar en el próximo ciclo.",
   "match.proposalOf": "Propuesta de",
