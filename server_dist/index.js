@@ -1401,7 +1401,10 @@ var init_storage = __esm({
       async getMatchesForUser(userId) {
         return db.select().from(bikerZavarrinaMatches).where(
           (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.bikerId, userId), (0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.zavarrinaId, userId))
-        ).orderBy((0, import_drizzle_orm2.desc)(bikerZavarrinaMatches.status), (0, import_drizzle_orm2.desc)(bikerZavarrinaMatches.createdAt)).limit(200);
+        ).orderBy(
+          import_drizzle_orm2.sql`CASE WHEN ${bikerZavarrinaMatches.status} = 'accepted' THEN 0 WHEN ${bikerZavarrinaMatches.status} = 'new' THEN 1 ELSE 2 END`,
+          (0, import_drizzle_orm2.desc)(bikerZavarrinaMatches.createdAt)
+        ).limit(200);
       }
       async getGarageMatch(id) {
         const [match] = await db.select().from(bikerZavarrinaMatches).where((0, import_drizzle_orm2.eq)(bikerZavarrinaMatches.id, id));
