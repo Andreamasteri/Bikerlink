@@ -21,7 +21,7 @@ router.post("/generate", async (req: Request, res: Response) => {
     const invitation = await storage.createInvitationCode({
       code,
       createdBy: req.session.userId,
-      maxUses: maxUses || 1,
+      maxUses: maxUses || 100,
       expiresAt: expiresAt ? new Date(expiresAt) : undefined,
     });
 

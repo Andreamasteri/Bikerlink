@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -9,13 +9,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
+
+const RESEND_COOLDOWN = 60;
 
 export default function VerifyEmailScreen() {
   const router = useRouter();
@@ -27,34 +28,45 @@ export default function VerifyEmailScreen() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
+  const [emailConfigured, setEmailConfigured] = useState<boolean | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    fetch(new URL("/api/auth/email-configured", getApiUrl()).toString())
+      .then((r) => r.json())
+      .then((d) => setEmailConfigured(d.configured ?? false))
+      .catch(() => setEmailConfigured(false));
+  }, []);
+
+  const startCooldown = () => {
+    setResendCooldown(RESEND_COOLDOWN);
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+    cooldownRef.current = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) {
+          if (cooldownRef.current) clearInterval(cooldownRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current); }, []);
 
   const handleVerify = async () => {
-    if (!token.trim()) {
-      setError("Inserisci il codice di verifica");
-      return;
-    }
-    if (token.trim().length !== 6) {
-      setError("Il codice deve essere di 6 caratteri");
-      return;
-    }
-
+    if (!token.trim()) { setError("Inserisci il codice di verifica"); return; }
+    if (token.trim().length !== 6) { setError("Il codice deve essere di 6 caratteri"); return; }
     setError("");
     setIsVerifying(true);
     try {
-      const res = await apiRequest("POST", "/api/auth/verify-email", {
-        email,
-        token: token.trim(),
-      });
+      await apiRequest("POST", "/api/auth/verify-email", { email, token: token.trim() });
       router.replace("/(tabs)");
     } catch (err: any) {
       const msg = err?.message || "Errore durante la verifica";
       const cleaned = msg.replace(/^\d+:\s*/, "");
-      try {
-        const parsed = JSON.parse(cleaned);
-        setError(parsed.message || cleaned);
-      } catch {
-        setError(cleaned);
-      }
+      try { setError(JSON.parse(cleaned).message || cleaned); } catch { setError(cleaned); }
     } finally {
       setIsVerifying(false);
     }
@@ -67,25 +79,18 @@ export default function VerifyEmailScreen() {
     try {
       await apiRequest("POST", "/api/auth/resend-verification", { email });
       setResendSuccess(true);
+      startCooldown();
     } catch (err: any) {
       const msg = err?.message || "Errore durante l'invio";
       const cleaned = msg.replace(/^\d+:\s*/, "");
-      try {
-        const parsed = JSON.parse(cleaned);
-        setError(parsed.message || cleaned);
-      } catch {
-        setError(cleaned);
-      }
+      try { setError(JSON.parse(cleaned).message || cleaned); } catch { setError(cleaned); }
     } finally {
       setIsResending(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView
         contentContainerStyle={[
           styles.container,
@@ -103,10 +108,19 @@ export default function VerifyEmailScreen() {
         </View>
 
         <Text style={styles.title}>Verifica Email</Text>
-        <Text style={styles.subtitle}>
-          Abbiamo inviato un codice di verifica a
-        </Text>
+
+        {emailConfigured === false && (
+          <View style={styles.warnBanner}>
+            <Ionicons name="warning" size={18} color="#F59E0B" />
+            <Text style={styles.warnText}>
+              Il servizio email non è configurato. Chiedi all'amministratore di impostare le credenziali Gmail nelle impostazioni.
+            </Text>
+          </View>
+        )}
+
+        <Text style={styles.subtitle}>Abbiamo inviato un codice di verifica a</Text>
         <Text style={styles.emailText}>{email}</Text>
+        <Text style={styles.spamHint}>Controlla anche la cartella spam.</Text>
 
         {error ? (
           <View style={styles.errorBanner}>
@@ -118,7 +132,7 @@ export default function VerifyEmailScreen() {
         {resendSuccess ? (
           <View style={styles.successBanner}>
             <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
-            <Text style={styles.successText}>Codice reinviato con successo</Text>
+            <Text style={styles.successText}>Codice reinviato — controlla la tua email</Text>
           </View>
         ) : null}
 
@@ -151,15 +165,17 @@ export default function VerifyEmailScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.resendButton, isResending && styles.buttonDisabled]}
+          style={[styles.resendButton, (isResending || resendCooldown > 0) && styles.buttonDisabled]}
           onPress={handleResend}
-          disabled={isResending}
+          disabled={isResending || resendCooldown > 0}
           testID="verify-resend"
         >
           {isResending ? (
             <ActivityIndicator color={Colors.accent} />
           ) : (
-            <Text style={styles.resendButtonText}>Reinvia codice</Text>
+            <Text style={styles.resendButtonText}>
+              {resendCooldown > 0 ? `Reinvia tra ${resendCooldown}s` : "Reinvia codice"}
+            </Text>
           )}
         </TouchableOpacity>
       </ScrollView>
@@ -168,128 +184,43 @@ export default function VerifyEmailScreen() {
 }
 
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  container: {
-    flexGrow: 1,
-    paddingHorizontal: 28,
-    justifyContent: "center",
-  },
-  iconContainer: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
+  flex: { flex: 1, backgroundColor: Colors.background },
+  container: { flexGrow: 1, paddingHorizontal: 28, justifyContent: "center" },
+  iconContainer: { alignItems: "center", marginBottom: 24 },
   iconCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: Colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: Colors.accent,
+    width: 96, height: 96, borderRadius: 48,
+    backgroundColor: Colors.surface, alignItems: "center", justifyContent: "center",
+    borderWidth: 2, borderColor: Colors.accent,
   },
-  title: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 28,
-    color: Colors.text,
-    textAlign: "center",
-    marginBottom: 8,
+  title: { fontFamily: "Inter_700Bold", fontSize: 28, color: Colors.text, textAlign: "center", marginBottom: 16 },
+  warnBanner: {
+    flexDirection: "row", alignItems: "flex-start", gap: 8,
+    backgroundColor: "rgba(245,158,11,0.12)", padding: 12, borderRadius: 10,
+    borderLeftWidth: 3, borderLeftColor: "#F59E0B", marginBottom: 16,
   },
-  subtitle: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 15,
-    color: Colors.textSecondary,
-    textAlign: "center",
-  },
-  emailText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    color: Colors.accent,
-    textAlign: "center",
-    marginBottom: 32,
-  },
+  warnText: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 13, color: "#F59E0B", lineHeight: 18 },
+  subtitle: { fontFamily: "Inter_400Regular", fontSize: 15, color: Colors.textSecondary, textAlign: "center" },
+  emailText: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: Colors.accent, textAlign: "center", marginBottom: 4 },
+  spamHint: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, textAlign: "center", marginBottom: 24 },
   errorBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(244, 67, 54, 0.1)",
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 16,
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: "rgba(244,67,54,0.1)", padding: 12, borderRadius: 10, marginBottom: 16,
   },
-  errorText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    color: Colors.error,
-    flex: 1,
-  },
+  errorText: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.error, flex: 1 },
   successBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(76, 175, 80, 0.1)",
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 16,
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: "rgba(76,175,80,0.1)", padding: 12, borderRadius: 10, marginBottom: 16,
   },
-  successText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    color: Colors.success,
-    flex: 1,
-  },
+  successText: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.success, flex: 1 },
   inputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 16,
-    marginBottom: 20,
+    flexDirection: "row", alignItems: "center", backgroundColor: Colors.surface,
+    borderRadius: 14, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 16, marginBottom: 20,
   },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    height: 52,
-    fontFamily: "Inter_500Medium",
-    fontSize: 18,
-    color: Colors.text,
-    letterSpacing: 4,
-    textAlign: "center",
-  },
-  verifyButton: {
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: Colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  verifyButtonText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 16,
-    color: Colors.background,
-  },
-  resendButton: {
-    height: 48,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  resendButtonText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    color: Colors.accent,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
+  inputIcon: { marginRight: 12 },
+  input: { flex: 1, height: 52, fontFamily: "Inter_500Medium", fontSize: 18, color: Colors.text, letterSpacing: 4, textAlign: "center" },
+  verifyButton: { height: 52, borderRadius: 14, backgroundColor: Colors.accent, alignItems: "center", justifyContent: "center", marginBottom: 16 },
+  verifyButtonText: { fontFamily: "Inter_700Bold", fontSize: 16, color: Colors.background },
+  resendButton: { height: 48, borderRadius: 14, borderWidth: 1, borderColor: Colors.accent, alignItems: "center", justifyContent: "center" },
+  resendButtonText: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: Colors.accent },
+  buttonDisabled: { opacity: 0.5 },
 });

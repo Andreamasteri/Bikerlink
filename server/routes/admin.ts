@@ -5,7 +5,7 @@ import path from "path";
 import bcrypt from "bcryptjs";
 import { storage } from "../storage";
 import { db } from "../db";
-import { motoClubs, motoClubRequests, motoClubMembers, conversations, moderatorLogs, users } from "@shared/schema";
+import { motoClubs, motoClubRequests, motoClubMembers, conversations, moderatorLogs, users, userProfiles } from "@shared/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 
 const router = Router();
@@ -1069,6 +1069,8 @@ router.post("/fake-users", async (req: Request, res: Response) => {
     }
     const email = `fake_${nickname.toLowerCase().replace(/[^a-z0-9]/g, "")}@fakeuser.bikerlink.it`;
     const hashedPassword = await bcrypt.hash("fakeuser2025!", 10);
+    const ITALIAN_REGIONS = new Set(["Abruzzo","Basilicata","Calabria","Campania","Emilia-Romagna","Friuli Venezia Giulia","Lazio","Liguria","Lombardia","Marche","Molise","Piemonte","Puglia","Sardegna","Sicilia","Toscana","Trentino-Alto Adige","Umbria","Valle d'Aosta","Veneto"]);
+    const country = req.body.country || (region && ITALIAN_REGIONS.has(region) ? "IT" : "IT");
     const user = await storage.createUser({
       nickname,
       email,
@@ -1078,6 +1080,7 @@ router.post("/fake-users", async (req: Request, res: Response) => {
       coupleSexConfig: coupleSexConfig || null,
       birthYear: birthYear || null,
       region: region || null,
+      country,
       isFake: true,
       status: "active",
       emailVerified: true,
@@ -1252,7 +1255,9 @@ router.put("/fake-users/toggle-all", async (req: Request, res: Response) => {
     const newLoginAt = enabled ? new Date() : new Date("2020-01-01");
     for (const fakeUser of fakeUsers) {
       await db.update(userProfiles).set({ isAvailable: enabled }).where(eq(userProfiles.userId, fakeUser.id));
-      await db.update(usersTable).set({ lastLoginAt: newLoginAt }).where(eq(usersTable.id, fakeUser.id));
+      const userUpdate: Record<string, unknown> = { lastLoginAt: newLoginAt };
+      if (enabled && !fakeUser.country) userUpdate.country = "IT";
+      await db.update(usersTable).set(userUpdate as any).where(eq(usersTable.id, fakeUser.id));
     }
     return res.json({ message: `Tutti gli utenti fake sono stati ${enabled ? "abilitati" : "disabilitati"}`, count: fakeUsers.length });
   } catch (error) {
@@ -1712,6 +1717,42 @@ router.delete("/invitation-codes/:id", async (req: Request, res: Response) => {
     return res.json({ ok: true });
   } catch (error) {
     console.error("Admin invitation delete error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/email-status", async (_req: Request, res: Response) => {
+  try {
+    const userSetting = await storage.getAppSetting("gmail_user");
+    const passSetting = await storage.getAppSetting("gmail_app_password");
+    const hasDbCreds = !!(userSetting?.value && passSetting?.value);
+    const hasEnvCreds = !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+    const configured = hasDbCreds || hasEnvCreds;
+    const maskedEmail = hasDbCreds
+      ? userSetting!.value!.replace(/(.{2}).*(@.*)/, "$1***$2")
+      : hasEnvCreds
+      ? process.env.GMAIL_USER!.replace(/(.{2}).*(@.*)/, "$1***$2")
+      : null;
+    return res.json({ configured, maskedEmail });
+  } catch (error) {
+    console.error("Admin email status error:", error);
+    return res.status(500).json({ configured: false, maskedEmail: null });
+  }
+});
+
+router.post("/fake-users/wake-all", async (_req: Request, res: Response) => {
+  try {
+    const now = new Date();
+    const fakeUsers = await db.select({ id: users.id, country: users.country }).from(users).where(eq(users.isFake, true));
+    for (const fu of fakeUsers) {
+      const update: Record<string, unknown> = { lastLoginAt: now };
+      if (!fu.country) update.country = "IT";
+      await db.update(users).set(update as any).where(eq(users.id, fu.id));
+      await db.update(userProfiles).set({ isAvailable: true }).where(eq(userProfiles.userId, fu.id));
+    }
+    return res.json({ ok: true, count: fakeUsers.length });
+  } catch (error) {
+    console.error("Admin wake-all fake users error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

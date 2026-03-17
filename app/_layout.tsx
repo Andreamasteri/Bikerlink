@@ -43,13 +43,25 @@ import Colors from "@/constants/colors";
 
 SplashScreen.preventAutoHideAsync();
 
+const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
+
+async function sendHeartbeat() {
+  try {
+    await apiRequest("POST", "/api/auth/heartbeat");
+  } catch {}
+}
+
 function AppStateHandler() {
   const { user } = useAuth();
   const wasAvailableRef = useRef<boolean | null>(null);
   const appStateRef = useRef(AppState.currentState);
+  const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!user) return;
+
+    sendHeartbeat();
+    heartbeatTimerRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
 
     const subscription = AppState.addEventListener("change", async (nextAppState) => {
       if (appStateRef.current.match(/active/) && nextAppState.match(/inactive|background/)) {
@@ -62,6 +74,7 @@ function AppStateHandler() {
           }
         } catch {}
       } else if (appStateRef.current.match(/inactive|background/) && nextAppState === "active") {
+        sendHeartbeat();
         if (wasAvailableRef.current === true) {
           try {
             await apiRequest("PUT", "/api/users/me/availability", { isAvailable: true });
@@ -73,7 +86,10 @@ function AppStateHandler() {
       appStateRef.current = nextAppState;
     });
 
-    return () => subscription.remove();
+    return () => {
+      subscription.remove();
+      if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+    };
   }, [user]);
 
   return null;

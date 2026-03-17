@@ -413,7 +413,7 @@ export async function massSeedFakeUsers(): Promise<void> {
           eulaAccepted: true,
           country: spec.country,
           spokenLanguages: spec.spokenLanguages,
-          lastLoginAt: new Date(Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)),
+          lastLoginAt: new Date(),
           invitationCode: SEED_TAG,
         });
         specMeta.push({ nickname, email, spec });

@@ -2854,7 +2854,7 @@ async function massSeedFakeUsers() {
           eulaAccepted: true,
           country: spec.country,
           spokenLanguages: spec.spokenLanguages,
-          lastLoginAt: new Date(Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1e3)),
+          lastLoginAt: /* @__PURE__ */ new Date(),
           invitationCode: SEED_TAG
         });
         specMeta.push({ nickname, email, spec });
@@ -3461,6 +3461,26 @@ router.post("/resend-verification", async (req, res) => {
   } catch (error) {
     console.error("Resend verification error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router.get("/email-configured", async (_req, res) => {
+  try {
+    const userSetting = await storage.getAppSetting("gmail_user");
+    const passSetting = await storage.getAppSetting("gmail_app_password");
+    const configured = !!(userSetting?.value && passSetting?.value || process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+    return res.json({ configured });
+  } catch {
+    return res.json({ configured: false });
+  }
+});
+router.post("/heartbeat", async (req, res) => {
+  try {
+    const userId = req.session?.userId;
+    if (!userId) return res.status(401).json({ ok: false });
+    await storage.updateUser(userId, { lastLoginAt: /* @__PURE__ */ new Date() });
+    return res.json({ ok: true });
+  } catch {
+    return res.status(500).json({ ok: false });
   }
 });
 var auth_default = router;
@@ -5693,7 +5713,7 @@ router9.post("/generate", async (req, res) => {
     const invitation = await storage.createInvitationCode({
       code,
       createdBy: req.session.userId,
-      maxUses: maxUses || 1,
+      maxUses: maxUses || 100,
       expiresAt: expiresAt ? new Date(expiresAt) : void 0
     });
     return res.status(201).json(invitation);
@@ -7863,6 +7883,8 @@ router17.post("/fake-users", async (req, res) => {
     }
     const email = `fake_${nickname.toLowerCase().replace(/[^a-z0-9]/g, "")}@fakeuser.bikerlink.it`;
     const hashedPassword = await import_bcryptjs3.default.hash("fakeuser2025!", 10);
+    const ITALIAN_REGIONS = /* @__PURE__ */ new Set(["Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna", "Friuli Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche", "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia", "Toscana", "Trentino-Alto Adige", "Umbria", "Valle d'Aosta", "Veneto"]);
+    const country = req.body.country || (region && ITALIAN_REGIONS.has(region) ? "IT" : "IT");
     const user = await storage.createUser({
       nickname,
       email,
@@ -7872,6 +7894,7 @@ router17.post("/fake-users", async (req, res) => {
       coupleSexConfig: coupleSexConfig || null,
       birthYear: birthYear || null,
       region: region || null,
+      country,
       isFake: true,
       status: "active",
       emailVerified: true,
@@ -8048,7 +8071,9 @@ router17.put("/fake-users/toggle-all", async (req, res) => {
     const newLoginAt = enabled ? /* @__PURE__ */ new Date() : /* @__PURE__ */ new Date("2020-01-01");
     for (const fakeUser of fakeUsers) {
       await db2.update(userProfiles2).set({ isAvailable: enabled }).where(eq8(userProfiles2.userId, fakeUser.id));
-      await db2.update(usersTable).set({ lastLoginAt: newLoginAt }).where(eq8(usersTable.id, fakeUser.id));
+      const userUpdate = { lastLoginAt: newLoginAt };
+      if (enabled && !fakeUser.country) userUpdate.country = "IT";
+      await db2.update(usersTable).set(userUpdate).where(eq8(usersTable.id, fakeUser.id));
     }
     return res.json({ message: `Tutti gli utenti fake sono stati ${enabled ? "abilitati" : "disabilitati"}`, count: fakeUsers.length });
   } catch (error) {
@@ -8445,6 +8470,36 @@ router17.delete("/invitation-codes/:id", async (req, res) => {
     return res.json({ ok: true });
   } catch (error) {
     console.error("Admin invitation delete error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router17.get("/email-status", async (_req, res) => {
+  try {
+    const userSetting = await storage.getAppSetting("gmail_user");
+    const passSetting = await storage.getAppSetting("gmail_app_password");
+    const hasDbCreds = !!(userSetting?.value && passSetting?.value);
+    const hasEnvCreds = !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+    const configured = hasDbCreds || hasEnvCreds;
+    const maskedEmail = hasDbCreds ? userSetting.value.replace(/(.{2}).*(@.*)/, "$1***$2") : hasEnvCreds ? process.env.GMAIL_USER.replace(/(.{2}).*(@.*)/, "$1***$2") : null;
+    return res.json({ configured, maskedEmail });
+  } catch (error) {
+    console.error("Admin email status error:", error);
+    return res.status(500).json({ configured: false, maskedEmail: null });
+  }
+});
+router17.post("/fake-users/wake-all", async (_req, res) => {
+  try {
+    const now = /* @__PURE__ */ new Date();
+    const fakeUsers = await db.select({ id: users.id, country: users.country }).from(users).where((0, import_drizzle_orm7.eq)(users.isFake, true));
+    for (const fu of fakeUsers) {
+      const update = { lastLoginAt: now };
+      if (!fu.country) update.country = "IT";
+      await db.update(users).set(update).where((0, import_drizzle_orm7.eq)(users.id, fu.id));
+      await db.update(userProfiles).set({ isAvailable: true }).where((0, import_drizzle_orm7.eq)(userProfiles.userId, fu.id));
+    }
+    return res.json({ ok: true, count: fakeUsers.length });
+  } catch (error) {
+    console.error("Admin wake-all fake users error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

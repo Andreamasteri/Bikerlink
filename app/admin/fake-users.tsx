@@ -222,6 +222,16 @@ export default function FakeUsersAdmin() {
   const [massSeedTotal, setMassSeedTotal] = useState(0);
   const [massSeedError, setMassSeedError] = useState<string | null>(null);
   const [massSeedConfirmVisible, setMassSeedConfirmVisible] = useState(false);
+
+  const [wakeAllResult, setWakeAllResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const wakeAllMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/fake-users/wake-all", {}),
+    onSuccess: (data: any) => {
+      setWakeAllResult({ type: "success", text: `${data?.count ?? "?"} utenti fake portati online` });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] });
+    },
+    onError: () => setWakeAllResult({ type: "error", text: "Errore durante l'operazione" }),
+  });
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = () => {
@@ -609,6 +619,32 @@ export default function FakeUsersAdmin() {
               </>
             )}
           </TouchableOpacity>
+
+          <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 12, gap: 8 }}>
+            <Text style={[styles.massSeedDesc, { marginBottom: 0 }]}>
+              Porta tutti gli utenti fake online aggiornando l'ultima sessione a adesso.
+            </Text>
+            {!!wakeAllResult && (
+              <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: wakeAllResult.type === "success" ? Colors.success : Colors.error }}>
+                {wakeAllResult.text}
+              </Text>
+            )}
+            <TouchableOpacity
+              style={[styles.massSeedBtn, { backgroundColor: "#2196F3" }, wakeAllMutation.isPending && styles.massSeedBtnDisabled]}
+              onPress={() => { setWakeAllResult(null); wakeAllMutation.mutate(); }}
+              disabled={wakeAllMutation.isPending}
+              activeOpacity={0.7}
+            >
+              {wakeAllMutation.isPending ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="radio-button-on" size={18} color="#fff" />
+                  <Text style={[styles.massSeedBtnText, { color: "#fff" }]}>Porta tutti online</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.summaryRow}>

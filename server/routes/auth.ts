@@ -360,4 +360,29 @@ router.post("/resend-verification", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/email-configured", async (_req: Request, res: Response) => {
+  try {
+    const userSetting = await storage.getAppSetting("gmail_user");
+    const passSetting = await storage.getAppSetting("gmail_app_password");
+    const configured = !!(
+      (userSetting?.value && passSetting?.value) ||
+      (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD)
+    );
+    return res.json({ configured });
+  } catch {
+    return res.json({ configured: false });
+  }
+});
+
+router.post("/heartbeat", async (req: Request, res: Response) => {
+  try {
+    const userId = req.session?.userId;
+    if (!userId) return res.status(401).json({ ok: false });
+    await storage.updateUser(userId, { lastLoginAt: new Date() } as any);
+    return res.json({ ok: true });
+  } catch {
+    return res.status(500).json({ ok: false });
+  }
+});
+
 export default router;
