@@ -6,3 +6,15 @@ id = "4Y78ngKHwO0VLy8lAIKVp"
 uri = "file://manuale-utente-bikerlink.docx"
 type = "word_document"
 title = "Manuale d'Uso BikerLink"
+
+[[outputs]]
+id = "xPLc5vWHrjoO5mwUw0rjH"
+uri = "file://assets/images/playstore-icon.png"
+type = "image"
+title = "Icona Play Store — 512×512 PNG"
+
+[[outputs]]
+id = "3rtGPTyhqHQwerDZqP15T"
+uri = "file://assets/images/playstore-feature-graphic.png"
+type = "image"
+title = "Feature Graphic — 1024×500 PNG"
