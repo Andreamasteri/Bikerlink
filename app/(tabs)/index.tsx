@@ -30,6 +30,12 @@ import { getRegionCoordinates } from "@/constants/regions";
 import { getCountryFlag, getCountryName, EUROPEAN_COUNTRIES } from "@/lib/countries-regions";
 import { useT, useLocale } from "@/lib/language-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { User } from "@shared/schema";
+
+type UserWithProfileCoords = Omit<User, "password"> & {
+  profileLatitude?: number | null;
+  profileLongitude?: number | null;
+};
 
 export default function MapScreen() {
   const router = useRouter();
@@ -220,19 +226,21 @@ export default function MapScreen() {
     }
   }, []);
 
+  const typedUser = user as UserWithProfileCoords | null | undefined;
+  const profileLat = typedUser?.profileLatitude;
+  const profileLng = typedUser?.profileLongitude;
+
   useEffect(() => {
     (async () => {
       if (user?.region) {
-        setLocation(getRegionCoordinates(user.country, user.region));
+        setLocation(getRegionCoordinates(user.region, user.country));
         setLocationLoading(false);
         fetchGPSLocation();
         return;
       }
 
-      const savedLat = (user as any)?.profileLatitude;
-      const savedLng = (user as any)?.profileLongitude;
-      if (savedLat != null && savedLng != null && !isNaN(savedLat) && !isNaN(savedLng)) {
-        setLocation({ latitude: Number(savedLat), longitude: Number(savedLng) });
+      if (profileLat != null && profileLng != null && !isNaN(Number(profileLat)) && !isNaN(Number(profileLng))) {
+        setLocation({ latitude: Number(profileLat), longitude: Number(profileLng) });
         setLocationLoading(false);
         fetchGPSLocation();
         return;
@@ -246,7 +254,7 @@ export default function MapScreen() {
       }
       setLocationLoading(false);
     })();
-  }, [fetchGPSLocation, getRegionFallback, user?.region, user?.country]);
+  }, [fetchGPSLocation, getRegionFallback, user?.region, user?.country, profileLat, profileLng]);
 
   const handleCenterPosition = useCallback(async () => {
     const gps = await fetchGPSLocation();
