@@ -16,8 +16,6 @@ function loadTranslations(lang: AppLanguage): Record<string, string> {
   }
 }
 
-loadTranslations("it");
-
 export function setAppLanguage(lang: AppLanguage) {
   currentLanguage = lang;
   loadTranslations(lang);

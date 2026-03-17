@@ -4,6 +4,8 @@ import { type AppLanguage, setAppLanguage, getAppLanguage, tWithLang, langToLoca
 
 const STORAGE_KEY = "@bikerlink_language";
 
+const VALID_LANGS: AppLanguage[] = ["it", "en", "de", "es", "fr"];
+
 interface LanguageContextType {
   language: AppLanguage;
   setLanguage: (lang: AppLanguage) => void;
@@ -23,12 +25,16 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((stored) => {
-      if (stored && (stored === "it" || stored === "en" || stored === "de" || stored === "es" || stored === "fr")) {
-        setAppLanguage(stored as AppLanguage);
-        setLanguageState(stored as AppLanguage);
-      }
+      const lang: AppLanguage = (stored && VALID_LANGS.includes(stored as AppLanguage))
+        ? (stored as AppLanguage)
+        : "it";
+      setAppLanguage(lang);
+      setLanguageState(lang);
       setLoaded(true);
-    }).catch(() => setLoaded(true));
+    }).catch(() => {
+      setAppLanguage("it");
+      setLoaded(true);
+    });
   }, []);
 
   const setLanguage = useCallback((lang: AppLanguage) => {
