@@ -2660,7 +2660,7 @@ async function ensureOfficialAccount() {
   return user.id;
 }
 async function cleanupOldSeedUsers() {
-  const oldTaggedUsers = await db.select({ id: users.id }).from(users).where((0, import_drizzle_orm5.eq)(users.invitationCode, OLD_SEED_TAG));
+  const oldTaggedUsers = await db.select({ id: users.id }).from(users).where((0, import_drizzle_orm6.eq)(users.invitationCode, OLD_SEED_TAG));
   if (oldTaggedUsers.length === 0) return;
   console.log(`[mass-seed] Cleaning up ${oldTaggedUsers.length} old Italian-only seed users...`);
   const CLEANUP_BATCH = 100;
@@ -2669,17 +2669,17 @@ async function cleanupOldSeedUsers() {
     const ids = batch.map((u) => u.id);
     for (const uid of ids) {
       try {
-        await db.delete(zavarrinaWishlistMotos).where(import_drizzle_orm5.sql`${zavarrinaWishlistMotos.wishlistId} IN (SELECT id FROM zavorrina_wishlists WHERE user_id = ${uid})`);
-        await db.delete(zavarrinaWishlists).where((0, import_drizzle_orm5.eq)(zavarrinaWishlists.userId, uid));
-        await db.delete(userMotorcycles).where((0, import_drizzle_orm5.eq)(userMotorcycles.userId, uid));
-        const userConvs = await db.select({ convId: conversationParticipants.conversationId }).from(conversationParticipants).where((0, import_drizzle_orm5.eq)(conversationParticipants.userId, uid));
+        await db.delete(zavarrinaWishlistMotos).where(import_drizzle_orm6.sql`${zavarrinaWishlistMotos.wishlistId} IN (SELECT id FROM zavorrina_wishlists WHERE user_id = ${uid})`);
+        await db.delete(zavarrinaWishlists).where((0, import_drizzle_orm6.eq)(zavarrinaWishlists.userId, uid));
+        await db.delete(userMotorcycles).where((0, import_drizzle_orm6.eq)(userMotorcycles.userId, uid));
+        const userConvs = await db.select({ convId: conversationParticipants.conversationId }).from(conversationParticipants).where((0, import_drizzle_orm6.eq)(conversationParticipants.userId, uid));
         for (const c of userConvs) {
-          await db.delete(messages).where((0, import_drizzle_orm5.eq)(messages.conversationId, c.convId));
-          await db.delete(conversationParticipants).where((0, import_drizzle_orm5.eq)(conversationParticipants.conversationId, c.convId));
-          await db.delete(conversations).where((0, import_drizzle_orm5.eq)(conversations.id, c.convId));
+          await db.delete(messages).where((0, import_drizzle_orm6.eq)(messages.conversationId, c.convId));
+          await db.delete(conversationParticipants).where((0, import_drizzle_orm6.eq)(conversationParticipants.conversationId, c.convId));
+          await db.delete(conversations).where((0, import_drizzle_orm6.eq)(conversations.id, c.convId));
         }
-        await db.delete(userProfiles).where((0, import_drizzle_orm5.eq)(userProfiles.userId, uid));
-        await db.delete(users).where((0, import_drizzle_orm5.eq)(users.id, uid));
+        await db.delete(userProfiles).where((0, import_drizzle_orm6.eq)(userProfiles.userId, uid));
+        await db.delete(users).where((0, import_drizzle_orm6.eq)(users.id, uid));
       } catch (err) {
         logSeedError(`cleanup-old-user-${uid}`, err);
       }
@@ -2696,9 +2696,9 @@ async function reconcileExistingUsers(officialId) {
     userType: users.userType,
     sex: users.sex,
     nickname: users.nickname
-  }).from(users).where((0, import_drizzle_orm5.eq)(users.invitationCode, SEED_TAG));
+  }).from(users).where((0, import_drizzle_orm6.eq)(users.invitationCode, SEED_TAG));
   for (const u of taggedUsers) {
-    const [profileExists] = await db.select({ id: userProfiles.id }).from(userProfiles).where((0, import_drizzle_orm5.eq)(userProfiles.userId, u.id)).limit(1);
+    const [profileExists] = await db.select({ id: userProfiles.id }).from(userProfiles).where((0, import_drizzle_orm6.eq)(userProfiles.userId, u.id)).limit(1);
     if (!profileExists) {
       try {
         const zone = pickRandom(EUROPEAN_ZONES);
@@ -2715,7 +2715,7 @@ async function reconcileExistingUsers(officialId) {
       }
     }
     if (u.userType === "biker" || u.userType === "coppia") {
-      const existingMotos = await db.select({ id: userMotorcycles.id }).from(userMotorcycles).where((0, import_drizzle_orm5.eq)(userMotorcycles.userId, u.id));
+      const existingMotos = await db.select({ id: userMotorcycles.id }).from(userMotorcycles).where((0, import_drizzle_orm6.eq)(userMotorcycles.userId, u.id));
       if (existingMotos.length < 2) {
         const needed = 2 - existingMotos.length;
         const motos = pickRandomN(MOTORCYCLES, needed);
@@ -2755,8 +2755,8 @@ async function reconcileExistingUsers(officialId) {
         }
       }
     }
-    const officialConvs = await db.select({ convId: conversationParticipants.conversationId }).from(conversationParticipants).where((0, import_drizzle_orm5.eq)(conversationParticipants.userId, officialId));
-    const userConvs = await db.select({ convId: conversationParticipants.conversationId }).from(conversationParticipants).where((0, import_drizzle_orm5.eq)(conversationParticipants.userId, u.id));
+    const officialConvs = await db.select({ convId: conversationParticipants.conversationId }).from(conversationParticipants).where((0, import_drizzle_orm6.eq)(conversationParticipants.userId, officialId));
+    const userConvs = await db.select({ convId: conversationParticipants.conversationId }).from(conversationParticipants).where((0, import_drizzle_orm6.eq)(conversationParticipants.userId, u.id));
     const officialConvSet = new Set(officialConvs.map((c) => c.convId));
     const hasOfficialConv = userConvs.some((c) => officialConvSet.has(c.convId));
     if (!hasOfficialConv) {
@@ -2795,7 +2795,7 @@ async function massSeedFakeUsers() {
       sex: users.sex,
       coupleSexConfig: users.coupleSexConfig,
       region: users.region
-    }).from(users).where((0, import_drizzle_orm5.eq)(users.invitationCode, SEED_TAG));
+    }).from(users).where((0, import_drizzle_orm6.eq)(users.invitationCode, SEED_TAG));
     if (existingTagged.length > 0) {
       console.log(`[mass-seed] Found ${existingTagged.length} existing tagged users, reconciling...`);
       await reconcileExistingUsers(officialId);
@@ -3016,7 +3016,7 @@ async function massSeedFakeUsers() {
     massSeedStatus.running = false;
   }
 }
-var import_bcryptjs2, import_drizzle_orm5, SEED_TAG, OLD_SEED_TAG, massSeedStatus, BATCH_SIZE, seedErrors;
+var import_bcryptjs2, import_drizzle_orm6, SEED_TAG, OLD_SEED_TAG, massSeedStatus, BATCH_SIZE, seedErrors;
 var init_mass_seed = __esm({
   "server/mass-seed.ts"() {
     "use strict";
@@ -3024,7 +3024,7 @@ var init_mass_seed = __esm({
     init_db();
     init_storage();
     init_schema();
-    import_drizzle_orm5 = require("drizzle-orm");
+    import_drizzle_orm6 = require("drizzle-orm");
     init_mass_seed_data();
     SEED_TAG = "mass_seed_eu_v1";
     OLD_SEED_TAG = "mass_seed_2420";
@@ -3747,12 +3747,12 @@ router2.get("/online-list", requireAuth, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq7, and: and5, lt, or: or3, isNull, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq8, and: and6, lt, or: or3, isNull, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const offlineConds = [eq7(usersTable.status, "active"), or3(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt))];
+      const offlineConds = [eq8(usersTable.status, "active"), or3(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt))];
       if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
-      const offlineResults = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(usersTable).leftJoin(profilesTable, eq7(profilesTable.userId, usersTable.id)).where(and5(...offlineConds)).orderBy(sqlTag`distance`);
+      const offlineResults = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(usersTable).leftJoin(profilesTable, eq8(profilesTable.userId, usersTable.id)).where(and6(...offlineConds)).orderBy(sqlTag`distance`);
       const offlineOnly = offlineResults.filter((r) => !onlineIdSet.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
     }
@@ -3857,12 +3857,12 @@ router2.get("/biker-available-list", requireAuth, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq7, and: and5, or: or3, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq8, and: and6, or: or3, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const bikerConds = [eq7(usersTable.status, "active"), or3(eq7(usersTable.userType, "biker"), eq7(usersTable.userType, "coppia"))];
+      const bikerConds = [eq8(usersTable.status, "active"), or3(eq8(usersTable.userType, "biker"), eq8(usersTable.userType, "coppia"))];
       if (countriesParam && countriesParam.length > 0) bikerConds.push(inArr(usersTable.country, countriesParam));
-      const allBikers = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq7(usersTable.id, profilesTable.userId)).where(and5(...bikerConds)).orderBy(sqlTag`distance`);
+      const allBikers = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq8(usersTable.id, profilesTable.userId)).where(and6(...bikerConds)).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));
       const offlineOnly = allBikers.filter((r) => !onlineIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
@@ -3911,12 +3911,12 @@ router2.get("/zavorrine-available-list", requireAuth, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq7, and: and5, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq8, and: and6, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const zavConds = [eq7(usersTable.status, "active"), eq7(usersTable.userType, "zavorrina")];
+      const zavConds = [eq8(usersTable.status, "active"), eq8(usersTable.userType, "zavorrina")];
       if (countriesParam && countriesParam.length > 0) zavConds.push(inArr(usersTable.country, countriesParam));
-      const allZav = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq7(usersTable.id, profilesTable.userId)).where(and5(...zavConds)).orderBy(sqlTag`distance`);
+      const allZav = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq8(usersTable.id, profilesTable.userId)).where(and6(...zavConds)).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));
       const offlineOnly = allZav.filter((r) => !onlineIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
@@ -4098,6 +4098,9 @@ var users_default = router2;
 var import_express4 = require("express");
 var import_path2 = __toESM(require("path"));
 var import_fs2 = __toESM(require("fs"));
+var import_drizzle_orm4 = require("drizzle-orm");
+init_db();
+init_schema();
 init_storage();
 
 // server/routes/motoclubs.ts
@@ -4645,10 +4648,7 @@ router4.put("/:id", requireAuth3, async (req, res) => {
       }
     }
     if (updateData.isDefault === true) {
-      const allMotos = await storage.getUserMotorcycles(userId);
-      await Promise.all(
-        allMotos.filter((m) => m.id !== motoId).map((m) => storage.updateUserMotorcycle(m.id, { isDefault: false }))
-      );
+      await db.update(userMotorcycles).set({ isDefault: false }).where((0, import_drizzle_orm4.and)((0, import_drizzle_orm4.eq)(userMotorcycles.userId, userId), (0, import_drizzle_orm4.ne)(userMotorcycles.id, motoId)));
     }
     const motorcycle = await storage.updateUserMotorcycle(motoId, updateData);
     return res.json(motorcycle);
@@ -4735,7 +4735,7 @@ var import_express5 = require("express");
 init_storage();
 init_db();
 init_schema();
-var import_drizzle_orm4 = require("drizzle-orm");
+var import_drizzle_orm5 = require("drizzle-orm");
 var router5 = (0, import_express5.Router)();
 function requireAuth4(req, res, next) {
   if (!req.session.userId) {
@@ -4752,7 +4752,7 @@ router5.get("/", requireAuth4, async (req, res) => {
     const filter = req.query.filter;
     const userId = req.session.userId;
     let allProposals = await storage.getProposals(status ? { status } : void 0);
-    const userMemberships = await db.select({ clubId: motoClubMembers.clubId }).from(motoClubMembers).where((0, import_drizzle_orm4.and)((0, import_drizzle_orm4.eq)(motoClubMembers.userId, userId), (0, import_drizzle_orm4.eq)(motoClubMembers.status, "active")));
+    const userMemberships = await db.select({ clubId: motoClubMembers.clubId }).from(motoClubMembers).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(motoClubMembers.userId, userId), (0, import_drizzle_orm5.eq)(motoClubMembers.status, "active")));
     const memberClubIds = new Set(userMemberships.map((m) => m.clubId));
     allProposals = allProposals.filter((p) => {
       if (!p.clubId) return true;
@@ -6881,7 +6881,7 @@ var import_bcryptjs3 = __toESM(require("bcryptjs"));
 init_storage();
 init_db();
 init_schema();
-var import_drizzle_orm6 = require("drizzle-orm");
+var import_drizzle_orm7 = require("drizzle-orm");
 var router17 = (0, import_express17.Router)();
 function requireAdmin(req, res, next) {
   if (!req.session.userId) {
@@ -7260,8 +7260,8 @@ router17.get("/easter-eggs/:id/stats", async (req, res) => {
     }
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { collectedEasterEggs: collectedEasterEggs2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq7, count } = await import("drizzle-orm");
-    const [result] = await db2.select({ count: count() }).from(collectedEasterEggs2).where(eq7(collectedEasterEggs2.easterEggId, id));
+    const { eq: eq8, count } = await import("drizzle-orm");
+    const [result] = await db2.select({ count: count() }).from(collectedEasterEggs2).where(eq8(collectedEasterEggs2.easterEggId, id));
     return res.json({ eggId: id, collectionsCount: result?.count || 0 });
   } catch (error) {
     console.error("Admin get easter egg stats error:", error);
@@ -8042,13 +8042,13 @@ router17.put("/fake-users/toggle-all", async (req, res) => {
     }
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { users: usersTable, userProfiles: userProfiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq7 } = await import("drizzle-orm");
+    const { eq: eq8 } = await import("drizzle-orm");
     await storage.upsertAppSetting("fake_users_enabled", enabled ? "true" : "false");
-    const fakeUsers = await db2.select().from(usersTable).where(eq7(usersTable.isFake, true));
+    const fakeUsers = await db2.select().from(usersTable).where(eq8(usersTable.isFake, true));
     const newLoginAt = enabled ? /* @__PURE__ */ new Date() : /* @__PURE__ */ new Date("2020-01-01");
     for (const fakeUser of fakeUsers) {
-      await db2.update(userProfiles2).set({ isAvailable: enabled }).where(eq7(userProfiles2.userId, fakeUser.id));
-      await db2.update(usersTable).set({ lastLoginAt: newLoginAt }).where(eq7(usersTable.id, fakeUser.id));
+      await db2.update(userProfiles2).set({ isAvailable: enabled }).where(eq8(userProfiles2.userId, fakeUser.id));
+      await db2.update(usersTable).set({ lastLoginAt: newLoginAt }).where(eq8(usersTable.id, fakeUser.id));
     }
     return res.json({ message: `Tutti gli utenti fake sono stati ${enabled ? "abilitati" : "disabilitati"}`, count: fakeUsers.length });
   } catch (error) {
@@ -8216,9 +8216,9 @@ router17.get("/chats/:id/messages", async (req, res) => {
 });
 router17.get("/motoclubs", async (_req, res) => {
   try {
-    const clubs = await db.select().from(motoClubs).orderBy((0, import_drizzle_orm6.desc)(motoClubs.createdAt));
+    const clubs = await db.select().from(motoClubs).orderBy((0, import_drizzle_orm7.desc)(motoClubs.createdAt));
     const result = await Promise.all(clubs.map(async (c) => {
-      const members = await db.select().from(motoClubMembers).where((0, import_drizzle_orm6.and)((0, import_drizzle_orm6.eq)(motoClubMembers.clubId, c.id), (0, import_drizzle_orm6.eq)(motoClubMembers.status, "active")));
+      const members = await db.select().from(motoClubMembers).where((0, import_drizzle_orm7.and)((0, import_drizzle_orm7.eq)(motoClubMembers.clubId, c.id), (0, import_drizzle_orm7.eq)(motoClubMembers.status, "active")));
       return { ...c, memberCount: members.length };
     }));
     return res.json(result);
@@ -8230,7 +8230,7 @@ router17.delete("/motoclubs/:id", async (req, res) => {
   try {
     const adminId = req.session.userId;
     const clubId = req.params.id;
-    await db.delete(motoClubs).where((0, import_drizzle_orm6.eq)(motoClubs.id, clubId));
+    await db.delete(motoClubs).where((0, import_drizzle_orm7.eq)(motoClubs.id, clubId));
     await db.insert(moderatorLogs).values({
       moderatorId: adminId,
       action: "delete_motoclub",
@@ -8245,7 +8245,7 @@ router17.delete("/motoclubs/:id", async (req, res) => {
 });
 router17.get("/motoclubs/requests", async (_req, res) => {
   try {
-    const requests = await db.select().from(motoClubRequests).orderBy((0, import_drizzle_orm6.desc)(motoClubRequests.createdAt));
+    const requests = await db.select().from(motoClubRequests).orderBy((0, import_drizzle_orm7.desc)(motoClubRequests.createdAt));
     return res.json(requests);
   } catch (e) {
     return res.status(500).json({ message: "Errore interno" });
@@ -8255,9 +8255,9 @@ router17.post("/motoclubs/requests/:id/approve", async (req, res) => {
   try {
     const adminId = req.session.userId;
     const requestId = req.params.id;
-    const [request] = await db.select().from(motoClubRequests).where((0, import_drizzle_orm6.eq)(motoClubRequests.id, requestId)).limit(1);
+    const [request] = await db.select().from(motoClubRequests).where((0, import_drizzle_orm7.eq)(motoClubRequests.id, requestId)).limit(1);
     if (!request) return res.status(404).json({ message: "Richiesta non trovata" });
-    await db.update(motoClubRequests).set({ status: "approved", reviewedBy: adminId, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm6.eq)(motoClubRequests.id, requestId));
+    await db.update(motoClubRequests).set({ status: "approved", reviewedBy: adminId, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm7.eq)(motoClubRequests.id, requestId));
     const [newClub] = await db.insert(motoClubs).values({
       name: request.name,
       clubType: request.clubType,
@@ -8270,7 +8270,7 @@ router17.post("/motoclubs/requests/:id/approve", async (req, res) => {
       conversationType: "motoclub",
       title: `Club ${request.name}`
     }).returning();
-    await db.update(motoClubs).set({ conversationId: conv.id }).where((0, import_drizzle_orm6.eq)(motoClubs.id, newClub.id));
+    await db.update(motoClubs).set({ conversationId: conv.id }).where((0, import_drizzle_orm7.eq)(motoClubs.id, newClub.id));
     await db.insert(moderatorLogs).values({
       moderatorId: adminId,
       action: "approve_motoclub_request",
@@ -8289,7 +8289,7 @@ router17.post("/motoclubs/requests/:id/reject", async (req, res) => {
     const adminId = req.session.userId;
     const requestId = req.params.id;
     const { note } = req.body;
-    await db.update(motoClubRequests).set({ status: "rejected", reviewedBy: adminId, reviewNote: note ?? null, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm6.eq)(motoClubRequests.id, requestId));
+    await db.update(motoClubRequests).set({ status: "rejected", reviewedBy: adminId, reviewNote: note ?? null, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm7.eq)(motoClubRequests.id, requestId));
     await db.insert(moderatorLogs).values({
       moderatorId: adminId,
       action: "reject_motoclub_request",
@@ -8305,7 +8305,7 @@ router17.post("/motoclubs/requests/:id/reject", async (req, res) => {
 router17.get("/motoclubs/:id", async (req, res) => {
   try {
     const clubId = req.params.id;
-    const [club] = await db.select().from(motoClubs).where((0, import_drizzle_orm6.eq)(motoClubs.id, clubId)).limit(1);
+    const [club] = await db.select().from(motoClubs).where((0, import_drizzle_orm7.eq)(motoClubs.id, clubId)).limit(1);
     if (!club) return res.status(404).json({ message: "Club non trovato" });
     const memberships = await db.select({
       membershipId: motoClubMembers.id,
@@ -8318,7 +8318,7 @@ router17.get("/motoclubs/:id", async (req, res) => {
       avatarUrl: users.avatarUrl,
       country: users.country,
       isFake: users.isFake
-    }).from(motoClubMembers).innerJoin(users, (0, import_drizzle_orm6.eq)(motoClubMembers.userId, users.id)).where((0, import_drizzle_orm6.and)((0, import_drizzle_orm6.eq)(motoClubMembers.clubId, clubId), (0, import_drizzle_orm6.eq)(motoClubMembers.status, "active"))).orderBy(motoClubMembers.joinedAt);
+    }).from(motoClubMembers).innerJoin(users, (0, import_drizzle_orm7.eq)(motoClubMembers.userId, users.id)).where((0, import_drizzle_orm7.and)((0, import_drizzle_orm7.eq)(motoClubMembers.clubId, clubId), (0, import_drizzle_orm7.eq)(motoClubMembers.status, "active"))).orderBy(motoClubMembers.joinedAt);
     return res.json({ ...club, members: memberships });
   } catch (e) {
     return res.status(500).json({ message: "Errore interno" });
@@ -8328,7 +8328,7 @@ router17.delete("/motoclubs/:id/members/:userId", async (req, res) => {
   try {
     const adminId = req.session.userId;
     const { id: clubId, userId } = req.params;
-    await db.delete(motoClubMembers).where((0, import_drizzle_orm6.and)((0, import_drizzle_orm6.eq)(motoClubMembers.clubId, clubId), (0, import_drizzle_orm6.eq)(motoClubMembers.userId, userId)));
+    await db.delete(motoClubMembers).where((0, import_drizzle_orm7.and)((0, import_drizzle_orm7.eq)(motoClubMembers.clubId, clubId), (0, import_drizzle_orm7.eq)(motoClubMembers.userId, userId)));
     await db.insert(moderatorLogs).values({
       moderatorId: adminId,
       action: "remove_motoclub_member",
@@ -8366,7 +8366,7 @@ router17.get("/mass-seed-status", async (_req, res) => {
 });
 router17.get("/invitation-codes/stats", async (_req, res) => {
   try {
-    const totalUsers = await db.select({ count: import_drizzle_orm6.sql`count(*)` }).from(users).then((r) => Number(r[0]?.count ?? 0));
+    const totalUsers = await db.select({ count: import_drizzle_orm7.sql`count(*)` }).from(users).then((r) => Number(r[0]?.count ?? 0));
     const usersWithCode = await storage.countUsersWithInvitationCode();
     const codes = await storage.getInvitationCodes();
     const perCode = await Promise.all(
@@ -9406,7 +9406,7 @@ function startMatchingEngine() {
 var import_bcryptjs4 = __toESM(require("bcryptjs"));
 init_db();
 init_schema();
-var import_drizzle_orm7 = require("drizzle-orm");
+var import_drizzle_orm8 = require("drizzle-orm");
 var essentialUsers = [
   {
     nickname: "admin",
@@ -9428,7 +9428,7 @@ var essentialUsers = [
 async function autoSeedEssentialUsers() {
   try {
     for (const userData of essentialUsers) {
-      const existing = await db.select().from(users).where((0, import_drizzle_orm7.eq)(users.email, userData.email)).limit(1);
+      const existing = await db.select().from(users).where((0, import_drizzle_orm8.eq)(users.email, userData.email)).limit(1);
       if (existing.length > 0) {
         continue;
       }
@@ -9534,17 +9534,17 @@ var fakeCoppie = [
 ];
 async function autoSeedFakeUsers() {
   try {
-    const skipSetting = await db.select().from(appSettings).where((0, import_drizzle_orm7.eq)(appSettings.key, "skip_fake_user_seed")).limit(1);
+    const skipSetting = await db.select().from(appSettings).where((0, import_drizzle_orm8.eq)(appSettings.key, "skip_fake_user_seed")).limit(1);
     if (skipSetting.length > 0 && skipSetting[0].value === "true") {
       console.log("Auto-seed fake users skipped (admin deleted all fake users)");
       return;
     }
-    const massSeedTagged = await db.select({ id: users.id }).from(users).where(import_drizzle_orm7.sql`${users.invitationCode} IN ('mass_seed_2420', 'mass_seed_eu_v1')`).limit(1);
+    const massSeedTagged = await db.select({ id: users.id }).from(users).where(import_drizzle_orm8.sql`${users.invitationCode} IN ('mass_seed_2420', 'mass_seed_eu_v1')`).limit(1);
     if (massSeedTagged.length > 0) {
       console.log("Auto-seed fake users skipped (mass-seeded population exists)");
       return;
     }
-    const existingFakes = await db.select().from(users).where((0, import_drizzle_orm7.eq)(users.isFake, true)).limit(11);
+    const existingFakes = await db.select().from(users).where((0, import_drizzle_orm8.eq)(users.isFake, true)).limit(11);
     if (existingFakes.length > 10) {
       return;
     }

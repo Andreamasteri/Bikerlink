@@ -1,6 +1,9 @@
 import { Router, type Request, type Response } from "express";
 import path from "path";
 import fs from "fs";
+import { and, ne, eq } from "drizzle-orm";
+import { db } from "../db";
+import { userMotorcycles } from "../../shared/schema";
 import { storage } from "../storage";
 import { createClubInvitesForMoto } from "./motoclubs";
 
@@ -132,12 +135,10 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
     }
 
     if (updateData.isDefault === true) {
-      const allMotos = await storage.getUserMotorcycles(userId);
-      await Promise.all(
-        allMotos
-          .filter((m) => m.id !== motoId)
-          .map((m) => storage.updateUserMotorcycle(m.id, { isDefault: false }))
-      );
+      await db
+        .update(userMotorcycles)
+        .set({ isDefault: false })
+        .where(and(eq(userMotorcycles.userId, userId), ne(userMotorcycles.id, motoId)));
     }
 
     const motorcycle = await storage.updateUserMotorcycle(motoId, updateData as any);
