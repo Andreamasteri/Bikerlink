@@ -25,7 +25,7 @@ export default function TabLayout() {
   const { data: unreadData } = useQuery<{ count: number }>({
     queryKey: ["/api/chat/unread-total"],
     enabled: !!user,
-    refetchInterval: 30000,
+    refetchInterval: 6000,
   });
 
   const unreadCount = unreadData?.count ?? 0;
