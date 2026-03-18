@@ -330,6 +330,7 @@ export default function MapScreen() {
   const { data: homeMessageData } = useQuery<{ enabled: boolean; text: string }>({
     queryKey: ["/api/settings/home-message"],
     staleTime: 0,
+    refetchInterval: 60000,
     enabled: isAuthenticated,
   });
 
