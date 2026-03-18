@@ -26,12 +26,28 @@ fi
 echo $$ > "$LOCK_FILE"
 
 kill_port() {
-  pkill -9 -f "metro" 2>/dev/null || true
-  pkill -9 -f "expo start" 2>/dev/null || true
-  pkill -9 -f "react-native start" 2>/dev/null || true
-  pkill -9 -f "node.*8081" 2>/dev/null || true
-  lsof -ti:$PORT 2>/dev/null | xargs kill -9 2>/dev/null || true
-  fuser -k -9 ${PORT}/tcp 2>/dev/null || true
+  # Kill only the process listening on port 8081, not all metro globally
+  local pid_on_port
+  pid_on_port=$(lsof -ti:$PORT 2>/dev/null)
+  if [ -n "$pid_on_port" ]; then
+    echo "Terminating PID(s) on port $PORT: $pid_on_port"
+    echo "$pid_on_port" | xargs kill -15 2>/dev/null || true
+    sleep 3
+    # Force kill if still running
+    pid_on_port=$(lsof -ti:$PORT 2>/dev/null)
+    if [ -n "$pid_on_port" ]; then
+      echo "$pid_on_port" | xargs kill -9 2>/dev/null || true
+    fi
+  fi
+
+  # Also kill any previous Metro PID we know about
+  if [ -f "$PID_FILE" ]; then
+    OLD_METRO_PID=$(cat "$PID_FILE" 2>/dev/null)
+    if [ -n "$OLD_METRO_PID" ] && kill -0 "$OLD_METRO_PID" 2>/dev/null; then
+      kill -9 "$OLD_METRO_PID" 2>/dev/null || true
+    fi
+    rm -f "$PID_FILE"
+  fi
 
   for i in $(seq 1 10); do
     if ! lsof -ti:$PORT >/dev/null 2>&1; then
@@ -76,10 +92,22 @@ for retry in $(seq 1 $MAX_RETRIES); do
   METRO_PID=$!
   echo $METRO_PID > "$PID_FILE"
 
-  sleep 25
+  # Wait up to 60s for Metro to actually bind to port 8081
+  echo "Attendo che Metro si avvii sulla porta $PORT (max 60s)..."
+  for i in $(seq 1 60); do
+    if ! kill -0 $METRO_PID 2>/dev/null; then
+      echo "Metro (PID $METRO_PID) è terminato durante l'avvio al secondo $i"
+      break
+    fi
+    if lsof -ti:$PORT >/dev/null 2>&1; then
+      echo "Metro avviato con successo (PID: $METRO_PID) dopo ${i}s"
+      break
+    fi
+    sleep 1
+  done
 
   if kill -0 $METRO_PID 2>/dev/null; then
-    echo "Metro avviato con successo (PID: $METRO_PID)"
+    echo "Metro in esecuzione, attendo..."
     wait $METRO_PID
     EXIT_CODE=$?
     echo "Metro terminato con codice: $EXIT_CODE"

@@ -6,6 +6,7 @@ LOG_FILE="/home/runner/workspace/logs/watchdog.log"
 HEALTH_CHECK_INTERVAL=60
 CHECK_INTERVAL=10
 RESTART_COOLDOWN=60
+FRONTEND_RESTART_COOLDOWN=120
 
 mkdir -p "$(dirname "$LOG_FILE")"
 
@@ -111,11 +112,11 @@ while true; do
       frontend_down_since=$now
     fi
     time_since_last_restart=$((now - last_frontend_restart))
-    if [ "$time_since_last_restart" -ge "$RESTART_COOLDOWN" ]; then
+    if [ "$time_since_last_restart" -ge "$FRONTEND_RESTART_COOLDOWN" ]; then
       restart_frontend
       last_frontend_restart=$now
     else
-      log "FRONTEND ANCORA GIU': prossimo tentativo di riavvio tra $((RESTART_COOLDOWN - time_since_last_restart))s"
+      log "FRONTEND ANCORA GIU': prossimo tentativo di riavvio tra $((FRONTEND_RESTART_COOLDOWN - time_since_last_restart))s"
     fi
   fi
 
