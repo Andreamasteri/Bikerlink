@@ -327,7 +327,7 @@ export default function MapScreen() {
     enabled: isAuthenticated && adsGloballyEnabled && nearbyLoaded,
   });
 
-  const { data: homeMessageData } = useQuery<{ enabled: boolean; text: string }>({
+  const { data: homeMessageData, refetch: refetchHomeMessage } = useQuery<{ enabled: boolean; text: string }>({
     queryKey: ["/api/settings/home-message"],
     staleTime: 0,
     refetchInterval: 60000,
@@ -607,8 +607,9 @@ export default function MapScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.titleRow}
-          onPress={() => {
-            if (homeMessageData?.enabled) {
+          onPress={async () => {
+            const { data } = await refetchHomeMessage();
+            if (data?.enabled) {
               setShowHomeMessage(true);
             }
           }}
