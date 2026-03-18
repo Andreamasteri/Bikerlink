@@ -198,41 +198,41 @@ async function runBikerBikerMatching(): Promise<number> {
     const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
     if (bikerMotorcycles.length < 2) return 0;
 
+    const buckets = new Map<string, Array<{ userId: string; brand: string; model: string }>>();
+    for (const bm of bikerMotorcycles) {
+      if (!bm.motorcycle.brand || !bm.motorcycle.model) continue;
+      const key = `${bm.motorcycle.brand.toLowerCase()}|${bm.motorcycle.model.toLowerCase()}`;
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key)!.push({ userId: bm.userId, brand: bm.motorcycle.brand, model: bm.motorcycle.model });
+    }
+
     let matchCount = 0;
     const MAX_MATCHES_PER_RUN = 200;
 
-    for (let i = 0; i < bikerMotorcycles.length && matchCount < MAX_MATCHES_PER_RUN; i++) {
-      const bm1 = bikerMotorcycles[i];
-      if (!bm1.motorcycle.brand || !bm1.motorcycle.model) continue;
+    for (const [, members] of buckets) {
+      if (members.length < 2) continue;
+      const uniqueMembers = members.filter((m, idx) => members.findIndex(x => x.userId === m.userId) === idx);
+      if (uniqueMembers.length < 2) continue;
 
-      for (let j = i + 1; j < bikerMotorcycles.length && matchCount < MAX_MATCHES_PER_RUN; j++) {
-        const bm2 = bikerMotorcycles[j];
+      for (let i = 0; i < uniqueMembers.length && matchCount < MAX_MATCHES_PER_RUN; i++) {
+        for (let j = i + 1; j < uniqueMembers.length && matchCount < MAX_MATCHES_PER_RUN; j++) {
+          const m1 = uniqueMembers[i];
+          const m2 = uniqueMembers[j];
+          const idA = m1.userId < m2.userId ? m1.userId : m2.userId;
+          const idB = m1.userId < m2.userId ? m2.userId : m1.userId;
 
-        if (bm1.userId === bm2.userId) continue;
-        if (!bm2.motorcycle.brand || !bm2.motorcycle.model) continue;
-
-        const brand1 = bm1.motorcycle.brand.toLowerCase();
-        const brand2 = bm2.motorcycle.brand.toLowerCase();
-        const model1 = bm1.motorcycle.model.toLowerCase();
-        const model2 = bm2.motorcycle.model.toLowerCase();
-
-        if (brand1 !== brand2) continue;
-        if (model1 !== model2) continue;
-
-        const idA = bm1.userId < bm2.userId ? bm1.userId : bm2.userId;
-        const idB = bm1.userId < bm2.userId ? bm2.userId : bm1.userId;
-        const brand = bm1.motorcycle.brand;
-        const model = bm1.motorcycle.model;
-
-        const inserted = await storage.createBikerBikerMatch({
-          biker1Id: idA,
-          biker2Id: idB,
-          motorcycleBrand: brand,
-          motorcycleModel: model,
-          status: "new",
-        });
-        if (inserted) matchCount++;
+          const inserted = await storage.createBikerBikerMatch({
+            biker1Id: idA,
+            biker2Id: idB,
+            motorcycleBrand: m1.brand,
+            motorcycleModel: m1.model,
+            status: "new",
+          });
+          if (inserted) matchCount++;
+        }
       }
+
+      if (matchCount >= MAX_MATCHES_PER_RUN) break;
     }
 
     return matchCount;

@@ -700,7 +700,12 @@ export const bikerBikerMatches = pgTable("biker_biker_matches", {
 }, (table) => [
   index("biker_biker_biker1_idx").on(table.biker1Id),
   index("biker_biker_biker2_idx").on(table.biker2Id),
-  uniqueIndex("biker_biker_unique_idx").on(table.biker1Id, table.biker2Id, table.motorcycleBrand, table.motorcycleModel),
+  uniqueIndex("biker_biker_symmetric_idx").on(
+    sql`LEAST(${table.biker1Id}, ${table.biker2Id})`,
+    sql`GREATEST(${table.biker1Id}, ${table.biker2Id})`,
+    table.motorcycleBrand,
+    table.motorcycleModel,
+  ),
 ]);
 
 export const emailVerificationTokens = pgTable("email_verification_tokens", {
