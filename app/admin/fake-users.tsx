@@ -880,7 +880,7 @@ export default function FakeUsersAdmin() {
                 <Text style={styles.inputText}>{formRegion || "— nessuna —"}</Text>
               </TouchableOpacity>
               {!!showRegionPicker && (
-                <View style={styles.pickerList}>
+                <ScrollView style={styles.pickerList} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
                   {getRegionsForCountry(formCountry).map((r) => (
                     <TouchableOpacity
                       key={r}
@@ -890,7 +890,7 @@ export default function FakeUsersAdmin() {
                       <Text style={[styles.pickerItemText, formRegion === r && styles.pickerItemTextActive]}>{r}</Text>
                     </TouchableOpacity>
                   ))}
-                </View>
+                </ScrollView>
               )}
 
               <Text style={styles.fieldLabel}>Anno nascita</Text>
