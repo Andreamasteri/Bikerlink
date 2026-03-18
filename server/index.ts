@@ -294,6 +294,22 @@ function setupErrorHandler(app: express.Application) {
     console.warn("[MIGRATION] invitation_codes.image_url:", e);
   }
 
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS user_blocks (
+        id SERIAL PRIMARY KEY,
+        blocker_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        blocked_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS user_blocks_unique_idx ON user_blocks (blocker_id, blocked_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS user_blocks_blocker_idx ON user_blocks (blocker_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS user_blocks_blocked_idx ON user_blocks (blocked_id)`);
+  } catch (e) {
+    console.warn("[MIGRATION] user_blocks:", e);
+  }
+
   await autoSeedEssentialUsers();
   await autoSeedFakeUsers();
 
