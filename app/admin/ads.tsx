@@ -287,6 +287,13 @@ export default function AdminAds() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.warningBanner}>
+        <MaterialIcons name="warning" size={20} color="#92400e" />
+        <Text style={styles.warningBannerText}>
+          Attenzione, prima di caricare una nuova campagna, il sistema di Advertisement va arrestato, e dopo fatto ripartire
+        </Text>
+      </View>
+
       <View style={styles.tabBar}>
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;
@@ -534,6 +541,27 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  warningBanner: {
+    flexDirection: "row" as const,
+    alignItems: "flex-start" as const,
+    gap: 10,
+    backgroundColor: "#fef3c7",
+    borderWidth: 1,
+    borderColor: "#f59e0b",
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+  },
+  warningBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: "#92400e",
+    lineHeight: 18,
+  },
   adsBanner: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
