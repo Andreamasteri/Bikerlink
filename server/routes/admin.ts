@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import { storage } from "../storage";
 import { db } from "../db";
 import { motoClubs, motoClubRequests, motoClubMembers, conversations, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches } from "@shared/schema";
-import { eq, and, desc, sql, count, notExists } from "drizzle-orm";
+import { eq, and, ne, desc, sql, count, notExists } from "drizzle-orm";
 import { MOTORCYCLES, pickRandomN, getMotoYear } from "../mass-seed-data";
 import { getLastMatchingCycleMeta } from "../matching-engine";
 
@@ -1546,6 +1546,33 @@ router.get("/fake-users/:id/conversations", async (req: Request, res: Response) 
     return res.json(convs);
   } catch (error) {
     console.error("Admin get fake user conversations error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/fake-users/all-conversations", async (req: Request, res: Response) => {
+  try {
+    const fakeUsers = await db.select({ id: users.id, nickname: users.nickname })
+      .from(users)
+      .where(and(eq(users.isFake, true), ne(users.nickname, "BikerLink_Official")));
+    let deleted = 0;
+    for (const u of fakeUsers) {
+      const convs = await storage.getFakeUserConversations(u.id);
+      for (const conv of convs) {
+        await storage.deleteConversation(String(conv.id));
+        deleted++;
+      }
+    }
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "delete_all_fake_chats",
+      targetType: "system",
+      targetId: "all",
+      details: `Eliminate globalmente ${deleted} conversazioni di ${fakeUsers.length} utenti fake`,
+    });
+    return res.json({ deleted, users: fakeUsers.length, message: `${deleted} conversazioni eliminate` });
+  } catch (error) {
+    console.error("Admin delete all fake conversations error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

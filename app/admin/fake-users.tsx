@@ -131,6 +131,8 @@ export default function FakeUsersAdmin() {
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [chatModalVisible, setChatModalVisible] = useState(false);
   const [deletingChats, setDeletingChats] = useState(false);
+  const [deletingAllChats, setDeletingAllChats] = useState(false);
+  const [deleteAllChatsResult, setDeleteAllChatsResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -433,6 +435,37 @@ export default function FakeUsersAdmin() {
     setLoadingChat(false);
   };
 
+  const handleDeleteAllFakeChats = async () => {
+    Alert.alert(
+      "Elimina tutte le chat fake",
+      "Eliminare TUTTE le conversazioni di TUTTI gli utenti fake? L'operazione non è reversibile.",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Elimina tutto",
+          style: "destructive",
+          onPress: async () => {
+            setDeletingAllChats(true);
+            setDeleteAllChatsResult(null);
+            try {
+              const url = new URL("/api/admin/fake-users/all-conversations", getApiUrl()).toString();
+              const res = await fetch(url, { method: "DELETE", credentials: "include" });
+              const data = await res.json();
+              if (res.ok) {
+                setDeleteAllChatsResult({ type: "success", text: `✓ ${data.deleted} conversazioni eliminate` });
+              } else {
+                setDeleteAllChatsResult({ type: "error", text: data.message || "Errore durante l'eliminazione" });
+              }
+            } catch (e) {
+              setDeleteAllChatsResult({ type: "error", text: "Errore di rete" });
+            }
+            setDeletingAllChats(false);
+          },
+        },
+      ]
+    );
+  };
+
   const handleDeleteFakeChats = async () => {
     if (!selectedUserId) return;
     Alert.alert(
@@ -629,6 +662,30 @@ export default function FakeUsersAdmin() {
           <Text style={styles.controlDesc}>
             {chatbotEnabled ? "Il bot risponde automaticamente per gli utenti fittizi" : "Il bot è disattivato, gli utenti fittizi non rispondono"}
           </Text>
+
+          <TouchableOpacity
+            style={[styles.deleteAllBtn, { backgroundColor: "#c62828", marginTop: 12 }, deletingAllChats && { opacity: 0.7 }]}
+            onPress={handleDeleteAllFakeChats}
+            disabled={deletingAllChats}
+            activeOpacity={0.7}
+          >
+            {deletingAllChats ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <ActivityIndicator size="small" color="#fff" />
+                <Text style={styles.deleteAllBtnText}>Eliminazione in corso...</Text>
+              </View>
+            ) : (
+              <>
+                <Ionicons name="chatbubbles" size={18} color="#fff" />
+                <Text style={styles.deleteAllBtnText}>Elimina tutte le chat fake</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          {!!deleteAllChatsResult && (
+            <Text style={[styles.controlDesc, { color: deleteAllChatsResult.type === "success" ? Colors.success : (Colors.error ?? "#e53935"), marginTop: 8, fontWeight: "600" as const }]}>
+              {deleteAllChatsResult.text}
+            </Text>
+          )}
 
           <View style={[styles.controlDivider]} />
 

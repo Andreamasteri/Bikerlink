@@ -9712,6 +9712,30 @@ router17.get("/fake-users/:id/conversations", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
+router17.delete("/fake-users/all-conversations", async (req, res) => {
+  try {
+    const fakeUsers = await db.select({ id: users.id, nickname: users.nickname }).from(users).where((0, import_drizzle_orm8.and)((0, import_drizzle_orm8.eq)(users.isFake, true), (0, import_drizzle_orm8.ne)(users.nickname, "BikerLink_Official")));
+    let deleted = 0;
+    for (const u of fakeUsers) {
+      const convs = await storage.getFakeUserConversations(u.id);
+      for (const conv of convs) {
+        await storage.deleteConversation(String(conv.id));
+        deleted++;
+      }
+    }
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId,
+      action: "delete_all_fake_chats",
+      targetType: "system",
+      targetId: "all",
+      details: `Eliminate globalmente ${deleted} conversazioni di ${fakeUsers.length} utenti fake`
+    });
+    return res.json({ deleted, users: fakeUsers.length, message: `${deleted} conversazioni eliminate` });
+  } catch (error) {
+    console.error("Admin delete all fake conversations error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
 router17.delete("/fake-users/:id/conversations", async (req, res) => {
   try {
     const id = req.params.id;
