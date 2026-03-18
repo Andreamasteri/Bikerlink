@@ -1916,13 +1916,14 @@ router.get("/backup/list", async (_req: Request, res: Response) => {
 
 router.post("/backup/db", async (_req: Request, res: Response) => {
   try {
-    const { backupDatabase } = await import("../backup-service");
+    const { backupDatabase, purgeOldBackups } = await import("../backup-service");
     const result = await backupDatabase();
+    purgeOldBackups().catch((e: Error) => console.error("[backup] purge error:", e.message));
     await storage.createModeratorLog({
-      moderatorId: (_req as any).currentUser?.id || "admin",
+      moderatorId: (_req as any).currentUser?.id || "system",
       action: "backup_db",
       targetType: "system",
-      targetId: result.id,
+      targetId: result.name.slice(0, 36),
       details: `Backup DB eseguito: ${result.name} (${result.size} bytes)`,
     });
     return res.json({ ok: true, ...result });
@@ -1934,13 +1935,14 @@ router.post("/backup/db", async (_req: Request, res: Response) => {
 
 router.post("/backup/media", async (_req: Request, res: Response) => {
   try {
-    const { backupMedia } = await import("../backup-service");
+    const { backupMedia, purgeOldBackups } = await import("../backup-service");
     const result = await backupMedia();
+    purgeOldBackups().catch((e: Error) => console.error("[backup] purge error:", e.message));
     await storage.createModeratorLog({
-      moderatorId: (_req as any).currentUser?.id || "admin",
+      moderatorId: (_req as any).currentUser?.id || "system",
       action: "backup_media",
       targetType: "system",
-      targetId: result.id,
+      targetId: result.name.slice(0, 36),
       details: `Backup media eseguito: ${result.name} (${result.size} bytes)`,
     });
     return res.json({ ok: true, ...result });
@@ -1967,11 +1969,12 @@ router.post("/backup/restore", async (req: Request, res: Response) => {
     }
     const { restoreDatabase } = await import("../backup-service");
     await restoreDatabase(filePath);
+    const backupName = (filePath as string).split("/").pop() ?? filePath;
     await storage.createModeratorLog({
       moderatorId: user.id,
       action: "restore_db",
       targetType: "system",
-      targetId: filePath,
+      targetId: (backupName as string).slice(0, 36),
       details: `Database ripristinato dal backup: ${filePath}`,
     });
     return res.json({ ok: true, message: "Database ripristinato con successo" });
