@@ -3645,11 +3645,13 @@ async function sendInvitationGiftEmail(to, code, imageUrl, giftMessage, expiryDa
   const expiryStr = expiryDate.toLocaleDateString("it-IT", {
     day: "2-digit",
     month: "2-digit",
-    year: "numeric"
+    year: "numeric",
+    timeZone: "Europe/Rome"
   });
   const expiryTime = expiryDate.toLocaleTimeString("it-IT", {
     hour: "2-digit",
-    minute: "2-digit"
+    minute: "2-digit",
+    timeZone: "Europe/Rome"
   });
   const expiryLabel = `Scade il ${expiryStr} alle ${expiryTime}`;
   let imageAttachment = null;

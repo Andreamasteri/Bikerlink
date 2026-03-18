@@ -113,10 +113,12 @@ export async function sendInvitationGiftEmail(
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+    timeZone: "Europe/Rome",
   });
   const expiryTime = expiryDate.toLocaleTimeString("it-IT", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Europe/Rome",
   });
   const expiryLabel = `Scade il ${expiryStr} alle ${expiryTime}`;
 
