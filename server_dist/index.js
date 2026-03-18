@@ -3154,134 +3154,56 @@ var init_mass_seed = __esm({
   }
 });
 
-// server/google-drive.ts
-function getAuth() {
-  if (_auth) return _auth;
-  const keyJson = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-  if (!keyJson) throw new Error("GOOGLE_SERVICE_ACCOUNT_KEY non configurato");
-  const credentials = JSON.parse(keyJson);
-  _auth = new import_googleapis.google.auth.GoogleAuth({
-    credentials,
-    scopes: ["https://www.googleapis.com/auth/drive"]
-  });
-  return _auth;
-}
-function getDrive() {
-  if (_drive) return _drive;
-  _drive = import_googleapis.google.drive({ version: "v3", auth: getAuth() });
-  return _drive;
-}
-async function findOrCreateFolder(name, parentId) {
-  const drive = getDrive();
-  const q = parentId ? `name='${name}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false` : `name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-  const res = await drive.files.list({ q, fields: "files(id,name)", spaces: "drive" });
-  if (res.data.files && res.data.files.length > 0) {
-    return res.data.files[0].id;
+// server/objectStorage.ts
+function getClient() {
+  if (!_client) {
+    _client = new import_object_storage.Client();
   }
-  const meta = {
-    name,
-    mimeType: "application/vnd.google-apps.folder"
-  };
-  if (parentId) meta.parents = [parentId];
-  const created = await drive.files.create({ requestBody: meta, fields: "id" });
-  return created.data.id;
+  return _client;
 }
-async function getOrCreateFolderPath(folderPath) {
-  const parts = folderPath.split("/").filter(Boolean);
-  let parentId = void 0;
-  for (const part of parts) {
-    parentId = await findOrCreateFolder(part, parentId);
-  }
-  return parentId;
-}
-async function uploadFile(fileName, buffer, mimeType, folderPath) {
-  const drive = getDrive();
-  const folderId = await getOrCreateFolderPath(folderPath);
-  const stream = import_stream.Readable.from(buffer);
-  const res = await drive.files.create({
-    requestBody: {
-      name: fileName,
-      parents: [folderId]
-    },
-    media: {
-      mimeType,
-      body: stream
-    },
-    fields: "id,name,size,createdTime"
+async function uploadBuffer(objectPath, buffer, contentType) {
+  const client = getClient();
+  const result = await client.uploadFromBytes(objectPath, buffer, {
+    headers: { "Content-Type": contentType }
   });
-  return { id: res.data.id, name: res.data.name };
+  if (!result.ok) {
+    throw new Error(`Upload fallito per ${objectPath}: ${result.error?.message}`);
+  }
 }
-async function listAllBackupFiles(rootFolder) {
-  const drive = getDrive();
-  let rootId = void 0;
-  try {
-    const rootQ = `name='${rootFolder}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-    const rootRes = await drive.files.list({ q: rootQ, fields: "files(id)" });
-    if (!rootRes.data.files || rootRes.data.files.length === 0) return [];
-    rootId = rootRes.data.files[0].id;
-  } catch {
+async function downloadBuffer(objectPath) {
+  const client = getClient();
+  const result = await client.downloadAsBytes(objectPath);
+  if (!result.ok) {
+    throw new Error(`Download fallito per ${objectPath}: ${result.error?.message}`);
+  }
+  return Buffer.from(result.value);
+}
+async function deleteObject(objectPath) {
+  const client = getClient();
+  const result = await client.delete(objectPath);
+  if (!result.ok) {
+    throw new Error(`Eliminazione fallita per ${objectPath}: ${result.error?.message}`);
+  }
+}
+async function listObjects(prefix) {
+  const client = getClient();
+  const result = await client.list({ prefix });
+  if (!result.ok) {
     return [];
   }
-  const allFiles = [];
-  let pageToken = void 0;
-  do {
-    const res = await drive.files.list({
-      q: `'${rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-      fields: "nextPageToken,files(id,name)",
-      pageSize: 100,
-      pageToken
-    });
-    const yearFolders = res.data.files || [];
-    pageToken = res.data.nextPageToken;
-    for (const yearFolder of yearFolders) {
-      const monthRes = await drive.files.list({
-        q: `'${yearFolder.id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-        fields: "files(id,name)"
-      });
-      const monthFolders = monthRes.data.files || [];
-      for (const monthFolder of monthFolders) {
-        let filePage = void 0;
-        do {
-          const fileRes = await drive.files.list({
-            q: `'${monthFolder.id}' in parents and trashed=false and mimeType!='application/vnd.google-apps.folder'`,
-            fields: "nextPageToken,files(id,name,size,createdTime)",
-            pageSize: 100,
-            pageToken: filePage
-          });
-          const files = fileRes.data.files || [];
-          allFiles.push(...files.map((f) => ({
-            id: f.id,
-            name: f.name,
-            size: parseInt(f.size || "0"),
-            createdTime: f.createdTime
-          })));
-          filePage = fileRes.data.nextPageToken;
-        } while (filePage);
-      }
-    }
-  } while (pageToken);
-  return allFiles;
+  const objects = result.value ?? [];
+  return objects.map((obj) => ({
+    name: obj.name,
+    size: obj.size ?? 0,
+    createdTime: obj.createdAt?.toISOString?.() ?? (/* @__PURE__ */ new Date()).toISOString()
+  }));
 }
-async function downloadFile(fileId) {
-  const drive = getDrive();
-  const res = await drive.files.get({ fileId, alt: "media" }, { responseType: "arraybuffer" });
-  return Buffer.from(res.data);
-}
-async function deleteFile(fileId) {
-  const drive = getDrive();
-  await drive.files.delete({ fileId });
-}
-function isGoogleDriveConfigured() {
-  return !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-}
-var import_googleapis, import_stream, _auth, _drive;
-var init_google_drive = __esm({
-  "server/google-drive.ts"() {
+var import_object_storage, _client;
+var init_objectStorage = __esm({
+  "server/objectStorage.ts"() {
     "use strict";
-    import_googleapis = require("googleapis");
-    import_stream = require("stream");
-    _auth = null;
-    _drive = null;
+    import_object_storage = require("@replit/object-storage");
+    _client = null;
   }
 });
 
@@ -3290,6 +3212,7 @@ var backup_service_exports = {};
 __export(backup_service_exports, {
   backupDatabase: () => backupDatabase,
   backupMedia: () => backupMedia,
+  downloadBackupBuffer: () => downloadBackupBuffer,
   getBackupStatus: () => getBackupStatus,
   listBackups: () => listBackups,
   purgeOldBackups: () => purgeOldBackups,
@@ -3299,26 +3222,24 @@ __export(backup_service_exports, {
   stopScheduler: () => stopScheduler
 });
 function getBackupStatus() {
-  const now = Date.now();
-  const nextScheduled = schedulerTimer ? new Date(now + getNextRunMs()).toISOString() : null;
   return {
     scheduled: schedulerTimer !== null,
     lastDbBackup,
     lastMediaBackup,
     isBackingUp,
     isRestoringDb,
-    nextScheduled,
-    configured: isGoogleDriveConfigured()
+    nextScheduled: schedulerNextAt?.toISOString() ?? null,
+    configured: true
   };
 }
-function getNextRunMs() {
-  return nextRunMs;
+function buildNextAt() {
+  return new Date(Date.now() + 24 * 60 * 60 * 1e3);
 }
 async function startScheduler() {
   if (schedulerTimer) return;
   const enabled = await isAutoBackupEnabled();
   if (!enabled) return;
-  if (!isGoogleDriveConfigured()) return;
+  schedulerNextAt = buildNextAt();
   schedulerTimer = setInterval(async () => {
     try {
       const stillEnabled = await isAutoBackupEnabled();
@@ -3328,17 +3249,19 @@ async function startScheduler() {
       }
       await backupDatabase();
       await purgeOldBackups();
+      schedulerNextAt = buildNextAt();
     } catch (err) {
       console.error("[backup-service] Scheduled DB backup failed:", err);
+      schedulerNextAt = buildNextAt();
     }
   }, 24 * 60 * 60 * 1e3);
-  nextRunMs = 24 * 60 * 60 * 1e3;
   console.log("[backup-service] Scheduler started (every 24h)");
 }
 function stopScheduler() {
   if (schedulerTimer) {
     clearInterval(schedulerTimer);
     schedulerTimer = null;
+    schedulerNextAt = null;
     console.log("[backup-service] Scheduler stopped");
   }
 }
@@ -3357,7 +3280,11 @@ async function setAutoBackupEnabled(enabled) {
     if (existing.length > 0) {
       await db.update(appSettings).set({ value: enabled ? "true" : "false" }).where((0, import_drizzle_orm7.eq)(appSettings.key, "backup_auto_enabled"));
     } else {
-      await db.insert(appSettings).values({ key: "backup_auto_enabled", value: enabled ? "true" : "false", description: "Backup automatico su Google Drive" });
+      await db.insert(appSettings).values({
+        key: "backup_auto_enabled",
+        value: enabled ? "true" : "false",
+        description: "Backup automatico (Replit Object Storage)"
+      });
     }
     if (enabled) {
       await startScheduler();
@@ -3369,78 +3296,79 @@ async function setAutoBackupEnabled(enabled) {
     throw err;
   }
 }
-function getFolderPath(type) {
+function getObjectPath(type, fileName) {
   const now = /* @__PURE__ */ new Date();
   const year = now.getFullYear().toString();
   const month = (now.getMonth() + 1).toString().padStart(2, "0");
-  const base = type === "db" ? DB_FOLDER : MEDIA_FOLDER;
-  return `${base}/${year}/${month}`;
+  const prefix = type === "db" ? DB_PREFIX : MEDIA_PREFIX;
+  return `${prefix}/${year}/${month}/${fileName}`;
 }
 function getTimestamp() {
-  const now = /* @__PURE__ */ new Date();
-  return now.toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 19);
+  return (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 19);
 }
 async function backupDatabase() {
-  if (!isGoogleDriveConfigured()) throw new Error("Google Drive non configurato");
   if (isBackingUp) throw new Error("Backup gi\xE0 in corso");
   isBackingUp = true;
-  const tmpFile = import_path4.default.join(import_os.default.tmpdir(), `bikerlink_db_${getTimestamp()}.sql`);
-  const gzFile = tmpFile + ".gz";
+  const ts = getTimestamp();
+  const tmpSql = import_path4.default.join(import_os.default.tmpdir(), `bikerlink_db_${ts}.sql`);
+  const tmpGz = tmpSql + ".gz";
   try {
     const dbUrl = process.env.DATABASE_URL;
-    await execAsync(`pg_dump "${dbUrl}" -f "${tmpFile}" --no-password`);
+    await execAsync(`pg_dump "${dbUrl}" -f "${tmpSql}" --no-password`);
     await new Promise((resolve2, reject) => {
-      const inp = import_fs4.default.createReadStream(tmpFile);
-      const out = import_fs4.default.createWriteStream(gzFile);
+      const inp = import_fs4.default.createReadStream(tmpSql);
+      const out = import_fs4.default.createWriteStream(tmpGz);
       const gz = import_zlib.default.createGzip({ level: 9 });
       inp.pipe(gz).pipe(out);
       out.on("finish", resolve2);
       out.on("error", reject);
       inp.on("error", reject);
     });
-    const buf = import_fs4.default.readFileSync(gzFile);
-    const fileName = `bikerlink_db_${getTimestamp()}.sql.gz`;
-    const folderPath = getFolderPath("db");
-    const result = await uploadFile(fileName, buf, "application/gzip", folderPath);
+    const buf = import_fs4.default.readFileSync(tmpGz);
+    const fileName = `bikerlink_db_${ts}.sql.gz`;
+    const objectPath = getObjectPath("db", fileName);
+    await uploadBuffer(objectPath, buf, "application/gzip");
     lastDbBackup = { timestamp: (/* @__PURE__ */ new Date()).toISOString(), size: buf.length };
-    console.log(`[backup-service] DB backup uploaded: ${fileName} (${buf.length} bytes)`);
-    return { id: result.id, name: fileName, size: buf.length };
+    console.log(`[backup-service] DB backup salvato: ${objectPath} (${buf.length} bytes)`);
+    return { path: objectPath, name: fileName, size: buf.length };
   } finally {
     isBackingUp = false;
     try {
-      import_fs4.default.unlinkSync(tmpFile);
+      import_fs4.default.unlinkSync(tmpSql);
     } catch {
     }
     try {
-      import_fs4.default.unlinkSync(gzFile);
+      import_fs4.default.unlinkSync(tmpGz);
     } catch {
     }
   }
 }
 async function backupMedia() {
-  if (!isGoogleDriveConfigured()) throw new Error("Google Drive non configurato");
   if (isBackingUp) throw new Error("Backup gi\xE0 in corso");
   isBackingUp = true;
-  const tmpZip = import_path4.default.join(import_os.default.tmpdir(), `bikerlink_media_${getTimestamp()}.zip`);
+  const ts = getTimestamp();
+  const tmpZip = import_path4.default.join(import_os.default.tmpdir(), `bikerlink_media_${ts}.zip`);
   try {
-    const mediaDir = process.env.OBJECT_STORAGE_PATH || "/home/runner/workspace/.data/uploads";
+    const mediaDir = process.env.PRIVATE_OBJECT_DIR ? import_path4.default.join(process.env.PRIVATE_OBJECT_DIR, "..") : "/home/runner/workspace/.data/uploads";
     const zipBuffer = await new Promise((resolve2, reject) => {
       const output = import_fs4.default.createWriteStream(tmpZip);
       const archive = (0, import_archiver.default)("zip", { zlib: { level: 6 } });
       archive.pipe(output);
       if (import_fs4.default.existsSync(mediaDir)) {
         archive.directory(mediaDir, false);
+      } else {
+        archive.append("(nessun file media)", { name: "README.txt" });
       }
       archive.finalize();
       output.on("close", () => resolve2(import_fs4.default.readFileSync(tmpZip)));
       archive.on("error", reject);
     });
-    const fileName = `bikerlink_media_${getTimestamp()}.zip`;
-    const folderPath = getFolderPath("media");
-    const result = await uploadFile(fileName, zipBuffer, "application/zip", folderPath);
+    const fileName = `bikerlink_media_${ts}.zip`;
+    const objectPath = getObjectPath("media", fileName);
+    await uploadBuffer(objectPath, zipBuffer, "application/zip");
     lastMediaBackup = { timestamp: (/* @__PURE__ */ new Date()).toISOString(), size: zipBuffer.length };
-    console.log(`[backup-service] Media backup uploaded: ${fileName} (${zipBuffer.length} bytes)`);
-    return { id: result.id, name: fileName, size: zipBuffer.length };
+    console.log(`[backup-service] Media backup salvato: ${objectPath} (${zipBuffer.length} bytes)`);
+    return { path: objectPath, name: fileName, size: zipBuffer.length };
   } finally {
     isBackingUp = false;
     try {
@@ -3449,14 +3377,13 @@ async function backupMedia() {
     }
   }
 }
-async function restoreDatabase(fileId) {
-  if (!isGoogleDriveConfigured()) throw new Error("Google Drive non configurato");
+async function restoreDatabase(objectPath) {
   if (isRestoringDb) throw new Error("Ripristino gi\xE0 in corso");
   isRestoringDb = true;
   const tmpGz = import_path4.default.join(import_os.default.tmpdir(), `bikerlink_restore_${Date.now()}.sql.gz`);
   const tmpSql = tmpGz.replace(".sql.gz", ".sql");
   try {
-    const buf = await downloadFile(fileId);
+    const buf = await downloadBuffer(objectPath);
     import_fs4.default.writeFileSync(tmpGz, buf);
     await new Promise((resolve2, reject) => {
       const inp = import_fs4.default.createReadStream(tmpGz);
@@ -3469,7 +3396,7 @@ async function restoreDatabase(fileId) {
     });
     const dbUrl = process.env.DATABASE_URL;
     await execAsync(`psql "${dbUrl}" -f "${tmpSql}" --no-password`);
-    console.log("[backup-service] Database restored successfully");
+    console.log("[backup-service] Database ripristinato con successo");
   } finally {
     isRestoringDb = false;
     try {
@@ -3483,17 +3410,20 @@ async function restoreDatabase(fileId) {
   }
 }
 async function listBackups() {
-  if (!isGoogleDriveConfigured()) return { db: [], media: [] };
   const [dbFiles, mediaFiles] = await Promise.all([
-    listAllBackupFiles("backup/database").catch(() => []),
-    listAllBackupFiles("backup/media").catch(() => [])
+    listObjects(DB_PREFIX).catch(() => []),
+    listObjects(MEDIA_PREFIX).catch(() => [])
   ]);
-  dbFiles.sort((a, b) => b.createdTime.localeCompare(a.createdTime));
-  mediaFiles.sort((a, b) => b.createdTime.localeCompare(a.createdTime));
-  return { db: dbFiles, media: mediaFiles };
+  const toBackupFile = (f) => ({
+    ...f,
+    path: f.name,
+    name: f.name.split("/").pop() ?? f.name
+  });
+  const db2 = dbFiles.map(toBackupFile).sort((a, b) => b.createdTime.localeCompare(a.createdTime));
+  const media = mediaFiles.map(toBackupFile).sort((a, b) => b.createdTime.localeCompare(a.createdTime));
+  return { db: db2, media };
 }
 async function purgeOldBackups() {
-  if (!isGoogleDriveConfigured()) return 0;
   const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1e3);
   const all = await listBackups();
   const toDelete = [...all.db, ...all.media].filter(
@@ -3502,16 +3432,19 @@ async function purgeOldBackups() {
   let deleted = 0;
   for (const f of toDelete) {
     try {
-      await deleteFile(f.id);
+      await deleteObject(f.path);
       deleted++;
-      console.log(`[backup-service] Purged old backup: ${f.name}`);
+      console.log(`[backup-service] Eliminato backup vecchio: ${f.name}`);
     } catch (err) {
-      console.error(`[backup-service] Failed to delete ${f.name}:`, err);
+      console.error(`[backup-service] Impossibile eliminare ${f.name}:`, err);
     }
   }
   return deleted;
 }
-var import_child_process, import_util, import_zlib, import_archiver, import_fs4, import_os, import_path4, import_drizzle_orm7, execAsync, DB_FOLDER, MEDIA_FOLDER, RETENTION_DAYS, schedulerTimer, lastDbBackup, lastMediaBackup, isBackingUp, isRestoringDb, nextRunMs;
+async function downloadBackupBuffer(objectPath) {
+  return downloadBuffer(objectPath);
+}
+var import_child_process, import_util, import_zlib, import_archiver, import_fs4, import_os, import_path4, import_drizzle_orm7, execAsync, DB_PREFIX, MEDIA_PREFIX, RETENTION_DAYS, schedulerTimer, schedulerNextAt, lastDbBackup, lastMediaBackup, isBackingUp, isRestoringDb;
 var init_backup_service = __esm({
   "server/backup-service.ts"() {
     "use strict";
@@ -3522,20 +3455,20 @@ var init_backup_service = __esm({
     import_fs4 = __toESM(require("fs"));
     import_os = __toESM(require("os"));
     import_path4 = __toESM(require("path"));
-    init_google_drive();
+    init_objectStorage();
     init_db();
     init_schema();
     import_drizzle_orm7 = require("drizzle-orm");
     execAsync = (0, import_util.promisify)(import_child_process.exec);
-    DB_FOLDER = "backup/database";
-    MEDIA_FOLDER = "backup/media";
+    DB_PREFIX = "backup/database";
+    MEDIA_PREFIX = "backup/media";
     RETENTION_DAYS = 90;
     schedulerTimer = null;
+    schedulerNextAt = null;
     lastDbBackup = null;
     lastMediaBackup = null;
     isBackingUp = false;
     isRestoringDb = false;
-    nextRunMs = 24 * 60 * 60 * 1e3;
   }
 });
 
@@ -9338,9 +9271,9 @@ router17.post("/backup/media", async (_req, res) => {
 });
 router17.post("/backup/restore", async (req, res) => {
   try {
-    const { fileId, adminPassword } = req.body;
-    if (!fileId || !adminPassword) {
-      return res.status(400).json({ message: "fileId e adminPassword sono obbligatori" });
+    const { filePath, adminPassword } = req.body;
+    if (!filePath || !adminPassword) {
+      return res.status(400).json({ message: "filePath e adminPassword sono obbligatori" });
     }
     const user = req.currentUser;
     const fullUser = await storage.getUser(user.id);
@@ -9352,18 +9285,40 @@ router17.post("/backup/restore", async (req, res) => {
       return res.status(401).json({ message: "Password non corretta" });
     }
     const { restoreDatabase: restoreDatabase2 } = await Promise.resolve().then(() => (init_backup_service(), backup_service_exports));
-    await restoreDatabase2(fileId);
+    await restoreDatabase2(filePath);
     await storage.createModeratorLog({
       moderatorId: user.id,
       action: "restore_db",
       targetType: "system",
-      targetId: fileId,
-      details: `Database ripristinato dal backup: ${fileId}`
+      targetId: filePath,
+      details: `Database ripristinato dal backup: ${filePath}`
     });
     return res.json({ ok: true, message: "Database ripristinato con successo" });
   } catch (error) {
     console.error("Admin restore db error:", error);
     return res.status(500).json({ message: error.message || "Errore durante il ripristino del database" });
+  }
+});
+router17.get("/backup/download", async (req, res) => {
+  try {
+    const { path: filePath } = req.query;
+    if (!filePath || typeof filePath !== "string") {
+      return res.status(400).json({ message: "Parametro path mancante" });
+    }
+    if (!filePath.startsWith("backup/")) {
+      return res.status(400).json({ message: "Path non valido" });
+    }
+    const { downloadBackupBuffer: downloadBackupBuffer2 } = await Promise.resolve().then(() => (init_backup_service(), backup_service_exports));
+    const buf = await downloadBackupBuffer2(filePath);
+    const fileName = filePath.split("/").pop() ?? "backup";
+    const contentType = fileName.endsWith(".gz") ? "application/gzip" : "application/zip";
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Length", buf.length);
+    return res.send(buf);
+  } catch (error) {
+    console.error("Admin backup download error:", error);
+    return res.status(500).json({ message: error.message || "Errore durante il download" });
   }
 });
 router17.put("/backup/schedule", async (req, res) => {

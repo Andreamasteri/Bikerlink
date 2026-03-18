@@ -6,71 +6,64 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import {
-  uploadFile,
-  downloadFile,
-  deleteFile,
-  listAllBackupFiles,
-  isGoogleDriveConfigured,
-  type DriveFile,
-} from "./google-drive";
+  uploadBuffer,
+  downloadBuffer,
+  deleteObject,
+  listObjects,
+  type StorageFile,
+} from "./objectStorage";
 import { db } from "./db";
 import { appSettings } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const execAsync = promisify(exec);
 
-const DB_FOLDER = "backup/database";
-const MEDIA_FOLDER = "backup/media";
+const DB_PREFIX = "backup/database";
+const MEDIA_PREFIX = "backup/media";
 const RETENTION_DAYS = 90;
 
 let schedulerTimer: NodeJS.Timeout | null = null;
+let schedulerNextAt: Date | null = null;
 let lastDbBackup: { timestamp: string; size: number } | null = null;
 let lastMediaBackup: { timestamp: string; size: number } | null = null;
 let isBackingUp = false;
 let isRestoringDb = false;
 
 export function getBackupStatus() {
-  const now = Date.now();
-  const nextScheduled = schedulerTimer
-    ? new Date(now + getNextRunMs()).toISOString()
-    : null;
   return {
     scheduled: schedulerTimer !== null,
     lastDbBackup,
     lastMediaBackup,
     isBackingUp,
     isRestoringDb,
-    nextScheduled,
-    configured: isGoogleDriveConfigured(),
+    nextScheduled: schedulerNextAt?.toISOString() ?? null,
+    configured: true,
   };
 }
 
-let nextRunMs = 24 * 60 * 60 * 1000;
-function getNextRunMs() {
-  return nextRunMs;
+function buildNextAt(): Date {
+  return new Date(Date.now() + 24 * 60 * 60 * 1000);
 }
 
 export async function startScheduler() {
   if (schedulerTimer) return;
   const enabled = await isAutoBackupEnabled();
   if (!enabled) return;
-  if (!isGoogleDriveConfigured()) return;
 
+  schedulerNextAt = buildNextAt();
   schedulerTimer = setInterval(async () => {
     try {
       const stillEnabled = await isAutoBackupEnabled();
-      if (!stillEnabled) {
-        stopScheduler();
-        return;
-      }
+      if (!stillEnabled) { stopScheduler(); return; }
       await backupDatabase();
       await purgeOldBackups();
+      schedulerNextAt = buildNextAt();
     } catch (err) {
       console.error("[backup-service] Scheduled DB backup failed:", err);
+      schedulerNextAt = buildNextAt();
     }
   }, 24 * 60 * 60 * 1000);
 
-  nextRunMs = 24 * 60 * 60 * 1000;
   console.log("[backup-service] Scheduler started (every 24h)");
 }
 
@@ -78,6 +71,7 @@ export function stopScheduler() {
   if (schedulerTimer) {
     clearInterval(schedulerTimer);
     schedulerTimer = null;
+    schedulerNextAt = null;
     console.log("[backup-service] Scheduler stopped");
   }
 }
@@ -98,7 +92,11 @@ export async function setAutoBackupEnabled(enabled: boolean) {
     if (existing.length > 0) {
       await db.update(appSettings).set({ value: enabled ? "true" : "false" }).where(eq(appSettings.key, "backup_auto_enabled"));
     } else {
-      await db.insert(appSettings).values({ key: "backup_auto_enabled", value: enabled ? "true" : "false", description: "Backup automatico su Google Drive" });
+      await db.insert(appSettings).values({
+        key: "backup_auto_enabled",
+        value: enabled ? "true" : "false",
+        description: "Backup automatico (Replit Object Storage)",
+      });
     }
     if (enabled) {
       await startScheduler();
@@ -111,33 +109,33 @@ export async function setAutoBackupEnabled(enabled: boolean) {
   }
 }
 
-function getFolderPath(type: "db" | "media"): string {
+function getObjectPath(type: "db" | "media", fileName: string): string {
   const now = new Date();
   const year = now.getFullYear().toString();
   const month = (now.getMonth() + 1).toString().padStart(2, "0");
-  const base = type === "db" ? DB_FOLDER : MEDIA_FOLDER;
-  return `${base}/${year}/${month}`;
+  const prefix = type === "db" ? DB_PREFIX : MEDIA_PREFIX;
+  return `${prefix}/${year}/${month}/${fileName}`;
 }
 
 function getTimestamp(): string {
-  const now = new Date();
-  return now.toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 19);
+  return new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 19);
 }
 
-export async function backupDatabase(): Promise<{ id: string; name: string; size: number }> {
-  if (!isGoogleDriveConfigured()) throw new Error("Google Drive non configurato");
+export async function backupDatabase(): Promise<{ path: string; name: string; size: number }> {
   if (isBackingUp) throw new Error("Backup già in corso");
   isBackingUp = true;
 
-  const tmpFile = path.join(os.tmpdir(), `bikerlink_db_${getTimestamp()}.sql`);
-  const gzFile = tmpFile + ".gz";
+  const ts = getTimestamp();
+  const tmpSql = path.join(os.tmpdir(), `bikerlink_db_${ts}.sql`);
+  const tmpGz = tmpSql + ".gz";
 
   try {
     const dbUrl = process.env.DATABASE_URL!;
-    await execAsync(`pg_dump "${dbUrl}" -f "${tmpFile}" --no-password`);
+    await execAsync(`pg_dump "${dbUrl}" -f "${tmpSql}" --no-password`);
+
     await new Promise<void>((resolve, reject) => {
-      const inp = fs.createReadStream(tmpFile);
-      const out = fs.createWriteStream(gzFile);
+      const inp = fs.createReadStream(tmpSql);
+      const out = fs.createWriteStream(tmpGz);
       const gz = zlib.createGzip({ level: 9 });
       inp.pipe(gz).pipe(out);
       out.on("finish", resolve);
@@ -145,54 +143,61 @@ export async function backupDatabase(): Promise<{ id: string; name: string; size
       inp.on("error", reject);
     });
 
-    const buf = fs.readFileSync(gzFile);
-    const fileName = `bikerlink_db_${getTimestamp()}.sql.gz`;
-    const folderPath = getFolderPath("db");
-    const result = await uploadFile(fileName, buf, "application/gzip", folderPath);
+    const buf = fs.readFileSync(tmpGz);
+    const fileName = `bikerlink_db_${ts}.sql.gz`;
+    const objectPath = getObjectPath("db", fileName);
+    await uploadBuffer(objectPath, buf, "application/gzip");
+
     lastDbBackup = { timestamp: new Date().toISOString(), size: buf.length };
-    console.log(`[backup-service] DB backup uploaded: ${fileName} (${buf.length} bytes)`);
-    return { id: result.id, name: fileName, size: buf.length };
+    console.log(`[backup-service] DB backup salvato: ${objectPath} (${buf.length} bytes)`);
+    return { path: objectPath, name: fileName, size: buf.length };
   } finally {
     isBackingUp = false;
-    try { fs.unlinkSync(tmpFile); } catch {}
-    try { fs.unlinkSync(gzFile); } catch {}
+    try { fs.unlinkSync(tmpSql); } catch {}
+    try { fs.unlinkSync(tmpGz); } catch {}
   }
 }
 
-export async function backupMedia(): Promise<{ id: string; name: string; size: number }> {
-  if (!isGoogleDriveConfigured()) throw new Error("Google Drive non configurato");
+export async function backupMedia(): Promise<{ path: string; name: string; size: number }> {
   if (isBackingUp) throw new Error("Backup già in corso");
   isBackingUp = true;
 
-  const tmpZip = path.join(os.tmpdir(), `bikerlink_media_${getTimestamp()}.zip`);
+  const ts = getTimestamp();
+  const tmpZip = path.join(os.tmpdir(), `bikerlink_media_${ts}.zip`);
+
   try {
-    const mediaDir = process.env.OBJECT_STORAGE_PATH || "/home/runner/workspace/.data/uploads";
+    const mediaDir = process.env.PRIVATE_OBJECT_DIR
+      ? path.join(process.env.PRIVATE_OBJECT_DIR, "..")
+      : "/home/runner/workspace/.data/uploads";
+
     const zipBuffer = await new Promise<Buffer>((resolve, reject) => {
       const output = fs.createWriteStream(tmpZip);
       const archive = archiver("zip", { zlib: { level: 6 } });
       archive.pipe(output);
       if (fs.existsSync(mediaDir)) {
         archive.directory(mediaDir, false);
+      } else {
+        archive.append("(nessun file media)", { name: "README.txt" });
       }
       archive.finalize();
       output.on("close", () => resolve(fs.readFileSync(tmpZip)));
       archive.on("error", reject);
     });
 
-    const fileName = `bikerlink_media_${getTimestamp()}.zip`;
-    const folderPath = getFolderPath("media");
-    const result = await uploadFile(fileName, zipBuffer, "application/zip", folderPath);
+    const fileName = `bikerlink_media_${ts}.zip`;
+    const objectPath = getObjectPath("media", fileName);
+    await uploadBuffer(objectPath, zipBuffer, "application/zip");
+
     lastMediaBackup = { timestamp: new Date().toISOString(), size: zipBuffer.length };
-    console.log(`[backup-service] Media backup uploaded: ${fileName} (${zipBuffer.length} bytes)`);
-    return { id: result.id, name: fileName, size: zipBuffer.length };
+    console.log(`[backup-service] Media backup salvato: ${objectPath} (${zipBuffer.length} bytes)`);
+    return { path: objectPath, name: fileName, size: zipBuffer.length };
   } finally {
     isBackingUp = false;
     try { fs.unlinkSync(tmpZip); } catch {}
   }
 }
 
-export async function restoreDatabase(fileId: string): Promise<void> {
-  if (!isGoogleDriveConfigured()) throw new Error("Google Drive non configurato");
+export async function restoreDatabase(objectPath: string): Promise<void> {
   if (isRestoringDb) throw new Error("Ripristino già in corso");
   isRestoringDb = true;
 
@@ -200,8 +205,9 @@ export async function restoreDatabase(fileId: string): Promise<void> {
   const tmpSql = tmpGz.replace(".sql.gz", ".sql");
 
   try {
-    const buf = await downloadFile(fileId);
+    const buf = await downloadBuffer(objectPath);
     fs.writeFileSync(tmpGz, buf);
+
     await new Promise<void>((resolve, reject) => {
       const inp = fs.createReadStream(tmpGz);
       const out = fs.createWriteStream(tmpSql);
@@ -214,7 +220,7 @@ export async function restoreDatabase(fileId: string): Promise<void> {
 
     const dbUrl = process.env.DATABASE_URL!;
     await execAsync(`psql "${dbUrl}" -f "${tmpSql}" --no-password`);
-    console.log("[backup-service] Database restored successfully");
+    console.log("[backup-service] Database ripristinato con successo");
   } finally {
     isRestoringDb = false;
     try { fs.unlinkSync(tmpGz); } catch {}
@@ -222,19 +228,29 @@ export async function restoreDatabase(fileId: string): Promise<void> {
   }
 }
 
-export async function listBackups(): Promise<{ db: DriveFile[]; media: DriveFile[] }> {
-  if (!isGoogleDriveConfigured()) return { db: [], media: [] };
+export interface BackupFile extends StorageFile {
+  path: string;
+}
+
+export async function listBackups(): Promise<{ db: BackupFile[]; media: BackupFile[] }> {
   const [dbFiles, mediaFiles] = await Promise.all([
-    listAllBackupFiles("backup/database").catch(() => [] as DriveFile[]),
-    listAllBackupFiles("backup/media").catch(() => [] as DriveFile[]),
+    listObjects(DB_PREFIX).catch(() => [] as StorageFile[]),
+    listObjects(MEDIA_PREFIX).catch(() => [] as StorageFile[]),
   ]);
-  dbFiles.sort((a, b) => b.createdTime.localeCompare(a.createdTime));
-  mediaFiles.sort((a, b) => b.createdTime.localeCompare(a.createdTime));
-  return { db: dbFiles, media: mediaFiles };
+
+  const toBackupFile = (f: StorageFile): BackupFile => ({
+    ...f,
+    path: f.name,
+    name: f.name.split("/").pop() ?? f.name,
+  });
+
+  const db2 = dbFiles.map(toBackupFile).sort((a, b) => b.createdTime.localeCompare(a.createdTime));
+  const media = mediaFiles.map(toBackupFile).sort((a, b) => b.createdTime.localeCompare(a.createdTime));
+
+  return { db: db2, media };
 }
 
 export async function purgeOldBackups(): Promise<number> {
-  if (!isGoogleDriveConfigured()) return 0;
   const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
   const all = await listBackups();
   const toDelete = [...all.db, ...all.media].filter(
@@ -243,12 +259,16 @@ export async function purgeOldBackups(): Promise<number> {
   let deleted = 0;
   for (const f of toDelete) {
     try {
-      await deleteFile(f.id);
+      await deleteObject(f.path);
       deleted++;
-      console.log(`[backup-service] Purged old backup: ${f.name}`);
+      console.log(`[backup-service] Eliminato backup vecchio: ${f.name}`);
     } catch (err) {
-      console.error(`[backup-service] Failed to delete ${f.name}:`, err);
+      console.error(`[backup-service] Impossibile eliminare ${f.name}:`, err);
     }
   }
   return deleted;
+}
+
+export async function downloadBackupBuffer(objectPath: string): Promise<Buffer> {
+  return downloadBuffer(objectPath);
 }

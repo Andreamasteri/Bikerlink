@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, Modal, TextInput, Platform, Switch,
+  ActivityIndicator, Modal, TextInput, Platform, Switch, Linking,
 } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -10,7 +10,7 @@ import Colors from "@/constants/colors";
 import { getApiUrl, queryClient, apiRequest } from "@/lib/query-client";
 
 interface BackupFile {
-  id: string;
+  path: string;
   name: string;
   size: number;
   createdTime: string;
@@ -57,7 +57,6 @@ export default function BackupScreen() {
   const [activeTab, setActiveTab] = useState<Tab>("db");
   const [restoreModal, setRestoreModal] = useState<{ file: BackupFile } | null>(null);
   const [restorePassword, setRestorePassword] = useState("");
-  const [setupModal, setSetupModal] = useState(false);
 
   const { data: status, refetch: refetchStatus } = useQuery<BackupStatus>({
     queryKey: ["/api/admin/backup/status"],
@@ -66,7 +65,6 @@ export default function BackupScreen() {
 
   const { data: backups, isLoading: loadingBackups, refetch: refetchBackups } = useQuery<BackupList>({
     queryKey: ["/api/admin/backup/list"],
-    enabled: status?.configured === true,
   });
 
   const backupDbMutation = useMutation({
@@ -112,12 +110,12 @@ export default function BackupScreen() {
   });
 
   const restoreMutation = useMutation({
-    mutationFn: async ({ fileId, adminPassword }: { fileId: string; adminPassword: string }) => {
+    mutationFn: async ({ filePath, adminPassword }: { filePath: string; adminPassword: string }) => {
       const url = new URL("/api/admin/backup/restore", getApiUrl()).toString();
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileId, adminPassword }),
+        body: JSON.stringify({ filePath, adminPassword }),
         credentials: "include",
       });
       const data = await res.json();
@@ -130,7 +128,12 @@ export default function BackupScreen() {
     },
   });
 
-  const configured = status?.configured === true;
+  function handleDownload(filePath: string) {
+    const url = new URL("/api/admin/backup/download", getApiUrl());
+    url.searchParams.set("path", filePath);
+    Linking.openURL(url.toString());
+  }
+
   const isBackingUp = backupDbMutation.isPending || backupMediaMutation.isPending || status?.isBackingUp;
   const isRestoring = restoreMutation.isPending || status?.isRestoringDb;
 
@@ -144,13 +147,6 @@ export default function BackupScreen() {
         { paddingBottom: insets.bottom + 30, paddingTop: Platform.OS === "web" ? 67 : 0 },
       ]}
     >
-      {!configured && (
-        <TouchableOpacity style={styles.warningBanner} onPress={() => setSetupModal(true)}>
-          <Ionicons name="warning-outline" size={20} color="#f59e0b" />
-          <Text style={styles.warningText}>Google Drive non configurato. Tocca per le istruzioni.</Text>
-        </TouchableOpacity>
-      )}
-
       <View style={styles.statusCard}>
         <View style={styles.statusRow}>
           <MaterialCommunityIcons name="cloud-upload" size={24} color={Colors.accent} />
@@ -158,7 +154,7 @@ export default function BackupScreen() {
           <Switch
             value={!!status?.scheduled}
             onValueChange={(v) => scheduleMutation.mutate(v)}
-            disabled={scheduleMutation.isPending || !configured}
+            disabled={scheduleMutation.isPending}
             trackColor={{ false: Colors.border, true: Colors.accent }}
             thumbColor="#fff"
           />
@@ -175,9 +171,7 @@ export default function BackupScreen() {
           <View style={styles.lastBackupItem}>
             <Text style={styles.lastBackupLabel}>Ultimo DB</Text>
             <Text style={styles.lastBackupValue}>
-              {status?.lastDbBackup
-                ? formatDate(status.lastDbBackup.timestamp)
-                : "—"}
+              {status?.lastDbBackup ? formatDate(status.lastDbBackup.timestamp) : "—"}
             </Text>
             {status?.lastDbBackup && (
               <Text style={styles.lastBackupSize}>{formatBytes(status.lastDbBackup.size)}</Text>
@@ -187,9 +181,7 @@ export default function BackupScreen() {
           <View style={styles.lastBackupItem}>
             <Text style={styles.lastBackupLabel}>Ultimo Media</Text>
             <Text style={styles.lastBackupValue}>
-              {status?.lastMediaBackup
-                ? formatDate(status.lastMediaBackup.timestamp)
-                : "—"}
+              {status?.lastMediaBackup ? formatDate(status.lastMediaBackup.timestamp) : "—"}
             </Text>
             {status?.lastMediaBackup && (
               <Text style={styles.lastBackupSize}>{formatBytes(status.lastMediaBackup.size)}</Text>
@@ -200,9 +192,9 @@ export default function BackupScreen() {
 
       <View style={styles.actionsRow}>
         <TouchableOpacity
-          style={[styles.actionBtn, styles.actionBtnGreen, (!configured || isBackingUp) && styles.btnDisabled]}
+          style={[styles.actionBtn, styles.actionBtnGreen, !!isBackingUp && styles.btnDisabled]}
           onPress={() => backupDbMutation.mutate()}
-          disabled={!configured || !!isBackingUp}
+          disabled={!!isBackingUp}
           activeOpacity={0.8}
         >
           {backupDbMutation.isPending
@@ -213,9 +205,9 @@ export default function BackupScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.actionBtn, styles.actionBtnBlue, (!configured || isBackingUp) && styles.btnDisabled]}
+          style={[styles.actionBtn, styles.actionBtnBlue, !!isBackingUp && styles.btnDisabled]}
           onPress={() => backupMediaMutation.mutate()}
-          disabled={!configured || !!isBackingUp}
+          disabled={!!isBackingUp}
           activeOpacity={0.8}
         >
           {backupMediaMutation.isPending
@@ -256,12 +248,7 @@ export default function BackupScreen() {
         </TouchableOpacity>
       </View>
 
-      {!configured ? (
-        <View style={styles.emptyState}>
-          <MaterialCommunityIcons name="cloud-off-outline" size={48} color={Colors.textSecondary} />
-          <Text style={styles.emptyText}>Configura Google Drive per visualizzare i backup</Text>
-        </View>
-      ) : loadingBackups ? (
+      {loadingBackups ? (
         <ActivityIndicator style={{ marginTop: 32 }} color={Colors.accent} />
       ) : currentList.length === 0 ? (
         <View style={styles.emptyState}>
@@ -270,7 +257,7 @@ export default function BackupScreen() {
         </View>
       ) : (
         currentList.map((file) => (
-          <View key={file.id} style={styles.backupCard}>
+          <View key={file.path} style={styles.backupCard}>
             <MaterialCommunityIcons
               name={activeTab === "db" ? "database" : "folder-zip"}
               size={24}
@@ -283,19 +270,27 @@ export default function BackupScreen() {
                 {formatDate(file.createdTime)} · {formatBytes(file.size)}
               </Text>
             </View>
-            {activeTab === "db" && (
+            <View style={styles.fileActions}>
               <TouchableOpacity
-                style={[styles.restoreBtn, isRestoring && styles.btnDisabled]}
-                onPress={() => {
-                  setRestoreModal({ file });
-                  setRestorePassword("");
-                }}
-                disabled={!!isRestoring}
+                style={styles.downloadBtn}
+                onPress={() => handleDownload(file.path)}
               >
-                <Ionicons name="refresh" size={16} color="#fff" />
-                <Text style={styles.restoreBtnText}>Ripristina</Text>
+                <Ionicons name="download-outline" size={16} color="#fff" />
               </TouchableOpacity>
-            )}
+              {activeTab === "db" && (
+                <TouchableOpacity
+                  style={[styles.restoreBtn, isRestoring && styles.btnDisabled]}
+                  onPress={() => {
+                    setRestoreModal({ file });
+                    setRestorePassword("");
+                  }}
+                  disabled={!!isRestoring}
+                >
+                  <Ionicons name="refresh" size={16} color="#fff" />
+                  <Text style={styles.restoreBtnText}>Ripristina</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         ))
       )}
@@ -308,8 +303,8 @@ export default function BackupScreen() {
               <Text style={styles.modalTitle}>Ripristina database</Text>
             </View>
             <Text style={styles.modalDesc}>
-              Stai per sostituire il database attuale con:
-              {"\n"}<Text style={{ fontWeight: "700" }}>{restoreModal?.file.name}</Text>
+              Stai per sostituire il database attuale con:{"\n"}
+              <Text style={{ fontWeight: "700" }}>{restoreModal?.file.name}</Text>
               {"\n\nQuesta operazione è irreversibile. Inserisci la password admin per confermare."}
             </Text>
             <TextInput
@@ -333,7 +328,7 @@ export default function BackupScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.confirmBtn, (restoreMutation.isPending || !restorePassword) && styles.btnDisabled]}
-                onPress={() => restoreModal && restoreMutation.mutate({ fileId: restoreModal.file.id, adminPassword: restorePassword })}
+                onPress={() => restoreModal && restoreMutation.mutate({ filePath: restoreModal.file.path, adminPassword: restorePassword })}
                 disabled={restoreMutation.isPending || !restorePassword}
               >
                 {restoreMutation.isPending
@@ -345,36 +340,6 @@ export default function BackupScreen() {
           </View>
         </View>
       </Modal>
-
-      <Modal visible={setupModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <View style={styles.modalHeader}>
-              <MaterialCommunityIcons name="google-drive" size={24} color={Colors.accent} />
-              <Text style={styles.modalTitle}>Configurazione Google Drive</Text>
-            </View>
-            <Text style={styles.modalDesc}>
-              Per abilitare i backup su Google Drive, segui questi passaggi:{"\n\n"}
-              {"1. "}Vai su{" "}
-              <Text style={{ color: Colors.accent }}>console.cloud.google.com</Text>
-              {"\n"}
-              {"2. "}Crea un progetto e abilita l'API "Google Drive API"
-              {"\n"}
-              {"3. "}Crea un Service Account con ruolo Editor
-              {"\n"}
-              {"4. "}Genera e scarica la chiave JSON
-              {"\n"}
-              {"5. "}Aggiungi il contenuto JSON come secret{"\n"}   con nome:{" "}
-              <Text style={{ fontWeight: "700", color: Colors.accent }}>GOOGLE_SERVICE_ACCOUNT_KEY</Text>
-              {"\n"}
-              {"6. "}Riavvia il backend
-            </Text>
-            <TouchableOpacity style={styles.confirmBtn} onPress={() => setSetupModal(false)}>
-              <Text style={styles.confirmBtnText}>Ho capito</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </ScrollView>
   );
 }
@@ -382,12 +347,6 @@ export default function BackupScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 16 },
-  warningBanner: {
-    flexDirection: "row", alignItems: "center", gap: 10,
-    backgroundColor: "#f59e0b20", borderRadius: 12,
-    padding: 14, marginBottom: 16, borderWidth: 1, borderColor: "#f59e0b40",
-  },
-  warningText: { flex: 1, color: "#f59e0b", fontSize: 13, fontFamily: "Inter_500Medium" },
   statusCard: {
     backgroundColor: Colors.surface, borderRadius: 16,
     padding: 16, marginBottom: 16,
@@ -460,6 +419,11 @@ const styles = StyleSheet.create({
   backupMeta: {
     fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary,
   },
+  fileActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  downloadBtn: {
+    backgroundColor: Colors.accent, borderRadius: 8,
+    padding: 7, alignItems: "center", justifyContent: "center",
+  },
   restoreBtn: {
     flexDirection: "row", alignItems: "center", gap: 4,
     backgroundColor: Colors.warning, borderRadius: 8,
@@ -503,5 +467,4 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.error, alignItems: "center",
   },
   confirmBtnText: { color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14 },
-  success: { color: Colors.success },
 });

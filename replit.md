@@ -62,6 +62,8 @@ server/
     feedback.ts         # Feedback e bug report (invia email a bikerlinkapp@gmail.com)
     invitations.ts      # Codici invito
   storage.ts            # Layer di accesso dati (Drizzle)
+  backup-service.ts     # Sistema backup DB+media su Replit Object Storage (scheduler 24h, retention 90gg)
+  objectStorage.ts      # Wrapper @replit/object-storage (upload, download, list, delete)
   db.ts                 # Connessione PostgreSQL
   public/
     bikerlink-manual.pdf  # Manuale utente PDF (5 lingue: IT/EN/DE/ES/FR)

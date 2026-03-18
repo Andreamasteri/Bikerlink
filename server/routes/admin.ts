@@ -1952,9 +1952,9 @@ router.post("/backup/media", async (_req: Request, res: Response) => {
 
 router.post("/backup/restore", async (req: Request, res: Response) => {
   try {
-    const { fileId, adminPassword } = req.body;
-    if (!fileId || !adminPassword) {
-      return res.status(400).json({ message: "fileId e adminPassword sono obbligatori" });
+    const { filePath, adminPassword } = req.body;
+    if (!filePath || !adminPassword) {
+      return res.status(400).json({ message: "filePath e adminPassword sono obbligatori" });
     }
     const user = (req as any).currentUser;
     const fullUser = await storage.getUser(user.id);
@@ -1966,18 +1966,43 @@ router.post("/backup/restore", async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Password non corretta" });
     }
     const { restoreDatabase } = await import("../backup-service");
-    await restoreDatabase(fileId);
+    await restoreDatabase(filePath);
     await storage.createModeratorLog({
       moderatorId: user.id,
       action: "restore_db",
       targetType: "system",
-      targetId: fileId,
-      details: `Database ripristinato dal backup: ${fileId}`,
+      targetId: filePath,
+      details: `Database ripristinato dal backup: ${filePath}`,
     });
     return res.json({ ok: true, message: "Database ripristinato con successo" });
   } catch (error: any) {
     console.error("Admin restore db error:", error);
     return res.status(500).json({ message: error.message || "Errore durante il ripristino del database" });
+  }
+});
+
+router.get("/backup/download", async (req: Request, res: Response) => {
+  try {
+    const { path: filePath } = req.query;
+    if (!filePath || typeof filePath !== "string") {
+      return res.status(400).json({ message: "Parametro path mancante" });
+    }
+    if (!filePath.startsWith("backup/")) {
+      return res.status(400).json({ message: "Path non valido" });
+    }
+    const { downloadBackupBuffer } = await import("../backup-service");
+    const buf = await downloadBackupBuffer(filePath);
+    const fileName = filePath.split("/").pop() ?? "backup";
+    const contentType = fileName.endsWith(".gz")
+      ? "application/gzip"
+      : "application/zip";
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Length", buf.length);
+    return res.send(buf);
+  } catch (error: any) {
+    console.error("Admin backup download error:", error);
+    return res.status(500).json({ message: error.message || "Errore durante il download" });
   }
 });
 
