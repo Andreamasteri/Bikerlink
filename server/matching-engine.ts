@@ -224,17 +224,14 @@ async function runBikerBikerMatching(): Promise<number> {
         const brand = bm1.motorcycle.brand;
         const model = bm1.motorcycle.model;
 
-        try {
-          await storage.createBikerBikerMatch({
-            biker1Id: idA,
-            biker2Id: idB,
-            motorcycleBrand: brand,
-            motorcycleModel: model,
-            status: "new",
-          });
-          matchCount++;
-        } catch {
-        }
+        const inserted = await storage.createBikerBikerMatch({
+          biker1Id: idA,
+          biker2Id: idB,
+          motorcycleBrand: brand,
+          motorcycleModel: model,
+          status: "new",
+        });
+        if (inserted) matchCount++;
       }
     }
 

@@ -311,7 +311,8 @@ export interface IStorage {
   getAllExistingProposalMatchKeys(): Promise<Set<string>>;
 
   getBikerBikerMatchesForUser(userId: string): Promise<BikerBikerMatch[]>;
-  createBikerBikerMatch(data: InsertBikerBikerMatch): Promise<BikerBikerMatch>;
+  getAllExistingBikerBikerMatchKeys(): Promise<Set<string>>;
+  createBikerBikerMatch(data: InsertBikerBikerMatch): Promise<BikerBikerMatch | undefined>;
   getBikerBikerMatch(id: string): Promise<BikerBikerMatch | undefined>;
   updateBikerBikerMatch(id: string, data: Partial<InsertBikerBikerMatch>): Promise<BikerBikerMatch | undefined>;
   resetBikerBikerMatchToNew(id: string, userId: string): Promise<boolean>;
@@ -1693,6 +1694,20 @@ export class DatabaseStorage implements IStorage {
     return req;
   }
 
+  async getAllExistingBikerBikerMatchKeys(): Promise<Set<string>> {
+    const rows = await db.select({
+      biker1Id: bikerBikerMatches.biker1Id,
+      biker2Id: bikerBikerMatches.biker2Id,
+      motorcycleBrand: bikerBikerMatches.motorcycleBrand,
+      motorcycleModel: bikerBikerMatches.motorcycleModel,
+    }).from(bikerBikerMatches);
+    const keys = new Set<string>();
+    for (const row of rows) {
+      keys.add(`${row.biker1Id}|${row.biker2Id}|${row.motorcycleBrand}|${row.motorcycleModel}`);
+    }
+    return keys;
+  }
+
   async getBikerBikerMatchesForUser(userId: string): Promise<BikerBikerMatch[]> {
     return db.select().from(bikerBikerMatches).where(
       or(eq(bikerBikerMatches.biker1Id, userId), eq(bikerBikerMatches.biker2Id, userId))
@@ -1702,7 +1717,7 @@ export class DatabaseStorage implements IStorage {
     ).limit(200);
   }
 
-  async createBikerBikerMatch(data: InsertBikerBikerMatch): Promise<BikerBikerMatch> {
+  async createBikerBikerMatch(data: InsertBikerBikerMatch): Promise<BikerBikerMatch | undefined> {
     const [match] = await db.insert(bikerBikerMatches).values(data)
       .onConflictDoNothing()
       .returning();
