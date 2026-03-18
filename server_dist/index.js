@@ -1787,19 +1787,6 @@ var init_storage = __esm({
         const [req] = await db.update(sosRequests).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm2.eq)(sosRequests.id, id)).returning();
         return req;
       }
-      async getAllExistingBikerBikerMatchKeys() {
-        const rows = await db.select({
-          biker1Id: bikerBikerMatches.biker1Id,
-          biker2Id: bikerBikerMatches.biker2Id,
-          motorcycleBrand: bikerBikerMatches.motorcycleBrand,
-          motorcycleModel: bikerBikerMatches.motorcycleModel
-        }).from(bikerBikerMatches);
-        const keys = /* @__PURE__ */ new Set();
-        for (const row of rows) {
-          keys.add(`${row.biker1Id}|${row.biker2Id}|${row.motorcycleBrand}|${row.motorcycleModel}`);
-        }
-        return keys;
-      }
       async getBikerBikerMatchesForUser(userId) {
         return db.select().from(bikerBikerMatches).where(
           (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(bikerBikerMatches.biker1Id, userId), (0, import_drizzle_orm2.eq)(bikerBikerMatches.biker2Id, userId))

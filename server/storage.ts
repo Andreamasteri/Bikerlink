@@ -311,7 +311,6 @@ export interface IStorage {
   getAllExistingProposalMatchKeys(): Promise<Set<string>>;
 
   getBikerBikerMatchesForUser(userId: string): Promise<BikerBikerMatch[]>;
-  getAllExistingBikerBikerMatchKeys(): Promise<Set<string>>;
   createBikerBikerMatch(data: InsertBikerBikerMatch): Promise<BikerBikerMatch | undefined>;
   getBikerBikerMatch(id: string): Promise<BikerBikerMatch | undefined>;
   updateBikerBikerMatch(id: string, data: Partial<InsertBikerBikerMatch>): Promise<BikerBikerMatch | undefined>;
@@ -1692,20 +1691,6 @@ export class DatabaseStorage implements IStorage {
   async updateSosRequest(id: string, data: Partial<InsertSosRequest>): Promise<SosRequest | undefined> {
     const [req] = await db.update(sosRequests).set({ ...data, updatedAt: new Date() }).where(eq(sosRequests.id, id)).returning();
     return req;
-  }
-
-  async getAllExistingBikerBikerMatchKeys(): Promise<Set<string>> {
-    const rows = await db.select({
-      biker1Id: bikerBikerMatches.biker1Id,
-      biker2Id: bikerBikerMatches.biker2Id,
-      motorcycleBrand: bikerBikerMatches.motorcycleBrand,
-      motorcycleModel: bikerBikerMatches.motorcycleModel,
-    }).from(bikerBikerMatches);
-    const keys = new Set<string>();
-    for (const row of rows) {
-      keys.add(`${row.biker1Id}|${row.biker2Id}|${row.motorcycleBrand}|${row.motorcycleModel}`);
-    }
-    return keys;
   }
 
   async getBikerBikerMatchesForUser(userId: string): Promise<BikerBikerMatch[]> {
