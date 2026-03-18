@@ -9756,9 +9756,10 @@ async function runBikerBikerMatching() {
     }
     let matchCount = 0;
     const MAX_MATCHES_PER_RUN = 200;
-    for (const [, members] of buckets) {
+    const shuffledBuckets = [...buckets.values()].sort(() => Math.random() - 0.5);
+    for (const members of shuffledBuckets) {
       if (members.length < 2) continue;
-      const uniqueMembers = members.filter((m, idx) => members.findIndex((x) => x.userId === m.userId) === idx);
+      const uniqueMembers = members.filter((m, idx) => members.findIndex((x) => x.userId === m.userId) === idx).sort(() => Math.random() - 0.5);
       if (uniqueMembers.length < 2) continue;
       for (let i = 0; i < uniqueMembers.length && matchCount < MAX_MATCHES_PER_RUN; i++) {
         for (let j = i + 1; j < uniqueMembers.length && matchCount < MAX_MATCHES_PER_RUN; j++) {
