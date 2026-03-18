@@ -12,6 +12,12 @@ import { getLastMatchingCycleMeta } from "../matching-engine";
 
 const router = Router();
 
+const PROTECTED_NICKNAMES = ["BikerLink_Official"];
+
+function isProtectedUser(nickname: string): boolean {
+  return PROTECTED_NICKNAMES.includes(nickname);
+}
+
 function requireAdmin(req: Request, res: Response, next: Function) {
   if (!req.session.userId) {
     return res.status(401).json({ message: "Non autenticato" });
@@ -68,6 +74,11 @@ router.put("/users/:id/status", async (req: Request, res: Response) => {
     if (!["active", "suspended", "blocked"].includes(status)) {
       return res.status(400).json({ message: "Stato non valido" });
     }
+    const targetUser = await storage.getUser(id);
+    if (!targetUser) return res.status(404).json({ message: "Utente non trovato" });
+    if (isProtectedUser(targetUser.nickname)) {
+      return res.status(403).json({ message: "Utente di sistema non modificabile" });
+    }
     const user = await storage.updateUser(id, { status });
     if (!user) {
       return res.status(404).json({ message: "Utente non trovato" });
@@ -93,6 +104,11 @@ router.put("/users/:id/role", async (req: Request, res: Response) => {
     const { role } = req.body;
     if (!["user", "moderator", "admin"].includes(role)) {
       return res.status(400).json({ message: "Ruolo non valido" });
+    }
+    const targetUser = await storage.getUser(id);
+    if (!targetUser) return res.status(404).json({ message: "Utente non trovato" });
+    if (isProtectedUser(targetUser.nickname)) {
+      return res.status(403).json({ message: "Utente di sistema non modificabile" });
     }
     const user = await storage.updateUser(id, { role });
     if (!user) {
@@ -120,6 +136,11 @@ router.put("/users/:id/email", async (req: Request, res: Response) => {
     if (!email || !email.includes("@")) {
       return res.status(400).json({ message: "Email non valida" });
     }
+    const targetUser = await storage.getUser(id);
+    if (!targetUser) return res.status(404).json({ message: "Utente non trovato" });
+    if (isProtectedUser(targetUser.nickname)) {
+      return res.status(403).json({ message: "Utente di sistema non modificabile" });
+    }
     const user = await storage.updateUser(id, { email });
     if (!user) {
       return res.status(404).json({ message: "Utente non trovato" });
@@ -145,6 +166,11 @@ router.put("/users/:id/password", async (req: Request, res: Response) => {
     const { password } = req.body;
     if (!password || password.length < 6) {
       return res.status(400).json({ message: "La password deve avere almeno 6 caratteri" });
+    }
+    const targetUser = await storage.getUser(id);
+    if (!targetUser) return res.status(404).json({ message: "Utente non trovato" });
+    if (isProtectedUser(targetUser.nickname)) {
+      return res.status(403).json({ message: "Utente di sistema non modificabile" });
     }
     const hashedPassword = await bcrypt.hash(password, 12);
     const user = await storage.updateUser(id, { password: hashedPassword });
@@ -198,6 +224,9 @@ router.delete("/users/:id", async (req: Request, res: Response) => {
     }
     if (user.role === "admin" || user.role === "moderator") {
       return res.status(403).json({ message: "Impossibile eliminare un utente di sistema" });
+    }
+    if (isProtectedUser(user.nickname)) {
+      return res.status(403).json({ message: "Utente di sistema non modificabile" });
     }
     await storage.deleteUser(id);
     await storage.createModeratorLog({

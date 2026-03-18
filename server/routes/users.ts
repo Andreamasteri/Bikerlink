@@ -748,6 +748,11 @@ router.post("/:id/block", requireAuth, async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Utente non trovato" });
     }
 
+    const PROTECTED_NICKNAMES = ["BikerLink_Official"];
+    if (PROTECTED_NICKNAMES.includes(targetUser.nickname)) {
+      return res.status(403).json({ message: "Utente di sistema non bloccabile" });
+    }
+
     const alreadyBlocked = await storage.isBlocked(blockerId, blockedId);
     if (alreadyBlocked) {
       return res.status(409).json({ message: "Utente già bloccato" });

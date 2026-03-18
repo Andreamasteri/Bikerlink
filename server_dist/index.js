@@ -4784,6 +4784,10 @@ router2.post("/:id/block", requireAuth, async (req, res) => {
     if (!targetUser) {
       return res.status(404).json({ message: "Utente non trovato" });
     }
+    const PROTECTED_NICKNAMES2 = ["BikerLink_Official"];
+    if (PROTECTED_NICKNAMES2.includes(targetUser.nickname)) {
+      return res.status(403).json({ message: "Utente di sistema non bloccabile" });
+    }
     const alreadyBlocked = await storage.isBlocked(blockerId, blockedId);
     if (alreadyBlocked) {
       return res.status(409).json({ message: "Utente gi\xE0 bloccato" });
@@ -8134,6 +8138,10 @@ function startMatchingEngine() {
 
 // server/routes/admin.ts
 var router17 = (0, import_express17.Router)();
+var PROTECTED_NICKNAMES = ["BikerLink_Official"];
+function isProtectedUser(nickname) {
+  return PROTECTED_NICKNAMES.includes(nickname);
+}
 function requireAdmin(req, res, next) {
   if (!req.session.userId) {
     return res.status(401).json({ message: "Non autenticato" });
@@ -8186,6 +8194,11 @@ router17.put("/users/:id/status", async (req, res) => {
     if (!["active", "suspended", "blocked"].includes(status)) {
       return res.status(400).json({ message: "Stato non valido" });
     }
+    const targetUser = await storage.getUser(id);
+    if (!targetUser) return res.status(404).json({ message: "Utente non trovato" });
+    if (isProtectedUser(targetUser.nickname)) {
+      return res.status(403).json({ message: "Utente di sistema non modificabile" });
+    }
     const user = await storage.updateUser(id, { status });
     if (!user) {
       return res.status(404).json({ message: "Utente non trovato" });
@@ -8210,6 +8223,11 @@ router17.put("/users/:id/role", async (req, res) => {
     const { role } = req.body;
     if (!["user", "moderator", "admin"].includes(role)) {
       return res.status(400).json({ message: "Ruolo non valido" });
+    }
+    const targetUser = await storage.getUser(id);
+    if (!targetUser) return res.status(404).json({ message: "Utente non trovato" });
+    if (isProtectedUser(targetUser.nickname)) {
+      return res.status(403).json({ message: "Utente di sistema non modificabile" });
     }
     const user = await storage.updateUser(id, { role });
     if (!user) {
@@ -8236,6 +8254,11 @@ router17.put("/users/:id/email", async (req, res) => {
     if (!email || !email.includes("@")) {
       return res.status(400).json({ message: "Email non valida" });
     }
+    const targetUser = await storage.getUser(id);
+    if (!targetUser) return res.status(404).json({ message: "Utente non trovato" });
+    if (isProtectedUser(targetUser.nickname)) {
+      return res.status(403).json({ message: "Utente di sistema non modificabile" });
+    }
     const user = await storage.updateUser(id, { email });
     if (!user) {
       return res.status(404).json({ message: "Utente non trovato" });
@@ -8260,6 +8283,11 @@ router17.put("/users/:id/password", async (req, res) => {
     const { password } = req.body;
     if (!password || password.length < 6) {
       return res.status(400).json({ message: "La password deve avere almeno 6 caratteri" });
+    }
+    const targetUser = await storage.getUser(id);
+    if (!targetUser) return res.status(404).json({ message: "Utente non trovato" });
+    if (isProtectedUser(targetUser.nickname)) {
+      return res.status(403).json({ message: "Utente di sistema non modificabile" });
     }
     const hashedPassword = await import_bcryptjs3.default.hash(password, 12);
     const user = await storage.updateUser(id, { password: hashedPassword });
@@ -8311,6 +8339,9 @@ router17.delete("/users/:id", async (req, res) => {
     }
     if (user.role === "admin" || user.role === "moderator") {
       return res.status(403).json({ message: "Impossibile eliminare un utente di sistema" });
+    }
+    if (isProtectedUser(user.nickname)) {
+      return res.status(403).json({ message: "Utente di sistema non modificabile" });
     }
     await storage.deleteUser(id);
     await storage.createModeratorLog({
