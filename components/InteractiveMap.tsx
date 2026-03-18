@@ -115,12 +115,14 @@ export default function InteractiveMap({
   const [region, setRegion] = useState<Region>(ITALY_REGION);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         if (Platform.OS === "web") {
           if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
               (position) => {
+                if (cancelled) return;
                 const loc = {
                   latitude: position.coords.latitude,
                   longitude: position.coords.longitude,
@@ -133,17 +135,19 @@ export default function InteractiveMap({
                 });
                 setLocationLoading(false);
               },
-              () => setLocationLoading(false)
+              () => { if (!cancelled) setLocationLoading(false); }
             );
           } else {
-            setLocationLoading(false);
+            if (!cancelled) setLocationLoading(false);
           }
         } else {
           const { status } = await Location.requestForegroundPermissionsAsync();
+          if (cancelled) return;
           if (status === "granted") {
             const loc = await Location.getCurrentPositionAsync({
               accuracy: Location.Accuracy.Balanced,
             });
+            if (cancelled) return;
             const coords = {
               latitude: loc.coords.latitude,
               longitude: loc.coords.longitude,
@@ -155,12 +159,13 @@ export default function InteractiveMap({
               longitudeDelta: 0.1,
             });
           }
-          setLocationLoading(false);
+          if (!cancelled) setLocationLoading(false);
         }
       } catch {
-        setLocationLoading(false);
+        if (!cancelled) setLocationLoading(false);
       }
     })();
+    return () => { cancelled = true; };
   }, []);
 
   const filteredUsers = users.filter((u) => {

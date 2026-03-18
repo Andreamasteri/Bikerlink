@@ -48,6 +48,7 @@ export default function MapScreen() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
   const [mapFullscreen, setMapFullscreen] = useState(false);
+  const [mapFullscreenReady, setMapFullscreenReady] = useState(false);
   const [filterBiker, setFilterBiker] = useState(true);
   const [filterZavorrina, setFilterZavorrina] = useState(true);
   const [filterCoppia, setFilterCoppia] = useState(true);
@@ -86,6 +87,15 @@ export default function MapScreen() {
     const t = setTimeout(() => setMapReady(true), 5000);
     return () => clearTimeout(t);
   }, [mapReady]);
+
+  useEffect(() => {
+    if (mapFullscreen) {
+      const t = setTimeout(() => setMapFullscreenReady(true), 400);
+      return () => clearTimeout(t);
+    } else {
+      setMapFullscreenReady(false);
+    }
+  }, [mapFullscreen]);
 
   useEffect(() => {
     (async () => {
@@ -704,6 +714,7 @@ export default function MapScreen() {
 
       <Modal visible={mapFullscreen} animationType="fade" onRequestClose={() => setMapFullscreen(false)}>
         <View style={styles.fullscreenContainer}>
+          {mapFullscreenReady ? (
           <InteractiveMap
             users={(nearbyUsersQuery.data ?? []).filter((u: any) => u.latitude != null && u.longitude != null && !isNaN(u.latitude) && !isNaN(u.longitude))}
             workshops={(workshopsQuery.data ?? []).filter((w: any) => w.latitude != null && w.longitude != null && !isNaN(w.latitude) && !isNaN(w.longitude))}
@@ -721,6 +732,11 @@ export default function MapScreen() {
             onUserPress={handleUserPress}
             onEasterEggPress={handleEasterEggPress}
           />
+          ) : (
+            <View style={styles.mapPlaceholder}>
+              <ActivityIndicator size="large" color={Colors.accent} />
+            </View>
+          )}
           <Pressable style={[styles.closeBtn, { top: Platform.OS === "web" ? 12 : insets.top + 4 }]} onPress={() => setMapFullscreen(false)}>
             <Ionicons name="close" size={28} color="#fff" />
           </Pressable>
