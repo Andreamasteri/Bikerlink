@@ -674,23 +674,29 @@ export default function MapScreen() {
       </View>
 
       <Pressable style={styles.mapContainer} onPress={() => setMapFullscreen(true)}>
-        <InteractiveMap
-          users={(nearbyUsersQuery.data ?? []).filter((u: any) => u.latitude != null && u.longitude != null && !isNaN(u.latitude) && !isNaN(u.longitude))}
-          workshops={(workshopsQuery.data ?? []).filter((w: any) => w.latitude != null && w.longitude != null && !isNaN(w.latitude) && !isNaN(w.longitude))}
-          easterEggs={(easterEggsQuery.data ?? []).filter((e: any) => e.latitude != null && e.longitude != null && !isNaN(e.latitude) && !isNaN(e.longitude))}
-          activeSosRequests={(activeSosQuery.data ?? []).filter((s: any) => s.latitude != null && s.longitude != null)}
-          isAvailable={isAvailable}
-          searchRadiusKm={mySearchRadius}
-          filterBiker={filterBiker}
-          filterZavorrina={filterZavorrina}
-          filterCoppia={filterCoppia}
-          onToggleFilterBiker={() => setFilterBiker((p) => !p)}
-          onToggleFilterZavorrina={() => setFilterZavorrina((p) => !p)}
-          onToggleFilterCoppia={() => setFilterCoppia((p) => !p)}
-          onUserPress={handleUserPress}
-          onEasterEggPress={handleEasterEggPress}
-          onReady={() => setMapReady(true)}
-        />
+        {!mapFullscreen ? (
+          <InteractiveMap
+            users={(nearbyUsersQuery.data ?? []).filter((u: any) => u.latitude != null && u.longitude != null && !isNaN(u.latitude) && !isNaN(u.longitude))}
+            workshops={(workshopsQuery.data ?? []).filter((w: any) => w.latitude != null && w.longitude != null && !isNaN(w.latitude) && !isNaN(w.longitude))}
+            easterEggs={(easterEggsQuery.data ?? []).filter((e: any) => e.latitude != null && e.longitude != null && !isNaN(e.latitude) && !isNaN(e.longitude))}
+            activeSosRequests={(activeSosQuery.data ?? []).filter((s: any) => s.latitude != null && s.longitude != null)}
+            isAvailable={isAvailable}
+            searchRadiusKm={mySearchRadius}
+            filterBiker={filterBiker}
+            filterZavorrina={filterZavorrina}
+            filterCoppia={filterCoppia}
+            onToggleFilterBiker={() => setFilterBiker((p) => !p)}
+            onToggleFilterZavorrina={() => setFilterZavorrina((p) => !p)}
+            onToggleFilterCoppia={() => setFilterCoppia((p) => !p)}
+            onUserPress={handleUserPress}
+            onEasterEggPress={handleEasterEggPress}
+            onReady={() => setMapReady(true)}
+          />
+        ) : (
+          <View style={styles.mapPlaceholder}>
+            <ActivityIndicator size="small" color={Colors.accent} />
+          </View>
+        )}
         <View style={styles.expandHint}>
           <Ionicons name="expand" size={16} color={Colors.text} />
         </View>
@@ -1372,6 +1378,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: "hidden",
     position: "relative",
+  },
+  mapPlaceholder: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    alignItems: "center",
+    justifyContent: "center",
   },
   expandHint: {
     position: "absolute",
