@@ -22,6 +22,7 @@ function useLoginMutation() {
     },
     onSuccess: (user: SafeUser) => {
       queryClient.setQueryData(["/api/auth/me"], user);
+      queryClient.invalidateQueries();
     },
   });
 }

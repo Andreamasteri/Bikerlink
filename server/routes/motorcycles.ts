@@ -49,10 +49,17 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Solo biker e coppie possono aggiungere moto" });
     }
 
-    const { brand, model, year, displacement, motorcycleType, ridingStyle, photoUrl, isForSale, saleDescription } = req.body;
+    const { brand, model, year, displacement, motorcycleType, ridingStyle, photoUrl, isForSale, saleDescription, isDefault } = req.body;
 
     if (!brand || !model) {
       return res.status(400).json({ message: "Marca e modello sono obbligatori" });
+    }
+
+    if (isDefault === true) {
+      await db
+        .update(userMotorcycles)
+        .set({ isDefault: false })
+        .where(eq(userMotorcycles.userId, userId));
     }
 
     const motorcycle = await storage.createUserMotorcycle({
@@ -64,6 +71,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       motorcycleType: motorcycleType || null,
       ridingStyle: ridingStyle || null,
       photoUrl: photoUrl || null,
+      isDefault: isDefault === true,
       isForSale: isForSale || false,
       saleDescription: saleDescription || null,
     });
