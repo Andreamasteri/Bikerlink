@@ -120,10 +120,17 @@ async function runWishlistMatching(): Promise<number> {
     const wishlistMotos = await storage.getAllWishlistMotosWithUsers();
     const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
 
-    if (wishlistMotos.length === 0 || bikerMotorcycles.length === 0) return 0;
+    console.log(`[WishlistMatching] wishlist entries: ${wishlistMotos.length}, biker motorcycles: ${bikerMotorcycles.length}`);
+
+    if (wishlistMotos.length === 0 || bikerMotorcycles.length === 0) {
+      if (wishlistMotos.length === 0) console.warn("[WishlistMatching] WARN: nessuna wishlist trovata");
+      if (bikerMotorcycles.length === 0) console.warn("[WishlistMatching] WARN: nessuna moto biker trovata — eseguire /api/admin/reconcile-fake-moto");
+      return 0;
+    }
 
     const existingKeys = await storage.getAllExistingBikerZavarrinaMatchKeys();
     let matchCount = 0;
+    let skipCount = 0;
     const MAX_MATCHES_PER_RUN = 500;
 
     outer:
@@ -142,7 +149,6 @@ async function runWishlistMatching(): Promise<number> {
         let compatible = false;
 
         if (wish.brand && wish.model) {
-          // Wish specifica marca + modello: devono combaciare entrambi
           if (
             moto.brand &&
             moto.model &&
@@ -153,12 +159,10 @@ async function runWishlistMatching(): Promise<number> {
             compatible = true;
           }
         } else if (wish.brand) {
-          // Wish specifica solo marca: basta che la marca combaci
           if (moto.brand && wish.brand.toLowerCase() === moto.brand.toLowerCase()) {
             compatible = true;
           }
         } else if (wish.motorcycleType) {
-          // Wish specifica solo tipo moto: basta che il tipo combaci
           if (moto.motorcycleType && wish.motorcycleType.toLowerCase() === moto.motorcycleType.toLowerCase()) {
             compatible = true;
           }
@@ -167,7 +171,7 @@ async function runWishlistMatching(): Promise<number> {
         if (!compatible) continue;
 
         const key = `${bikerId}:${zavarrinaId}:${moto.id}:${wish.id}`;
-        if (existingKeys.has(key)) continue;
+        if (existingKeys.has(key)) { skipCount++; continue; }
 
         await storage.createMatch({
           bikerId,
@@ -182,8 +186,10 @@ async function runWishlistMatching(): Promise<number> {
       }
     }
 
+    console.log(`[WishlistMatching] nuovi match: ${matchCount}, saltati (già esistenti): ${skipCount}`);
+
     if (matchCount >= MAX_MATCHES_PER_RUN) {
-      console.log(`[Matching] Cap raggiunto (${MAX_MATCHES_PER_RUN} match/ciclo). Riprenderà al prossimo run.`);
+      console.log(`[WishlistMatching] Cap raggiunto (${MAX_MATCHES_PER_RUN} match/ciclo). Riprenderà al prossimo run.`);
     }
 
     return matchCount;
@@ -196,7 +202,11 @@ async function runWishlistMatching(): Promise<number> {
 async function runBikerBikerMatching(): Promise<number> {
   try {
     const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
-    if (bikerMotorcycles.length < 2) return 0;
+    console.log(`[BikerBikerMatching] moto biker trovate: ${bikerMotorcycles.length}`);
+    if (bikerMotorcycles.length < 2) {
+      console.warn("[BikerBikerMatching] WARN: meno di 2 moto biker trovate, matching impossibile");
+      return 0;
+    }
 
     const buckets = new Map<string, Array<{ userId: string; brand: string; model: string }>>();
     for (const bm of bikerMotorcycles) {
@@ -206,7 +216,10 @@ async function runBikerBikerMatching(): Promise<number> {
       buckets.get(key)!.push({ userId: bm.userId, brand: bm.motorcycle.brand, model: bm.motorcycle.model });
     }
 
+    console.log(`[BikerBikerMatching] bucket creati: ${buckets.size}`);
+
     let matchCount = 0;
+    let skipCount = 0;
     const MAX_MATCHES_PER_RUN = 200;
 
     const shuffledBuckets = [...buckets.values()].sort(() => Math.random() - 0.5);
@@ -233,11 +246,14 @@ async function runBikerBikerMatching(): Promise<number> {
             status: "new",
           });
           if (inserted) matchCount++;
+          else skipCount++;
         }
       }
 
       if (matchCount >= MAX_MATCHES_PER_RUN) break;
     }
+
+    console.log(`[BikerBikerMatching] nuovi match: ${matchCount}, saltati (già esistenti): ${skipCount}`);
 
     return matchCount;
   } catch (error) {
@@ -269,6 +285,19 @@ const LOAD_THRESHOLD = 0.85;
 
 let currentIntervalMs = BASE_INTERVAL_MS;
 let adminNotifiedAt = 0;
+
+interface MatchingCycleMeta {
+  completedAt: string;
+  durationMs: number;
+  zavarrinaMatchesNew: number;
+  bikerBikerMatchesNew: number;
+}
+
+let lastCycleMeta: MatchingCycleMeta | null = null;
+
+export function getLastMatchingCycleMeta(): MatchingCycleMeta | null {
+  return lastCycleMeta;
+}
 
 async function notifyAdminOverload(intervalSec: number, cycleDurationSec: number): Promise<void> {
   const now = Date.now();
@@ -313,20 +342,29 @@ export function startMatchingEngine(): void {
     const autoMatchSetting = await storage.getAppSetting("auto_matching_enabled");
     const autoMatchEnabled = autoMatchSetting?.value !== "false";
 
+    let garageMatches = 0;
+    let bikerBikerMatchCount = 0;
+
     if (autoMatchEnabled) {
       const matches = await runMatching();
       if (matches > 0) console.log(`Found ${matches} new proposal matches`);
 
-      const garageMatches = await runWishlistMatching();
+      garageMatches = await runWishlistMatching();
       if (garageMatches > 0) console.log(`Found ${garageMatches} new garage matches`);
 
-      const bikerBikerMatchCount = await runBikerBikerMatching();
+      bikerBikerMatchCount = await runBikerBikerMatching();
       if (bikerBikerMatchCount > 0) console.log(`Found ${bikerBikerMatchCount} new biker-biker matches`);
     } else {
       console.log("Auto matching disabled by admin, skipping");
     }
 
     const cycleDuration = Date.now() - cycleStart;
+    lastCycleMeta = {
+      completedAt: new Date().toISOString(),
+      durationMs: cycleDuration,
+      zavarrinaMatchesNew: garageMatches,
+      bikerBikerMatchesNew: bikerBikerMatchCount,
+    };
     const loadRatio = cycleDuration / currentIntervalMs;
 
     console.log(`[Matching] Ciclo completato in ${(cycleDuration / 1000).toFixed(1)}s (${(loadRatio * 100).toFixed(0)}% dell'intervallo di ${currentIntervalMs / 1000}s)`);

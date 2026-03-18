@@ -5,8 +5,10 @@ import path from "path";
 import bcrypt from "bcryptjs";
 import { storage } from "../storage";
 import { db } from "../db";
-import { motoClubs, motoClubRequests, motoClubMembers, conversations, moderatorLogs, users, userProfiles } from "@shared/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { motoClubs, motoClubRequests, motoClubMembers, conversations, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches } from "@shared/schema";
+import { eq, and, desc, sql, count, notExists } from "drizzle-orm";
+import { MOTORCYCLES, pickRandomN, getMotoYear } from "../mass-seed-data";
+import { getLastMatchingCycleMeta } from "../matching-engine";
 
 const router = Router();
 
@@ -2129,6 +2131,123 @@ router.put("/backup/schedule", async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Admin backup schedule error:", error);
     return res.status(500).json({ message: error.message || "Errore durante la configurazione del backup" });
+  }
+});
+
+router.post("/reconcile-fake-moto", async (req: Request, res: Response) => {
+  try {
+    const fakeUsersWithoutMoto = await db.select({ id: users.id })
+      .from(users)
+      .where(
+        and(
+          eq(users.isFake, true),
+          sql`${users.userType} IN ('biker', 'coppia')`,
+          notExists(
+            db.select({ id: userMotorcycles.id })
+              .from(userMotorcycles)
+              .where(eq(userMotorcycles.userId, users.id))
+          )
+        )
+      );
+
+    if (fakeUsersWithoutMoto.length === 0) {
+      return res.json({ reconciled: 0, message: "Tutti i fake biker hanno già moto nel garage" });
+    }
+
+    let reconciledCount = 0;
+    const BATCH_SIZE = 50;
+
+    for (let i = 0; i < fakeUsersWithoutMoto.length; i += BATCH_SIZE) {
+      const batch = fakeUsersWithoutMoto.slice(i, i + BATCH_SIZE);
+      const motoRows: {
+        userId: string;
+        brand: string;
+        model: string;
+        year: number;
+        displacement: number;
+        motorcycleType: string;
+        ridingStyle: string;
+      }[] = [];
+
+      for (const u of batch) {
+        const motos = pickRandomN(MOTORCYCLES, 2 + Math.floor(Math.random() * 2));
+        for (const moto of motos) {
+          motoRows.push({
+            userId: u.id,
+            brand: moto.brand,
+            model: moto.model,
+            year: getMotoYear(),
+            displacement: moto.displacement,
+            motorcycleType: moto.type,
+            ridingStyle: moto.style,
+          });
+        }
+        reconciledCount++;
+      }
+
+      if (motoRows.length > 0) {
+        await db.insert(userMotorcycles).values(motoRows).onConflictDoNothing();
+      }
+    }
+
+    console.log(`[ReconcileFakeMoto] Riconciliati ${reconciledCount} utenti fake senza moto`);
+
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "reconcile_fake_moto",
+      targetType: "system",
+      targetId: "matching",
+      details: `Inserite moto per ${reconciledCount} fake biker senza garage`,
+    });
+
+    return res.json({
+      reconciled: reconciledCount,
+      message: `Inserite moto per ${reconciledCount} fake biker che non avevano moto nel garage`,
+    });
+  } catch (error) {
+    console.error("Reconcile fake moto error:", error);
+    return res.status(500).json({ message: "Errore durante il reconcile" });
+  }
+});
+
+router.get("/matching-stats", async (_req: Request, res: Response) => {
+  try {
+    const [totalMotoResult, zavarrinaMatchResult, bikerBikerMatchResult] = await Promise.all([
+      db.select({ count: count() }).from(userMotorcycles),
+      db.select({ count: count() }).from(bikerZavarrinaMatches),
+      db.select({ count: count() }).from(bikerBikerMatches),
+    ]);
+
+    const totalMotorcycles = Number(totalMotoResult[0]?.count ?? 0);
+    const totalZavarrinaMatches = Number(zavarrinaMatchResult[0]?.count ?? 0);
+    const totalBikerBikerMatches = Number(bikerBikerMatchResult[0]?.count ?? 0);
+
+    const fakeBikersWithoutMoto = await db.select({ id: users.id })
+      .from(users)
+      .where(
+        and(
+          eq(users.isFake, true),
+          sql`${users.userType} IN ('biker', 'coppia')`,
+          notExists(
+            db.select({ id: userMotorcycles.id })
+              .from(userMotorcycles)
+              .where(eq(userMotorcycles.userId, users.id))
+          )
+        )
+      );
+
+    const lastCycle = getLastMatchingCycleMeta();
+
+    return res.json({
+      totalMotorcycles,
+      totalZavarrinaMatches,
+      totalBikerBikerMatches,
+      fakeBikersWithoutMoto: fakeBikersWithoutMoto.length,
+      lastCycle,
+    });
+  } catch (error) {
+    console.error("Matching stats error:", error);
+    return res.status(500).json({ message: "Errore durante il recupero delle statistiche" });
   }
 });
 

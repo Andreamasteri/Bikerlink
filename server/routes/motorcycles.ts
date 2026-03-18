@@ -45,8 +45,8 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Utente non trovato" });
     }
 
-    if (user.userType !== "biker" && user.userType !== "coppia") {
-      return res.status(403).json({ message: "Solo biker e coppie possono aggiungere moto" });
+    if (user.userType !== "biker" && user.userType !== "coppia" && user.userType !== "admin") {
+      return res.status(403).json({ message: "Solo biker, coppie e admin possono aggiungere moto" });
     }
 
     const { brand, model, year, displacement, motorcycleType, ridingStyle, photoUrl, isForSale, saleDescription, isDefault } = req.body;

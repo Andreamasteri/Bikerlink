@@ -1300,7 +1300,7 @@ export class DatabaseStorage implements IStorage {
       userId: userMotorcycles.userId,
     }).from(userMotorcycles)
       .innerJoin(users, eq(users.id, userMotorcycles.userId))
-      .where(or(eq(users.userType, "biker"), eq(users.userType, "coppia")));
+      .where(or(eq(users.userType, "biker"), eq(users.userType, "coppia"), eq(users.userType, "admin")));
     return results;
   }
 

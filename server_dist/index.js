@@ -1487,7 +1487,7 @@ var init_storage = __esm({
         const results = await db.select({
           motorcycle: userMotorcycles,
           userId: userMotorcycles.userId
-        }).from(userMotorcycles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userMotorcycles.userId)).where((0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.userType, "biker"), (0, import_drizzle_orm2.eq)(users.userType, "coppia")));
+        }).from(userMotorcycles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userMotorcycles.userId)).where((0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.userType, "biker"), (0, import_drizzle_orm2.eq)(users.userType, "coppia"), (0, import_drizzle_orm2.eq)(users.userType, "admin")));
         return results;
       }
       async findExistingBikerZavarrinaMatch(bikerId, zavarrinaId, bikerMotorcycleId, wishlistMotoId) {
@@ -1665,12 +1665,12 @@ var init_storage = __esm({
       }
       async deleteAllFakeUsers() {
         const condition = (0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.isFake, true), import_drizzle_orm2.sql`${users.nickname} != 'BikerLink_Official'`);
-        const [{ count }] = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(users).where(condition);
-        console.log(`[Admin] deleteAllFakeUsers: trovati ${count} utenti fake da eliminare`);
-        if (count === 0) return 0;
+        const [{ count: count2 }] = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(users).where(condition);
+        console.log(`[Admin] deleteAllFakeUsers: trovati ${count2} utenti fake da eliminare`);
+        if (count2 === 0) return 0;
         await db.transaction(async (tx) => {
           await tx.delete(users).where(condition);
-          console.log(`[Admin] deleteAllFakeUsers: eliminati ${count} utenti fake`);
+          console.log(`[Admin] deleteAllFakeUsers: eliminati ${count2} utenti fake`);
           await tx.execute(import_drizzle_orm2.sql`
         DELETE FROM conversations
         WHERE id IN (
@@ -1695,7 +1695,7 @@ var init_storage = __esm({
           }
         });
         console.log(`[Admin] deleteAllFakeUsers: pulizia conversation orfane completata`);
-        return count;
+        return count2;
       }
       async toggleFakeZavorrineAvailability() {
         const globalToggle = await this.getAppSetting("fake_users_enabled");
@@ -4383,8 +4383,8 @@ router2.get("/online-count", requireAuth, async (req, res) => {
   try {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
     const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
-    const count = await storage.countOnlineUsers(fifteenMinutesAgo, countriesParam);
-    return res.json({ count });
+    const count2 = await storage.countOnlineUsers(fifteenMinutesAgo, countriesParam);
+    return res.json({ count: count2 });
   } catch (error) {
     console.error("Online count error:", error);
     return res.json({ count: 0 });
@@ -4393,8 +4393,8 @@ router2.get("/online-count", requireAuth, async (req, res) => {
 router2.get("/available-count", requireAuth, async (req, res) => {
   try {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
-    const count = await storage.countAvailableUsers(fifteenMinutesAgo);
-    return res.json({ count });
+    const count2 = await storage.countAvailableUsers(fifteenMinutesAgo);
+    return res.json({ count: count2 });
   } catch (error) {
     console.error("Available count error:", error);
     return res.json({ count: 0 });
@@ -4498,8 +4498,8 @@ router2.get("/biker-available-count", requireAuth, async (req, res) => {
   try {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
     const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
-    const count = await storage.countAvailableBikers(fifteenMinutesAgo, countriesParam);
-    return res.json({ count });
+    const count2 = await storage.countAvailableBikers(fifteenMinutesAgo, countriesParam);
+    return res.json({ count: count2 });
   } catch (error) {
     console.error("Biker available count error:", error);
     return res.json({ count: 0 });
@@ -4509,8 +4509,8 @@ router2.get("/zavorrine-available-count", requireAuth, async (req, res) => {
   try {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
     const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
-    const count = await storage.countAvailableZavorrine(fifteenMinutesAgo, countriesParam);
-    return res.json({ count });
+    const count2 = await storage.countAvailableZavorrine(fifteenMinutesAgo, countriesParam);
+    return res.json({ count: count2 });
   } catch (error) {
     console.error("Zavorrine available count error:", error);
     return res.json({ count: 0 });
@@ -4704,8 +4704,8 @@ router2.post("/me/photos", requireAuth, upload.single("photo"), async (req, res)
       return res.status(404).json({ message: "Utente non trovato" });
     }
     if (user.userType === "zavorrina") {
-      const count = await storage.getUserPhotoCount(userId);
-      if (count >= 3) {
+      const count2 = await storage.getUserPhotoCount(userId);
+      if (count2 >= 3) {
         if (req.file) {
           import_fs2.default.unlinkSync(req.file.path);
         }
@@ -5271,8 +5271,8 @@ router4.post("/", requireAuth3, async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "Utente non trovato" });
     }
-    if (user.userType !== "biker" && user.userType !== "coppia") {
-      return res.status(403).json({ message: "Solo biker e coppie possono aggiungere moto" });
+    if (user.userType !== "biker" && user.userType !== "coppia" && user.userType !== "admin") {
+      return res.status(403).json({ message: "Solo biker, coppie e admin possono aggiungere moto" });
     }
     const { brand, model, year, displacement, motorcycleType, ridingStyle, photoUrl, isForSale, saleDescription, isDefault } = req.body;
     if (!brand || !model) {
@@ -5404,8 +5404,8 @@ router4.post("/:id/photos", requireAuth3, async (req, res) => {
     if (!existing || existing.userId !== userId) {
       return res.status(403).json({ message: "Non autorizzato" });
     }
-    const count = await storage.getMotorcyclePhotoCount(motoId);
-    if (count >= 3) {
+    const count2 = await storage.getMotorcyclePhotoCount(motoId);
+    if (count2 >= 3) {
       return res.status(400).json({ message: "Massimo 3 foto per moto" });
     }
     const { imageBase64, filename } = req.body;
@@ -5421,7 +5421,7 @@ router4.post("/:id/photos", requireAuth3, async (req, res) => {
     const photo = await storage.addMotorcyclePhoto({
       motorcycleId: motoId,
       photoUrl,
-      sortOrder: count
+      sortOrder: count2
     });
     return res.status(201).json(photo);
   } catch (error) {
@@ -5752,8 +5752,8 @@ router5.post("/biker-matches/:id/reject", requireAuth4, async (req, res) => {
 router5.delete("/biker-matches/rejected", requireAuth4, async (req, res) => {
   try {
     const userId = req.session.userId;
-    const count = await storage.deleteRejectedBikerBikerMatches(userId);
-    return res.json({ deleted: count });
+    const count2 = await storage.deleteRejectedBikerBikerMatches(userId);
+    return res.json({ deleted: count2 });
   } catch (error) {
     console.error("Delete rejected biker-biker matches error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -5972,8 +5972,8 @@ router5.post("/:id/join", requireAuth4, async (req, res) => {
 router5.delete("/matches/rejected", requireAuth4, async (req, res) => {
   try {
     const userId = req.session.userId;
-    const count = await storage.deleteRejectedProposalMatches(userId);
-    return res.json({ deleted: count });
+    const count2 = await storage.deleteRejectedProposalMatches(userId);
+    return res.json({ deleted: count2 });
   } catch (error) {
     console.error("Delete rejected proposal matches error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -5993,8 +5993,8 @@ router5.delete("/matches/:matchId", requireAuth4, async (req, res) => {
 router5.delete("/garage-matches/rejected", requireAuth4, async (req, res) => {
   try {
     const userId = req.session.userId;
-    const count = await storage.deleteRejectedGarageMatches(userId);
-    return res.json({ deleted: count });
+    const count2 = await storage.deleteRejectedGarageMatches(userId);
+    return res.json({ deleted: count2 });
   } catch (error) {
     console.error("Delete rejected garage matches error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -6301,8 +6301,8 @@ router7.post("/photos", requireAuth6, async (req, res) => {
     if (!wishlist) {
       wishlist = await storage.createOrUpdateWishlist(userId, "");
     }
-    const count = await storage.getWishlistPhotoCount(wishlist.id);
-    if (count >= 3) {
+    const count2 = await storage.getWishlistPhotoCount(wishlist.id);
+    if (count2 >= 3) {
       return res.status(400).json({ message: "Massimo 3 foto permesse" });
     }
     const { imageBase64, filename } = req.body;
@@ -6318,7 +6318,7 @@ router7.post("/photos", requireAuth6, async (req, res) => {
     const photo = await storage.addWishlistPhoto({
       wishlistId: wishlist.id,
       photoUrl,
-      sortOrder: count
+      sortOrder: count2
     });
     return res.status(201).json(photo);
   } catch (error) {
@@ -6343,8 +6343,8 @@ router7.post("/motos", requireAuth6, async (req, res) => {
     if (!wishlist) {
       wishlist = await storage.createOrUpdateWishlist(userId, "");
     }
-    const count = await storage.getWishlistMotoCount(wishlist.id);
-    if (count >= 5) {
+    const count2 = await storage.getWishlistMotoCount(wishlist.id);
+    if (count2 >= 5) {
       return res.status(400).json({ message: "Massimo 5 moto nella wishlist" });
     }
     const { brand, model, ridingStyle, motorcycleType } = req.body;
@@ -6921,8 +6921,8 @@ function isSenderZavorrina(ctx) {
   return ctx.senderUserType === "zavorrina_f" || ctx.senderUserType === "zavorrina_m";
 }
 function getFakeBotReply(content, conversationId, ctx) {
-  const count = fakeBotMessageCounts.get(conversationId) || 0;
-  fakeBotMessageCounts.set(conversationId, count + 1);
+  const count2 = fakeBotMessageCounts.get(conversationId) || 0;
+  fakeBotMessageCounts.set(conversationId, count2 + 1);
   const lower = content.toLowerCase().trim();
   const region = ctx.region || "zona mia";
   const bike = ctx.brand && ctx.model ? `${ctx.brand} ${ctx.model}` : "";
@@ -6957,7 +6957,7 @@ function getFakeBotReply(content, conversationId, ctx) {
     ];
     return pick(vulgarReplies);
   }
-  if (count === 0 && isGreeting) {
+  if (count2 === 0 && isGreeting) {
     if (isZav && senderIsBiker) {
       reply = pick([
         `Ciao! Di dove sei? Io ${region}`,
@@ -6986,7 +6986,7 @@ function getFakeBotReply(content, conversationId, ctx) {
         "Ciao! Come stai?"
       ]);
     }
-  } else if (count === 0) {
+  } else if (count2 === 0) {
     reply = pick([
       "Ehi ciao, piacere",
       `Ciao! Io sono di ${region}`,
@@ -7000,7 +7000,7 @@ function getFakeBotReply(content, conversationId, ctx) {
       "No niente, lascia stare",
       "Haha scusa, dicevo altro"
     ]);
-  } else if (isShort && !isGreeting && !isPushing && !isMotoTalk && count > 0) {
+  } else if (isShort && !isGreeting && !isPushing && !isMotoTalk && count2 > 0) {
     reply = pick([
       "In che senso?",
       "Dimmi",
@@ -7017,7 +7017,7 @@ function getFakeBotReply(content, conversationId, ctx) {
       "No no non si paga niente",
       "Gratis gratis, stai tranquillo"
     ]);
-  } else if (isPushing && count >= 5) {
+  } else if (isPushing && count2 >= 5) {
     if (isZav) {
       reply = pick([
         "Guarda appena mi organizzo ti scrivo io",
@@ -7085,7 +7085,7 @@ function getFakeBotReply(content, conversationId, ctx) {
         bike ? `Con la ${bike} ho girato mezza Italia` : "Ho girato mezza Italia in moto"
       ]);
     }
-  } else if (isCompliment && count > 0) {
+  } else if (isCompliment && count2 > 0) {
     if (isZav) {
       reply = pick([
         "Ahah grazie, sei gentile",
@@ -7120,7 +7120,7 @@ function getFakeBotReply(content, conversationId, ctx) {
       `${region}. Ci sono delle strade bellissime da queste parti`
     ]);
   } else {
-    if (isZav && senderIsBiker && count < 4) {
+    if (isZav && senderIsBiker && count2 < 4) {
       reply = pick([
         "Tu che moto hai? Sono curiosa",
         "Da quanto tempo guidi?",
@@ -7129,7 +7129,7 @@ function getFakeBotReply(content, conversationId, ctx) {
         "Ma tu giri da solo o con un gruppo?",
         "Che tipo di strade ti piacciono di pi\xF9?"
       ]);
-    } else if (isBik && senderIsZav && count < 4) {
+    } else if (isBik && senderIsZav && count2 < 4) {
       reply = pick([
         "Sei mai salita in moto?",
         `Di dove sei? Io sono di ${region}`,
@@ -7137,7 +7137,7 @@ function getFakeBotReply(content, conversationId, ctx) {
         bike ? `Se vuoi un giorno ti faccio fare un giro sulla ${bike}` : "Se vuoi un giorno ti faccio fare un giro",
         "Cosa ti ha fatto scaricare l'app?"
       ]);
-    } else if (isBik && senderIsBiker && count < 4) {
+    } else if (isBik && senderIsBiker && count2 < 4) {
       reply = pick([
         "Tu che giri fai di solito?",
         `Io di solito giro in ${region}`,
@@ -7830,6 +7830,309 @@ init_storage();
 init_db();
 init_schema();
 var import_drizzle_orm8 = require("drizzle-orm");
+init_mass_seed_data();
+
+// server/matching-engine.ts
+init_storage();
+function haversineDistance2(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+function timeRangesOverlap(from1, to1, from2, to2) {
+  if (!from1 || !to1 || !from2 || !to2) return true;
+  const f1 = new Date(from1).getTime();
+  const t1 = new Date(to1).getTime();
+  const f2 = new Date(from2).getTime();
+  const t2 = new Date(to2).getTime();
+  return f1 <= t2 && f2 <= t1;
+}
+function sameDay(d1, d2) {
+  if (!d1 || !d2) return true;
+  const a = new Date(d1);
+  const b = new Date(d2);
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+var MATCH_RULES = [
+  { searchType1: "find_a_friend", searchType2: "find_a_friend" },
+  { searchType1: "find_a_guest", searchType2: "find_a_biker" },
+  { searchType1: "hitcher", searchType2: "hitchhiker" },
+  { searchType1: "find_a_guest", searchType2: "hitchhiker" },
+  { searchType1: "hitcher", searchType2: "find_a_biker" }
+];
+function areCompatible(p1, p2) {
+  if (!p1.searchType || !p2.searchType) return false;
+  if (p1.userId === p2.userId) return false;
+  const ruleMatch = MATCH_RULES.some(
+    (r) => r.searchType1 === p1.searchType && r.searchType2 === p2.searchType || r.searchType1 === p2.searchType && r.searchType2 === p1.searchType
+  );
+  if (!ruleMatch) return false;
+  if (!p1.departureLatitude || !p1.departureLongitude || !p2.departureLatitude || !p2.departureLongitude) return false;
+  const distance = haversineDistance2(
+    p1.departureLatitude,
+    p1.departureLongitude,
+    p2.departureLatitude,
+    p2.departureLongitude
+  );
+  const radius1 = p1.searchRadius || 50;
+  const radius2 = p2.searchRadius || 50;
+  const maxAllowedDistance = Math.min(radius1, radius2);
+  if (distance > maxAllowedDistance) return false;
+  const date1 = p1.scheduledAt || p1.departureTimeFrom;
+  const date2 = p2.scheduledAt || p2.departureTimeFrom;
+  if (!sameDay(date1, date2)) return false;
+  if (!timeRangesOverlap(p1.departureTimeFrom, p1.departureTimeTo, p2.departureTimeFrom, p2.departureTimeTo)) return false;
+  return true;
+}
+async function runMatching() {
+  try {
+    const activeProposals = await storage.getActiveProposalsWithLocation();
+    if (activeProposals.length < 2) return 0;
+    const existingKeys = await storage.getAllExistingProposalMatchKeys();
+    let matchCount = 0;
+    for (let i = 0; i < activeProposals.length; i++) {
+      for (let j = i + 1; j < activeProposals.length; j++) {
+        const p1 = activeProposals[i];
+        const p2 = activeProposals[j];
+        if (!areCompatible(p1, p2)) continue;
+        if (existingKeys.has(`${p1.id}:${p2.id}`)) continue;
+        await storage.createProposalMatch({
+          proposalId1: p1.id,
+          proposalId2: p2.id,
+          userId1: p1.userId,
+          userId2: p2.userId,
+          status: "pending",
+          acceptedByUser1: false,
+          acceptedByUser2: false
+        });
+        existingKeys.add(`${p1.id}:${p2.id}`);
+        existingKeys.add(`${p2.id}:${p1.id}`);
+        matchCount++;
+      }
+    }
+    return matchCount;
+  } catch (error) {
+    console.error("Matching engine error:", error);
+    return 0;
+  }
+}
+async function runWishlistMatching() {
+  try {
+    const wishlistMotos = await storage.getAllWishlistMotosWithUsers();
+    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
+    console.log(`[WishlistMatching] wishlist entries: ${wishlistMotos.length}, biker motorcycles: ${bikerMotorcycles.length}`);
+    if (wishlistMotos.length === 0 || bikerMotorcycles.length === 0) {
+      if (wishlistMotos.length === 0) console.warn("[WishlistMatching] WARN: nessuna wishlist trovata");
+      if (bikerMotorcycles.length === 0) console.warn("[WishlistMatching] WARN: nessuna moto biker trovata \u2014 eseguire /api/admin/reconcile-fake-moto");
+      return 0;
+    }
+    const existingKeys = await storage.getAllExistingBikerZavarrinaMatchKeys();
+    let matchCount = 0;
+    let skipCount = 0;
+    const MAX_MATCHES_PER_RUN = 500;
+    outer:
+      for (const wm of wishlistMotos) {
+        const zavarrinaId = wm.userId;
+        const wish = wm.wishlistMoto;
+        for (const bm of bikerMotorcycles) {
+          if (matchCount >= MAX_MATCHES_PER_RUN) break outer;
+          const bikerId = bm.userId;
+          const moto = bm.motorcycle;
+          if (bikerId === zavarrinaId) continue;
+          let compatible = false;
+          if (wish.brand && wish.model) {
+            if (moto.brand && moto.model && wish.brand.toLowerCase() === moto.brand.toLowerCase() && (moto.model.toLowerCase().includes(wish.model.toLowerCase()) || wish.model.toLowerCase().includes(moto.model.toLowerCase()))) {
+              compatible = true;
+            }
+          } else if (wish.brand) {
+            if (moto.brand && wish.brand.toLowerCase() === moto.brand.toLowerCase()) {
+              compatible = true;
+            }
+          } else if (wish.motorcycleType) {
+            if (moto.motorcycleType && wish.motorcycleType.toLowerCase() === moto.motorcycleType.toLowerCase()) {
+              compatible = true;
+            }
+          }
+          if (!compatible) continue;
+          const key = `${bikerId}:${zavarrinaId}:${moto.id}:${wish.id}`;
+          if (existingKeys.has(key)) {
+            skipCount++;
+            continue;
+          }
+          await storage.createMatch({
+            bikerId,
+            zavarrinaId,
+            bikerMotorcycleId: moto.id,
+            wishlistMotoId: wish.id,
+            status: "new"
+          });
+          existingKeys.add(key);
+          matchCount++;
+        }
+      }
+    console.log(`[WishlistMatching] nuovi match: ${matchCount}, saltati (gi\xE0 esistenti): ${skipCount}`);
+    if (matchCount >= MAX_MATCHES_PER_RUN) {
+      console.log(`[WishlistMatching] Cap raggiunto (${MAX_MATCHES_PER_RUN} match/ciclo). Riprender\xE0 al prossimo run.`);
+    }
+    return matchCount;
+  } catch (error) {
+    console.error("Wishlist matching error:", error);
+    return 0;
+  }
+}
+async function runBikerBikerMatching() {
+  try {
+    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
+    console.log(`[BikerBikerMatching] moto biker trovate: ${bikerMotorcycles.length}`);
+    if (bikerMotorcycles.length < 2) {
+      console.warn("[BikerBikerMatching] WARN: meno di 2 moto biker trovate, matching impossibile");
+      return 0;
+    }
+    const buckets = /* @__PURE__ */ new Map();
+    for (const bm of bikerMotorcycles) {
+      if (!bm.motorcycle.brand || !bm.motorcycle.model) continue;
+      const key = `${bm.motorcycle.brand.toLowerCase()}|${bm.motorcycle.model.toLowerCase()}`;
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push({ userId: bm.userId, brand: bm.motorcycle.brand, model: bm.motorcycle.model });
+    }
+    console.log(`[BikerBikerMatching] bucket creati: ${buckets.size}`);
+    let matchCount = 0;
+    let skipCount = 0;
+    const MAX_MATCHES_PER_RUN = 200;
+    const shuffledBuckets = [...buckets.values()].sort(() => Math.random() - 0.5);
+    for (const members of shuffledBuckets) {
+      if (members.length < 2) continue;
+      const uniqueMembers = members.filter((m, idx) => members.findIndex((x) => x.userId === m.userId) === idx).sort(() => Math.random() - 0.5);
+      if (uniqueMembers.length < 2) continue;
+      for (let i = 0; i < uniqueMembers.length && matchCount < MAX_MATCHES_PER_RUN; i++) {
+        for (let j = i + 1; j < uniqueMembers.length && matchCount < MAX_MATCHES_PER_RUN; j++) {
+          const m1 = uniqueMembers[i];
+          const m2 = uniqueMembers[j];
+          const idA = m1.userId < m2.userId ? m1.userId : m2.userId;
+          const idB = m1.userId < m2.userId ? m2.userId : m1.userId;
+          const inserted = await storage.createBikerBikerMatch({
+            biker1Id: idA,
+            biker2Id: idB,
+            motorcycleBrand: m1.brand,
+            motorcycleModel: m1.model,
+            status: "new"
+          });
+          if (inserted) matchCount++;
+          else skipCount++;
+        }
+      }
+      if (matchCount >= MAX_MATCHES_PER_RUN) break;
+    }
+    console.log(`[BikerBikerMatching] nuovi match: ${matchCount}, saltati (gi\xE0 esistenti): ${skipCount}`);
+    return matchCount;
+  } catch (error) {
+    console.error("Biker-biker matching error:", error);
+    return 0;
+  }
+}
+async function runCleanup() {
+  try {
+    return await storage.expireOldProposals();
+  } catch (error) {
+    console.error("Cleanup error:", error);
+    return 0;
+  }
+}
+async function runFakeZavorrineRotation() {
+  try {
+    await storage.toggleFakeZavorrineAvailability();
+  } catch (error) {
+    console.error("Fake zavorrine rotation error:", error);
+  }
+}
+var BASE_INTERVAL_MS = 60 * 1e3;
+var MAX_INTERVAL_MS = 16 * 60 * 1e3;
+var LOAD_THRESHOLD = 0.85;
+var currentIntervalMs = BASE_INTERVAL_MS;
+var adminNotifiedAt = 0;
+var lastCycleMeta = null;
+function getLastMatchingCycleMeta() {
+  return lastCycleMeta;
+}
+async function notifyAdminOverload(intervalSec, cycleDurationSec) {
+  const now = Date.now();
+  if (now - adminNotifiedAt < 30 * 60 * 1e3) return;
+  try {
+    const adminUser = await storage.getUserByNickname("admin");
+    if (!adminUser) return;
+    await storage.createNotification({
+      userId: adminUser.id,
+      title: "Matching Engine sotto carico",
+      body: `Il ciclo di matching ha impiegato ${cycleDurationSec.toFixed(1)}s. L'intervallo \xE8 stato raddoppiato a ${intervalSec}s. \xC8 tempo di implementare una soluzione per i troppi calcoli!`,
+      notificationType: "system",
+      referenceType: "system",
+      referenceId: "matching-engine"
+    });
+    adminNotifiedAt = now;
+    console.warn(`[Matching] Notifica inviata all'admin: intervallo raddoppiato a ${intervalSec}s`);
+  } catch (err) {
+    console.error("[Matching] Errore invio notifica admin:", err);
+  }
+}
+function startMatchingEngine() {
+  console.log(`Matching engine started (${currentIntervalMs / 1e3}s interval)`);
+  const run = async () => {
+    const cycleStart = Date.now();
+    const expired = await runCleanup();
+    if (expired > 0) console.log(`Expired ${expired} proposals`);
+    try {
+      const deleted = await storage.deleteExpiredProposals();
+      if (deleted > 0) console.log(`Deleted ${deleted} expired proposals`);
+    } catch (err) {
+      console.error("Error deleting expired proposals:", err);
+    }
+    const autoMatchSetting = await storage.getAppSetting("auto_matching_enabled");
+    const autoMatchEnabled = autoMatchSetting?.value !== "false";
+    let garageMatches = 0;
+    let bikerBikerMatchCount = 0;
+    if (autoMatchEnabled) {
+      const matches = await runMatching();
+      if (matches > 0) console.log(`Found ${matches} new proposal matches`);
+      garageMatches = await runWishlistMatching();
+      if (garageMatches > 0) console.log(`Found ${garageMatches} new garage matches`);
+      bikerBikerMatchCount = await runBikerBikerMatching();
+      if (bikerBikerMatchCount > 0) console.log(`Found ${bikerBikerMatchCount} new biker-biker matches`);
+    } else {
+      console.log("Auto matching disabled by admin, skipping");
+    }
+    const cycleDuration = Date.now() - cycleStart;
+    lastCycleMeta = {
+      completedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      durationMs: cycleDuration,
+      zavarrinaMatchesNew: garageMatches,
+      bikerBikerMatchesNew: bikerBikerMatchCount
+    };
+    const loadRatio = cycleDuration / currentIntervalMs;
+    console.log(`[Matching] Ciclo completato in ${(cycleDuration / 1e3).toFixed(1)}s (${(loadRatio * 100).toFixed(0)}% dell'intervallo di ${currentIntervalMs / 1e3}s)`);
+    if (loadRatio > LOAD_THRESHOLD && currentIntervalMs < MAX_INTERVAL_MS) {
+      const oldInterval = currentIntervalMs;
+      currentIntervalMs = Math.min(currentIntervalMs * 2, MAX_INTERVAL_MS);
+      console.warn(`[Matching] CARICO ELEVATO: ciclo ${(cycleDuration / 1e3).toFixed(1)}s > 85% di ${oldInterval / 1e3}s. Intervallo raddoppiato a ${currentIntervalMs / 1e3}s`);
+      await notifyAdminOverload(currentIntervalMs / 1e3, cycleDuration / 1e3);
+    } else if (loadRatio < 0.3 && currentIntervalMs > BASE_INTERVAL_MS) {
+      currentIntervalMs = Math.max(currentIntervalMs / 2, BASE_INTERVAL_MS);
+      console.log(`[Matching] Carico basso: intervallo ridotto a ${currentIntervalMs / 1e3}s`);
+    }
+    scheduleNext();
+  };
+  const scheduleNext = () => {
+    setTimeout(run, currentIntervalMs);
+  };
+  run();
+  runFakeZavorrineRotation();
+  setInterval(runFakeZavorrineRotation, 5 * 60 * 1e3);
+  console.log("Fake zavorrine availability rotation started (5min interval)");
+}
+
+// server/routes/admin.ts
 var router17 = (0, import_express17.Router)();
 function requireAdmin(req, res, next) {
   if (!req.session.userId) {
@@ -8131,13 +8434,13 @@ router17.post("/easter-eggs", async (req, res) => {
 });
 router17.post("/easter-eggs/batch", async (req, res) => {
   try {
-    const count = parseInt(req.body.count) || 10;
+    const count2 = parseInt(req.body.count) || 10;
     const radius = parseInt(req.body.radius) || 30;
     const points = parseInt(req.body.points) || 10;
     const existing = await storage.getEasterEggs();
     const startNum = existing.length + 1;
     const created = [];
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < count2; i++) {
       const lat = 36 + Math.random() * 11;
       const lng = 6.5 + Math.random() * 12;
       const egg = await storage.createEasterEgg({
@@ -8155,7 +8458,7 @@ router17.post("/easter-eggs/batch", async (req, res) => {
       action: "batch_create_easter_eggs",
       targetType: "easter_egg",
       targetId: "",
-      details: `${count} Easter Egg creati in batch`
+      details: `${count2} Easter Egg creati in batch`
     });
     return res.status(201).json(created);
   } catch (error) {
@@ -8208,8 +8511,8 @@ router17.get("/easter-eggs/:id/stats", async (req, res) => {
     }
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { collectedEasterEggs: collectedEasterEggs2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq9, count } = await import("drizzle-orm");
-    const [result] = await db2.select({ count: count() }).from(collectedEasterEggs2).where(eq9(collectedEasterEggs2.easterEggId, id));
+    const { eq: eq9, count: count2 } = await import("drizzle-orm");
+    const [result] = await db2.select({ count: count2() }).from(collectedEasterEggs2).where(eq9(collectedEasterEggs2.easterEggId, id));
     return res.json({ eggId: id, collectionsCount: result?.count || 0 });
   } catch (error) {
     console.error("Admin get easter egg stats error:", error);
@@ -8220,10 +8523,10 @@ router17.get("/easter-eggs-stats", async (_req, res) => {
   try {
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { collectedEasterEggs: collectedEasterEggs2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { count, sql: sql8 } = await import("drizzle-orm");
+    const { count: count2, sql: sql8 } = await import("drizzle-orm");
     const rows = await db2.select({
       easterEggId: collectedEasterEggs2.easterEggId,
-      collectionsCount: count()
+      collectionsCount: count2()
     }).from(collectedEasterEggs2).groupBy(collectedEasterEggs2.easterEggId);
     const statsMap = {};
     rows.forEach((r) => {
@@ -8382,8 +8685,8 @@ router17.get("/analytics/export-csv", async (_req, res) => {
     for (const contact of workshopContacts2) {
       contactsByWorkshop[contact.workshopId] = (contactsByWorkshop[contact.workshopId] || 0) + 1;
     }
-    for (const [workshopId, count] of Object.entries(contactsByWorkshop)) {
-      csv += `Officina,${workshopId},,${count},,Ultimo mese
+    for (const [workshopId, count2] of Object.entries(contactsByWorkshop)) {
+      csv += `Officina,${workshopId},,${count2},,Ultimo mese
 `;
     }
     res.setHeader("Content-Type", "text/csv");
@@ -9292,17 +9595,17 @@ router17.put("/fake-users/toggle-all", async (req, res) => {
 router17.delete("/fake-users", async (req, res) => {
   console.log("[Admin] DELETE /fake-users ricevuto");
   try {
-    const count = await storage.deleteAllFakeUsers();
+    const count2 = await storage.deleteAllFakeUsers();
     await storage.upsertAppSetting("skip_fake_user_seed", "true");
     await storage.createModeratorLog({
       moderatorId: req.session.userId,
       action: "delete_all_fake_users",
       targetType: "user",
       targetId: "",
-      details: `Eliminati tutti gli utenti fake (${count})`
+      details: `Eliminati tutti gli utenti fake (${count2})`
     });
-    console.log(`[Admin] DELETE /fake-users completato: ${count} eliminati`);
-    return res.json({ message: `${count} utenti fake eliminati`, count });
+    console.log(`[Admin] DELETE /fake-users completato: ${count2} eliminati`);
+    return res.json({ message: `${count2} utenti fake eliminati`, count: count2 });
   } catch (error) {
     console.error("[Admin] DELETE /fake-users ERRORE:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -9913,6 +10216,93 @@ router17.put("/backup/schedule", async (req, res) => {
   } catch (error) {
     console.error("Admin backup schedule error:", error);
     return res.status(500).json({ message: error.message || "Errore durante la configurazione del backup" });
+  }
+});
+router17.post("/reconcile-fake-moto", async (req, res) => {
+  try {
+    const fakeUsersWithoutMoto = await db.select({ id: users.id }).from(users).where(
+      (0, import_drizzle_orm8.and)(
+        (0, import_drizzle_orm8.eq)(users.isFake, true),
+        import_drizzle_orm8.sql`${users.userType} IN ('biker', 'coppia')`,
+        (0, import_drizzle_orm8.notExists)(
+          db.select({ id: userMotorcycles.id }).from(userMotorcycles).where((0, import_drizzle_orm8.eq)(userMotorcycles.userId, users.id))
+        )
+      )
+    );
+    if (fakeUsersWithoutMoto.length === 0) {
+      return res.json({ reconciled: 0, message: "Tutti i fake biker hanno gi\xE0 moto nel garage" });
+    }
+    let reconciledCount = 0;
+    const BATCH_SIZE2 = 50;
+    for (let i = 0; i < fakeUsersWithoutMoto.length; i += BATCH_SIZE2) {
+      const batch = fakeUsersWithoutMoto.slice(i, i + BATCH_SIZE2);
+      const motoRows = [];
+      for (const u of batch) {
+        const motos = pickRandomN(MOTORCYCLES, 2 + Math.floor(Math.random() * 2));
+        for (const moto of motos) {
+          motoRows.push({
+            userId: u.id,
+            brand: moto.brand,
+            model: moto.model,
+            year: getMotoYear(),
+            displacement: moto.displacement,
+            motorcycleType: moto.type,
+            ridingStyle: moto.style
+          });
+        }
+        reconciledCount++;
+      }
+      if (motoRows.length > 0) {
+        await db.insert(userMotorcycles).values(motoRows).onConflictDoNothing();
+      }
+    }
+    console.log(`[ReconcileFakeMoto] Riconciliati ${reconciledCount} utenti fake senza moto`);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId,
+      action: "reconcile_fake_moto",
+      targetType: "system",
+      targetId: "matching",
+      details: `Inserite moto per ${reconciledCount} fake biker senza garage`
+    });
+    return res.json({
+      reconciled: reconciledCount,
+      message: `Inserite moto per ${reconciledCount} fake biker che non avevano moto nel garage`
+    });
+  } catch (error) {
+    console.error("Reconcile fake moto error:", error);
+    return res.status(500).json({ message: "Errore durante il reconcile" });
+  }
+});
+router17.get("/matching-stats", async (_req, res) => {
+  try {
+    const [totalMotoResult, zavarrinaMatchResult, bikerBikerMatchResult] = await Promise.all([
+      db.select({ count: (0, import_drizzle_orm8.count)() }).from(userMotorcycles),
+      db.select({ count: (0, import_drizzle_orm8.count)() }).from(bikerZavarrinaMatches),
+      db.select({ count: (0, import_drizzle_orm8.count)() }).from(bikerBikerMatches)
+    ]);
+    const totalMotorcycles = Number(totalMotoResult[0]?.count ?? 0);
+    const totalZavarrinaMatches = Number(zavarrinaMatchResult[0]?.count ?? 0);
+    const totalBikerBikerMatches = Number(bikerBikerMatchResult[0]?.count ?? 0);
+    const fakeBikersWithoutMoto = await db.select({ id: users.id }).from(users).where(
+      (0, import_drizzle_orm8.and)(
+        (0, import_drizzle_orm8.eq)(users.isFake, true),
+        import_drizzle_orm8.sql`${users.userType} IN ('biker', 'coppia')`,
+        (0, import_drizzle_orm8.notExists)(
+          db.select({ id: userMotorcycles.id }).from(userMotorcycles).where((0, import_drizzle_orm8.eq)(userMotorcycles.userId, users.id))
+        )
+      )
+    );
+    const lastCycle = getLastMatchingCycleMeta();
+    return res.json({
+      totalMotorcycles,
+      totalZavarrinaMatches,
+      totalBikerBikerMatches,
+      fakeBikersWithoutMoto: fakeBikersWithoutMoto.length,
+      lastCycle
+    });
+  } catch (error) {
+    console.error("Matching stats error:", error);
+    return res.status(500).json({ message: "Errore durante il recupero delle statistiche" });
   }
 });
 var admin_default = router17;
@@ -10804,276 +11194,6 @@ async function registerRoutes(app2) {
   }).catch(() => {
   });
   return httpServer;
-}
-
-// server/matching-engine.ts
-init_storage();
-function haversineDistance2(lat1, lng1, lat2, lng2) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-function timeRangesOverlap(from1, to1, from2, to2) {
-  if (!from1 || !to1 || !from2 || !to2) return true;
-  const f1 = new Date(from1).getTime();
-  const t1 = new Date(to1).getTime();
-  const f2 = new Date(from2).getTime();
-  const t2 = new Date(to2).getTime();
-  return f1 <= t2 && f2 <= t1;
-}
-function sameDay(d1, d2) {
-  if (!d1 || !d2) return true;
-  const a = new Date(d1);
-  const b = new Date(d2);
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-var MATCH_RULES = [
-  { searchType1: "find_a_friend", searchType2: "find_a_friend" },
-  { searchType1: "find_a_guest", searchType2: "find_a_biker" },
-  { searchType1: "hitcher", searchType2: "hitchhiker" },
-  { searchType1: "find_a_guest", searchType2: "hitchhiker" },
-  { searchType1: "hitcher", searchType2: "find_a_biker" }
-];
-function areCompatible(p1, p2) {
-  if (!p1.searchType || !p2.searchType) return false;
-  if (p1.userId === p2.userId) return false;
-  const ruleMatch = MATCH_RULES.some(
-    (r) => r.searchType1 === p1.searchType && r.searchType2 === p2.searchType || r.searchType1 === p2.searchType && r.searchType2 === p1.searchType
-  );
-  if (!ruleMatch) return false;
-  if (!p1.departureLatitude || !p1.departureLongitude || !p2.departureLatitude || !p2.departureLongitude) return false;
-  const distance = haversineDistance2(
-    p1.departureLatitude,
-    p1.departureLongitude,
-    p2.departureLatitude,
-    p2.departureLongitude
-  );
-  const radius1 = p1.searchRadius || 50;
-  const radius2 = p2.searchRadius || 50;
-  const maxAllowedDistance = Math.min(radius1, radius2);
-  if (distance > maxAllowedDistance) return false;
-  const date1 = p1.scheduledAt || p1.departureTimeFrom;
-  const date2 = p2.scheduledAt || p2.departureTimeFrom;
-  if (!sameDay(date1, date2)) return false;
-  if (!timeRangesOverlap(p1.departureTimeFrom, p1.departureTimeTo, p2.departureTimeFrom, p2.departureTimeTo)) return false;
-  return true;
-}
-async function runMatching() {
-  try {
-    const activeProposals = await storage.getActiveProposalsWithLocation();
-    if (activeProposals.length < 2) return 0;
-    const existingKeys = await storage.getAllExistingProposalMatchKeys();
-    let matchCount = 0;
-    for (let i = 0; i < activeProposals.length; i++) {
-      for (let j = i + 1; j < activeProposals.length; j++) {
-        const p1 = activeProposals[i];
-        const p2 = activeProposals[j];
-        if (!areCompatible(p1, p2)) continue;
-        if (existingKeys.has(`${p1.id}:${p2.id}`)) continue;
-        await storage.createProposalMatch({
-          proposalId1: p1.id,
-          proposalId2: p2.id,
-          userId1: p1.userId,
-          userId2: p2.userId,
-          status: "pending",
-          acceptedByUser1: false,
-          acceptedByUser2: false
-        });
-        existingKeys.add(`${p1.id}:${p2.id}`);
-        existingKeys.add(`${p2.id}:${p1.id}`);
-        matchCount++;
-      }
-    }
-    return matchCount;
-  } catch (error) {
-    console.error("Matching engine error:", error);
-    return 0;
-  }
-}
-async function runWishlistMatching() {
-  try {
-    const wishlistMotos = await storage.getAllWishlistMotosWithUsers();
-    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
-    if (wishlistMotos.length === 0 || bikerMotorcycles.length === 0) return 0;
-    const existingKeys = await storage.getAllExistingBikerZavarrinaMatchKeys();
-    let matchCount = 0;
-    const MAX_MATCHES_PER_RUN = 500;
-    outer:
-      for (const wm of wishlistMotos) {
-        const zavarrinaId = wm.userId;
-        const wish = wm.wishlistMoto;
-        for (const bm of bikerMotorcycles) {
-          if (matchCount >= MAX_MATCHES_PER_RUN) break outer;
-          const bikerId = bm.userId;
-          const moto = bm.motorcycle;
-          if (bikerId === zavarrinaId) continue;
-          let compatible = false;
-          if (wish.brand && wish.model) {
-            if (moto.brand && moto.model && wish.brand.toLowerCase() === moto.brand.toLowerCase() && (moto.model.toLowerCase().includes(wish.model.toLowerCase()) || wish.model.toLowerCase().includes(moto.model.toLowerCase()))) {
-              compatible = true;
-            }
-          } else if (wish.brand) {
-            if (moto.brand && wish.brand.toLowerCase() === moto.brand.toLowerCase()) {
-              compatible = true;
-            }
-          } else if (wish.motorcycleType) {
-            if (moto.motorcycleType && wish.motorcycleType.toLowerCase() === moto.motorcycleType.toLowerCase()) {
-              compatible = true;
-            }
-          }
-          if (!compatible) continue;
-          const key = `${bikerId}:${zavarrinaId}:${moto.id}:${wish.id}`;
-          if (existingKeys.has(key)) continue;
-          await storage.createMatch({
-            bikerId,
-            zavarrinaId,
-            bikerMotorcycleId: moto.id,
-            wishlistMotoId: wish.id,
-            status: "new"
-          });
-          existingKeys.add(key);
-          matchCount++;
-        }
-      }
-    if (matchCount >= MAX_MATCHES_PER_RUN) {
-      console.log(`[Matching] Cap raggiunto (${MAX_MATCHES_PER_RUN} match/ciclo). Riprender\xE0 al prossimo run.`);
-    }
-    return matchCount;
-  } catch (error) {
-    console.error("Wishlist matching error:", error);
-    return 0;
-  }
-}
-async function runBikerBikerMatching() {
-  try {
-    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
-    if (bikerMotorcycles.length < 2) return 0;
-    const buckets = /* @__PURE__ */ new Map();
-    for (const bm of bikerMotorcycles) {
-      if (!bm.motorcycle.brand || !bm.motorcycle.model) continue;
-      const key = `${bm.motorcycle.brand.toLowerCase()}|${bm.motorcycle.model.toLowerCase()}`;
-      if (!buckets.has(key)) buckets.set(key, []);
-      buckets.get(key).push({ userId: bm.userId, brand: bm.motorcycle.brand, model: bm.motorcycle.model });
-    }
-    let matchCount = 0;
-    const MAX_MATCHES_PER_RUN = 200;
-    const shuffledBuckets = [...buckets.values()].sort(() => Math.random() - 0.5);
-    for (const members of shuffledBuckets) {
-      if (members.length < 2) continue;
-      const uniqueMembers = members.filter((m, idx) => members.findIndex((x) => x.userId === m.userId) === idx).sort(() => Math.random() - 0.5);
-      if (uniqueMembers.length < 2) continue;
-      for (let i = 0; i < uniqueMembers.length && matchCount < MAX_MATCHES_PER_RUN; i++) {
-        for (let j = i + 1; j < uniqueMembers.length && matchCount < MAX_MATCHES_PER_RUN; j++) {
-          const m1 = uniqueMembers[i];
-          const m2 = uniqueMembers[j];
-          const idA = m1.userId < m2.userId ? m1.userId : m2.userId;
-          const idB = m1.userId < m2.userId ? m2.userId : m1.userId;
-          const inserted = await storage.createBikerBikerMatch({
-            biker1Id: idA,
-            biker2Id: idB,
-            motorcycleBrand: m1.brand,
-            motorcycleModel: m1.model,
-            status: "new"
-          });
-          if (inserted) matchCount++;
-        }
-      }
-      if (matchCount >= MAX_MATCHES_PER_RUN) break;
-    }
-    return matchCount;
-  } catch (error) {
-    console.error("Biker-biker matching error:", error);
-    return 0;
-  }
-}
-async function runCleanup() {
-  try {
-    return await storage.expireOldProposals();
-  } catch (error) {
-    console.error("Cleanup error:", error);
-    return 0;
-  }
-}
-async function runFakeZavorrineRotation() {
-  try {
-    await storage.toggleFakeZavorrineAvailability();
-  } catch (error) {
-    console.error("Fake zavorrine rotation error:", error);
-  }
-}
-var BASE_INTERVAL_MS = 60 * 1e3;
-var MAX_INTERVAL_MS = 16 * 60 * 1e3;
-var LOAD_THRESHOLD = 0.85;
-var currentIntervalMs = BASE_INTERVAL_MS;
-var adminNotifiedAt = 0;
-async function notifyAdminOverload(intervalSec, cycleDurationSec) {
-  const now = Date.now();
-  if (now - adminNotifiedAt < 30 * 60 * 1e3) return;
-  try {
-    const adminUser = await storage.getUserByNickname("admin");
-    if (!adminUser) return;
-    await storage.createNotification({
-      userId: adminUser.id,
-      title: "Matching Engine sotto carico",
-      body: `Il ciclo di matching ha impiegato ${cycleDurationSec.toFixed(1)}s. L'intervallo \xE8 stato raddoppiato a ${intervalSec}s. \xC8 tempo di implementare una soluzione per i troppi calcoli!`,
-      notificationType: "system",
-      referenceType: "system",
-      referenceId: "matching-engine"
-    });
-    adminNotifiedAt = now;
-    console.warn(`[Matching] Notifica inviata all'admin: intervallo raddoppiato a ${intervalSec}s`);
-  } catch (err) {
-    console.error("[Matching] Errore invio notifica admin:", err);
-  }
-}
-function startMatchingEngine() {
-  console.log(`Matching engine started (${currentIntervalMs / 1e3}s interval)`);
-  const run = async () => {
-    const cycleStart = Date.now();
-    const expired = await runCleanup();
-    if (expired > 0) console.log(`Expired ${expired} proposals`);
-    try {
-      const deleted = await storage.deleteExpiredProposals();
-      if (deleted > 0) console.log(`Deleted ${deleted} expired proposals`);
-    } catch (err) {
-      console.error("Error deleting expired proposals:", err);
-    }
-    const autoMatchSetting = await storage.getAppSetting("auto_matching_enabled");
-    const autoMatchEnabled = autoMatchSetting?.value !== "false";
-    if (autoMatchEnabled) {
-      const matches = await runMatching();
-      if (matches > 0) console.log(`Found ${matches} new proposal matches`);
-      const garageMatches = await runWishlistMatching();
-      if (garageMatches > 0) console.log(`Found ${garageMatches} new garage matches`);
-      const bikerBikerMatchCount = await runBikerBikerMatching();
-      if (bikerBikerMatchCount > 0) console.log(`Found ${bikerBikerMatchCount} new biker-biker matches`);
-    } else {
-      console.log("Auto matching disabled by admin, skipping");
-    }
-    const cycleDuration = Date.now() - cycleStart;
-    const loadRatio = cycleDuration / currentIntervalMs;
-    console.log(`[Matching] Ciclo completato in ${(cycleDuration / 1e3).toFixed(1)}s (${(loadRatio * 100).toFixed(0)}% dell'intervallo di ${currentIntervalMs / 1e3}s)`);
-    if (loadRatio > LOAD_THRESHOLD && currentIntervalMs < MAX_INTERVAL_MS) {
-      const oldInterval = currentIntervalMs;
-      currentIntervalMs = Math.min(currentIntervalMs * 2, MAX_INTERVAL_MS);
-      console.warn(`[Matching] CARICO ELEVATO: ciclo ${(cycleDuration / 1e3).toFixed(1)}s > 85% di ${oldInterval / 1e3}s. Intervallo raddoppiato a ${currentIntervalMs / 1e3}s`);
-      await notifyAdminOverload(currentIntervalMs / 1e3, cycleDuration / 1e3);
-    } else if (loadRatio < 0.3 && currentIntervalMs > BASE_INTERVAL_MS) {
-      currentIntervalMs = Math.max(currentIntervalMs / 2, BASE_INTERVAL_MS);
-      console.log(`[Matching] Carico basso: intervallo ridotto a ${currentIntervalMs / 1e3}s`);
-    }
-    scheduleNext();
-  };
-  const scheduleNext = () => {
-    setTimeout(run, currentIntervalMs);
-  };
-  run();
-  runFakeZavorrineRotation();
-  setInterval(runFakeZavorrineRotation, 5 * 60 * 1e3);
-  console.log("Fake zavorrine availability rotation started (5min interval)");
 }
 
 // server/auto-seed.ts
