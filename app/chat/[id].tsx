@@ -10,6 +10,7 @@ import {
   Switch,
   Platform,
   Alert,
+  Modal,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -183,6 +184,7 @@ export default function ChatConversationScreen() {
   const [showHashtagPanel, setShowHashtagPanel] = useState(false);
   const [hashtagInput, setHashtagInput] = useState("");
   const [autoHashtag, setAutoHashtag] = useState(false);
+  const [showMembersPanel, setShowMembersPanel] = useState(false);
 
   const { data: conversations } = useQuery<ConversationDetail[]>({
     queryKey: ["/api/chat/conversations"],
@@ -332,6 +334,15 @@ export default function ChatConversationScreen() {
         </View>
         {isMotoclub && (
           <TouchableOpacity
+            onPress={() => setShowMembersPanel(true)}
+            style={styles.membersBtn}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="people-outline" size={20} color={Colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+        {isMotoclub && (
+          <TouchableOpacity
             onPress={() => setShowHashtagPanel((v) => !v)}
             style={[styles.hashtagBtn, showHashtagPanel && styles.hashtagBtnActive]}
             activeOpacity={0.7}
@@ -438,6 +449,49 @@ export default function ChatConversationScreen() {
           }
         />
       )}
+
+      <Modal
+        visible={showMembersPanel}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowMembersPanel(false)}
+      >
+        <View style={styles.membersOverlay}>
+          <TouchableOpacity
+            style={styles.membersBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowMembersPanel(false)}
+          />
+          <View style={styles.membersSheet}>
+            <View style={styles.membersHeader}>
+              <Text style={styles.membersTitle}>Iscritti</Text>
+              <TouchableOpacity onPress={() => setShowMembersPanel(false)} style={styles.membersCloseBtn}>
+                <Ionicons name="close" size={22} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={conversation?.participants ?? []}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.memberRow}>
+                  <View style={styles.memberAvatar}>
+                    <Text style={styles.memberAvatarText}>
+                      {item.nickname.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.memberInfo}>
+                    <Text style={styles.memberNickname}>{item.nickname}</Text>
+                    <Text style={styles.memberUserType}>{item.userType}</Text>
+                  </View>
+                </View>
+              )}
+              ItemSeparatorComponent={() => <View style={styles.memberSeparator} />}
+              contentContainerStyle={styles.membersList}
+              showsVerticalScrollIndicator={false}
+            />
+          </View>
+        </View>
+      </Modal>
 
       <View style={[styles.inputBar, { paddingBottom: Platform.OS === "web" ? 34 : Math.max(insets.bottom, 12) }]}>
         <TouchableOpacity onPress={handleSendLocation} style={styles.iconButton}>
@@ -734,5 +788,90 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: Colors.surfaceLight,
+  },
+  membersBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surfaceLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  membersOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  membersBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  membersSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "70%",
+    paddingBottom: Platform.OS === "web" ? 34 : 0,
+  },
+  membersHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    borderBottomWidth: 0.5,
+    borderBottomColor: Colors.border,
+  },
+  membersTitle: {
+    fontSize: 17,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+  },
+  membersCloseBtn: {
+    padding: 4,
+  },
+  membersList: {
+    paddingVertical: 8,
+  },
+  memberRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    gap: 12,
+  },
+  memberAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.accent + "33",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  memberAvatarText: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    color: Colors.accent,
+  },
+  memberInfo: {
+    flex: 1,
+  },
+  memberNickname: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
+  memberUserType: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  memberSeparator: {
+    height: 0.5,
+    backgroundColor: Colors.border,
+    marginLeft: 70,
   },
 });
