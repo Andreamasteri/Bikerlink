@@ -38,6 +38,7 @@ type DisplayMode = "banner" | "card" | "carousel";
 
 interface SynecoAdProps {
   displayMode?: DisplayMode;
+  queryKey?: string;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -134,9 +135,9 @@ function AdCardItem({ campaign, onPress }: { campaign: AdCampaign; onPress: () =
   );
 }
 
-export default function SynecoAd({ displayMode = "banner" }: SynecoAdProps) {
+export default function SynecoAd({ displayMode = "banner", queryKey = "/api/ads/active" }: SynecoAdProps) {
   const { data: campaigns } = useQuery<AdCampaign[]>({
-    queryKey: ["/api/ads/active"],
+    queryKey: [queryKey],
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });

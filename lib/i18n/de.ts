@@ -299,6 +299,7 @@ const de: Record<string, string> = {
   "match.tabZavorrine": "Sozias",
   "match.tabBiker": "Biker",
   "match.tabProposals": "Vorschläge",
+  "match.title": "Meine Matches",
   "match.systemDesc": "Das System findet automatisch Matches zwischen Bikern und Sozias anhand der Garage und Wunschliste, sowie zwischen Bikern mit demselben Motorrad.",
   "match.emptyZavorrinaTitle": "Keine Sozia-Matches",
   "match.emptyZavorrinaDesc": "Das System vergleicht Garage-Motorräder mit Sozia-Wunschlisten. Füge Motorräder zur Garage hinzu!",

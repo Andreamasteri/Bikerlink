@@ -19,6 +19,8 @@ import { queryClient, getApiUrl, apiRequest } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import { useT, useLocale } from "@/lib/language-context";
 
+import SynecoAd from "@/components/SynecoAd";
+
 const SEARCH_TYPE_I18N: Record<string, string> = {
   find_a_friend: "FindAFriend",
   find_a_guest: "proposals.searchType.findPassenger",
@@ -835,30 +837,35 @@ export default function MatchScreen() {
   };
 
   return (
-    <View style={[styles.container, Platform.OS === "web" && { paddingTop: insets.top + 67, paddingBottom: 34 }]}>
-      {hasRejected && (
-        <TouchableOpacity
-          style={styles.resetBtn}
-          onPress={handleResetRejected}
-          disabled={resetRejectedMutation.isPending}
-        >
-          {resetRejectedMutation.isPending ? (
-            <ActivityIndicator size="small" color={Colors.accentRed} />
-          ) : (
-            <>
-              <Ionicons name="refresh" size={13} color={Colors.accentRed} />
-              <Text style={styles.resetBtnText}>{t("match.resetRejected")}</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      )}
+    <View style={[styles.container, { paddingTop: Platform.OS === "web" ? insets.top + 67 : insets.top }, Platform.OS === "web" && { paddingBottom: 34 }]}>
+      <View style={styles.inlineHeader}>
+        <Text style={styles.inlineTitle}>{t("match.title")}</Text>
+        {hasRejected && (
+          <TouchableOpacity
+            style={styles.resetBtn}
+            onPress={handleResetRejected}
+            disabled={resetRejectedMutation.isPending}
+          >
+            {resetRejectedMutation.isPending ? (
+              <ActivityIndicator size="small" color={Colors.accentRed} />
+            ) : (
+              <>
+                <Ionicons name="refresh" size={13} color={Colors.accentRed} />
+                <Text style={styles.resetBtnText}>{t("match.resetRejected")}</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <SynecoAd displayMode="carousel" queryKey="/api/ads/placement/match" />
 
       <View style={styles.systemDescBanner}>
         <Ionicons name="information-circle" size={15} color={Colors.accent} />
         <Text style={styles.systemDescText}>{t("match.systemDesc")}</Text>
       </View>
 
-      <View style={styles.tabRow}>
+      <View style={[styles.tabRow, styles.tabRowSpaced]}>
         {tabs.map((tab) => (
           <TouchableOpacity
             key={tab.key}
@@ -917,6 +924,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  inlineHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "space-between" as const,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  inlineTitle: {
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+  },
   resetBtn: {
     flexDirection: "row" as const,
     height: 32,
@@ -928,10 +948,9 @@ const styles = StyleSheet.create({
     alignItems: "center" as const,
     paddingHorizontal: 12,
     gap: 4,
-    marginHorizontal: 12,
-    marginTop: 8,
-    marginBottom: 2,
-    alignSelf: "flex-start" as const,
+  },
+  tabRowSpaced: {
+    marginTop: 4,
   },
   resetBtnText: {
     fontSize: 11,

@@ -501,6 +501,7 @@ export const adCampaigns = pgTable("ad_campaigns", {
   rotationDuration: integer("rotation_duration").notNull().default(10),
   rotationMode: varchar("rotation_mode", { length: 20 }).notNull().default("sequential"),
   sortOrder: integer("sort_order").notNull().default(0),
+  placement: varchar("placement", { length: 30 }).notNull().default("all"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

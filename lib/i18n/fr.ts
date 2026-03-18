@@ -299,6 +299,7 @@ const fr: Record<string, string> = {
   "match.tabZavorrine": "Passagères",
   "match.tabBiker": "Bikers",
   "match.tabProposals": "Propositions",
+  "match.title": "Mes Matchs",
   "match.systemDesc": "Le système trouve automatiquement des matches entre bikers et passagères selon le garage et la liste de souhaits, et entre bikers avec la même moto.",
   "match.emptyZavorrinaTitle": "Aucun match passagère",
   "match.emptyZavorrinaDesc": "Le système croise les motos du garage avec les listes de souhaits des passagères. Ajoutez des motos au garage !",

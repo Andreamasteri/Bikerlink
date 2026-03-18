@@ -52,12 +52,45 @@ router.get("/my-ads", async (req: Request, res: Response) => {
     const activeCampaigns = campaigns.filter((c) => {
       if (c.startDate && new Date(c.startDate) > now) return false;
       if (c.endDate && new Date(c.endDate) < now) return false;
-      return true;
+      const p = c.placement || "all";
+      return p === "all" || p === "home";
     });
 
     return res.json(activeCampaigns);
   } catch (error) {
     console.error("Get my ads error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/placement/:placement", async (req: Request, res: Response) => {
+  try {
+    const adsSetting = await storage.getAppSetting("ads_enabled");
+    if (adsSetting?.value === "false") {
+      return res.json([]);
+    }
+
+    const { placement } = req.params;
+    const userId = req.session?.userId;
+    let userType = "biker";
+    if (userId) {
+      const user = await storage.getUser(userId);
+      if (user) userType = user.userType || "biker";
+    }
+
+    const campaigns = await storage.getActiveAdsByUserType(userType);
+
+    const now = new Date();
+    const activeCampaigns = campaigns.filter((c) => {
+      if (c.startDate && new Date(c.startDate) > now) return false;
+      if (c.endDate && new Date(c.endDate) < now) return false;
+      const cp = c.placement || "all";
+      return cp === placement || cp === "all";
+    });
+
+    return res.json(activeCampaigns);
+  } catch (error) {
+    console.error("Get placement ads error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

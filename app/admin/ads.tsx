@@ -35,6 +35,7 @@ interface Campaign {
   rotationDuration: number;
   rotationMode: string;
   sortOrder: number;
+  placement: string;
 }
 
 type TabKey = "biker" | "zavorrina" | "coppia";
@@ -45,20 +46,36 @@ const TABS: { key: TabKey; label: string; icon: string; iconSet: "material" | "c
   { key: "coppia", label: "Coppie", icon: "people", iconSet: "material", color: Colors.coupleIcon },
 ];
 
+const PLACEMENT_LABELS: Record<string, string> = {
+  all: "Tutti",
+  home: "Home",
+  match: "Match",
+};
+
+const PLACEMENT_CYCLE: Record<string, string> = {
+  all: "home",
+  home: "match",
+  match: "all",
+};
+
 function CampaignCard({
   item,
   onToggle,
   onDelete,
+  onUpdatePlacement,
 }: {
   item: Campaign;
   onToggle: (id: string, isActive: boolean) => void;
   onDelete: (item: Campaign) => void;
+  onUpdatePlacement: (id: string, placement: string) => void;
 }) {
   const imageUri = item.imageUrl
     ? item.imageUrl.startsWith("http")
       ? item.imageUrl
       : `${getApiUrl().replace(/\/$/, "")}${item.imageUrl}`
     : null;
+
+  const placement = item.placement || "all";
 
   return (
     <View style={styles.card}>
@@ -80,6 +97,14 @@ function CampaignCard({
                 {item.isActive ? "Attiva" : "Disattiva"}
               </Text>
             </View>
+            <TouchableOpacity
+              style={[styles.badge, { backgroundColor: Colors.accent + "22" }]}
+              onPress={() => onUpdatePlacement(item.id, PLACEMENT_CYCLE[placement] || "all")}
+            >
+              <Text style={[styles.badgeText, { color: Colors.accent }]}>
+                {PLACEMENT_LABELS[placement] || placement}
+              </Text>
+            </TouchableOpacity>
             <Text style={styles.cardImpressions}>{item.impressions} impressioni</Text>
           </View>
         </View>
@@ -107,6 +132,7 @@ export default function AdminAds() {
   const [formLinkUrl, setFormLinkUrl] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formImageUri, setFormImageUri] = useState<string | null>(null);
+  const [formPlacement, setFormPlacement] = useState<"all" | "home" | "match">("all");
 
   const [settingsDuration, setSettingsDuration] = useState("10");
   const [settingsMode, setSettingsMode] = useState<"sequential" | "random">("sequential");
@@ -179,11 +205,20 @@ export default function AdminAds() {
     },
   });
 
+  const updatePlacementMutation = useMutation({
+    mutationFn: async ({ id, placement }: { id: string; placement: string }) => {
+      const res = await apiRequest("PUT", `/api/admin/advertisements/${id}`, { placement });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] }),
+  });
+
   function resetForm() {
     setFormName("");
     setFormLinkUrl("");
     setFormDescription("");
     setFormImageUri(null);
+    setFormPlacement("all");
   }
 
   const pickImage = useCallback(() => {
@@ -201,6 +236,7 @@ export default function AdminAds() {
     const formData = new FormData();
     formData.append("name", formName.trim());
     formData.append("targetUserType", activeTab);
+    formData.append("placement", formPlacement);
     if (formLinkUrl.trim()) formData.append("linkUrl", formLinkUrl.trim());
     if (formDescription.trim()) formData.append("description", formDescription.trim());
 
@@ -301,6 +337,7 @@ export default function AdminAds() {
               item={item}
               onToggle={(id, isActive) => toggleMutation.mutate({ id, isActive })}
               onDelete={handleDelete}
+              onUpdatePlacement={(id, placement) => updatePlacementMutation.mutate({ id, placement })}
             />
           )}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 80 }}
@@ -367,6 +404,23 @@ export default function AdminAds() {
               multiline
               textAlignVertical="top"
             />
+
+            <Text style={styles.settingsLabel}>Posizionamento</Text>
+            <View style={styles.modeRow}>
+              {([
+                { key: "all", label: "Tutti" },
+                { key: "home", label: "Home page" },
+                { key: "match", label: "Nei Match" },
+              ] as const).map((opt) => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[styles.modeBtn, formPlacement === opt.key && { borderColor: currentTab.color, backgroundColor: currentTab.color + "22" }]}
+                  onPress={() => setFormPlacement(opt.key)}
+                >
+                  <Text style={[styles.modeBtnText, formPlacement === opt.key && { color: currentTab.color }]}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             <TouchableOpacity
               style={[styles.submitBtn, { backgroundColor: currentTab.color }, !formName.trim() && styles.submitBtnDisabled]}

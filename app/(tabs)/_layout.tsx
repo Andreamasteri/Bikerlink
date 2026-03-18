@@ -156,7 +156,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="flash" size={size} color={color} />
             ),
-            headerTitle: "I Miei Match",
+            headerShown: false,
             href: gpsTabHref,
           }}
         />

@@ -299,6 +299,7 @@ const en: Record<string, string> = {
   "match.tabZavorrine": "Pillions",
   "match.tabBiker": "Bikers",
   "match.tabProposals": "Proposals",
+  "match.title": "My Matches",
   "match.systemDesc": "The system automatically matches bikers and pillions based on garage and wishlist, and bikers sharing the same motorcycle.",
   "match.emptyZavorrinaTitle": "No pillion matches",
   "match.emptyZavorrinaDesc": "The system matches garage motorcycles with pillion wishlists. Add motorcycles to your garage to find matches!",

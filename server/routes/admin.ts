@@ -862,7 +862,7 @@ router.get("/advertisements", async (_req: Request, res: Response) => {
 
 router.post("/advertisements", adUpload.single("image"), async (req: Request, res: Response) => {
   try {
-    const { name, sponsor, linkUrl, description, targetUserType, rotationDuration, rotationMode, sortOrder, startDate, endDate } = req.body;
+    const { name, sponsor, linkUrl, description, targetUserType, rotationDuration, rotationMode, sortOrder, startDate, endDate, placement } = req.body;
     if (!name) {
       return res.status(400).json({ message: "Nome campagna obbligatorio" });
     }
@@ -880,6 +880,7 @@ router.post("/advertisements", adUpload.single("image"), async (req: Request, re
       sortOrder: sortOrder ? parseInt(sortOrder) : 0,
       startDate: startDate ? new Date(startDate) : null,
       endDate: endDate ? new Date(endDate) : null,
+      placement: placement || "all",
     });
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -910,6 +911,7 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
     if (req.body.sortOrder !== undefined) updates.sortOrder = parseInt(req.body.sortOrder);
     if (req.body.startDate !== undefined) updates.startDate = req.body.startDate ? new Date(req.body.startDate) : null;
     if (req.body.endDate !== undefined) updates.endDate = req.body.endDate ? new Date(req.body.endDate) : null;
+    if (req.body.placement !== undefined) updates.placement = req.body.placement;
     if (req.file) updates.imageUrl = `/uploads/ads/${req.file.filename}`;
     else if (req.body.imageUrl !== undefined) updates.imageUrl = req.body.imageUrl;
     const campaign = await storage.updateAdCampaign(id, updates);

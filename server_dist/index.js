@@ -436,6 +436,7 @@ var init_schema = __esm({
       rotationDuration: (0, import_pg_core.integer)("rotation_duration").notNull().default(10),
       rotationMode: (0, import_pg_core.varchar)("rotation_mode", { length: 20 }).notNull().default("sequential"),
       sortOrder: (0, import_pg_core.integer)("sort_order").notNull().default(0),
+      placement: (0, import_pg_core.varchar)("placement", { length: 30 }).notNull().default("all"),
       createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow()
     });
     adClicks = (0, import_pg_core.pgTable)("ad_clicks", {
@@ -6204,11 +6205,39 @@ router11.get("/my-ads", async (req, res) => {
     const activeCampaigns = campaigns.filter((c) => {
       if (c.startDate && new Date(c.startDate) > now) return false;
       if (c.endDate && new Date(c.endDate) < now) return false;
-      return true;
+      const p = c.placement || "all";
+      return p === "all" || p === "home";
     });
     return res.json(activeCampaigns);
   } catch (error) {
     console.error("Get my ads error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router11.get("/placement/:placement", async (req, res) => {
+  try {
+    const adsSetting = await storage.getAppSetting("ads_enabled");
+    if (adsSetting?.value === "false") {
+      return res.json([]);
+    }
+    const { placement } = req.params;
+    const userId = req.session?.userId;
+    let userType = "biker";
+    if (userId) {
+      const user = await storage.getUser(userId);
+      if (user) userType = user.userType || "biker";
+    }
+    const campaigns = await storage.getActiveAdsByUserType(userType);
+    const now = /* @__PURE__ */ new Date();
+    const activeCampaigns = campaigns.filter((c) => {
+      if (c.startDate && new Date(c.startDate) > now) return false;
+      if (c.endDate && new Date(c.endDate) < now) return false;
+      const cp = c.placement || "all";
+      return cp === placement || cp === "all";
+    });
+    return res.json(activeCampaigns);
+  } catch (error) {
+    console.error("Get placement ads error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -7927,7 +7956,7 @@ router17.get("/advertisements", async (_req, res) => {
 });
 router17.post("/advertisements", adUpload.single("image"), async (req, res) => {
   try {
-    const { name, sponsor, linkUrl, description, targetUserType, rotationDuration, rotationMode, sortOrder, startDate, endDate } = req.body;
+    const { name, sponsor, linkUrl, description, targetUserType, rotationDuration, rotationMode, sortOrder, startDate, endDate, placement } = req.body;
     if (!name) {
       return res.status(400).json({ message: "Nome campagna obbligatorio" });
     }
@@ -7944,7 +7973,8 @@ router17.post("/advertisements", adUpload.single("image"), async (req, res) => {
       rotationMode: rotationMode || "sequential",
       sortOrder: sortOrder ? parseInt(sortOrder) : 0,
       startDate: startDate ? new Date(startDate) : null,
-      endDate: endDate ? new Date(endDate) : null
+      endDate: endDate ? new Date(endDate) : null,
+      placement: placement || "all"
     });
     await storage.createModeratorLog({
       moderatorId: req.session.userId,
@@ -7974,6 +8004,7 @@ router17.put("/advertisements/:id", adUpload.single("image"), async (req, res) =
     if (req.body.sortOrder !== void 0) updates.sortOrder = parseInt(req.body.sortOrder);
     if (req.body.startDate !== void 0) updates.startDate = req.body.startDate ? new Date(req.body.startDate) : null;
     if (req.body.endDate !== void 0) updates.endDate = req.body.endDate ? new Date(req.body.endDate) : null;
+    if (req.body.placement !== void 0) updates.placement = req.body.placement;
     if (req.file) updates.imageUrl = `/uploads/ads/${req.file.filename}`;
     else if (req.body.imageUrl !== void 0) updates.imageUrl = req.body.imageUrl;
     const campaign = await storage.updateAdCampaign(id, updates);
