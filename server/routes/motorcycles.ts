@@ -55,13 +55,6 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Marca e modello sono obbligatori" });
     }
 
-    if (isDefault === true) {
-      await db
-        .update(userMotorcycles)
-        .set({ isDefault: false })
-        .where(eq(userMotorcycles.userId, userId));
-    }
-
     const motorcycle = await storage.createUserMotorcycle({
       userId,
       brand,
@@ -75,6 +68,13 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       isForSale: isForSale || false,
       saleDescription: saleDescription || null,
     });
+
+    if (isDefault === true) {
+      await db
+        .update(userMotorcycles)
+        .set({ isDefault: false })
+        .where(and(eq(userMotorcycles.userId, userId), ne(userMotorcycles.id, motorcycle.id)));
+    }
 
     let matches: any[] = [];
     if (ridingStyle) {

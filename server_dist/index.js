@@ -5278,9 +5278,6 @@ router4.post("/", requireAuth3, async (req, res) => {
     if (!brand || !model) {
       return res.status(400).json({ message: "Marca e modello sono obbligatori" });
     }
-    if (isDefault === true) {
-      await db.update(userMotorcycles).set({ isDefault: false }).where((0, import_drizzle_orm4.eq)(userMotorcycles.userId, userId));
-    }
     const motorcycle = await storage.createUserMotorcycle({
       userId,
       brand,
@@ -5294,6 +5291,9 @@ router4.post("/", requireAuth3, async (req, res) => {
       isForSale: isForSale || false,
       saleDescription: saleDescription || null
     });
+    if (isDefault === true) {
+      await db.update(userMotorcycles).set({ isDefault: false }).where((0, import_drizzle_orm4.and)((0, import_drizzle_orm4.eq)(userMotorcycles.userId, userId), (0, import_drizzle_orm4.ne)(userMotorcycles.id, motorcycle.id)));
+    }
     let matches = [];
     if (ridingStyle) {
       const wishlistMotos = await storage.findMatchingWishlistMotos(brand || "", model || "", ridingStyle, motorcycleType || "");
