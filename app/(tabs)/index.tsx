@@ -73,6 +73,7 @@ export default function MapScreen() {
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [showAreaModal, setShowAreaModal] = useState(false);
   const [countriesLoaded, setCountriesLoaded] = useState(false);
+  const [showHomeMessage, setShowHomeMessage] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -324,6 +325,12 @@ export default function MapScreen() {
     queryKey: ["/api/ads/my-ads"],
     staleTime: 60000,
     enabled: isAuthenticated && adsGloballyEnabled && nearbyLoaded,
+  });
+
+  const { data: homeMessageData } = useQuery<{ enabled: boolean; text: string }>({
+    queryKey: ["/api/settings/home-message"],
+    staleTime: 60000,
+    enabled: isAuthenticated,
   });
 
   const profileQuery = useQuery({
@@ -597,10 +604,18 @@ export default function MapScreen() {
       contentContainerStyle={{ paddingTop: Platform.OS === "web" ? 67 : insets.top, paddingBottom: 16 }}
     >
       <View style={styles.header}>
-        <View style={styles.titleRow}>
+        <TouchableOpacity
+          style={styles.titleRow}
+          onPress={() => {
+            if (homeMessageData?.enabled && homeMessageData?.text) {
+              setShowHomeMessage(true);
+            }
+          }}
+          activeOpacity={homeMessageData?.enabled && homeMessageData?.text ? 0.7 : 1}
+        >
           <Text style={styles.title}>BikerLink</Text>
           <Image source={require("@/assets/images/helmet-logo.png")} style={styles.helmetLogo} resizeMode="contain" />
-        </View>
+        </TouchableOpacity>
         <Pressable style={styles.defineAreaBtnInline} onPress={() => setShowAreaModal(true)}>
           <Ionicons name="globe-outline" size={14} color={Colors.accent} />
           <Text style={styles.defineAreaBtnInlineText}>
@@ -1156,6 +1171,21 @@ export default function MapScreen() {
                 </View>
               </ScrollView>
             )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={showHomeMessage} transparent animationType="fade" onRequestClose={() => setShowHomeMessage(false)}>
+        <Pressable style={styles.detailOverlay} onPress={() => setShowHomeMessage(false)}>
+          <Pressable style={styles.homeMessageSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.homeMessageHeader}>
+              <Image source={require("@/assets/images/helmet-logo.png")} style={{ width: 40, height: 40 }} resizeMode="contain" />
+              <Text style={styles.homeMessageTitle}>BikerLink</Text>
+            </View>
+            <Text style={styles.homeMessageText}>{homeMessageData?.text || ""}</Text>
+            <Pressable style={styles.homeMessageCloseBtn} onPress={() => setShowHomeMessage(false)}>
+              <Text style={styles.homeMessageCloseBtnText}>Chiudi</Text>
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
@@ -1821,6 +1851,44 @@ const styles = StyleSheet.create({
   areaSaveBtnText: {
     fontSize: 16,
     fontFamily: "Inter_700Bold",
+    color: Colors.background,
+  },
+  homeMessageSheet: {
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    padding: 24,
+    marginHorizontal: 24,
+    maxWidth: 420,
+    width: "90%",
+    alignSelf: "center",
+  },
+  homeMessageHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
+  },
+  homeMessageTitle: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+  },
+  homeMessageText: {
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    color: Colors.text,
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  homeMessageCloseBtn: {
+    backgroundColor: Colors.accent,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center" as const,
+  },
+  homeMessageCloseBtnText: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
     color: Colors.background,
   },
 });

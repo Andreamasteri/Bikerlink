@@ -250,6 +250,52 @@ export default function AdminSettings() {
   });
   const sosEnabled = sosData?.enabled !== false;
 
+  const { data: homeMessageData } = useQuery<{ enabled: boolean; text: string }>({
+    queryKey: ["/api/settings/home-message"],
+  });
+  const homeMessageEnabled = homeMessageData?.enabled === true;
+  const [homeMessageText, setHomeMessageText] = useState("");
+  const [isSavingHomeMessage, setIsSavingHomeMessage] = useState(false);
+
+  React.useEffect(() => {
+    if (homeMessageData?.text !== undefined) {
+      setHomeMessageText(homeMessageData.text);
+    }
+  }, [homeMessageData?.text]);
+
+  const homeMessageToggleMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/home_message_enabled", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/home-message"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  async function handleSaveHomeMessageText() {
+    try {
+      setIsSavingHomeMessage(true);
+      await apiRequest("PUT", "/api/admin/settings/home_message_text", { value: homeMessageText });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/home-message"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      Alert.alert("Successo", "Messaggio home salvato");
+    } catch (error: any) {
+      Alert.alert("Errore", error.message || "Errore durante il salvataggio");
+    } finally {
+      setIsSavingHomeMessage(false);
+    }
+  }
+
   const sosMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       const baseUrl = getApiUrl();
@@ -722,6 +768,47 @@ export default function AdminSettings() {
         <Text style={styles.synecoDesc}>
           {sosEnabled ? "Gli utenti possono inviare e accogliere richieste SOS" : "La funzione SOS è disattivata per tutti"}
         </Text>
+      </View>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="megaphone-outline" size={20} color={Colors.accent} />
+            <Text style={styles.synecoLabel}>Messaggio Home</Text>
+          </View>
+          <Switch
+            value={homeMessageEnabled}
+            onValueChange={(val) => homeMessageToggleMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: Colors.accent }}
+            thumbColor={homeMessageEnabled ? Colors.text : Colors.textSecondary}
+            disabled={homeMessageToggleMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {homeMessageEnabled
+            ? "Il messaggio è attivo: gli utenti lo vedono toccando il logo"
+            : "Il messaggio è disattivato: il tocco sul logo non mostra nulla"}
+        </Text>
+        <View style={{ marginTop: 14 }}>
+          <TextInput
+            style={[styles.input, { minHeight: 100 }]}
+            placeholder="Inserisci il messaggio da mostrare agli utenti..."
+            placeholderTextColor={Colors.textSecondary}
+            value={homeMessageText}
+            onChangeText={setHomeMessageText}
+            multiline
+            numberOfLines={4}
+          />
+          <View style={styles.editActions}>
+            <TouchableOpacity
+              style={styles.saveBtn}
+              onPress={handleSaveHomeMessageText}
+              disabled={isSavingHomeMessage}
+            >
+              <Text style={styles.saveBtnText}>{isSavingHomeMessage ? "..." : "Salva"}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       <View style={styles.paypalCard}>

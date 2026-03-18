@@ -10013,6 +10013,20 @@ async function registerRoutes(app2) {
       res.json({ required: true });
     }
   });
+  app2.get("/api/settings/home-message", async (_req, res) => {
+    try {
+      const [enabledSetting, textSetting] = await Promise.all([
+        storage.getAppSetting("home_message_enabled"),
+        storage.getAppSetting("home_message_text")
+      ]);
+      res.json({
+        enabled: enabledSetting?.value === "true",
+        text: textSetting?.value || ""
+      });
+    } catch {
+      res.json({ enabled: false, text: "" });
+    }
+  });
   app2.get("/api/settings/donation", async (_req, res) => {
     try {
       const [enabledSetting, textSetting, paypalSetting] = await Promise.all([
