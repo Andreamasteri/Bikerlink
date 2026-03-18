@@ -1896,7 +1896,7 @@ router.post("/fake-users/wake-all", async (_req: Request, res: Response) => {
 router.get("/backup/status", async (_req: Request, res: Response) => {
   try {
     const { getBackupStatus } = await import("../backup-service");
-    return res.json(getBackupStatus());
+    return res.json(await getBackupStatus());
   } catch (error) {
     console.error("Admin backup status error:", error);
     return res.status(500).json({ message: "Errore interno del server" });

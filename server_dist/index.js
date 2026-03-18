@@ -3221,49 +3221,103 @@ __export(backup_service_exports, {
   startScheduler: () => startScheduler,
   stopScheduler: () => stopScheduler
 });
-function getBackupStatus() {
+function addMs(ms) {
+  return new Date(Date.now() + ms);
+}
+async function deriveLastBackup(prefix) {
+  try {
+    const files = await listObjects(prefix);
+    if (files.length === 0) return null;
+    files.sort((a, b) => b.createdTime.localeCompare(a.createdTime));
+    const latest = files[0];
+    return { timestamp: latest.createdTime, size: latest.size };
+  } catch {
+    return null;
+  }
+}
+async function getBackupStatus() {
+  const [lastDbBackup, lastMediaBackup] = await Promise.all([
+    deriveLastBackup(DB_PREFIX),
+    deriveLastBackup(MEDIA_PREFIX)
+  ]);
   return {
-    scheduled: schedulerTimer !== null,
+    scheduled: dbSchedulerTimer !== null,
     lastDbBackup,
     lastMediaBackup,
     isBackingUp,
     isRestoringDb,
-    nextScheduled: schedulerNextAt?.toISOString() ?? null,
+    nextScheduled: dbNextAt?.toISOString() ?? null,
+    nextMediaScheduled: mediaNextAt?.toISOString() ?? null,
     configured: true
   };
 }
-function buildNextAt() {
-  return new Date(Date.now() + 24 * 60 * 60 * 1e3);
-}
 async function startScheduler() {
-  if (schedulerTimer) return;
+  await startDbScheduler();
+  await startMediaScheduler();
+}
+async function startDbScheduler() {
+  if (dbSchedulerTimer) return;
   const enabled = await isAutoBackupEnabled();
   if (!enabled) return;
-  schedulerNextAt = buildNextAt();
-  schedulerTimer = setInterval(async () => {
+  dbNextAt = addMs(INTERVAL_DB_MS);
+  dbSchedulerTimer = setInterval(async () => {
     try {
       const stillEnabled = await isAutoBackupEnabled();
       if (!stillEnabled) {
-        stopScheduler();
+        stopDbScheduler();
         return;
       }
       await backupDatabase();
       await purgeOldBackups();
-      schedulerNextAt = buildNextAt();
+      dbNextAt = addMs(INTERVAL_DB_MS);
     } catch (err) {
       console.error("[backup-service] Scheduled DB backup failed:", err);
-      schedulerNextAt = buildNextAt();
+      dbNextAt = addMs(INTERVAL_DB_MS);
     }
-  }, 24 * 60 * 60 * 1e3);
-  console.log("[backup-service] Scheduler started (every 24h)");
+  }, INTERVAL_DB_MS);
+  console.log("[backup-service] DB scheduler started (every 24h)");
+}
+async function startMediaScheduler() {
+  if (mediaSchedulerTimer) return;
+  const enabled = await isAutoBackupEnabled();
+  if (!enabled) return;
+  mediaNextAt = addMs(INTERVAL_MEDIA_MS);
+  mediaSchedulerTimer = setInterval(async () => {
+    try {
+      const stillEnabled = await isAutoBackupEnabled();
+      if (!stillEnabled) {
+        stopMediaScheduler();
+        return;
+      }
+      await backupMedia();
+      await purgeOldBackups();
+      mediaNextAt = addMs(INTERVAL_MEDIA_MS);
+    } catch (err) {
+      console.error("[backup-service] Scheduled media backup failed:", err);
+      mediaNextAt = addMs(INTERVAL_MEDIA_MS);
+    }
+  }, INTERVAL_MEDIA_MS);
+  console.log("[backup-service] Media scheduler started (every 7 days)");
+}
+function stopDbScheduler() {
+  if (dbSchedulerTimer) {
+    clearInterval(dbSchedulerTimer);
+    dbSchedulerTimer = null;
+    dbNextAt = null;
+    console.log("[backup-service] DB scheduler stopped");
+  }
+}
+function stopMediaScheduler() {
+  if (mediaSchedulerTimer) {
+    clearInterval(mediaSchedulerTimer);
+    mediaSchedulerTimer = null;
+    mediaNextAt = null;
+    console.log("[backup-service] Media scheduler stopped");
+  }
 }
 function stopScheduler() {
-  if (schedulerTimer) {
-    clearInterval(schedulerTimer);
-    schedulerTimer = null;
-    schedulerNextAt = null;
-    console.log("[backup-service] Scheduler stopped");
-  }
+  stopDbScheduler();
+  stopMediaScheduler();
 }
 async function isAutoBackupEnabled() {
   try {
@@ -3314,7 +3368,7 @@ async function backupDatabase() {
   const tmpGz = tmpSql + ".gz";
   try {
     const dbUrl = process.env.DATABASE_URL;
-    await execAsync(`pg_dump "${dbUrl}" -f "${tmpSql}" --no-password`);
+    await execAsync(`pg_dump "${dbUrl}" --clean --if-exists -f "${tmpSql}" --no-password`);
     await new Promise((resolve2, reject) => {
       const inp = import_fs4.default.createReadStream(tmpSql);
       const out = import_fs4.default.createWriteStream(tmpGz);
@@ -3328,7 +3382,6 @@ async function backupDatabase() {
     const fileName = `bikerlink_db_${ts}.sql.gz`;
     const objectPath = getObjectPath("db", fileName);
     await uploadBuffer(objectPath, buf, "application/gzip");
-    lastDbBackup = { timestamp: (/* @__PURE__ */ new Date()).toISOString(), size: buf.length };
     console.log(`[backup-service] DB backup salvato: ${objectPath} (${buf.length} bytes)`);
     return { path: objectPath, name: fileName, size: buf.length };
   } finally {
@@ -3366,7 +3419,6 @@ async function backupMedia() {
     const fileName = `bikerlink_media_${ts}.zip`;
     const objectPath = getObjectPath("media", fileName);
     await uploadBuffer(objectPath, zipBuffer, "application/zip");
-    lastMediaBackup = { timestamp: (/* @__PURE__ */ new Date()).toISOString(), size: zipBuffer.length };
     console.log(`[backup-service] Media backup salvato: ${objectPath} (${zipBuffer.length} bytes)`);
     return { path: objectPath, name: fileName, size: zipBuffer.length };
   } finally {
@@ -3395,7 +3447,7 @@ async function restoreDatabase(objectPath) {
       inp.on("error", reject);
     });
     const dbUrl = process.env.DATABASE_URL;
-    await execAsync(`psql "${dbUrl}" -f "${tmpSql}" --no-password`);
+    await execAsync(`psql "${dbUrl}" -v ON_ERROR_STOP=1 -f "${tmpSql}" --no-password`);
     console.log("[backup-service] Database ripristinato con successo");
   } finally {
     isRestoringDb = false;
@@ -3444,7 +3496,7 @@ async function purgeOldBackups() {
 async function downloadBackupBuffer(objectPath) {
   return downloadBuffer(objectPath);
 }
-var import_child_process, import_util, import_zlib, import_archiver, import_fs4, import_os, import_path4, import_drizzle_orm7, execAsync, DB_PREFIX, MEDIA_PREFIX, RETENTION_DAYS, schedulerTimer, schedulerNextAt, lastDbBackup, lastMediaBackup, isBackingUp, isRestoringDb;
+var import_child_process, import_util, import_zlib, import_archiver, import_fs4, import_os, import_path4, import_drizzle_orm7, execAsync, DB_PREFIX, MEDIA_PREFIX, RETENTION_DAYS, dbSchedulerTimer, mediaSchedulerTimer, dbNextAt, mediaNextAt, isBackingUp, isRestoringDb, INTERVAL_DB_MS, INTERVAL_MEDIA_MS;
 var init_backup_service = __esm({
   "server/backup-service.ts"() {
     "use strict";
@@ -3463,12 +3515,14 @@ var init_backup_service = __esm({
     DB_PREFIX = "backup/database";
     MEDIA_PREFIX = "backup/media";
     RETENTION_DAYS = 90;
-    schedulerTimer = null;
-    schedulerNextAt = null;
-    lastDbBackup = null;
-    lastMediaBackup = null;
+    dbSchedulerTimer = null;
+    mediaSchedulerTimer = null;
+    dbNextAt = null;
+    mediaNextAt = null;
     isBackingUp = false;
     isRestoringDb = false;
+    INTERVAL_DB_MS = 24 * 60 * 60 * 1e3;
+    INTERVAL_MEDIA_MS = 7 * 24 * 60 * 60 * 1e3;
   }
 });
 
@@ -9219,7 +9273,7 @@ router17.post("/fake-users/wake-all", async (_req, res) => {
 router17.get("/backup/status", async (_req, res) => {
   try {
     const { getBackupStatus: getBackupStatus2 } = await Promise.resolve().then(() => (init_backup_service(), backup_service_exports));
-    return res.json(getBackupStatus2());
+    return res.json(await getBackupStatus2());
   } catch (error) {
     console.error("Admin backup status error:", error);
     return res.status(500).json({ message: "Errore interno del server" });

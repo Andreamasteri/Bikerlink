@@ -28,6 +28,7 @@ interface BackupStatus {
   isBackingUp: boolean;
   isRestoringDb: boolean;
   nextScheduled: string | null;
+  nextMediaScheduled: string | null;
   configured: boolean;
 }
 
@@ -160,7 +161,10 @@ export default function BackupScreen() {
           />
         </View>
         {status?.nextScheduled && (
-          <Text style={styles.statusSub}>Prossimo: {formatDate(status.nextScheduled)}</Text>
+          <Text style={styles.statusSub}>Prossimo DB: {formatDate(status.nextScheduled)}</Text>
+        )}
+        {status?.nextMediaScheduled && (
+          <Text style={styles.statusSub}>Prossimo Media: {formatDate(status.nextMediaScheduled)}</Text>
         )}
         <View style={styles.retentionRow}>
           <Ionicons name="information-circle-outline" size={14} color={Colors.textSecondary} />
