@@ -337,5 +337,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
 
+  import("./backup-service").then(({ startScheduler }) => {
+    startScheduler().catch((err) => {
+      console.error("[backup-service] Failed to start scheduler:", err);
+    });
+  }).catch(() => {});
+
   return httpServer;
 }

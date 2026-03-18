@@ -1,9 +1,10 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { getApiUrl } from "@/lib/query-client";
 
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
 type MaterialCommunityIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -12,7 +13,9 @@ type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
 type AdminItem = {
   key: string;
   label: string;
-  route: string;
+  route?: string;
+  action?: "backup-now";
+  accentColor?: string;
 } & (
   | { iconSet: "MaterialIcons"; icon: MaterialIconName }
   | { iconSet: "MaterialCommunityIcons"; icon: MaterialCommunityIconName }
@@ -69,6 +72,8 @@ const adminGroups: AdminGroup[] = [
     items: [
       { key: "settings", label: "Impostazioni", icon: "settings", iconSet: "MaterialIcons", route: "/admin/settings" },
       { key: "invite-codes", label: "Codici Invito", icon: "gift", iconSet: "Ionicons", route: "/admin/invite-codes" },
+      { key: "backup", label: "Backup automatici", icon: "cloud-upload", iconSet: "MaterialCommunityIcons", route: "/admin/backup" },
+      { key: "backup-now", label: "Backup ora", icon: "play-circle", iconSet: "MaterialCommunityIcons", action: "backup-now", accentColor: "#22c55e" },
     ],
   },
 ];
@@ -98,6 +103,41 @@ function renderGroupHeaderIcon(group: AdminGroup) {
 export default function AdminDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [backingUp, setBackingUp] = useState(false);
+
+  async function handleBackupNow() {
+    if (backingUp) return;
+    setBackingUp(true);
+    try {
+      const url = new URL("/api/admin/backup/db", getApiUrl()).toString();
+      const res = await fetch(url, { method: "POST", credentials: "include" });
+      const data = await res.json();
+      if (res.ok) {
+        Alert.alert("Backup completato", `File: ${data.name}\nDimensione: ${formatBytes(data.size)}`);
+      } else {
+        Alert.alert("Errore backup", data.message || "Errore durante il backup");
+      }
+    } catch (e: any) {
+      Alert.alert("Errore", e.message || "Errore durante il backup");
+    } finally {
+      setBackingUp(false);
+    }
+  }
+
+  function formatBytes(bytes: number): string {
+    if (!bytes) return "—";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  function handleItemPress(item: AdminItem) {
+    if (item.action === "backup-now") {
+      handleBackupNow();
+    } else if (item.route) {
+      router.push(item.route);
+    }
+  }
 
   return (
     <ScrollView
@@ -116,19 +156,35 @@ export default function AdminDashboard() {
             <Text style={styles.groupTitle}>{group.title}</Text>
           </View>
           <View style={styles.grid}>
-            {group.items.map((section) => (
-              <TouchableOpacity
-                key={section.key}
-                style={styles.card}
-                onPress={() => router.push(section.route)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.cardIcon}>
-                  {renderIcon(section)}
-                </View>
-                <Text style={styles.cardLabel}>{section.label}</Text>
-              </TouchableOpacity>
-            ))}
+            {group.items.map((section) => {
+              const isAction = !!section.action;
+              const iconColor = section.accentColor || Colors.accent;
+              const isLoading = section.action === "backup-now" && backingUp;
+              return (
+                <TouchableOpacity
+                  key={section.key}
+                  style={[
+                    styles.card,
+                    isAction && section.accentColor
+                      ? { borderColor: section.accentColor, borderWidth: 2 }
+                      : null,
+                  ]}
+                  onPress={() => handleItemPress(section)}
+                  activeOpacity={0.7}
+                  disabled={isLoading}
+                >
+                  <View style={[styles.cardIcon, isAction && section.accentColor ? { backgroundColor: section.accentColor + "20" } : null]}>
+                    {isLoading
+                      ? <ActivityIndicator size="small" color={iconColor} />
+                      : renderIcon(section, 28, iconColor)
+                    }
+                  </View>
+                  <Text style={[styles.cardLabel, isAction && section.accentColor ? { color: section.accentColor } : null]}>
+                    {section.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
       ))}

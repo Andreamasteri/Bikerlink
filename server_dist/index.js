@@ -3154,6 +3154,391 @@ var init_mass_seed = __esm({
   }
 });
 
+// server/google-drive.ts
+function getAuth() {
+  if (_auth) return _auth;
+  const keyJson = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+  if (!keyJson) throw new Error("GOOGLE_SERVICE_ACCOUNT_KEY non configurato");
+  const credentials = JSON.parse(keyJson);
+  _auth = new import_googleapis.google.auth.GoogleAuth({
+    credentials,
+    scopes: ["https://www.googleapis.com/auth/drive"]
+  });
+  return _auth;
+}
+function getDrive() {
+  if (_drive) return _drive;
+  _drive = import_googleapis.google.drive({ version: "v3", auth: getAuth() });
+  return _drive;
+}
+async function findOrCreateFolder(name, parentId) {
+  const drive = getDrive();
+  const q = parentId ? `name='${name}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false` : `name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  const res = await drive.files.list({ q, fields: "files(id,name)", spaces: "drive" });
+  if (res.data.files && res.data.files.length > 0) {
+    return res.data.files[0].id;
+  }
+  const meta = {
+    name,
+    mimeType: "application/vnd.google-apps.folder"
+  };
+  if (parentId) meta.parents = [parentId];
+  const created = await drive.files.create({ requestBody: meta, fields: "id" });
+  return created.data.id;
+}
+async function getOrCreateFolderPath(folderPath) {
+  const parts = folderPath.split("/").filter(Boolean);
+  let parentId = void 0;
+  for (const part of parts) {
+    parentId = await findOrCreateFolder(part, parentId);
+  }
+  return parentId;
+}
+async function uploadFile(fileName, buffer, mimeType, folderPath) {
+  const drive = getDrive();
+  const folderId = await getOrCreateFolderPath(folderPath);
+  const stream = import_stream.Readable.from(buffer);
+  const res = await drive.files.create({
+    requestBody: {
+      name: fileName,
+      parents: [folderId]
+    },
+    media: {
+      mimeType,
+      body: stream
+    },
+    fields: "id,name,size,createdTime"
+  });
+  return { id: res.data.id, name: res.data.name };
+}
+async function listAllBackupFiles(rootFolder) {
+  const drive = getDrive();
+  let rootId = void 0;
+  try {
+    const rootQ = `name='${rootFolder}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    const rootRes = await drive.files.list({ q: rootQ, fields: "files(id)" });
+    if (!rootRes.data.files || rootRes.data.files.length === 0) return [];
+    rootId = rootRes.data.files[0].id;
+  } catch {
+    return [];
+  }
+  const allFiles = [];
+  let pageToken = void 0;
+  do {
+    const res = await drive.files.list({
+      q: `'${rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+      fields: "nextPageToken,files(id,name)",
+      pageSize: 100,
+      pageToken
+    });
+    const yearFolders = res.data.files || [];
+    pageToken = res.data.nextPageToken;
+    for (const yearFolder of yearFolders) {
+      const monthRes = await drive.files.list({
+        q: `'${yearFolder.id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+        fields: "files(id,name)"
+      });
+      const monthFolders = monthRes.data.files || [];
+      for (const monthFolder of monthFolders) {
+        let filePage = void 0;
+        do {
+          const fileRes = await drive.files.list({
+            q: `'${monthFolder.id}' in parents and trashed=false and mimeType!='application/vnd.google-apps.folder'`,
+            fields: "nextPageToken,files(id,name,size,createdTime)",
+            pageSize: 100,
+            pageToken: filePage
+          });
+          const files = fileRes.data.files || [];
+          allFiles.push(...files.map((f) => ({
+            id: f.id,
+            name: f.name,
+            size: parseInt(f.size || "0"),
+            createdTime: f.createdTime
+          })));
+          filePage = fileRes.data.nextPageToken;
+        } while (filePage);
+      }
+    }
+  } while (pageToken);
+  return allFiles;
+}
+async function downloadFile(fileId) {
+  const drive = getDrive();
+  const res = await drive.files.get({ fileId, alt: "media" }, { responseType: "arraybuffer" });
+  return Buffer.from(res.data);
+}
+async function deleteFile(fileId) {
+  const drive = getDrive();
+  await drive.files.delete({ fileId });
+}
+function isGoogleDriveConfigured() {
+  return !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+}
+var import_googleapis, import_stream, _auth, _drive;
+var init_google_drive = __esm({
+  "server/google-drive.ts"() {
+    "use strict";
+    import_googleapis = require("googleapis");
+    import_stream = require("stream");
+    _auth = null;
+    _drive = null;
+  }
+});
+
+// server/backup-service.ts
+var backup_service_exports = {};
+__export(backup_service_exports, {
+  backupDatabase: () => backupDatabase,
+  backupMedia: () => backupMedia,
+  getBackupStatus: () => getBackupStatus,
+  listBackups: () => listBackups,
+  purgeOldBackups: () => purgeOldBackups,
+  restoreDatabase: () => restoreDatabase,
+  setAutoBackupEnabled: () => setAutoBackupEnabled,
+  startScheduler: () => startScheduler,
+  stopScheduler: () => stopScheduler
+});
+function getBackupStatus() {
+  const now = Date.now();
+  const nextScheduled = schedulerTimer ? new Date(now + getNextRunMs()).toISOString() : null;
+  return {
+    scheduled: schedulerTimer !== null,
+    lastDbBackup,
+    lastMediaBackup,
+    isBackingUp,
+    isRestoringDb,
+    nextScheduled,
+    configured: isGoogleDriveConfigured()
+  };
+}
+function getNextRunMs() {
+  return nextRunMs;
+}
+async function startScheduler() {
+  if (schedulerTimer) return;
+  const enabled = await isAutoBackupEnabled();
+  if (!enabled) return;
+  if (!isGoogleDriveConfigured()) return;
+  schedulerTimer = setInterval(async () => {
+    try {
+      const stillEnabled = await isAutoBackupEnabled();
+      if (!stillEnabled) {
+        stopScheduler();
+        return;
+      }
+      await backupDatabase();
+      await purgeOldBackups();
+    } catch (err) {
+      console.error("[backup-service] Scheduled DB backup failed:", err);
+    }
+  }, 24 * 60 * 60 * 1e3);
+  nextRunMs = 24 * 60 * 60 * 1e3;
+  console.log("[backup-service] Scheduler started (every 24h)");
+}
+function stopScheduler() {
+  if (schedulerTimer) {
+    clearInterval(schedulerTimer);
+    schedulerTimer = null;
+    console.log("[backup-service] Scheduler stopped");
+  }
+}
+async function isAutoBackupEnabled() {
+  try {
+    const rows = await db.select().from(appSettings).where((0, import_drizzle_orm7.eq)(appSettings.key, "backup_auto_enabled"));
+    if (rows.length === 0) return true;
+    return rows[0].value !== "false";
+  } catch {
+    return true;
+  }
+}
+async function setAutoBackupEnabled(enabled) {
+  try {
+    const existing = await db.select().from(appSettings).where((0, import_drizzle_orm7.eq)(appSettings.key, "backup_auto_enabled"));
+    if (existing.length > 0) {
+      await db.update(appSettings).set({ value: enabled ? "true" : "false" }).where((0, import_drizzle_orm7.eq)(appSettings.key, "backup_auto_enabled"));
+    } else {
+      await db.insert(appSettings).values({ key: "backup_auto_enabled", value: enabled ? "true" : "false", description: "Backup automatico su Google Drive" });
+    }
+    if (enabled) {
+      await startScheduler();
+    } else {
+      stopScheduler();
+    }
+  } catch (err) {
+    console.error("[backup-service] setAutoBackupEnabled error:", err);
+    throw err;
+  }
+}
+function getFolderPath(type) {
+  const now = /* @__PURE__ */ new Date();
+  const year = now.getFullYear().toString();
+  const month = (now.getMonth() + 1).toString().padStart(2, "0");
+  const base = type === "db" ? DB_FOLDER : MEDIA_FOLDER;
+  return `${base}/${year}/${month}`;
+}
+function getTimestamp() {
+  const now = /* @__PURE__ */ new Date();
+  return now.toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 19);
+}
+async function backupDatabase() {
+  if (!isGoogleDriveConfigured()) throw new Error("Google Drive non configurato");
+  if (isBackingUp) throw new Error("Backup gi\xE0 in corso");
+  isBackingUp = true;
+  const tmpFile = import_path4.default.join(import_os.default.tmpdir(), `bikerlink_db_${getTimestamp()}.sql`);
+  const gzFile = tmpFile + ".gz";
+  try {
+    const dbUrl = process.env.DATABASE_URL;
+    await execAsync(`pg_dump "${dbUrl}" -f "${tmpFile}" --no-password`);
+    await new Promise((resolve2, reject) => {
+      const inp = import_fs4.default.createReadStream(tmpFile);
+      const out = import_fs4.default.createWriteStream(gzFile);
+      const gz = import_zlib.default.createGzip({ level: 9 });
+      inp.pipe(gz).pipe(out);
+      out.on("finish", resolve2);
+      out.on("error", reject);
+      inp.on("error", reject);
+    });
+    const buf = import_fs4.default.readFileSync(gzFile);
+    const fileName = `bikerlink_db_${getTimestamp()}.sql.gz`;
+    const folderPath = getFolderPath("db");
+    const result = await uploadFile(fileName, buf, "application/gzip", folderPath);
+    lastDbBackup = { timestamp: (/* @__PURE__ */ new Date()).toISOString(), size: buf.length };
+    console.log(`[backup-service] DB backup uploaded: ${fileName} (${buf.length} bytes)`);
+    return { id: result.id, name: fileName, size: buf.length };
+  } finally {
+    isBackingUp = false;
+    try {
+      import_fs4.default.unlinkSync(tmpFile);
+    } catch {
+    }
+    try {
+      import_fs4.default.unlinkSync(gzFile);
+    } catch {
+    }
+  }
+}
+async function backupMedia() {
+  if (!isGoogleDriveConfigured()) throw new Error("Google Drive non configurato");
+  if (isBackingUp) throw new Error("Backup gi\xE0 in corso");
+  isBackingUp = true;
+  const tmpZip = import_path4.default.join(import_os.default.tmpdir(), `bikerlink_media_${getTimestamp()}.zip`);
+  try {
+    const mediaDir = process.env.OBJECT_STORAGE_PATH || "/home/runner/workspace/.data/uploads";
+    const zipBuffer = await new Promise((resolve2, reject) => {
+      const output = import_fs4.default.createWriteStream(tmpZip);
+      const archive = (0, import_archiver.default)("zip", { zlib: { level: 6 } });
+      archive.pipe(output);
+      if (import_fs4.default.existsSync(mediaDir)) {
+        archive.directory(mediaDir, false);
+      }
+      archive.finalize();
+      output.on("close", () => resolve2(import_fs4.default.readFileSync(tmpZip)));
+      archive.on("error", reject);
+    });
+    const fileName = `bikerlink_media_${getTimestamp()}.zip`;
+    const folderPath = getFolderPath("media");
+    const result = await uploadFile(fileName, zipBuffer, "application/zip", folderPath);
+    lastMediaBackup = { timestamp: (/* @__PURE__ */ new Date()).toISOString(), size: zipBuffer.length };
+    console.log(`[backup-service] Media backup uploaded: ${fileName} (${zipBuffer.length} bytes)`);
+    return { id: result.id, name: fileName, size: zipBuffer.length };
+  } finally {
+    isBackingUp = false;
+    try {
+      import_fs4.default.unlinkSync(tmpZip);
+    } catch {
+    }
+  }
+}
+async function restoreDatabase(fileId) {
+  if (!isGoogleDriveConfigured()) throw new Error("Google Drive non configurato");
+  if (isRestoringDb) throw new Error("Ripristino gi\xE0 in corso");
+  isRestoringDb = true;
+  const tmpGz = import_path4.default.join(import_os.default.tmpdir(), `bikerlink_restore_${Date.now()}.sql.gz`);
+  const tmpSql = tmpGz.replace(".sql.gz", ".sql");
+  try {
+    const buf = await downloadFile(fileId);
+    import_fs4.default.writeFileSync(tmpGz, buf);
+    await new Promise((resolve2, reject) => {
+      const inp = import_fs4.default.createReadStream(tmpGz);
+      const out = import_fs4.default.createWriteStream(tmpSql);
+      const gz = import_zlib.default.createGunzip();
+      inp.pipe(gz).pipe(out);
+      out.on("finish", resolve2);
+      out.on("error", reject);
+      inp.on("error", reject);
+    });
+    const dbUrl = process.env.DATABASE_URL;
+    await execAsync(`psql "${dbUrl}" -f "${tmpSql}" --no-password`);
+    console.log("[backup-service] Database restored successfully");
+  } finally {
+    isRestoringDb = false;
+    try {
+      import_fs4.default.unlinkSync(tmpGz);
+    } catch {
+    }
+    try {
+      import_fs4.default.unlinkSync(tmpSql);
+    } catch {
+    }
+  }
+}
+async function listBackups() {
+  if (!isGoogleDriveConfigured()) return { db: [], media: [] };
+  const [dbFiles, mediaFiles] = await Promise.all([
+    listAllBackupFiles("backup/database").catch(() => []),
+    listAllBackupFiles("backup/media").catch(() => [])
+  ]);
+  dbFiles.sort((a, b) => b.createdTime.localeCompare(a.createdTime));
+  mediaFiles.sort((a, b) => b.createdTime.localeCompare(a.createdTime));
+  return { db: dbFiles, media: mediaFiles };
+}
+async function purgeOldBackups() {
+  if (!isGoogleDriveConfigured()) return 0;
+  const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1e3);
+  const all = await listBackups();
+  const toDelete = [...all.db, ...all.media].filter(
+    (f) => new Date(f.createdTime) < cutoff
+  );
+  let deleted = 0;
+  for (const f of toDelete) {
+    try {
+      await deleteFile(f.id);
+      deleted++;
+      console.log(`[backup-service] Purged old backup: ${f.name}`);
+    } catch (err) {
+      console.error(`[backup-service] Failed to delete ${f.name}:`, err);
+    }
+  }
+  return deleted;
+}
+var import_child_process, import_util, import_zlib, import_archiver, import_fs4, import_os, import_path4, import_drizzle_orm7, execAsync, DB_FOLDER, MEDIA_FOLDER, RETENTION_DAYS, schedulerTimer, lastDbBackup, lastMediaBackup, isBackingUp, isRestoringDb, nextRunMs;
+var init_backup_service = __esm({
+  "server/backup-service.ts"() {
+    "use strict";
+    import_child_process = require("child_process");
+    import_util = require("util");
+    import_zlib = __toESM(require("zlib"));
+    import_archiver = __toESM(require("archiver"));
+    import_fs4 = __toESM(require("fs"));
+    import_os = __toESM(require("os"));
+    import_path4 = __toESM(require("path"));
+    init_google_drive();
+    init_db();
+    init_schema();
+    import_drizzle_orm7 = require("drizzle-orm");
+    execAsync = (0, import_util.promisify)(import_child_process.exec);
+    DB_FOLDER = "backup/database";
+    MEDIA_FOLDER = "backup/media";
+    RETENTION_DAYS = 90;
+    schedulerTimer = null;
+    lastDbBackup = null;
+    lastMediaBackup = null;
+    isBackingUp = false;
+    isRestoringDb = false;
+    nextRunMs = 24 * 60 * 60 * 1e3;
+  }
+});
+
 // server/index.ts
 var import_express21 = __toESM(require("express"));
 
@@ -3887,12 +4272,12 @@ router2.get("/online-list", requireAuth, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq8, and: and6, lt, or: or3, isNull, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq9, and: and6, lt, or: or3, isNull, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const offlineConds = [eq8(usersTable.status, "active"), or3(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt))];
+      const offlineConds = [eq9(usersTable.status, "active"), or3(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt))];
       if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
-      const offlineResults = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(usersTable).leftJoin(profilesTable, eq8(profilesTable.userId, usersTable.id)).where(and6(...offlineConds)).orderBy(sqlTag`distance`);
+      const offlineResults = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(usersTable).leftJoin(profilesTable, eq9(profilesTable.userId, usersTable.id)).where(and6(...offlineConds)).orderBy(sqlTag`distance`);
       const offlineOnly = offlineResults.filter((r) => !onlineIdSet.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
     }
@@ -3997,12 +4382,12 @@ router2.get("/biker-available-list", requireAuth, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq8, and: and6, or: or3, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq9, and: and6, or: or3, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const bikerConds = [eq8(usersTable.status, "active"), or3(eq8(usersTable.userType, "biker"), eq8(usersTable.userType, "coppia"))];
+      const bikerConds = [eq9(usersTable.status, "active"), or3(eq9(usersTable.userType, "biker"), eq9(usersTable.userType, "coppia"))];
       if (countriesParam && countriesParam.length > 0) bikerConds.push(inArr(usersTable.country, countriesParam));
-      const allBikers = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq8(usersTable.id, profilesTable.userId)).where(and6(...bikerConds)).orderBy(sqlTag`distance`);
+      const allBikers = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq9(usersTable.id, profilesTable.userId)).where(and6(...bikerConds)).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));
       const offlineOnly = allBikers.filter((r) => !onlineIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
@@ -4051,12 +4436,12 @@ router2.get("/zavorrine-available-list", requireAuth, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq8, and: and6, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq9, and: and6, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const zavConds = [eq8(usersTable.status, "active"), eq8(usersTable.userType, "zavorrina")];
+      const zavConds = [eq9(usersTable.status, "active"), eq9(usersTable.userType, "zavorrina")];
       if (countriesParam && countriesParam.length > 0) zavConds.push(inArr(usersTable.country, countriesParam));
-      const allZav = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq8(usersTable.id, profilesTable.userId)).where(and6(...zavConds)).orderBy(sqlTag`distance`);
+      const allZav = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq9(usersTable.id, profilesTable.userId)).where(and6(...zavConds)).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));
       const offlineOnly = allZav.filter((r) => !onlineIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
@@ -7157,13 +7542,13 @@ var easter_eggs_default = router16;
 // server/routes/admin.ts
 var import_express17 = require("express");
 var import_multer2 = __toESM(require("multer"));
-var import_fs4 = __toESM(require("fs"));
-var import_path4 = __toESM(require("path"));
+var import_fs5 = __toESM(require("fs"));
+var import_path5 = __toESM(require("path"));
 var import_bcryptjs3 = __toESM(require("bcryptjs"));
 init_storage();
 init_db();
 init_schema();
-var import_drizzle_orm7 = require("drizzle-orm");
+var import_drizzle_orm8 = require("drizzle-orm");
 var router17 = (0, import_express17.Router)();
 function requireAdmin(req, res, next) {
   if (!req.session.userId) {
@@ -7542,8 +7927,8 @@ router17.get("/easter-eggs/:id/stats", async (req, res) => {
     }
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { collectedEasterEggs: collectedEasterEggs2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq8, count } = await import("drizzle-orm");
-    const [result] = await db2.select({ count: count() }).from(collectedEasterEggs2).where(eq8(collectedEasterEggs2.easterEggId, id));
+    const { eq: eq9, count } = await import("drizzle-orm");
+    const [result] = await db2.select({ count: count() }).from(collectedEasterEggs2).where(eq9(collectedEasterEggs2.easterEggId, id));
     return res.json({ eggId: id, collectionsCount: result?.count || 0 });
   } catch (error) {
     console.error("Admin get easter egg stats error:", error);
@@ -7922,15 +8307,15 @@ router17.put("/settings/:key", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-var adsDir = import_path4.default.join(process.cwd(), "uploads", "ads");
-if (!import_fs4.default.existsSync(adsDir)) {
-  import_fs4.default.mkdirSync(adsDir, { recursive: true });
+var adsDir = import_path5.default.join(process.cwd(), "uploads", "ads");
+if (!import_fs5.default.existsSync(adsDir)) {
+  import_fs5.default.mkdirSync(adsDir, { recursive: true });
 }
 var adImageStorage = import_multer2.default.diskStorage({
   destination: (_req, _file, cb) => cb(null, adsDir),
   filename: (_req, file, cb) => {
     const uniqueSuffix = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
-    cb(null, uniqueSuffix + import_path4.default.extname(file.originalname));
+    cb(null, uniqueSuffix + import_path5.default.extname(file.originalname));
   }
 });
 var adUpload = (0, import_multer2.default)({
@@ -8041,7 +8426,7 @@ router17.delete("/advertisements/:id", async (req, res) => {
   }
 });
 var eulaUpload = (0, import_multer2.default)({
-  dest: import_path4.default.join(process.cwd(), "uploads", "tmp"),
+  dest: import_path5.default.join(process.cwd(), "uploads", "tmp"),
   limits: { fileSize: 1 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype === "text/plain") {
@@ -8056,8 +8441,8 @@ router17.post("/settings/eula/upload", eulaUpload.single("file"), async (req, re
     if (!req.file) {
       return res.status(400).json({ message: "Nessun file caricato" });
     }
-    const content = import_fs4.default.readFileSync(req.file.path, "utf-8");
-    import_fs4.default.unlinkSync(req.file.path);
+    const content = import_fs5.default.readFileSync(req.file.path, "utf-8");
+    import_fs5.default.unlinkSync(req.file.path);
     const setting = await storage.upsertAppSetting("eula_text", content);
     await storage.createModeratorLog({
       moderatorId: req.session.userId,
@@ -8068,8 +8453,8 @@ router17.post("/settings/eula/upload", eulaUpload.single("file"), async (req, re
     });
     return res.json({ message: "EULA caricato con successo", value: content, setting });
   } catch (error) {
-    if (req.file && import_fs4.default.existsSync(req.file.path)) {
-      import_fs4.default.unlinkSync(req.file.path);
+    if (req.file && import_fs5.default.existsSync(req.file.path)) {
+      import_fs5.default.unlinkSync(req.file.path);
     }
     console.error("Admin upload EULA error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -8080,8 +8465,8 @@ router17.post("/settings/privacy-policy/upload", eulaUpload.single("file"), asyn
     if (!req.file) {
       return res.status(400).json({ message: "Nessun file caricato" });
     }
-    const content = import_fs4.default.readFileSync(req.file.path, "utf-8");
-    import_fs4.default.unlinkSync(req.file.path);
+    const content = import_fs5.default.readFileSync(req.file.path, "utf-8");
+    import_fs5.default.unlinkSync(req.file.path);
     const setting = await storage.upsertAppSetting("privacy_policy_text", content);
     await storage.createModeratorLog({
       moderatorId: req.session.userId,
@@ -8092,8 +8477,8 @@ router17.post("/settings/privacy-policy/upload", eulaUpload.single("file"), asyn
     });
     return res.json({ message: "Privacy Policy caricata con successo", value: content, setting });
   } catch (error) {
-    if (req.file && import_fs4.default.existsSync(req.file.path)) {
-      import_fs4.default.unlinkSync(req.file.path);
+    if (req.file && import_fs5.default.existsSync(req.file.path)) {
+      import_fs5.default.unlinkSync(req.file.path);
     }
     console.error("Admin upload Privacy Policy error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -8329,15 +8714,15 @@ router17.put("/fake-users/toggle-all", async (req, res) => {
     }
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { users: usersTable, userProfiles: userProfiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq8 } = await import("drizzle-orm");
+    const { eq: eq9 } = await import("drizzle-orm");
     await storage.upsertAppSetting("fake_users_enabled", enabled ? "true" : "false");
-    const fakeUsers = await db2.select().from(usersTable).where(eq8(usersTable.isFake, true));
+    const fakeUsers = await db2.select().from(usersTable).where(eq9(usersTable.isFake, true));
     const newLoginAt = enabled ? /* @__PURE__ */ new Date() : /* @__PURE__ */ new Date("2020-01-01");
     for (const fakeUser of fakeUsers) {
-      await db2.update(userProfiles2).set({ isAvailable: enabled }).where(eq8(userProfiles2.userId, fakeUser.id));
+      await db2.update(userProfiles2).set({ isAvailable: enabled }).where(eq9(userProfiles2.userId, fakeUser.id));
       const userUpdate = { lastLoginAt: newLoginAt };
       if (enabled && !fakeUser.country) userUpdate.country = "IT";
-      await db2.update(usersTable).set(userUpdate).where(eq8(usersTable.id, fakeUser.id));
+      await db2.update(usersTable).set(userUpdate).where(eq9(usersTable.id, fakeUser.id));
     }
     return res.json({ message: `Tutti gli utenti fake sono stati ${enabled ? "abilitati" : "disabilitati"}`, count: fakeUsers.length });
   } catch (error) {
@@ -8505,9 +8890,9 @@ router17.get("/chats/:id/messages", async (req, res) => {
 });
 router17.get("/motoclubs", async (_req, res) => {
   try {
-    const clubs = await db.select().from(motoClubs).orderBy((0, import_drizzle_orm7.desc)(motoClubs.createdAt));
+    const clubs = await db.select().from(motoClubs).orderBy((0, import_drizzle_orm8.desc)(motoClubs.createdAt));
     const result = await Promise.all(clubs.map(async (c) => {
-      const members = await db.select().from(motoClubMembers).where((0, import_drizzle_orm7.and)((0, import_drizzle_orm7.eq)(motoClubMembers.clubId, c.id), (0, import_drizzle_orm7.eq)(motoClubMembers.status, "active")));
+      const members = await db.select().from(motoClubMembers).where((0, import_drizzle_orm8.and)((0, import_drizzle_orm8.eq)(motoClubMembers.clubId, c.id), (0, import_drizzle_orm8.eq)(motoClubMembers.status, "active")));
       return { ...c, memberCount: members.length };
     }));
     return res.json(result);
@@ -8519,7 +8904,7 @@ router17.delete("/motoclubs/:id", async (req, res) => {
   try {
     const adminId = req.session.userId;
     const clubId = req.params.id;
-    await db.delete(motoClubs).where((0, import_drizzle_orm7.eq)(motoClubs.id, clubId));
+    await db.delete(motoClubs).where((0, import_drizzle_orm8.eq)(motoClubs.id, clubId));
     await db.insert(moderatorLogs).values({
       moderatorId: adminId,
       action: "delete_motoclub",
@@ -8534,7 +8919,7 @@ router17.delete("/motoclubs/:id", async (req, res) => {
 });
 router17.get("/motoclubs/requests", async (_req, res) => {
   try {
-    const requests = await db.select().from(motoClubRequests).orderBy((0, import_drizzle_orm7.desc)(motoClubRequests.createdAt));
+    const requests = await db.select().from(motoClubRequests).orderBy((0, import_drizzle_orm8.desc)(motoClubRequests.createdAt));
     return res.json(requests);
   } catch (e) {
     return res.status(500).json({ message: "Errore interno" });
@@ -8544,9 +8929,9 @@ router17.post("/motoclubs/requests/:id/approve", async (req, res) => {
   try {
     const adminId = req.session.userId;
     const requestId = req.params.id;
-    const [request] = await db.select().from(motoClubRequests).where((0, import_drizzle_orm7.eq)(motoClubRequests.id, requestId)).limit(1);
+    const [request] = await db.select().from(motoClubRequests).where((0, import_drizzle_orm8.eq)(motoClubRequests.id, requestId)).limit(1);
     if (!request) return res.status(404).json({ message: "Richiesta non trovata" });
-    await db.update(motoClubRequests).set({ status: "approved", reviewedBy: adminId, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm7.eq)(motoClubRequests.id, requestId));
+    await db.update(motoClubRequests).set({ status: "approved", reviewedBy: adminId, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm8.eq)(motoClubRequests.id, requestId));
     const [newClub] = await db.insert(motoClubs).values({
       name: request.name,
       clubType: request.clubType,
@@ -8559,7 +8944,7 @@ router17.post("/motoclubs/requests/:id/approve", async (req, res) => {
       conversationType: "motoclub",
       title: `Club ${request.name}`
     }).returning();
-    await db.update(motoClubs).set({ conversationId: conv.id }).where((0, import_drizzle_orm7.eq)(motoClubs.id, newClub.id));
+    await db.update(motoClubs).set({ conversationId: conv.id }).where((0, import_drizzle_orm8.eq)(motoClubs.id, newClub.id));
     await db.insert(moderatorLogs).values({
       moderatorId: adminId,
       action: "approve_motoclub_request",
@@ -8578,7 +8963,7 @@ router17.post("/motoclubs/requests/:id/reject", async (req, res) => {
     const adminId = req.session.userId;
     const requestId = req.params.id;
     const { note } = req.body;
-    await db.update(motoClubRequests).set({ status: "rejected", reviewedBy: adminId, reviewNote: note ?? null, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm7.eq)(motoClubRequests.id, requestId));
+    await db.update(motoClubRequests).set({ status: "rejected", reviewedBy: adminId, reviewNote: note ?? null, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm8.eq)(motoClubRequests.id, requestId));
     await db.insert(moderatorLogs).values({
       moderatorId: adminId,
       action: "reject_motoclub_request",
@@ -8594,7 +8979,7 @@ router17.post("/motoclubs/requests/:id/reject", async (req, res) => {
 router17.get("/motoclubs/:id", async (req, res) => {
   try {
     const clubId = req.params.id;
-    const [club] = await db.select().from(motoClubs).where((0, import_drizzle_orm7.eq)(motoClubs.id, clubId)).limit(1);
+    const [club] = await db.select().from(motoClubs).where((0, import_drizzle_orm8.eq)(motoClubs.id, clubId)).limit(1);
     if (!club) return res.status(404).json({ message: "Club non trovato" });
     const memberships = await db.select({
       membershipId: motoClubMembers.id,
@@ -8607,7 +8992,7 @@ router17.get("/motoclubs/:id", async (req, res) => {
       avatarUrl: users.avatarUrl,
       country: users.country,
       isFake: users.isFake
-    }).from(motoClubMembers).innerJoin(users, (0, import_drizzle_orm7.eq)(motoClubMembers.userId, users.id)).where((0, import_drizzle_orm7.and)((0, import_drizzle_orm7.eq)(motoClubMembers.clubId, clubId), (0, import_drizzle_orm7.eq)(motoClubMembers.status, "active"))).orderBy(motoClubMembers.joinedAt);
+    }).from(motoClubMembers).innerJoin(users, (0, import_drizzle_orm8.eq)(motoClubMembers.userId, users.id)).where((0, import_drizzle_orm8.and)((0, import_drizzle_orm8.eq)(motoClubMembers.clubId, clubId), (0, import_drizzle_orm8.eq)(motoClubMembers.status, "active"))).orderBy(motoClubMembers.joinedAt);
     return res.json({ ...club, members: memberships });
   } catch (e) {
     return res.status(500).json({ message: "Errore interno" });
@@ -8617,7 +9002,7 @@ router17.delete("/motoclubs/:id/members/:userId", async (req, res) => {
   try {
     const adminId = req.session.userId;
     const { id: clubId, userId } = req.params;
-    await db.delete(motoClubMembers).where((0, import_drizzle_orm7.and)((0, import_drizzle_orm7.eq)(motoClubMembers.clubId, clubId), (0, import_drizzle_orm7.eq)(motoClubMembers.userId, userId)));
+    await db.delete(motoClubMembers).where((0, import_drizzle_orm8.and)((0, import_drizzle_orm8.eq)(motoClubMembers.clubId, clubId), (0, import_drizzle_orm8.eq)(motoClubMembers.userId, userId)));
     await db.insert(moderatorLogs).values({
       moderatorId: adminId,
       action: "remove_motoclub_member",
@@ -8655,7 +9040,7 @@ router17.get("/mass-seed-status", async (_req, res) => {
 });
 router17.get("/invitation-codes/stats", async (_req, res) => {
   try {
-    const totalUsers = await db.select({ count: import_drizzle_orm7.sql`count(*)` }).from(users).then((r) => Number(r[0]?.count ?? 0));
+    const totalUsers = await db.select({ count: import_drizzle_orm8.sql`count(*)` }).from(users).then((r) => Number(r[0]?.count ?? 0));
     const usersWithCode = await storage.countUsersWithInvitationCode();
     const codes = await storage.getInvitationCodes();
     const perCode = await Promise.all(
@@ -8885,17 +9270,114 @@ router17.get("/db-stats", async (_req, res) => {
 router17.post("/fake-users/wake-all", async (_req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
-    const fakeUsers = await db.select({ id: users.id, country: users.country }).from(users).where((0, import_drizzle_orm7.eq)(users.isFake, true));
+    const fakeUsers = await db.select({ id: users.id, country: users.country }).from(users).where((0, import_drizzle_orm8.eq)(users.isFake, true));
     for (const fu of fakeUsers) {
       const update = { lastLoginAt: now };
       if (!fu.country) update.country = "IT";
-      await db.update(users).set(update).where((0, import_drizzle_orm7.eq)(users.id, fu.id));
-      await db.update(userProfiles).set({ isAvailable: true }).where((0, import_drizzle_orm7.eq)(userProfiles.userId, fu.id));
+      await db.update(users).set(update).where((0, import_drizzle_orm8.eq)(users.id, fu.id));
+      await db.update(userProfiles).set({ isAvailable: true }).where((0, import_drizzle_orm8.eq)(userProfiles.userId, fu.id));
     }
     return res.json({ ok: true, count: fakeUsers.length });
   } catch (error) {
     console.error("Admin wake-all fake users error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router17.get("/backup/status", async (_req, res) => {
+  try {
+    const { getBackupStatus: getBackupStatus2 } = await Promise.resolve().then(() => (init_backup_service(), backup_service_exports));
+    return res.json(getBackupStatus2());
+  } catch (error) {
+    console.error("Admin backup status error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router17.get("/backup/list", async (_req, res) => {
+  try {
+    const { listBackups: listBackups2 } = await Promise.resolve().then(() => (init_backup_service(), backup_service_exports));
+    const result = await listBackups2();
+    return res.json(result);
+  } catch (error) {
+    console.error("Admin backup list error:", error);
+    return res.status(500).json({ message: "Errore durante il recupero dei backup" });
+  }
+});
+router17.post("/backup/db", async (_req, res) => {
+  try {
+    const { backupDatabase: backupDatabase2 } = await Promise.resolve().then(() => (init_backup_service(), backup_service_exports));
+    const result = await backupDatabase2();
+    await storage.createModeratorLog({
+      moderatorId: _req.currentUser?.id || "admin",
+      action: "backup_db",
+      targetType: "system",
+      targetId: result.id,
+      details: `Backup DB eseguito: ${result.name} (${result.size} bytes)`
+    });
+    return res.json({ ok: true, ...result });
+  } catch (error) {
+    console.error("Admin backup db error:", error);
+    return res.status(500).json({ message: error.message || "Errore durante il backup del database" });
+  }
+});
+router17.post("/backup/media", async (_req, res) => {
+  try {
+    const { backupMedia: backupMedia2 } = await Promise.resolve().then(() => (init_backup_service(), backup_service_exports));
+    const result = await backupMedia2();
+    await storage.createModeratorLog({
+      moderatorId: _req.currentUser?.id || "admin",
+      action: "backup_media",
+      targetType: "system",
+      targetId: result.id,
+      details: `Backup media eseguito: ${result.name} (${result.size} bytes)`
+    });
+    return res.json({ ok: true, ...result });
+  } catch (error) {
+    console.error("Admin backup media error:", error);
+    return res.status(500).json({ message: error.message || "Errore durante il backup dei media" });
+  }
+});
+router17.post("/backup/restore", async (req, res) => {
+  try {
+    const { fileId, adminPassword } = req.body;
+    if (!fileId || !adminPassword) {
+      return res.status(400).json({ message: "fileId e adminPassword sono obbligatori" });
+    }
+    const user = req.currentUser;
+    const fullUser = await storage.getUser(user.id);
+    if (!fullUser || !fullUser.password) {
+      return res.status(403).json({ message: "Utente non trovato" });
+    }
+    const valid = await import_bcryptjs3.default.compare(adminPassword, fullUser.password);
+    if (!valid) {
+      return res.status(401).json({ message: "Password non corretta" });
+    }
+    const { restoreDatabase: restoreDatabase2 } = await Promise.resolve().then(() => (init_backup_service(), backup_service_exports));
+    await restoreDatabase2(fileId);
+    await storage.createModeratorLog({
+      moderatorId: user.id,
+      action: "restore_db",
+      targetType: "system",
+      targetId: fileId,
+      details: `Database ripristinato dal backup: ${fileId}`
+    });
+    return res.json({ ok: true, message: "Database ripristinato con successo" });
+  } catch (error) {
+    console.error("Admin restore db error:", error);
+    return res.status(500).json({ message: error.message || "Errore durante il ripristino del database" });
+  }
+});
+router17.put("/backup/schedule", async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== "boolean") {
+      return res.status(400).json({ message: "enabled deve essere un booleano" });
+    }
+    const { setAutoBackupEnabled: setAutoBackupEnabled2 } = await Promise.resolve().then(() => (init_backup_service(), backup_service_exports));
+    await setAutoBackupEnabled2(enabled);
+    return res.json({ ok: true, enabled });
+  } catch (error) {
+    console.error("Admin backup schedule error:", error);
+    return res.status(500).json({ message: error.message || "Errore durante la configurazione del backup" });
   }
 });
 var admin_default = router17;
@@ -9630,6 +10112,12 @@ async function registerRoutes(app2) {
     res.json({ status: "ok" });
   });
   const httpServer = (0, import_node_http.createServer)(app2);
+  Promise.resolve().then(() => (init_backup_service(), backup_service_exports)).then(({ startScheduler: startScheduler2 }) => {
+    startScheduler2().catch((err) => {
+      console.error("[backup-service] Failed to start scheduler:", err);
+    });
+  }).catch(() => {
+  });
   return httpServer;
 }
 
@@ -9907,7 +10395,7 @@ function startMatchingEngine() {
 var import_bcryptjs4 = __toESM(require("bcryptjs"));
 init_db();
 init_schema();
-var import_drizzle_orm8 = require("drizzle-orm");
+var import_drizzle_orm9 = require("drizzle-orm");
 var essentialUsers = [
   {
     nickname: "admin",
@@ -9929,7 +10417,7 @@ var essentialUsers = [
 async function autoSeedEssentialUsers() {
   try {
     for (const userData of essentialUsers) {
-      const existing = await db.select().from(users).where((0, import_drizzle_orm8.eq)(users.email, userData.email)).limit(1);
+      const existing = await db.select().from(users).where((0, import_drizzle_orm9.eq)(users.email, userData.email)).limit(1);
       if (existing.length > 0) {
         continue;
       }
@@ -10035,17 +10523,17 @@ var fakeCoppie = [
 ];
 async function autoSeedFakeUsers() {
   try {
-    const skipSetting = await db.select().from(appSettings).where((0, import_drizzle_orm8.eq)(appSettings.key, "skip_fake_user_seed")).limit(1);
+    const skipSetting = await db.select().from(appSettings).where((0, import_drizzle_orm9.eq)(appSettings.key, "skip_fake_user_seed")).limit(1);
     if (skipSetting.length > 0 && skipSetting[0].value === "true") {
       console.log("Auto-seed fake users skipped (admin deleted all fake users)");
       return;
     }
-    const massSeedTagged = await db.select({ id: users.id }).from(users).where(import_drizzle_orm8.sql`${users.invitationCode} IN ('mass_seed_2420', 'mass_seed_eu_v1')`).limit(1);
+    const massSeedTagged = await db.select({ id: users.id }).from(users).where(import_drizzle_orm9.sql`${users.invitationCode} IN ('mass_seed_2420', 'mass_seed_eu_v1')`).limit(1);
     if (massSeedTagged.length > 0) {
       console.log("Auto-seed fake users skipped (mass-seeded population exists)");
       return;
     }
-    const existingFakes = await db.select().from(users).where((0, import_drizzle_orm8.eq)(users.isFake, true)).limit(11);
+    const existingFakes = await db.select().from(users).where((0, import_drizzle_orm9.eq)(users.isFake, true)).limit(11);
     if (existingFakes.length > 10) {
       return;
     }
@@ -10179,8 +10667,8 @@ async function autoSeedFakeUsers() {
 }
 
 // server/index.ts
-var fs6 = __toESM(require("fs"));
-var path6 = __toESM(require("path"));
+var fs7 = __toESM(require("fs"));
+var path7 = __toESM(require("path"));
 var app = (0, import_express21.default)();
 var log = console.log;
 app.set("trust proxy", 1);
@@ -10226,7 +10714,7 @@ function setupBodyParsing(app2) {
 function setupRequestLogging(app2) {
   app2.use((req, res, next) => {
     const start = Date.now();
-    const path7 = req.path;
+    const path8 = req.path;
     let capturedJsonResponse = void 0;
     const originalResJson = res.json;
     res.json = function(bodyJson, ...args) {
@@ -10234,9 +10722,9 @@ function setupRequestLogging(app2) {
       return originalResJson.apply(res, [bodyJson, ...args]);
     };
     res.on("finish", () => {
-      if (!path7.startsWith("/api")) return;
+      if (!path8.startsWith("/api")) return;
       const duration = Date.now() - start;
-      let logLine = `${req.method} ${path7} ${res.statusCode} in ${duration}ms`;
+      let logLine = `${req.method} ${path8} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse && res.statusCode !== 304) {
         const jsonStr = JSON.stringify(capturedJsonResponse);
         logLine += ` :: ${jsonStr.length > 200 ? jsonStr.slice(0, 197) + "..." : jsonStr}`;
@@ -10251,8 +10739,8 @@ function setupRequestLogging(app2) {
 }
 function getAppName() {
   try {
-    const appJsonPath = path6.resolve(process.cwd(), "app.json");
-    const appJsonContent = fs6.readFileSync(appJsonPath, "utf-8");
+    const appJsonPath = path7.resolve(process.cwd(), "app.json");
+    const appJsonContent = fs7.readFileSync(appJsonPath, "utf-8");
     const appJson = JSON.parse(appJsonContent);
     return appJson.expo?.name || "App Landing Page";
   } catch {
@@ -10260,19 +10748,19 @@ function getAppName() {
   }
 }
 function serveExpoManifest(platform, res) {
-  const manifestPath = path6.resolve(
+  const manifestPath = path7.resolve(
     process.cwd(),
     "static-build",
     platform,
     "manifest.json"
   );
-  if (!fs6.existsSync(manifestPath)) {
+  if (!fs7.existsSync(manifestPath)) {
     return res.status(404).json({ error: `Manifest not found for platform: ${platform}` });
   }
   res.setHeader("expo-protocol-version", "1");
   res.setHeader("expo-sfv-version", "0");
   res.setHeader("content-type", "application/json");
-  const manifest = fs6.readFileSync(manifestPath, "utf-8");
+  const manifest = fs7.readFileSync(manifestPath, "utf-8");
   res.send(manifest);
 }
 function serveLandingPage({
@@ -10294,13 +10782,13 @@ function serveLandingPage({
   res.status(200).send(html);
 }
 function configureExpoAndLanding(app2) {
-  const templatePath = path6.resolve(
+  const templatePath = path7.resolve(
     process.cwd(),
     "server",
     "templates",
     "landing-page.html"
   );
-  const landingPageTemplate = fs6.readFileSync(templatePath, "utf-8");
+  const landingPageTemplate = fs7.readFileSync(templatePath, "utf-8");
   const appName = getAppName();
   log("Serving static Expo files with dynamic manifest routing");
   app2.use((req, res, next) => {
@@ -10324,10 +10812,10 @@ function configureExpoAndLanding(app2) {
     }
     next();
   });
-  app2.use("/assets", import_express21.default.static(path6.resolve(process.cwd(), "assets")));
-  app2.use("/uploads", import_express21.default.static(path6.resolve(process.cwd(), "uploads")));
-  app2.use(import_express21.default.static(path6.resolve(process.cwd(), "static-build")));
-  const webBuildDir = path6.resolve(process.cwd(), "static-build", "web");
+  app2.use("/assets", import_express21.default.static(path7.resolve(process.cwd(), "assets")));
+  app2.use("/uploads", import_express21.default.static(path7.resolve(process.cwd(), "uploads")));
+  app2.use(import_express21.default.static(path7.resolve(process.cwd(), "static-build")));
+  const webBuildDir = path7.resolve(process.cwd(), "static-build", "web");
   const noCacheHtml = (res, filePath) => {
     if (filePath.endsWith(".html")) {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
@@ -10338,8 +10826,8 @@ function configureExpoAndLanding(app2) {
   app2.use("/web", import_express21.default.static(webBuildDir, { setHeaders: noCacheHtml }));
   app2.use(import_express21.default.static(webBuildDir, { index: false, setHeaders: noCacheHtml }));
   app2.use("/web", (_req, res) => {
-    const indexPath = path6.join(webBuildDir, "index.html");
-    if (fs6.existsSync(indexPath)) {
+    const indexPath = path7.join(webBuildDir, "index.html");
+    if (fs7.existsSync(indexPath)) {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");
@@ -10372,13 +10860,13 @@ function setupErrorHandler(app2) {
   setupRequestLogging(app);
   configureExpoAndLanding(app);
   const server = await registerRoutes(app);
-  const webBuildIndex = path6.join(path6.resolve(process.cwd(), "static-build", "web"), "index.html");
+  const webBuildIndex = path7.join(path7.resolve(process.cwd(), "static-build", "web"), "index.html");
   app.use((req, res, next) => {
     if (req.method !== "GET" && req.method !== "HEAD") return next();
     if (req.path.startsWith("/api/")) return next();
     if (req.path === "/" || req.path === "/manifest" || req.path === "/healthz") return next();
     if (req.path.match(/\.\w+$/)) return next();
-    if (fs6.existsSync(webBuildIndex)) {
+    if (fs7.existsSync(webBuildIndex)) {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");

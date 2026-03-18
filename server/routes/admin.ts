@@ -1893,4 +1893,107 @@ router.post("/fake-users/wake-all", async (_req: Request, res: Response) => {
   }
 });
 
+router.get("/backup/status", async (_req: Request, res: Response) => {
+  try {
+    const { getBackupStatus } = await import("../backup-service");
+    return res.json(getBackupStatus());
+  } catch (error) {
+    console.error("Admin backup status error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/backup/list", async (_req: Request, res: Response) => {
+  try {
+    const { listBackups } = await import("../backup-service");
+    const result = await listBackups();
+    return res.json(result);
+  } catch (error) {
+    console.error("Admin backup list error:", error);
+    return res.status(500).json({ message: "Errore durante il recupero dei backup" });
+  }
+});
+
+router.post("/backup/db", async (_req: Request, res: Response) => {
+  try {
+    const { backupDatabase } = await import("../backup-service");
+    const result = await backupDatabase();
+    await storage.createModeratorLog({
+      moderatorId: (_req as any).currentUser?.id || "admin",
+      action: "backup_db",
+      targetType: "system",
+      targetId: result.id,
+      details: `Backup DB eseguito: ${result.name} (${result.size} bytes)`,
+    });
+    return res.json({ ok: true, ...result });
+  } catch (error: any) {
+    console.error("Admin backup db error:", error);
+    return res.status(500).json({ message: error.message || "Errore durante il backup del database" });
+  }
+});
+
+router.post("/backup/media", async (_req: Request, res: Response) => {
+  try {
+    const { backupMedia } = await import("../backup-service");
+    const result = await backupMedia();
+    await storage.createModeratorLog({
+      moderatorId: (_req as any).currentUser?.id || "admin",
+      action: "backup_media",
+      targetType: "system",
+      targetId: result.id,
+      details: `Backup media eseguito: ${result.name} (${result.size} bytes)`,
+    });
+    return res.json({ ok: true, ...result });
+  } catch (error: any) {
+    console.error("Admin backup media error:", error);
+    return res.status(500).json({ message: error.message || "Errore durante il backup dei media" });
+  }
+});
+
+router.post("/backup/restore", async (req: Request, res: Response) => {
+  try {
+    const { fileId, adminPassword } = req.body;
+    if (!fileId || !adminPassword) {
+      return res.status(400).json({ message: "fileId e adminPassword sono obbligatori" });
+    }
+    const user = (req as any).currentUser;
+    const fullUser = await storage.getUser(user.id);
+    if (!fullUser || !fullUser.password) {
+      return res.status(403).json({ message: "Utente non trovato" });
+    }
+    const valid = await bcrypt.compare(adminPassword, fullUser.password);
+    if (!valid) {
+      return res.status(401).json({ message: "Password non corretta" });
+    }
+    const { restoreDatabase } = await import("../backup-service");
+    await restoreDatabase(fileId);
+    await storage.createModeratorLog({
+      moderatorId: user.id,
+      action: "restore_db",
+      targetType: "system",
+      targetId: fileId,
+      details: `Database ripristinato dal backup: ${fileId}`,
+    });
+    return res.json({ ok: true, message: "Database ripristinato con successo" });
+  } catch (error: any) {
+    console.error("Admin restore db error:", error);
+    return res.status(500).json({ message: error.message || "Errore durante il ripristino del database" });
+  }
+});
+
+router.put("/backup/schedule", async (req: Request, res: Response) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== "boolean") {
+      return res.status(400).json({ message: "enabled deve essere un booleano" });
+    }
+    const { setAutoBackupEnabled } = await import("../backup-service");
+    await setAutoBackupEnabled(enabled);
+    return res.json({ ok: true, enabled });
+  } catch (error: any) {
+    console.error("Admin backup schedule error:", error);
+    return res.status(500).json({ message: error.message || "Errore durante la configurazione del backup" });
+  }
+});
+
 export default router;
