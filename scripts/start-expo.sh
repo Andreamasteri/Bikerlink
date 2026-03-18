@@ -4,6 +4,26 @@ PORT=8081
 BACKEND_PORT=5000
 MAX_RETRIES=3
 BACKEND_WAIT_SECONDS=120
+LOCK_FILE="/tmp/start-expo.lock"
+PID_FILE="/tmp/metro.pid"
+
+cleanup() {
+  rm -f "$LOCK_FILE"
+}
+trap cleanup EXIT
+
+if [ -f "$LOCK_FILE" ]; then
+  LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null)
+  if kill -0 "$LOCK_PID" 2>/dev/null; then
+    echo "Un'altra istanza di start-expo.sh è già in esecuzione (PID: $LOCK_PID). Uscita."
+    exit 0
+  else
+    echo "Lock file obsoleto trovato, continuo."
+    rm -f "$LOCK_FILE"
+  fi
+fi
+
+echo $$ > "$LOCK_FILE"
 
 kill_port() {
   pkill -9 -f "metro" 2>/dev/null || true
@@ -43,6 +63,7 @@ for retry in $(seq 1 $MAX_RETRIES); do
   echo "=== Tentativo $retry/$MAX_RETRIES ==="
   echo "Pulizia porta $PORT..."
   kill_port
+  sleep 2
 
   PIDS=$(lsof -ti:$PORT 2>/dev/null)
   if [ -n "$PIDS" ]; then
@@ -53,8 +74,9 @@ for retry in $(seq 1 $MAX_RETRIES); do
   echo "Porta $PORT libera, avvio Metro..."
   npm run expo:dev &
   METRO_PID=$!
+  echo $METRO_PID > "$PID_FILE"
 
-  sleep 8
+  sleep 25
 
   if kill -0 $METRO_PID 2>/dev/null; then
     echo "Metro avviato con successo (PID: $METRO_PID)"
@@ -67,6 +89,7 @@ for retry in $(seq 1 $MAX_RETRIES); do
     fi
     if [ $retry -lt $MAX_RETRIES ]; then
       echo "Riavvio in corso..."
+      sleep 3
       continue
     fi
     exit $EXIT_CODE

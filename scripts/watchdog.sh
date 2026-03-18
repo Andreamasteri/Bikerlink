@@ -5,7 +5,7 @@ FRONTEND_PORT=8081
 LOG_FILE="/home/runner/workspace/logs/watchdog.log"
 HEALTH_CHECK_INTERVAL=60
 CHECK_INTERVAL=10
-RESTART_COOLDOWN=15
+RESTART_COOLDOWN=60
 
 mkdir -p "$(dirname "$LOG_FILE")"
 
@@ -34,6 +34,17 @@ restart_backend() {
 
 restart_frontend() {
   log "CRASH RILEVATO: frontend (porta $FRONTEND_PORT) non risponde. Avvio riavvio..."
+
+  LOCK_FILE="/tmp/start-expo.lock"
+  if [ -f "$LOCK_FILE" ]; then
+    LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null)
+    if kill -0 "$LOCK_PID" 2>/dev/null; then
+      log "Start-expo già in esecuzione (PID: $LOCK_PID), attendo che Metro si avvii..."
+      return 0
+    fi
+    rm -f "$LOCK_FILE"
+  fi
+
   pkill -f "metro" 2>/dev/null || true
   pkill -f "expo start" 2>/dev/null || true
   pkill -f "react-native start" 2>/dev/null || true
