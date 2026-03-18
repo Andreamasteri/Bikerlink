@@ -3320,6 +3320,8 @@ function stopScheduler() {
   stopMediaScheduler();
 }
 async function isAutoBackupEnabled() {
+  if (process.env.BACKUP_AUTO_ENABLED === "false") return false;
+  if (process.env.BACKUP_AUTO_ENABLED === "true") return true;
   try {
     const rows = await db.select().from(appSettings).where((0, import_drizzle_orm7.eq)(appSettings.key, "backup_auto_enabled"));
     if (rows.length === 0) return true;
@@ -3402,7 +3404,7 @@ async function backupMedia() {
   const ts = getTimestamp();
   const tmpZip = import_path4.default.join(import_os.default.tmpdir(), `bikerlink_media_${ts}.zip`);
   try {
-    const mediaDir = process.env.PRIVATE_OBJECT_DIR ? import_path4.default.join(process.env.PRIVATE_OBJECT_DIR, "..") : "/home/runner/workspace/.data/uploads";
+    const mediaDir = process.env.MEDIA_UPLOAD_DIR || process.env.UPLOAD_DIR || import_path4.default.join(process.cwd(), ".data", "uploads");
     const zipBuffer = await new Promise((resolve2, reject) => {
       const output = import_fs4.default.createWriteStream(tmpZip);
       const archive = (0, import_archiver.default)("zip", { zlib: { level: 6 } });
