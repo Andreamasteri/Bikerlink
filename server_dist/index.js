@@ -10383,6 +10383,25 @@ async function registerRoutes(app2) {
       res.json({ enabled: true, text: "", paypalEmail: "" });
     }
   });
+  app2.get("/api/settings/splash", async (_req, res) => {
+    try {
+      const [modeSetting, messageSetting, listSetting] = await Promise.all([
+        storage.getAppSetting("splash_message_mode"),
+        storage.getAppSetting("splash_message"),
+        storage.getAppSetting("splash_messages_list")
+      ]);
+      const mode = modeSetting?.value || "single";
+      const message = messageSetting?.value || "";
+      let list = [];
+      try {
+        list = JSON.parse(listSetting?.value || "[]");
+      } catch {
+      }
+      res.json({ mode, message, list });
+    } catch {
+      res.json({ mode: "single", message: "", list: [] });
+    }
+  });
   app2.get("/api/settings/all", async (_req, res) => {
     try {
       const [syneco, emailVerification, chatbot, autoMatching, customRoutes2, paypal, sosEnabled] = await Promise.all([
@@ -11369,6 +11388,15 @@ function setupErrorHandler(app2) {
   }
   await autoSeedEssentialUsers();
   await autoSeedFakeUsers();
+  try {
+    const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+    const modeSetting = await storage2.getAppSetting("splash_message_mode");
+    if (!modeSetting) await storage2.upsertAppSetting("splash_message_mode", "single");
+    const listSetting = await storage2.getAppSetting("splash_messages_list");
+    if (!listSetting) await storage2.upsertAppSetting("splash_messages_list", "[]");
+  } catch (e) {
+    console.warn("[SEED] splash settings:", e);
+  }
   const port = parseInt(process.env.PORT || "5000", 10);
   server.listen(
     {

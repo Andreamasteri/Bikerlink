@@ -246,6 +246,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/splash", async (_req, res) => {
+    try {
+      const [modeSetting, messageSetting, listSetting] = await Promise.all([
+        storage.getAppSetting("splash_message_mode"),
+        storage.getAppSetting("splash_message"),
+        storage.getAppSetting("splash_messages_list"),
+      ]);
+      const mode = modeSetting?.value || "single";
+      const message = messageSetting?.value || "";
+      let list: string[] = [];
+      try {
+        list = JSON.parse(listSetting?.value || "[]");
+      } catch {}
+      res.json({ mode, message, list });
+    } catch {
+      res.json({ mode: "single", message: "", list: [] });
+    }
+  });
+
   app.get("/api/settings/all", async (_req, res) => {
     try {
       const [syneco, emailVerification, chatbot, autoMatching, customRoutes, paypal, sosEnabled] = await Promise.all([

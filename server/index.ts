@@ -297,6 +297,16 @@ function setupErrorHandler(app: express.Application) {
   await autoSeedEssentialUsers();
   await autoSeedFakeUsers();
 
+  try {
+    const { storage } = await import("./storage");
+    const modeSetting = await storage.getAppSetting("splash_message_mode");
+    if (!modeSetting) await storage.upsertAppSetting("splash_message_mode", "single");
+    const listSetting = await storage.getAppSetting("splash_messages_list");
+    if (!listSetting) await storage.upsertAppSetting("splash_messages_list", "[]");
+  } catch (e) {
+    console.warn("[SEED] splash settings:", e);
+  }
+
   const port = parseInt(process.env.PORT || "5000", 10);
   server.listen(
     {

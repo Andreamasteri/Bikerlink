@@ -588,6 +588,45 @@ export default function AdminSettings() {
     }
   }, [privacyData?.text]);
 
+  const [splashMode, setSplashMode] = useState<"single" | "cycle">("single");
+  const [splashMessagesList, setSplashMessagesList] = useState<string[]>([]);
+
+  React.useEffect(() => {
+    if (settings && settings.length > 0) {
+      const modeSetting = settings.find(s => s.key === "splash_message_mode");
+      if (modeSetting?.value === "cycle") setSplashMode("cycle");
+      else setSplashMode("single");
+
+      const listSetting = settings.find(s => s.key === "splash_messages_list");
+      try {
+        const parsed = JSON.parse(listSetting?.value || "[]");
+        if (Array.isArray(parsed)) setSplashMessagesList(parsed);
+      } catch {}
+    }
+  }, [settings]);
+
+  async function handleSaveSplashMode(mode: "single" | "cycle") {
+    setSplashMode(mode);
+    try {
+      await apiRequest("PUT", "/api/admin/settings/splash_message_mode", { value: mode });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/splash"] });
+    } catch (error: any) {
+      Alert.alert("Errore", error.message || "Errore durante il salvataggio");
+    }
+  }
+
+  async function handleSaveSplashList(list: string[]) {
+    setSplashMessagesList(list);
+    try {
+      await apiRequest("PUT", "/api/admin/settings/splash_messages_list", { value: JSON.stringify(list) });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/splash"] });
+    } catch (error: any) {
+      Alert.alert("Errore", error.message || "Errore durante il salvataggio");
+    }
+  }
+
   const updateMutation = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
       const baseUrl = getApiUrl();
@@ -1338,7 +1377,92 @@ export default function AdminSettings() {
         <Text style={styles.loadingText}>Caricamento...</Text>
       ) : (
         <>
-          {renderSettingCard(splashSetting)}
+          <View style={styles.settingCard}>
+            <View style={styles.settingHeader}>
+              <Text style={styles.settingLabel}>Messaggio Splash</Text>
+            </View>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
+              <TouchableOpacity
+                style={[styles.modeBtn, splashMode === "single" && styles.modeBtnActive]}
+                onPress={() => handleSaveSplashMode("single")}
+              >
+                <Text style={[styles.modeBtnText, splashMode === "single" && styles.modeBtnTextActive]}>Singolo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modeBtn, splashMode === "cycle" && styles.modeBtnActive]}
+                onPress={() => handleSaveSplashMode("cycle")}
+              >
+                <Text style={[styles.modeBtnText, splashMode === "cycle" && styles.modeBtnTextActive]}>Cicla</Text>
+              </TouchableOpacity>
+            </View>
+            {splashMode === "single" ? (
+              editingKey === "splash_message" ? (
+                <View>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Messaggio da mostrare nello splash..."
+                    placeholderTextColor={Colors.textSecondary}
+                    value={editValue}
+                    onChangeText={setEditValue}
+                  />
+                  <View style={styles.editActions}>
+                    <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditingKey(null)}>
+                      <Text style={styles.cancelBtnText}>Annulla</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.saveBtn}
+                      onPress={handleSave}
+                      disabled={updateMutation.isPending}
+                    >
+                      <Text style={styles.saveBtnText}>{updateMutation.isPending ? "..." : "Salva"}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <Text style={[styles.settingValue, { flex: 1 }]}>
+                    {getSettingValue("splash_message") || "Messaggio da mostrare nello splash..."}
+                  </Text>
+                  <TouchableOpacity onPress={() => startEditing("splash_message")}>
+                    <Ionicons name="create" size={20} color={Colors.accent} />
+                  </TouchableOpacity>
+                </View>
+              )
+            ) : (
+              <View>
+                {splashMessagesList.map((msg, idx) => (
+                  <View key={idx} style={{ flexDirection: "row", alignItems: "center", marginBottom: 8, gap: 8 }}>
+                    <TextInput
+                      style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                      value={msg}
+                      onChangeText={(text) => {
+                        const updated = [...splashMessagesList];
+                        updated[idx] = text;
+                        handleSaveSplashList(updated);
+                      }}
+                      placeholder={`Messaggio ${idx + 1}`}
+                      placeholderTextColor={Colors.textSecondary}
+                    />
+                    <TouchableOpacity
+                      onPress={() => {
+                        const updated = splashMessagesList.filter((_, i) => i !== idx);
+                        handleSaveSplashList(updated);
+                      }}
+                    >
+                      <Ionicons name="trash-outline" size={20} color={Colors.error || "#e74c3c"} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                <TouchableOpacity
+                  style={[styles.saveBtn, { alignSelf: "flex-start" as const, flexDirection: "row" as const, alignItems: "center" as const, gap: 6 }]}
+                  onPress={() => handleSaveSplashList([...splashMessagesList, ""])}
+                >
+                  <Ionicons name="add" size={16} color="#fff" />
+                  <Text style={styles.saveBtnText}>Aggiungi messaggio</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
           {renderSettingCard(maxPhotosSetting)}
           {renderSettingCard(maxVotesSetting)}
         </>
@@ -1502,6 +1626,13 @@ const styles = StyleSheet.create({
   cancelBtnText: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.textSecondary },
   saveBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: Colors.accent },
   saveBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.background },
+  modeBtn: {
+    flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: "center" as const,
+    borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.background,
+  },
+  modeBtnActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  modeBtnText: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.textSecondary },
+  modeBtnTextActive: { color: Colors.background },
   privacyCard: {
     backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginTop: 16,
     borderWidth: 1, borderColor: Colors.accent,

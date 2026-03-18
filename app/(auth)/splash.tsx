@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -17,14 +17,43 @@ import Animated, {
   interpolate,
 } from "react-native-reanimated";
 import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
+import { getApiUrl } from "@/lib/query-client";
 
 const { width, height } = Dimensions.get("window");
 const AnimatedImageBackground = Animated.createAnimatedComponent(ImageBackground);
 
+const SPLASH_INDEX_KEY = "splash_cycle_index";
+
+async function pickSplashMessage(): Promise<string | null> {
+  try {
+    const baseUrl = getApiUrl();
+    const url = new URL("/api/settings/splash", baseUrl);
+    const res = await fetch(url.toString(), { credentials: "include" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const mode: string = data.mode || "single";
+    if (mode === "cycle") {
+      const list: string[] = Array.isArray(data.list) ? data.list.filter((m: string) => m && m.trim()) : [];
+      if (list.length === 0) return data.message || null;
+      const raw = await AsyncStorage.getItem(SPLASH_INDEX_KEY);
+      const currentIndex = parseInt(raw || "0", 10);
+      const idx = isNaN(currentIndex) ? 0 : currentIndex % list.length;
+      await AsyncStorage.setItem(SPLASH_INDEX_KEY, String((idx + 1) % list.length));
+      return list[idx];
+    } else {
+      return data.message || null;
+    }
+  } catch {
+    return null;
+  }
+}
+
 export default function SplashAnimatedScreen() {
   const router = useRouter();
+  const [splashMessage, setSplashMessage] = useState<string | null>(null);
 
   const bgOpacity = useSharedValue(0);
   const overlayOpacity = useSharedValue(1);
@@ -36,6 +65,8 @@ export default function SplashAnimatedScreen() {
   const glowOpacity = useSharedValue(0);
 
   useEffect(() => {
+    pickSplashMessage().then(msg => setSplashMessage(msg));
+
     bgOpacity.value = withTiming(1, { duration: 1200, easing: Easing.out(Easing.cubic) });
     overlayOpacity.value = withTiming(0.55, { duration: 1400, easing: Easing.out(Easing.cubic) });
 
@@ -84,6 +115,8 @@ export default function SplashAnimatedScreen() {
     opacity: glowOpacity.value,
   }));
 
+  const displayMessage = splashMessage || t("app.tagline");
+
   return (
     <View style={styles.container}>
       <AnimatedImageBackground
@@ -103,7 +136,7 @@ export default function SplashAnimatedScreen() {
           </Animated.View>
 
           <Animated.View style={taglineAnimatedStyle}>
-            <Text style={styles.tagline}>{t("app.tagline")}</Text>
+            <Text style={styles.tagline}>{displayMessage}</Text>
           </Animated.View>
 
           <Animated.View style={[styles.lineAccent, taglineAnimatedStyle]} />
