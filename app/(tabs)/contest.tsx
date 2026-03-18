@@ -22,7 +22,7 @@ import { showImagePickerMenu } from "@/lib/image-picker-utils";
 
 import Colors from "@/constants/colors";
 import { useT, useLocale } from "@/lib/language-context";
-import { apiRequest, queryClient } from "@/lib/query-client";
+import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const COLUMN_COUNT = 2;
@@ -195,8 +195,34 @@ export default function ContestScreen() {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: async (data: { photoUrl: string; caption: string }) => {
-      await apiRequest("POST", "/api/contest/entries", data);
+    mutationFn: async (data: { imageUri: string; caption: string }) => {
+      const formData = new FormData();
+      const filename = data.imageUri.split("/").pop() || "photo.jpg";
+      const ext = /\.(\w+)$/.exec(filename);
+      const mimeType = ext ? `image/${ext[1].toLowerCase()}` : "image/jpeg";
+
+      if (Platform.OS === "web") {
+        const response = await globalThis.fetch(data.imageUri);
+        const blob = await response.blob();
+        formData.append("photo", blob, filename);
+      } else {
+        formData.append("photo", { uri: data.imageUri, name: filename, type: mimeType } as any);
+      }
+
+      if (data.caption) {
+        formData.append("caption", data.caption);
+      }
+
+      const url = new URL("/api/contest/entries", getApiUrl());
+      const res = await globalThis.fetch(url.toString(), {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contest/entries"] });
@@ -228,7 +254,7 @@ export default function ContestScreen() {
 
   const handleUpload = useCallback(() => {
     if (!selectedImage) return;
-    uploadMutation.mutate({ photoUrl: selectedImage, caption });
+    uploadMutation.mutate({ imageUri: selectedImage, caption });
   }, [selectedImage, caption, uploadMutation]);
 
   const votesUsed = data?.votesUsed ?? 0;

@@ -1,7 +1,38 @@
 import { Router, type Request, type Response } from "express";
+import path from "path";
+import fs from "fs";
+import multer from "multer";
 import { storage } from "../storage";
 
 const router = Router();
+
+const uploadsDir = path.join(process.cwd(), "uploads", "contest");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const contestStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname) || ".jpg";
+    const uniqueName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}${ext}`;
+    cb(null, uniqueName);
+  },
+});
+
+const upload = multer({
+  storage: contestStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Solo immagini consentite"));
+    }
+  },
+});
 
 function requireAuth(req: Request, res: Response): string | null {
   if (!req.session.userId) {
@@ -19,12 +50,22 @@ function getWeekNumber(date: Date): number {
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
-router.post("/entries", async (req: Request, res: Response) => {
+router.post("/entries", upload.single("photo"), async (req: Request, res: Response) => {
   try {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
-    const { photoUrl, caption, performanceData } = req.body;
+    const caption = req.body.caption || null;
+    const performanceData = req.body.performanceData || null;
+
+    let photoUrl: string | null = null;
+
+    if (req.file) {
+      photoUrl = `/uploads/contest/${req.file.filename}`;
+    } else if (req.body.photoUrl) {
+      photoUrl = req.body.photoUrl;
+    }
+
     if (!photoUrl && !performanceData) {
       return res.status(400).json({ message: "Foto o dati performance obbligatori" });
     }
@@ -35,8 +76,8 @@ router.post("/entries", async (req: Request, res: Response) => {
 
     const entry = await storage.createPhotoContestEntry({
       userId,
-      photoUrl: photoUrl || null,
-      caption: caption || null,
+      photoUrl,
+      caption,
       performanceData: performanceData ? (typeof performanceData === "string" ? performanceData : JSON.stringify(performanceData)) : null,
       weekNumber,
       year,

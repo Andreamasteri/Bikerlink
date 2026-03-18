@@ -3400,21 +3400,21 @@ async function backupDatabase() {
   if (isBackingUp) throw new Error("Backup gi\xE0 in corso");
   isBackingUp = true;
   const ts = getTimestamp();
-  const tmpSql = import_path5.default.join(import_os.default.tmpdir(), `bikerlink_db_${ts}.sql`);
+  const tmpSql = import_path6.default.join(import_os.default.tmpdir(), `bikerlink_db_${ts}.sql`);
   const tmpGz = tmpSql + ".gz";
   try {
     const dbUrl = process.env.DATABASE_URL;
     await execAsync(`pg_dump "${dbUrl}" --clean --if-exists -f "${tmpSql}" --no-password`);
     await new Promise((resolve2, reject) => {
-      const inp = import_fs5.default.createReadStream(tmpSql);
-      const out = import_fs5.default.createWriteStream(tmpGz);
+      const inp = import_fs6.default.createReadStream(tmpSql);
+      const out = import_fs6.default.createWriteStream(tmpGz);
       const gz = import_zlib.default.createGzip({ level: 9 });
       inp.pipe(gz).pipe(out);
       out.on("finish", resolve2);
       out.on("error", reject);
       inp.on("error", reject);
     });
-    const buf = import_fs5.default.readFileSync(tmpGz);
+    const buf = import_fs6.default.readFileSync(tmpGz);
     const fileName = `bikerlink_db_${ts}.sql.gz`;
     const objectPath = getObjectPath("db", fileName);
     await uploadBuffer(objectPath, buf, "application/gzip");
@@ -3423,11 +3423,11 @@ async function backupDatabase() {
   } finally {
     isBackingUp = false;
     try {
-      import_fs5.default.unlinkSync(tmpSql);
+      import_fs6.default.unlinkSync(tmpSql);
     } catch {
     }
     try {
-      import_fs5.default.unlinkSync(tmpGz);
+      import_fs6.default.unlinkSync(tmpGz);
     } catch {
     }
   }
@@ -3436,20 +3436,20 @@ async function backupMedia() {
   if (isBackingUp) throw new Error("Backup gi\xE0 in corso");
   isBackingUp = true;
   const ts = getTimestamp();
-  const tmpZip = import_path5.default.join(import_os.default.tmpdir(), `bikerlink_media_${ts}.zip`);
+  const tmpZip = import_path6.default.join(import_os.default.tmpdir(), `bikerlink_media_${ts}.zip`);
   try {
-    const mediaDir = process.env.MEDIA_UPLOAD_DIR || process.env.UPLOAD_DIR || import_path5.default.join(process.cwd(), ".data", "uploads");
+    const mediaDir = process.env.MEDIA_UPLOAD_DIR || process.env.UPLOAD_DIR || import_path6.default.join(process.cwd(), ".data", "uploads");
     const zipBuffer = await new Promise((resolve2, reject) => {
-      const output = import_fs5.default.createWriteStream(tmpZip);
+      const output = import_fs6.default.createWriteStream(tmpZip);
       const archive = (0, import_archiver.default)("zip", { zlib: { level: 6 } });
       archive.pipe(output);
-      if (import_fs5.default.existsSync(mediaDir)) {
+      if (import_fs6.default.existsSync(mediaDir)) {
         archive.directory(mediaDir, false);
       } else {
         archive.append("(nessun file media)", { name: "README.txt" });
       }
       archive.finalize();
-      output.on("close", () => resolve2(import_fs5.default.readFileSync(tmpZip)));
+      output.on("close", () => resolve2(import_fs6.default.readFileSync(tmpZip)));
       archive.on("error", reject);
     });
     const fileName = `bikerlink_media_${ts}.zip`;
@@ -3460,7 +3460,7 @@ async function backupMedia() {
   } finally {
     isBackingUp = false;
     try {
-      import_fs5.default.unlinkSync(tmpZip);
+      import_fs6.default.unlinkSync(tmpZip);
     } catch {
     }
   }
@@ -3468,14 +3468,14 @@ async function backupMedia() {
 async function restoreDatabase(objectPath) {
   if (isRestoringDb) throw new Error("Ripristino gi\xE0 in corso");
   isRestoringDb = true;
-  const tmpGz = import_path5.default.join(import_os.default.tmpdir(), `bikerlink_restore_${Date.now()}.sql.gz`);
+  const tmpGz = import_path6.default.join(import_os.default.tmpdir(), `bikerlink_restore_${Date.now()}.sql.gz`);
   const tmpSql = tmpGz.replace(".sql.gz", ".sql");
   try {
     const buf = await downloadBuffer(objectPath);
-    import_fs5.default.writeFileSync(tmpGz, buf);
+    import_fs6.default.writeFileSync(tmpGz, buf);
     await new Promise((resolve2, reject) => {
-      const inp = import_fs5.default.createReadStream(tmpGz);
-      const out = import_fs5.default.createWriteStream(tmpSql);
+      const inp = import_fs6.default.createReadStream(tmpGz);
+      const out = import_fs6.default.createWriteStream(tmpSql);
       const gz = import_zlib.default.createGunzip();
       inp.pipe(gz).pipe(out);
       out.on("finish", resolve2);
@@ -3488,11 +3488,11 @@ async function restoreDatabase(objectPath) {
   } finally {
     isRestoringDb = false;
     try {
-      import_fs5.default.unlinkSync(tmpGz);
+      import_fs6.default.unlinkSync(tmpGz);
     } catch {
     }
     try {
-      import_fs5.default.unlinkSync(tmpSql);
+      import_fs6.default.unlinkSync(tmpSql);
     } catch {
     }
   }
@@ -3532,7 +3532,7 @@ async function purgeOldBackups() {
 async function downloadBackupBuffer(objectPath) {
   return downloadBuffer(objectPath);
 }
-var import_child_process, import_util, import_zlib, import_archiver, import_fs5, import_os, import_path5, import_drizzle_orm7, execAsync, DB_PREFIX, MEDIA_PREFIX, RETENTION_DAYS, dbSchedulerTimer, mediaSchedulerTimer, dbNextAt, mediaNextAt, isBackingUp, isRestoringDb, INTERVAL_DB_MS, INTERVAL_MEDIA_MS;
+var import_child_process, import_util, import_zlib, import_archiver, import_fs6, import_os, import_path6, import_drizzle_orm7, execAsync, DB_PREFIX, MEDIA_PREFIX, RETENTION_DAYS, dbSchedulerTimer, mediaSchedulerTimer, dbNextAt, mediaNextAt, isBackingUp, isRestoringDb, INTERVAL_DB_MS, INTERVAL_MEDIA_MS;
 var init_backup_service = __esm({
   "server/backup-service.ts"() {
     "use strict";
@@ -3540,9 +3540,9 @@ var init_backup_service = __esm({
     import_util = require("util");
     import_zlib = __toESM(require("zlib"));
     import_archiver = __toESM(require("archiver"));
-    import_fs5 = __toESM(require("fs"));
+    import_fs6 = __toESM(require("fs"));
     import_os = __toESM(require("os"));
-    import_path5 = __toESM(require("path"));
+    import_path6 = __toESM(require("path"));
     init_objectStorage();
     init_db();
     init_schema();
@@ -3571,7 +3571,7 @@ var import_node_path = __toESM(require("node:path"));
 var import_node_fs = __toESM(require("node:fs"));
 var import_express_session = __toESM(require("express-session"));
 var import_connect_pg_simple = __toESM(require("connect-pg-simple"));
-var import_multer3 = __toESM(require("multer"));
+var import_multer4 = __toESM(require("multer"));
 init_db();
 init_storage();
 
@@ -6604,8 +6604,36 @@ var invitations_default = router9;
 
 // server/routes/contest.ts
 var import_express10 = require("express");
+var import_path5 = __toESM(require("path"));
+var import_fs5 = __toESM(require("fs"));
+var import_multer2 = __toESM(require("multer"));
 init_storage();
 var router10 = (0, import_express10.Router)();
+var uploadsDir4 = import_path5.default.join(process.cwd(), "uploads", "contest");
+if (!import_fs5.default.existsSync(uploadsDir4)) {
+  import_fs5.default.mkdirSync(uploadsDir4, { recursive: true });
+}
+var contestStorage = import_multer2.default.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadsDir4);
+  },
+  filename: (_req, file, cb) => {
+    const ext = import_path5.default.extname(file.originalname) || ".jpg";
+    const uniqueName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}${ext}`;
+    cb(null, uniqueName);
+  }
+});
+var upload2 = (0, import_multer2.default)({
+  storage: contestStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Solo immagini consentite"));
+    }
+  }
+});
 function requireAuth7(req, res) {
   if (!req.session.userId) {
     res.status(401).json({ message: "Non autenticato" });
@@ -6620,11 +6648,18 @@ function getWeekNumber(date) {
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 864e5 + 1) / 7);
 }
-router10.post("/entries", async (req, res) => {
+router10.post("/entries", upload2.single("photo"), async (req, res) => {
   try {
     const userId = requireAuth7(req, res);
     if (!userId) return;
-    const { photoUrl, caption, performanceData } = req.body;
+    const caption = req.body.caption || null;
+    const performanceData = req.body.performanceData || null;
+    let photoUrl = null;
+    if (req.file) {
+      photoUrl = `/uploads/contest/${req.file.filename}`;
+    } else if (req.body.photoUrl) {
+      photoUrl = req.body.photoUrl;
+    }
     if (!photoUrl && !performanceData) {
       return res.status(400).json({ message: "Foto o dati performance obbligatori" });
     }
@@ -6633,8 +6668,8 @@ router10.post("/entries", async (req, res) => {
     const year = now.getFullYear();
     const entry = await storage.createPhotoContestEntry({
       userId,
-      photoUrl: photoUrl || null,
-      caption: caption || null,
+      photoUrl,
+      caption,
       performanceData: performanceData ? typeof performanceData === "string" ? performanceData : JSON.stringify(performanceData) : null,
       weekNumber,
       year,
@@ -7783,9 +7818,9 @@ var easter_eggs_default = router16;
 
 // server/routes/admin.ts
 var import_express17 = require("express");
-var import_multer2 = __toESM(require("multer"));
-var import_fs6 = __toESM(require("fs"));
-var import_path6 = __toESM(require("path"));
+var import_multer3 = __toESM(require("multer"));
+var import_fs7 = __toESM(require("fs"));
+var import_path7 = __toESM(require("path"));
 var import_bcryptjs3 = __toESM(require("bcryptjs"));
 init_storage();
 init_db();
@@ -8549,20 +8584,20 @@ router17.put("/settings/:key", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-var adsDir = import_path6.default.join(process.cwd(), "uploads", "ads");
-var inviteCodesDir = import_path6.default.join(process.cwd(), "uploads", "invitation-codes");
-if (!import_fs6.default.existsSync(inviteCodesDir)) import_fs6.default.mkdirSync(inviteCodesDir, { recursive: true });
-if (!import_fs6.default.existsSync(adsDir)) {
-  import_fs6.default.mkdirSync(adsDir, { recursive: true });
+var adsDir = import_path7.default.join(process.cwd(), "uploads", "ads");
+var inviteCodesDir = import_path7.default.join(process.cwd(), "uploads", "invitation-codes");
+if (!import_fs7.default.existsSync(inviteCodesDir)) import_fs7.default.mkdirSync(inviteCodesDir, { recursive: true });
+if (!import_fs7.default.existsSync(adsDir)) {
+  import_fs7.default.mkdirSync(adsDir, { recursive: true });
 }
-var inviteCodeImageStorage = import_multer2.default.diskStorage({
+var inviteCodeImageStorage = import_multer3.default.diskStorage({
   destination: (_req, _file, cb) => cb(null, inviteCodesDir),
   filename: (_req, file, cb) => {
     const uniqueSuffix = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
-    cb(null, uniqueSuffix + import_path6.default.extname(file.originalname));
+    cb(null, uniqueSuffix + import_path7.default.extname(file.originalname));
   }
 });
-var inviteCodeUpload = (0, import_multer2.default)({
+var inviteCodeUpload = (0, import_multer3.default)({
   storage: inviteCodeImageStorage,
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
@@ -8574,14 +8609,14 @@ var inviteCodeUpload = (0, import_multer2.default)({
     }
   }
 });
-var adImageStorage = import_multer2.default.diskStorage({
+var adImageStorage = import_multer3.default.diskStorage({
   destination: (_req, _file, cb) => cb(null, adsDir),
   filename: (_req, file, cb) => {
     const uniqueSuffix = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
-    cb(null, uniqueSuffix + import_path6.default.extname(file.originalname));
+    cb(null, uniqueSuffix + import_path7.default.extname(file.originalname));
   }
 });
-var adUpload = (0, import_multer2.default)({
+var adUpload = (0, import_multer3.default)({
   storage: adImageStorage,
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
@@ -8688,8 +8723,8 @@ router17.delete("/advertisements/:id", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-var eulaUpload = (0, import_multer2.default)({
-  dest: import_path6.default.join(process.cwd(), "uploads", "tmp"),
+var eulaUpload = (0, import_multer3.default)({
+  dest: import_path7.default.join(process.cwd(), "uploads", "tmp"),
   limits: { fileSize: 1 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype === "text/plain") {
@@ -8704,8 +8739,8 @@ router17.post("/settings/eula/upload", eulaUpload.single("file"), async (req, re
     if (!req.file) {
       return res.status(400).json({ message: "Nessun file caricato" });
     }
-    const content = import_fs6.default.readFileSync(req.file.path, "utf-8");
-    import_fs6.default.unlinkSync(req.file.path);
+    const content = import_fs7.default.readFileSync(req.file.path, "utf-8");
+    import_fs7.default.unlinkSync(req.file.path);
     const setting = await storage.upsertAppSetting("eula_text", content);
     await storage.createModeratorLog({
       moderatorId: req.session.userId,
@@ -8716,8 +8751,8 @@ router17.post("/settings/eula/upload", eulaUpload.single("file"), async (req, re
     });
     return res.json({ message: "EULA caricato con successo", value: content, setting });
   } catch (error) {
-    if (req.file && import_fs6.default.existsSync(req.file.path)) {
-      import_fs6.default.unlinkSync(req.file.path);
+    if (req.file && import_fs7.default.existsSync(req.file.path)) {
+      import_fs7.default.unlinkSync(req.file.path);
     }
     console.error("Admin upload EULA error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -8728,8 +8763,8 @@ router17.post("/settings/privacy-policy/upload", eulaUpload.single("file"), asyn
     if (!req.file) {
       return res.status(400).json({ message: "Nessun file caricato" });
     }
-    const content = import_fs6.default.readFileSync(req.file.path, "utf-8");
-    import_fs6.default.unlinkSync(req.file.path);
+    const content = import_fs7.default.readFileSync(req.file.path, "utf-8");
+    import_fs7.default.unlinkSync(req.file.path);
     const setting = await storage.upsertAppSetting("privacy_policy_text", content);
     await storage.createModeratorLog({
       moderatorId: req.session.userId,
@@ -8740,8 +8775,8 @@ router17.post("/settings/privacy-policy/upload", eulaUpload.single("file"), asyn
     });
     return res.json({ message: "Privacy Policy caricata con successo", value: content, setting });
   } catch (error) {
-    if (req.file && import_fs6.default.existsSync(req.file.path)) {
-      import_fs6.default.unlinkSync(req.file.path);
+    if (req.file && import_fs7.default.existsSync(req.file.path)) {
+      import_fs7.default.unlinkSync(req.file.path);
     }
     console.error("Admin upload Privacy Policy error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -10609,8 +10644,8 @@ async function registerRoutes(app2) {
       lastModified: stats.mtime.toISOString()
     });
   });
-  const manualUpload = (0, import_multer3.default)({
-    storage: import_multer3.default.diskStorage({
+  const manualUpload = (0, import_multer4.default)({
+    storage: import_multer4.default.diskStorage({
       destination: (_req, _file, cb) => {
         if (!import_node_fs.default.existsSync(MANUAL_DIR)) import_node_fs.default.mkdirSync(MANUAL_DIR, { recursive: true });
         cb(null, MANUAL_DIR);
@@ -10639,8 +10674,8 @@ async function registerRoutes(app2) {
       });
     });
   });
-  const eulaUpload2 = (0, import_multer3.default)({
-    storage: import_multer3.default.diskStorage({
+  const eulaUpload2 = (0, import_multer4.default)({
+    storage: import_multer4.default.diskStorage({
       destination: (_req, _file, cb) => {
         if (!import_node_fs.default.existsSync(MANUAL_DIR)) import_node_fs.default.mkdirSync(MANUAL_DIR, { recursive: true });
         cb(null, MANUAL_DIR);
@@ -10653,8 +10688,8 @@ async function registerRoutes(app2) {
     },
     limits: { fileSize: 20 * 1024 * 1024 }
   });
-  const privacyUpload = (0, import_multer3.default)({
-    storage: import_multer3.default.diskStorage({
+  const privacyUpload = (0, import_multer4.default)({
+    storage: import_multer4.default.diskStorage({
       destination: (_req, _file, cb) => {
         if (!import_node_fs.default.existsSync(MANUAL_DIR)) import_node_fs.default.mkdirSync(MANUAL_DIR, { recursive: true });
         cb(null, MANUAL_DIR);
@@ -11315,8 +11350,8 @@ async function autoSeedFakeUsers() {
 // server/index.ts
 init_db();
 var import_drizzle_orm10 = require("drizzle-orm");
-var fs8 = __toESM(require("fs"));
-var path8 = __toESM(require("path"));
+var fs9 = __toESM(require("fs"));
+var path9 = __toESM(require("path"));
 var app = (0, import_express21.default)();
 var log = console.log;
 app.set("trust proxy", 1);
@@ -11362,7 +11397,7 @@ function setupBodyParsing(app2) {
 function setupRequestLogging(app2) {
   app2.use((req, res, next) => {
     const start = Date.now();
-    const path9 = req.path;
+    const path10 = req.path;
     let capturedJsonResponse = void 0;
     const originalResJson = res.json;
     res.json = function(bodyJson, ...args) {
@@ -11370,9 +11405,9 @@ function setupRequestLogging(app2) {
       return originalResJson.apply(res, [bodyJson, ...args]);
     };
     res.on("finish", () => {
-      if (!path9.startsWith("/api")) return;
+      if (!path10.startsWith("/api")) return;
       const duration = Date.now() - start;
-      let logLine = `${req.method} ${path9} ${res.statusCode} in ${duration}ms`;
+      let logLine = `${req.method} ${path10} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse && res.statusCode !== 304) {
         const jsonStr = JSON.stringify(capturedJsonResponse);
         logLine += ` :: ${jsonStr.length > 200 ? jsonStr.slice(0, 197) + "..." : jsonStr}`;
@@ -11387,8 +11422,8 @@ function setupRequestLogging(app2) {
 }
 function getAppName() {
   try {
-    const appJsonPath = path8.resolve(process.cwd(), "app.json");
-    const appJsonContent = fs8.readFileSync(appJsonPath, "utf-8");
+    const appJsonPath = path9.resolve(process.cwd(), "app.json");
+    const appJsonContent = fs9.readFileSync(appJsonPath, "utf-8");
     const appJson = JSON.parse(appJsonContent);
     return appJson.expo?.name || "App Landing Page";
   } catch {
@@ -11396,19 +11431,19 @@ function getAppName() {
   }
 }
 function serveExpoManifest(platform, res) {
-  const manifestPath = path8.resolve(
+  const manifestPath = path9.resolve(
     process.cwd(),
     "static-build",
     platform,
     "manifest.json"
   );
-  if (!fs8.existsSync(manifestPath)) {
+  if (!fs9.existsSync(manifestPath)) {
     return res.status(404).json({ error: `Manifest not found for platform: ${platform}` });
   }
   res.setHeader("expo-protocol-version", "1");
   res.setHeader("expo-sfv-version", "0");
   res.setHeader("content-type", "application/json");
-  const manifest = fs8.readFileSync(manifestPath, "utf-8");
+  const manifest = fs9.readFileSync(manifestPath, "utf-8");
   res.send(manifest);
 }
 function serveLandingPage({
@@ -11430,13 +11465,13 @@ function serveLandingPage({
   res.status(200).send(html);
 }
 function configureExpoAndLanding(app2) {
-  const templatePath = path8.resolve(
+  const templatePath = path9.resolve(
     process.cwd(),
     "server",
     "templates",
     "landing-page.html"
   );
-  const landingPageTemplate = fs8.readFileSync(templatePath, "utf-8");
+  const landingPageTemplate = fs9.readFileSync(templatePath, "utf-8");
   const appName = getAppName();
   log("Serving static Expo files with dynamic manifest routing");
   app2.use((req, res, next) => {
@@ -11460,10 +11495,10 @@ function configureExpoAndLanding(app2) {
     }
     next();
   });
-  app2.use("/assets", import_express21.default.static(path8.resolve(process.cwd(), "assets")));
-  app2.use("/uploads", import_express21.default.static(path8.resolve(process.cwd(), "uploads")));
-  app2.use(import_express21.default.static(path8.resolve(process.cwd(), "static-build")));
-  const webBuildDir = path8.resolve(process.cwd(), "static-build", "web");
+  app2.use("/assets", import_express21.default.static(path9.resolve(process.cwd(), "assets")));
+  app2.use("/uploads", import_express21.default.static(path9.resolve(process.cwd(), "uploads")));
+  app2.use(import_express21.default.static(path9.resolve(process.cwd(), "static-build")));
+  const webBuildDir = path9.resolve(process.cwd(), "static-build", "web");
   const noCacheHtml = (res, filePath) => {
     if (filePath.endsWith(".html")) {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
@@ -11474,8 +11509,8 @@ function configureExpoAndLanding(app2) {
   app2.use("/web", import_express21.default.static(webBuildDir, { setHeaders: noCacheHtml }));
   app2.use(import_express21.default.static(webBuildDir, { index: false, setHeaders: noCacheHtml }));
   app2.use("/web", (_req, res) => {
-    const indexPath = path8.join(webBuildDir, "index.html");
-    if (fs8.existsSync(indexPath)) {
+    const indexPath = path9.join(webBuildDir, "index.html");
+    if (fs9.existsSync(indexPath)) {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");
@@ -11508,13 +11543,13 @@ function setupErrorHandler(app2) {
   setupRequestLogging(app);
   configureExpoAndLanding(app);
   const server = await registerRoutes(app);
-  const webBuildIndex = path8.join(path8.resolve(process.cwd(), "static-build", "web"), "index.html");
+  const webBuildIndex = path9.join(path9.resolve(process.cwd(), "static-build", "web"), "index.html");
   app.use((req, res, next) => {
     if (req.method !== "GET" && req.method !== "HEAD") return next();
     if (req.path.startsWith("/api/")) return next();
     if (req.path === "/" || req.path === "/manifest" || req.path === "/healthz") return next();
     if (req.path.match(/\.\w+$/)) return next();
-    if (fs8.existsSync(webBuildIndex)) {
+    if (fs9.existsSync(webBuildIndex)) {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");
