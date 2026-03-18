@@ -193,6 +193,58 @@ async function runWishlistMatching(): Promise<number> {
   }
 }
 
+async function runBikerBikerMatching(): Promise<number> {
+  try {
+    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
+    if (bikerMotorcycles.length < 2) return 0;
+
+    let matchCount = 0;
+    const MAX_MATCHES_PER_RUN = 200;
+
+    for (let i = 0; i < bikerMotorcycles.length && matchCount < MAX_MATCHES_PER_RUN; i++) {
+      const bm1 = bikerMotorcycles[i];
+      if (!bm1.motorcycle.brand || !bm1.motorcycle.model) continue;
+
+      for (let j = i + 1; j < bikerMotorcycles.length && matchCount < MAX_MATCHES_PER_RUN; j++) {
+        const bm2 = bikerMotorcycles[j];
+
+        if (bm1.userId === bm2.userId) continue;
+        if (!bm2.motorcycle.brand || !bm2.motorcycle.model) continue;
+
+        const brand1 = bm1.motorcycle.brand.toLowerCase();
+        const brand2 = bm2.motorcycle.brand.toLowerCase();
+        const model1 = bm1.motorcycle.model.toLowerCase();
+        const model2 = bm2.motorcycle.model.toLowerCase();
+
+        if (brand1 !== brand2) continue;
+        if (!model1.includes(model2) && !model2.includes(model1)) continue;
+
+        const idA = bm1.userId < bm2.userId ? bm1.userId : bm2.userId;
+        const idB = bm1.userId < bm2.userId ? bm2.userId : bm1.userId;
+        const brand = bm1.motorcycle.brand;
+        const model = bm1.motorcycle.model;
+
+        try {
+          await storage.createBikerBikerMatch({
+            biker1Id: idA,
+            biker2Id: idB,
+            motorcycleBrand: brand,
+            motorcycleModel: model,
+            status: "new",
+          });
+          matchCount++;
+        } catch {
+        }
+      }
+    }
+
+    return matchCount;
+  } catch (error) {
+    console.error("Biker-biker matching error:", error);
+    return 0;
+  }
+}
+
 async function runCleanup(): Promise<number> {
   try {
     return await storage.expireOldProposals();
@@ -266,6 +318,9 @@ export function startMatchingEngine(): void {
 
       const garageMatches = await runWishlistMatching();
       if (garageMatches > 0) console.log(`Found ${garageMatches} new garage matches`);
+
+      const bikerBikerMatchCount = await runBikerBikerMatching();
+      if (bikerBikerMatchCount > 0) console.log(`Found ${bikerBikerMatchCount} new biker-biker matches`);
     } else {
       console.log("Auto matching disabled by admin, skipping");
     }

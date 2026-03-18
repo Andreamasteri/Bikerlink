@@ -162,7 +162,112 @@ function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress
   );
 }
 
-type TabKey = "pending" | "accepted" | "garage";
+function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, onChatPress, onRemove, isPending, t, locale }: {
+  match: any;
+  currentUserId: string;
+  onAccept: () => void;
+  onReject: () => void;
+  onChatPress?: () => void;
+  onRemove?: () => void;
+  isPending: boolean;
+  t: (key: string) => string;
+  locale: string;
+}) {
+  const cardRouter = useRouter();
+  const isBiker1 = match.biker1Id === currentUserId;
+  const otherNickname = isBiker1 ? match.biker2Nickname : match.biker1Nickname;
+  const otherUserId = isBiker1 ? match.biker2Id : match.biker1Id;
+  const isNew = match.status === "new";
+  const isAccepted = match.status === "accepted";
+  const isRejected = match.status === "rejected";
+
+  const statusColor = isAccepted ? Colors.success : isRejected ? Colors.accentRed : Colors.accent;
+  const statusLabel = isAccepted ? t("match.accepted") : isRejected ? t("match.rejected") : t("match.sameMoto");
+  const statusIcon: keyof typeof Ionicons.glyphMap = isAccepted ? "checkmark-circle" : isRejected ? "close-circle" : "bicycle";
+
+  const createdDate = match.createdAt
+    ? new Date(match.createdAt).toLocaleDateString(locale, {
+        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+      })
+    : null;
+
+  return (
+    <View style={[
+      styles.matchCard,
+      isAccepted && styles.matchCardAccepted,
+      isRejected && styles.matchCardDimmed,
+    ]}>
+      <View style={styles.matchStatusRow}>
+        <Ionicons name={statusIcon} size={16} color={statusColor} />
+        <Text style={[styles.statusLabel, { color: statusColor }]}>{statusLabel}</Text>
+        {createdDate && <Text style={styles.matchDate}>{createdDate}</Text>}
+        {isAccepted && onRemove && (
+          <TouchableOpacity onPress={onRemove} style={styles.removeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="trash-outline" size={16} color={Colors.accentRed} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <TouchableOpacity
+        style={styles.matchUserRow}
+        onPress={() => otherUserId && cardRouter.push(`/profile/${otherUserId}` as any)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.matchUserInfo}>
+          <Ionicons name="bicycle" size={28} color={Colors.maleIcon} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.matchNickname, { color: Colors.maleIcon }]}>{otherNickname}</Text>
+            <Text style={styles.matchUserType}>{t("userType.biker")}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
+        </View>
+      </TouchableOpacity>
+
+      <View style={styles.matchProposals}>
+        <View style={[styles.proposalMini, { flex: 1 }]}>
+          <Text style={styles.proposalMiniLabel}>{t("match.sameMoto")}</Text>
+          <Text style={styles.proposalMiniTitle} numberOfLines={1}>
+            {`${match.motorcycleBrand || ""} ${match.motorcycleModel || ""}`.trim() || t("match.moto")}
+          </Text>
+        </View>
+      </View>
+
+      {isAccepted && onChatPress && (
+        <TouchableOpacity style={styles.chatBtn} onPress={onChatPress}>
+          <Ionicons name="chatbubble" size={18} color={Colors.background} />
+          <Text style={styles.chatBtnText}>{t("match.sendMessage")}</Text>
+        </TouchableOpacity>
+      )}
+
+      {isNew && (
+        <View style={styles.matchActions}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.rejectBtn]}
+            onPress={onReject}
+            disabled={isPending}
+          >
+            <Ionicons name="close" size={20} color="#fff" />
+            <Text style={styles.actionBtnText}>{t("match.reject")}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.acceptBtn]}
+            onPress={onAccept}
+            disabled={isPending}
+          >
+            {isPending ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="checkmark" size={20} color="#fff" />
+                <Text style={styles.actionBtnText}>{t("match.accept")}</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+}
 
 function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, onRemove, isPending, t, locale }: {
   match: any;
@@ -319,65 +424,185 @@ function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, 
   );
 }
 
+type TabKey = "zavorrine" | "biker" | "proposals";
+
 export default function MatchScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const t = useT();
   const locale = useLocale();
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<TabKey>("pending");
+  const [activeTab, setActiveTab] = useState<TabKey>("zavorrine");
   const [pendingMatchId, setPendingMatchId] = useState<string | null>(null);
 
-  const { data: matches, isLoading, refetch, isRefetching } = useQuery<any[]>({
+  const { data: proposalMatches, isLoading: proposalLoading, refetch: proposalRefetch, isRefetching: proposalRefetching } = useQuery<any[]>({
     queryKey: ["/api/proposals/matches"],
     refetchInterval: 30000,
   });
 
-  const { data: garageMatches, isLoading: garageLoading, refetch: garageRefetch } = useQuery<any[]>({
+  const { data: garageMatches, isLoading: garageLoading, refetch: garageRefetch, isRefetching: garageRefetching } = useQuery<any[]>({
     queryKey: ["/api/proposals/garage-matches"],
+    refetchInterval: 30000,
+  });
+
+  const { data: bikerMatches, isLoading: bikerLoading, refetch: bikerRefetch, isRefetching: bikerRefetching } = useQuery<any[]>({
+    queryKey: ["/api/proposals/biker-matches"],
     refetchInterval: 30000,
   });
 
   const prevMatchCountRef = useRef<number | null>(null);
 
-  const allMatches = matches || [];
+  const allProposalMatches = proposalMatches || [];
   const allGarageMatches = garageMatches || [];
-  const pendingProposalMatches = allMatches.filter((m: any) => m.status === "pending");
-  const acceptedProposalMatches = allMatches.filter((m: any) => m.status === "accepted");
+  const allBikerMatches = bikerMatches || [];
 
-  const garageMatchesTagged = allGarageMatches.map((m: any) => ({ ...m, _isGarage: true }));
-  const newGarageMatches = garageMatchesTagged.filter((m: any) => m.status === "new");
-  const acceptedGarageMatches = garageMatchesTagged.filter((m: any) => m.status === "accepted");
-  const visibleGarageMatches = garageMatchesTagged.filter((m: any) => m.status !== "rejected");
+  const visibleGarageMatches = allGarageMatches.filter((m: any) => m.status !== "rejected");
+  const visibleBikerMatches = allBikerMatches.filter((m: any) => m.status !== "rejected");
+  const visibleProposalMatches = allProposalMatches.filter((m: any) => m.status !== "rejected" && m.status !== "expired");
 
-  const pendingMatches = [...pendingProposalMatches, ...newGarageMatches];
-  const acceptedMatches = [...acceptedProposalMatches, ...acceptedGarageMatches];
+  const newGarageMatches = visibleGarageMatches.filter((m: any) => m.status === "new");
+  const newBikerMatches = visibleBikerMatches.filter((m: any) => m.status === "new");
+  const newProposalMatches = visibleProposalMatches.filter((m: any) => m.status === "pending");
+
+  const totalNew = newGarageMatches.length + newBikerMatches.length + newProposalMatches.length;
 
   const hasRejected =
-    allMatches.some((m: any) => m.status === "rejected") ||
-    allGarageMatches.some((m: any) => m.status === "rejected");
-
-  const totalNewMatches = pendingMatches.length;
+    allProposalMatches.some((m: any) => m.status === "rejected") ||
+    allGarageMatches.some((m: any) => m.status === "rejected") ||
+    allBikerMatches.some((m: any) => m.status === "rejected");
 
   useEffect(() => {
     if (prevMatchCountRef.current === null) {
-      prevMatchCountRef.current = totalNewMatches;
+      prevMatchCountRef.current = totalNew;
       return;
     }
-    if (totalNewMatches > prevMatchCountRef.current) {
+    if (totalNew > prevMatchCountRef.current) {
       if (Platform.OS === "web") {
         window.alert(`${t("match.newMatchAlert")}\n${t("match.checkTab")}`);
       } else {
         Alert.alert(t("match.newMatchAlert"), t("match.checkTab"));
       }
     }
-    prevMatchCountRef.current = totalNewMatches;
-  }, [totalNewMatches]);
+    prevMatchCountRef.current = totalNew;
+  }, [totalNew]);
 
   const currentList =
-    activeTab === "pending" ? pendingMatches :
-    activeTab === "accepted" ? acceptedMatches :
-    visibleGarageMatches;
+    activeTab === "zavorrine" ? visibleGarageMatches :
+    activeTab === "biker" ? visibleBikerMatches :
+    visibleProposalMatches;
+
+  const isLoading = activeTab === "zavorrine" ? garageLoading : activeTab === "biker" ? bikerLoading : proposalLoading;
+  const isRefetching = activeTab === "zavorrine" ? garageRefetching : activeTab === "biker" ? bikerRefetching : proposalRefetching;
+
+  const onRefresh = useCallback(() => {
+    garageRefetch();
+    bikerRefetch();
+    proposalRefetch();
+  }, [garageRefetch, bikerRefetch, proposalRefetch]);
+
+  const acceptGarageMutation = useMutation({
+    mutationFn: async (matchId: string) => {
+      const url = new URL(`/api/proposals/garage-matches/${matchId}/accept`, getApiUrl());
+      const res = await globalThis.fetch(url.toString(), { method: "POST", credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: t("match.error") }));
+        throw new Error(err.message || t("match.errorAccept"));
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setPendingMatchId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
+    },
+    onError: (err: Error) => {
+      setPendingMatchId(null);
+      Alert.alert(t("match.error"), err.message);
+    },
+  });
+
+  const rejectGarageMutation = useMutation({
+    mutationFn: async (matchId: string) => {
+      const url = new URL(`/api/proposals/garage-matches/${matchId}/reject`, getApiUrl());
+      const res = await globalThis.fetch(url.toString(), { method: "POST", credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: t("match.error") }));
+        throw new Error(err.message || t("match.errorReject"));
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
+    },
+    onError: (err: Error) => Alert.alert(t("match.error"), err.message),
+  });
+
+  const removeGarageMatchMutation = useMutation({
+    mutationFn: async (matchId: string) => {
+      const url = new URL(`/api/proposals/garage-matches/${matchId}`, getApiUrl());
+      const res = await globalThis.fetch(url.toString(), { method: "DELETE", credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: t("match.error") }));
+        throw new Error(err.message || t("match.error"));
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
+    },
+    onError: (err: Error) => Alert.alert(t("match.error"), err.message),
+  });
+
+  const acceptBikerMutation = useMutation({
+    mutationFn: async (matchId: string) => {
+      const url = new URL(`/api/proposals/biker-matches/${matchId}/accept`, getApiUrl());
+      const res = await globalThis.fetch(url.toString(), { method: "POST", credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: t("match.error") }));
+        throw new Error(err.message || t("match.errorAccept"));
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setPendingMatchId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/biker-matches"] });
+    },
+    onError: (err: Error) => {
+      setPendingMatchId(null);
+      Alert.alert(t("match.error"), err.message);
+    },
+  });
+
+  const rejectBikerMutation = useMutation({
+    mutationFn: async (matchId: string) => {
+      const url = new URL(`/api/proposals/biker-matches/${matchId}/reject`, getApiUrl());
+      const res = await globalThis.fetch(url.toString(), { method: "POST", credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: t("match.error") }));
+        throw new Error(err.message || t("match.errorReject"));
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/biker-matches"] });
+    },
+    onError: (err: Error) => Alert.alert(t("match.error"), err.message),
+  });
+
+  const removeBikerMatchMutation = useMutation({
+    mutationFn: async (matchId: string) => {
+      const url = new URL(`/api/proposals/biker-matches/${matchId}`, getApiUrl());
+      const res = await globalThis.fetch(url.toString(), { method: "DELETE", credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: t("match.error") }));
+        throw new Error(err.message || t("match.error"));
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/biker-matches"] });
+    },
+    onError: (err: Error) => Alert.alert(t("match.error"), err.message),
+  });
 
   const acceptMutation = useMutation({
     mutationFn: async (matchId: string) => {
@@ -421,42 +646,6 @@ export default function MatchScreen() {
     onError: (err: Error) => Alert.alert(t("match.error"), err.message),
   });
 
-  const acceptGarageMutation = useMutation({
-    mutationFn: async (matchId: string) => {
-      const url = new URL(`/api/proposals/garage-matches/${matchId}/accept`, getApiUrl());
-      const res = await globalThis.fetch(url.toString(), { method: "POST", credentials: "include" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: t("match.error") }));
-        throw new Error(err.message || t("match.errorAccept"));
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      setPendingMatchId(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
-    },
-    onError: (err: Error) => {
-      setPendingMatchId(null);
-      Alert.alert(t("match.error"), err.message);
-    },
-  });
-
-  const rejectGarageMutation = useMutation({
-    mutationFn: async (matchId: string) => {
-      const url = new URL(`/api/proposals/garage-matches/${matchId}/reject`, getApiUrl());
-      const res = await globalThis.fetch(url.toString(), { method: "POST", credentials: "include" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: t("match.error") }));
-        throw new Error(err.message || t("match.errorReject"));
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
-    },
-    onError: (err: Error) => Alert.alert(t("match.error"), err.message),
-  });
-
   const removeProposalMatchMutation = useMutation({
     mutationFn: async (matchId: string) => {
       const url = new URL(`/api/proposals/matches/${matchId}`, getApiUrl());
@@ -473,37 +662,24 @@ export default function MatchScreen() {
     onError: (err: Error) => Alert.alert(t("match.error"), err.message),
   });
 
-  const removeGarageMatchMutation = useMutation({
-    mutationFn: async (matchId: string) => {
-      const url = new URL(`/api/proposals/garage-matches/${matchId}`, getApiUrl());
-      const res = await globalThis.fetch(url.toString(), { method: "DELETE", credentials: "include" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: t("match.error") }));
-        throw new Error(err.message || t("match.error"));
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
-    },
-    onError: (err: Error) => Alert.alert(t("match.error"), err.message),
-  });
-
   const resetRejectedMutation = useMutation({
     mutationFn: async () => {
       const url1 = new URL("/api/proposals/matches/rejected", getApiUrl());
       const url2 = new URL("/api/proposals/garage-matches/rejected", getApiUrl());
-      const [res1, res2] = await Promise.all([
+      const url3 = new URL("/api/proposals/biker-matches/rejected", getApiUrl());
+      const [res1, res2, res3] = await Promise.all([
         globalThis.fetch(url1.toString(), { method: "DELETE", credentials: "include" }),
         globalThis.fetch(url2.toString(), { method: "DELETE", credentials: "include" }),
+        globalThis.fetch(url3.toString(), { method: "DELETE", credentials: "include" }),
       ]);
-      if (!res1.ok || !res2.ok) {
+      if (!res1.ok || !res2.ok || !res3.ok) {
         throw new Error(t("match.error"));
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/biker-matches"] });
     },
     onError: (err: Error) => Alert.alert(t("match.error"), err.message),
   });
@@ -521,33 +697,46 @@ export default function MatchScreen() {
     }
   }, [resetRejectedMutation, t]);
 
-  const confirmRemoveProposalMatch = useCallback((matchId: string) => {
-    if (Platform.OS === "web") {
-      if (window.confirm(t("match.removeAccepted") + "?")) {
-        removeProposalMatchMutation.mutate(matchId);
-      }
-    } else {
-      Alert.alert(t("match.removeAccepted"), t("match.removeMatchConfirm") || t("match.removeAccepted") + "?", [
-        { text: t("common.cancel"), style: "cancel" },
-        { text: t("match.removeAccepted"), style: "destructive", onPress: () => removeProposalMatchMutation.mutate(matchId) },
-      ]);
-    }
-  }, [removeProposalMatchMutation, t]);
-
   const confirmRemoveGarageMatch = useCallback((matchId: string) => {
     if (Platform.OS === "web") {
       if (window.confirm(t("match.removeAccepted") + "?")) {
         removeGarageMatchMutation.mutate(matchId);
       }
     } else {
-      Alert.alert(t("match.removeAccepted"), t("match.removeMatchConfirm") || t("match.removeAccepted") + "?", [
+      Alert.alert(t("match.removeAccepted"), t("match.removeMatchConfirm"), [
         { text: t("common.cancel"), style: "cancel" },
         { text: t("match.removeAccepted"), style: "destructive", onPress: () => removeGarageMatchMutation.mutate(matchId) },
       ]);
     }
   }, [removeGarageMatchMutation, t]);
 
-  const startGarageChatMutation = useMutation({
+  const confirmRemoveBikerMatch = useCallback((matchId: string) => {
+    if (Platform.OS === "web") {
+      if (window.confirm(t("match.removeAccepted") + "?")) {
+        removeBikerMatchMutation.mutate(matchId);
+      }
+    } else {
+      Alert.alert(t("match.removeAccepted"), t("match.removeMatchConfirm"), [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("match.removeAccepted"), style: "destructive", onPress: () => removeBikerMatchMutation.mutate(matchId) },
+      ]);
+    }
+  }, [removeBikerMatchMutation, t]);
+
+  const confirmRemoveProposalMatch = useCallback((matchId: string) => {
+    if (Platform.OS === "web") {
+      if (window.confirm(t("match.removeAccepted") + "?")) {
+        removeProposalMatchMutation.mutate(matchId);
+      }
+    } else {
+      Alert.alert(t("match.removeAccepted"), t("match.removeMatchConfirm"), [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("match.removeAccepted"), style: "destructive", onPress: () => removeProposalMatchMutation.mutate(matchId) },
+      ]);
+    }
+  }, [removeProposalMatchMutation, t]);
+
+  const startChatMutation = useMutation({
     mutationFn: async (otherUserId: string) => {
       const res = await apiRequest("POST", "/api/chat/conversations", {
         conversationType: "private",
@@ -563,7 +752,27 @@ export default function MatchScreen() {
   });
 
   const renderItem = useCallback(({ item }: { item: any }) => {
-    if (item._isGarage) {
+    if (activeTab === "biker") {
+      const isBiker1 = item.biker1Id === user?.id;
+      const otherUserId = isBiker1 ? item.biker2Id : item.biker1Id;
+      return (
+        <BikerBikerMatchCard
+          match={item}
+          currentUserId={user?.id || ""}
+          onAccept={() => {
+            setPendingMatchId(item.id);
+            acceptBikerMutation.mutate(item.id);
+          }}
+          onReject={() => rejectBikerMutation.mutate(item.id)}
+          onChatPress={item.status === "accepted" ? () => startChatMutation.mutate(otherUserId) : undefined}
+          onRemove={item.status === "accepted" ? () => confirmRemoveBikerMatch(item.id) : undefined}
+          isPending={pendingMatchId === item.id}
+          t={t}
+          locale={locale}
+        />
+      );
+    }
+    if (activeTab === "zavorrine") {
       const isBiker = item.bikerId === user?.id;
       const otherUserId = isBiker ? item.zavarrinaId : item.bikerId;
       return (
@@ -575,7 +784,7 @@ export default function MatchScreen() {
             acceptGarageMutation.mutate(item.id);
           }}
           onReject={() => rejectGarageMutation.mutate(item.id)}
-          onChatPress={item.status === "accepted" ? () => startGarageChatMutation.mutate(otherUserId) : undefined}
+          onChatPress={item.status === "accepted" ? () => startChatMutation.mutate(otherUserId) : undefined}
           onRemove={item.status === "accepted" ? () => confirmRemoveGarageMatch(item.id) : undefined}
           isPending={pendingMatchId === item.id}
           t={t}
@@ -599,16 +808,51 @@ export default function MatchScreen() {
         locale={locale}
       />
     );
-  }, [user?.id, pendingMatchId, acceptMutation, rejectMutation, acceptGarageMutation, rejectGarageMutation, startGarageChatMutation, confirmRemoveProposalMatch, confirmRemoveGarageMatch, router]);
+  }, [activeTab, user?.id, pendingMatchId, acceptGarageMutation, rejectGarageMutation, acceptBikerMutation, rejectBikerMutation, acceptMutation, rejectMutation, startChatMutation, confirmRemoveGarageMatch, confirmRemoveBikerMatch, confirmRemoveProposalMatch, router, t, locale]);
 
   const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; count: number }[] = [
-    { key: "pending", label: t("match.tabPending"), icon: "hourglass", count: pendingMatches.length },
-    { key: "accepted", label: t("match.tabAccepted"), icon: "checkmark-circle", count: acceptedMatches.length },
-    { key: "garage", label: t("match.tabGarage"), icon: "bicycle", count: visibleGarageMatches.length },
+    { key: "zavorrine", label: t("match.tabZavorrine"), icon: "person", count: newGarageMatches.length },
+    { key: "biker", label: t("match.tabBiker"), icon: "bicycle", count: newBikerMatches.length },
+    { key: "proposals", label: t("match.tabProposals"), icon: "flash", count: newProposalMatches.length },
   ];
+
+  const getEmptyIcon = (): keyof typeof Ionicons.glyphMap => {
+    if (activeTab === "zavorrine") return "person-outline";
+    if (activeTab === "biker") return "bicycle-outline";
+    return "flash-outline";
+  };
+
+  const getEmptyTitle = () => {
+    if (activeTab === "zavorrine") return t("match.emptyZavorrinaTitle");
+    if (activeTab === "biker") return t("match.emptyBikerTitle");
+    return t("match.emptyProposalsTitle");
+  };
+
+  const getEmptyDesc = () => {
+    if (activeTab === "zavorrine") return t("match.emptyZavorrinaDesc");
+    if (activeTab === "biker") return t("match.emptyBikerDesc");
+    return t("match.emptyProposalsDesc");
+  };
 
   return (
     <View style={[styles.container, Platform.OS === "web" && { paddingTop: insets.top + 67, paddingBottom: 34 }]}>
+      {hasRejected && (
+        <TouchableOpacity
+          style={styles.resetBtn}
+          onPress={handleResetRejected}
+          disabled={resetRejectedMutation.isPending}
+        >
+          {resetRejectedMutation.isPending ? (
+            <ActivityIndicator size="small" color={Colors.accentRed} />
+          ) : (
+            <>
+              <Ionicons name="refresh" size={13} color={Colors.accentRed} />
+              <Text style={styles.resetBtnText}>{t("match.resetRejected")}</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      )}
+
       <View style={styles.tabRow}>
         {tabs.map((tab) => (
           <TouchableOpacity
@@ -625,43 +869,19 @@ export default function MatchScreen() {
               {tab.label}
             </Text>
             {tab.count > 0 && (
-              <View style={[
-                styles.countBadge,
-                { backgroundColor: tab.key === "pending" ? Colors.accentRed : Colors.accent + "30" },
-              ]}>
-                <Text style={[
-                  styles.countBadgeText,
-                  { color: tab.key === "pending" ? "#fff" : Colors.accent },
-                ]}>
+              <View style={[styles.countBadge, { backgroundColor: Colors.accentRed }]}>
+                <Text style={[styles.countBadgeText, { color: "#fff" }]}>
                   {tab.count}
                 </Text>
               </View>
             )}
           </TouchableOpacity>
         ))}
-        {hasRejected && (
-          <TouchableOpacity
-            style={styles.resetBtn}
-            onPress={handleResetRejected}
-            disabled={resetRejectedMutation.isPending}
-          >
-            {resetRejectedMutation.isPending ? (
-              <ActivityIndicator size="small" color={Colors.accentRed} />
-            ) : (
-              <>
-                <Ionicons name="refresh" size={13} color={Colors.accentRed} />
-                <Text style={styles.resetBtnText}>{t("match.resetRejected")}</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        )}
       </View>
 
-      <View style={styles.infoBanner}>
-        <Ionicons name="information-circle" size={16} color={Colors.accent} />
-        <Text style={styles.infoBannerText}>
-          {t("match.infoBanner")}
-        </Text>
+      <View style={styles.systemDescBanner}>
+        <Ionicons name="information-circle" size={15} color={Colors.accent} />
+        <Text style={styles.systemDescText}>{t("match.systemDesc")}</Text>
       </View>
 
       {isLoading ? (
@@ -673,29 +893,17 @@ export default function MatchScreen() {
           data={currentList}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          extraData={currentList}
+          extraData={[currentList, activeTab]}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={isRefetching} onRefresh={() => { refetch(); garageRefetch(); }} tintColor={Colors.accent} />
+            <RefreshControl refreshing={isRefetching} onRefresh={onRefresh} tintColor={Colors.accent} />
           }
           scrollEnabled={currentList.length > 0}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons
-                name={activeTab === "pending" ? "flash-outline" : activeTab === "accepted" ? "checkmark-done-outline" : "bicycle-outline" as any}
-                size={48}
-                color={Colors.textSecondary}
-              />
-              <Text style={styles.emptyTitle}>
-                {activeTab === "pending" ? t("match.emptyPendingTitle") : activeTab === "accepted" ? t("match.emptyAcceptedTitle") : t("match.emptyGarageTitle")}
-              </Text>
-              <Text style={styles.emptyDesc}>
-                {activeTab === "pending"
-                  ? t("match.emptyPendingDesc")
-                  : activeTab === "accepted"
-                  ? t("match.emptyAcceptedDesc")
-                  : t("match.emptyGarageDesc")}
-              </Text>
+              <Ionicons name={getEmptyIcon()} size={48} color={Colors.textSecondary} />
+              <Text style={styles.emptyTitle}>{getEmptyTitle()}</Text>
+              <Text style={styles.emptyDesc}>{getEmptyDesc()}</Text>
             </View>
           }
         />
@@ -709,31 +917,32 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  infoBanner: {
+  resetBtn: {
     flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 8,
-    backgroundColor: Colors.accent + "15",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginHorizontal: 12,
-    marginBottom: 8,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: Colors.accentRed + "15",
     borderWidth: 1,
-    borderColor: Colors.accent + "30",
+    borderColor: Colors.accentRed + "30",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: 12,
+    gap: 4,
+    marginHorizontal: 12,
+    marginTop: 8,
+    marginBottom: 2,
+    alignSelf: "flex-start" as const,
   },
-  infoBannerText: {
-    flex: 1,
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    lineHeight: 17,
+  resetBtnText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.accentRed,
   },
   tabRow: {
     flexDirection: "row" as const,
-    paddingHorizontal: 4,
+    paddingHorizontal: 8,
     paddingVertical: 8,
-    gap: 4,
+    gap: 6,
     alignItems: "center" as const,
   },
   tab: {
@@ -742,7 +951,7 @@ const styles = StyleSheet.create({
     alignItems: "center" as const,
     justifyContent: "center" as const,
     gap: 3,
-    paddingVertical: 8,
+    paddingVertical: 9,
     paddingHorizontal: 4,
     borderRadius: 10,
     backgroundColor: Colors.surface,
@@ -773,22 +982,25 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700" as const,
   },
-  resetBtn: {
+  systemDescBanner: {
     flexDirection: "row" as const,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: Colors.accentRed + "15",
-    borderWidth: 1,
-    borderColor: Colors.accentRed + "30",
-    justifyContent: "center" as const,
     alignItems: "center" as const,
-    paddingHorizontal: 8,
-    gap: 4,
+    gap: 7,
+    backgroundColor: Colors.accent + "10",
+    borderRadius: 9,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    marginHorizontal: 12,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: Colors.accent + "25",
   },
-  resetBtnText: {
-    fontSize: 10,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.accentRed,
+  systemDescText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    lineHeight: 16,
   },
   removeBtn: {
     marginLeft: 4,
@@ -933,11 +1145,6 @@ const styles = StyleSheet.create({
   actionBtnText: {
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
-  },
-  chatIconBtn: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.accent + "20",
   },
   chatBtn: {
     flexDirection: "row" as const,

@@ -35,6 +35,7 @@ __export(schema_exports, {
   adCampaigns: () => adCampaigns,
   adClicks: () => adClicks,
   appSettings: () => appSettings,
+  bikerBikerMatches: () => bikerBikerMatches,
   bikerZavarrinaMatches: () => bikerZavarrinaMatches,
   collectedEasterEggs: () => collectedEasterEggs,
   conversationParticipants: () => conversationParticipants,
@@ -80,7 +81,7 @@ __export(schema_exports, {
   zavarrinaWishlistPhotos: () => zavarrinaWishlistPhotos,
   zavarrinaWishlists: () => zavarrinaWishlists
 });
-var import_drizzle_orm, import_pg_core, import_zod, users, userPhotos, userMotorcycles, userProfiles, proposals, proposalParticipants, proposalMatches, conversations, conversationParticipants, messages, routes, routePoints, customRoutes, customRouteWaypoints, photoContestEntries, photoVotes, dailyVoteCounts, photoWinners, workshops, workshopContacts, easterEggs, collectedEasterEggs, reports, moderatorLogs, adCampaigns, adClicks, notifications, invitationCodes, feedbackTickets, appSettings, verificationCodes, passwordResetTokens, motorcyclePhotos, zavarrinaWishlists, zavarrinaWishlistPhotos, zavarrinaWishlistMotos, bikerZavarrinaMatches, emailVerificationTokens, phoneSharingTracker, fakeUserInteractions, sosRequests, motoClubs, motoClubMembers, motoClubInvites, motoClubRequests, registerSchema, loginSchema;
+var import_drizzle_orm, import_pg_core, import_zod, users, userPhotos, userMotorcycles, userProfiles, proposals, proposalParticipants, proposalMatches, conversations, conversationParticipants, messages, routes, routePoints, customRoutes, customRouteWaypoints, photoContestEntries, photoVotes, dailyVoteCounts, photoWinners, workshops, workshopContacts, easterEggs, collectedEasterEggs, reports, moderatorLogs, adCampaigns, adClicks, notifications, invitationCodes, feedbackTickets, appSettings, verificationCodes, passwordResetTokens, motorcyclePhotos, zavarrinaWishlists, zavarrinaWishlistPhotos, zavarrinaWishlistMotos, bikerZavarrinaMatches, bikerBikerMatches, emailVerificationTokens, phoneSharingTracker, fakeUserInteractions, sosRequests, motoClubs, motoClubMembers, motoClubInvites, motoClubRequests, registerSchema, loginSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -553,6 +554,19 @@ var init_schema = __esm({
       (0, import_pg_core.index)("matches_biker_id_idx").on(table.bikerId),
       (0, import_pg_core.index)("matches_zavorrina_id_idx").on(table.zavarrinaId),
       (0, import_pg_core.uniqueIndex)("matches_unique_combo_idx").on(table.bikerId, table.zavarrinaId, table.bikerMotorcycleId, table.wishlistMotoId)
+    ]);
+    bikerBikerMatches = (0, import_pg_core.pgTable)("biker_biker_matches", {
+      id: (0, import_pg_core.varchar)("id", { length: 36 }).primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      biker1Id: (0, import_pg_core.varchar)("biker1_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+      biker2Id: (0, import_pg_core.varchar)("biker2_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+      motorcycleBrand: (0, import_pg_core.varchar)("motorcycle_brand", { length: 100 }).notNull(),
+      motorcycleModel: (0, import_pg_core.varchar)("motorcycle_model", { length: 100 }).notNull(),
+      status: (0, import_pg_core.varchar)("status", { length: 20 }).notNull().default("new"),
+      createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow()
+    }, (table) => [
+      (0, import_pg_core.index)("biker_biker_biker1_idx").on(table.biker1Id),
+      (0, import_pg_core.index)("biker_biker_biker2_idx").on(table.biker2Id),
+      (0, import_pg_core.uniqueIndex)("biker_biker_unique_idx").on(table.biker1Id, table.biker2Id, table.motorcycleBrand, table.motorcycleModel)
     ]);
     emailVerificationTokens = (0, import_pg_core.pgTable)("email_verification_tokens", {
       id: (0, import_pg_core.varchar)("id", { length: 36 }).primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
@@ -1767,6 +1781,49 @@ var init_storage = __esm({
       async updateSosRequest(id, data) {
         const [req] = await db.update(sosRequests).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm2.eq)(sosRequests.id, id)).returning();
         return req;
+      }
+      async getBikerBikerMatchesForUser(userId) {
+        return db.select().from(bikerBikerMatches).where(
+          (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(bikerBikerMatches.biker1Id, userId), (0, import_drizzle_orm2.eq)(bikerBikerMatches.biker2Id, userId))
+        ).orderBy(
+          import_drizzle_orm2.sql`CASE WHEN ${bikerBikerMatches.status} = 'accepted' THEN 0 WHEN ${bikerBikerMatches.status} = 'new' THEN 1 ELSE 2 END`,
+          (0, import_drizzle_orm2.desc)(bikerBikerMatches.createdAt)
+        ).limit(200);
+      }
+      async createBikerBikerMatch(data) {
+        const [match] = await db.insert(bikerBikerMatches).values(data).returning();
+        return match;
+      }
+      async getBikerBikerMatch(id) {
+        const [match] = await db.select().from(bikerBikerMatches).where((0, import_drizzle_orm2.eq)(bikerBikerMatches.id, id));
+        return match;
+      }
+      async updateBikerBikerMatch(id, data) {
+        const [updated] = await db.update(bikerBikerMatches).set(data).where((0, import_drizzle_orm2.eq)(bikerBikerMatches.id, id)).returning();
+        return updated;
+      }
+      async deleteBikerBikerMatch(id, userId) {
+        const [match] = await db.select().from(bikerBikerMatches).where((0, import_drizzle_orm2.eq)(bikerBikerMatches.id, id));
+        if (!match) return false;
+        if (match.biker1Id !== userId && match.biker2Id !== userId) return false;
+        await db.delete(bikerBikerMatches).where((0, import_drizzle_orm2.eq)(bikerBikerMatches.id, id));
+        return true;
+      }
+      async deleteRejectedBikerBikerMatches(userId) {
+        const rejected = await db.select().from(bikerBikerMatches).where(
+          (0, import_drizzle_orm2.and)(
+            (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(bikerBikerMatches.biker1Id, userId), (0, import_drizzle_orm2.eq)(bikerBikerMatches.biker2Id, userId)),
+            (0, import_drizzle_orm2.eq)(bikerBikerMatches.status, "rejected")
+          )
+        );
+        if (rejected.length === 0) return 0;
+        await db.delete(bikerBikerMatches).where(
+          (0, import_drizzle_orm2.and)(
+            (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(bikerBikerMatches.biker1Id, userId), (0, import_drizzle_orm2.eq)(bikerBikerMatches.biker2Id, userId)),
+            (0, import_drizzle_orm2.eq)(bikerBikerMatches.status, "rejected")
+          )
+        );
+        return rejected.length;
       }
     };
     storage = new DatabaseStorage();
@@ -5292,6 +5349,78 @@ router5.delete("/garage-matches/:matchId", requireAuth4, async (req, res) => {
     return res.json({ deleted: true });
   } catch (error) {
     console.error("Reset garage match error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router5.get("/biker-matches", requireAuth4, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const bikerMatches = await storage.getBikerBikerMatchesForUser(userId);
+    const results = await Promise.all(
+      bikerMatches.map(async (match) => {
+        const biker1 = await storage.getUser(match.biker1Id);
+        const biker2 = await storage.getUser(match.biker2Id);
+        return {
+          ...match,
+          biker1Nickname: biker1?.nickname,
+          biker2Nickname: biker2?.nickname
+        };
+      })
+    );
+    return res.json(results);
+  } catch (error) {
+    console.error("Get biker-biker matches error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router5.post("/biker-matches/:id/accept", requireAuth4, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const matchId = req.params.id;
+    const match = await storage.getBikerBikerMatch(matchId);
+    if (!match) return res.status(404).json({ message: "Match non trovato" });
+    if (match.biker1Id !== userId && match.biker2Id !== userId) return res.status(403).json({ message: "Non autorizzato" });
+    if (match.status !== "new") return res.status(400).json({ message: "Match gi\xE0 gestito" });
+    const updated = await storage.updateBikerBikerMatch(matchId, { status: "accepted" });
+    return res.json(updated);
+  } catch (error) {
+    console.error("Accept biker-biker match error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router5.post("/biker-matches/:id/reject", requireAuth4, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const matchId = req.params.id;
+    const match = await storage.getBikerBikerMatch(matchId);
+    if (!match) return res.status(404).json({ message: "Match non trovato" });
+    if (match.biker1Id !== userId && match.biker2Id !== userId) return res.status(403).json({ message: "Non autorizzato" });
+    if (match.status !== "new") return res.status(400).json({ message: "Match gi\xE0 gestito" });
+    const updated = await storage.updateBikerBikerMatch(matchId, { status: "rejected" });
+    return res.json(updated);
+  } catch (error) {
+    console.error("Reject biker-biker match error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router5.delete("/biker-matches/rejected", requireAuth4, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const count = await storage.deleteRejectedBikerBikerMatches(userId);
+    return res.json({ deleted: count });
+  } catch (error) {
+    console.error("Delete rejected biker-biker matches error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router5.delete("/biker-matches/:matchId", requireAuth4, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const ok = await storage.deleteBikerBikerMatch(req.params.matchId, userId);
+    if (!ok) return res.status(404).json({ message: "Match non trovato o non autorizzato" });
+    return res.json({ deleted: true });
+  } catch (error) {
+    console.error("Delete biker-biker match error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -9609,6 +9738,48 @@ async function runWishlistMatching() {
     return 0;
   }
 }
+async function runBikerBikerMatching() {
+  try {
+    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
+    if (bikerMotorcycles.length < 2) return 0;
+    let matchCount = 0;
+    const MAX_MATCHES_PER_RUN = 200;
+    for (let i = 0; i < bikerMotorcycles.length && matchCount < MAX_MATCHES_PER_RUN; i++) {
+      const bm1 = bikerMotorcycles[i];
+      if (!bm1.motorcycle.brand || !bm1.motorcycle.model) continue;
+      for (let j = i + 1; j < bikerMotorcycles.length && matchCount < MAX_MATCHES_PER_RUN; j++) {
+        const bm2 = bikerMotorcycles[j];
+        if (bm1.userId === bm2.userId) continue;
+        if (!bm2.motorcycle.brand || !bm2.motorcycle.model) continue;
+        const brand1 = bm1.motorcycle.brand.toLowerCase();
+        const brand2 = bm2.motorcycle.brand.toLowerCase();
+        const model1 = bm1.motorcycle.model.toLowerCase();
+        const model2 = bm2.motorcycle.model.toLowerCase();
+        if (brand1 !== brand2) continue;
+        if (!model1.includes(model2) && !model2.includes(model1)) continue;
+        const idA = bm1.userId < bm2.userId ? bm1.userId : bm2.userId;
+        const idB = bm1.userId < bm2.userId ? bm2.userId : bm1.userId;
+        const brand = bm1.motorcycle.brand;
+        const model = bm1.motorcycle.model;
+        try {
+          await storage.createBikerBikerMatch({
+            biker1Id: idA,
+            biker2Id: idB,
+            motorcycleBrand: brand,
+            motorcycleModel: model,
+            status: "new"
+          });
+          matchCount++;
+        } catch {
+        }
+      }
+    }
+    return matchCount;
+  } catch (error) {
+    console.error("Biker-biker matching error:", error);
+    return 0;
+  }
+}
 async function runCleanup() {
   try {
     return await storage.expireOldProposals();
@@ -9668,6 +9839,8 @@ function startMatchingEngine() {
       if (matches > 0) console.log(`Found ${matches} new proposal matches`);
       const garageMatches = await runWishlistMatching();
       if (garageMatches > 0) console.log(`Found ${garageMatches} new garage matches`);
+      const bikerBikerMatchCount = await runBikerBikerMatching();
+      if (bikerBikerMatchCount > 0) console.log(`Found ${bikerBikerMatchCount} new biker-biker matches`);
     } else {
       console.log("Auto matching disabled by admin, skipping");
     }

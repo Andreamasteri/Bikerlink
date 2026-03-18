@@ -683,6 +683,26 @@ export const bikerZavarrinaMatches = pgTable("biker_zavorrina_matches", {
   uniqueIndex("matches_unique_combo_idx").on(table.bikerId, table.zavarrinaId, table.bikerMotorcycleId, table.wishlistMotoId),
 ]);
 
+export const bikerBikerMatches = pgTable("biker_biker_matches", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  biker1Id: varchar("biker1_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  biker2Id: varchar("biker2_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  motorcycleBrand: varchar("motorcycle_brand", { length: 100 }).notNull(),
+  motorcycleModel: varchar("motorcycle_model", { length: 100 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("new"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("biker_biker_biker1_idx").on(table.biker1Id),
+  index("biker_biker_biker2_idx").on(table.biker2Id),
+  uniqueIndex("biker_biker_unique_idx").on(table.biker1Id, table.biker2Id, table.motorcycleBrand, table.motorcycleModel),
+]);
+
 export const emailVerificationTokens = pgTable("email_verification_tokens", {
   id: varchar("id", { length: 36 })
     .primaryKey()
@@ -943,6 +963,9 @@ export type MotoClubInvite = typeof motoClubInvites.$inferSelect;
 export type InsertMotoClubInvite = typeof motoClubInvites.$inferInsert;
 export type MotoClubRequest = typeof motoClubRequests.$inferSelect;
 export type InsertMotoClubRequest = typeof motoClubRequests.$inferInsert;
+
+export type BikerBikerMatch = typeof bikerBikerMatches.$inferSelect;
+export type InsertBikerBikerMatch = typeof bikerBikerMatches.$inferInsert;
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

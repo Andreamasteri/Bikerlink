@@ -36,6 +36,7 @@ import {
   zavarrinaWishlistPhotos,
   zavarrinaWishlistMotos,
   bikerZavarrinaMatches,
+  bikerBikerMatches,
   emailVerificationTokens,
   proposalMatches,
   fakeUserInteractions,
@@ -109,6 +110,8 @@ import {
   type InsertZavarrinaWishlistMoto,
   type BikerZavarrinaMatch,
   type InsertBikerZavarrinaMatch,
+  type BikerBikerMatch,
+  type InsertBikerBikerMatch,
   type EmailVerificationToken,
   type InsertEmailVerificationToken,
   type ProposalMatch,
@@ -306,6 +309,13 @@ export interface IStorage {
   findExistingBikerZavarrinaMatch(bikerId: string, zavarrinaId: string, bikerMotorcycleId: string, wishlistMotoId: string): Promise<BikerZavarrinaMatch | undefined>;
   getAllExistingBikerZavarrinaMatchKeys(): Promise<Set<string>>;
   getAllExistingProposalMatchKeys(): Promise<Set<string>>;
+
+  getBikerBikerMatchesForUser(userId: string): Promise<BikerBikerMatch[]>;
+  createBikerBikerMatch(data: InsertBikerBikerMatch): Promise<BikerBikerMatch>;
+  getBikerBikerMatch(id: string): Promise<BikerBikerMatch | undefined>;
+  updateBikerBikerMatch(id: string, data: Partial<InsertBikerBikerMatch>): Promise<BikerBikerMatch | undefined>;
+  deleteBikerBikerMatch(id: string, userId: string): Promise<boolean>;
+  deleteRejectedBikerBikerMatches(userId: string): Promise<number>;
 
   createEmailVerificationToken(userId: string, token: string, expiresAt: Date): Promise<void>;
   getEmailVerificationToken(token: string): Promise<EmailVerificationToken | undefined>;
@@ -1681,6 +1691,55 @@ export class DatabaseStorage implements IStorage {
   async updateSosRequest(id: string, data: Partial<InsertSosRequest>): Promise<SosRequest | undefined> {
     const [req] = await db.update(sosRequests).set({ ...data, updatedAt: new Date() }).where(eq(sosRequests.id, id)).returning();
     return req;
+  }
+
+  async getBikerBikerMatchesForUser(userId: string): Promise<BikerBikerMatch[]> {
+    return db.select().from(bikerBikerMatches).where(
+      or(eq(bikerBikerMatches.biker1Id, userId), eq(bikerBikerMatches.biker2Id, userId))
+    ).orderBy(
+      sql`CASE WHEN ${bikerBikerMatches.status} = 'accepted' THEN 0 WHEN ${bikerBikerMatches.status} = 'new' THEN 1 ELSE 2 END`,
+      desc(bikerBikerMatches.createdAt)
+    ).limit(200);
+  }
+
+  async createBikerBikerMatch(data: InsertBikerBikerMatch): Promise<BikerBikerMatch> {
+    const [match] = await db.insert(bikerBikerMatches).values(data).returning();
+    return match;
+  }
+
+  async getBikerBikerMatch(id: string): Promise<BikerBikerMatch | undefined> {
+    const [match] = await db.select().from(bikerBikerMatches).where(eq(bikerBikerMatches.id, id));
+    return match;
+  }
+
+  async updateBikerBikerMatch(id: string, data: Partial<InsertBikerBikerMatch>): Promise<BikerBikerMatch | undefined> {
+    const [updated] = await db.update(bikerBikerMatches).set(data).where(eq(bikerBikerMatches.id, id)).returning();
+    return updated;
+  }
+
+  async deleteBikerBikerMatch(id: string, userId: string): Promise<boolean> {
+    const [match] = await db.select().from(bikerBikerMatches).where(eq(bikerBikerMatches.id, id));
+    if (!match) return false;
+    if (match.biker1Id !== userId && match.biker2Id !== userId) return false;
+    await db.delete(bikerBikerMatches).where(eq(bikerBikerMatches.id, id));
+    return true;
+  }
+
+  async deleteRejectedBikerBikerMatches(userId: string): Promise<number> {
+    const rejected = await db.select().from(bikerBikerMatches).where(
+      and(
+        or(eq(bikerBikerMatches.biker1Id, userId), eq(bikerBikerMatches.biker2Id, userId)),
+        eq(bikerBikerMatches.status, "rejected")
+      )
+    );
+    if (rejected.length === 0) return 0;
+    await db.delete(bikerBikerMatches).where(
+      and(
+        or(eq(bikerBikerMatches.biker1Id, userId), eq(bikerBikerMatches.biker2Id, userId)),
+        eq(bikerBikerMatches.status, "rejected")
+      )
+    );
+    return rejected.length;
   }
 }
 
