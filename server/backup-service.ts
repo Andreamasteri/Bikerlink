@@ -142,6 +142,8 @@ export function stopScheduler() {
 }
 
 async function isAutoBackupEnabled(): Promise<boolean> {
+  if (process.env.BACKUP_AUTO_ENABLED === "false") return false;
+  if (process.env.BACKUP_AUTO_ENABLED === "true") return true;
   try {
     const rows = await db.select().from(appSettings).where(eq(appSettings.key, "backup_auto_enabled"));
     if (rows.length === 0) return true;
@@ -230,9 +232,9 @@ export async function backupMedia(): Promise<{ path: string; name: string; size:
   const tmpZip = path.join(os.tmpdir(), `bikerlink_media_${ts}.zip`);
 
   try {
-    const mediaDir = process.env.PRIVATE_OBJECT_DIR
-      ? path.join(process.env.PRIVATE_OBJECT_DIR, "..")
-      : "/home/runner/workspace/.data/uploads";
+    const mediaDir = process.env.MEDIA_UPLOAD_DIR
+      || process.env.UPLOAD_DIR
+      || path.join(process.cwd(), ".data", "uploads");
 
     const zipBuffer = await new Promise<Buffer>((resolve, reject) => {
       const output = fs.createWriteStream(tmpZip);
