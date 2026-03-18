@@ -552,6 +552,7 @@ export const invitationCodes = pgTable("invitation_codes", {
   currentUses: integer("current_uses").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
   expiresAt: timestamp("expires_at"),
+  imageUrl: text("image_url"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

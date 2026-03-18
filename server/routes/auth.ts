@@ -4,7 +4,7 @@ import crypto from "crypto";
 import rateLimit from "express-rate-limit";
 import { registerSchema, loginSchema } from "@shared/schema";
 import { storage } from "../storage";
-import { sendVerificationEmail, sendPasswordResetEmail } from "../email";
+import { sendVerificationEmail, sendPasswordResetEmail, sendInvitationGiftEmail } from "../email";
 
 declare module "express-session" {
   interface SessionData {
@@ -71,6 +71,8 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     }
 
     let invitationGiftMessage: string | null = null;
+    let invitationImageUrl: string | null = null;
+    let invitationCodeStr: string | null = null;
     if (data.invitationCode) {
       const invitation = await storage.getInvitationCode(data.invitationCode);
       if (!invitation || !invitation.isActive || invitation.currentUses >= invitation.maxUses) {
@@ -81,6 +83,8 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       }
       await storage.incrementInvitationCodeUses(invitation.id);
       invitationGiftMessage = invitation.giftMessage ?? null;
+      invitationImageUrl = invitation.imageUrl ?? null;
+      invitationCodeStr = invitation.code;
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 12);
@@ -105,6 +109,16 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     });
 
     await storage.createUserProfile({ userId: user.id });
+
+    if (invitationCodeStr) {
+      try {
+        const registrationDate = new Date();
+        const expiryDate = new Date(registrationDate.getTime() + 5 * 24 * 60 * 60 * 1000);
+        await sendInvitationGiftEmail(user.email, invitationCodeStr, invitationImageUrl, invitationGiftMessage, expiryDate);
+      } catch (e) {
+        console.warn("[EMAIL] Errore invio gift email (non bloccante):", e);
+      }
+    }
 
     const emailVerifSetting = await storage.getAppSetting("email_verification_enabled");
     const emailVerificationEnabled = emailVerifSetting?.value === "true";

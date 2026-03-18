@@ -10,13 +10,15 @@ import {
   Modal,
   Switch,
   Platform,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as ImagePicker from "expo-image-picker";
 import Colors from "@/constants/colors";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
 
 type InvitationCode = {
   id: string;
@@ -27,7 +29,14 @@ type InvitationCode = {
   currentUses: number;
   isActive: boolean;
   expiresAt: string | null;
+  imageUrl: string | null;
   createdAt: string;
+};
+
+type PendingImage = {
+  uri: string;
+  name: string;
+  type: string;
 };
 
 type StatsPerCode = {
@@ -57,6 +66,8 @@ export default function InviteCodesScreen() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
+  const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const { data: stats, isLoading: statsLoading } = useQuery<Stats>({
     queryKey: ["/api/admin/invitation-codes/stats"],
@@ -71,6 +82,43 @@ export default function InviteCodesScreen() {
     qc.invalidateQueries({ queryKey: ["/api/admin/invitation-codes/stats"] });
   };
 
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: false,
+      quality: 0.9,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      const name = asset.fileName ?? `gadget_${Date.now()}.jpg`;
+      const type = asset.mimeType ?? "image/jpeg";
+      setPendingImage({ uri: asset.uri, name, type });
+    }
+  };
+
+  const uploadImageForCode = async (codeId: string, img: PendingImage) => {
+    setIsUploadingImage(true);
+    try {
+      const baseUrl = getApiUrl();
+      const url = new URL(`/api/admin/invitation-codes/${codeId}/image`, baseUrl);
+      const formData = new FormData();
+      formData.append("image", { uri: img.uri, name: img.name, type: img.type } as any);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        console.warn("[UPLOAD] Errore upload immagine:", text);
+      }
+    } catch (err) {
+      console.warn("[UPLOAD] Errore upload immagine:", err);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
   const createMutation = useMutation({
     mutationFn: (data: typeof EMPTY_FORM) =>
       apiRequest("POST", "/api/admin/invitation-codes", {
@@ -80,7 +128,17 @@ export default function InviteCodesScreen() {
         maxUses: parseInt(data.maxUses, 10) || 100,
         expiresAt: data.expiresAt || null,
       }),
-    onSuccess: () => { invalidate(); setShowCreateModal(false); setForm(EMPTY_FORM); setFormError(""); },
+    onSuccess: async (res: any) => {
+      const created: InvitationCode = await res.json().catch(() => null);
+      if (created?.id && pendingImage) {
+        await uploadImageForCode(created.id, pendingImage);
+      }
+      invalidate();
+      setShowCreateModal(false);
+      setForm(EMPTY_FORM);
+      setFormError("");
+      setPendingImage(null);
+    },
     onError: (err: any) => {
       const msg = err?.message || "Errore nella creazione";
       try { setFormError(JSON.parse(msg.replace(/^\d+:\s*/, "")).message); } catch { setFormError(msg); }
@@ -90,7 +148,16 @@ export default function InviteCodesScreen() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<InvitationCode> }) =>
       apiRequest("PUT", `/api/admin/invitation-codes/${id}`, data),
-    onSuccess: () => { invalidate(); setEditingCode(null); setForm(EMPTY_FORM); setFormError(""); },
+    onSuccess: async (_res: any, variables: { id: string; data: Partial<InvitationCode> }) => {
+      if (pendingImage) {
+        await uploadImageForCode(variables.id, pendingImage);
+      }
+      invalidate();
+      setEditingCode(null);
+      setForm(EMPTY_FORM);
+      setFormError("");
+      setPendingImage(null);
+    },
     onError: (err: any) => {
       const msg = err?.message || "Errore nell'aggiornamento";
       try { setFormError(JSON.parse(msg.replace(/^\d+:\s*/, "")).message); } catch { setFormError(msg); }
@@ -112,6 +179,7 @@ export default function InviteCodesScreen() {
     setForm(EMPTY_FORM);
     setFormError("");
     setEditingCode(null);
+    setPendingImage(null);
     setShowCreateModal(true);
   };
 
@@ -125,6 +193,7 @@ export default function InviteCodesScreen() {
     });
     setFormError("");
     setEditingCode(c);
+    setPendingImage(null);
     setShowCreateModal(true);
   };
 
@@ -148,7 +217,7 @@ export default function InviteCodesScreen() {
     }
   };
 
-  const isSaving = createMutation.isPending || updateMutation.isPending;
+  const isSaving = createMutation.isPending || updateMutation.isPending || isUploadingImage;
 
   const activeCount = codes.filter((c) => c.isActive).length;
 
@@ -218,6 +287,13 @@ export default function InviteCodesScreen() {
         {codes.map((c) => (
           <View key={c.id} style={[styles.codeCard, !c.isActive && styles.codeCardInactive]}>
             <View style={styles.codeCardHeader}>
+              {c.imageUrl ? (
+                <Image
+                  source={{ uri: `${getApiUrl().replace(/\/$/, "")}${c.imageUrl}` }}
+                  style={styles.cardThumbnail}
+                  resizeMode="cover"
+                />
+              ) : null}
               <View style={{ flex: 1 }}>
                 <Text style={styles.codeText}>{c.code}</Text>
                 {c.label && <Text style={styles.codeLabelText}>{c.label}</Text>}
@@ -319,6 +395,34 @@ export default function InviteCodesScreen() {
                   numberOfLines={4}
                 />
                 <Text style={styles.fieldHint}>Verrà mostrato all'utente dopo la registrazione con questo codice</Text>
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Immagine gadget</Text>
+                <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
+                  <Ionicons name="image-outline" size={20} color={Colors.accent} />
+                  <Text style={styles.imagePickerBtnText}>
+                    {pendingImage ? "Cambia immagine" : (editingCode?.imageUrl ? "Sostituisci immagine" : "Carica immagine")}
+                  </Text>
+                </TouchableOpacity>
+                <Text style={styles.fieldHint}>Formati supportati: JPG e PNG — max 5 MB</Text>
+                {pendingImage ? (
+                  <View style={styles.imagePreviewRow}>
+                    <Image source={{ uri: pendingImage.uri }} style={styles.imagePreview} resizeMode="cover" />
+                    <TouchableOpacity onPress={() => setPendingImage(null)} style={styles.imageRemoveBtn}>
+                      <Ionicons name="close-circle" size={20} color={Colors.error} />
+                    </TouchableOpacity>
+                  </View>
+                ) : editingCode?.imageUrl ? (
+                  <View style={styles.imagePreviewRow}>
+                    <Image
+                      source={{ uri: `${getApiUrl().replace(/\/$/, "")}${editingCode.imageUrl}` }}
+                      style={styles.imagePreview}
+                      resizeMode="cover"
+                    />
+                    <Text style={styles.imageExistingLabel}>Immagine attuale</Text>
+                  </View>
+                ) : null}
               </View>
 
               <View style={styles.field}>
@@ -713,5 +817,48 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
+  },
+  imagePickerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(255,107,53,0.1)",
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  imagePickerBtnText: {
+    color: Colors.accent,
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  imagePreviewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 8,
+  },
+  imagePreview: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: Colors.border,
+  },
+  imageRemoveBtn: {
+    padding: 4,
+  },
+  imageExistingLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+  },
+  cardThumbnail: {
+    width: 44,
+    height: 44,
+    borderRadius: 6,
+    marginRight: 8,
+    backgroundColor: Colors.border,
   },
 });

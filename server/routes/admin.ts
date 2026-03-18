@@ -825,9 +825,32 @@ router.put("/settings/:key", async (req: Request, res: Response) => {
 });
 
 const adsDir = path.join(process.cwd(), "uploads", "ads");
+const inviteCodesDir = path.join(process.cwd(), "uploads", "invitation-codes");
+if (!fs.existsSync(inviteCodesDir)) fs.mkdirSync(inviteCodesDir, { recursive: true });
 if (!fs.existsSync(adsDir)) {
   fs.mkdirSync(adsDir, { recursive: true });
 }
+
+const inviteCodeImageStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, inviteCodesDir),
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const inviteCodeUpload = multer({
+  storage: inviteCodeImageStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png"];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Solo immagini JPEG o PNG"));
+    }
+  },
+});
 
 const adImageStorage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, adsDir),
@@ -1719,6 +1742,21 @@ router.delete("/invitation-codes/:id", async (req: Request, res: Response) => {
     return res.json({ ok: true });
   } catch (error) {
     console.error("Admin invitation delete error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/invitation-codes/:id/image", inviteCodeUpload.single("image"), async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const existing = await storage.getInvitationCodeById(id);
+    if (!existing) return res.status(404).json({ message: "Codice non trovato" });
+    if (!req.file) return res.status(400).json({ message: "Nessuna immagine caricata" });
+    const imageUrl = `/uploads/invitation-codes/${req.file.filename}`;
+    const updated = await storage.updateInvitationCode(id, { imageUrl });
+    return res.json(updated);
+  } catch (error) {
+    console.error("Admin invitation image upload error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
