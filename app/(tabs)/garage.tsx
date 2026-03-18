@@ -388,8 +388,8 @@ function GarageContent() {
       }
       return res.json();
     },
-    onSuccess: (responseData: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/motorcycles"] });
+    onSuccess: async (responseData: any) => {
+      await queryClient.refetchQueries({ queryKey: ["/api/motorcycles"] });
       setShowForm(false);
       resetForm();
 

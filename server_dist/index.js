@@ -5278,6 +5278,7 @@ router4.post("/", requireAuth3, async (req, res) => {
     if (!brand || !model) {
       return res.status(400).json({ message: "Marca e modello sono obbligatori" });
     }
+    const isDefaultBool = isDefault === true || isDefault === "true";
     const motorcycle = await storage.createUserMotorcycle({
       userId,
       brand,
@@ -5287,11 +5288,11 @@ router4.post("/", requireAuth3, async (req, res) => {
       motorcycleType: motorcycleType || null,
       ridingStyle: ridingStyle || null,
       photoUrl: photoUrl || null,
-      isDefault: isDefault === true,
+      isDefault: isDefaultBool,
       isForSale: isForSale || false,
       saleDescription: saleDescription || null
     });
-    if (isDefault === true) {
+    if (isDefaultBool) {
       await db.update(userMotorcycles).set({ isDefault: false }).where((0, import_drizzle_orm4.and)((0, import_drizzle_orm4.eq)(userMotorcycles.userId, userId), (0, import_drizzle_orm4.ne)(userMotorcycles.id, motorcycle.id)));
     }
     let matches = [];
@@ -5353,6 +5354,9 @@ router4.put("/:id", requireAuth3, async (req, res) => {
       if (req.body[field] !== void 0) {
         updateData[field] = req.body[field];
       }
+    }
+    if (updateData.isDefault !== void 0) {
+      updateData.isDefault = updateData.isDefault === true || updateData.isDefault === "true";
     }
     if (updateData.isDefault === true) {
       await db.update(userMotorcycles).set({ isDefault: false }).where((0, import_drizzle_orm4.and)((0, import_drizzle_orm4.eq)(userMotorcycles.userId, userId), (0, import_drizzle_orm4.ne)(userMotorcycles.id, motoId)));

@@ -55,6 +55,8 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Marca e modello sono obbligatori" });
     }
 
+    const isDefaultBool = isDefault === true || isDefault === "true";
+
     const motorcycle = await storage.createUserMotorcycle({
       userId,
       brand,
@@ -64,12 +66,12 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       motorcycleType: motorcycleType || null,
       ridingStyle: ridingStyle || null,
       photoUrl: photoUrl || null,
-      isDefault: isDefault === true,
+      isDefault: isDefaultBool,
       isForSale: isForSale || false,
       saleDescription: saleDescription || null,
     });
 
-    if (isDefault === true) {
+    if (isDefaultBool) {
       await db
         .update(userMotorcycles)
         .set({ isDefault: false })
@@ -140,6 +142,10 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
       if (req.body[field] !== undefined) {
         updateData[field] = req.body[field];
       }
+    }
+
+    if (updateData.isDefault !== undefined) {
+      updateData.isDefault = updateData.isDefault === true || updateData.isDefault === "true";
     }
 
     if (updateData.isDefault === true) {
