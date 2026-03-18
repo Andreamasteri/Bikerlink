@@ -25,37 +25,48 @@ fi
 
 echo $$ > "$LOCK_FILE"
 
+is_port_open() {
+  local port=$1
+  # Usa fuser prima (più affidabile senza lsof), poi nc
+  fuser ${port}/tcp >/dev/null 2>&1 || \
+  nc -z -w1 localhost "$port" >/dev/null 2>&1
+}
+
 kill_port() {
-  # Kill only the process listening on port 8081, not all metro globally
-  local pid_on_port
-  pid_on_port=$(lsof -ti:$PORT 2>/dev/null)
-  if [ -n "$pid_on_port" ]; then
-    echo "Terminating PID(s) on port $PORT: $pid_on_port"
-    echo "$pid_on_port" | xargs kill -15 2>/dev/null || true
-    sleep 3
-    # Force kill if still running
-    pid_on_port=$(lsof -ti:$PORT 2>/dev/null)
-    if [ -n "$pid_on_port" ]; then
-      echo "$pid_on_port" | xargs kill -9 2>/dev/null || true
-    fi
+  # Kill subprocessi di npm run expo:dev per nome
+  pkill -9 -f "node.*@expo/cli" 2>/dev/null || true
+  pkill -9 -f "node.*expo/build/cli" 2>/dev/null || true
+  pkill -9 -f "metro.*bundler" 2>/dev/null || true
+
+  # Kill per porta con fuser (funziona anche senza lsof)
+  fuser -k -9 ${PORT}/tcp 2>/dev/null || true
+
+  # Kill con lsof se disponibile
+  local pids
+  pids=$(lsof -ti:$PORT 2>/dev/null)
+  if [ -n "$pids" ]; then
+    echo "Kill SIGKILL PID(s) su porta $PORT: $pids"
+    echo "$pids" | xargs kill -9 2>/dev/null || true
   fi
 
-  # Also kill any previous Metro PID we know about
+  # Kill PID Metro noto
   if [ -f "$PID_FILE" ]; then
-    OLD_METRO_PID=$(cat "$PID_FILE" 2>/dev/null)
-    if [ -n "$OLD_METRO_PID" ] && kill -0 "$OLD_METRO_PID" 2>/dev/null; then
-      kill -9 "$OLD_METRO_PID" 2>/dev/null || true
+    OLD_PID=$(cat "$PID_FILE" 2>/dev/null)
+    if [ -n "$OLD_PID" ]; then
+      kill -9 "$OLD_PID" 2>/dev/null || true
     fi
     rm -f "$PID_FILE"
   fi
 
-  for i in $(seq 1 10); do
-    if ! lsof -ti:$PORT >/dev/null 2>&1; then
+  # Aspetta fino a 15s che la porta si liberi
+  for i in $(seq 1 15); do
+    if ! is_port_open $PORT; then
+      echo "Porta $PORT libera dopo ${i}s"
       return 0
     fi
     sleep 1
   done
-  echo "Attenzione: porta $PORT ancora occupata dopo 10s"
+  echo "Attenzione: porta $PORT ancora occupata dopo 15s"
 }
 
 wait_for_backend() {
@@ -79,11 +90,16 @@ for retry in $(seq 1 $MAX_RETRIES); do
   echo "=== Tentativo $retry/$MAX_RETRIES ==="
   echo "Pulizia porta $PORT..."
   kill_port
+
+  # Pausa di sicurezza extra dopo kill
   sleep 2
 
-  PIDS=$(lsof -ti:$PORT 2>/dev/null)
-  if [ -n "$PIDS" ]; then
-    echo "Porta $PORT ancora occupata da PID: $PIDS, riprovo..."
+  # Verifica finale porta libera
+  if is_port_open $PORT; then
+    echo "Porta $PORT ancora occupata dopo kill, tentativo $retry fallito"
+    if [ $retry -lt $MAX_RETRIES ]; then
+      sleep 3
+    fi
     continue
   fi
 
@@ -92,40 +108,55 @@ for retry in $(seq 1 $MAX_RETRIES); do
   METRO_PID=$!
   echo $METRO_PID > "$PID_FILE"
 
-  # Wait up to 60s for Metro to actually bind to port 8081
-  echo "Attendo che Metro si avvii sulla porta $PORT (max 60s)..."
-  for i in $(seq 1 60); do
-    if ! kill -0 $METRO_PID 2>/dev/null; then
-      echo "Metro (PID $METRO_PID) è terminato durante l'avvio al secondo $i"
+  # Aspetta fino a 90s che Metro si avvii sulla porta 8081
+  # Monitora la PORTA, non il PID di npm (Metro sopravvive come orphan)
+  echo "Attendo che Metro si avvii sulla porta $PORT (max 90s)..."
+  METRO_STARTED=0
+  for i in $(seq 1 90); do
+    if is_port_open $PORT; then
+      echo "Metro avviato con successo sulla porta $PORT dopo ${i}s"
+      METRO_STARTED=1
       break
     fi
-    if lsof -ti:$PORT >/dev/null 2>&1; then
-      echo "Metro avviato con successo (PID: $METRO_PID) dopo ${i}s"
+    # Se npm è morto E la porta non è ancora aperta, Metro non partirà
+    if ! kill -0 $METRO_PID 2>/dev/null; then
+      # Dai ancora 5s per vedere se Metro si è avviato come orphan
+      sleep 5
+      if is_port_open $PORT; then
+        echo "Metro avviato (come processo orphan) dopo ${i}s"
+        METRO_STARTED=1
+      else
+        echo "npm (PID $METRO_PID) morto e porta $PORT non aperta al secondo $i"
+      fi
       break
     fi
     sleep 1
   done
 
-  if kill -0 $METRO_PID 2>/dev/null; then
-    echo "Metro in esecuzione, attendo..."
-    wait $METRO_PID
-    EXIT_CODE=$?
-    echo "Metro terminato con codice: $EXIT_CODE"
-    if [ $EXIT_CODE -eq 137 ] || [ $EXIT_CODE -eq 143 ]; then
-      echo "Metro fermato dal sistema (signal kill/term), uscita pulita."
-      exit 0
-    fi
+  if [ $METRO_STARTED -eq 1 ]; then
+    echo "Metro in esecuzione, monitoraggio porta $PORT..."
+    # Tieni il workflow vivo monitorando la porta (non il PID di npm)
+    while true; do
+      sleep 15
+      if ! is_port_open $PORT; then
+        echo "Metro giù: porta $PORT non risponde"
+        break
+      fi
+    done
+    # Quando Metro è giù, questo tentativo è fallito
+    echo "Metro terminato su porta $PORT"
+    # Pulisci prima di riprovare
+    kill $METRO_PID 2>/dev/null || true
     if [ $retry -lt $MAX_RETRIES ]; then
       echo "Riavvio in corso..."
-      sleep 3
-      continue
+      sleep 5
     fi
-    exit $EXIT_CODE
   else
     echo "Metro crashato al tentativo $retry"
+    kill $METRO_PID 2>/dev/null || true
     if [ $retry -lt $MAX_RETRIES ]; then
-      echo "Riprovo tra 3 secondi..."
-      sleep 3
+      echo "Riprovo tra 5 secondi..."
+      sleep 5
     fi
   fi
 done

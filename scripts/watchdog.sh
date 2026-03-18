@@ -24,6 +24,17 @@ is_port_open() {
 
 restart_backend() {
   log "CRASH RILEVATO: backend (porta $BACKEND_PORT) non risponde. Avvio riavvio..."
+
+  BACKEND_LOCK_FILE="/tmp/start-backend.lock"
+  if [ -f "$BACKEND_LOCK_FILE" ]; then
+    LOCK_PID=$(cat "$BACKEND_LOCK_FILE" 2>/dev/null)
+    if kill -0 "$LOCK_PID" 2>/dev/null; then
+      log "Start-backend già in esecuzione (PID: $LOCK_PID), attendo che il backend si avvii..."
+      return 0
+    fi
+    rm -f "$BACKEND_LOCK_FILE"
+  fi
+
   pkill -f "node server_dist/index.js" 2>/dev/null || true
   pkill -f "tsx server" 2>/dev/null || true
   lsof -ti:"$BACKEND_PORT" 2>/dev/null | xargs kill -9 2>/dev/null || true

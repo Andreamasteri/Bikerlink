@@ -10,4 +10,6 @@ config.resolver.blockList = [
   /\/server_dist\//,
 ];
 
+config.maxWorkers = 2;
+
 module.exports = config;
