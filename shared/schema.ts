@@ -750,6 +750,23 @@ export const fakeUserInteractions = pgTable("fake_user_interactions", {
   index("fake_interactions_real_user_idx").on(table.realUserId),
 ]);
 
+export const userBlocks = pgTable("user_blocks", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  blockerId: varchar("blocker_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  blockedId: varchar("blocked_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("user_blocks_unique_idx").on(table.blockerId, table.blockedId),
+  index("user_blocks_blocker_idx").on(table.blockerId),
+  index("user_blocks_blocked_idx").on(table.blockedId),
+]);
+
 export const sosRequests = pgTable("sos_requests", {
   id: varchar("id", { length: 36 })
     .primaryKey()
@@ -973,6 +990,9 @@ export type InsertMotoClubRequest = typeof motoClubRequests.$inferInsert;
 
 export type BikerBikerMatch = typeof bikerBikerMatches.$inferSelect;
 export type InsertBikerBikerMatch = typeof bikerBikerMatches.$inferInsert;
+
+export type UserBlock = typeof userBlocks.$inferSelect;
+export type InsertUserBlock = typeof userBlocks.$inferInsert;
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

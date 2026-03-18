@@ -8,6 +8,13 @@
       "when": 1773836597511,
       "tag": "0000_open_shotgun",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1742327400000,
+      "tag": "0001_user_blocks",
+      "breakpoints": true
     }
   ]
 }

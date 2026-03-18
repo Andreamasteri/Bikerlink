@@ -43,8 +43,12 @@ function requireAuth(req: Request, res: Response, next: () => void) {
 
 router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
+    const requesterId = req.session.userId!;
+    const blockedIds = await storage.getBlockedUserIds(requesterId);
+    const blockedSet = new Set(blockedIds);
     const allUsers = await storage.getAllUsers();
     const results = allUsers
+      .filter((u) => !blockedSet.has(u.id) && u.id !== requesterId)
       .map((u) => ({
         id: u.id,
         nickname: u.nickname,
@@ -241,12 +245,20 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
 router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.params.id as string;
+    const requesterId = req.session.userId!;
+
     const targetUser = await storage.getUser(userId);
     if (!targetUser) {
       return res.status(404).json({ message: "Utente non trovato" });
     }
-    if (targetUser.isFake && req.session.userId && req.session.userId !== userId) {
-      storage.recordFakeUserInteraction(userId, req.session.userId, "profile_view").catch(() => {});
+
+    const isBlockedRelation = await storage.isBlocked(requesterId, userId);
+    if (isBlockedRelation && requesterId !== userId) {
+      return res.status(403).json({ message: "Non puoi visualizzare questo profilo" });
+    }
+
+    if (targetUser.isFake && requesterId !== userId) {
+      storage.recordFakeUserInteraction(userId, requesterId, "profile_view").catch(() => {});
     }
     const profile = await storage.getUserProfile(userId);
     const motorcycles = await storage.getUserMotorcycles(userId);
@@ -297,14 +309,16 @@ router.get("/available-count", requireAuth, async (req: Request, res: Response) 
 
 router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
   try {
+    const requesterId = req.session.userId!;
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
     const includeOffline = req.query.includeOffline === "true";
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
+    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
     const onlineResults = await storage.getOnlineUsersList(fifteenMinutesAgo, lat, lng, countriesParam);
-    let allResults = onlineResults;
-    const onlineIdSet = new Set(onlineResults.map((r: any) => r.user.id));
+    let allResults = onlineResults.filter((r: any) => !blockedIds.has(r.user.id));
+    const onlineIdSet = new Set(allResults.map((r: any) => r.user.id));
     if (includeOffline) {
       const { db } = await import("../db");
       const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
@@ -321,8 +335,8 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
         .leftJoin(profilesTable, eq(profilesTable.userId, usersTable.id))
         .where(and(...offlineConds))
         .orderBy(sqlTag`distance`);
-      const offlineOnly = offlineResults.filter((r: any) => !onlineIdSet.has(r.user.id));
-      allResults = [...onlineResults, ...offlineOnly];
+      const offlineOnly = offlineResults.filter((r: any) => !onlineIdSet.has(r.user.id) && !blockedIds.has(r.user.id));
+      allResults = [...allResults, ...offlineOnly];
     }
     const motorcyclesMap: Record<string, any[]> = {};
     for (const item of allResults) {
@@ -359,10 +373,13 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
 
 router.get("/available-list", requireAuth, async (req: Request, res: Response) => {
   try {
+    const requesterId = req.session.userId!;
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
-    const results = await storage.getAvailableUsersList(fifteenMinutesAgo, lat, lng);
+    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
+    const allItems = await storage.getAvailableUsersList(fifteenMinutesAgo, lat, lng);
+    const results = allItems.filter((r: any) => !blockedIds.has(r.user.id));
     const motorcyclesMap: Record<string, any[]> = {};
     for (const item of results) {
       if (!motorcyclesMap[item.user.id]) {
@@ -421,12 +438,15 @@ router.get("/zavorrine-available-count", requireAuth, async (req: Request, res: 
 
 router.get("/biker-available-list", requireAuth, async (req: Request, res: Response) => {
   try {
+    const requesterId = req.session.userId!;
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
     const includeOffline = req.query.includeOffline === "true";
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
-    const onlineResults = await storage.getAvailableBikersList(fifteenMinutesAgo, lat, lng, countriesParam);
+    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
+    const onlineResultsRaw = await storage.getAvailableBikersList(fifteenMinutesAgo, lat, lng, countriesParam);
+    const onlineResults = onlineResultsRaw.filter((r: any) => !blockedIds.has(r.user.id));
     let allResults = onlineResults;
     if (includeOffline) {
       const { db } = await import("../db");
@@ -445,7 +465,7 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
         .where(and(...bikerConds))
         .orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r: any) => r.user.id));
-      const offlineOnly = allBikers.filter((r: any) => !onlineIds.has(r.user.id));
+      const offlineOnly = allBikers.filter((r: any) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
     }
     const motorcyclesMap: Record<string, any[]> = {};
@@ -483,12 +503,15 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
 
 router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: Response) => {
   try {
+    const requesterId = req.session.userId!;
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
     const includeOffline = req.query.includeOffline === "true";
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
-    const onlineResults = await storage.getAvailableZavorrinaList(fifteenMinutesAgo, lat, lng, countriesParam);
+    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
+    const onlineResultsRaw = await storage.getAvailableZavorrinaList(fifteenMinutesAgo, lat, lng, countriesParam);
+    const onlineResults = onlineResultsRaw.filter((r: any) => !blockedIds.has(r.user.id));
     let allResults = onlineResults;
     if (includeOffline) {
       const { db } = await import("../db");
@@ -507,7 +530,7 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
         .where(and(...zavConds))
         .orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r: any) => r.user.id));
-      const offlineOnly = allZav.filter((r: any) => !onlineIds.has(r.user.id));
+      const offlineOnly = allZav.filter((r: any) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
     }
     const motorcyclesMap: Record<string, any[]> = {};
@@ -545,6 +568,7 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
 
 router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
   try {
+    const requesterId = req.session.userId!;
     const lat = parseFloat(req.query.lat as string);
     const lng = parseFloat(req.query.lng as string);
     const radius = parseFloat(req.query.radius as string) || 50;
@@ -554,9 +578,11 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Parametri lat e lng richiesti" });
     }
 
+    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
     const nearbyUsers = await storage.getNearbyUsers(lat, lng, radius, countriesParam);
 
     const results = nearbyUsers
+      .filter((item) => !blockedIds.has(item.user.id))
       .map((item) => {
         return {
           id: item.user.id,
@@ -585,27 +611,31 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
 
 router.get("/search", requireAuth, async (req: Request, res: Response) => {
   try {
+    const requesterId = req.session.userId!;
     const q = (req.query.q as string || "").trim();
     if (q.length < 2) {
       return res.json([]);
     }
+    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
     const results = await storage.searchUsers(q);
-    const safeResults = results.map((item: any) => {
-      return {
-        id: item.user.id,
-        nickname: item.user.nickname,
-        userType: item.user.userType,
-        sex: item.user.sex,
-        birthYear: item.user.birthYear,
-        region: item.user.region,
-        country: item.user.country,
-        avatarUrl: item.user.avatarUrl,
-        latitude: item.profile?.latitude || null,
-        longitude: item.profile?.longitude || null,
-        isAvailable: item.profile?.isAvailable || false,
-        bio: item.profile?.bio || null,
-      };
-    });
+    const safeResults = results
+      .filter((item: any) => !blockedIds.has(item.user.id))
+      .map((item: any) => {
+        return {
+          id: item.user.id,
+          nickname: item.user.nickname,
+          userType: item.user.userType,
+          sex: item.user.sex,
+          birthYear: item.user.birthYear,
+          region: item.user.region,
+          country: item.user.country,
+          avatarUrl: item.user.avatarUrl,
+          latitude: item.profile?.latitude || null,
+          longitude: item.profile?.longitude || null,
+          isAvailable: item.profile?.isAvailable || false,
+          bio: item.profile?.bio || null,
+        };
+      });
     return res.json(safeResults);
   } catch (error) {
     console.error("Search users error:", error);
@@ -700,6 +730,33 @@ router.post("/me/cancel-deletion", requireAuth, async (req: Request, res: Respon
     return res.json({ message: "Richiesta di cancellazione annullata." });
   } catch (error) {
     console.error("Cancel deletion error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/:id/block", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const blockerId = req.session.userId!;
+    const blockedId = req.params.id as string;
+
+    if (blockerId === blockedId) {
+      return res.status(400).json({ message: "Non puoi bloccare te stesso" });
+    }
+
+    const targetUser = await storage.getUser(blockedId);
+    if (!targetUser) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+
+    const alreadyBlocked = await storage.isBlocked(blockerId, blockedId);
+    if (alreadyBlocked) {
+      return res.status(409).json({ message: "Utente già bloccato" });
+    }
+
+    await storage.blockUser(blockerId, blockedId);
+    return res.json({ message: "Utente bloccato con successo" });
+  } catch (error) {
+    console.error("Block user error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

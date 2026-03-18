@@ -118,7 +118,7 @@ function ConversationRow({ item, userId, onPress, onDelete, t }: { item: Convers
   };
 
   return (
-    <TouchableOpacity style={styles.conversationRow} onPress={onPress} onLongPress={handleLongPress} activeOpacity={0.7}>
+    <TouchableOpacity style={styles.conversationRow} onPress={onPress} activeOpacity={0.7}>
       <View style={[styles.avatar, { backgroundColor: avatarBg }]}>
         <Ionicons
           name={icon.name}
@@ -144,6 +144,13 @@ function ConversationRow({ item, userId, onPress, onDelete, t }: { item: Convers
           )}
         </View>
       </View>
+      <TouchableOpacity
+        onPress={handleLongPress}
+        style={styles.deleteButton}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Ionicons name="trash-outline" size={18} color={Colors.textSecondary} />
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 }
@@ -463,6 +470,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_700Bold",
     color: Colors.background,
+  },
+  deleteButton: {
+    padding: 6,
+    marginLeft: 8,
   },
   modalOverlay: {
     flex: 1,

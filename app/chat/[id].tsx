@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Switch,
   Platform,
+  Alert,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -215,6 +216,31 @@ export default function ChatConversationScreen() {
     },
   });
 
+  const deleteConversationMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/chat/conversations/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      router.back();
+    },
+  });
+
+  const handleDeleteConversation = useCallback(() => {
+    Alert.alert(
+      "Elimina chat",
+      "Vuoi eliminare questa conversazione? Tutti i messaggi verranno cancellati.",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Elimina",
+          style: "destructive",
+          onPress: () => deleteConversationMutation.mutate(),
+        },
+      ]
+    );
+  }, [deleteConversationMutation]);
+
   const handleSend = useCallback(() => {
     let text = inputText.trim();
     if (!text) return;
@@ -313,6 +339,13 @@ export default function ChatConversationScreen() {
             <Text style={[styles.hashtagBtnText, showHashtagPanel && styles.hashtagBtnTextActive]}>#</Text>
           </TouchableOpacity>
         )}
+        <TouchableOpacity
+          onPress={handleDeleteConversation}
+          style={styles.infoButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="trash-outline" size={22} color={Colors.error} />
+        </TouchableOpacity>
         {!isMotoclub && conversation?.conversationType !== "group" && (() => {
           const otherUser = conversation?.participants.find((p: any) => p.id !== userId);
           if (!otherUser) return null;

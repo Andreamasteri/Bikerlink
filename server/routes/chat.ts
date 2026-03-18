@@ -366,11 +366,21 @@ router.get("/unread-total", async (req: Request, res: Response) => {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
+    const blockedIds = new Set(await storage.getBlockedUserIds(userId));
     const convs = await storage.getConversations(userId);
     let total = 0;
 
     for (const conv of convs) {
       const participants = await storage.getConversationParticipants(conv.id);
+
+      const isDirectConv = conv.conversationType === "direct" || conv.conversationType === "private" || conv.conversationType === "contact";
+      if (isDirectConv) {
+        const otherParticipantIds = participants.filter(p => p.userId !== userId).map(p => p.userId);
+        if (otherParticipantIds.some(id => blockedIds.has(id))) {
+          continue;
+        }
+      }
+
       const myParticipant = participants.find((p) => p.userId === userId);
       const msgs = await storage.getMessages(conv.id, 1, 0);
       const lastMessage = msgs[0] || null;
@@ -398,13 +408,24 @@ router.get("/conversations", async (req: Request, res: Response) => {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
+    const blockedIds = await storage.getBlockedUserIds(userId);
+    const blockedSet = new Set(blockedIds);
+
     const convs = await storage.getConversations(userId);
 
-    const result = await Promise.all(
+    const result = (await Promise.all(
       convs.map(async (conv) => {
         const participants = await storage.getConversationParticipants(conv.id);
         const msgs = await storage.getMessages(conv.id, 1, 0);
         const lastMessage = msgs[0] || null;
+
+        const isDirectConv = conv.conversationType === "direct" || conv.conversationType === "private" || conv.conversationType === "contact";
+        if (isDirectConv) {
+          const otherParticipantIds = participants.filter(p => p.userId !== userId).map(p => p.userId);
+          if (otherParticipantIds.some(id => blockedSet.has(id))) {
+            return null;
+          }
+        }
 
         const participantUsers = await Promise.all(
           participants.map(async (p) => {
@@ -429,7 +450,7 @@ router.get("/conversations", async (req: Request, res: Response) => {
           unreadCount,
         };
       })
-    );
+    )).filter(Boolean);
 
     return res.json(result);
   } catch (error) {
@@ -444,6 +465,14 @@ router.post("/conversations", async (req: Request, res: Response) => {
     if (!userId) return;
 
     const { conversationType, title, proposalId, participantIds } = req.body;
+
+    if (participantIds?.length === 1) {
+      const targetUserId = participantIds[0];
+      const blocked = await storage.isBlocked(userId, targetUserId);
+      if (blocked) {
+        return res.status(403).json({ message: "Non puoi aprire una conversazione con questo utente" });
+      }
+    }
 
     if (conversationType === "contact" && participantIds?.length === 1) {
       const targetUserId = participantIds[0];
@@ -566,9 +595,27 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
 
-    const participants = await storage.getConversationParticipants(id);
+    const [conversation, participants] = await Promise.all([
+      storage.getConversation(id),
+      storage.getConversationParticipants(id),
+    ]);
     if (!participants.find((p) => p.userId === userId)) {
       return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+    }
+
+    const isDirectConv = conversation && (
+      conversation.conversationType === "direct" ||
+      conversation.conversationType === "private" ||
+      conversation.conversationType === "contact"
+    );
+    if (isDirectConv && participants.length === 2) {
+      const otherParticipant = participants.find((p) => p.userId !== userId);
+      if (otherParticipant) {
+        const blocked = await storage.isBlocked(userId, otherParticipant.userId);
+        if (blocked) {
+          return res.status(403).json({ message: "Utente bloccato" });
+        }
+      }
     }
 
     const msgs = await storage.getMessages(id, limit, offset);
@@ -602,9 +649,27 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     const id = req.params.id as string;
     const { messageType, content, imageUrl, latitude, longitude } = req.body;
 
-    const participants = await storage.getConversationParticipants(id);
+    const [conversation, participants] = await Promise.all([
+      storage.getConversation(id),
+      storage.getConversationParticipants(id),
+    ]);
     if (!participants.find((p) => p.userId === userId)) {
       return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+    }
+
+    const isDirectConv = conversation && (
+      conversation.conversationType === "direct" ||
+      conversation.conversationType === "private" ||
+      conversation.conversationType === "contact"
+    );
+    if (isDirectConv && participants.length === 2) {
+      const otherParticipant = participants.find((p) => p.userId !== userId);
+      if (otherParticipant) {
+        const blocked = await storage.isBlocked(userId, otherParticipant.userId);
+        if (blocked) {
+          return res.status(403).json({ message: "Utente bloccato" });
+        }
+      }
     }
 
     let finalContent = content;

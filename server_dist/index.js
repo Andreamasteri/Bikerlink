@@ -70,6 +70,7 @@ __export(schema_exports, {
   routePoints: () => routePoints,
   routes: () => routes,
   sosRequests: () => sosRequests,
+  userBlocks: () => userBlocks,
   userMotorcycles: () => userMotorcycles,
   userPhotos: () => userPhotos,
   userProfiles: () => userProfiles,
@@ -81,7 +82,7 @@ __export(schema_exports, {
   zavarrinaWishlistPhotos: () => zavarrinaWishlistPhotos,
   zavarrinaWishlists: () => zavarrinaWishlists
 });
-var import_drizzle_orm, import_pg_core, import_zod, users, userPhotos, userMotorcycles, userProfiles, proposals, proposalParticipants, proposalMatches, conversations, conversationParticipants, messages, routes, routePoints, customRoutes, customRouteWaypoints, photoContestEntries, photoVotes, dailyVoteCounts, photoWinners, workshops, workshopContacts, easterEggs, collectedEasterEggs, reports, moderatorLogs, adCampaigns, adClicks, notifications, invitationCodes, feedbackTickets, appSettings, verificationCodes, passwordResetTokens, motorcyclePhotos, zavarrinaWishlists, zavarrinaWishlistPhotos, zavarrinaWishlistMotos, bikerZavarrinaMatches, bikerBikerMatches, emailVerificationTokens, phoneSharingTracker, fakeUserInteractions, sosRequests, motoClubs, motoClubMembers, motoClubInvites, motoClubRequests, registerSchema, loginSchema;
+var import_drizzle_orm, import_pg_core, import_zod, users, userPhotos, userMotorcycles, userProfiles, proposals, proposalParticipants, proposalMatches, conversations, conversationParticipants, messages, routes, routePoints, customRoutes, customRouteWaypoints, photoContestEntries, photoVotes, dailyVoteCounts, photoWinners, workshops, workshopContacts, easterEggs, collectedEasterEggs, reports, moderatorLogs, adCampaigns, adClicks, notifications, invitationCodes, feedbackTickets, appSettings, verificationCodes, passwordResetTokens, motorcyclePhotos, zavarrinaWishlists, zavarrinaWishlistPhotos, zavarrinaWishlistMotos, bikerZavarrinaMatches, bikerBikerMatches, emailVerificationTokens, phoneSharingTracker, fakeUserInteractions, userBlocks, sosRequests, motoClubs, motoClubMembers, motoClubInvites, motoClubRequests, registerSchema, loginSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -599,6 +600,16 @@ var init_schema = __esm({
     }, (table) => [
       (0, import_pg_core.index)("fake_interactions_fake_user_idx").on(table.fakeUserId),
       (0, import_pg_core.index)("fake_interactions_real_user_idx").on(table.realUserId)
+    ]);
+    userBlocks = (0, import_pg_core.pgTable)("user_blocks", {
+      id: (0, import_pg_core.varchar)("id", { length: 36 }).primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      blockerId: (0, import_pg_core.varchar)("blocker_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+      blockedId: (0, import_pg_core.varchar)("blocked_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+      createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow()
+    }, (table) => [
+      (0, import_pg_core.uniqueIndex)("user_blocks_unique_idx").on(table.blockerId, table.blockedId),
+      (0, import_pg_core.index)("user_blocks_blocker_idx").on(table.blockerId),
+      (0, import_pg_core.index)("user_blocks_blocked_idx").on(table.blockedId)
     ]);
     sosRequests = (0, import_pg_core.pgTable)("sos_requests", {
       id: (0, import_pg_core.varchar)("id", { length: 36 }).primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
@@ -1831,6 +1842,28 @@ var init_storage = __esm({
           )
         );
         return rejected.length;
+      }
+      async blockUser(blockerId, blockedId) {
+        const [block] = await db.insert(userBlocks).values({ blockerId, blockedId }).returning();
+        return block;
+      }
+      async isBlocked(userId1, userId2) {
+        const [row] = await db.select().from(userBlocks).where(
+          (0, import_drizzle_orm2.or)(
+            (0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(userBlocks.blockerId, userId1), (0, import_drizzle_orm2.eq)(userBlocks.blockedId, userId2)),
+            (0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(userBlocks.blockerId, userId2), (0, import_drizzle_orm2.eq)(userBlocks.blockedId, userId1))
+          )
+        ).limit(1);
+        return !!row;
+      }
+      async getBlockedUserIds(userId) {
+        const rows = await db.select().from(userBlocks).where(
+          (0, import_drizzle_orm2.or)(
+            (0, import_drizzle_orm2.eq)(userBlocks.blockerId, userId),
+            (0, import_drizzle_orm2.eq)(userBlocks.blockedId, userId)
+          )
+        );
+        return rows.map((r) => r.blockerId === userId ? r.blockedId : r.blockerId);
       }
     };
     storage = new DatabaseStorage();
@@ -4130,8 +4163,11 @@ function requireAuth(req, res, next) {
 }
 router2.get("/", requireAuth, async (req, res) => {
   try {
+    const requesterId = req.session.userId;
+    const blockedIds = await storage.getBlockedUserIds(requesterId);
+    const blockedSet = new Set(blockedIds);
     const allUsers = await storage.getAllUsers();
-    const results = allUsers.map((u) => ({
+    const results = allUsers.filter((u) => !blockedSet.has(u.id) && u.id !== requesterId).map((u) => ({
       id: u.id,
       nickname: u.nickname,
       avatarUrl: u.avatarUrl,
@@ -4307,12 +4343,17 @@ router2.put("/me/availability", requireAuth, async (req, res) => {
 router2.get("/:id/public", requireAuth, async (req, res) => {
   try {
     const userId = req.params.id;
+    const requesterId = req.session.userId;
     const targetUser = await storage.getUser(userId);
     if (!targetUser) {
       return res.status(404).json({ message: "Utente non trovato" });
     }
-    if (targetUser.isFake && req.session.userId && req.session.userId !== userId) {
-      storage.recordFakeUserInteraction(userId, req.session.userId, "profile_view").catch(() => {
+    const isBlockedRelation = await storage.isBlocked(requesterId, userId);
+    if (isBlockedRelation && requesterId !== userId) {
+      return res.status(403).json({ message: "Non puoi visualizzare questo profilo" });
+    }
+    if (targetUser.isFake && requesterId !== userId) {
+      storage.recordFakeUserInteraction(userId, requesterId, "profile_view").catch(() => {
       });
     }
     const profile = await storage.getUserProfile(userId);
@@ -4361,14 +4402,16 @@ router2.get("/available-count", requireAuth, async (req, res) => {
 });
 router2.get("/online-list", requireAuth, async (req, res) => {
   try {
+    const requesterId = req.session.userId;
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
     const lat = req.query.lat ? parseFloat(req.query.lat) : void 0;
     const lng = req.query.lng ? parseFloat(req.query.lng) : void 0;
     const includeOffline = req.query.includeOffline === "true";
     const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
+    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
     const onlineResults = await storage.getOnlineUsersList(fifteenMinutesAgo, lat, lng, countriesParam);
-    let allResults = onlineResults;
-    const onlineIdSet = new Set(onlineResults.map((r) => r.user.id));
+    let allResults = onlineResults.filter((r) => !blockedIds.has(r.user.id));
+    const onlineIdSet = new Set(allResults.map((r) => r.user.id));
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
@@ -4378,8 +4421,8 @@ router2.get("/online-list", requireAuth, async (req, res) => {
       const offlineConds = [eq9(usersTable.status, "active"), or3(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt))];
       if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
       const offlineResults = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(usersTable).leftJoin(profilesTable, eq9(profilesTable.userId, usersTable.id)).where(and6(...offlineConds)).orderBy(sqlTag`distance`);
-      const offlineOnly = offlineResults.filter((r) => !onlineIdSet.has(r.user.id));
-      allResults = [...onlineResults, ...offlineOnly];
+      const offlineOnly = offlineResults.filter((r) => !onlineIdSet.has(r.user.id) && !blockedIds.has(r.user.id));
+      allResults = [...allResults, ...offlineOnly];
     }
     const motorcyclesMap = {};
     for (const item of allResults) {
@@ -4414,10 +4457,13 @@ router2.get("/online-list", requireAuth, async (req, res) => {
 });
 router2.get("/available-list", requireAuth, async (req, res) => {
   try {
+    const requesterId = req.session.userId;
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
     const lat = req.query.lat ? parseFloat(req.query.lat) : void 0;
     const lng = req.query.lng ? parseFloat(req.query.lng) : void 0;
-    const results = await storage.getAvailableUsersList(fifteenMinutesAgo, lat, lng);
+    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
+    const allItems = await storage.getAvailableUsersList(fifteenMinutesAgo, lat, lng);
+    const results = allItems.filter((r) => !blockedIds.has(r.user.id));
     const motorcyclesMap = {};
     for (const item of results) {
       if (!motorcyclesMap[item.user.id]) {
@@ -4472,12 +4518,15 @@ router2.get("/zavorrine-available-count", requireAuth, async (req, res) => {
 });
 router2.get("/biker-available-list", requireAuth, async (req, res) => {
   try {
+    const requesterId = req.session.userId;
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
     const lat = req.query.lat ? parseFloat(req.query.lat) : void 0;
     const lng = req.query.lng ? parseFloat(req.query.lng) : void 0;
     const includeOffline = req.query.includeOffline === "true";
     const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
-    const onlineResults = await storage.getAvailableBikersList(fifteenMinutesAgo, lat, lng, countriesParam);
+    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
+    const onlineResultsRaw = await storage.getAvailableBikersList(fifteenMinutesAgo, lat, lng, countriesParam);
+    const onlineResults = onlineResultsRaw.filter((r) => !blockedIds.has(r.user.id));
     let allResults = onlineResults;
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
@@ -4489,7 +4538,7 @@ router2.get("/biker-available-list", requireAuth, async (req, res) => {
       if (countriesParam && countriesParam.length > 0) bikerConds.push(inArr(usersTable.country, countriesParam));
       const allBikers = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq9(usersTable.id, profilesTable.userId)).where(and6(...bikerConds)).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));
-      const offlineOnly = allBikers.filter((r) => !onlineIds.has(r.user.id));
+      const offlineOnly = allBikers.filter((r) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
     }
     const motorcyclesMap = {};
@@ -4526,12 +4575,15 @@ router2.get("/biker-available-list", requireAuth, async (req, res) => {
 });
 router2.get("/zavorrine-available-list", requireAuth, async (req, res) => {
   try {
+    const requesterId = req.session.userId;
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
     const lat = req.query.lat ? parseFloat(req.query.lat) : void 0;
     const lng = req.query.lng ? parseFloat(req.query.lng) : void 0;
     const includeOffline = req.query.includeOffline === "true";
     const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
-    const onlineResults = await storage.getAvailableZavorrinaList(fifteenMinutesAgo, lat, lng, countriesParam);
+    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
+    const onlineResultsRaw = await storage.getAvailableZavorrinaList(fifteenMinutesAgo, lat, lng, countriesParam);
+    const onlineResults = onlineResultsRaw.filter((r) => !blockedIds.has(r.user.id));
     let allResults = onlineResults;
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
@@ -4543,7 +4595,7 @@ router2.get("/zavorrine-available-list", requireAuth, async (req, res) => {
       if (countriesParam && countriesParam.length > 0) zavConds.push(inArr(usersTable.country, countriesParam));
       const allZav = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq9(usersTable.id, profilesTable.userId)).where(and6(...zavConds)).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));
-      const offlineOnly = allZav.filter((r) => !onlineIds.has(r.user.id));
+      const offlineOnly = allZav.filter((r) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
     }
     const motorcyclesMap = {};
@@ -4580,6 +4632,7 @@ router2.get("/zavorrine-available-list", requireAuth, async (req, res) => {
 });
 router2.get("/nearby", requireAuth, async (req, res) => {
   try {
+    const requesterId = req.session.userId;
     const lat = parseFloat(req.query.lat);
     const lng = parseFloat(req.query.lng);
     const radius = parseFloat(req.query.radius) || 50;
@@ -4587,8 +4640,9 @@ router2.get("/nearby", requireAuth, async (req, res) => {
     if (isNaN(lat) || isNaN(lng)) {
       return res.status(400).json({ message: "Parametri lat e lng richiesti" });
     }
+    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
     const nearbyUsers = await storage.getNearbyUsers(lat, lng, radius, countriesParam);
-    const results = nearbyUsers.map((item) => {
+    const results = nearbyUsers.filter((item) => !blockedIds.has(item.user.id)).map((item) => {
       return {
         id: item.user.id,
         nickname: item.user.nickname,
@@ -4613,12 +4667,14 @@ router2.get("/nearby", requireAuth, async (req, res) => {
 });
 router2.get("/search", requireAuth, async (req, res) => {
   try {
+    const requesterId = req.session.userId;
     const q = (req.query.q || "").trim();
     if (q.length < 2) {
       return res.json([]);
     }
+    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
     const results = await storage.searchUsers(q);
-    const safeResults = results.map((item) => {
+    const safeResults = results.filter((item) => !blockedIds.has(item.user.id)).map((item) => {
       return {
         id: item.user.id,
         nickname: item.user.nickname,
@@ -4714,6 +4770,28 @@ router2.post("/me/cancel-deletion", requireAuth, async (req, res) => {
     return res.json({ message: "Richiesta di cancellazione annullata." });
   } catch (error) {
     console.error("Cancel deletion error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router2.post("/:id/block", requireAuth, async (req, res) => {
+  try {
+    const blockerId = req.session.userId;
+    const blockedId = req.params.id;
+    if (blockerId === blockedId) {
+      return res.status(400).json({ message: "Non puoi bloccare te stesso" });
+    }
+    const targetUser = await storage.getUser(blockedId);
+    if (!targetUser) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    const alreadyBlocked = await storage.isBlocked(blockerId, blockedId);
+    if (alreadyBlocked) {
+      return res.status(409).json({ message: "Utente gi\xE0 bloccato" });
+    }
+    await storage.blockUser(blockerId, blockedId);
+    return res.json({ message: "Utente bloccato con successo" });
+  } catch (error) {
+    console.error("Block user error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -5454,9 +5532,14 @@ router5.get("/matches", requireAuth4, async (req, res) => {
 router5.get("/garage-matches", requireAuth4, async (req, res) => {
   try {
     const userId = req.session.userId;
+    const blockedIds = new Set(await storage.getBlockedUserIds(userId));
     const garageMatches = await storage.getMatchesForUser(userId);
+    const filteredMatches = garageMatches.filter((match) => {
+      const otherId = match.bikerId === userId ? match.zavarrinaId : match.bikerId;
+      return !blockedIds.has(otherId);
+    });
     const results = await Promise.all(
-      garageMatches.map(async (match) => {
+      filteredMatches.map(async (match) => {
         const biker = await storage.getUser(match.bikerId);
         const zavorrina = await storage.getUser(match.zavarrinaId);
         const bikerMoto = await storage.getUserMotorcycle(match.bikerMotorcycleId);
@@ -5605,9 +5688,14 @@ router5.post("/matches/:id/reject", requireAuth4, async (req, res) => {
 router5.get("/biker-matches", requireAuth4, async (req, res) => {
   try {
     const userId = req.session.userId;
+    const blockedIds = new Set(await storage.getBlockedUserIds(userId));
     const bikerMatchesList = await storage.getBikerBikerMatchesForUser(userId);
+    const filteredMatches = bikerMatchesList.filter((match) => {
+      const otherId = match.biker1Id === userId ? match.biker2Id : match.biker1Id;
+      return !blockedIds.has(otherId);
+    });
     const results = await Promise.all(
-      bikerMatchesList.map(async (match) => {
+      filteredMatches.map(async (match) => {
         const biker1 = await storage.getUser(match.biker1Id);
         const biker2 = await storage.getUser(match.biker2Id);
         return {
@@ -7062,10 +7150,18 @@ router12.get("/unread-total", async (req, res) => {
   try {
     const userId = requireAuth8(req, res);
     if (!userId) return;
+    const blockedIds = new Set(await storage.getBlockedUserIds(userId));
     const convs = await storage.getConversations(userId);
     let total = 0;
     for (const conv of convs) {
       const participants = await storage.getConversationParticipants(conv.id);
+      const isDirectConv = conv.conversationType === "direct" || conv.conversationType === "private" || conv.conversationType === "contact";
+      if (isDirectConv) {
+        const otherParticipantIds = participants.filter((p) => p.userId !== userId).map((p) => p.userId);
+        if (otherParticipantIds.some((id) => blockedIds.has(id))) {
+          continue;
+        }
+      }
       const myParticipant = participants.find((p) => p.userId === userId);
       const msgs = await storage.getMessages(conv.id, 1, 0);
       const lastMessage = msgs[0] || null;
@@ -7089,12 +7185,21 @@ router12.get("/conversations", async (req, res) => {
   try {
     const userId = requireAuth8(req, res);
     if (!userId) return;
+    const blockedIds = await storage.getBlockedUserIds(userId);
+    const blockedSet = new Set(blockedIds);
     const convs = await storage.getConversations(userId);
-    const result = await Promise.all(
+    const result = (await Promise.all(
       convs.map(async (conv) => {
         const participants = await storage.getConversationParticipants(conv.id);
         const msgs = await storage.getMessages(conv.id, 1, 0);
         const lastMessage = msgs[0] || null;
+        const isDirectConv = conv.conversationType === "direct" || conv.conversationType === "private" || conv.conversationType === "contact";
+        if (isDirectConv) {
+          const otherParticipantIds = participants.filter((p) => p.userId !== userId).map((p) => p.userId);
+          if (otherParticipantIds.some((id) => blockedSet.has(id))) {
+            return null;
+          }
+        }
         const participantUsers = await Promise.all(
           participants.map(async (p) => {
             const user = await storage.getUser(p.userId);
@@ -7110,7 +7215,7 @@ router12.get("/conversations", async (req, res) => {
           unreadCount
         };
       })
-    );
+    )).filter(Boolean);
     return res.json(result);
   } catch (error) {
     console.error("Get conversations error:", error);
@@ -7122,6 +7227,13 @@ router12.post("/conversations", async (req, res) => {
     const userId = requireAuth8(req, res);
     if (!userId) return;
     const { conversationType, title, proposalId, participantIds } = req.body;
+    if (participantIds?.length === 1) {
+      const targetUserId = participantIds[0];
+      const blocked = await storage.isBlocked(userId, targetUserId);
+      if (blocked) {
+        return res.status(403).json({ message: "Non puoi aprire una conversazione con questo utente" });
+      }
+    }
     if (conversationType === "contact" && participantIds?.length === 1) {
       const targetUserId = participantIds[0];
       const targetConvs = await storage.getConversations(targetUserId);
@@ -7228,9 +7340,22 @@ router12.get("/conversations/:id/messages", async (req, res) => {
     const id = req.params.id;
     const limit = parseInt(req.query.limit) || 50;
     const offset = parseInt(req.query.offset) || 0;
-    const participants = await storage.getConversationParticipants(id);
+    const [conversation, participants] = await Promise.all([
+      storage.getConversation(id),
+      storage.getConversationParticipants(id)
+    ]);
     if (!participants.find((p) => p.userId === userId)) {
       return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+    }
+    const isDirectConv = conversation && (conversation.conversationType === "direct" || conversation.conversationType === "private" || conversation.conversationType === "contact");
+    if (isDirectConv && participants.length === 2) {
+      const otherParticipant = participants.find((p) => p.userId !== userId);
+      if (otherParticipant) {
+        const blocked = await storage.isBlocked(userId, otherParticipant.userId);
+        if (blocked) {
+          return res.status(403).json({ message: "Utente bloccato" });
+        }
+      }
     }
     const msgs = await storage.getMessages(id, limit, offset);
     const result = await Promise.all(
@@ -7255,9 +7380,22 @@ router12.post("/conversations/:id/messages", async (req, res) => {
     if (!userId) return;
     const id = req.params.id;
     const { messageType, content, imageUrl, latitude, longitude } = req.body;
-    const participants = await storage.getConversationParticipants(id);
+    const [conversation, participants] = await Promise.all([
+      storage.getConversation(id),
+      storage.getConversationParticipants(id)
+    ]);
     if (!participants.find((p) => p.userId === userId)) {
       return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+    }
+    const isDirectConv = conversation && (conversation.conversationType === "direct" || conversation.conversationType === "private" || conversation.conversationType === "contact");
+    if (isDirectConv && participants.length === 2) {
+      const otherParticipant = participants.find((p) => p.userId !== userId);
+      if (otherParticipant) {
+        const blocked = await storage.isBlocked(userId, otherParticipant.userId);
+        if (blocked) {
+          return res.status(403).json({ message: "Utente bloccato" });
+        }
+      }
     }
     let finalContent = content;
     let isFiltered = false;

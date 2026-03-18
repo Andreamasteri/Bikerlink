@@ -116,10 +116,16 @@ router.get("/matches", requireAuth, async (req: Request, res: Response) => {
 router.get("/garage-matches", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
+    const blockedIds = new Set(await storage.getBlockedUserIds(userId));
     const garageMatches = await storage.getMatchesForUser(userId);
 
+    const filteredMatches = garageMatches.filter((match) => {
+      const otherId = match.bikerId === userId ? match.zavarrinaId : match.bikerId;
+      return !blockedIds.has(otherId);
+    });
+
     const results = await Promise.all(
-      garageMatches.map(async (match) => {
+      filteredMatches.map(async (match) => {
         const biker = await storage.getUser(match.bikerId);
         const zavorrina = await storage.getUser(match.zavarrinaId);
         const bikerMoto = await storage.getUserMotorcycle(match.bikerMotorcycleId);
@@ -288,10 +294,16 @@ router.post("/matches/:id/reject", requireAuth, async (req: Request, res: Respon
 router.get("/biker-matches", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
+    const blockedIds = new Set(await storage.getBlockedUserIds(userId));
     const bikerMatchesList = await storage.getBikerBikerMatchesForUser(userId);
 
+    const filteredMatches = bikerMatchesList.filter((match) => {
+      const otherId = match.biker1Id === userId ? match.biker2Id : match.biker1Id;
+      return !blockedIds.has(otherId);
+    });
+
     const results = await Promise.all(
-      bikerMatchesList.map(async (match) => {
+      filteredMatches.map(async (match) => {
         const biker1 = await storage.getUser(match.biker1Id);
         const biker2 = await storage.getUser(match.biker2Id);
         return {

@@ -42,6 +42,7 @@ import {
   fakeUserInteractions,
   customRoutes,
   customRouteWaypoints,
+  userBlocks,
   type User,
   type InsertUser,
   type UserPhoto,
@@ -125,6 +126,7 @@ import {
   sosRequests,
   type SosRequest,
   type InsertSosRequest,
+  type UserBlock,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -350,6 +352,10 @@ export interface IStorage {
   getActiveSosRequestByUser(userId: string): Promise<SosRequest | undefined>;
   getActiveSosRequests(): Promise<SosRequest[]>;
   updateSosRequest(id: string, data: Partial<InsertSosRequest>): Promise<SosRequest | undefined>;
+
+  blockUser(blockerId: string, blockedId: string): Promise<UserBlock>;
+  isBlocked(userId1: string, userId2: string): Promise<boolean>;
+  getBlockedUserIds(userId: string): Promise<string[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1742,6 +1748,31 @@ export class DatabaseStorage implements IStorage {
       )
     );
     return rejected.length;
+  }
+
+  async blockUser(blockerId: string, blockedId: string): Promise<UserBlock> {
+    const [block] = await db.insert(userBlocks).values({ blockerId, blockedId }).returning();
+    return block;
+  }
+
+  async isBlocked(userId1: string, userId2: string): Promise<boolean> {
+    const [row] = await db.select().from(userBlocks).where(
+      or(
+        and(eq(userBlocks.blockerId, userId1), eq(userBlocks.blockedId, userId2)),
+        and(eq(userBlocks.blockerId, userId2), eq(userBlocks.blockedId, userId1))
+      )
+    ).limit(1);
+    return !!row;
+  }
+
+  async getBlockedUserIds(userId: string): Promise<string[]> {
+    const rows = await db.select().from(userBlocks).where(
+      or(
+        eq(userBlocks.blockerId, userId),
+        eq(userBlocks.blockedId, userId)
+      )
+    );
+    return rows.map(r => r.blockerId === userId ? r.blockedId : r.blockerId);
   }
 }
 

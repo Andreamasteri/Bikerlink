@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -10,12 +10,12 @@ import {
   Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 import Colors from "@/constants/colors";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 
 export default function PublicProfileScreen() {
@@ -52,6 +52,45 @@ export default function PublicProfileScreen() {
     if (userType === "biker") return "Biker";
     if (userType === "zavorrina") return "Zavorrina/o";
     return "Coppia";
+  };
+
+  const [isBlocked, setIsBlocked] = useState(false);
+
+  const blockMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/users/${id}/block`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      setIsBlocked(true);
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/biker-matches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/online-list"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/available-list"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-list"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-list"] });
+      router.back();
+    },
+    onError: (e: any) => {
+      Alert.alert("Errore", e.message || "Impossibile bloccare l'utente");
+    },
+  });
+
+  const handleBlockUser = () => {
+    Alert.alert(
+      "Blocca utente",
+      `Sei sicuro di voler bloccare ${profile?.nickname ?? "questo utente"}?\n\nQuesta azione è permanente e irreversibile. Né tu né ${profile?.nickname ?? "l'utente"} potrete più vedervi nella chat, nei profili e nei match.`,
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Blocca",
+          style: "destructive",
+          onPress: () => blockMutation.mutate(),
+        },
+      ]
+    );
   };
 
   const handleStartChat = async () => {
@@ -173,6 +212,19 @@ export default function PublicProfileScreen() {
             <Text style={styles.chatButtonText}>Scrivi un messaggio</Text>
           </TouchableOpacity>
         )}
+        {!isSelf && (
+          <TouchableOpacity
+            style={[styles.blockButton, blockMutation.isPending && styles.blockButtonDisabled]}
+            onPress={handleBlockUser}
+            activeOpacity={0.8}
+            disabled={blockMutation.isPending || isBlocked}
+          >
+            <Ionicons name="ban" size={20} color={Colors.error} />
+            <Text style={styles.blockButtonText}>
+              {isBlocked ? "Utente bloccato" : "Blocca utente"}
+            </Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </>
   );
@@ -207,4 +259,21 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   chatButtonText: { fontSize: 16, fontWeight: "700" as const, color: Colors.background },
+  blockButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginHorizontal: 20,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: Colors.error,
+  },
+  blockButtonDisabled: {
+    opacity: 0.5,
+  },
+  blockButtonText: { fontSize: 15, fontWeight: "600" as const, color: Colors.error },
 });
