@@ -128,8 +128,8 @@ export default function InviteCodesScreen() {
         maxUses: parseInt(data.maxUses, 10) || 100,
         expiresAt: data.expiresAt || null,
       }),
-    onSuccess: async (res: any) => {
-      const created: InvitationCode = await res.json().catch(() => null);
+    onSuccess: async (res: Response) => {
+      const created: InvitationCode = await res.json().catch(() => null) as InvitationCode;
       if (created?.id && pendingImage) {
         await uploadImageForCode(created.id, pendingImage);
       }
@@ -148,7 +148,7 @@ export default function InviteCodesScreen() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<InvitationCode> }) =>
       apiRequest("PUT", `/api/admin/invitation-codes/${id}`, data),
-    onSuccess: async (_res: any, variables: { id: string; data: Partial<InvitationCode> }) => {
+    onSuccess: async (_res: Response, variables: { id: string; data: Partial<InvitationCode> }) => {
       if (pendingImage) {
         await uploadImageForCode(variables.id, pendingImage);
       }

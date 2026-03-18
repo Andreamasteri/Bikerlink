@@ -3718,11 +3718,9 @@ async function sendInvitationGiftEmail(to, code, imageUrl, giftMessage, expiryDa
       from: `"BikerLink" <${creds.user}>`,
       to,
       subject,
-      html
+      html,
+      ...imageAttachment ? { attachments: [imageAttachment] } : {}
     };
-    if (imageAttachment) {
-      mailOptions.attachments = [imageAttachment];
-    }
     await transporter.sendMail(mailOptions);
     console.log(`[EMAIL] Gift email inviata a ${to} per codice ${code}`);
     return true;
@@ -8039,7 +8037,7 @@ router17.get("/easter-eggs-stats", async (_req, res) => {
   try {
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { collectedEasterEggs: collectedEasterEggs2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { count, sql: sql7 } = await import("drizzle-orm");
+    const { count, sql: sql8 } = await import("drizzle-orm");
     const rows = await db2.select({
       easterEggId: collectedEasterEggs2.easterEggId,
       collectionsCount: count()
@@ -10841,6 +10839,8 @@ async function autoSeedFakeUsers() {
 }
 
 // server/index.ts
+init_db();
+var import_drizzle_orm10 = require("drizzle-orm");
 var fs8 = __toESM(require("fs"));
 var path8 = __toESM(require("path"));
 var app = (0, import_express21.default)();
@@ -11049,6 +11049,11 @@ function setupErrorHandler(app2) {
     next();
   });
   setupErrorHandler(app);
+  try {
+    await db.execute(import_drizzle_orm10.sql`ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS image_url TEXT`);
+  } catch (e) {
+    console.warn("[MIGRATION] invitation_codes.image_url:", e);
+  }
   await autoSeedEssentialUsers();
   await autoSeedFakeUsers();
   const port = parseInt(process.env.PORT || "5000", 10);

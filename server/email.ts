@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import nodemailer, { type Attachment, type SendMailOptions } from "nodemailer";
 import fs from "fs";
 import path from "path";
 import sharp from "sharp";
@@ -120,7 +120,7 @@ export async function sendInvitationGiftEmail(
   });
   const expiryLabel = `Scade il ${expiryStr} alle ${expiryTime}`;
 
-  let imageAttachment: any = null;
+  let imageAttachment: Attachment | null = null;
   let imageHtml = "";
 
   if (imageUrl) {
@@ -191,15 +191,13 @@ export async function sendInvitationGiftEmail(
   `;
 
   try {
-    const mailOptions: any = {
+    const mailOptions: SendMailOptions = {
       from: `"BikerLink" <${creds.user}>`,
       to,
       subject,
       html,
+      ...(imageAttachment ? { attachments: [imageAttachment] } : {}),
     };
-    if (imageAttachment) {
-      mailOptions.attachments = [imageAttachment];
-    }
     await transporter.sendMail(mailOptions);
     console.log(`[EMAIL] Gift email inviata a ${to} per codice ${code}`);
     return true;

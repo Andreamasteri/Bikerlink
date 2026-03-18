@@ -3,6 +3,8 @@ import type { Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { startMatchingEngine } from "./matching-engine";
 import { autoSeedEssentialUsers, autoSeedFakeUsers } from "./auto-seed";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -285,6 +287,12 @@ function setupErrorHandler(app: express.Application) {
   });
 
   setupErrorHandler(app);
+
+  try {
+    await db.execute(sql`ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS image_url TEXT`);
+  } catch (e) {
+    console.warn("[MIGRATION] invitation_codes.image_url:", e);
+  }
 
   await autoSeedEssentialUsers();
   await autoSeedFakeUsers();
