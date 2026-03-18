@@ -102,7 +102,7 @@ export default function InviteCodesScreen() {
       const baseUrl = getApiUrl();
       const url = new URL(`/api/admin/invitation-codes/${codeId}/image`, baseUrl);
       const formData = new FormData();
-      formData.append("image", { uri: img.uri, name: img.name, type: img.type } as any);
+      formData.append("image", { uri: img.uri, name: img.name, type: img.type } as unknown as Blob);
       const res = await globalThis.fetch(url.toString(), {
         method: "POST",
         body: formData,
@@ -210,7 +210,7 @@ export default function InviteCodesScreen() {
           giftMessage: form.giftMessage.trim() || null,
           maxUses: parseInt(form.maxUses, 10) || 100,
           expiresAt: form.expiresAt || null,
-        } as any,
+        },
       });
     } else {
       createMutation.mutate(form);
@@ -318,7 +318,7 @@ export default function InviteCodesScreen() {
                 <View
                   style={[
                     styles.usesBarFill,
-                    { width: `${Math.min(100, (c.currentUses / c.maxUses) * 100)}%` as any },
+                    { width: `${Math.min(100, (c.currentUses / c.maxUses) * 100)}%` },
                   ]}
                 />
               </View>
