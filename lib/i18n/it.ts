@@ -145,6 +145,14 @@ const it: Record<string, string> = {
 
   "language.title": "Lingua",
   "profile.downloadManual": "Scarica Manuale Utente",
+  "profile.documentation": "Documentazione",
+  "profile.downloadEula": "EULA",
+  "profile.downloadPrivacyPolicy": "Privacy Policy",
+  "profile.exportUserData": "Dati Utente",
+  "profile.downloading": "Download...",
+  "profile.exportDataError": "Impossibile esportare i dati. Controlla la connessione.",
+  "profile.eulaNotAvailable": "EULA non ancora disponibile.",
+  "profile.privacyNotAvailable": "Privacy Policy non ancora disponibile.",
 
   "userType.biker": "Biker",
   "userType.zavorrina": "Zavorrina/o",

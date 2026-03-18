@@ -10480,6 +10480,8 @@ async function registerRoutes(app2) {
   });
   const MANUAL_PATH = import_node_path.default.resolve(process.cwd(), "server/public/bikerlink-manual.pdf");
   const MANUAL_DIR = import_node_path.default.dirname(MANUAL_PATH);
+  const EULA_PDF_PATH = import_node_path.default.resolve(process.cwd(), "server/public/bikerlink-eula.pdf");
+  const PRIVACY_PDF_PATH = import_node_path.default.resolve(process.cwd(), "server/public/bikerlink-privacy-policy.pdf");
   app2.get("/api/manual/download", (_req, res) => {
     if (!import_node_fs.default.existsSync(MANUAL_PATH)) {
       return res.status(404).json({ message: "Manuale non disponibile" });
@@ -10538,6 +10540,121 @@ async function registerRoutes(app2) {
         lastModified: stats.mtime.toISOString()
       });
     });
+  });
+  const eulaUpload2 = (0, import_multer3.default)({
+    storage: import_multer3.default.diskStorage({
+      destination: (_req, _file, cb) => {
+        if (!import_node_fs.default.existsSync(MANUAL_DIR)) import_node_fs.default.mkdirSync(MANUAL_DIR, { recursive: true });
+        cb(null, MANUAL_DIR);
+      },
+      filename: (_req, _file, cb) => cb(null, "bikerlink-eula.pdf")
+    }),
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype === "application/pdf") cb(null, true);
+      else cb(new Error("Solo file PDF consentiti"));
+    },
+    limits: { fileSize: 20 * 1024 * 1024 }
+  });
+  const privacyUpload = (0, import_multer3.default)({
+    storage: import_multer3.default.diskStorage({
+      destination: (_req, _file, cb) => {
+        if (!import_node_fs.default.existsSync(MANUAL_DIR)) import_node_fs.default.mkdirSync(MANUAL_DIR, { recursive: true });
+        cb(null, MANUAL_DIR);
+      },
+      filename: (_req, _file, cb) => cb(null, "bikerlink-privacy-policy.pdf")
+    }),
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype === "application/pdf") cb(null, true);
+      else cb(new Error("Solo file PDF consentiti"));
+    },
+    limits: { fileSize: 20 * 1024 * 1024 }
+  });
+  app2.get("/api/eula/download", (_req, res) => {
+    if (!import_node_fs.default.existsSync(EULA_PDF_PATH)) {
+      return res.status(404).json({ message: "EULA non disponibile" });
+    }
+    res.setHeader("Content-Disposition", 'attachment; filename="BikerLink-EULA.pdf"');
+    res.setHeader("Content-Type", "application/pdf");
+    const stream = import_node_fs.default.createReadStream(EULA_PDF_PATH);
+    stream.on("error", (err) => {
+      console.error("EULA stream error:", err);
+      if (!res.headersSent) res.status(500).json({ message: "Errore lettura file" });
+      else res.end();
+    });
+    stream.pipe(res);
+  });
+  app2.get("/api/eula/info", (_req, res) => {
+    if (!import_node_fs.default.existsSync(EULA_PDF_PATH)) return res.json({ available: false });
+    const stats = import_node_fs.default.statSync(EULA_PDF_PATH);
+    res.json({ available: true, fileName: "BikerLink-EULA.pdf", fileSize: stats.size, lastModified: stats.mtime.toISOString() });
+  });
+  app2.post("/api/admin/eula/upload", async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Non autenticato" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== "admin") return res.status(403).json({ message: "Accesso non autorizzato" });
+    eulaUpload2.single("file")(req, res, (err) => {
+      if (err) return res.status(400).json({ message: err.message || "Errore upload" });
+      if (!req.file) return res.status(400).json({ message: "Nessun file caricato" });
+      const stats = import_node_fs.default.statSync(EULA_PDF_PATH);
+      res.json({ message: "EULA aggiornato con successo", fileName: "BikerLink-EULA.pdf", fileSize: stats.size, lastModified: stats.mtime.toISOString() });
+    });
+  });
+  app2.get("/api/privacy-policy/download", (_req, res) => {
+    if (!import_node_fs.default.existsSync(PRIVACY_PDF_PATH)) {
+      return res.status(404).json({ message: "Privacy Policy non disponibile" });
+    }
+    res.setHeader("Content-Disposition", 'attachment; filename="BikerLink-PrivacyPolicy.pdf"');
+    res.setHeader("Content-Type", "application/pdf");
+    const stream = import_node_fs.default.createReadStream(PRIVACY_PDF_PATH);
+    stream.on("error", (err) => {
+      console.error("Privacy Policy stream error:", err);
+      if (!res.headersSent) res.status(500).json({ message: "Errore lettura file" });
+      else res.end();
+    });
+    stream.pipe(res);
+  });
+  app2.get("/api/privacy-policy/info", (_req, res) => {
+    if (!import_node_fs.default.existsSync(PRIVACY_PDF_PATH)) return res.json({ available: false });
+    const stats = import_node_fs.default.statSync(PRIVACY_PDF_PATH);
+    res.json({ available: true, fileName: "BikerLink-PrivacyPolicy.pdf", fileSize: stats.size, lastModified: stats.mtime.toISOString() });
+  });
+  app2.post("/api/admin/privacy-policy/upload", async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Non autenticato" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== "admin") return res.status(403).json({ message: "Accesso non autorizzato" });
+    privacyUpload.single("file")(req, res, (err) => {
+      if (err) return res.status(400).json({ message: err.message || "Errore upload" });
+      if (!req.file) return res.status(400).json({ message: "Nessun file caricato" });
+      const stats = import_node_fs.default.statSync(PRIVACY_PDF_PATH);
+      res.json({ message: "Privacy Policy aggiornata con successo", fileName: "BikerLink-PrivacyPolicy.pdf", fileSize: stats.size, lastModified: stats.mtime.toISOString() });
+    });
+  });
+  app2.get("/api/user/export-data", async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Non autenticato" });
+    const user = await storage.getUser(req.session.userId);
+    if (!user) return res.status(404).json({ message: "Utente non trovato" });
+    const exportData = {
+      exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      user: {
+        id: user.id,
+        nickname: user.nickname,
+        email: user.email,
+        phone: user.phone ?? null,
+        userType: user.userType,
+        sex: user.sex ?? null,
+        birthYear: user.birthYear ?? null,
+        country: user.country ?? null,
+        region: user.region ?? null,
+        role: user.role,
+        status: user.status,
+        createdAt: null
+      }
+    };
+    const json = JSON.stringify(exportData, null, 2);
+    const filename = `BikerLink-UserData-${user.nickname}-${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.json`;
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Type", "application/json");
+    res.send(json);
   });
   app2.get("/api/health", (_req, res) => {
     res.json({ status: "ok" });

@@ -107,6 +107,9 @@ export default function ProfileScreen() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [isDownloadingManual, setIsDownloadingManual] = useState(false);
+  const [isDownloadingEula, setIsDownloadingEula] = useState(false);
+  const [isDownloadingPrivacy, setIsDownloadingPrivacy] = useState(false);
+  const [isExportingData, setIsExportingData] = useState(false);
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -266,6 +269,104 @@ export default function ProfileScreen() {
       setIsDownloadingManual(false);
     }
   }, [isDownloadingManual, t]);
+
+  const handleDownloadEula = useCallback(async () => {
+    if (isDownloadingEula) return;
+    setIsDownloadingEula(true);
+    try {
+      if (Platform.OS === "web") {
+        const url = new URL("/api/eula/download", getApiUrl()).toString();
+        Linking.openURL(url);
+      } else {
+        const url = new URL("/api/eula/download", getApiUrl()).toString();
+        const fileUri = (FileSystem.cacheDirectory || FileSystem.documentDirectory) + "BikerLink-EULA.pdf";
+        const result = await FileSystem.downloadAsync(url, fileUri);
+        if (result.status === 200) {
+          const canShare = await Sharing.isAvailableAsync();
+          if (canShare) {
+            await Sharing.shareAsync(fileUri, { mimeType: "application/pdf" });
+          } else {
+            Alert.alert("Download", t("profile.downloadEula") + " ✓");
+          }
+        } else if (result.status === 404) {
+          Alert.alert("Info", t("profile.eulaNotAvailable"));
+        } else {
+          Alert.alert("Errore", "Download non riuscito. Riprova più tardi.");
+        }
+      }
+    } catch (e) {
+      console.error("EULA download error:", e);
+      Alert.alert("Errore", t("profile.eulaNotAvailable"));
+    } finally {
+      setIsDownloadingEula(false);
+    }
+  }, [isDownloadingEula, t]);
+
+  const handleDownloadPrivacyPolicy = useCallback(async () => {
+    if (isDownloadingPrivacy) return;
+    setIsDownloadingPrivacy(true);
+    try {
+      if (Platform.OS === "web") {
+        const url = new URL("/api/privacy-policy/download", getApiUrl()).toString();
+        Linking.openURL(url);
+      } else {
+        const url = new URL("/api/privacy-policy/download", getApiUrl()).toString();
+        const fileUri = (FileSystem.cacheDirectory || FileSystem.documentDirectory) + "BikerLink-PrivacyPolicy.pdf";
+        const result = await FileSystem.downloadAsync(url, fileUri);
+        if (result.status === 200) {
+          const canShare = await Sharing.isAvailableAsync();
+          if (canShare) {
+            await Sharing.shareAsync(fileUri, { mimeType: "application/pdf" });
+          } else {
+            Alert.alert("Download", t("profile.downloadPrivacyPolicy") + " ✓");
+          }
+        } else if (result.status === 404) {
+          Alert.alert("Info", t("profile.privacyNotAvailable"));
+        } else {
+          Alert.alert("Errore", "Download non riuscito. Riprova più tardi.");
+        }
+      }
+    } catch (e) {
+      console.error("Privacy Policy download error:", e);
+      Alert.alert("Errore", t("profile.privacyNotAvailable"));
+    } finally {
+      setIsDownloadingPrivacy(false);
+    }
+  }, [isDownloadingPrivacy, t]);
+
+  const handleExportUserData = useCallback(async () => {
+    if (isExportingData) return;
+    setIsExportingData(true);
+    try {
+      if (Platform.OS === "web") {
+        const url = new URL("/api/user/export-data", getApiUrl()).toString();
+        Linking.openURL(url);
+      } else {
+        const url = new URL("/api/user/export-data", getApiUrl()).toString();
+        const response = await globalThis.fetch(url, { credentials: "include" });
+        if (!response.ok) {
+          Alert.alert("Errore", t("profile.exportDataError"));
+          return;
+        }
+        const json = await response.text();
+        const nickname = profile?.nickname || "user";
+        const date = new Date().toISOString().split("T")[0];
+        const fileUri = (FileSystem.cacheDirectory || FileSystem.documentDirectory) + `BikerLink-UserData-${nickname}-${date}.json`;
+        await FileSystem.writeAsStringAsync(fileUri, json, { encoding: FileSystem.EncodingType.UTF8 });
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(fileUri, { mimeType: "application/json" });
+        } else {
+          Alert.alert("Export", t("profile.exportUserData") + " ✓");
+        }
+      }
+    } catch (e) {
+      console.error("User data export error:", e);
+      Alert.alert("Errore", t("profile.exportDataError"));
+    } finally {
+      setIsExportingData(false);
+    }
+  }, [isExportingData, t, profile?.nickname]);
 
   const handleDeleteAccount = useCallback(() => {
     if (Platform.OS === "web") {
@@ -625,11 +726,32 @@ export default function ProfileScreen() {
           <MenuItem icon="eye" label="Pannello Moderatore" onPress={() => router.push("/moderator" as any)} color={Colors.warning} />
         )}
 
-        <MenuItem icon="document-text-outline" label="Privacy Policy" onPress={() => router.push("/privacy-policy" as any)} />
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{t("profile.documentation")}</Text>
         <MenuItem
           icon="document-text"
-          label={isDownloadingManual ? "Download..." : t("profile.downloadManual")}
+          label={isDownloadingManual ? t("profile.downloading") : t("profile.downloadManual")}
           onPress={handleDownloadManual}
+          color={Colors.accent}
+        />
+        <MenuItem
+          icon="shield-checkmark-outline"
+          label={isDownloadingEula ? t("profile.downloading") : t("profile.downloadEula")}
+          onPress={handleDownloadEula}
+          color={Colors.accent}
+        />
+        <MenuItem
+          icon="document-text-outline"
+          label={isDownloadingPrivacy ? t("profile.downloading") : t("profile.downloadPrivacyPolicy")}
+          onPress={handleDownloadPrivacyPolicy}
+          color={Colors.accent}
+        />
+        <MenuItem
+          icon="cloud-download-outline"
+          label={isExportingData ? t("profile.downloading") : t("profile.exportUserData")}
+          onPress={handleExportUserData}
           color={Colors.accent}
         />
       </View>
