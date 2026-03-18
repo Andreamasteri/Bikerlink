@@ -1523,7 +1523,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteFakeUser(id: string): Promise<void> {
-    await db.delete(users).where(and(eq(users.id, id), eq(users.isFake, true)));
+    const fakeCondition = and(eq(users.id, id), eq(users.isFake, true), sql`${users.nickname} != 'BikerLink_Official'`);
+    const [fakeUser] = await db.select({ id: users.id }).from(users).where(fakeCondition).limit(1);
+    if (!fakeUser) return;
+    await db.transaction(async (tx) => {
+      await tx.delete(userMotorcycles).where(eq(userMotorcycles.userId, id));
+      await tx.delete(users).where(fakeCondition);
+    });
   }
 
   async deleteAllFakeUsers(): Promise<number> {
@@ -1533,6 +1539,14 @@ export class DatabaseStorage implements IStorage {
     if (count === 0) return 0;
 
     await db.transaction(async (tx) => {
+      await tx.execute(sql`
+        DELETE FROM user_motorcycles
+        WHERE user_id IN (
+          SELECT id FROM users WHERE is_fake = true AND nickname != 'BikerLink_Official'
+        )
+      `);
+      console.log(`[Admin] deleteAllFakeUsers: eliminate moto associate agli utenti fake`);
+
       await tx.delete(users).where(condition);
       console.log(`[Admin] deleteAllFakeUsers: eliminati ${count} utenti fake`);
 

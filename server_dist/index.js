@@ -1661,7 +1661,13 @@ var init_storage = __esm({
         ).orderBy((0, import_drizzle_orm2.desc)(users.createdAt));
       }
       async deleteFakeUser(id) {
-        await db.delete(users).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.id, id), (0, import_drizzle_orm2.eq)(users.isFake, true)));
+        const fakeCondition = (0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.id, id), (0, import_drizzle_orm2.eq)(users.isFake, true), import_drizzle_orm2.sql`${users.nickname} != 'BikerLink_Official'`);
+        const [fakeUser] = await db.select({ id: users.id }).from(users).where(fakeCondition).limit(1);
+        if (!fakeUser) return;
+        await db.transaction(async (tx) => {
+          await tx.delete(userMotorcycles).where((0, import_drizzle_orm2.eq)(userMotorcycles.userId, id));
+          await tx.delete(users).where(fakeCondition);
+        });
       }
       async deleteAllFakeUsers() {
         const condition = (0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.isFake, true), import_drizzle_orm2.sql`${users.nickname} != 'BikerLink_Official'`);
@@ -1669,6 +1675,13 @@ var init_storage = __esm({
         console.log(`[Admin] deleteAllFakeUsers: trovati ${count2} utenti fake da eliminare`);
         if (count2 === 0) return 0;
         await db.transaction(async (tx) => {
+          await tx.execute(import_drizzle_orm2.sql`
+        DELETE FROM user_motorcycles
+        WHERE user_id IN (
+          SELECT id FROM users WHERE is_fake = true AND nickname != 'BikerLink_Official'
+        )
+      `);
+          console.log(`[Admin] deleteAllFakeUsers: eliminate moto associate agli utenti fake`);
           await tx.delete(users).where(condition);
           console.log(`[Admin] deleteAllFakeUsers: eliminati ${count2} utenti fake`);
           await tx.execute(import_drizzle_orm2.sql`
