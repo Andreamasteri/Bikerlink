@@ -20,12 +20,57 @@ import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 
-const REGIONS = [
-  "Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna",
-  "Friuli Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche",
-  "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia", "Toscana",
-  "Trentino-Alto Adige", "Umbria", "Valle d'Aosta", "Veneto",
+const COUNTRIES_DATA: { code: string; name: string; regions: string[] }[] = [
+  { code: "IT", name: "🇮🇹 Italia", regions: ["Abruzzo","Basilicata","Calabria","Campania","Emilia-Romagna","Friuli Venezia Giulia","Lazio","Liguria","Lombardia","Marche","Molise","Piemonte","Puglia","Sardegna","Sicilia","Toscana","Trentino-Alto Adige","Umbria","Valle d'Aosta","Veneto"] },
+  { code: "DE", name: "🇩🇪 Germania", regions: ["Baden-Württemberg","Bayern","Berlin","Brandenburg","Bremen","Hamburg","Hessen","Mecklenburg-Vorpommern","Niedersachsen","Nordrhein-Westfalen","Rheinland-Pfalz","Saarland","Sachsen","Sachsen-Anhalt","Schleswig-Holstein","Thüringen"] },
+  { code: "FR", name: "🇫🇷 Francia", regions: ["Auvergne-Rhône-Alpes","Bourgogne-Franche-Comté","Bretagne","Centre-Val de Loire","Corse","Grand Est","Hauts-de-France","Île-de-France","Normandie","Nouvelle-Aquitaine","Occitanie","Pays de la Loire","Provence-Alpes-Côte d'Azur"] },
+  { code: "ES", name: "🇪🇸 Spagna", regions: ["Andalucía","Aragón","Asturias","Baleares","Canarias","Cantabria","Castilla-La Mancha","Castilla y León","Cataluña","Comunidad de Madrid","Comunidad Valenciana","Extremadura","Galicia","La Rioja","Navarra","País Vasco","Región de Murcia"] },
+  { code: "PT", name: "🇵🇹 Portogallo", regions: ["Alentejo","Algarve","Centro","Lisboa","Norte","Açores","Madeira"] },
+  { code: "AT", name: "🇦🇹 Austria", regions: ["Burgenland","Kärnten","Niederösterreich","Oberösterreich","Salzburg","Steiermark","Tirol","Vorarlberg","Wien"] },
+  { code: "CH", name: "🇨🇭 Svizzera", regions: ["Bern","Geneva","Graubünden","Luzern","Ticino","Valais","Vaud","Zürich"] },
+  { code: "BE", name: "🇧🇪 Belgio", regions: ["Bruxelles","Fiandre","Vallonia"] },
+  { code: "NL", name: "🇳🇱 Paesi Bassi", regions: ["Drenthe","Flevoland","Friesland","Gelderland","Groningen","Limburg","Noord-Brabant","Noord-Holland","Overijssel","Utrecht","Zeeland","Zuid-Holland"] },
+  { code: "PL", name: "🇵🇱 Polonia", regions: ["Dolnośląskie","Kujawsko-Pomorskie","Łódź","Lubelskie","Lubuskie","Małopolskie","Mazowieckie","Opolskie","Podkarpackie","Podlaskie","Pomorskie","Śląskie","Świętokrzyskie","Warmińsko-Mazurskie","Wielkopolskie","Zachodniopomorskie"] },
+  { code: "CZ", name: "🇨🇿 Rep. Ceca", regions: ["Jihočeský","Jihomoravský","Karlovarský","Královéhradecký","Liberecký","Moravskoslezský","Olomoucký","Pardubický","Plzeňský","Praha","Středočeský","Ústecký","Vysočina","Zlínský"] },
+  { code: "SK", name: "🇸🇰 Slovacchia", regions: ["Banskobystrický","Bratislavský","Košický","Nitrianský","Prešovský","Trenčínský","Trnavský","Žilinský"] },
+  { code: "HU", name: "🇭🇺 Ungheria", regions: ["Budapest","Bács-Kiskun","Baranya","Békés","Borsod-Abaúj-Zemplén","Csongrád-Csanád","Fejér","Győr-Moson-Sopron","Hajdú-Bihar","Heves","Jász-Nagykun-Szolnok","Komárom-Esztergom","Nógrád","Pest","Somogy","Szabolcs-Szatmár-Bereg","Tolna","Vas","Veszprém","Zala"] },
+  { code: "RO", name: "🇷🇴 Romania", regions: ["Alba","Arad","Argeș","Bacău","Bihor","Bistrița-Năsăud","Botoșani","Brașov","Brăila","București","Buzău","Caraș-Severin","Cluj","Constanța","Covasna","Dâmbovița","Dolj","Galați","Gorj","Harghita","Hunedoara","Iași","Maramureș","Mureș","Neamț","Olt","Prahova","Satu Mare","Sibiu","Suceava","Timiș","Tulcea","Vâlcea","Vaslui","Vrancea"] },
+  { code: "GR", name: "🇬🇷 Grecia", regions: ["Attica","Creta","Epiro","Ionia","Macedonia","Peloponneso","Tessaglia","Tracia"] },
+  { code: "HR", name: "🇭🇷 Croazia", regions: ["Grad Zagreb","Splitsko-dalmatinska","Primorsko-goranska","Istarska","Osječko-baranjska","Zadarska","Vukovarsko-srijemska","Karlovačka","Varaždinska","Sisačko-moslavačka","Šibensko-kninska","Dubrovačko-neretvanska","Koprivničko-križevačka","Brodsko-posavska","Međimurska","Bjelovarsko-bilogorska","Virovitičko-podravska","Požeško-slavonska","Krapinsko-zagorska","Ličko-senjska","Zagrebačka"] },
+  { code: "SI", name: "🇸🇮 Slovenia", regions: ["Gorenjska","Goriška","Jugovzhodna Slovenija","Koroška","Obalno-kraška","Osrednjeslovenska","Podravska","Pomurska","Posavska","Primorsko-notranjska","Savinjska","Zasavska"] },
+  { code: "RS", name: "🇷🇸 Serbia", regions: ["Beograd","Vojvodina","Šumadija","Serbia Occidentale","Serbia Meridionale","Serbia Orientale"] },
+  { code: "BA", name: "🇧🇦 Bosnia Erzegovina", regions: ["Federazione di BiH","Repubblica Srpska","Distretto di Brčko"] },
+  { code: "ME", name: "🇲🇪 Montenegro", regions: ["Bar","Bijelo Polje","Budva","Nikšić","Pljevlja","Podgorica"] },
+  { code: "MK", name: "🇲🇰 Macedonia del Nord", regions: ["Pelagonia","Polog","Skopje","Sud-Ovest","Sud-Est","Vardar","Est","Nord-Est"] },
+  { code: "AL", name: "🇦🇱 Albania", regions: ["Berat","Dibër","Durrës","Elbasan","Fier","Gjirokastër","Korçë","Kukës","Lezhë","Shkodër","Tiranë","Vlorë"] },
+  { code: "BG", name: "🇧🇬 Bulgaria", regions: ["Blagoevgrad","Burgas","Gabrovo","Haskovo","Lovech","Montana","Pazardzhik","Pernik","Pleven","Plovdiv","Razgrad","Ruse","Shumen","Silistra","Sliven","Sofia","Stara Zagora","Varna","Veliko Tarnovo","Vidin","Vratsa","Yambol"] },
+  { code: "MD", name: "🇲🇩 Moldova", regions: ["Chișinău","Centru","Nord","Sud"] },
+  { code: "UA", name: "🇺🇦 Ucraina", regions: ["Cherkasy","Chernihiv","Chernivtsi","Dnipropetrovsk","Ivano-Frankivsk","Kharkiv","Kherson","Kiev","Leopoli","Mykolaiv","Odessa","Poltava","Rivne","Sumy","Ternopil","Vinnytsia","Volyn","Zakarpattia","Zaporizhzhia","Zhytomyr"] },
+  { code: "BY", name: "🇧🇾 Bielorussia", regions: ["Brest","Gomel","Grodno","Minsk","Mogilev","Vitebsk"] },
+  { code: "LT", name: "🇱🇹 Lituania", regions: ["Alytus","Kaunas","Klaipėda","Marijampolė","Panevėžys","Šiauliai","Tauragė","Telšiai","Utena","Vilnius"] },
+  { code: "LV", name: "🇱🇻 Lettonia", regions: ["Courland","Latgale","Pieriga","Riga","Vidzeme","Zemgale"] },
+  { code: "EE", name: "🇪🇪 Estonia", regions: ["Harju","Hiiu","Ida-Viru","Jõgeva","Järva","Lääne","Lääne-Viru","Põlva","Pärnu","Rapla","Saare","Tartu","Valga","Viljandi","Võru"] },
+  { code: "FI", name: "🇫🇮 Finlandia", regions: ["Ahvenanmaa","Etelä-Karjala","Etelä-Pohjanmaa","Etelä-Savo","Kainuu","Kanta-Häme","Keski-Suomi","Kymenlaakso","Lappi","Pirkanmaa","Pohjanmaa","Pohjois-Karjala","Pohjois-Pohjanmaa","Pohjois-Savo","Päijät-Häme","Satakunta","Uusimaa","Varsinais-Suomi"] },
+  { code: "SE", name: "🇸🇪 Svezia", regions: ["Blekinge","Dalarna","Gävleborg","Gotland","Halland","Jämtland","Jönköping","Kalmar","Kronoberg","Norrbotten","Skåne","Södermanland","Stockholm","Uppsala","Värmland","Västerbotten","Västernorrland","Västmanland","Västra Götaland","Örebro","Östergötland"] },
+  { code: "NO", name: "🇳🇴 Norvegia", regions: ["Agder","Innlandet","Møre og Romsdal","Nordland","Oslo","Rogaland","Troms og Finnmark","Trøndelag","Vestfold og Telemark","Vestland","Viken"] },
+  { code: "DK", name: "🇩🇰 Danimarca", regions: ["Hovedstaden","Midtjylland","Nordjylland","Sjælland","Syddanmark"] },
+  { code: "IE", name: "🇮🇪 Irlanda", regions: ["Connacht","Leinster","Munster","Ulster"] },
+  { code: "GB", name: "🇬🇧 Regno Unito", regions: ["Inghilterra","Scozia","Galles","Irlanda del Nord"] },
+  { code: "IS", name: "🇮🇸 Islanda", regions: ["Capitale","Penisola di Reykjanes","Ovest","Fiordi Occidentali","Nord-Ovest","Nord-Est","Est","Sud"] },
+  { code: "LU", name: "🇱🇺 Lussemburgo", regions: ["Diekirch","Grevenmacher","Lussemburgo"] },
+  { code: "MT", name: "🇲🇹 Malta", regions: ["Malta","Gozo"] },
+  { code: "CY", name: "🇨🇾 Cipro", regions: ["Nicosia","Limassol","Larnaca","Paphos","Famagosta","Kyrenia"] },
+  { code: "TR", name: "🇹🇷 Turchia", regions: ["Ankara","İstanbul","İzmir","Antalya","Bursa","Adana","Konya","Gaziantep","Mersin","Kayseri","Trabzon","Erzurum","Malatya","Diyarbakır","Samsun"] },
+  { code: "AD", name: "🇦🇩 Andorra", regions: ["Andorra la Vella","Canillo","Encamp","Escaldes-Engordany","La Massana","Ordino","Sant Julià de Lòria"] },
+  { code: "MC", name: "🇲🇨 Monaco", regions: ["Monaco"] },
+  { code: "SM", name: "🇸🇲 San Marino", regions: ["San Marino","Borgo Maggiore","Serravalle","Domagnano","Fiorentino","Acquaviva","Città","Montegiardino","Faetano"] },
+  { code: "LI", name: "🇱🇮 Liechtenstein", regions: ["Vaduz","Schaan","Balzers","Triesen","Eschen","Mauren","Triesenberg","Ruggell","Gamprin","Schellenberg","Planken"] },
+  { code: "XK", name: "🇽🇰 Kosovo", regions: ["Pristina","Mitrovica","Peja","Prizren","Gjakova","Ferizaj","Gjilan"] },
 ];
+
+const getRegionsForCountry = (code: string): string[] => {
+  return COUNTRIES_DATA.find(c => c.code === code)?.regions ?? [];
+};
 
 const MOTORCYCLE_TYPES = ["Naked", "Sport", "Touring", "Enduro", "Cruiser", "Adventure", "Custom", "Scooter"];
 const RIDING_STYLES = ["Allegra", "Tranquilla", "Sportiva", "Turistica"];
@@ -94,6 +139,7 @@ export default function FakeUsersAdmin() {
   const [formType, setFormType] = useState<string>("biker");
   const [formSex, setFormSex] = useState<string>("M");
   const [formNickname, setFormNickname] = useState("");
+  const [formCountry, setFormCountry] = useState("IT");
   const [formRegion, setFormRegion] = useState("Lombardia");
   const [formBirthYear, setFormBirthYear] = useState("");
   const [formBio, setFormBio] = useState("");
@@ -106,6 +152,7 @@ export default function FakeUsersAdmin() {
   const [formWishlistDesc, setFormWishlistDesc] = useState("");
   const [formDesiredBrand, setFormDesiredBrand] = useState("");
   const [formDesiredModel, setFormDesiredModel] = useState("");
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [showRegionPicker, setShowRegionPicker] = useState(false);
 
   const { data: chatbotData } = useQuery<{ enabled: boolean }>({
@@ -315,6 +362,7 @@ export default function FakeUsersAdmin() {
     setFormType("biker");
     setFormSex("M");
     setFormNickname("");
+    setFormCountry("IT");
     setFormRegion("Lombardia");
     setFormBirthYear("");
     setFormBio("");
@@ -327,6 +375,8 @@ export default function FakeUsersAdmin() {
     setFormWishlistDesc("");
     setFormDesiredBrand("");
     setFormDesiredModel("");
+    setShowCountryPicker(false);
+    setShowRegionPicker(false);
   };
 
   useEffect(() => {
@@ -387,6 +437,7 @@ export default function FakeUsersAdmin() {
       userType: formType,
       sex: formSex,
       nickname: formNickname,
+      country: formCountry,
       region: formRegion,
       birthYear: parseInt(formBirthYear) || 1990,
       bio: formBio,
@@ -801,13 +852,36 @@ export default function FakeUsersAdmin() {
                 placeholderTextColor="#666"
               />
 
+              <Text style={styles.fieldLabel}>Paese</Text>
+              <TouchableOpacity style={styles.input} onPress={() => { setShowCountryPicker(!showCountryPicker); setShowRegionPicker(false); }}>
+                <Text style={styles.inputText}>{COUNTRIES_DATA.find(c => c.code === formCountry)?.name ?? formCountry}</Text>
+              </TouchableOpacity>
+              {!!showCountryPicker && (
+                <View style={styles.pickerList}>
+                  {COUNTRIES_DATA.map((c) => (
+                    <TouchableOpacity
+                      key={c.code}
+                      style={[styles.pickerItem, formCountry === c.code && styles.pickerItemActive]}
+                      onPress={() => {
+                        setFormCountry(c.code);
+                        const firstRegion = c.regions[0] ?? "";
+                        setFormRegion(firstRegion);
+                        setShowCountryPicker(false);
+                      }}
+                    >
+                      <Text style={[styles.pickerItemText, formCountry === c.code && styles.pickerItemTextActive]}>{c.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
               <Text style={styles.fieldLabel}>Regione</Text>
-              <TouchableOpacity style={styles.input} onPress={() => setShowRegionPicker(!showRegionPicker)}>
-                <Text style={styles.inputText}>{formRegion}</Text>
+              <TouchableOpacity style={styles.input} onPress={() => { setShowRegionPicker(!showRegionPicker); setShowCountryPicker(false); }}>
+                <Text style={styles.inputText}>{formRegion || "— nessuna —"}</Text>
               </TouchableOpacity>
               {!!showRegionPicker && (
                 <View style={styles.pickerList}>
-                  {REGIONS.map((r) => (
+                  {getRegionsForCountry(formCountry).map((r) => (
                     <TouchableOpacity
                       key={r}
                       style={[styles.pickerItem, formRegion === r && styles.pickerItemActive]}

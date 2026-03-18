@@ -1094,8 +1094,7 @@ router.post("/fake-users", async (req: Request, res: Response) => {
     }
     const email = `fake_${nickname.toLowerCase().replace(/[^a-z0-9]/g, "")}@fakeuser.bikerlink.it`;
     const hashedPassword = await bcrypt.hash("fakeuser2025!", 10);
-    const ITALIAN_REGIONS = new Set(["Abruzzo","Basilicata","Calabria","Campania","Emilia-Romagna","Friuli Venezia Giulia","Lazio","Liguria","Lombardia","Marche","Molise","Piemonte","Puglia","Sardegna","Sicilia","Toscana","Trentino-Alto Adige","Umbria","Valle d'Aosta","Veneto"]);
-    const country = req.body.country || (region && ITALIAN_REGIONS.has(region) ? "IT" : "IT");
+    const country = req.body.country || "IT";
     const user = await storage.createUser({
       nickname,
       email,
@@ -1112,21 +1111,169 @@ router.post("/fake-users", async (req: Request, res: Response) => {
       eulaAccepted: true,
       lastLoginAt: new Date(),
     });
-    const regionCoords: Record<string, { lat: number; lng: number }> = {
-      "Abruzzo": { lat: 42.19, lng: 13.73 }, "Basilicata": { lat: 40.64, lng: 15.97 },
-      "Calabria": { lat: 38.91, lng: 16.59 }, "Campania": { lat: 40.85, lng: 14.27 },
-      "Emilia-Romagna": { lat: 44.49, lng: 11.34 }, "Friuli Venezia Giulia": { lat: 46.07, lng: 13.23 },
-      "Lazio": { lat: 41.90, lng: 12.50 }, "Liguria": { lat: 44.41, lng: 8.95 },
-      "Lombardia": { lat: 45.46, lng: 9.19 }, "Marche": { lat: 43.62, lng: 13.52 },
-      "Molise": { lat: 41.56, lng: 14.67 }, "Piemonte": { lat: 45.07, lng: 7.69 },
-      "Puglia": { lat: 41.13, lng: 16.86 }, "Sardegna": { lat: 39.22, lng: 9.12 },
-      "Sicilia": { lat: 37.60, lng: 14.02 }, "Toscana": { lat: 43.77, lng: 11.25 },
-      "Trentino-Alto Adige": { lat: 46.07, lng: 11.13 }, "Umbria": { lat: 43.00, lng: 12.64 },
-      "Valle d'Aosta": { lat: 45.74, lng: 7.32 }, "Veneto": { lat: 45.44, lng: 12.33 },
+    const COUNTRY_CENTERS: Record<string, { lat: number; lng: number }> = {
+      IT: { lat: 41.87, lng: 12.57 }, DE: { lat: 51.17, lng: 10.45 }, FR: { lat: 46.23, lng: 2.21 },
+      ES: { lat: 40.46, lng: -3.75 }, PT: { lat: 39.40, lng: -8.22 }, AT: { lat: 47.52, lng: 14.55 },
+      CH: { lat: 46.82, lng: 8.23 }, BE: { lat: 50.50, lng: 4.47 }, NL: { lat: 52.13, lng: 5.29 },
+      PL: { lat: 51.92, lng: 19.15 }, CZ: { lat: 49.82, lng: 15.47 }, SK: { lat: 48.67, lng: 19.70 },
+      HU: { lat: 47.16, lng: 19.50 }, RO: { lat: 45.94, lng: 24.97 }, GR: { lat: 39.07, lng: 21.82 },
+      HR: { lat: 45.10, lng: 15.20 }, SI: { lat: 46.12, lng: 14.80 }, RS: { lat: 44.02, lng: 21.01 },
+      BA: { lat: 44.17, lng: 17.91 }, ME: { lat: 42.71, lng: 19.37 }, MK: { lat: 41.61, lng: 21.75 },
+      AL: { lat: 41.15, lng: 20.17 }, BG: { lat: 42.73, lng: 25.49 }, MD: { lat: 47.41, lng: 28.37 },
+      UA: { lat: 48.38, lng: 31.17 }, BY: { lat: 53.71, lng: 27.95 }, LT: { lat: 55.17, lng: 23.88 },
+      LV: { lat: 56.88, lng: 24.60 }, EE: { lat: 58.60, lng: 25.01 }, FI: { lat: 64.96, lng: 25.74 },
+      SE: { lat: 60.13, lng: 18.64 }, NO: { lat: 60.47, lng: 8.47 }, DK: { lat: 56.26, lng: 9.50 },
+      IE: { lat: 53.41, lng: -8.24 }, GB: { lat: 55.38, lng: -3.44 }, IS: { lat: 64.96, lng: -19.02 },
+      LU: { lat: 49.82, lng: 6.13 }, MT: { lat: 35.94, lng: 14.38 }, CY: { lat: 35.13, lng: 33.43 },
+      TR: { lat: 38.96, lng: 35.24 }, AD: { lat: 42.55, lng: 1.60 }, MC: { lat: 43.74, lng: 7.41 },
+      SM: { lat: 43.94, lng: 12.46 }, LI: { lat: 47.17, lng: 9.56 }, XK: { lat: 42.60, lng: 20.90 },
     };
-    const coords = region ? regionCoords[region] : null;
-    const lat = coords ? coords.lat + (Math.random() - 0.5) * 0.5 : null;
-    const lng = coords ? coords.lng + (Math.random() - 0.5) * 0.5 : null;
+    const REGION_COORDS: Record<string, Record<string, { lat: number; lng: number }>> = {
+      IT: {
+        "Abruzzo": { lat: 42.19, lng: 13.73 }, "Basilicata": { lat: 40.64, lng: 15.97 },
+        "Calabria": { lat: 38.91, lng: 16.59 }, "Campania": { lat: 40.85, lng: 14.27 },
+        "Emilia-Romagna": { lat: 44.49, lng: 11.34 }, "Friuli Venezia Giulia": { lat: 46.07, lng: 13.23 },
+        "Lazio": { lat: 41.90, lng: 12.50 }, "Liguria": { lat: 44.41, lng: 8.95 },
+        "Lombardia": { lat: 45.46, lng: 9.19 }, "Marche": { lat: 43.62, lng: 13.52 },
+        "Molise": { lat: 41.56, lng: 14.67 }, "Piemonte": { lat: 45.07, lng: 7.69 },
+        "Puglia": { lat: 41.13, lng: 16.86 }, "Sardegna": { lat: 39.22, lng: 9.12 },
+        "Sicilia": { lat: 37.60, lng: 14.02 }, "Toscana": { lat: 43.77, lng: 11.25 },
+        "Trentino-Alto Adige": { lat: 46.07, lng: 11.13 }, "Umbria": { lat: 43.00, lng: 12.64 },
+        "Valle d'Aosta": { lat: 45.74, lng: 7.32 }, "Veneto": { lat: 45.44, lng: 12.33 },
+      },
+      DE: {
+        "Baden-Württemberg": { lat: 48.66, lng: 9.35 }, "Bayern": { lat: 48.79, lng: 11.50 },
+        "Berlin": { lat: 52.52, lng: 13.40 }, "Brandenburg": { lat: 52.41, lng: 12.53 },
+        "Bremen": { lat: 53.08, lng: 8.80 }, "Hamburg": { lat: 53.55, lng: 10.00 },
+        "Hessen": { lat: 50.65, lng: 9.17 }, "Mecklenburg-Vorpommern": { lat: 53.61, lng: 12.43 },
+        "Niedersachsen": { lat: 52.64, lng: 9.84 }, "Nordrhein-Westfalen": { lat: 51.43, lng: 7.66 },
+        "Rheinland-Pfalz": { lat: 49.91, lng: 7.45 }, "Saarland": { lat: 49.40, lng: 7.02 },
+        "Sachsen": { lat: 51.10, lng: 13.20 }, "Sachsen-Anhalt": { lat: 51.95, lng: 11.69 },
+        "Schleswig-Holstein": { lat: 54.22, lng: 9.69 }, "Thüringen": { lat: 50.91, lng: 11.03 },
+      },
+      FR: {
+        "Auvergne-Rhône-Alpes": { lat: 45.44, lng: 4.39 }, "Bourgogne-Franche-Comté": { lat: 47.28, lng: 4.99 },
+        "Bretagne": { lat: 48.20, lng: -2.93 }, "Centre-Val de Loire": { lat: 47.75, lng: 1.67 },
+        "Corse": { lat: 42.04, lng: 9.02 }, "Grand Est": { lat: 48.70, lng: 6.18 },
+        "Hauts-de-France": { lat: 50.48, lng: 2.79 }, "Île-de-France": { lat: 48.85, lng: 2.35 },
+        "Normandie": { lat: 49.18, lng: 0.37 }, "Nouvelle-Aquitaine": { lat: 44.83, lng: 0.58 },
+        "Occitanie": { lat: 43.61, lng: 2.21 }, "Pays de la Loire": { lat: 47.76, lng: -0.33 },
+        "Provence-Alpes-Côte d'Azur": { lat: 43.93, lng: 6.07 },
+      },
+      ES: {
+        "Andalucía": { lat: 37.38, lng: -5.97 }, "Aragón": { lat: 41.65, lng: -0.88 },
+        "Asturias": { lat: 43.36, lng: -5.86 }, "Baleares": { lat: 39.57, lng: 2.65 },
+        "Canarias": { lat: 28.10, lng: -15.41 }, "Cantabria": { lat: 43.18, lng: -4.05 },
+        "Castilla-La Mancha": { lat: 39.54, lng: -3.00 }, "Castilla y León": { lat: 41.65, lng: -4.73 },
+        "Cataluña": { lat: 41.59, lng: 1.52 }, "Comunidad de Madrid": { lat: 40.42, lng: -3.70 },
+        "Comunidad Valenciana": { lat: 39.48, lng: -0.75 }, "Extremadura": { lat: 39.49, lng: -6.06 },
+        "Galicia": { lat: 42.58, lng: -7.89 }, "La Rioja": { lat: 42.29, lng: -2.54 },
+        "Navarra": { lat: 42.82, lng: -1.65 }, "País Vasco": { lat: 43.04, lng: -2.34 },
+        "Región de Murcia": { lat: 37.99, lng: -1.13 },
+      },
+      PT: {
+        "Alentejo": { lat: 38.57, lng: -8.00 }, "Algarve": { lat: 37.20, lng: -8.20 },
+        "Centro": { lat: 40.21, lng: -8.43 }, "Lisboa": { lat: 38.72, lng: -9.14 },
+        "Norte": { lat: 41.55, lng: -8.43 }, "Açores": { lat: 37.74, lng: -25.67 },
+        "Madeira": { lat: 32.76, lng: -16.96 },
+      },
+      AT: {
+        "Burgenland": { lat: 47.51, lng: 16.59 }, "Kärnten": { lat: 46.73, lng: 14.30 },
+        "Niederösterreich": { lat: 48.11, lng: 15.81 }, "Oberösterreich": { lat: 48.03, lng: 13.98 },
+        "Salzburg": { lat: 47.63, lng: 13.13 }, "Steiermark": { lat: 47.36, lng: 15.12 },
+        "Tirol": { lat: 47.26, lng: 11.39 }, "Vorarlberg": { lat: 47.26, lng: 9.92 },
+        "Wien": { lat: 48.21, lng: 16.37 },
+      },
+      CH: {
+        "Bern": { lat: 46.95, lng: 7.45 }, "Geneva": { lat: 46.20, lng: 6.15 },
+        "Graubünden": { lat: 46.66, lng: 9.58 }, "Luzern": { lat: 47.05, lng: 8.31 },
+        "Ticino": { lat: 46.33, lng: 8.80 }, "Valais": { lat: 46.23, lng: 7.61 },
+        "Vaud": { lat: 46.57, lng: 6.52 }, "Zürich": { lat: 47.38, lng: 8.54 },
+      },
+      GR: {
+        "Attica": { lat: 37.97, lng: 23.73 }, "Creta": { lat: 35.24, lng: 24.81 },
+        "Macedonia": { lat: 40.64, lng: 22.94 }, "Tessaglia": { lat: 39.64, lng: 22.42 },
+        "Peloponneso": { lat: 37.50, lng: 22.37 }, "Epiro": { lat: 39.66, lng: 20.85 },
+        "Ionia": { lat: 38.90, lng: 20.69 }, "Tracia": { lat: 41.15, lng: 25.41 },
+      },
+      PL: {
+        "Mazowieckie": { lat: 52.07, lng: 21.02 }, "Małopolskie": { lat: 49.72, lng: 20.25 },
+        "Śląskie": { lat: 50.26, lng: 19.02 }, "Dolnośląskie": { lat: 51.11, lng: 17.04 },
+        "Wielkopolskie": { lat: 52.41, lng: 16.93 }, "Pomorskie": { lat: 54.35, lng: 18.65 },
+        "Łódź": { lat: 51.76, lng: 19.46 }, "Lubelskie": { lat: 51.25, lng: 22.57 },
+      },
+      RO: {
+        "București": { lat: 44.43, lng: 26.10 }, "Cluj": { lat: 46.77, lng: 23.60 },
+        "Timiș": { lat: 45.75, lng: 21.22 }, "Brașov": { lat: 45.65, lng: 25.61 },
+        "Constanța": { lat: 44.18, lng: 28.64 }, "Iași": { lat: 47.16, lng: 27.59 },
+        "Sibiu": { lat: 45.80, lng: 24.15 }, "Prahova": { lat: 45.14, lng: 25.99 },
+      },
+      TR: {
+        "İstanbul": { lat: 41.01, lng: 28.97 }, "Ankara": { lat: 39.92, lng: 32.85 },
+        "İzmir": { lat: 38.42, lng: 27.14 }, "Antalya": { lat: 36.90, lng: 30.69 },
+        "Bursa": { lat: 40.19, lng: 29.06 }, "Konya": { lat: 37.87, lng: 32.49 },
+        "Adana": { lat: 37.00, lng: 35.32 }, "Trabzon": { lat: 41.00, lng: 39.73 },
+      },
+      GB: {
+        "Inghilterra": { lat: 52.35, lng: -1.17 }, "Scozia": { lat: 56.49, lng: -4.20 },
+        "Galles": { lat: 52.13, lng: -3.78 }, "Irlanda del Nord": { lat: 54.61, lng: -6.69 },
+      },
+      SE: {
+        "Stockholm": { lat: 59.33, lng: 18.07 }, "Västra Götaland": { lat: 57.71, lng: 12.01 },
+        "Skåne": { lat: 55.99, lng: 13.59 }, "Uppsala": { lat: 59.86, lng: 17.64 },
+        "Östergötland": { lat: 58.41, lng: 15.62 }, "Norrbotten": { lat: 66.83, lng: 20.40 },
+      },
+      NO: {
+        "Oslo": { lat: 59.91, lng: 10.75 }, "Vestland": { lat: 60.39, lng: 5.32 },
+        "Rogaland": { lat: 59.00, lng: 6.09 }, "Trøndelag": { lat: 63.43, lng: 10.39 },
+        "Nordland": { lat: 67.28, lng: 14.41 }, "Troms og Finnmark": { lat: 69.66, lng: 18.96 },
+      },
+      FI: {
+        "Uusimaa": { lat: 60.25, lng: 24.84 }, "Pirkanmaa": { lat: 61.50, lng: 23.77 },
+        "Lappi": { lat: 67.73, lng: 26.60 }, "Pohjois-Pohjanmaa": { lat: 65.01, lng: 25.47 },
+        "Varsinais-Suomi": { lat: 60.44, lng: 22.26 }, "Etelä-Karjala": { lat: 61.05, lng: 28.19 },
+      },
+      HU: {
+        "Budapest": { lat: 47.50, lng: 19.04 }, "Pest": { lat: 47.45, lng: 19.48 },
+        "Győr-Moson-Sopron": { lat: 47.68, lng: 17.63 }, "Hajdú-Bihar": { lat: 47.53, lng: 21.63 },
+        "Borsod-Abaúj-Zemplén": { lat: 48.10, lng: 20.79 }, "Baranya": { lat: 45.99, lng: 18.23 },
+      },
+      CZ: {
+        "Praha": { lat: 50.08, lng: 14.43 }, "Jihomoravský": { lat: 49.19, lng: 16.61 },
+        "Moravskoslezský": { lat: 49.82, lng: 18.26 }, "Ústecký": { lat: 50.66, lng: 13.88 },
+        "Plzeňský": { lat: 49.74, lng: 13.38 }, "Jihočeský": { lat: 49.00, lng: 14.43 },
+      },
+      SK: {
+        "Bratislavský": { lat: 48.15, lng: 17.11 }, "Košický": { lat: 48.72, lng: 21.26 },
+        "Prešovský": { lat: 49.00, lng: 21.24 }, "Banskobystrický": { lat: 48.74, lng: 19.15 },
+        "Žilinský": { lat: 49.22, lng: 18.74 }, "Nitrianský": { lat: 48.31, lng: 18.08 },
+      },
+      BG: {
+        "Sofia": { lat: 42.70, lng: 23.32 }, "Plovdiv": { lat: 42.15, lng: 24.75 },
+        "Varna": { lat: 43.21, lng: 27.91 }, "Burgas": { lat: 42.51, lng: 27.47 },
+        "Stara Zagora": { lat: 42.43, lng: 25.64 }, "Ruse": { lat: 43.85, lng: 25.95 },
+      },
+      UA: {
+        "Kiev": { lat: 50.45, lng: 30.52 }, "Leopoli": { lat: 49.84, lng: 24.03 },
+        "Kharkiv": { lat: 49.99, lng: 36.23 }, "Odessa": { lat: 46.49, lng: 30.73 },
+        "Dnipropetrovsk": { lat: 48.47, lng: 35.05 }, "Zakarpattia": { lat: 48.62, lng: 22.30 },
+        "Mykolaiv": { lat: 46.97, lng: 31.99 }, "Zaporizhzhia": { lat: 47.84, lng: 35.14 },
+      },
+      RS: {
+        "Beograd": { lat: 44.82, lng: 20.46 }, "Vojvodina": { lat: 45.26, lng: 19.83 },
+        "Šumadija": { lat: 44.02, lng: 20.81 },
+      },
+      HR: {
+        "Grad Zagreb": { lat: 45.81, lng: 15.97 }, "Splitsko-dalmatinska": { lat: 43.51, lng: 16.44 },
+        "Primorsko-goranska": { lat: 45.34, lng: 14.41 }, "Istarska": { lat: 45.23, lng: 13.90 },
+        "Osječko-baranjska": { lat: 45.55, lng: 18.69 }, "Zadarska": { lat: 44.12, lng: 15.23 },
+        "Dubrovačko-neretvanska": { lat: 42.65, lng: 18.09 },
+      },
+    };
+    const regionCoordsForCountry = REGION_COORDS[country] ?? {};
+    const coordsEntry = region ? (regionCoordsForCountry[region] ?? COUNTRY_CENTERS[country] ?? { lat: 41.87, lng: 12.57 }) : (COUNTRY_CENTERS[country] ?? { lat: 41.87, lng: 12.57 });
+    const lat = coordsEntry.lat + (Math.random() - 0.5) * 0.5;
+    const lng = coordsEntry.lng + (Math.random() - 0.5) * 0.5;
     await storage.createUserProfile({
       userId: user.id,
       isAvailable: true,
