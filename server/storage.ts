@@ -314,7 +314,7 @@ export interface IStorage {
   createBikerBikerMatch(data: InsertBikerBikerMatch): Promise<BikerBikerMatch>;
   getBikerBikerMatch(id: string): Promise<BikerBikerMatch | undefined>;
   updateBikerBikerMatch(id: string, data: Partial<InsertBikerBikerMatch>): Promise<BikerBikerMatch | undefined>;
-  deleteBikerBikerMatch(id: string, userId: string): Promise<boolean>;
+  resetBikerBikerMatchToNew(id: string, userId: string): Promise<boolean>;
   deleteRejectedBikerBikerMatches(userId: string): Promise<number>;
 
   createEmailVerificationToken(userId: string, token: string, expiresAt: Date): Promise<void>;
@@ -1703,7 +1703,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createBikerBikerMatch(data: InsertBikerBikerMatch): Promise<BikerBikerMatch> {
-    const [match] = await db.insert(bikerBikerMatches).values(data).returning();
+    const [match] = await db.insert(bikerBikerMatches).values(data)
+      .onConflictDoNothing()
+      .returning();
     return match;
   }
 
@@ -1717,11 +1719,11 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async deleteBikerBikerMatch(id: string, userId: string): Promise<boolean> {
+  async resetBikerBikerMatchToNew(id: string, userId: string): Promise<boolean> {
     const [match] = await db.select().from(bikerBikerMatches).where(eq(bikerBikerMatches.id, id));
     if (!match) return false;
     if (match.biker1Id !== userId && match.biker2Id !== userId) return false;
-    await db.delete(bikerBikerMatches).where(eq(bikerBikerMatches.id, id));
+    await db.update(bikerBikerMatches).set({ status: "new" }).where(eq(bikerBikerMatches.id, id));
     return true;
   }
 

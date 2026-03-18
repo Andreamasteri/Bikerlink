@@ -1791,7 +1791,7 @@ var init_storage = __esm({
         ).limit(200);
       }
       async createBikerBikerMatch(data) {
-        const [match] = await db.insert(bikerBikerMatches).values(data).returning();
+        const [match] = await db.insert(bikerBikerMatches).values(data).onConflictDoNothing().returning();
         return match;
       }
       async getBikerBikerMatch(id) {
@@ -1802,11 +1802,11 @@ var init_storage = __esm({
         const [updated] = await db.update(bikerBikerMatches).set(data).where((0, import_drizzle_orm2.eq)(bikerBikerMatches.id, id)).returning();
         return updated;
       }
-      async deleteBikerBikerMatch(id, userId) {
+      async resetBikerBikerMatchToNew(id, userId) {
         const [match] = await db.select().from(bikerBikerMatches).where((0, import_drizzle_orm2.eq)(bikerBikerMatches.id, id));
         if (!match) return false;
         if (match.biker1Id !== userId && match.biker2Id !== userId) return false;
-        await db.delete(bikerBikerMatches).where((0, import_drizzle_orm2.eq)(bikerBikerMatches.id, id));
+        await db.update(bikerBikerMatches).set({ status: "new" }).where((0, import_drizzle_orm2.eq)(bikerBikerMatches.id, id));
         return true;
       }
       async deleteRejectedBikerBikerMatches(userId) {
@@ -5111,6 +5111,78 @@ router5.post("/matches/:id/reject", requireAuth4, async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
+router5.get("/biker-matches", requireAuth4, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const bikerMatchesList = await storage.getBikerBikerMatchesForUser(userId);
+    const results = await Promise.all(
+      bikerMatchesList.map(async (match) => {
+        const biker1 = await storage.getUser(match.biker1Id);
+        const biker2 = await storage.getUser(match.biker2Id);
+        return {
+          ...match,
+          biker1Nickname: biker1?.nickname,
+          biker2Nickname: biker2?.nickname
+        };
+      })
+    );
+    return res.json(results);
+  } catch (error) {
+    console.error("Get biker-biker matches error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router5.post("/biker-matches/:id/accept", requireAuth4, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const matchId = req.params.id;
+    const match = await storage.getBikerBikerMatch(matchId);
+    if (!match) return res.status(404).json({ message: "Match non trovato" });
+    if (match.biker1Id !== userId && match.biker2Id !== userId) return res.status(403).json({ message: "Non autorizzato" });
+    if (match.status !== "new") return res.status(400).json({ message: "Match gi\xE0 gestito" });
+    const updated = await storage.updateBikerBikerMatch(matchId, { status: "accepted" });
+    return res.json(updated);
+  } catch (error) {
+    console.error("Accept biker-biker match error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router5.post("/biker-matches/:id/reject", requireAuth4, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const matchId = req.params.id;
+    const match = await storage.getBikerBikerMatch(matchId);
+    if (!match) return res.status(404).json({ message: "Match non trovato" });
+    if (match.biker1Id !== userId && match.biker2Id !== userId) return res.status(403).json({ message: "Non autorizzato" });
+    if (match.status !== "new") return res.status(400).json({ message: "Match gi\xE0 gestito" });
+    const updated = await storage.updateBikerBikerMatch(matchId, { status: "rejected" });
+    return res.json(updated);
+  } catch (error) {
+    console.error("Reject biker-biker match error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router5.delete("/biker-matches/rejected", requireAuth4, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const count = await storage.deleteRejectedBikerBikerMatches(userId);
+    return res.json({ deleted: count });
+  } catch (error) {
+    console.error("Delete rejected biker-biker matches error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router5.delete("/biker-matches/:matchId", requireAuth4, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const ok = await storage.resetBikerBikerMatchToNew(req.params.matchId, userId);
+    if (!ok) return res.status(404).json({ message: "Match non trovato o non autorizzato" });
+    return res.json({ reset: true });
+  } catch (error) {
+    console.error("Reset biker-biker match error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
 router5.get("/:id", requireAuth4, async (req, res) => {
   try {
     const proposalId = req.params.id;
@@ -5349,78 +5421,6 @@ router5.delete("/garage-matches/:matchId", requireAuth4, async (req, res) => {
     return res.json({ deleted: true });
   } catch (error) {
     console.error("Reset garage match error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router5.get("/biker-matches", requireAuth4, async (req, res) => {
-  try {
-    const userId = req.session.userId;
-    const bikerMatches = await storage.getBikerBikerMatchesForUser(userId);
-    const results = await Promise.all(
-      bikerMatches.map(async (match) => {
-        const biker1 = await storage.getUser(match.biker1Id);
-        const biker2 = await storage.getUser(match.biker2Id);
-        return {
-          ...match,
-          biker1Nickname: biker1?.nickname,
-          biker2Nickname: biker2?.nickname
-        };
-      })
-    );
-    return res.json(results);
-  } catch (error) {
-    console.error("Get biker-biker matches error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router5.post("/biker-matches/:id/accept", requireAuth4, async (req, res) => {
-  try {
-    const userId = req.session.userId;
-    const matchId = req.params.id;
-    const match = await storage.getBikerBikerMatch(matchId);
-    if (!match) return res.status(404).json({ message: "Match non trovato" });
-    if (match.biker1Id !== userId && match.biker2Id !== userId) return res.status(403).json({ message: "Non autorizzato" });
-    if (match.status !== "new") return res.status(400).json({ message: "Match gi\xE0 gestito" });
-    const updated = await storage.updateBikerBikerMatch(matchId, { status: "accepted" });
-    return res.json(updated);
-  } catch (error) {
-    console.error("Accept biker-biker match error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router5.post("/biker-matches/:id/reject", requireAuth4, async (req, res) => {
-  try {
-    const userId = req.session.userId;
-    const matchId = req.params.id;
-    const match = await storage.getBikerBikerMatch(matchId);
-    if (!match) return res.status(404).json({ message: "Match non trovato" });
-    if (match.biker1Id !== userId && match.biker2Id !== userId) return res.status(403).json({ message: "Non autorizzato" });
-    if (match.status !== "new") return res.status(400).json({ message: "Match gi\xE0 gestito" });
-    const updated = await storage.updateBikerBikerMatch(matchId, { status: "rejected" });
-    return res.json(updated);
-  } catch (error) {
-    console.error("Reject biker-biker match error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router5.delete("/biker-matches/rejected", requireAuth4, async (req, res) => {
-  try {
-    const userId = req.session.userId;
-    const count = await storage.deleteRejectedBikerBikerMatches(userId);
-    return res.json({ deleted: count });
-  } catch (error) {
-    console.error("Delete rejected biker-biker matches error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router5.delete("/biker-matches/:matchId", requireAuth4, async (req, res) => {
-  try {
-    const userId = req.session.userId;
-    const ok = await storage.deleteBikerBikerMatch(req.params.matchId, userId);
-    if (!ok) return res.status(404).json({ message: "Match non trovato o non autorizzato" });
-    return res.json({ deleted: true });
-  } catch (error) {
-    console.error("Delete biker-biker match error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -9756,7 +9756,7 @@ async function runBikerBikerMatching() {
         const model1 = bm1.motorcycle.model.toLowerCase();
         const model2 = bm2.motorcycle.model.toLowerCase();
         if (brand1 !== brand2) continue;
-        if (!model1.includes(model2) && !model2.includes(model1)) continue;
+        if (model1 !== model2) continue;
         const idA = bm1.userId < bm2.userId ? bm1.userId : bm2.userId;
         const idB = bm1.userId < bm2.userId ? bm2.userId : bm1.userId;
         const brand = bm1.motorcycle.brand;

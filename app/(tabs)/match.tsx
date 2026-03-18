@@ -853,6 +853,11 @@ export default function MatchScreen() {
         </TouchableOpacity>
       )}
 
+      <View style={styles.systemDescBanner}>
+        <Ionicons name="information-circle" size={15} color={Colors.accent} />
+        <Text style={styles.systemDescText}>{t("match.systemDesc")}</Text>
+      </View>
+
       <View style={styles.tabRow}>
         {tabs.map((tab) => (
           <TouchableOpacity
@@ -877,11 +882,6 @@ export default function MatchScreen() {
             )}
           </TouchableOpacity>
         ))}
-      </View>
-
-      <View style={styles.systemDescBanner}>
-        <Ionicons name="information-circle" size={15} color={Colors.accent} />
-        <Text style={styles.systemDescText}>{t("match.systemDesc")}</Text>
       </View>
 
       {isLoading ? (

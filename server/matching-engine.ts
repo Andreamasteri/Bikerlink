@@ -217,7 +217,7 @@ async function runBikerBikerMatching(): Promise<number> {
         const model2 = bm2.motorcycle.model.toLowerCase();
 
         if (brand1 !== brand2) continue;
-        if (!model1.includes(model2) && !model2.includes(model1)) continue;
+        if (model1 !== model2) continue;
 
         const idA = bm1.userId < bm2.userId ? bm1.userId : bm2.userId;
         const idB = bm1.userId < bm2.userId ? bm2.userId : bm1.userId;
