@@ -130,6 +130,7 @@ export default function FakeUsersAdmin() {
   const [pendingToggleVal, setPendingToggleVal] = useState<boolean | null>(null);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [chatModalVisible, setChatModalVisible] = useState(false);
+  const [deletingChats, setDeletingChats] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -430,6 +431,32 @@ export default function FakeUsersAdmin() {
       setChatMessages([]);
     }
     setLoadingChat(false);
+  };
+
+  const handleDeleteFakeChats = async () => {
+    if (!selectedUserId) return;
+    Alert.alert(
+      "Elimina Chat Fake",
+      "Eliminare tutte le conversazioni di questo utente fake? L'operazione non è reversibile.",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Elimina",
+          style: "destructive",
+          onPress: async () => {
+            setDeletingChats(true);
+            try {
+              const url = new URL(`/api/admin/fake-users/${selectedUserId}/conversations`, getApiUrl()).toString();
+              const res = await fetch(url, { method: "DELETE", credentials: "include" });
+              if (res.ok) {
+                setConversations([]);
+              }
+            } catch (e) {}
+            setDeletingChats(false);
+          },
+        },
+      ]
+    );
   };
 
   const handleCreate = () => {
@@ -750,16 +777,25 @@ export default function FakeUsersAdmin() {
               <Text style={styles.modalTitle}>
                 {!!selectedConvId ? "Messaggi" : "Conversazioni"}
               </Text>
-              <TouchableOpacity onPress={() => {
-                if (selectedConvId) {
-                  setSelectedConvId(null);
-                  setChatMessages([]);
-                } else {
-                  setChatModalVisible(false);
-                }
-              }}>
-                <Ionicons name={selectedConvId ? "arrow-back" : "close"} size={24} color={Colors.text} />
-              </TouchableOpacity>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
+                {!selectedConvId && conversations.length > 0 && (
+                  <TouchableOpacity onPress={handleDeleteFakeChats} disabled={deletingChats}>
+                    {deletingChats
+                      ? <ActivityIndicator size="small" color="#e53935" />
+                      : <Ionicons name="trash" size={22} color="#e53935" />}
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => {
+                  if (selectedConvId) {
+                    setSelectedConvId(null);
+                    setChatMessages([]);
+                  } else {
+                    setChatModalVisible(false);
+                  }
+                }}>
+                  <Ionicons name={selectedConvId ? "arrow-back" : "close"} size={24} color={Colors.text} />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <ScrollView style={styles.modalScroll}>

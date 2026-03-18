@@ -9712,6 +9712,32 @@ router17.get("/fake-users/:id/conversations", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
+router17.delete("/fake-users/:id/conversations", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const user = await storage.getUser(id);
+    if (!user || !user.isFake) {
+      return res.status(404).json({ message: "Utente fake non trovato" });
+    }
+    const convs = await storage.getFakeUserConversations(id);
+    let deleted = 0;
+    for (const conv of convs) {
+      await storage.deleteConversation(String(conv.id));
+      deleted++;
+    }
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId,
+      action: "delete_fake_user_chats",
+      targetType: "user",
+      targetId: id,
+      details: `Eliminate ${deleted} conversazioni dell'utente fake ${user.nickname}`
+    });
+    return res.json({ deleted, message: `${deleted} conversazioni eliminate` });
+  } catch (error) {
+    console.error("Admin delete fake user conversations error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
 router17.get("/fake-users/conversations/:convId/messages", async (req, res) => {
   try {
     const convId = req.params.convId;
