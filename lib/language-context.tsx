@@ -24,7 +24,14 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    // Timeout di sicurezza: se AsyncStorage non risponde entro 3s, procedi con "it"
+    const timeout = setTimeout(() => {
+      setAppLanguage("it");
+      setLoaded(true);
+    }, 3000);
+
     AsyncStorage.getItem(STORAGE_KEY).then((stored) => {
+      clearTimeout(timeout);
       const lang: AppLanguage = (stored && VALID_LANGS.includes(stored as AppLanguage))
         ? (stored as AppLanguage)
         : "it";
@@ -32,9 +39,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       setLanguageState(lang);
       setLoaded(true);
     }).catch(() => {
+      clearTimeout(timeout);
       setAppLanguage("it");
       setLoaded(true);
     });
+
+    return () => clearTimeout(timeout);
   }, []);
 
   const setLanguage = useCallback((lang: AppLanguage) => {

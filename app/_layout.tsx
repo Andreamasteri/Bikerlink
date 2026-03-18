@@ -8,7 +8,7 @@ import {
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Platform, AppState } from "react-native";
 
 if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -140,14 +140,26 @@ export default function RootLayout() {
       ? {}
       : { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold }
   );
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    const forceReady = () => {
+      setReady(true);
+      SplashScreen.hideAsync().catch(() => {});
+    };
+
+    // Forza l'avvio dopo 5s se useFonts rimane pending (Android/new arch)
+    const timeout = setTimeout(forceReady, 5000);
+
     if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
+      clearTimeout(timeout);
+      forceReady();
     }
+
+    return () => clearTimeout(timeout);
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) return null;
+  if (!ready) return null;
 
   return (
     <ErrorBoundary>
