@@ -329,7 +329,7 @@ export default function MapScreen() {
 
   const { data: homeMessageData } = useQuery<{ enabled: boolean; text: string }>({
     queryKey: ["/api/settings/home-message"],
-    staleTime: 60000,
+    staleTime: 0,
     enabled: isAuthenticated,
   });
 
@@ -607,11 +607,11 @@ export default function MapScreen() {
         <TouchableOpacity
           style={styles.titleRow}
           onPress={() => {
-            if (homeMessageData?.enabled && homeMessageData?.text) {
+            if (homeMessageData?.enabled) {
               setShowHomeMessage(true);
             }
           }}
-          activeOpacity={homeMessageData?.enabled && homeMessageData?.text ? 0.7 : 1}
+          activeOpacity={homeMessageData?.enabled ? 0.7 : 1}
         >
           <Text style={styles.title}>BikerLink</Text>
           <Image source={require("@/assets/images/helmet-logo.png")} style={styles.helmetLogo} resizeMode="contain" />
