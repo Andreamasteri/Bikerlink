@@ -206,6 +206,10 @@ router.put("/me/ghost-mode", requireAuth, async (req: Request, res: Response) =>
     if (typeof enabled !== "boolean") {
       return res.status(400).json({ message: "enabled deve essere un booleano" });
     }
+    const ghostModeSetting = await storage.getAppSetting("ghost_mode_enabled");
+    if (ghostModeSetting?.value !== "true") {
+      return res.status(403).json({ message: "Ghost Mode non attivo su questa piattaforma" });
+    }
     await storage.updateUser(userId, { ghostMode: enabled } as any);
     if (enabled) {
       const existingProfile = await storage.getUserProfile(userId);

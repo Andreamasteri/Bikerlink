@@ -196,6 +196,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/ghost-mode-enabled", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("ghost_mode_enabled");
+      res.json({ enabled: setting?.value === "true" });
+    } catch {
+      res.json({ enabled: false });
+    }
+  });
+
   app.get("/api/settings/marketplace-enabled", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("marketplace_enabled");

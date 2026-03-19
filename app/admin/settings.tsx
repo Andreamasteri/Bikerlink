@@ -325,6 +325,11 @@ export default function AdminSettings() {
   });
   const motoclubZavEnabled = motoclubZavData?.enabled !== false;
 
+  const { data: ghostModeData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/ghost-mode-enabled"],
+  });
+  const ghostModeEnabled = ghostModeData?.enabled === true;
+
   const protectedToggleMutation = useMutation({
     mutationFn: async ({ key, value, adminPassword }: { key: string; value: string; adminPassword: string }) => {
       const baseUrl = getApiUrl();
@@ -348,6 +353,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/donation"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/gps-required"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/marketplace-enabled"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/ghost-mode-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
       setProtectedToggle(null);
       setProtectedPassword("");
@@ -1041,6 +1047,27 @@ export default function AdminSettings() {
           {gpsRequired
             ? "Senza permesso GPS, l'utente vede solo Profilo e Garage. Le altre tab sono nascoste."
             : "GPS non obbligatorio: tutte le tab sono sempre visibili, anche senza permesso di localizzazione."}
+        </Text>
+      </View>
+
+      <View style={styles.paypalCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="eye-off" size={20} color="#9C27B0" />
+            <Text style={styles.synecoLabel}>Ghost Mode</Text>
+          </View>
+          <Switch
+            value={ghostModeEnabled}
+            onValueChange={(val) => setProtectedToggle({ key: "ghost_mode_enabled", value: String(val), label: "Ghost Mode" })}
+            trackColor={{ false: Colors.border, true: "#9C27B0" }}
+            thumbColor={ghostModeEnabled ? Colors.text : Colors.textSecondary}
+            disabled={protectedToggleMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {ghostModeEnabled
+            ? "Gli utenti possono attivarsi in modalità invisibile: risultano offline per tutti."
+            : "Ghost Mode disabilitato. Gli utenti non possono nascondersi dalla piattaforma."}
         </Text>
       </View>
 

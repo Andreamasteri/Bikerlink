@@ -4355,6 +4355,10 @@ router2.put("/me/ghost-mode", requireAuth, async (req, res) => {
     if (typeof enabled !== "boolean") {
       return res.status(400).json({ message: "enabled deve essere un booleano" });
     }
+    const ghostModeSetting = await storage.getAppSetting("ghost_mode_enabled");
+    if (ghostModeSetting?.value !== "true") {
+      return res.status(403).json({ message: "Ghost Mode non attivo su questa piattaforma" });
+    }
     await storage.updateUser(userId, { ghostMode: enabled });
     if (enabled) {
       const existingProfile = await storage.getUserProfile(userId);
@@ -9012,7 +9016,7 @@ router17.post("/migrate/verify-real-users", async (_req, res) => {
 router17.put("/settings/toggle-protected", async (req, res) => {
   try {
     const { key, value, adminPassword } = req.body;
-    const allowedKeys = ["email_verification_enabled", "ads_enabled", "syneco_branding_visible", "donation_enabled", "donation_text", "gps_required", "marketplace_enabled", "fake_users_enabled"];
+    const allowedKeys = ["email_verification_enabled", "ads_enabled", "syneco_branding_visible", "donation_enabled", "donation_text", "gps_required", "marketplace_enabled", "fake_users_enabled", "ghost_mode_enabled"];
     if (!allowedKeys.includes(key)) {
       return res.status(400).json({ message: "Chiave non valida" });
     }
@@ -11184,6 +11188,14 @@ async function registerRoutes(app2) {
       res.json({ email });
     } catch {
       res.json({ email: "" });
+    }
+  });
+  app2.get("/api/settings/ghost-mode-enabled", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("ghost_mode_enabled");
+      res.json({ enabled: setting?.value === "true" });
+    } catch {
+      res.json({ enabled: false });
     }
   });
   app2.get("/api/settings/marketplace-enabled", async (_req, res) => {

@@ -64,6 +64,11 @@ export default function ReadyToRideScreen() {
     queryKey: ["/api/users/profile"],
   });
 
+  const { data: ghostSettingData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/ghost-mode-enabled"],
+  });
+  const ghostModeFeatureEnabled = ghostSettingData?.enabled === true;
+
   const isAvailable = (data as any)?.isAvailable || false;
   const isGhostMode = (data as any)?.ghostMode || false;
 
@@ -196,28 +201,30 @@ export default function ReadyToRideScreen() {
           )}
         </Pressable>
 
-        <View style={styles.ghostBlock}>
-          <Pressable
-            style={[
-              styles.ghostBtn,
-              isGhostMode && styles.ghostBtnActive,
-            ]}
-            onPress={handleGhostToggle}
-            disabled={ghostMutation.isPending || toggleMutation.isPending}
-          >
-            {ghostMutation.isPending ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Ionicons
-                name={isGhostMode ? "eye-off" : "eye"}
-                size={20}
-                color="#fff"
-              />
-            )}
-            <Text style={styles.ghostBtnText}>{t("ride.ghostMode")}</Text>
-          </Pressable>
-          <Text style={styles.ghostDesc}>{t("ride.ghostModeDesc")}</Text>
-        </View>
+        {ghostModeFeatureEnabled && (
+          <View style={styles.ghostBlock}>
+            <Pressable
+              style={[
+                styles.ghostBtn,
+                isGhostMode && styles.ghostBtnActive,
+              ]}
+              onPress={handleGhostToggle}
+              disabled={ghostMutation.isPending || toggleMutation.isPending}
+            >
+              {ghostMutation.isPending ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Ionicons
+                  name={isGhostMode ? "eye-off" : "eye"}
+                  size={20}
+                  color="#fff"
+                />
+              )}
+              <Text style={styles.ghostBtnText}>{t("ride.ghostMode")}</Text>
+            </Pressable>
+            <Text style={styles.ghostDesc}>{t("ride.ghostModeDesc")}</Text>
+          </View>
+        )}
 
         <Pressable
           style={styles.cronoBtn}
