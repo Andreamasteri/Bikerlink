@@ -943,7 +943,7 @@ export class DatabaseStorage implements IStorage {
       sql`${userProfiles.longitude} IS NOT NULL`,
     ];
     if (countries && countries.length > 0) {
-      conditions.push(inArray(users.country, countries));
+      conditions.push(or(inArray(users.country, countries), sql`${users.country} IS NULL`)!);
     }
     const results = await db
       .select({

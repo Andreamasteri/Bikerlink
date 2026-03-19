@@ -1206,7 +1206,7 @@ var init_storage = __esm({
           import_drizzle_orm2.sql`${userProfiles.longitude} IS NOT NULL`
         ];
         if (countries && countries.length > 0) {
-          conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
+          conditions.push((0, import_drizzle_orm2.or)((0, import_drizzle_orm2.inArray)(users.country, countries), import_drizzle_orm2.sql`${users.country} IS NULL`));
         }
         const results = await db.select({
           user: users,
