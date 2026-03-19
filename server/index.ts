@@ -319,6 +319,8 @@ function setupErrorHandler(app: express.Application) {
     if (!modeSetting) await storage.upsertAppSetting("splash_message_mode", "single");
     const listSetting = await storage.getAppSetting("splash_messages_list");
     if (!listSetting) await storage.upsertAppSetting("splash_messages_list", "[]");
+    const motoclubZavSetting = await storage.getAppSetting("motoclub_include_zav");
+    if (!motoclubZavSetting) await storage.upsertAppSetting("motoclub_include_zav", "true");
   } catch (e) {
     console.warn("[SEED] splash settings:", e);
   }

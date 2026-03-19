@@ -11967,6 +11967,8 @@ function setupErrorHandler(app2) {
     if (!modeSetting) await storage2.upsertAppSetting("splash_message_mode", "single");
     const listSetting = await storage2.getAppSetting("splash_messages_list");
     if (!listSetting) await storage2.upsertAppSetting("splash_messages_list", "[]");
+    const motoclubZavSetting = await storage2.getAppSetting("motoclub_include_zav");
+    if (!motoclubZavSetting) await storage2.upsertAppSetting("motoclub_include_zav", "true");
   } catch (e) {
     console.warn("[SEED] splash settings:", e);
   }
