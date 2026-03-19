@@ -282,6 +282,14 @@ export default function FakeUsersAdmin() {
     },
     onError: () => setWakeAllResult({ type: "error", text: "Errore durante l'operazione" }),
   });
+  const [distributeResult, setDistributeResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const distributeMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/fake-users/distribute-to-clubs", {}),
+    onSuccess: (data: any) => {
+      setDistributeResult({ type: "success", text: `${data?.count ?? "?"} utenti fake distribuiti nei motoclub` });
+    },
+    onError: () => setDistributeResult({ type: "error", text: "Errore durante la distribuzione" }),
+  });
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = () => {
@@ -776,6 +784,31 @@ export default function FakeUsersAdmin() {
                 <>
                   <Ionicons name="radio-button-on" size={18} color="#fff" />
                   <Text style={[styles.massSeedBtnText, { color: "#fff" }]}>Porta tutti online</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+          <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 12, gap: 8 }}>
+            <Text style={[styles.massSeedDesc, { marginBottom: 0 }]}>
+              Distribuisce i fake user esistenti nei motoclub approvati (1-3 club casuali per utente).
+            </Text>
+            {!!distributeResult && (
+              <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: distributeResult.type === "success" ? Colors.success : Colors.error }}>
+                {distributeResult.text}
+              </Text>
+            )}
+            <TouchableOpacity
+              style={[styles.massSeedBtn, { backgroundColor: "#4CAF50" }, distributeMutation.isPending && styles.massSeedBtnDisabled]}
+              onPress={() => { setDistributeResult(null); distributeMutation.mutate(); }}
+              disabled={distributeMutation.isPending}
+              activeOpacity={0.7}
+            >
+              {distributeMutation.isPending ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="people" size={18} color="#fff" />
+                  <Text style={[styles.massSeedBtnText, { color: "#fff" }]}>Distribuisci nei motoclub</Text>
                 </>
               )}
             </TouchableOpacity>

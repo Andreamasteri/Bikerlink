@@ -3167,6 +3167,26 @@ async function massSeedFakeUsers() {
           }
         }
       }
+      if (insertedUsers.length > 0) {
+        try {
+          const approvedClubs = await db.select({ id: motoClubs.id }).from(motoClubs).where((0, import_drizzle_orm6.eq)(motoClubs.isApproved, true));
+          if (approvedClubs.length > 0) {
+            const clubMemberRows = [];
+            for (const newUser of insertedUsers) {
+              const count2 = 1 + Math.floor(Math.random() * 3);
+              const shuffled = [...approvedClubs].sort(() => Math.random() - 0.5).slice(0, count2);
+              for (const club of shuffled) {
+                clubMemberRows.push({ clubId: club.id, userId: newUser.id, role: "member", status: "active" });
+              }
+            }
+            if (clubMemberRows.length > 0) {
+              await db.insert(motoClubMembers).values(clubMemberRows).onConflictDoNothing();
+            }
+          }
+        } catch (err) {
+          logSeedError("batch-club-member-insert", err);
+        }
+      }
       massSeedStatus.created += insertedUsers.length;
       if (batchStart % (BATCH_SIZE * 5) === 0) {
         console.log(`[mass-seed] Progress: ${massSeedStatus.created}/${massSeedStatus.total}`);
@@ -8158,6 +8178,24 @@ function startMatchingEngine() {
 
 // server/routes/admin.ts
 var router17 = (0, import_express17.Router)();
+async function assignFakeUserToClubs(userId) {
+  try {
+    const approvedClubs = await db.select({ id: motoClubs.id }).from(motoClubs).where((0, import_drizzle_orm8.eq)(motoClubs.isApproved, true));
+    if (approvedClubs.length === 0) return;
+    const count2 = 1 + Math.floor(Math.random() * 3);
+    const shuffled = approvedClubs.sort(() => Math.random() - 0.5).slice(0, count2);
+    for (const club of shuffled) {
+      await db.insert(motoClubMembers).values({
+        clubId: club.id,
+        userId,
+        role: "member",
+        status: "active"
+      }).onConflictDoNothing();
+    }
+  } catch (err) {
+    console.error("[assignFakeUserToClubs] error:", err);
+  }
+}
 function requireAdmin(req, res, next) {
   if (!req.session.userId) {
     return res.status(401).json({ message: "Non autenticato" });
@@ -9516,6 +9554,7 @@ router17.post("/fake-users", async (req, res) => {
         }
       }
     }
+    await assignFakeUserToClubs(user.id);
     const { password: _, ...safeUser } = user;
     return res.status(201).json(safeUser);
   } catch (error) {
@@ -10190,6 +10229,18 @@ router17.post("/fake-users/wake-all", async (_req, res) => {
     return res.json({ ok: true, count: fakeUsers.length });
   } catch (error) {
     console.error("Admin wake-all fake users error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router17.post("/fake-users/distribute-to-clubs", async (_req, res) => {
+  try {
+    const fakeUsers = await db.select({ id: users.id }).from(users).where((0, import_drizzle_orm8.eq)(users.isFake, true));
+    for (const fu of fakeUsers) {
+      await assignFakeUserToClubs(fu.id);
+    }
+    return res.json({ ok: true, count: fakeUsers.length });
+  } catch (error) {
+    console.error("Admin distribute-to-clubs error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

@@ -3,7 +3,7 @@ import { db } from "./db";
 import { storage } from "./storage";
 import {
   users, userProfiles, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos,
-  conversations, conversationParticipants, messages,
+  conversations, conversationParticipants, messages, motoClubs, motoClubMembers,
   type User,
 } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
@@ -565,6 +565,27 @@ export async function massSeedFakeUsers(): Promise<void> {
               logSeedError(`single-conv-insert-${ci.userId}`, innerErr);
             }
           }
+        }
+      }
+
+      if (insertedUsers.length > 0) {
+        try {
+          const approvedClubs = await db.select({ id: motoClubs.id }).from(motoClubs).where(eq(motoClubs.isApproved, true));
+          if (approvedClubs.length > 0) {
+            const clubMemberRows: { clubId: string; userId: string; role: string; status: string }[] = [];
+            for (const newUser of insertedUsers) {
+              const count = 1 + Math.floor(Math.random() * 3);
+              const shuffled = [...approvedClubs].sort(() => Math.random() - 0.5).slice(0, count);
+              for (const club of shuffled) {
+                clubMemberRows.push({ clubId: club.id, userId: newUser.id, role: "member", status: "active" });
+              }
+            }
+            if (clubMemberRows.length > 0) {
+              await db.insert(motoClubMembers).values(clubMemberRows).onConflictDoNothing();
+            }
+          }
+        } catch (err: unknown) {
+          logSeedError("batch-club-member-insert", err);
         }
       }
 

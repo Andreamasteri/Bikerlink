@@ -13,6 +13,25 @@ import { isProtectedUser } from "../constants";
 
 const router = Router();
 
+async function assignFakeUserToClubs(userId: string): Promise<void> {
+  try {
+    const approvedClubs = await db.select({ id: motoClubs.id }).from(motoClubs).where(eq(motoClubs.isApproved, true));
+    if (approvedClubs.length === 0) return;
+    const count = 1 + Math.floor(Math.random() * 3);
+    const shuffled = approvedClubs.sort(() => Math.random() - 0.5).slice(0, count);
+    for (const club of shuffled) {
+      await db.insert(motoClubMembers).values({
+        clubId: club.id,
+        userId,
+        role: "member",
+        status: "active",
+      }).onConflictDoNothing();
+    }
+  } catch (err) {
+    console.error("[assignFakeUserToClubs] error:", err);
+  }
+}
+
 function requireAdmin(req: Request, res: Response, next: Function) {
   if (!req.session.userId) {
     return res.status(401).json({ message: "Non autenticato" });
@@ -1332,6 +1351,7 @@ router.post("/fake-users", async (req: Request, res: Response) => {
         }
       }
     }
+    await assignFakeUserToClubs(user.id);
     const { password: _, ...safeUser } = user;
     return res.status(201).json(safeUser);
   } catch (error) {
@@ -2077,6 +2097,19 @@ router.post("/fake-users/wake-all", async (_req: Request, res: Response) => {
     return res.json({ ok: true, count: fakeUsers.length });
   } catch (error) {
     console.error("Admin wake-all fake users error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/fake-users/distribute-to-clubs", async (_req: Request, res: Response) => {
+  try {
+    const fakeUsers = await db.select({ id: users.id }).from(users).where(eq(users.isFake, true));
+    for (const fu of fakeUsers) {
+      await assignFakeUserToClubs(fu.id);
+    }
+    return res.json({ ok: true, count: fakeUsers.length });
+  } catch (error) {
+    console.error("Admin distribute-to-clubs error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
