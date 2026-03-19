@@ -5171,7 +5171,7 @@ router3.get("/:id/detail", requireAuth2, async (req, res) => {
     if (!membership) return res.status(403).json({ message: "Non sei membro di questo club" });
     const [{ totalCount }] = await db.select({ totalCount: (0, import_drizzle_orm3.count)(motoClubMembers.id) }).from(motoClubMembers).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubMembers.clubId, clubId), (0, import_drizzle_orm3.eq)(motoClubMembers.status, "active")));
     const memberships = await db.select({
-      userId: motoClubMembers.userId,
+      profileId: motoClubMembers.userId,
       role: motoClubMembers.role,
       joinedAt: motoClubMembers.joinedAt,
       nickname: users.nickname,
@@ -6470,8 +6470,11 @@ router7.post("/motos", requireAuth6, async (req, res) => {
       }
     }
     if (brand) {
-      createClubInvitesForMoto(userId, brand, model || "").catch(() => {
-      });
+      const includeZavSetting = await storage.getAppSetting("motoclub_include_zav");
+      if (includeZavSetting?.value !== "false") {
+        createClubInvitesForMoto(userId, brand, model || "").catch(() => {
+        });
+      }
     }
     return res.status(201).json({ moto, matches });
   } catch (error) {
@@ -9009,6 +9012,45 @@ router17.put("/settings/toggle-protected", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
+router17.put("/settings/motoclub_include_zav", async (req, res) => {
+  try {
+    const { value } = req.body;
+    const newEnabled = value !== "false";
+    const current = await storage.getAppSetting("motoclub_include_zav");
+    const wasEnabled = current?.value !== "false";
+    const setting = await storage.upsertAppSetting("motoclub_include_zav", value);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId,
+      action: "update_setting",
+      targetType: "app_setting",
+      targetId: "motoclub_include_zav",
+      details: `motoclub_include_zav = ${value}`
+    });
+    if (wasEnabled && !newEnabled) {
+      const zavarrinaUsers = await db.select({ id: users.id }).from(users).where((0, import_drizzle_orm8.eq)(users.userType, "zavorrina"));
+      const zavIds = zavarrinaUsers.map((u) => u.id);
+      if (zavIds.length > 0) {
+        await db.delete(motoClubInvites).where((0, import_drizzle_orm8.inArray)(motoClubInvites.userId, zavIds));
+        await db.delete(motoClubMembers).where((0, import_drizzle_orm8.inArray)(motoClubMembers.userId, zavIds));
+      }
+    } else if (!wasEnabled && newEnabled) {
+      const wishlists = await db.select({ userId: zavarrinaWishlists.userId, id: zavarrinaWishlists.id }).from(zavarrinaWishlists);
+      for (const wl of wishlists) {
+        const motos = await db.select().from(zavarrinaWishlistMotos).where((0, import_drizzle_orm8.eq)(zavarrinaWishlistMotos.wishlistId, wl.id));
+        for (const moto of motos) {
+          if (moto.brand) {
+            await createClubInvitesForMoto(wl.userId, moto.brand, moto.model || "").catch(() => {
+            });
+          }
+        }
+      }
+    }
+    return res.json(setting);
+  } catch (error) {
+    console.error("Admin motoclub_include_zav error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
 router17.put("/settings/:key", async (req, res) => {
   try {
     const key = req.params.key;
@@ -11129,6 +11171,14 @@ async function registerRoutes(app2) {
       res.json({ required: setting?.value !== "false" });
     } catch {
       res.json({ required: true });
+    }
+  });
+  app2.get("/api/settings/motoclub-include-zav", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("motoclub_include_zav");
+      res.json({ enabled: setting?.value !== "false" });
+    } catch {
+      res.json({ enabled: true });
     }
   });
   app2.get("/api/settings/home-message", async (_req, res) => {

@@ -162,7 +162,10 @@ router.post("/motos", requireAuth, async (req: Request, res: Response) => {
     }
 
     if (brand) {
-      createClubInvitesForMoto(userId, brand, model || "").catch(() => {});
+      const includeZavSetting = await storage.getAppSetting("motoclub_include_zav");
+      if (includeZavSetting?.value !== "false") {
+        createClubInvitesForMoto(userId, brand, model || "").catch(() => {});
+      }
     }
 
     return res.status(201).json({ moto, matches });

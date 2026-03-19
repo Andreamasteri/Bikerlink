@@ -5,8 +5,9 @@ import path from "path";
 import bcrypt from "bcryptjs";
 import { storage } from "../storage";
 import { db } from "../db";
-import { motoClubs, motoClubRequests, motoClubMembers, conversations, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches } from "@shared/schema";
-import { eq, and, ne, desc, sql, count, notExists } from "drizzle-orm";
+import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches } from "@shared/schema";
+import { createClubInvitesForMoto } from "./motoclubs";
+import { eq, and, ne, desc, sql, count, notExists, inArray } from "drizzle-orm";
 import { MOTORCYCLES, pickRandomN, getMotoYear } from "../mass-seed-data";
 import { getLastMatchingCycleMeta } from "../matching-engine";
 import { isProtectedUser } from "../constants";
@@ -865,6 +866,58 @@ router.put("/settings/toggle-protected", async (req: Request, res: Response) => 
     return res.json(result);
   } catch (error) {
     console.error("Admin toggle-protected error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.put("/settings/motoclub_include_zav", async (req: Request, res: Response) => {
+  try {
+    const { value } = req.body as { value: string };
+    const newEnabled = value !== "false";
+
+    const current = await storage.getAppSetting("motoclub_include_zav");
+    const wasEnabled = current?.value !== "false";
+
+    const setting = await storage.upsertAppSetting("motoclub_include_zav", value);
+
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_setting",
+      targetType: "app_setting",
+      targetId: "motoclub_include_zav",
+      details: `motoclub_include_zav = ${value}`,
+    });
+
+    if (wasEnabled && !newEnabled) {
+      const zavarrinaUsers = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.userType, "zavorrina"));
+      const zavIds = zavarrinaUsers.map((u) => u.id);
+      if (zavIds.length > 0) {
+        await db.delete(motoClubInvites).where(inArray(motoClubInvites.userId, zavIds));
+        await db.delete(motoClubMembers).where(inArray(motoClubMembers.userId, zavIds));
+      }
+    } else if (!wasEnabled && newEnabled) {
+      const wishlists = await db
+        .select({ userId: zavarrinaWishlists.userId, id: zavarrinaWishlists.id })
+        .from(zavarrinaWishlists);
+      for (const wl of wishlists) {
+        const motos = await db
+          .select()
+          .from(zavarrinaWishlistMotos)
+          .where(eq(zavarrinaWishlistMotos.wishlistId, wl.id));
+        for (const moto of motos) {
+          if (moto.brand) {
+            await createClubInvitesForMoto(wl.userId, moto.brand, moto.model || "").catch(() => {});
+          }
+        }
+      }
+    }
+
+    return res.json(setting);
+  } catch (error) {
+    console.error("Admin motoclub_include_zav error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

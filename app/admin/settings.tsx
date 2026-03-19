@@ -320,6 +320,11 @@ export default function AdminSettings() {
   });
   const customRoutesEnabled = customRoutesData?.enabled !== false;
 
+  const { data: motoclubZavData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/motoclub-include-zav"],
+  });
+  const motoclubZavEnabled = motoclubZavData?.enabled !== false;
+
   const protectedToggleMutation = useMutation({
     mutationFn: async ({ key, value, adminPassword }: { key: string; value: string; adminPassword: string }) => {
       const baseUrl = getApiUrl();
@@ -438,6 +443,25 @@ export default function AdminSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/custom-routes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const motoclubZavMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/motoclub_include_zav", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/motoclub-include-zav"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
   });
@@ -894,6 +918,27 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {customRoutesEnabled ? "Gli utenti possono creare percorsi personalizzati" : "I percorsi personalizzati sono disattivati"}
+        </Text>
+      </View>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="people-circle" size={20} color={Colors.warning} />
+            <Text style={styles.synecoLabel}>Zavorrine nei Motoclub</Text>
+          </View>
+          <Switch
+            value={motoclubZavEnabled}
+            onValueChange={(val) => motoclubZavMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: Colors.warning }}
+            thumbColor={motoclubZavEnabled ? Colors.text : Colors.textSecondary}
+            disabled={motoclubZavMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {motoclubZavEnabled
+            ? "Le zavorrine ricevono invite ai motoclub in base alle moto nella wishlist"
+            : "Le zavorrine non sono incluse nei motoclub (iscrizioni e inviti esistenti rimossi)"}
         </Text>
       </View>
 
