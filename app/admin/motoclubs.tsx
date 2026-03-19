@@ -329,37 +329,39 @@ export default function AdminMotoclubs() {
       />
 
       {/* Reject modal */}
-      <Modal visible={!!rejectModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle} numberOfLines={1}>Rifiuta "{rejectModal?.name}"</Text>
-              <TouchableOpacity onPress={() => setRejectModal(null)}>
-                <MaterialIcons name="close" size={24} color={Colors.textSecondary} />
+      {rejectModal && (
+        <Modal visible animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle} numberOfLines={1}>Rifiuta "{rejectModal.name}"</Text>
+                <TouchableOpacity onPress={() => setRejectModal(null)}>
+                  <MaterialIcons name="close" size={24} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.modalSub}>Indica una motivazione opzionale che verrà registrata nel log.</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Motivazione (opzionale)"
+                placeholderTextColor={Colors.textSecondary}
+                value={rejectNote}
+                onChangeText={setRejectNote}
+                multiline
+                numberOfLines={3}
+              />
+              <TouchableOpacity
+                style={[styles.rejectConfirmBtn, rejectMutation.isPending && { opacity: 0.6 }]}
+                onPress={() => rejectMutation.mutate({ id: rejectModal.id, note: rejectNote })}
+                disabled={rejectMutation.isPending}
+              >
+                <Text style={styles.rejectConfirmBtnText}>
+                  {rejectMutation.isPending ? "Rifiuto in corso..." : "Conferma Rifiuto"}
+                </Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.modalSub}>Indica una motivazione opzionale che verrà registrata nel log.</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Motivazione (opzionale)"
-              placeholderTextColor={Colors.textSecondary}
-              value={rejectNote}
-              onChangeText={setRejectNote}
-              multiline
-              numberOfLines={3}
-            />
-            <TouchableOpacity
-              style={[styles.rejectConfirmBtn, rejectMutation.isPending && { opacity: 0.6 }]}
-              onPress={() => rejectMutation.mutate({ id: rejectModal!.id, note: rejectNote })}
-              disabled={rejectMutation.isPending}
-            >
-              <Text style={styles.rejectConfirmBtnText}>
-                {rejectMutation.isPending ? "Rifiuto in corso..." : "Conferma Rifiuto"}
-              </Text>
-            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
     </View>
   );
 }
