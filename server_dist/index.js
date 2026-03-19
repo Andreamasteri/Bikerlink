@@ -1202,7 +1202,6 @@ var init_storage = __esm({
       async getNearbyUsers(lat, lng, radiusKm, countries) {
         const conditions = [
           (0, import_drizzle_orm2.eq)(users.status, "active"),
-          (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           import_drizzle_orm2.sql`${userProfiles.latitude} IS NOT NULL`,
           import_drizzle_orm2.sql`${userProfiles.longitude} IS NOT NULL`
         ];

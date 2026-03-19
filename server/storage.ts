@@ -939,7 +939,6 @@ export class DatabaseStorage implements IStorage {
   async getNearbyUsers(lat: number, lng: number, radiusKm: number, countries?: string[]): Promise<Array<{ user: User; profile: UserProfile; distance: number }>> {
     const conditions = [
       eq(users.status, "active"),
-      eq(userProfiles.isAvailable, true),
       sql`${userProfiles.latitude} IS NOT NULL`,
       sql`${userProfiles.longitude} IS NOT NULL`,
     ];
