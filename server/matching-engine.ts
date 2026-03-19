@@ -199,6 +199,13 @@ async function runWishlistMatching(): Promise<number> {
   }
 }
 
+function baseModelName(model: string): string {
+  return model.toLowerCase()
+    .replace(/\s+\d+\s+/g, " ")
+    .replace(/\s+\d+$/g, "")
+    .trim();
+}
+
 async function runBikerBikerMatching(): Promise<number> {
   try {
     const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
@@ -211,7 +218,7 @@ async function runBikerBikerMatching(): Promise<number> {
     const buckets = new Map<string, Array<{ userId: string; brand: string; model: string }>>();
     for (const bm of bikerMotorcycles) {
       if (!bm.motorcycle.brand || !bm.motorcycle.model) continue;
-      const key = `${bm.motorcycle.brand.toLowerCase()}|${bm.motorcycle.model.toLowerCase()}`;
+      const key = `${bm.motorcycle.brand.toLowerCase()}|${baseModelName(bm.motorcycle.model)}`;
       if (!buckets.has(key)) buckets.set(key, []);
       buckets.get(key)!.push({ userId: bm.userId, brand: bm.motorcycle.brand, model: bm.motorcycle.model });
     }
