@@ -352,6 +352,7 @@ export default function MapScreen() {
     enabled: isAuthenticated,
   });
   const isAvailable = (profileQuery.data as any)?.isAvailable || false;
+  const isGhostMode = (profileQuery.data as any)?.ghostMode || false;
 
   const onlineListQuery = useQuery<any[]>({
     queryKey: ["/api/users/online-list", location?.latitude, location?.longitude, showOfflineOnline, countriesQueryParam],
@@ -694,6 +695,7 @@ export default function MapScreen() {
             easterEggs={(easterEggsQuery.data ?? []).filter((e: any) => e.latitude != null && e.longitude != null && !isNaN(e.latitude) && !isNaN(e.longitude))}
             activeSosRequests={(activeSosQuery.data ?? []).filter((s: any) => s.latitude != null && s.longitude != null)}
             isAvailable={isAvailable}
+            ghostMode={isGhostMode}
             searchRadiusKm={mySearchRadius}
             filterBiker={filterBiker}
             filterZavorrina={filterZavorrina}
@@ -724,6 +726,7 @@ export default function MapScreen() {
             easterEggs={(easterEggsQuery.data ?? []).filter((e: any) => e.latitude != null && e.longitude != null && !isNaN(e.latitude) && !isNaN(e.longitude))}
             activeSosRequests={(activeSosQuery.data ?? []).filter((s: any) => s.latitude != null && s.longitude != null)}
             isAvailable={isAvailable}
+            ghostMode={isGhostMode}
             searchRadiusKm={mySearchRadius}
             filterBiker={filterBiker}
             filterZavorrina={filterZavorrina}

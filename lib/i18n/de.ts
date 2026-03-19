@@ -40,6 +40,8 @@ const de: Record<string, string> = {
 
   "map.available": "Ich bin verfügbar",
   "map.unavailable": "Nicht verfügbar",
+  "map.online": "Online",
+  "map.offline": "Offline",
   "map.filters": "Filter",
   "map.nearbyUsers": "Nutzer in der Nähe",
 

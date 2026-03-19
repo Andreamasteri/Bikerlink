@@ -55,6 +55,7 @@ interface InteractiveMapProps {
   easterEggs?: MapEasterEgg[];
   activeSosRequests?: MapSosRequest[];
   isAvailable: boolean;
+  ghostMode?: boolean;
   searchRadiusKm?: number;
   filterBiker: boolean;
   filterZavorrina: boolean;
@@ -97,6 +98,7 @@ export default function InteractiveMap({
   easterEggs = [],
   activeSosRequests = [],
   isAvailable,
+  ghostMode = false,
   searchRadiusKm,
   filterBiker,
   filterZavorrina,
@@ -316,16 +318,19 @@ export default function InteractiveMap({
           <MaterialCommunityIcons name="crosshairs-gps" size={22} color={Colors.accent} />
         </TouchableOpacity>
 
-        <View
-          style={[
-            styles.availabilityIndicator,
-            { borderColor: isAvailable ? Colors.success : Colors.accentRed },
-          ]}
-        >
-          <View style={[styles.statusDot, { backgroundColor: isAvailable ? Colors.success : Colors.accentRed }]} />
-          <Text style={styles.availabilityText}>
-            {isAvailable ? t("map.available") : t("map.unavailable")}
-          </Text>
+        <View style={styles.availabilityIndicator}>
+          <View style={styles.indicatorRow}>
+            <View style={[styles.statusDot, { backgroundColor: isAvailable ? Colors.success : Colors.accentRed }]} />
+            <Text style={[styles.availabilityText, { color: isAvailable ? Colors.success : Colors.accentRed }]}>
+              {isAvailable ? t("map.available") : t("map.unavailable")}
+            </Text>
+          </View>
+          <View style={styles.indicatorRow}>
+            <View style={[styles.statusDot, { backgroundColor: ghostMode ? "#888888" : Colors.success }]} />
+            <Text style={[styles.availabilityText, { color: ghostMode ? "#888888" : Colors.success }]}>
+              {ghostMode ? t("map.offline") : t("map.online")}
+            </Text>
+          </View>
         </View>
       </View>
     </View>
@@ -407,14 +412,20 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   availabilityIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: 4,
     backgroundColor: Colors.surface,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  indicatorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   statusDot: {
     width: 8,
@@ -422,7 +433,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   availabilityText: {
-    color: Colors.textSecondary,
     fontSize: 12,
     fontWeight: "600" as const,
   },
