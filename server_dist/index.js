@@ -1670,9 +1670,9 @@ var init_storage = __esm({
       }
       async deleteAllFakeUsers() {
         const condition = (0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.isFake, true), import_drizzle_orm2.sql`${users.nickname} != 'BikerLink_Official'`);
-        const [{ count: count2 }] = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(users).where(condition);
-        console.log(`[Admin] deleteAllFakeUsers: trovati ${count2} utenti fake da eliminare`);
-        if (count2 === 0) return 0;
+        const [{ count: count3 }] = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(users).where(condition);
+        console.log(`[Admin] deleteAllFakeUsers: trovati ${count3} utenti fake da eliminare`);
+        if (count3 === 0) return 0;
         await db.transaction(async (tx) => {
           await tx.execute(import_drizzle_orm2.sql`
         DELETE FROM user_motorcycles
@@ -1682,7 +1682,7 @@ var init_storage = __esm({
       `);
           console.log(`[Admin] deleteAllFakeUsers: eliminate moto associate agli utenti fake`);
           await tx.delete(users).where(condition);
-          console.log(`[Admin] deleteAllFakeUsers: eliminati ${count2} utenti fake`);
+          console.log(`[Admin] deleteAllFakeUsers: eliminati ${count3} utenti fake`);
           await tx.execute(import_drizzle_orm2.sql`
         DELETE FROM conversations
         WHERE id IN (
@@ -1707,7 +1707,7 @@ var init_storage = __esm({
           }
         });
         console.log(`[Admin] deleteAllFakeUsers: pulizia conversation orfane completata`);
-        return count2;
+        return count3;
       }
       async toggleFakeZavorrineAvailability() {
         const globalToggle = await this.getAppSetting("fake_users_enabled");
@@ -3173,8 +3173,8 @@ async function massSeedFakeUsers() {
           if (approvedClubs.length > 0) {
             const clubMemberRows = [];
             for (const newUser of insertedUsers) {
-              const count2 = 1 + Math.floor(Math.random() * 3);
-              const shuffled = [...approvedClubs].sort(() => Math.random() - 0.5).slice(0, count2);
+              const count3 = 1 + Math.floor(Math.random() * 3);
+              const shuffled = [...approvedClubs].sort(() => Math.random() - 0.5).slice(0, count3);
               for (const club of shuffled) {
                 clubMemberRows.push({ clubId: club.id, userId: newUser.id, role: "member", status: "active" });
               }
@@ -4428,8 +4428,8 @@ router2.get("/online-count", requireAuth, async (req, res) => {
   try {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
     const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
-    const count2 = await storage.countOnlineUsers(fifteenMinutesAgo, countriesParam);
-    return res.json({ count: count2 });
+    const count3 = await storage.countOnlineUsers(fifteenMinutesAgo, countriesParam);
+    return res.json({ count: count3 });
   } catch (error) {
     console.error("Online count error:", error);
     return res.json({ count: 0 });
@@ -4438,8 +4438,8 @@ router2.get("/online-count", requireAuth, async (req, res) => {
 router2.get("/available-count", requireAuth, async (req, res) => {
   try {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
-    const count2 = await storage.countAvailableUsers(fifteenMinutesAgo);
-    return res.json({ count: count2 });
+    const count3 = await storage.countAvailableUsers(fifteenMinutesAgo);
+    return res.json({ count: count3 });
   } catch (error) {
     console.error("Available count error:", error);
     return res.json({ count: 0 });
@@ -4543,8 +4543,8 @@ router2.get("/biker-available-count", requireAuth, async (req, res) => {
   try {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
     const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
-    const count2 = await storage.countAvailableBikers(fifteenMinutesAgo, countriesParam);
-    return res.json({ count: count2 });
+    const count3 = await storage.countAvailableBikers(fifteenMinutesAgo, countriesParam);
+    return res.json({ count: count3 });
   } catch (error) {
     console.error("Biker available count error:", error);
     return res.json({ count: 0 });
@@ -4554,8 +4554,8 @@ router2.get("/zavorrine-available-count", requireAuth, async (req, res) => {
   try {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
     const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
-    const count2 = await storage.countAvailableZavorrine(fifteenMinutesAgo, countriesParam);
-    return res.json({ count: count2 });
+    const count3 = await storage.countAvailableZavorrine(fifteenMinutesAgo, countriesParam);
+    return res.json({ count: count3 });
   } catch (error) {
     console.error("Zavorrine available count error:", error);
     return res.json({ count: 0 });
@@ -4749,8 +4749,8 @@ router2.post("/me/photos", requireAuth, upload.single("photo"), async (req, res)
       return res.status(404).json({ message: "Utente non trovato" });
     }
     if (user.userType === "zavorrina") {
-      const count2 = await storage.getUserPhotoCount(userId);
-      if (count2 >= 3) {
+      const count3 = await storage.getUserPhotoCount(userId);
+      if (count3 >= 3) {
         if (req.file) {
           import_fs2.default.unlinkSync(req.file.path);
         }
@@ -5155,6 +5155,37 @@ router3.get("/:id/marketplace", requireAuth2, async (req, res) => {
     return res.status(500).json({ message: "Errore interno" });
   }
 });
+router3.get("/:id/detail", requireAuth2, async (req, res) => {
+  try {
+    const clubId = req.params.id;
+    const userId = req.session.userId;
+    const limit = Math.min(parseInt(String(req.query.limit ?? "30"), 10) || 30, 50);
+    const offset = Math.max(parseInt(String(req.query.offset ?? "0"), 10) || 0, 0);
+    const [club] = await db.select().from(motoClubs).where((0, import_drizzle_orm3.eq)(motoClubs.id, clubId)).limit(1);
+    if (!club) return res.status(404).json({ message: "Club non trovato" });
+    const [membership] = await db.select({ id: motoClubMembers.id }).from(motoClubMembers).where((0, import_drizzle_orm3.and)(
+      (0, import_drizzle_orm3.eq)(motoClubMembers.clubId, clubId),
+      (0, import_drizzle_orm3.eq)(motoClubMembers.userId, userId),
+      (0, import_drizzle_orm3.eq)(motoClubMembers.status, "active")
+    )).limit(1);
+    if (!membership) return res.status(403).json({ message: "Non sei membro di questo club" });
+    const [{ totalCount }] = await db.select({ totalCount: (0, import_drizzle_orm3.count)(motoClubMembers.id) }).from(motoClubMembers).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubMembers.clubId, clubId), (0, import_drizzle_orm3.eq)(motoClubMembers.status, "active")));
+    const memberships = await db.select({
+      userId: motoClubMembers.userId,
+      role: motoClubMembers.role,
+      joinedAt: motoClubMembers.joinedAt,
+      nickname: users.nickname,
+      userType: users.userType,
+      avatarUrl: users.avatarUrl,
+      country: users.country
+    }).from(motoClubMembers).innerJoin(users, (0, import_drizzle_orm3.eq)(motoClubMembers.userId, users.id)).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubMembers.clubId, clubId), (0, import_drizzle_orm3.eq)(motoClubMembers.status, "active"))).orderBy(motoClubMembers.joinedAt).limit(limit).offset(offset);
+    const total = Number(totalCount);
+    return res.json({ ...club, members: memberships, totalCount: total, hasMore: offset + limit < total });
+  } catch (e) {
+    console.error("[GET /:id/detail]", e);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
 router3.get("/:id/stats", requireAuth2, async (req, res) => {
   try {
     const clubId = req.params.id;
@@ -5452,8 +5483,8 @@ router4.post("/:id/photos", requireAuth3, async (req, res) => {
     if (!existing || existing.userId !== userId) {
       return res.status(403).json({ message: "Non autorizzato" });
     }
-    const count2 = await storage.getMotorcyclePhotoCount(motoId);
-    if (count2 >= 3) {
+    const count3 = await storage.getMotorcyclePhotoCount(motoId);
+    if (count3 >= 3) {
       return res.status(400).json({ message: "Massimo 3 foto per moto" });
     }
     const { imageBase64, filename } = req.body;
@@ -5469,7 +5500,7 @@ router4.post("/:id/photos", requireAuth3, async (req, res) => {
     const photo = await storage.addMotorcyclePhoto({
       motorcycleId: motoId,
       photoUrl,
-      sortOrder: count2
+      sortOrder: count3
     });
     return res.status(201).json(photo);
   } catch (error) {
@@ -5800,8 +5831,8 @@ router5.post("/biker-matches/:id/reject", requireAuth4, async (req, res) => {
 router5.delete("/biker-matches/rejected", requireAuth4, async (req, res) => {
   try {
     const userId = req.session.userId;
-    const count2 = await storage.deleteRejectedBikerBikerMatches(userId);
-    return res.json({ deleted: count2 });
+    const count3 = await storage.deleteRejectedBikerBikerMatches(userId);
+    return res.json({ deleted: count3 });
   } catch (error) {
     console.error("Delete rejected biker-biker matches error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -6020,8 +6051,8 @@ router5.post("/:id/join", requireAuth4, async (req, res) => {
 router5.delete("/matches/rejected", requireAuth4, async (req, res) => {
   try {
     const userId = req.session.userId;
-    const count2 = await storage.deleteRejectedProposalMatches(userId);
-    return res.json({ deleted: count2 });
+    const count3 = await storage.deleteRejectedProposalMatches(userId);
+    return res.json({ deleted: count3 });
   } catch (error) {
     console.error("Delete rejected proposal matches error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -6041,8 +6072,8 @@ router5.delete("/matches/:matchId", requireAuth4, async (req, res) => {
 router5.delete("/garage-matches/rejected", requireAuth4, async (req, res) => {
   try {
     const userId = req.session.userId;
-    const count2 = await storage.deleteRejectedGarageMatches(userId);
-    return res.json({ deleted: count2 });
+    const count3 = await storage.deleteRejectedGarageMatches(userId);
+    return res.json({ deleted: count3 });
   } catch (error) {
     console.error("Delete rejected garage matches error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -6349,8 +6380,8 @@ router7.post("/photos", requireAuth6, async (req, res) => {
     if (!wishlist) {
       wishlist = await storage.createOrUpdateWishlist(userId, "");
     }
-    const count2 = await storage.getWishlistPhotoCount(wishlist.id);
-    if (count2 >= 3) {
+    const count3 = await storage.getWishlistPhotoCount(wishlist.id);
+    if (count3 >= 3) {
       return res.status(400).json({ message: "Massimo 3 foto permesse" });
     }
     const { imageBase64, filename } = req.body;
@@ -6366,7 +6397,7 @@ router7.post("/photos", requireAuth6, async (req, res) => {
     const photo = await storage.addWishlistPhoto({
       wishlistId: wishlist.id,
       photoUrl,
-      sortOrder: count2
+      sortOrder: count3
     });
     return res.status(201).json(photo);
   } catch (error) {
@@ -6391,8 +6422,8 @@ router7.post("/motos", requireAuth6, async (req, res) => {
     if (!wishlist) {
       wishlist = await storage.createOrUpdateWishlist(userId, "");
     }
-    const count2 = await storage.getWishlistMotoCount(wishlist.id);
-    if (count2 >= 5) {
+    const count3 = await storage.getWishlistMotoCount(wishlist.id);
+    if (count3 >= 5) {
       return res.status(400).json({ message: "Massimo 5 moto nella wishlist" });
     }
     const { brand, model, ridingStyle, motorcycleType } = req.body;
@@ -6969,8 +7000,8 @@ function isSenderZavorrina(ctx) {
   return ctx.senderUserType === "zavorrina_f" || ctx.senderUserType === "zavorrina_m";
 }
 function getFakeBotReply(content, conversationId, ctx) {
-  const count2 = fakeBotMessageCounts.get(conversationId) || 0;
-  fakeBotMessageCounts.set(conversationId, count2 + 1);
+  const count3 = fakeBotMessageCounts.get(conversationId) || 0;
+  fakeBotMessageCounts.set(conversationId, count3 + 1);
   const lower = content.toLowerCase().trim();
   const region = ctx.region || "zona mia";
   const bike = ctx.brand && ctx.model ? `${ctx.brand} ${ctx.model}` : "";
@@ -7005,7 +7036,7 @@ function getFakeBotReply(content, conversationId, ctx) {
     ];
     return pick(vulgarReplies);
   }
-  if (count2 === 0 && isGreeting) {
+  if (count3 === 0 && isGreeting) {
     if (isZav && senderIsBiker) {
       reply = pick([
         `Ciao! Di dove sei? Io ${region}`,
@@ -7034,7 +7065,7 @@ function getFakeBotReply(content, conversationId, ctx) {
         "Ciao! Come stai?"
       ]);
     }
-  } else if (count2 === 0) {
+  } else if (count3 === 0) {
     reply = pick([
       "Ehi ciao, piacere",
       `Ciao! Io sono di ${region}`,
@@ -7048,7 +7079,7 @@ function getFakeBotReply(content, conversationId, ctx) {
       "No niente, lascia stare",
       "Haha scusa, dicevo altro"
     ]);
-  } else if (isShort && !isGreeting && !isPushing && !isMotoTalk && count2 > 0) {
+  } else if (isShort && !isGreeting && !isPushing && !isMotoTalk && count3 > 0) {
     reply = pick([
       "In che senso?",
       "Dimmi",
@@ -7065,7 +7096,7 @@ function getFakeBotReply(content, conversationId, ctx) {
       "No no non si paga niente",
       "Gratis gratis, stai tranquillo"
     ]);
-  } else if (isPushing && count2 >= 5) {
+  } else if (isPushing && count3 >= 5) {
     if (isZav) {
       reply = pick([
         "Guarda appena mi organizzo ti scrivo io",
@@ -7133,7 +7164,7 @@ function getFakeBotReply(content, conversationId, ctx) {
         bike ? `Con la ${bike} ho girato mezza Italia` : "Ho girato mezza Italia in moto"
       ]);
     }
-  } else if (isCompliment && count2 > 0) {
+  } else if (isCompliment && count3 > 0) {
     if (isZav) {
       reply = pick([
         "Ahah grazie, sei gentile",
@@ -7168,7 +7199,7 @@ function getFakeBotReply(content, conversationId, ctx) {
       `${region}. Ci sono delle strade bellissime da queste parti`
     ]);
   } else {
-    if (isZav && senderIsBiker && count2 < 4) {
+    if (isZav && senderIsBiker && count3 < 4) {
       reply = pick([
         "Tu che moto hai? Sono curiosa",
         "Da quanto tempo guidi?",
@@ -7177,7 +7208,7 @@ function getFakeBotReply(content, conversationId, ctx) {
         "Ma tu giri da solo o con un gruppo?",
         "Che tipo di strade ti piacciono di pi\xF9?"
       ]);
-    } else if (isBik && senderIsZav && count2 < 4) {
+    } else if (isBik && senderIsZav && count3 < 4) {
       reply = pick([
         "Sei mai salita in moto?",
         `Di dove sei? Io sono di ${region}`,
@@ -7185,7 +7216,7 @@ function getFakeBotReply(content, conversationId, ctx) {
         bike ? `Se vuoi un giorno ti faccio fare un giro sulla ${bike}` : "Se vuoi un giorno ti faccio fare un giro",
         "Cosa ti ha fatto scaricare l'app?"
       ]);
-    } else if (isBik && senderIsBiker && count2 < 4) {
+    } else if (isBik && senderIsBiker && count3 < 4) {
       reply = pick([
         "Tu che giri fai di solito?",
         `Io di solito giro in ${region}`,
@@ -8539,13 +8570,13 @@ router17.post("/easter-eggs", async (req, res) => {
 });
 router17.post("/easter-eggs/batch", async (req, res) => {
   try {
-    const count2 = parseInt(req.body.count) || 10;
+    const count3 = parseInt(req.body.count) || 10;
     const radius = parseInt(req.body.radius) || 30;
     const points = parseInt(req.body.points) || 10;
     const existing = await storage.getEasterEggs();
     const startNum = existing.length + 1;
     const created = [];
-    for (let i = 0; i < count2; i++) {
+    for (let i = 0; i < count3; i++) {
       const lat = 36 + Math.random() * 11;
       const lng = 6.5 + Math.random() * 12;
       const egg = await storage.createEasterEgg({
@@ -8563,7 +8594,7 @@ router17.post("/easter-eggs/batch", async (req, res) => {
       action: "batch_create_easter_eggs",
       targetType: "easter_egg",
       targetId: "",
-      details: `${count2} Easter Egg creati in batch`
+      details: `${count3} Easter Egg creati in batch`
     });
     return res.status(201).json(created);
   } catch (error) {
@@ -8616,8 +8647,8 @@ router17.get("/easter-eggs/:id/stats", async (req, res) => {
     }
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { collectedEasterEggs: collectedEasterEggs2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq9, count: count2 } = await import("drizzle-orm");
-    const [result] = await db2.select({ count: count2() }).from(collectedEasterEggs2).where(eq9(collectedEasterEggs2.easterEggId, id));
+    const { eq: eq9, count: count3 } = await import("drizzle-orm");
+    const [result] = await db2.select({ count: count3() }).from(collectedEasterEggs2).where(eq9(collectedEasterEggs2.easterEggId, id));
     return res.json({ eggId: id, collectionsCount: result?.count || 0 });
   } catch (error) {
     console.error("Admin get easter egg stats error:", error);
@@ -8628,10 +8659,10 @@ router17.get("/easter-eggs-stats", async (_req, res) => {
   try {
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { collectedEasterEggs: collectedEasterEggs2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { count: count2, sql: sql8 } = await import("drizzle-orm");
+    const { count: count3, sql: sql8 } = await import("drizzle-orm");
     const rows = await db2.select({
       easterEggId: collectedEasterEggs2.easterEggId,
-      collectionsCount: count2()
+      collectionsCount: count3()
     }).from(collectedEasterEggs2).groupBy(collectedEasterEggs2.easterEggId);
     const statsMap = {};
     rows.forEach((r) => {
@@ -8790,8 +8821,8 @@ router17.get("/analytics/export-csv", async (_req, res) => {
     for (const contact of workshopContacts2) {
       contactsByWorkshop[contact.workshopId] = (contactsByWorkshop[contact.workshopId] || 0) + 1;
     }
-    for (const [workshopId, count2] of Object.entries(contactsByWorkshop)) {
-      csv += `Officina,${workshopId},,${count2},,Ultimo mese
+    for (const [workshopId, count3] of Object.entries(contactsByWorkshop)) {
+      csv += `Officina,${workshopId},,${count3},,Ultimo mese
 `;
     }
     res.setHeader("Content-Type", "text/csv");
@@ -9701,17 +9732,17 @@ router17.put("/fake-users/toggle-all", async (req, res) => {
 router17.delete("/fake-users", async (req, res) => {
   console.log("[Admin] DELETE /fake-users ricevuto");
   try {
-    const count2 = await storage.deleteAllFakeUsers();
+    const count3 = await storage.deleteAllFakeUsers();
     await storage.upsertAppSetting("skip_fake_user_seed", "true");
     await storage.createModeratorLog({
       moderatorId: req.session.userId,
       action: "delete_all_fake_users",
       targetType: "user",
       targetId: "",
-      details: `Eliminati tutti gli utenti fake (${count2})`
+      details: `Eliminati tutti gli utenti fake (${count3})`
     });
-    console.log(`[Admin] DELETE /fake-users completato: ${count2} eliminati`);
-    return res.json({ message: `${count2} utenti fake eliminati`, count: count2 });
+    console.log(`[Admin] DELETE /fake-users completato: ${count3} eliminati`);
+    return res.json({ message: `${count3} utenti fake eliminati`, count: count3 });
   } catch (error) {
     console.error("[Admin] DELETE /fake-users ERRORE:", error);
     return res.status(500).json({ message: "Errore interno del server" });

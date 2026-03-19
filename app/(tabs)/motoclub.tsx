@@ -188,10 +188,10 @@ function ClubCard({
           </View>
         )}
       </View>
-      {isMember && conversationId && onOpenChat ? (
+      {isMember && onOpenChat ? (
         <TouchableOpacity
           style={styles.cardBody}
-          onPress={() => onOpenChat(conversationId)}
+          onPress={() => onOpenChat(club.id)}
           activeOpacity={0.7}
         >
           {cardBodyContent}
@@ -371,8 +371,8 @@ export default function MotoclubScreen() {
   );
 
   const handleOpenChat = useCallback(
-    (conversationId: string) => {
-      router.push(`/chat/${conversationId}` as any);
+    (clubId: string) => {
+      router.push(`/motoclub/${clubId}` as any);
     },
     [router]
   );

@@ -14,7 +14,7 @@ import {
   userProfiles,
   userMotorcycles,
 } from "@shared/schema";
-import { eq, and, ilike, or, sql, desc, ne } from "drizzle-orm";
+import { eq, and, ilike, or, sql, desc, ne, count } from "drizzle-orm";
 
 const router = Router();
 
@@ -401,6 +401,56 @@ router.get("/:id/marketplace", requireAuth, async (req: Request, res: Response) 
     return res.json(result);
   } catch (e) {
     console.error("Club marketplace error:", e);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+router.get("/:id/detail", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const clubId = req.params.id;
+    const userId = req.session.userId!;
+    const limit = Math.min(parseInt(String(req.query.limit ?? "30"), 10) || 30, 50);
+    const offset = Math.max(parseInt(String(req.query.offset ?? "0"), 10) || 0, 0);
+
+    const [club] = await db.select().from(motoClubs).where(eq(motoClubs.id, clubId)).limit(1);
+    if (!club) return res.status(404).json({ message: "Club non trovato" });
+
+    const [membership] = await db.select({ id: motoClubMembers.id })
+      .from(motoClubMembers)
+      .where(and(
+        eq(motoClubMembers.clubId, clubId),
+        eq(motoClubMembers.userId, userId),
+        eq(motoClubMembers.status, "active"),
+      ))
+      .limit(1);
+    if (!membership) return res.status(403).json({ message: "Non sei membro di questo club" });
+
+    const [{ totalCount }] = await db
+      .select({ totalCount: count(motoClubMembers.id) })
+      .from(motoClubMembers)
+      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active")));
+
+    const memberships = await db
+      .select({
+        userId: motoClubMembers.userId,
+        role: motoClubMembers.role,
+        joinedAt: motoClubMembers.joinedAt,
+        nickname: users.nickname,
+        userType: users.userType,
+        avatarUrl: users.avatarUrl,
+        country: users.country,
+      })
+      .from(motoClubMembers)
+      .innerJoin(users, eq(motoClubMembers.userId, users.id))
+      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active")))
+      .orderBy(motoClubMembers.joinedAt)
+      .limit(limit)
+      .offset(offset);
+
+    const total = Number(totalCount);
+    return res.json({ ...club, members: memberships, totalCount: total, hasMore: offset + limit < total });
+  } catch (e) {
+    console.error("[GET /:id/detail]", e);
     return res.status(500).json({ message: "Errore interno" });
   }
 });

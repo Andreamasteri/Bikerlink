@@ -124,6 +124,7 @@ function RootLayoutNav() {
       <Stack.Screen name="proposals" options={{ headerShown: false }} />
       <Stack.Screen name="profile" options={{ headerShown: false }} />
       <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="motoclub/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="route" options={{ headerShown: false }} />
       <Stack.Screen name="admin" options={{ headerShown: false }} />
       <Stack.Screen name="moderator" options={{ headerShown: false }} />
