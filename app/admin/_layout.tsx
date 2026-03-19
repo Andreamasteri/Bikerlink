@@ -16,7 +16,7 @@ export default function AdminLayout() {
       <Stack.Screen name="users" options={{ title: "Gestione Utenti" }} />
       <Stack.Screen name="workshops" options={{ title: "Gestione Officine" }} />
       <Stack.Screen name="easter-eggs" options={{ title: "Easter Eggs" }} />
-      <Stack.Screen name="ads" options={{ title: "Advertisement" }} />
+      <Stack.Screen name="ads" options={{ title: "Campagne" }} />
       <Stack.Screen name="reports" options={{ title: "Segnalazioni" }} />
       <Stack.Screen name="analytics" options={{ title: "Analytics" }} />
       <Stack.Screen name="settings" options={{ title: "Impostazioni" }} />

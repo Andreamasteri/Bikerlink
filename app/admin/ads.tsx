@@ -141,11 +141,6 @@ export default function AdminAds() {
     queryKey: ["/api/admin/advertisements"],
   });
 
-  const { data: adsEnabledData } = useQuery<{ enabled: boolean }>({
-    queryKey: ["/api/settings/ads-enabled"],
-  });
-  const adsEnabled = adsEnabledData?.enabled !== false;
-
   const campaigns = allCampaigns.filter((c) => c.targetUserType === activeTab);
 
   const createMutation = useMutation({
@@ -287,13 +282,6 @@ export default function AdminAds() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.warningBanner}>
-        <MaterialIcons name="warning" size={20} color="#92400e" />
-        <Text style={styles.warningBannerText}>
-          Attenzione, prima di caricare una nuova campagna, il sistema di Advertisement va arrestato, e dopo fatto ripartire
-        </Text>
-      </View>
-
       <View style={styles.tabBar}>
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;
@@ -314,20 +302,19 @@ export default function AdminAds() {
         })}
       </View>
 
-      {adsEnabled && (
-        <View style={styles.adsBanner}>
-          <MaterialIcons name="warning" size={16} color={Colors.warning} />
-          <Text style={styles.adsBannerText}>
-            Disabilita gli annunci nelle impostazioni prima di aggiungere nuove campagne
-          </Text>
-        </View>
-      )}
-
       <View style={styles.toolbar}>
         <Text style={styles.countText}>{campaigns.length} campagn{campaigns.length === 1 ? "a" : "e"}</Text>
-        <TouchableOpacity onPress={openRotationSettings} style={styles.toolbarBtn}>
-          <MaterialIcons name="settings" size={20} color={Colors.textSecondary} />
-        </TouchableOpacity>
+        <View style={styles.toolbarActions}>
+          <TouchableOpacity
+            onPress={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] })}
+            style={styles.toolbarBtn}
+          >
+            <MaterialIcons name="refresh" size={20} color={Colors.textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={openRotationSettings} style={styles.toolbarBtn}>
+            <MaterialIcons name="settings" size={20} color={Colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {isLoading ? (
@@ -359,9 +346,8 @@ export default function AdminAds() {
       )}
 
       <TouchableOpacity
-        style={[styles.fab, { backgroundColor: adsEnabled ? Colors.textSecondary : currentTab.color, bottom: insets.bottom + 16 }]}
-        onPress={() => { if (!adsEnabled) setShowCreateModal(true); }}
-        disabled={adsEnabled}
+        style={[styles.fab, { backgroundColor: currentTab.color, bottom: insets.bottom + 16 }]}
+        onPress={() => setShowCreateModal(true)}
       >
         <MaterialIcons name="add" size={28} color={Colors.background} />
       </TouchableOpacity>
@@ -539,6 +525,11 @@ const styles = StyleSheet.create({
   },
   toolbarBtn: {
     padding: 4,
+  },
+  toolbarActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   warningBanner: {

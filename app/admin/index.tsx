@@ -49,7 +49,7 @@ const adminGroups: AdminGroup[] = [
       { key: "workshops", label: "Officine", icon: "store", iconSet: "MaterialIcons", route: "/admin/workshops" },
       { key: "motoclubs", label: "Motoclub", icon: "shield", iconSet: "Ionicons", route: "/admin/motoclubs" },
       { key: "easter-eggs", label: "Easter Eggs", icon: "egg-easter", iconSet: "MaterialCommunityIcons", route: "/admin/easter-eggs" },
-      { key: "ads", label: "Advertisement", icon: "campaign", iconSet: "MaterialIcons", route: "/admin/ads" },
+      { key: "ads", label: "Campagne", icon: "campaign", iconSet: "MaterialIcons", route: "/admin/ads" },
     ],
   },
   {
