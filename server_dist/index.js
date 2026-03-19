@@ -8182,22 +8182,35 @@ function startMatchingEngine() {
 // server/routes/admin.ts
 var router17 = (0, import_express17.Router)();
 async function assignFakeUserToClubs(userId) {
+  const stats = { assigned: 0, skipped: 0, failed: 0 };
   try {
     const approvedClubs = await db.select({ id: motoClubs.id }).from(motoClubs).where((0, import_drizzle_orm8.eq)(motoClubs.isApproved, true));
-    if (approvedClubs.length === 0) return;
-    const count2 = 1 + Math.floor(Math.random() * 3);
-    const shuffled = approvedClubs.sort(() => Math.random() - 0.5).slice(0, count2);
+    if (approvedClubs.length === 0) return stats;
+    const pickCount = Math.min(1 + Math.floor(Math.random() * 3), approvedClubs.length);
+    const shuffled = approvedClubs.sort(() => Math.random() - 0.5).slice(0, pickCount);
     for (const club of shuffled) {
-      await db.insert(motoClubMembers).values({
-        clubId: club.id,
-        userId,
-        role: "member",
-        status: "active"
-      }).onConflictDoNothing();
+      try {
+        const result = await db.insert(motoClubMembers).values({
+          clubId: club.id,
+          userId,
+          role: "member",
+          status: "active"
+        }).onConflictDoNothing().returning({ id: motoClubMembers.id });
+        if (result.length > 0) {
+          stats.assigned++;
+        } else {
+          stats.skipped++;
+        }
+      } catch (err) {
+        console.error("[assignFakeUserToClubs] insert error:", err);
+        stats.failed++;
+      }
     }
   } catch (err) {
     console.error("[assignFakeUserToClubs] error:", err);
+    stats.failed++;
   }
+  return stats;
 }
 function requireAdmin(req, res, next) {
   if (!req.session.userId) {
@@ -10238,10 +10251,14 @@ router17.post("/fake-users/wake-all", async (_req, res) => {
 router17.post("/fake-users/distribute-to-clubs", async (_req, res) => {
   try {
     const fakeUsers = await db.select({ id: users.id }).from(users).where((0, import_drizzle_orm8.eq)(users.isFake, true));
+    const totals = { assigned: 0, skipped: 0, failed: 0 };
     for (const fu of fakeUsers) {
-      await assignFakeUserToClubs(fu.id);
+      const s = await assignFakeUserToClubs(fu.id);
+      totals.assigned += s.assigned;
+      totals.skipped += s.skipped;
+      totals.failed += s.failed;
     }
-    return res.json({ ok: true, count: fakeUsers.length });
+    return res.json({ ok: true, usersProcessed: fakeUsers.length, ...totals });
   } catch (error) {
     console.error("Admin distribute-to-clubs error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
