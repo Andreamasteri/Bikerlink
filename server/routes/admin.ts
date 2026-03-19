@@ -9,14 +9,9 @@ import { motoClubs, motoClubRequests, motoClubMembers, conversations, moderatorL
 import { eq, and, ne, desc, sql, count, notExists } from "drizzle-orm";
 import { MOTORCYCLES, pickRandomN, getMotoYear } from "../mass-seed-data";
 import { getLastMatchingCycleMeta } from "../matching-engine";
+import { isProtectedUser } from "../constants";
 
 const router = Router();
-
-const PROTECTED_NICKNAMES = ["BikerLink_Official"];
-
-function isProtectedUser(nickname: string): boolean {
-  return PROTECTED_NICKNAMES.includes(nickname);
-}
 
 function requireAdmin(req: Request, res: Response, next: Function) {
   if (!req.session.userId) {

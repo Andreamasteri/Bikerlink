@@ -4141,6 +4141,14 @@ var import_multer = __toESM(require("multer"));
 var import_path2 = __toESM(require("path"));
 var import_fs2 = __toESM(require("fs"));
 init_storage();
+
+// server/constants.ts
+var PROTECTED_NICKNAMES = ["BikerLink_Official"];
+function isProtectedUser(nickname) {
+  return PROTECTED_NICKNAMES.includes(nickname);
+}
+
+// server/routes/users.ts
 var router2 = (0, import_express2.Router)();
 var uploadsDir = import_path2.default.join(process.cwd(), "uploads", "photos");
 if (!import_fs2.default.existsSync(uploadsDir)) {
@@ -4796,9 +4804,8 @@ router2.post("/:id/block", requireAuth, async (req, res) => {
     if (!targetUser) {
       return res.status(404).json({ message: "Utente non trovato" });
     }
-    const PROTECTED_NICKNAMES2 = ["BikerLink_Official"];
-    if (PROTECTED_NICKNAMES2.includes(targetUser.nickname)) {
-      return res.status(403).json({ message: "Utente di sistema non bloccabile" });
+    if (isProtectedUser(targetUser.nickname)) {
+      return res.status(403).json({ message: "Utente di sistema non modificabile" });
     }
     const alreadyBlocked = await storage.isBlocked(blockerId, blockedId);
     if (alreadyBlocked) {
@@ -8150,10 +8157,6 @@ function startMatchingEngine() {
 
 // server/routes/admin.ts
 var router17 = (0, import_express17.Router)();
-var PROTECTED_NICKNAMES = ["BikerLink_Official"];
-function isProtectedUser(nickname) {
-  return PROTECTED_NICKNAMES.includes(nickname);
-}
 function requireAdmin(req, res, next) {
   if (!req.session.userId) {
     return res.status(401).json({ message: "Non autenticato" });

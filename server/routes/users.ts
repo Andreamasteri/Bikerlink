@@ -3,6 +3,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { storage } from "../storage";
+import { isProtectedUser } from "../constants";
 
 const router = Router();
 
@@ -748,9 +749,8 @@ router.post("/:id/block", requireAuth, async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Utente non trovato" });
     }
 
-    const PROTECTED_NICKNAMES = ["BikerLink_Official"];
-    if (PROTECTED_NICKNAMES.includes(targetUser.nickname)) {
-      return res.status(403).json({ message: "Utente di sistema non bloccabile" });
+    if (isProtectedUser(targetUser.nickname)) {
+      return res.status(403).json({ message: "Utente di sistema non modificabile" });
     }
 
     const alreadyBlocked = await storage.isBlocked(blockerId, blockedId);
