@@ -1742,7 +1742,8 @@ export class DatabaseStorage implements IStorage {
     const [match] = await db.select().from(bikerBikerMatches).where(eq(bikerBikerMatches.id, id));
     if (!match) return false;
     if (match.biker1Id !== userId && match.biker2Id !== userId) return false;
-    await db.update(bikerBikerMatches).set({ status: "new" }).where(eq(bikerBikerMatches.id, id));
+    const newStatus = match.status === "accepted" ? "rejected" : "new";
+    await db.update(bikerBikerMatches).set({ status: newStatus }).where(eq(bikerBikerMatches.id, id));
     return true;
   }
 

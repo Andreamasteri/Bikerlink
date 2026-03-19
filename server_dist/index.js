@@ -1836,7 +1836,8 @@ var init_storage = __esm({
         const [match] = await db.select().from(bikerBikerMatches).where((0, import_drizzle_orm2.eq)(bikerBikerMatches.id, id));
         if (!match) return false;
         if (match.biker1Id !== userId && match.biker2Id !== userId) return false;
-        await db.update(bikerBikerMatches).set({ status: "new" }).where((0, import_drizzle_orm2.eq)(bikerBikerMatches.id, id));
+        const newStatus = match.status === "accepted" ? "rejected" : "new";
+        await db.update(bikerBikerMatches).set({ status: newStatus }).where((0, import_drizzle_orm2.eq)(bikerBikerMatches.id, id));
         return true;
       }
       async deleteRejectedBikerBikerMatches(userId) {
