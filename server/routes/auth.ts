@@ -201,7 +201,8 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     }
 
     await storage.updateUser(user.id, { lastLoginAt: new Date() } as any);
-    if (!(user as any).ghostMode) {
+    const userRecord = await storage.getUser(user.id);
+    if (!userRecord?.ghostMode) {
       await storage.updateUserProfile(user.id, { isAvailable: true }).catch(() => {});
     }
 

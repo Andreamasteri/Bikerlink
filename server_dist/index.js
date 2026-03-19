@@ -3996,7 +3996,8 @@ router.post("/login", loginLimiter, async (req, res) => {
       return res.status(401).json({ message: "Credenziali non valide" });
     }
     await storage.updateUser(user.id, { lastLoginAt: /* @__PURE__ */ new Date() });
-    if (!user.ghostMode) {
+    const userRecord = await storage.getUser(user.id);
+    if (!userRecord?.ghostMode) {
       await storage.updateUserProfile(user.id, { isAvailable: true }).catch(() => {
       });
     }
