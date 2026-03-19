@@ -1058,7 +1058,7 @@ export default function AdminSettings() {
           </View>
           <Switch
             value={ghostModeEnabled}
-            onValueChange={(val) => setProtectedToggle({ key: "ghost_mode_enabled", value: String(val), label: "Ghost Mode" })}
+            onValueChange={(val) => setProtectedToggle({ key: "ghost_mode_enabled", value: val, label: "Ghost Mode" })}
             trackColor={{ false: Colors.border, true: "#9C27B0" }}
             thumbColor={ghostModeEnabled ? Colors.text : Colors.textSecondary}
             disabled={protectedToggleMutation.isPending}
