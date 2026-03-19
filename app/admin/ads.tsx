@@ -49,13 +49,11 @@ const TABS: { key: TabKey; label: string; icon: string; iconSet: "material" | "c
 const PLACEMENT_LABELS: Record<string, string> = {
   all: "Tutti",
   home: "Home",
-  match: "Match",
 };
 
 const PLACEMENT_CYCLE: Record<string, string> = {
   all: "home",
-  home: "match",
-  match: "all",
+  home: "all",
 };
 
 function CampaignCard({
@@ -132,7 +130,7 @@ export default function AdminAds() {
   const [formLinkUrl, setFormLinkUrl] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formImageUri, setFormImageUri] = useState<string | null>(null);
-  const [formPlacement, setFormPlacement] = useState<"all" | "home" | "match">("all");
+  const [formPlacement, setFormPlacement] = useState<"all" | "home">("all");
 
   const [settingsDuration, setSettingsDuration] = useState("10");
   const [settingsMode, setSettingsMode] = useState<"sequential" | "random">("sequential");
@@ -403,7 +401,6 @@ export default function AdminAds() {
               {([
                 { key: "all", label: "Tutti" },
                 { key: "home", label: "Home page" },
-                { key: "match", label: "Nei Match" },
               ] as const).map((opt) => (
                 <TouchableOpacity
                   key={opt.key}
