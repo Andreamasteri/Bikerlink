@@ -9930,7 +9930,7 @@ router17.post("/motoclubs/requests/:id/reject", async (req, res) => {
 router17.get("/motoclubs/:id", async (req, res) => {
   try {
     const clubId = req.params.id;
-    const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10) || 50, 100);
+    const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10) || 50, 50);
     const offset = Math.max(parseInt(String(req.query.offset ?? "0"), 10) || 0, 0);
     const [club] = await db.select().from(motoClubs).where((0, import_drizzle_orm8.eq)(motoClubs.id, clubId)).limit(1);
     if (!club) return res.status(404).json({ message: "Club non trovato" });

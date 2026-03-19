@@ -1774,7 +1774,7 @@ router.post("/motoclubs/requests/:id/reject", async (req: Request, res: Response
 router.get("/motoclubs/:id", async (req: Request, res: Response) => {
   try {
     const clubId = req.params.id;
-    const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10) || 50, 100);
+    const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10) || 50, 50);
     const offset = Math.max(parseInt(String(req.query.offset ?? "0"), 10) || 0, 0);
 
     const [club] = await db.select().from(motoClubs).where(eq(motoClubs.id, clubId)).limit(1);
