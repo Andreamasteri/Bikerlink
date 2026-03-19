@@ -11945,6 +11945,11 @@ function setupErrorHandler(app2) {
     console.warn("[MIGRATION] invitation_codes.image_url:", e);
   }
   try {
+    await db.execute(import_drizzle_orm10.sql`ALTER TABLE ad_campaigns ADD COLUMN IF NOT EXISTS placement VARCHAR(30) NOT NULL DEFAULT 'all'`);
+  } catch (e) {
+    console.warn("[MIGRATION] ad_campaigns.placement:", e);
+  }
+  try {
     await db.execute(import_drizzle_orm10.sql`
       CREATE TABLE IF NOT EXISTS user_blocks (
         id SERIAL PRIMARY KEY,

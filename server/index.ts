@@ -295,6 +295,12 @@ function setupErrorHandler(app: express.Application) {
   }
 
   try {
+    await db.execute(sql`ALTER TABLE ad_campaigns ADD COLUMN IF NOT EXISTS placement VARCHAR(30) NOT NULL DEFAULT 'all'`);
+  } catch (e) {
+    console.warn("[MIGRATION] ad_campaigns.placement:", e);
+  }
+
+  try {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS user_blocks (
         id SERIAL PRIMARY KEY,
