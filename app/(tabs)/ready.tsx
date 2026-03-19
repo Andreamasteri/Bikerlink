@@ -20,6 +20,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSetting } from "@/lib/settings-context";
+import { useT } from "@/lib/language-context";
 import * as Location from "expo-location";
 
 const sosLaunchIcon = require("@/assets/images/sos-launch-icon.png");
@@ -29,6 +30,7 @@ export default function ReadyToRideScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const sosEnabled = useSetting("sosEnabled");
+  const t = useT();
 
   const [showSosModal, setShowSosModal] = useState(false);
   const [sosReason, setSosReason] = useState("");
@@ -63,6 +65,18 @@ export default function ReadyToRideScreen() {
   });
 
   const isAvailable = (data as any)?.isAvailable || false;
+  const isGhostMode = (data as any)?.ghostMode || false;
+
+  const invalidateOnlineQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/users/profile"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-count"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-count"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/users/online-count"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-list"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-list"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/users/online-list"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/users/nearby"] });
+  };
 
   const toggleMutation = useMutation({
     mutationFn: async (newVal: boolean) => {
@@ -70,20 +84,22 @@ export default function ReadyToRideScreen() {
         isAvailable: newVal,
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/profile"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-count"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-count"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/users/online-count"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-list"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-list"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/users/online-list"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/users/nearby"] });
+    onSuccess: invalidateOnlineQueries,
+  });
+
+  const ghostMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      await apiRequest("PUT", "/api/users/me/ghost-mode", { enabled });
     },
+    onSuccess: invalidateOnlineQueries,
   });
 
   const handleToggle = () => {
     toggleMutation.mutate(!isAvailable);
+  };
+
+  const handleGhostToggle = () => {
+    ghostMutation.mutate(!isGhostMode);
   };
 
   const mySosQuery = useQuery<any>({
@@ -167,7 +183,7 @@ export default function ReadyToRideScreen() {
             { backgroundColor: isAvailable ? Colors.success : Colors.accentRed },
           ]}
           onPress={handleToggle}
-          disabled={toggleMutation.isPending}
+          disabled={toggleMutation.isPending || ghostMutation.isPending}
         >
           {toggleMutation.isPending ? (
             <ActivityIndicator color="#fff" size="large" />
@@ -179,6 +195,29 @@ export default function ReadyToRideScreen() {
             />
           )}
         </Pressable>
+
+        <View style={styles.ghostBlock}>
+          <Pressable
+            style={[
+              styles.ghostBtn,
+              isGhostMode && styles.ghostBtnActive,
+            ]}
+            onPress={handleGhostToggle}
+            disabled={ghostMutation.isPending || toggleMutation.isPending}
+          >
+            {ghostMutation.isPending ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Ionicons
+                name={isGhostMode ? "eye-off" : "eye-off-outline"}
+                size={20}
+                color="#fff"
+              />
+            )}
+            <Text style={styles.ghostBtnText}>{t("ride.ghostMode")}</Text>
+          </Pressable>
+          <Text style={styles.ghostDesc}>{t("ride.ghostModeDesc")}</Text>
+        </View>
 
         <Pressable
           style={styles.cronoBtn}
@@ -356,6 +395,37 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
+  },
+  ghostBlock: {
+    alignItems: "center",
+    marginTop: 18,
+    gap: 6,
+  },
+  ghostBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#3A3A3A",
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+    borderRadius: 24,
+  },
+  ghostBtnActive: {
+    backgroundColor: "#222222",
+    borderWidth: 1.5,
+    borderColor: "#888",
+  },
+  ghostBtnText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
+  },
+  ghostDesc: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.accentRed,
+    textAlign: "center",
+    maxWidth: 260,
   },
   cronoBtn: {
     flexDirection: "row",

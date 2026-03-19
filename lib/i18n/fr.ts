@@ -376,6 +376,8 @@ const fr: Record<string, string> = {
   "profile.donationTitle": "Don",
   "profile.paypalNotConfigured": "Le service PayPal n'est pas encore configuré.",
   "profile.donatePaypal": "Faire un don via PayPal",
+  "ride.ghostMode": "Ghost Mode",
+  "ride.ghostModeDesc": "Vous apparaissez hors ligne pour tous les autres utilisateurs",
 };
 
 export default fr;

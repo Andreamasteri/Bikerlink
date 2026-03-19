@@ -182,6 +182,10 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
     if (longitude !== undefined) updateData.longitude = longitude;
     if (searchPreference !== undefined) updateData.searchPreference = searchPreference;
 
+    if (isAvailable === true) {
+      await storage.updateUser(userId, { ghostMode: false } as any);
+    }
+
     if (existingProfile) {
       const profile = await storage.updateUserProfile(userId, updateData as any);
       return res.json(profile);
@@ -191,6 +195,27 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
     }
   } catch (error) {
     console.error("Update dynamic profile error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.put("/me/ghost-mode", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const { enabled } = req.body;
+    if (typeof enabled !== "boolean") {
+      return res.status(400).json({ message: "enabled deve essere un booleano" });
+    }
+    await storage.updateUser(userId, { ghostMode: enabled } as any);
+    if (enabled) {
+      const existingProfile = await storage.getUserProfile(userId);
+      if (existingProfile) {
+        await storage.updateUserProfile(userId, { isAvailable: false } as any);
+      }
+    }
+    return res.json({ ghostMode: enabled });
+  } catch (error) {
+    console.error("Ghost mode toggle error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -266,7 +291,7 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
     const photos = await storage.getUserPhotos(userId);
     const approvedPhotos = photos.filter((p) => p.isApproved);
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    const isOnline = targetUser.lastLoginAt != null && new Date(targetUser.lastLoginAt) >= fifteenMinutesAgo;
+    const isOnline = !targetUser.ghostMode && targetUser.lastLoginAt != null && new Date(targetUser.lastLoginAt) >= fifteenMinutesAgo;
     return res.json({
       id: targetUser.id,
       nickname: targetUser.nickname,
@@ -281,7 +306,7 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
       motorcycles,
       photos: approvedPhotos,
       isOnline,
-      isAvailable: profile?.isAvailable || false,
+      isAvailable: (profile?.isAvailable || false) && !targetUser.ghostMode,
     });
   } catch (error) {
     console.error("Get public user profile error:", error);

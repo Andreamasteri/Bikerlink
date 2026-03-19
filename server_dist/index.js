@@ -113,6 +113,7 @@ var init_schema = __esm({
       country: (0, import_pg_core.varchar)("country", { length: 2 }),
       spokenLanguages: (0, import_pg_core.jsonb)("spoken_languages").$type().default([]),
       autoJoinClubs: (0, import_pg_core.boolean)("auto_join_clubs").notNull().default(true),
+      ghostMode: (0, import_pg_core.boolean)("ghost_mode").notNull().default(false),
       lastLoginAt: (0, import_pg_core.timestamp)("last_login_at"),
       createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow(),
       updatedAt: (0, import_pg_core.timestamp)("updated_at").notNull().defaultNow()
@@ -1202,6 +1203,7 @@ var init_storage = __esm({
       async getNearbyUsers(lat, lng, radiusKm, countries) {
         const conditions = [
           (0, import_drizzle_orm2.eq)(users.status, "active"),
+          (0, import_drizzle_orm2.eq)(users.ghostMode, false),
           import_drizzle_orm2.sql`${userProfiles.latitude} IS NOT NULL`,
           import_drizzle_orm2.sql`${userProfiles.longitude} IS NOT NULL`
         ];
@@ -1256,20 +1258,20 @@ var init_storage = __esm({
         return result[0]?.count ?? 0;
       }
       async countOnlineUsers(since, countries) {
-        const conditions = [(0, import_drizzle_orm2.eq)(users.status, "active"), (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)];
+        const conditions = [(0, import_drizzle_orm2.eq)(users.status, "active"), (0, import_drizzle_orm2.gte)(users.lastLoginAt, since), (0, import_drizzle_orm2.eq)(users.ghostMode, false)];
         if (countries && countries.length > 0) conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
         const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(users).where((0, import_drizzle_orm2.and)(...conditions));
         return result[0]?.count ?? 0;
       }
       async countAvailableUsers(since) {
-        const conditions = [(0, import_drizzle_orm2.eq)(users.status, "active"), (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true)];
+        const conditions = [(0, import_drizzle_orm2.eq)(users.status, "active"), (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true), (0, import_drizzle_orm2.eq)(users.ghostMode, false)];
         if (since) conditions.push((0, import_drizzle_orm2.gte)(users.lastLoginAt, since));
         const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)(...conditions));
         return result[0]?.count ?? 0;
       }
       async getOnlineUsersList(since, lat, lng, countries) {
         const distanceExpr = lat != null && lng != null ? import_drizzle_orm2.sql`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance") : import_drizzle_orm2.sql`0`.as("distance");
-        const conditions = [(0, import_drizzle_orm2.eq)(users.status, "active"), (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)];
+        const conditions = [(0, import_drizzle_orm2.eq)(users.status, "active"), (0, import_drizzle_orm2.gte)(users.lastLoginAt, since), (0, import_drizzle_orm2.eq)(users.ghostMode, false)];
         if (countries && countries.length > 0) {
           conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
         }
@@ -1278,7 +1280,7 @@ var init_storage = __esm({
       }
       async getAvailableUsersList(since, lat, lng) {
         const distanceExpr = lat != null && lng != null ? import_drizzle_orm2.sql`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance") : import_drizzle_orm2.sql`0`.as("distance");
-        const results = await db.select({ user: users, profile: userProfiles, distance: distanceExpr }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.status, "active"), (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true), (0, import_drizzle_orm2.gte)(users.lastLoginAt, since))).orderBy(import_drizzle_orm2.sql`distance`);
+        const results = await db.select({ user: users, profile: userProfiles, distance: distanceExpr }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.status, "active"), (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true), (0, import_drizzle_orm2.gte)(users.lastLoginAt, since), (0, import_drizzle_orm2.eq)(users.ghostMode, false))).orderBy(import_drizzle_orm2.sql`distance`);
         return results;
       }
       async getUnapprovedUserPhotos() {
@@ -1530,7 +1532,8 @@ var init_storage = __esm({
           (0, import_drizzle_orm2.eq)(users.status, "active"),
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           (0, import_drizzle_orm2.gte)(users.lastLoginAt, since),
-          (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.userType, "biker"), (0, import_drizzle_orm2.eq)(users.userType, "coppia"))
+          (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.userType, "biker"), (0, import_drizzle_orm2.eq)(users.userType, "coppia")),
+          (0, import_drizzle_orm2.eq)(users.ghostMode, false)
         ];
         if (countries && countries.length > 0) conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
         const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)(...conditions));
@@ -1541,7 +1544,8 @@ var init_storage = __esm({
           (0, import_drizzle_orm2.eq)(users.status, "active"),
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           (0, import_drizzle_orm2.gte)(users.lastLoginAt, since),
-          (0, import_drizzle_orm2.eq)(users.userType, "zavorrina")
+          (0, import_drizzle_orm2.eq)(users.userType, "zavorrina"),
+          (0, import_drizzle_orm2.eq)(users.ghostMode, false)
         ];
         if (countries && countries.length > 0) conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
         const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)(...conditions));
@@ -1553,7 +1557,8 @@ var init_storage = __esm({
           (0, import_drizzle_orm2.eq)(users.status, "active"),
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           (0, import_drizzle_orm2.gte)(users.lastLoginAt, since),
-          (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.userType, "biker"), (0, import_drizzle_orm2.eq)(users.userType, "coppia"))
+          (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.userType, "biker"), (0, import_drizzle_orm2.eq)(users.userType, "coppia")),
+          (0, import_drizzle_orm2.eq)(users.ghostMode, false)
         ];
         if (countries && countries.length > 0) {
           conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
@@ -1566,7 +1571,8 @@ var init_storage = __esm({
           (0, import_drizzle_orm2.eq)(users.status, "active"),
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           (0, import_drizzle_orm2.gte)(users.lastLoginAt, since),
-          (0, import_drizzle_orm2.eq)(users.userType, "zavorrina")
+          (0, import_drizzle_orm2.eq)(users.userType, "zavorrina"),
+          (0, import_drizzle_orm2.eq)(users.ghostMode, false)
         ];
         if (countries && countries.length > 0) {
           conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
@@ -4327,6 +4333,9 @@ router2.put("/profile/dynamic", requireAuth, async (req, res) => {
     if (latitude !== void 0) updateData.latitude = latitude;
     if (longitude !== void 0) updateData.longitude = longitude;
     if (searchPreference !== void 0) updateData.searchPreference = searchPreference;
+    if (isAvailable === true) {
+      await storage.updateUser(userId, { ghostMode: false });
+    }
     if (existingProfile) {
       const profile = await storage.updateUserProfile(userId, updateData);
       return res.json(profile);
@@ -4336,6 +4345,26 @@ router2.put("/profile/dynamic", requireAuth, async (req, res) => {
     }
   } catch (error) {
     console.error("Update dynamic profile error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router2.put("/me/ghost-mode", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const { enabled } = req.body;
+    if (typeof enabled !== "boolean") {
+      return res.status(400).json({ message: "enabled deve essere un booleano" });
+    }
+    await storage.updateUser(userId, { ghostMode: enabled });
+    if (enabled) {
+      const existingProfile = await storage.getUserProfile(userId);
+      if (existingProfile) {
+        await storage.updateUserProfile(userId, { isAvailable: false });
+      }
+    }
+    return res.json({ ghostMode: enabled });
+  } catch (error) {
+    console.error("Ghost mode toggle error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -4402,7 +4431,7 @@ router2.get("/:id/public", requireAuth, async (req, res) => {
     const photos = await storage.getUserPhotos(userId);
     const approvedPhotos = photos.filter((p) => p.isApproved);
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
-    const isOnline = targetUser.lastLoginAt != null && new Date(targetUser.lastLoginAt) >= fifteenMinutesAgo;
+    const isOnline = !targetUser.ghostMode && targetUser.lastLoginAt != null && new Date(targetUser.lastLoginAt) >= fifteenMinutesAgo;
     return res.json({
       id: targetUser.id,
       nickname: targetUser.nickname,
@@ -4417,7 +4446,7 @@ router2.get("/:id/public", requireAuth, async (req, res) => {
       motorcycles,
       photos: approvedPhotos,
       isOnline,
-      isAvailable: profile?.isAvailable || false
+      isAvailable: (profile?.isAvailable || false) && !targetUser.ghostMode
     });
   } catch (error) {
     console.error("Get public user profile error:", error);
@@ -11948,6 +11977,11 @@ function setupErrorHandler(app2) {
     await db.execute(import_drizzle_orm10.sql`ALTER TABLE ad_campaigns ADD COLUMN IF NOT EXISTS placement VARCHAR(30) NOT NULL DEFAULT 'all'`);
   } catch (e) {
     console.warn("[MIGRATION] ad_campaigns.placement:", e);
+  }
+  try {
+    await db.execute(import_drizzle_orm10.sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ghost_mode BOOLEAN NOT NULL DEFAULT false`);
+  } catch (e) {
+    console.warn("[MIGRATION] users.ghost_mode:", e);
   }
   try {
     await db.execute(import_drizzle_orm10.sql`

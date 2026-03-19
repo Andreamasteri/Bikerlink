@@ -939,6 +939,7 @@ export class DatabaseStorage implements IStorage {
   async getNearbyUsers(lat: number, lng: number, radiusKm: number, countries?: string[]): Promise<Array<{ user: User; profile: UserProfile; distance: number }>> {
     const conditions = [
       eq(users.status, "active"),
+      eq(users.ghostMode, false),
       sql`${userProfiles.latitude} IS NOT NULL`,
       sql`${userProfiles.longitude} IS NOT NULL`,
     ];
@@ -1011,14 +1012,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async countOnlineUsers(since: Date, countries?: string[]): Promise<number> {
-    const conditions: any[] = [eq(users.status, "active"), gte(users.lastLoginAt, since)];
+    const conditions: any[] = [eq(users.status, "active"), gte(users.lastLoginAt, since), eq(users.ghostMode, false)];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(and(...conditions));
     return result[0]?.count ?? 0;
   }
 
   async countAvailableUsers(since?: Date): Promise<number> {
-    const conditions = [eq(users.status, "active"), eq(userProfiles.isAvailable, true)];
+    const conditions = [eq(users.status, "active"), eq(userProfiles.isAvailable, true), eq(users.ghostMode, false)];
     if (since) conditions.push(gte(users.lastLoginAt, since));
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(userProfiles).innerJoin(users, eq(users.id, userProfiles.userId)).where(and(...conditions));
     return result[0]?.count ?? 0;
@@ -1028,7 +1029,7 @@ export class DatabaseStorage implements IStorage {
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
-    const conditions: any[] = [eq(users.status, "active"), gte(users.lastLoginAt, since)];
+    const conditions: any[] = [eq(users.status, "active"), gte(users.lastLoginAt, since), eq(users.ghostMode, false)];
     if (countries && countries.length > 0) {
       conditions.push(inArray(users.country, countries));
     }
@@ -1049,7 +1050,7 @@ export class DatabaseStorage implements IStorage {
       .select({ user: users, profile: userProfiles, distance: distanceExpr })
       .from(userProfiles)
       .innerJoin(users, eq(users.id, userProfiles.userId))
-      .where(and(eq(users.status, "active"), eq(userProfiles.isAvailable, true), gte(users.lastLoginAt, since)))
+      .where(and(eq(users.status, "active"), eq(userProfiles.isAvailable, true), gte(users.lastLoginAt, since), eq(users.ghostMode, false)))
       .orderBy(sql`distance`);
     return results;
   }
@@ -1347,7 +1348,8 @@ export class DatabaseStorage implements IStorage {
       eq(users.status, "active"),
       eq(userProfiles.isAvailable, true),
       gte(users.lastLoginAt, since),
-      or(eq(users.userType, "biker"), eq(users.userType, "coppia"))
+      or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
+      eq(users.ghostMode, false),
     ];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const result = await db.select({ count: sql<number>`count(*)::int` })
@@ -1362,7 +1364,8 @@ export class DatabaseStorage implements IStorage {
       eq(users.status, "active"),
       eq(userProfiles.isAvailable, true),
       gte(users.lastLoginAt, since),
-      eq(users.userType, "zavorrina")
+      eq(users.userType, "zavorrina"),
+      eq(users.ghostMode, false),
     ];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const result = await db.select({ count: sql<number>`count(*)::int` })
@@ -1381,6 +1384,7 @@ export class DatabaseStorage implements IStorage {
       eq(userProfiles.isAvailable, true),
       gte(users.lastLoginAt, since),
       or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
+      eq(users.ghostMode, false),
     ];
     if (countries && countries.length > 0) {
       conditions.push(inArray(users.country, countries));
@@ -1402,6 +1406,7 @@ export class DatabaseStorage implements IStorage {
       eq(userProfiles.isAvailable, true),
       gte(users.lastLoginAt, since),
       eq(users.userType, "zavorrina"),
+      eq(users.ghostMode, false),
     ];
     if (countries && countries.length > 0) {
       conditions.push(inArray(users.country, countries));
