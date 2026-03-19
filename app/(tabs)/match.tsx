@@ -858,8 +858,6 @@ export default function MatchScreen() {
         )}
       </View>
 
-      <SynecoAd displayMode="carousel" queryKey="/api/ads/placement/match" />
-
       <View style={styles.systemDescBanner}>
         <Ionicons name="information-circle" size={15} color={Colors.accent} />
         <Text style={styles.systemDescText}>{t("match.systemDesc")}</Text>
