@@ -127,7 +127,7 @@ function ClubCard({
   myClubIds: Set<string>;
   onJoin: (id: string) => void;
   onLeave: (id: string, name: string) => void;
-  onOpenChat?: (conversationId: string) => void;
+  onOpenChat?: (clubId: string, conversationId?: string | null) => void;
   joinedAt?: string;
   role?: string;
   conversationId?: string | null;
@@ -191,7 +191,7 @@ function ClubCard({
       {isMember && onOpenChat ? (
         <TouchableOpacity
           style={styles.cardBody}
-          onPress={() => onOpenChat(club.id)}
+          onPress={() => onOpenChat(club.id, conversationId)}
           activeOpacity={0.7}
         >
           {cardBodyContent}
@@ -371,8 +371,11 @@ export default function MotoclubScreen() {
   );
 
   const handleOpenChat = useCallback(
-    (clubId: string) => {
-      router.push(`/motoclub/${clubId}` as any);
+    (clubId: string, conversationId?: string | null) => {
+      const url = conversationId
+        ? `/motoclub/${clubId}?conversationId=${conversationId}`
+        : `/motoclub/${clubId}`;
+      router.push(url as any);
     },
     [router]
   );

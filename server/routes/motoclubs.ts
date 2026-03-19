@@ -432,7 +432,7 @@ router.get("/:id/detail", requireAuth, async (req: Request, res: Response) => {
 
     const memberships = await db
       .select({
-        userId: motoClubMembers.userId,
+        profileId: motoClubMembers.userId,
         role: motoClubMembers.role,
         joinedAt: motoClubMembers.joinedAt,
         nickname: users.nickname,

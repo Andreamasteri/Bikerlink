@@ -19,7 +19,7 @@ const PAGE_SIZE = 30;
 const INITIAL_VISIBLE = 5;
 
 interface Member {
-  userId: string;
+  profileId: string;
   role: string;
   joinedAt: string;
   nickname: string;
@@ -88,17 +88,19 @@ const avatarStyles = StyleSheet.create({
 });
 
 export default function ClubDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, conversationId: convParam } = useLocalSearchParams<{ id: string; conversationId?: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const [showAll, setShowAll] = useState(false);
+  const conversationId = convParam ?? null;
+
+  const [expanded, setExpanded] = useState(false);
   const [extraMembers, setExtraMembers] = useState<Member[]>([]);
   const [nextOffset, setNextOffset] = useState(PAGE_SIZE);
   const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
-    setShowAll(false);
+    setExpanded(false);
     setExtraMembers([]);
     setNextOffset(PAGE_SIZE);
   }, [id]);
@@ -112,12 +114,13 @@ export default function ClubDetailScreen() {
 
   const allMembers: Member[] = [...(club?.members ?? []), ...extraMembers];
   const totalCount = club?.totalCount ?? 0;
-  const hasMore = allMembers.length < totalCount;
-  const visibleMembers = showAll ? allMembers : allMembers.slice(0, INITIAL_VISIBLE);
+  const hasMorePages = allMembers.length < totalCount;
+
+  const visibleMembers = expanded ? allMembers : allMembers.slice(0, INITIAL_VISIBLE);
   const hiddenCount = totalCount - INITIAL_VISIBLE;
 
-  async function loadMore() {
-    if (loadingMore || !hasMore) return;
+  async function loadMorePages() {
+    if (loadingMore || !hasMorePages) return;
     setLoadingMore(true);
     try {
       const res = await apiRequest("GET", `/api/motoclubs/${id}/detail?limit=${PAGE_SIZE}&offset=${nextOffset}`);
@@ -130,6 +133,7 @@ export default function ClubDetailScreen() {
     }
   }
 
+  const resolvedConvId = conversationId ?? club?.conversationId ?? null;
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   function handleBack() {
@@ -137,8 +141,8 @@ export default function ClubDetailScreen() {
   }
 
   function handleOpenChat() {
-    if (!club?.conversationId) return;
-    router.push(`/chat/${club.conversationId}` as any);
+    if (!resolvedConvId) return;
+    router.push(`/chat/${resolvedConvId}` as any);
   }
 
   if (isLoading) {
@@ -154,8 +158,8 @@ export default function ClubDetailScreen() {
       <View style={[styles.center, { paddingTop: topPad }]}>
         <Ionicons name="alert-circle-outline" size={48} color={Colors.border} />
         <Text style={styles.errorText}>Club non trovato</Text>
-        <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>Torna indietro</Text>
+        <TouchableOpacity onPress={handleBack} style={styles.backFallbackBtn}>
+          <Text style={styles.backFallbackText}>Torna indietro</Text>
         </TouchableOpacity>
       </View>
     );
@@ -170,7 +174,7 @@ export default function ClubDetailScreen() {
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.navTitle} numberOfLines={1}>{club.name}</Text>
-        {club.conversationId ? (
+        {resolvedConvId ? (
           <TouchableOpacity onPress={handleOpenChat} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="chatbubbles" size={24} color={Colors.accent} />
           </TouchableOpacity>
@@ -181,7 +185,7 @@ export default function ClubDetailScreen() {
 
       <FlatList
         data={visibleMembers}
-        keyExtractor={(item) => item.userId}
+        keyExtractor={(item) => item.profileId}
         contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: insets.bottom + 100 }}
         ListHeaderComponent={
           <>
@@ -230,9 +234,7 @@ export default function ClubDetailScreen() {
             </View>
 
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>
-                Membri ({totalCount})
-              </Text>
+              <Text style={styles.sectionTitle}>Membri ({totalCount})</Text>
             </View>
 
             {totalCount === 0 && (
@@ -247,7 +249,7 @@ export default function ClubDetailScreen() {
           <TouchableOpacity
             style={styles.memberCard}
             activeOpacity={0.7}
-            onPress={() => router.push(`/profile/${item.userId}` as any)}
+            onPress={() => router.push(`/profile/${item.profileId}` as any)}
           >
             <AvatarCircle nickname={item.nickname} size={42} />
             <View style={styles.memberInfo}>
@@ -280,36 +282,49 @@ export default function ClubDetailScreen() {
         )}
         ListFooterComponent={
           <View style={{ marginTop: 4 }}>
-            {!showAll && totalCount > INITIAL_VISIBLE && (
+            {!expanded && totalCount > INITIAL_VISIBLE && (
               <TouchableOpacity
-                style={styles.expandBtn}
-                onPress={() => setShowAll(true)}
+                style={styles.toggleBtn}
+                onPress={() => setExpanded(true)}
               >
-                <Ionicons name="people-outline" size={16} color={Colors.accent} />
-                <Text style={styles.expandBtnText}>
+                <Ionicons name="chevron-down" size={16} color={Colors.accent} />
+                <Text style={styles.toggleBtnText}>
                   Mostra tutti {hiddenCount > 0 ? `(+${hiddenCount})` : ""}
                 </Text>
               </TouchableOpacity>
             )}
-            {showAll && hasMore && (
-              <TouchableOpacity
-                style={[styles.expandBtn, loadingMore && { opacity: 0.6 }]}
-                onPress={loadMore}
-                disabled={loadingMore}
-              >
-                {loadingMore ? (
-                  <ActivityIndicator size="small" color={Colors.accent} />
-                ) : (
-                  <>
-                    <Ionicons name="chevron-down" size={16} color={Colors.accent} />
-                    <Text style={styles.expandBtnText}>
-                      Carica altri {Math.min(totalCount - allMembers.length, PAGE_SIZE)}
-                    </Text>
-                  </>
+            {expanded && (
+              <>
+                {hasMorePages && (
+                  <TouchableOpacity
+                    style={[styles.toggleBtn, loadingMore && { opacity: 0.6 }]}
+                    onPress={loadMorePages}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? (
+                      <ActivityIndicator size="small" color={Colors.accent} />
+                    ) : (
+                      <>
+                        <Ionicons name="chevron-down" size={16} color={Colors.accent} />
+                        <Text style={styles.toggleBtnText}>
+                          Carica altri {Math.min(totalCount - allMembers.length, PAGE_SIZE)}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.toggleBtn, { borderColor: Colors.border }]}
+                  onPress={() => setExpanded(false)}
+                >
+                  <Ionicons name="chevron-up" size={16} color={Colors.textSecondary} />
+                  <Text style={[styles.toggleBtnText, { color: Colors.textSecondary }]}>
+                    Mostra meno
+                  </Text>
+                </TouchableOpacity>
+              </>
             )}
-            {club.conversationId && (
+            {resolvedConvId && (
               <TouchableOpacity style={styles.chatBtn} onPress={handleOpenChat}>
                 <Ionicons name="chatbubbles" size={20} color="#fff" />
                 <Text style={styles.chatBtnText}>Apri chat del club</Text>
@@ -326,14 +341,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   errorText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary },
-  backBtn: {
+  backFallbackBtn: {
     marginTop: 8,
     paddingHorizontal: 20,
     paddingVertical: 10,
     backgroundColor: Colors.surface,
     borderRadius: 10,
   },
-  backBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text },
+  backFallbackText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text },
 
   navBar: {
     flexDirection: "row",
@@ -426,7 +441,7 @@ const styles = StyleSheet.create({
   rolePill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
   rolePillText: { fontFamily: "Inter_600SemiBold", fontSize: 10 },
 
-  expandBtn: {
+  toggleBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -436,9 +451,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderWidth: 1,
     borderColor: Colors.accent + "44",
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  expandBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.accent },
+  toggleBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.accent },
 
   chatBtn: {
     flexDirection: "row",
@@ -448,6 +463,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
     borderRadius: 14,
     paddingVertical: 16,
+    marginTop: 4,
     marginBottom: 8,
   },
   chatBtnText: { fontFamily: "Inter_700Bold", fontSize: 16, color: "#fff" },
