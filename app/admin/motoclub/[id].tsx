@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Alert, Platform, ScrollView,
+  Alert, Platform, ActivityIndicator,
 } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
@@ -9,6 +9,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
+
+const PAGE_SIZE = 50;
 
 interface Member {
   membershipId: string;
@@ -33,6 +35,8 @@ interface ClubDetail {
   activityScore: number | null;
   createdAt: string;
   members: Member[];
+  totalCount: number;
+  hasMore: boolean;
 }
 
 function userTypeIcon(type: string) {
@@ -78,15 +82,53 @@ export default function AdminClubDetail() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
+  const [extraMembers, setExtraMembers] = useState<Member[]>([]);
+  const [nextOffset, setNextOffset] = useState(PAGE_SIZE);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    setExtraMembers([]);
+    setNextOffset(PAGE_SIZE);
+  }, [id]);
+
+  const firstPageKey = `/api/admin/motoclubs/${id}?limit=${PAGE_SIZE}&offset=0`;
+
   const { data: club, isLoading, error } = useQuery<ClubDetail>({
-    queryKey: [`/api/admin/motoclubs/${id}`],
+    queryKey: [firstPageKey],
   });
+
+  const allMembers: Member[] = [...(club?.members ?? []), ...extraMembers];
+  const totalCount = club?.totalCount ?? 0;
+  const hasMore = allMembers.length < totalCount;
+
+  async function loadMore() {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await apiRequest("GET", `/api/admin/motoclubs/${id}?limit=${PAGE_SIZE}&offset=${nextOffset}`);
+      const data = await res.json() as ClubDetail;
+      setExtraMembers((prev) => [...prev, ...data.members]);
+      setNextOffset((prev) => prev + PAGE_SIZE);
+    } catch {
+      Alert.alert("Errore", "Impossibile caricare altri membri");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  function resetPagination() {
+    setExtraMembers([]);
+    setNextOffset(PAGE_SIZE);
+  }
 
   const removeMemberMutation = useMutation({
     mutationFn: async (userId: string) => {
       await apiRequest("DELETE", `/api/admin/motoclubs/${id}/members/${userId}`);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/admin/motoclubs/${id}`] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [firstPageKey] });
+      resetPagination();
+    },
     onError: () => Alert.alert("Errore", "Impossibile rimuovere il membro"),
   });
 
@@ -115,7 +157,7 @@ export default function AdminClubDetail() {
   function handleDeleteClub() {
     Alert.alert(
       "Elimina club",
-      `Eliminare "${club?.name}"?\n\n${club?.members.length} ${club?.members.length === 1 ? "membro verrà rimosso" : "membri verranno rimossi"}. Operazione irreversibile.`,
+      `Eliminare "${club?.name}"?\n\n${totalCount} ${totalCount === 1 ? "membro verrà rimosso" : "membri verranno rimossi"}. Operazione irreversibile.`,
       [
         { text: "Annulla", style: "cancel" },
         { text: "Elimina", style: "destructive", onPress: () => deleteClubMutation.mutate() },
@@ -182,17 +224,17 @@ export default function AdminClubDetail() {
   }
 
   const brandOrModel = [club.brandName, club.modelName].filter(Boolean).join(" ");
+  const remaining = totalCount - allMembers.length;
 
   return (
     <FlatList
       style={[styles.container, { paddingTop: topPad }]}
-      data={club.members}
+      data={allMembers}
       keyExtractor={(item) => item.membershipId}
       renderItem={renderMember}
       contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
       ListHeaderComponent={
         <>
-          {/* Club header card */}
           <View style={styles.headerCard}>
             <View style={styles.headerIconWrap}>
               <Ionicons name="shield" size={36} color={Colors.accent} />
@@ -211,11 +253,10 @@ export default function AdminClubDetail() {
             </View>
           </View>
 
-          {/* Stats row */}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Ionicons name="people" size={20} color={Colors.accent} />
-              <Text style={styles.statValue}>{club.members.length}</Text>
+              <Text style={styles.statValue}>{totalCount}</Text>
               <Text style={styles.statLabel}>Membri</Text>
             </View>
             <View style={styles.statDivider} />
@@ -234,12 +275,13 @@ export default function AdminClubDetail() {
             </View>
           </View>
 
-          {/* Members section title */}
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Membri ({club.members.length})</Text>
+            <Text style={styles.sectionTitle}>
+              Membri ({allMembers.length}{hasMore ? ` di ${totalCount}` : ""})
+            </Text>
           </View>
 
-          {club.members.length === 0 && (
+          {totalCount === 0 && (
             <View style={styles.emptyMembersWrap}>
               <Ionicons name="people-outline" size={40} color={Colors.border} />
               <Text style={styles.emptyMembersText}>Nessun membro ancora</Text>
@@ -248,18 +290,38 @@ export default function AdminClubDetail() {
         </>
       }
       ListFooterComponent={
-        <View style={[styles.dangerZone, { marginBottom: insets.bottom + 20 }]}>
-          <Text style={styles.dangerTitle}>Zona pericolosa</Text>
-          <TouchableOpacity
-            style={styles.deleteBtn}
-            onPress={handleDeleteClub}
-            disabled={deleteClubMutation.isPending}
-          >
-            <MaterialIcons name="delete-forever" size={20} color="#fff" />
-            <Text style={styles.deleteBtnText}>
-              {deleteClubMutation.isPending ? "Eliminazione..." : "Elimina questo club"}
-            </Text>
-          </TouchableOpacity>
+        <View style={{ marginHorizontal: 14 }}>
+          {hasMore && (
+            <TouchableOpacity
+              style={[styles.loadMoreBtn, loadingMore && { opacity: 0.6 }]}
+              onPress={loadMore}
+              disabled={loadingMore}
+            >
+              {loadingMore ? (
+                <ActivityIndicator size="small" color={Colors.accent} />
+              ) : (
+                <>
+                  <Ionicons name="chevron-down" size={16} color={Colors.accent} />
+                  <Text style={styles.loadMoreText}>
+                    Carica altri {Math.min(remaining, PAGE_SIZE)} membri
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+          <View style={[styles.dangerZone, { marginTop: 24, marginBottom: insets.bottom + 20 }]}>
+            <Text style={styles.dangerTitle}>Zona pericolosa</Text>
+            <TouchableOpacity
+              style={styles.deleteBtn}
+              onPress={handleDeleteClub}
+              disabled={deleteClubMutation.isPending}
+            >
+              <MaterialIcons name="delete-forever" size={20} color="#fff" />
+              <Text style={styles.deleteBtnText}>
+                {deleteClubMutation.isPending ? "Eliminazione..." : "Elimina questo club"}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       }
     />
@@ -348,9 +410,24 @@ const styles = StyleSheet.create({
   roleBadgeText: { fontFamily: "Inter_600SemiBold", fontSize: 10 },
   emptyMembersWrap: { alignItems: "center", paddingVertical: 32, gap: 10 },
   emptyMembersText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary },
+  loadMoreBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: Colors.accent + "44",
+    marginTop: 4,
+  },
+  loadMoreText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.accent,
+  },
   dangerZone: {
-    margin: 14,
-    marginTop: 24,
     padding: 16,
     backgroundColor: Colors.error + "10",
     borderRadius: 14,

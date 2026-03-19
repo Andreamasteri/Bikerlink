@@ -1661,11 +1661,14 @@ router.get("/fake-users/conversations/:convId/messages", async (req: Request, re
 router.get("/motoclubs", async (_req: Request, res: Response) => {
   try {
     const clubs = await db.select().from(motoClubs).orderBy(desc(motoClubs.createdAt));
-    const result = await Promise.all(clubs.map(async (c) => {
-      const members = await db.select().from(motoClubMembers)
-        .where(and(eq(motoClubMembers.clubId, c.id), eq(motoClubMembers.status, "active")));
-      return { ...c, memberCount: members.length };
-    }));
+    if (clubs.length === 0) return res.json([]);
+    const memberCounts = await db
+      .select({ clubId: motoClubMembers.clubId, memberCount: count(motoClubMembers.id) })
+      .from(motoClubMembers)
+      .where(eq(motoClubMembers.status, "active"))
+      .groupBy(motoClubMembers.clubId);
+    const countMap = new Map(memberCounts.map((r) => [r.clubId, Number(r.memberCount)]));
+    const result = clubs.map((c) => ({ ...c, memberCount: countMap.get(c.id) ?? 0 }));
     return res.json(result);
   } catch (e) {
     return res.status(500).json({ message: "Errore interno" });
@@ -1771,8 +1774,16 @@ router.post("/motoclubs/requests/:id/reject", async (req: Request, res: Response
 router.get("/motoclubs/:id", async (req: Request, res: Response) => {
   try {
     const clubId = req.params.id;
+    const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10) || 50, 100);
+    const offset = Math.max(parseInt(String(req.query.offset ?? "0"), 10) || 0, 0);
+
     const [club] = await db.select().from(motoClubs).where(eq(motoClubs.id, clubId)).limit(1);
     if (!club) return res.status(404).json({ message: "Club non trovato" });
+
+    const [{ totalCount }] = await db
+      .select({ totalCount: count(motoClubMembers.id) })
+      .from(motoClubMembers)
+      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active")));
 
     const memberships = await db
       .select({
@@ -1790,9 +1801,12 @@ router.get("/motoclubs/:id", async (req: Request, res: Response) => {
       .from(motoClubMembers)
       .innerJoin(users, eq(motoClubMembers.userId, users.id))
       .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active")))
-      .orderBy(motoClubMembers.joinedAt);
+      .orderBy(motoClubMembers.joinedAt)
+      .limit(limit)
+      .offset(offset);
 
-    return res.json({ ...club, members: memberships });
+    const total = Number(totalCount);
+    return res.json({ ...club, members: memberships, totalCount: total, hasMore: offset + limit < total });
   } catch (e) {
     return res.status(500).json({ message: "Errore interno" });
   }

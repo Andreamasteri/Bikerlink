@@ -9842,10 +9842,10 @@ router17.get("/fake-users/conversations/:convId/messages", async (req, res) => {
 router17.get("/motoclubs", async (_req, res) => {
   try {
     const clubs = await db.select().from(motoClubs).orderBy((0, import_drizzle_orm8.desc)(motoClubs.createdAt));
-    const result = await Promise.all(clubs.map(async (c) => {
-      const members = await db.select().from(motoClubMembers).where((0, import_drizzle_orm8.and)((0, import_drizzle_orm8.eq)(motoClubMembers.clubId, c.id), (0, import_drizzle_orm8.eq)(motoClubMembers.status, "active")));
-      return { ...c, memberCount: members.length };
-    }));
+    if (clubs.length === 0) return res.json([]);
+    const memberCounts = await db.select({ clubId: motoClubMembers.clubId, memberCount: (0, import_drizzle_orm8.count)(motoClubMembers.id) }).from(motoClubMembers).where((0, import_drizzle_orm8.eq)(motoClubMembers.status, "active")).groupBy(motoClubMembers.clubId);
+    const countMap = new Map(memberCounts.map((r) => [r.clubId, Number(r.memberCount)]));
+    const result = clubs.map((c) => ({ ...c, memberCount: countMap.get(c.id) ?? 0 }));
     return res.json(result);
   } catch (e) {
     return res.status(500).json({ message: "Errore interno" });
@@ -9930,8 +9930,11 @@ router17.post("/motoclubs/requests/:id/reject", async (req, res) => {
 router17.get("/motoclubs/:id", async (req, res) => {
   try {
     const clubId = req.params.id;
+    const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10) || 50, 100);
+    const offset = Math.max(parseInt(String(req.query.offset ?? "0"), 10) || 0, 0);
     const [club] = await db.select().from(motoClubs).where((0, import_drizzle_orm8.eq)(motoClubs.id, clubId)).limit(1);
     if (!club) return res.status(404).json({ message: "Club non trovato" });
+    const [{ totalCount }] = await db.select({ totalCount: (0, import_drizzle_orm8.count)(motoClubMembers.id) }).from(motoClubMembers).where((0, import_drizzle_orm8.and)((0, import_drizzle_orm8.eq)(motoClubMembers.clubId, clubId), (0, import_drizzle_orm8.eq)(motoClubMembers.status, "active")));
     const memberships = await db.select({
       membershipId: motoClubMembers.id,
       userId: motoClubMembers.userId,
@@ -9943,8 +9946,9 @@ router17.get("/motoclubs/:id", async (req, res) => {
       avatarUrl: users.avatarUrl,
       country: users.country,
       isFake: users.isFake
-    }).from(motoClubMembers).innerJoin(users, (0, import_drizzle_orm8.eq)(motoClubMembers.userId, users.id)).where((0, import_drizzle_orm8.and)((0, import_drizzle_orm8.eq)(motoClubMembers.clubId, clubId), (0, import_drizzle_orm8.eq)(motoClubMembers.status, "active"))).orderBy(motoClubMembers.joinedAt);
-    return res.json({ ...club, members: memberships });
+    }).from(motoClubMembers).innerJoin(users, (0, import_drizzle_orm8.eq)(motoClubMembers.userId, users.id)).where((0, import_drizzle_orm8.and)((0, import_drizzle_orm8.eq)(motoClubMembers.clubId, clubId), (0, import_drizzle_orm8.eq)(motoClubMembers.status, "active"))).orderBy(motoClubMembers.joinedAt).limit(limit).offset(offset);
+    const total = Number(totalCount);
+    return res.json({ ...club, members: memberships, totalCount: total, hasMore: offset + limit < total });
   } catch (e) {
     return res.status(500).json({ message: "Errore interno" });
   }
