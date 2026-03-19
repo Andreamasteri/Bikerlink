@@ -209,7 +209,7 @@ export default function ReadyToRideScreen() {
               <ActivityIndicator color="#fff" size="small" />
             ) : (
               <Ionicons
-                name={isGhostMode ? "eye-off" : "eye-off-outline"}
+                name={isGhostMode ? "eye-off" : "eye"}
                 size={20}
                 color="#fff"
               />

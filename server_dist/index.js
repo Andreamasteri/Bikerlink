@@ -4492,7 +4492,7 @@ router2.get("/online-list", requireAuth, async (req, res) => {
       const { eq: eq9, and: and6, lt, or: or3, isNull, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const offlineConds = [eq9(usersTable.status, "active"), or3(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt))];
+      const offlineConds = [eq9(usersTable.status, "active"), or3(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt)), eq9(usersTable.ghostMode, false)];
       if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
       const offlineResults = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(usersTable).leftJoin(profilesTable, eq9(profilesTable.userId, usersTable.id)).where(and6(...offlineConds)).orderBy(sqlTag`distance`);
       const offlineOnly = offlineResults.filter((r) => !onlineIdSet.has(r.user.id) && !blockedIds.has(r.user.id));
@@ -4608,7 +4608,7 @@ router2.get("/biker-available-list", requireAuth, async (req, res) => {
       const { eq: eq9, and: and6, or: or3, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const bikerConds = [eq9(usersTable.status, "active"), or3(eq9(usersTable.userType, "biker"), eq9(usersTable.userType, "coppia"))];
+      const bikerConds = [eq9(usersTable.status, "active"), or3(eq9(usersTable.userType, "biker"), eq9(usersTable.userType, "coppia")), eq9(usersTable.ghostMode, false)];
       if (countriesParam && countriesParam.length > 0) bikerConds.push(inArr(usersTable.country, countriesParam));
       const allBikers = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq9(usersTable.id, profilesTable.userId)).where(and6(...bikerConds)).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));
@@ -4665,7 +4665,7 @@ router2.get("/zavorrine-available-list", requireAuth, async (req, res) => {
       const { eq: eq9, and: and6, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const zavConds = [eq9(usersTable.status, "active"), eq9(usersTable.userType, "zavorrina")];
+      const zavConds = [eq9(usersTable.status, "active"), eq9(usersTable.userType, "zavorrina"), eq9(usersTable.ghostMode, false)];
       if (countriesParam && countriesParam.length > 0) zavConds.push(inArr(usersTable.country, countriesParam));
       const allZav = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq9(usersTable.id, profilesTable.userId)).where(and6(...zavConds)).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));

@@ -357,7 +357,7 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
       const distanceExpr = lat != null && lng != null
         ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
         : sqlTag<number>`0`.as("distance");
-      const offlineConds: any[] = [eq(usersTable.status, "active"), or(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt))];
+      const offlineConds: any[] = [eq(usersTable.status, "active"), or(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt)), eq(usersTable.ghostMode, false)];
       if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
       const offlineResults = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
@@ -486,7 +486,7 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
       const distanceExpr = lat != null && lng != null
         ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
         : sqlTag<number>`0`.as("distance");
-      const bikerConds: any[] = [eq(usersTable.status, "active"), or(eq(usersTable.userType, "biker"), eq(usersTable.userType, "coppia"))];
+      const bikerConds: any[] = [eq(usersTable.status, "active"), or(eq(usersTable.userType, "biker"), eq(usersTable.userType, "coppia")), eq(usersTable.ghostMode, false)];
       if (countriesParam && countriesParam.length > 0) bikerConds.push(inArr(usersTable.country, countriesParam));
       const allBikers = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
@@ -551,7 +551,7 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
       const distanceExpr = lat != null && lng != null
         ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
         : sqlTag<number>`0`.as("distance");
-      const zavConds: any[] = [eq(usersTable.status, "active"), eq(usersTable.userType, "zavorrina")];
+      const zavConds: any[] = [eq(usersTable.status, "active"), eq(usersTable.userType, "zavorrina"), eq(usersTable.ghostMode, false)];
       if (countriesParam && countriesParam.length > 0) zavConds.push(inArr(usersTable.country, countriesParam));
       const allZav = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
