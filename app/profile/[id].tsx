@@ -157,6 +157,20 @@ export default function PublicProfileScreen() {
             />
           </View>
           <Text style={[styles.nickname, { color }]}>{profile.nickname}</Text>
+          <View style={styles.statusRow}>
+            <View style={[styles.statusBadge, { backgroundColor: profile.isOnline ? "#4CAF5022" : "#66666622" }]}>
+              <View style={[styles.statusDot, { backgroundColor: profile.isOnline ? "#4CAF50" : "#888" }]} />
+              <Text style={[styles.statusBadgeText, { color: profile.isOnline ? "#4CAF50" : "#888" }]}>
+                {profile.isOnline ? "Online" : "Offline"}
+              </Text>
+            </View>
+            <View style={[styles.statusBadge, { backgroundColor: profile.isAvailable ? "#FF660022" : "#66666622" }]}>
+              <View style={[styles.statusDot, { backgroundColor: profile.isAvailable ? "#FF6600" : "#888" }]} />
+              <Text style={[styles.statusBadgeText, { color: profile.isAvailable ? "#FF6600" : "#888" }]}>
+                {profile.isAvailable ? "Disponibile" : "Non disponibile"}
+              </Text>
+            </View>
+          </View>
           <Text style={styles.userType}>
             {getUserTypeLabel(profile.userType)}
             {profile.sex ? ` · ${profile.sex === "M" ? "Maschio" : "Femmina"}` : ""}
@@ -237,6 +251,10 @@ const styles = StyleSheet.create({
   avatarSection: { alignItems: "center", paddingTop: 24, paddingBottom: 16 },
   avatar: { width: 96, height: 96, borderRadius: 48, justifyContent: "center", alignItems: "center", marginBottom: 12 },
   nickname: { fontSize: 24, fontFamily: "Inter_700Bold" },
+  statusRow: { flexDirection: "row" as const, gap: 6, marginTop: 8, marginBottom: 2 },
+  statusBadge: { flexDirection: "row" as const, alignItems: "center" as const, gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  statusDot: { width: 7, height: 7, borderRadius: 3.5 },
+  statusBadgeText: { fontSize: 11, fontFamily: "Inter_500Medium" },
   userType: { fontSize: 15, fontFamily: "Inter_500Medium", color: Colors.textSecondary, marginTop: 4 },
   locationRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 },
   locationText: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary },

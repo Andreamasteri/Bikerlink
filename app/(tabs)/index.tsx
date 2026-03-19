@@ -278,24 +278,27 @@ export default function MapScreen() {
   const onlineCountQuery = useQuery<{ count: number }>({
     queryKey: ["/api/users/online-count", countriesQueryParam],
     queryFn: () => fetch(new URL(`/api/users/online-count${countriesQueryParam ? `?countries=${countriesQueryParam}` : ""}`, getApiUrl()).toString(), { credentials: "include" }).then(r => r.json()),
-    staleTime: 300000,
-    refetchInterval: 300000,
+    staleTime: 60000,
+    refetchInterval: 60000,
+    refetchOnWindowFocus: true,
     enabled: isAuthenticated && mapReady && countriesLoaded,
   });
 
   const bikerCountQuery = useQuery<{ count: number }>({
     queryKey: ["/api/users/biker-available-count", countriesQueryParam],
     queryFn: () => fetch(new URL(`/api/users/biker-available-count${countriesQueryParam ? `?countries=${countriesQueryParam}` : ""}`, getApiUrl()).toString(), { credentials: "include" }).then(r => r.json()),
-    staleTime: 300000,
-    refetchInterval: 300000,
+    staleTime: 60000,
+    refetchInterval: 60000,
+    refetchOnWindowFocus: true,
     enabled: isAuthenticated && mapReady && countriesLoaded,
   });
 
   const zavCountQuery = useQuery<{ count: number }>({
     queryKey: ["/api/users/zavorrine-available-count", countriesQueryParam],
     queryFn: () => fetch(new URL(`/api/users/zavorrine-available-count${countriesQueryParam ? `?countries=${countriesQueryParam}` : ""}`, getApiUrl()).toString(), { credentials: "include" }).then(r => r.json()),
-    staleTime: 300000,
-    refetchInterval: 300000,
+    staleTime: 60000,
+    refetchInterval: 60000,
+    refetchOnWindowFocus: true,
     enabled: isAuthenticated && mapReady && countriesLoaded,
   });
 
@@ -1101,6 +1104,22 @@ export default function MapScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.detailName}>{selectedUser?.nickname}</Text>
                     <Text style={styles.detailType}>{getUserTypeLabel(selectedUser || {})}</Text>
+                    {selectedUserDetail && (
+                      <View style={{ flexDirection: "row", gap: 6, marginTop: 4 }}>
+                        <View style={[styles.statusBadge, { backgroundColor: selectedUserDetail.isOnline ? "#4CAF5022" : "#66666622" }]}>
+                          <View style={[styles.statusDot, { backgroundColor: selectedUserDetail.isOnline ? Colors.success : "#888" }]} />
+                          <Text style={[styles.statusBadgeText, { color: selectedUserDetail.isOnline ? Colors.success : "#888" }]}>
+                            {selectedUserDetail.isOnline ? "Online" : "Offline"}
+                          </Text>
+                        </View>
+                        <View style={[styles.statusBadge, { backgroundColor: selectedUserDetail.isAvailable ? "#FF660022" : "#66666622" }]}>
+                          <View style={[styles.statusDot, { backgroundColor: selectedUserDetail.isAvailable ? Colors.accent : "#888" }]} />
+                          <Text style={[styles.statusBadgeText, { color: selectedUserDetail.isAvailable ? Colors.accent : "#888" }]}>
+                            {selectedUserDetail.isAvailable ? "Disponibile" : "Non disponibile"}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
                   </View>
                   <Pressable onPress={() => setSelectedUser(null)}>
                     <Ionicons name="close" size={24} color={Colors.textSecondary} />
@@ -1920,5 +1939,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
     color: Colors.background,
+  },
+  statusBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
   },
 });

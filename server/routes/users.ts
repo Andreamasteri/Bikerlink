@@ -265,6 +265,8 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
     const motorcycles = await storage.getUserMotorcycles(userId);
     const photos = await storage.getUserPhotos(userId);
     const approvedPhotos = photos.filter((p) => p.isApproved);
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const isOnline = targetUser.lastLoginAt != null && new Date(targetUser.lastLoginAt) >= fifteenMinutesAgo;
     return res.json({
       id: targetUser.id,
       nickname: targetUser.nickname,
@@ -278,6 +280,8 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
       bio: profile?.bio || null,
       motorcycles,
       photos: approvedPhotos,
+      isOnline,
+      isAvailable: profile?.isAvailable || false,
     });
   } catch (error) {
     console.error("Get public user profile error:", error);
