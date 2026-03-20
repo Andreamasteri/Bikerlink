@@ -103,7 +103,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       birthYear: data.birthYear,
       region: data.region,
       country: data.country,
-      eulaAccepted: data.eulaAccepted,
+      eulaAccepted: true,
       privacyAccepted: true,
       consentAcceptedAt: new Date(),
       invitationCode: data.invitationCode,
