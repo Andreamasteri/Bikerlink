@@ -28,6 +28,8 @@ const en: Record<string, string> = {
   "register.step3.title": "Your details",
   "register.step4.title": "Terms and conditions",
   "register.step4.accept": "I accept the terms and conditions",
+  "register.step4.acceptPrivacy": "I have read and accept the Privacy Policy",
+  "register.step4.privacyRequired": "You must accept the Privacy Policy",
   "register.next": "Next",
   "register.back": "Back",
   "register.complete": "Complete registration",

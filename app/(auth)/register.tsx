@@ -129,6 +129,7 @@ export default function RegisterScreen() {
   const [region, setRegion] = useState("");
   const [showRegions, setShowRegions] = useState(false);
   const [eulaAccepted, setEulaAccepted] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   const [inviteCode, setInviteCode] = useState(params.inviteCode ?? "");
   const [invitePreview, setInvitePreview] = useState<{ code: string; label: string | null; giftMessage: string | null } | null>(null);
@@ -209,6 +210,10 @@ export default function RegisterScreen() {
     } else if (step === 4) {
       if (!eulaAccepted) {
         setError("Devi accettare i termini e le condizioni");
+        return false;
+      }
+      if (!privacyAccepted) {
+        setError(t("register.step4.privacyRequired"));
         return false;
       }
     }
@@ -713,7 +718,19 @@ export default function RegisterScreen() {
         </View>
         <Text style={styles.checkboxLabel}>{t("register.step4.accept")}</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => router.push("/privacy-policy")}>
+
+      <TouchableOpacity
+        style={styles.checkboxRow}
+        onPress={() => setPrivacyAccepted(!privacyAccepted)}
+        testID="privacy-checkbox"
+      >
+        <View style={[styles.checkbox, privacyAccepted && styles.checkboxChecked]}>
+          {privacyAccepted && <Ionicons name="checkmark" size={16} color={Colors.background} />}
+        </View>
+        <Text style={styles.checkboxLabel}>{t("register.step4.acceptPrivacy")}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => router.push("/privacy-policy")} style={styles.privacyLinkRow}>
+        <Ionicons name="document-text-outline" size={14} color={Colors.accent} />
         <Text style={styles.privacyLink}>Privacy Policy</Text>
       </TouchableOpacity>
     </View>
@@ -1157,11 +1174,17 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   privacyLink: {
-    marginTop: 10,
+    marginTop: 0,
     fontSize: 12,
     color: Colors.accent,
-    textAlign: "center" as const,
     textDecorationLine: "underline" as const,
+  },
+  privacyLinkRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    marginTop: 6,
+    marginLeft: 36,
   },
   inviteSection: {
     marginTop: 8,

@@ -28,6 +28,8 @@ const de: Record<string, string> = {
   "register.step3.title": "Deine Daten",
   "register.step4.title": "Geschäftsbedingungen",
   "register.step4.accept": "Ich akzeptiere die Geschäftsbedingungen",
+  "register.step4.acceptPrivacy": "Ich habe die Datenschutzerklärung gelesen und akzeptiere sie",
+  "register.step4.privacyRequired": "Du musst die Datenschutzerklärung akzeptieren",
   "register.next": "Weiter",
   "register.back": "Zurück",
   "register.complete": "Registrierung abschließen",
