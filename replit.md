@@ -267,11 +267,16 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 
 ## Generazione APK Android (EAS Build)
 
-### Ultimo APK stabile (Build #7 — development build)
-- **Build #7** completato — 2026-03-20 — Profilo: development
+### Ultimo APK stabile (Build #8 — preview build)
+- **Build #8** completato — 2026-03-20 — Profilo: preview (APK standalone)
+- **APK download**: https://expo.dev/artifacts/eas/7kvPoiveTzSQzJxg4kcUgL.apk
+- **ID build**: 335056c5-a45f-44af-8124-a5936f3c2eea
+- **Cache**: --clear-cache (tutti i moduli nativi freshly compilati)
+- **Log completo**: `eas-build-log.txt`
+
+### Build #7 (precedente — development build)
 - **APK download**: https://expo.dev/artifacts/eas/uHdV4BHuYr2vMT8r7GbVNu.apk
 - **ID build**: e881560b-f36c-4494-bd58-586b08078b8c
-- **Log completo**: `eas-build-log.txt`
 
 ### Configurazione stabile (CRITICA — non modificare)
 - `newArchEnabled: false` — **OBBLIGATORIO**: `react-native-keyboard-controller 1.18.5` crasha su dispositivi fisici con New Architecture

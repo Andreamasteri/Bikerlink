@@ -49,7 +49,15 @@ Build #7 (FINISHED ✅) — 2026-03-20 18:30 — Profilo: development (APK con e
   Log analisi: NESSUN ERRORE (solo deprecation warnings non fatali)
   Download: https://expo.dev/artifacts/eas/uHdV4BHuYr2vMT8r7GbVNu.apk
 
-CONFIGURAZIONE FINALE STABILE (Build #7):
+Build #8 (FINISHED ✅) — 2026-03-20 22:05 — Profilo: preview (APK standalone)
+  ID: 335056c5-a45f-44af-8124-a5936f3c2eea
+  Cache: --clear-cache (moduli nativi freshly compilati)
+  Moduli nativi aggiuntivi rispetto a Build #7: expo-camera ^16.1.11, expo-screen-orientation ^8.1.7, expo-file-system ^19.0.21
+  Audit pre-build: tutto OK — nessun problema critico rilevato
+  Profilo: preview (APK standalone, NO expo-dev-client launcher richiesto)
+  Download: https://expo.dev/artifacts/eas/7kvPoiveTzSQzJxg4kcUgL.apk
+
+CONFIGURAZIONE FINALE STABILE (Build #8):
   newArchEnabled: false (OBBLIGATORIO — keyboard-controller 1.18.5 non compatibile con New Arch)
   react-native-reanimated: ~3.19.5 (3.x per compatibilità old arch)
   react-native-worklets: RIMOSSO (non necessario con reanimated 3.x)
