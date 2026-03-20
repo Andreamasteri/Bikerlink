@@ -810,7 +810,7 @@ export default function ProfileScreen() {
 
       <View style={styles.section}>
         <MenuItem icon="shield-checkmark-outline" label={t("profile.revokeConsent")} onPress={() => setShowRevokeConsentModal(true)} color={Colors.accentRed} />
-        <MenuItem icon="trash-outline" label={t("common.delete") + " account"} onPress={handleDeleteAccount} color={Colors.accentRed} />
+        <MenuItem icon="trash-outline" label={t("profile.deleteAccount")} onPress={handleDeleteAccount} color={Colors.accentRed} />
       </View>
 
       <View style={[styles.section, { marginTop: 8 }]}>
