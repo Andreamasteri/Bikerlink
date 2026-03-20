@@ -513,7 +513,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         region: user.region ?? null,
         role: user.role,
         status: user.status,
-        createdAt: null,
+        eulaAccepted: user.eulaAccepted,
+        privacyAccepted: user.privacyAccepted,
+        consentAcceptedAt: user.consentAcceptedAt ?? null,
+        createdAt: user.createdAt ?? null,
       },
     };
 

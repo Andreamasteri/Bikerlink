@@ -105,6 +105,8 @@ var init_schema = __esm({
       avatarUrl: (0, import_pg_core.text)("avatar_url"),
       emailVerified: (0, import_pg_core.boolean)("email_verified").notNull().default(false),
       eulaAccepted: (0, import_pg_core.boolean)("eula_accepted").notNull().default(false),
+      privacyAccepted: (0, import_pg_core.boolean)("privacy_accepted").notNull().default(false),
+      consentAcceptedAt: (0, import_pg_core.timestamp)("consent_accepted_at"),
       deletionRequestedAt: (0, import_pg_core.timestamp)("deletion_requested_at"),
       deletionScheduledFor: (0, import_pg_core.timestamp)("deletion_scheduled_for"),
       invitationCode: (0, import_pg_core.varchar)("invitation_code", { length: 50 }),
@@ -3916,6 +3918,8 @@ router.post("/register", registerLimiter, async (req, res) => {
       region: data.region,
       country: data.country,
       eulaAccepted: data.eulaAccepted,
+      privacyAccepted: true,
+      consentAcceptedAt: /* @__PURE__ */ new Date(),
       invitationCode: data.invitationCode,
       isPrimal
     });
@@ -11485,7 +11489,10 @@ async function registerRoutes(app2) {
         region: user.region ?? null,
         role: user.role,
         status: user.status,
-        createdAt: null
+        eulaAccepted: user.eulaAccepted,
+        privacyAccepted: user.privacyAccepted,
+        consentAcceptedAt: user.consentAcceptedAt ?? null,
+        createdAt: user.createdAt ?? null
       }
     };
     const json = JSON.stringify(exportData, null, 2);

@@ -104,6 +104,8 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       region: data.region,
       country: data.country,
       eulaAccepted: data.eulaAccepted,
+      privacyAccepted: true,
+      consentAcceptedAt: new Date(),
       invitationCode: data.invitationCode,
       isPrimal,
     });

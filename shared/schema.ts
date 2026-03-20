@@ -32,6 +32,8 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   emailVerified: boolean("email_verified").notNull().default(false),
   eulaAccepted: boolean("eula_accepted").notNull().default(false),
+  privacyAccepted: boolean("privacy_accepted").notNull().default(false),
+  consentAcceptedAt: timestamp("consent_accepted_at"),
   deletionRequestedAt: timestamp("deletion_requested_at"),
   deletionScheduledFor: timestamp("deletion_scheduled_for"),
   invitationCode: varchar("invitation_code", { length: 50 }),
