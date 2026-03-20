@@ -8173,88 +8173,82 @@ async function runFakeZavorrineRotation() {
     console.error("Fake zavorrine rotation error:", error);
   }
 }
-var BASE_INTERVAL_MS = 60 * 1e3;
-var MAX_INTERVAL_MS = 16 * 60 * 1e3;
-var LOAD_THRESHOLD = 0.85;
-var currentIntervalMs = BASE_INTERVAL_MS;
-var adminNotifiedAt = 0;
 var lastCycleMeta = null;
+var lastMatchingRunAt = 0;
+var isMatchingRunning = false;
+var DEBOUNCE_MS = 5 * 60 * 1e3;
 function getLastMatchingCycleMeta() {
   return lastCycleMeta;
 }
-async function notifyAdminOverload(intervalSec, cycleDurationSec) {
+function triggerMatchingRun() {
   const now = Date.now();
-  if (now - adminNotifiedAt < 30 * 60 * 1e3) return;
-  try {
-    const adminUser = await storage.getUserByNickname("admin");
-    if (!adminUser) return;
-    await storage.createNotification({
-      userId: adminUser.id,
-      title: "Matching Engine sotto carico",
-      body: `Il ciclo di matching ha impiegato ${cycleDurationSec.toFixed(1)}s. L'intervallo \xE8 stato raddoppiato a ${intervalSec}s. \xC8 tempo di implementare una soluzione per i troppi calcoli!`,
-      notificationType: "system",
-      referenceType: "system",
-      referenceId: "matching-engine"
-    });
-    adminNotifiedAt = now;
-    console.warn(`[Matching] Notifica inviata all'admin: intervallo raddoppiato a ${intervalSec}s`);
-  } catch (err) {
-    console.error("[Matching] Errore invio notifica admin:", err);
+  if (isMatchingRunning) {
+    return { started: false, reason: "already_running" };
   }
+  if (now - lastMatchingRunAt < DEBOUNCE_MS) {
+    const secondsAgo = Math.round((now - lastMatchingRunAt) / 1e3);
+    return { started: false, reason: `debounced (last run ${secondsAgo}s ago, min interval ${DEBOUNCE_MS / 1e3}s)` };
+  }
+  isMatchingRunning = true;
+  lastMatchingRunAt = now;
+  (async () => {
+    const cycleStart = Date.now();
+    console.log("[Matching] Ciclo on-demand avviato");
+    try {
+      const expired = await runCleanup();
+      if (expired > 0) console.log(`[Matching] Scadute ${expired} proposte`);
+      try {
+        const deleted = await storage.deleteExpiredProposals();
+        if (deleted > 0) console.log(`[Matching] Eliminate ${deleted} proposte scadute`);
+      } catch (err) {
+        console.error("[Matching] Errore eliminazione proposte scadute:", err);
+      }
+      const autoMatchSetting = await storage.getAppSetting("auto_matching_enabled");
+      const autoMatchEnabled = autoMatchSetting?.value !== "false";
+      let garageMatches = 0;
+      let bikerBikerMatchCount = 0;
+      if (autoMatchEnabled) {
+        const matches = await runMatching();
+        if (matches > 0) console.log(`[Matching] Found ${matches} new proposal matches`);
+        garageMatches = await runWishlistMatching();
+        if (garageMatches > 0) console.log(`[Matching] Found ${garageMatches} new garage matches`);
+        bikerBikerMatchCount = await runBikerBikerMatching();
+        if (bikerBikerMatchCount > 0) console.log(`[Matching] Found ${bikerBikerMatchCount} new biker-biker matches`);
+      } else {
+        console.log("[Matching] Auto matching disabilitato dall'admin, skip");
+      }
+      const cycleDuration = Date.now() - cycleStart;
+      lastCycleMeta = {
+        completedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        durationMs: cycleDuration,
+        zavarrinaMatchesNew: garageMatches,
+        bikerBikerMatchesNew: bikerBikerMatchCount
+      };
+      console.log(`[Matching] Ciclo on-demand completato in ${(cycleDuration / 1e3).toFixed(1)}s`);
+    } catch (err) {
+      console.error("[Matching] Errore nel ciclo on-demand:", err);
+    } finally {
+      isMatchingRunning = false;
+    }
+  })();
+  return { started: true };
 }
 function startMatchingEngine() {
-  console.log(`Matching engine started (${currentIntervalMs / 1e3}s interval)`);
-  const run = async () => {
-    const cycleStart = Date.now();
-    const expired = await runCleanup();
-    if (expired > 0) console.log(`Expired ${expired} proposals`);
-    try {
-      const deleted = await storage.deleteExpiredProposals();
-      if (deleted > 0) console.log(`Deleted ${deleted} expired proposals`);
-    } catch (err) {
-      console.error("Error deleting expired proposals:", err);
-    }
-    const autoMatchSetting = await storage.getAppSetting("auto_matching_enabled");
-    const autoMatchEnabled = autoMatchSetting?.value !== "false";
-    let garageMatches = 0;
-    let bikerBikerMatchCount = 0;
-    if (autoMatchEnabled) {
-      const matches = await runMatching();
-      if (matches > 0) console.log(`Found ${matches} new proposal matches`);
-      garageMatches = await runWishlistMatching();
-      if (garageMatches > 0) console.log(`Found ${garageMatches} new garage matches`);
-      bikerBikerMatchCount = await runBikerBikerMatching();
-      if (bikerBikerMatchCount > 0) console.log(`Found ${bikerBikerMatchCount} new biker-biker matches`);
-    } else {
-      console.log("Auto matching disabled by admin, skipping");
-    }
-    const cycleDuration = Date.now() - cycleStart;
-    lastCycleMeta = {
-      completedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      durationMs: cycleDuration,
-      zavarrinaMatchesNew: garageMatches,
-      bikerBikerMatchesNew: bikerBikerMatchCount
-    };
-    const loadRatio = cycleDuration / currentIntervalMs;
-    console.log(`[Matching] Ciclo completato in ${(cycleDuration / 1e3).toFixed(1)}s (${(loadRatio * 100).toFixed(0)}% dell'intervallo di ${currentIntervalMs / 1e3}s)`);
-    if (loadRatio > LOAD_THRESHOLD && currentIntervalMs < MAX_INTERVAL_MS) {
-      const oldInterval = currentIntervalMs;
-      currentIntervalMs = Math.min(currentIntervalMs * 2, MAX_INTERVAL_MS);
-      console.warn(`[Matching] CARICO ELEVATO: ciclo ${(cycleDuration / 1e3).toFixed(1)}s > 85% di ${oldInterval / 1e3}s. Intervallo raddoppiato a ${currentIntervalMs / 1e3}s`);
-      await notifyAdminOverload(currentIntervalMs / 1e3, cycleDuration / 1e3);
-    } else if (loadRatio < 0.3 && currentIntervalMs > BASE_INTERVAL_MS) {
-      currentIntervalMs = Math.max(currentIntervalMs / 2, BASE_INTERVAL_MS);
-      console.log(`[Matching] Carico basso: intervallo ridotto a ${currentIntervalMs / 1e3}s`);
-    }
-    scheduleNext();
-  };
-  const scheduleNext = () => {
-    setTimeout(run, currentIntervalMs);
-  };
-  run();
+  console.log("[Matching] Engine avviato \u2014 modalit\xE0 on-demand (trigger da login utente)");
   runFakeZavorrineRotation();
   setInterval(runFakeZavorrineRotation, 5 * 60 * 1e3);
-  console.log("Fake zavorrine availability rotation started (5min interval)");
+  console.log("[Matching] Fake zavorrine availability rotation started (5min interval)");
+  setInterval(async () => {
+    try {
+      const expired = await runCleanup();
+      if (expired > 0) console.log(`[Cleanup] Scadute ${expired} proposte`);
+      const deleted = await storage.deleteExpiredProposals();
+      if (deleted > 0) console.log(`[Cleanup] Eliminate ${deleted} proposte scadute`);
+    } catch (err) {
+      console.error("[Cleanup] Errore pulizia oraria:", err);
+    }
+  }, 60 * 60 * 1e3);
+  console.log("[Matching] Cleanup orario proposte scadute avviato");
 }
 
 // server/routes/admin.ts
@@ -11557,6 +11551,13 @@ async function registerRoutes(app2) {
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Content-Type", "application/json");
     res.send(json);
+  });
+  app2.post("/api/matching/trigger", (req, res) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ message: "Non autenticato" });
+    }
+    const result = triggerMatchingRun();
+    res.json({ ok: true, ...result });
   });
   app2.get("/api/health", (_req, res) => {
     res.json({ status: "ok" });

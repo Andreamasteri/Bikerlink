@@ -27,6 +27,7 @@ import moderatorRoutes from "./routes/moderator";
 import customRoutesRouter from "./routes/custom-routes";
 import sosRoutes from "./routes/sos";
 import motoclubsRoutes from "./routes/motoclubs";
+import { triggerMatchingRun } from "./matching-engine";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const PgStore = connectPgSimple(session);
@@ -602,6 +603,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Content-Type", "application/json");
     res.send(json);
+  });
+
+  app.post("/api/matching/trigger", (req, res) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ message: "Non autenticato" });
+    }
+    const result = triggerMatchingRun();
+    res.json({ ok: true, ...result });
   });
 
   app.get("/api/health", (_req, res) => {
