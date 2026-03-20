@@ -1,0 +1,13 @@
+EAS Build Log — BikerLink Android APK
+======================================
+
+Build #1 (ERRORED) — 2026-03-20 12:22
+  ID: 740e5271-f1de-4e63-92a7-8ea13f9e1b5b
+  Causa: EAS_BUILD_UNKNOWN_GRADLE_ERROR — newArchEnabled: true incompatibile
+  URL: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/740e5271-f1de-4e63-92a7-8ea13f9e1b5b
+
+Build #2 (IN QUEUE) — 2026-03-20 12:40
+  ID: 793959ca-48a0-4894-92b2-314eb79286be
+  Fix: newArchEnabled: false + react-native-maps pinned a 1.18.0
+  URL: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/793959ca-48a0-4894-92b2-314eb79286be
+  Download APK: disponibile su expo.dev al termine del build (piano free: 20-40 min)
