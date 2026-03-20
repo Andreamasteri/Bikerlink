@@ -3872,7 +3872,7 @@ router.post("/register", registerLimiter, async (req, res) => {
       const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
       const age = currentYear - data.birthYear;
       if (age < 18) {
-        return res.status(403).json({ message: "Devi avere almeno 18 anni per registrarti" });
+        return res.status(400).json({ message: "Devi avere almeno 18 anni per registrarti" });
       }
     }
     const existingEmail = await storage.getUserByEmail(data.email);
