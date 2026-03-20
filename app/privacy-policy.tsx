@@ -58,7 +58,7 @@ I tuoi dati personali potranno essere condivisi con:
 
 - Syneco, in qualità di sponsor dell'applicazione, per finalità promozionali e di marketing legate ai servizi offerti tramite BikerLink.
 
-I dati non saranno trasferiti a terzi al di fuori dell'Unione Europea senza adeguate garanzie di protezione.
+I dati possono essere elaborati su infrastruttura cloud che può essere situata al di fuori dello Spazio Economico Europeo. In tali casi, il trasferimento è regolato dalle Clausole Contrattuali Standard approvate dalla Commissione Europea ai sensi dell'art. 46 GDPR.
 
 7. DIRITTI DELL'UTENTE
 
@@ -127,7 +127,7 @@ Your personal data may be shared with:
 
 - Syneco, as a sponsor of the application, for promotional and marketing purposes related to the services offered through BikerLink.
 
-Data will not be transferred to third parties outside the European Union without adequate safeguards.
+Data may be processed on cloud infrastructure that may be located outside the European Economic Area. In such cases, the transfer is governed by the Standard Contractual Clauses approved by the European Commission pursuant to Art. 46 GDPR.
 
 7. YOUR RIGHTS
 
@@ -196,7 +196,7 @@ Ihre personenbezogenen Daten können weitergegeben werden an:
 
 - Syneco, als Sponsor der Anwendung, für Werbe- und Marketingzwecke im Zusammenhang mit den über BikerLink angebotenen Diensten.
 
-Daten werden nicht ohne angemessene Schutzgarantien an Dritte außerhalb der Europäischen Union weitergegeben.
+Daten können auf Cloud-Infrastrukturen verarbeitet werden, die sich außerhalb des Europäischen Wirtschaftsraums befinden können. In solchen Fällen wird der Transfer durch die von der Europäischen Kommission genehmigten Standardvertragsklauseln gemäß Art. 46 DSGVO geregelt.
 
 7. IHRE RECHTE
 
@@ -265,7 +265,7 @@ Sus datos personales podrán compartirse con:
 
 - Syneco, en calidad de patrocinador de la aplicación, con fines promocionales y de marketing relacionados con los servicios ofrecidos a través de BikerLink.
 
-Los datos no serán transferidos a terceros fuera de la Unión Europea sin garantías adecuadas de protección.
+Los datos pueden ser tratados en infraestructura en la nube que puede estar ubicada fuera del Espacio Económico Europeo. En tales casos, la transferencia se rige por las Cláusulas Contractuales Tipo aprobadas por la Comisión Europea de conformidad con el art. 46 RGPD.
 
 7. DERECHOS DEL USUARIO
 
@@ -334,7 +334,7 @@ Vos données personnelles pourront être partagées avec :
 
 - Syneco, en qualité de sponsor de l'application, à des fins promotionnelles et marketing liées aux services proposés via BikerLink.
 
-Les données ne seront pas transférées à des tiers en dehors de l'Union européenne sans garanties de protection adéquates.
+Les données peuvent être traitées sur une infrastructure cloud pouvant être située en dehors de l'Espace économique européen. Dans ce cas, le transfert est régi par les Clauses Contractuelles Types approuvées par la Commission européenne conformément à l'art. 46 RGPD.
 
 7. DROITS DE L'UTILISATEUR
 

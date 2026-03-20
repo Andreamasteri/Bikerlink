@@ -11094,6 +11094,16 @@ async function registerRoutes(app2) {
   app2.use("/api/moderator", moderator_default);
   app2.use("/api/sos", sos_default);
   app2.use("/api/motoclubs", motoclubs_default);
+  app2.get("/privacy-policy", (_req, res) => {
+    const templatePath = import_node_path.default.resolve(
+      process.cwd(),
+      "server",
+      "templates",
+      "privacy-policy.html"
+    );
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.sendFile(templatePath);
+  });
   app2.get("/api/settings/privacy-policy", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("privacy_policy_text");

@@ -18,7 +18,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { t } from "@/lib/i18n";
+import { t, getAppLanguage } from "@/lib/i18n";
+import type { AppLanguage } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { getApiUrl } from "@/lib/query-client";
 
@@ -59,7 +60,8 @@ const PHONE_PREFIXES = [
   { code: "+91", country: "India" },
 ];
 
-const EULA_TEXT = `TERMINI E CONDIZIONI D'USO - BikerLink
+const EULA_TEXTS: Record<AppLanguage, string> = {
+  it: `TERMINI E CONDIZIONI D'USO - BikerLink
 
 1. ACCETTAZIONE DEI TERMINI
 Utilizzando l'app BikerLink, accetti integralmente i presenti termini e condizioni.
@@ -95,7 +97,160 @@ BikerLink è una piattaforma che connette motociclisti (biker) e passeggeri (zav
 BikerLink si riserva il diritto di modificare i presenti termini in qualsiasi momento.
 
 9. CONTATTI
-Per domande o segnalazioni: support@bikerlink.app`;
+Per domande o segnalazioni: support@bikerlink.app`,
+
+  en: `TERMS AND CONDITIONS OF USE - BikerLink
+
+1. ACCEPTANCE OF TERMS
+By using the BikerLink app, you fully accept these terms and conditions.
+
+2. DESCRIPTION OF SERVICE
+BikerLink is a platform that connects motorcyclists (bikers) and passengers (pillion riders) to share motorcycle travel experiences.
+
+3. REGISTRATION AND ACCOUNT
+- The user must provide truthful information during registration
+- You are responsible for the security of your credentials
+- You must be at least 18 years old to use the service
+
+4. USER CONDUCT
+- Any offensive, harassing or discriminatory behaviour is prohibited
+- Sharing inappropriate content is prohibited
+- Users must comply with road traffic laws
+
+5. PRIVACY AND PERSONAL DATA
+- Personal data is processed in accordance with the GDPR
+- GPS location is used only for app features
+- Uploaded photos are subject to moderation
+
+6. LIABILITY
+- BikerLink is not responsible for accidents during rides
+- Each user is responsible for their own safety
+- The use of helmets and protective gear is mandatory
+
+7. SPONSORS AND ADVERTISING
+- The app contains content sponsored by Syneco Lubrificanti
+- Advertising content is clearly identified
+
+8. CHANGES TO TERMS
+BikerLink reserves the right to modify these terms at any time.
+
+9. CONTACT
+For questions or reports: support@bikerlink.app`,
+
+  de: `NUTZUNGSBEDINGUNGEN - BikerLink
+
+1. ANNAHME DER BEDINGUNGEN
+Durch die Nutzung der BikerLink-App akzeptierst du diese Nutzungsbedingungen vollständig.
+
+2. BESCHREIBUNG DES DIENSTES
+BikerLink ist eine Plattform, die Motorradfahrer (Biker) und Mitfahrer (Soziusfahrer) verbindet, um gemeinsame Motorradreisen zu erleben.
+
+3. REGISTRIERUNG UND KONTO
+- Der Nutzer muss bei der Registrierung wahrheitsgemäße Angaben machen
+- Du bist für die Sicherheit deiner Anmeldedaten verantwortlich
+- Du musst mindestens 18 Jahre alt sein, um den Dienst zu nutzen
+
+4. NUTZERVERHALTEN
+- Jegliches beleidigende, belästigende oder diskriminierende Verhalten ist verboten
+- Das Teilen unangemessener Inhalte ist verboten
+- Nutzer müssen die Straßenverkehrsordnung einhalten
+
+5. DATENSCHUTZ UND PERSONENBEZOGENE DATEN
+- Personenbezogene Daten werden gemäß der DSGVO verarbeitet
+- Der GPS-Standort wird nur für App-Funktionen verwendet
+- Hochgeladene Fotos unterliegen der Moderation
+
+6. HAFTUNG
+- BikerLink haftet nicht für Unfälle während der Fahrten
+- Jeder Nutzer ist für seine eigene Sicherheit verantwortlich
+- Das Tragen von Helm und Schutzausrüstung ist obligatorisch
+
+7. SPONSOREN UND WERBUNG
+- Die App enthält von Syneco Lubrificanti gesponserte Inhalte
+- Werbeinhalte sind klar gekennzeichnet
+
+8. ÄNDERUNGEN DER BEDINGUNGEN
+BikerLink behält sich das Recht vor, diese Bedingungen jederzeit zu ändern.
+
+9. KONTAKT
+Für Fragen oder Meldungen: support@bikerlink.app`,
+
+  es: `TÉRMINOS Y CONDICIONES DE USO - BikerLink
+
+1. ACEPTACIÓN DE LOS TÉRMINOS
+Al usar la app BikerLink, aceptas íntegramente estos términos y condiciones.
+
+2. DESCRIPCIÓN DEL SERVICIO
+BikerLink es una plataforma que conecta motociclistas (bikers) y pasajeros (pillion riders) para compartir experiencias de viaje en moto.
+
+3. REGISTRO Y CUENTA
+- El usuario debe proporcionar información veraz durante el registro
+- Eres responsable de la seguridad de tus credenciales
+- Debes tener al menos 18 años para usar el servicio
+
+4. COMPORTAMIENTO DE LOS USUARIOS
+- Está prohibido cualquier comportamiento ofensivo, acosador o discriminatorio
+- Está prohibido compartir contenidos inapropiados
+- Los usuarios deben respetar el código de tráfico
+
+5. PRIVACIDAD Y DATOS PERSONALES
+- Los datos personales se tratan de conformidad con el RGPD
+- La ubicación GPS se utiliza únicamente para las funcionalidades de la app
+- Las fotos cargadas están sujetas a moderación
+
+6. RESPONSABILIDAD
+- BikerLink no es responsable de los accidentes ocurridos durante los trayectos
+- Cada usuario es responsable de su propia seguridad
+- El uso de casco y equipo de protección es obligatorio
+
+7. PATROCINADORES Y PUBLICIDAD
+- La app contiene contenidos patrocinados por Syneco Lubrificanti
+- Los contenidos publicitarios están claramente identificados
+
+8. MODIFICACIONES DE LOS TÉRMINOS
+BikerLink se reserva el derecho de modificar estos términos en cualquier momento.
+
+9. CONTACTO
+Para preguntas o notificaciones: support@bikerlink.app`,
+
+  fr: `CONDITIONS GÉNÉRALES D'UTILISATION - BikerLink
+
+1. ACCEPTATION DES CONDITIONS
+En utilisant l'app BikerLink, vous acceptez intégralement les présentes conditions générales.
+
+2. DESCRIPTION DU SERVICE
+BikerLink est une plateforme qui connecte des motocyclistes (bikers) et des passagers (passagers en tandem) pour partager des expériences de voyage en moto.
+
+3. INSCRIPTION ET COMPTE
+- L'utilisateur doit fournir des informations exactes lors de l'inscription
+- Vous êtes responsable de la sécurité de vos identifiants
+- Vous devez avoir au moins 18 ans pour utiliser le service
+
+4. COMPORTEMENT DES UTILISATEURS
+- Tout comportement offensant, harcelant ou discriminatoire est interdit
+- Le partage de contenus inappropriés est interdit
+- Les utilisateurs doivent respecter le code de la route
+
+5. CONFIDENTIALITÉ ET DONNÉES PERSONNELLES
+- Les données personnelles sont traitées conformément au RGPD
+- La localisation GPS est utilisée uniquement pour les fonctionnalités de l'app
+- Les photos téléchargées sont soumises à modération
+
+6. RESPONSABILITÉ
+- BikerLink n'est pas responsable des accidents survenus lors des trajets
+- Chaque utilisateur est responsable de sa propre sécurité
+- Le port du casque et des équipements de protection est obligatoire
+
+7. SPONSORS ET PUBLICITÉ
+- L'app contient des contenus sponsorisés par Syneco Lubrificanti
+- Les contenus publicitaires sont clairement identifiés
+
+8. MODIFICATIONS DES CONDITIONS
+BikerLink se réserve le droit de modifier les présentes conditions à tout moment.
+
+9. CONTACT
+Pour toute question ou signalement : support@bikerlink.app`,
+};
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -704,7 +859,7 @@ export default function RegisterScreen() {
 
       <View style={styles.eulaContainer}>
         <ScrollView style={styles.eulaScroll} nestedScrollEnabled>
-          <Text style={styles.eulaText}>{EULA_TEXT}</Text>
+          <Text style={styles.eulaText}>{EULA_TEXTS[getAppLanguage()] ?? EULA_TEXTS.it}</Text>
         </ScrollView>
       </View>
 

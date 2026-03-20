@@ -86,6 +86,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/sos", sosRoutes);
   app.use("/api/motoclubs", motoclubsRoutes);
 
+  app.get("/privacy-policy", (_req, res) => {
+    const templatePath = path.resolve(
+      process.cwd(),
+      "server",
+      "templates",
+      "privacy-policy.html",
+    );
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.sendFile(templatePath);
+  });
+
   app.get("/api/settings/privacy-policy", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("privacy_policy_text");
