@@ -1,0 +1,54 @@
+# Cache directories
+.cache/
+.local/
+.config/
+
+# Logs
+logs/
+*.log
+
+# Git
+.git/
+
+# Development
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native build artifacts
+ios/
+android/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS
+.DS_Store
+*.pem
+
+# Environment
+.env
+.env*.local
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Stress test
+stress-test/
+
+# Server templates not needed for mobile build
+server/templates/
+server/public/
+
+# Script logs
+scripts/*.log

@@ -56,6 +56,15 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": "https://replit.com/"
+      },
+      "eas": {
+        "projectId": "a25192d7-72e5-46af-97d0-2d38ed9b78e3"
+      }
+    },
+    "owner": "andreamasteri"
   }
 }
