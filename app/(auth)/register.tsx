@@ -730,10 +730,10 @@ export default function RegisterScreen() {
         </TouchableOpacity>
         <View style={styles.privacyCheckboxLabel}>
           <TouchableOpacity onPress={() => setPrivacyAccepted(!privacyAccepted)}>
-            <Text style={styles.checkboxLabel}>{t("register.step4.acceptPrivacyPre")} </Text>
+            <Text style={styles.checkboxLabel}>{t("register.step4.acceptPrivacy")} </Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push("/privacy-policy")}>
-            <Text style={styles.privacyLinkInline}>Privacy Policy</Text>
+            <Text style={styles.privacyLinkInline}>{t("register.step4.privacyLinkLabel")}</Text>
           </TouchableOpacity>
         </View>
       </View>
