@@ -267,29 +267,32 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 
 ## Generazione APK Android (EAS Build)
 
-### Ultimo APK stabile
-- **Build #5** completato con successo — 2026-03-20
-- **APK download**: https://expo.dev/artifacts/eas/3FhcAXH2J1R5L79rCFFUyo.apk
-- **ID build**: 15ae449a-9b04-4311-8848-afa1b2f1bcee
-- **Log**: `eas-build-log.txt`
+### Ultimo APK stabile (Build #7 — development build)
+- **Build #7** completato — 2026-03-20 — Profilo: development
+- **APK download**: https://expo.dev/artifacts/eas/uHdV4BHuYr2vMT8r7GbVNu.apk
+- **ID build**: e881560b-f36c-4494-bd58-586b08078b8c
+- **Log completo**: `eas-build-log.txt`
 
 ### Configurazione stabile (CRITICA — non modificare)
-- `newArchEnabled: true` — **OBBLIGATORIO**: react-native-reanimated 4.x richiede New Architecture
-- `react-native-reanimated: ~4.1.1` — versione ufficiale per Expo SDK 54
-- `react-native-worklets: ^0.7.4` — peer dep obbligatoria di reanimated 4.x
+- `newArchEnabled: false` — **OBBLIGATORIO**: `react-native-keyboard-controller 1.18.5` crasha su dispositivi fisici con New Architecture
+- `react-native-reanimated: ~3.19.5` — versione 3.x compatibile old arch (4.x richiederebbe New Arch)
+- `react-native-worklets`: RIMOSSO (era peer dep di reanimated 4.x, non necessario con 3.x)
 - `react-native-maps: 1.18.0` — pinnato, in `expo.install.exclude`
-- `react-native-worklets` — in `expo.install.exclude` (versione controllata manualmente)
+- `react-native-reanimated` — in `expo.install.exclude` (SDK 54 aspetta 4.x, usiamo 3.x intenzionalmente)
+- `expo-dev-client: ~6.0.20` — per development builds
 - `expo-doctor`: 17/17 checks passed
+- **EXPO_PUBLIC_DOMAIN**: configurato in tutti i profili eas.json → `biker-link.replit.app`
 
 ### Come lanciare un nuovo build
 ```bash
+# Development build (con expo-dev-client, per debug)
+EXPO_TOKEN=$EXPO_TOKEN npx eas-cli@latest build --platform android --profile development --clear-cache --non-interactive
+
+# Preview build (APK normale per distribuzione interna)
 EXPO_TOKEN=$EXPO_TOKEN npx eas-cli@latest build --platform android --profile preview --non-interactive
 ```
 - **Non usare** `npm install -g eas-cli` — usare sempre `npx eas-cli@latest`
 - Il build richiede 20-40 min sul piano free tier
-
-### Build APK per test interni (profilo `preview`)
-Produce un file `.apk` installabile direttamente su qualsiasi Android, non richiede Play Store.
 
 ### Build AAB per Play Store (profilo `production`)
 ```bash
@@ -298,7 +301,7 @@ EXPO_TOKEN=$EXPO_TOKEN npx eas-cli@latest build --platform android --profile pro
 Produce un `.aab` ottimizzato per la distribuzione su Google Play.
 
 ### Configurazione (già pronta)
-- `eas.json`: profili `preview` (APK) e `production` (AAB) configurati
+- `eas.json`: profili `development`, `preview` (APK) e `production` (AAB) configurati
 - `app.json`: package `com.bikerlink.app`, version `1.0.0`, versionCode `1`
 - Keystore: Build Credentials NX-Is9EQ1Y (su EAS remote, account andreamasteri)
 - Icone adaptive Android presenti in `assets/images/`
@@ -308,4 +311,5 @@ Produce un `.aab` ottimizzato per la distribuzione su Google Play.
 - `google-services.json` NON necessario (nessun modulo Firebase)
 - Per nuova versione: incrementare `versionCode` in `app.json` prima di ogni nuovo build
 - EAS account: andreamasteri, progetto: @andreamasteri/bikerlink
+- NON aggiornare keyboard-controller a 2.x senza testare compatibilità New Arch
 

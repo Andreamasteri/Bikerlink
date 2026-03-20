@@ -22,28 +22,39 @@ Build #4 (ERRORED) — 2026-03-20 13:45
   Causa: stessa — newArchEnabled: false + reanimated 4.x
   URL: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/7dab794d-d359-49be-bb16-51ec100d6ae8
 
-Build #5 (FINISHED ✅) — 2026-03-20 15:10
+Build #5 (FINISHED ✅) — 2026-03-20 15:10 — Profilo: preview
   ID: 15ae449a-9b04-4311-8848-afa1b2f1bcee
-  Profilo: preview (APK Android, distribuzione interna)
-  Fix applicati rispetto ai build precedenti:
-    - newArchEnabled: true (riabilitato — richiesto da reanimated 4.x)
-    - react-native-reanimated: mantenuto ~4.1.1 (versione ufficiale SDK 54)
-    - react-native-worklets: mantenuto (peer dep obbligatoria di reanimated 4.x)
-    - expo-document-picker: ~14.0.8 (SDK 54 compat)
-    - expo-sharing: ~14.0.8 (SDK 54 compat)
-    - @react-native-async-storage/async-storage: ^2.2.0 (SDK 54 compat)
-    - @expo/vector-icons: ^15.1.1 (SDK 54 compat)
-    - react-native-keyboard-controller: ^1.18.5 (SDK 54 compat)
-    - react-native-maps: 1.18.0 in expo.install.exclude
-    - react-native-worklets in expo.install.exclude
-    - expo-doctor: 17/17 checks passed
-  Download APK: https://expo.dev/artifacts/eas/3FhcAXH2J1R5L79rCFFUyo.apk
-  URL build: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/15ae449a-9b04-4311-8848-afa1b2f1bcee
+  Fix: newArchEnabled: true + versioni SDK 54 corrette
+  Problema: APK crasha su dispositivo fisico (keyboard-controller + New Arch incompatibili)
+  Download: https://expo.dev/artifacts/eas/3FhcAXH2J1R5L79rCFFUyo.apk
 
-CONFIGURAZIONE FINALE STABILE:
-  newArchEnabled: true (OBBLIGATORIO con reanimated 4.x)
-  react-native-reanimated: ~4.1.1
-  react-native-worklets: ^0.7.4
+Build #6 (FINISHED ✅) — 2026-03-20 16:00 — Profilo: preview
+  ID: e1213e35-04ff-475f-b051-f3e3dd9efdc7
+  Fix: aggiunto EXPO_PUBLIC_DOMAIN=biker-link.replit.app in eas.json
+  Problema: app crasha ancora (keyboard-controller con New Arch su dispositivo fisico)
+  Download: https://expo.dev/artifacts/eas/tNpbuDYaiUzb7MED96jynD.apk
+
+Build #7 (FINISHED ✅) — 2026-03-20 18:30 — Profilo: development (APK con expo-dev-client)
+  ID: e881560b-f36c-4494-bd58-586b08078b8c
+  Tipo: development build (expo-dev-client incluso per debug)
+  Cache: pulita con --clear-cache
+  Fix applicati:
+    - newArchEnabled: false (ripristinato — keyboard-controller incompatibile con New Arch)
+    - react-native-reanimated: ~3.19.5 (downgrade da 4.x — 4.x richiede New Arch)
+    - react-native-worklets: RIMOSSO (era solo per reanimated 4.x)
+    - expo-dev-client: ~6.0.20 (aggiunto per development build)
+    - EXPO_PUBLIC_DOMAIN: biker-link.replit.app (in profilo development di eas.json)
+    - react-native-reanimated aggiunto a expo.install.exclude
+    - expo-doctor: 17/17 checks passed
+  Log analisi: NESSUN ERRORE (solo deprecation warnings non fatali)
+  Download: https://expo.dev/artifacts/eas/uHdV4BHuYr2vMT8r7GbVNu.apk
+
+CONFIGURAZIONE FINALE STABILE (Build #7):
+  newArchEnabled: false (OBBLIGATORIO — keyboard-controller 1.18.5 non compatibile con New Arch)
+  react-native-reanimated: ~3.19.5 (3.x per compatibilità old arch)
+  react-native-worklets: RIMOSSO (non necessario con reanimated 3.x)
   react-native-maps: 1.18.0 (pinned, in expo.install.exclude)
-  react-native-keyboard-controller: ^1.18.5
+  react-native-reanimated: in expo.install.exclude (SDK 54 aspetta 4.x ma usiamo 3.x)
+  expo-dev-client: ~6.0.20
   expo-doctor: 17/17 checks passed
+  Profili eas.json: development, preview, production (tutti con EXPO_PUBLIC_DOMAIN)
