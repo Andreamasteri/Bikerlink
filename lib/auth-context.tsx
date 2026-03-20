@@ -23,6 +23,9 @@ function useLoginMutation() {
     onSuccess: (user: SafeUser) => {
       queryClient.setQueryData(["/api/auth/me"], user);
       queryClient.invalidateQueries();
+      setTimeout(() => {
+        apiRequest("POST", "/api/matching/trigger").catch(() => {});
+      }, 5000);
     },
   });
 }
