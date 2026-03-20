@@ -32,6 +32,10 @@ Nell'ambito dell'utilizzo dell'applicazione BikerLink, raccogliamo le seguenti c
 - Indirizzo email
 - Numero di telefono
 - Nickname (nome utente)
+- Anno di nascita
+- Paese di residenza
+- Regione di residenza
+- Tipo utente (biker, zavorrina/o, coppia)
 - Fotografie caricate dall'utente
 - Posizione GPS (dati di geolocalizzazione)
 
@@ -101,6 +105,10 @@ When you use the BikerLink application, we collect the following categories of p
 - Email address
 - Phone number
 - Nickname (username)
+- Year of birth
+- Country of residence
+- Region of residence
+- User type (biker, pillion, couple)
 - Photographs uploaded by the user
 - GPS location (geolocation data)
 
@@ -170,6 +178,10 @@ Im Rahmen der Nutzung der BikerLink-Anwendung erheben wir folgende Kategorien pe
 - E-Mail-Adresse
 - Telefonnummer
 - Nickname (Benutzername)
+- Geburtsjahr
+- Wohnsitzland
+- Wohnsitzregion
+- Benutzertyp (Biker, Sozia, Paar)
 - Vom Nutzer hochgeladene Fotos
 - GPS-Standort (Geolokalisierungsdaten)
 
@@ -239,6 +251,10 @@ En el marco del uso de la aplicación BikerLink, recopilamos las siguientes cate
 - Dirección de correo electrónico
 - Número de teléfono
 - Apodo (nombre de usuario)
+- Año de nacimiento
+- País de residencia
+- Región de residencia
+- Tipo de usuario (biker, pasajera, pareja)
 - Fotografías cargadas por el usuario
 - Ubicación GPS (datos de geolocalización)
 
@@ -308,6 +324,10 @@ Dans le cadre de l'utilisation de l'application BikerLink, nous collectons les c
 - Adresse e-mail
 - Numéro de téléphone
 - Pseudo (nom d'utilisateur)
+- Année de naissance
+- Pays de résidence
+- Région de résidence
+- Type d'utilisateur (biker, passagère, couple)
 - Photographies téléchargées par l'utilisateur
 - Localisation GPS (données de géolocalisation)
 

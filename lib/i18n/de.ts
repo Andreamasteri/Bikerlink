@@ -383,6 +383,10 @@ const de: Record<string, string> = {
   "profile.donatePaypal": "Mit PayPal spenden",
   "ride.ghostMode": "Ghost Mode",
   "ride.ghostModeDesc": "Du erscheinst für alle anderen Nutzer offline",
+
+  "profile.revokeConsent": "Einwilligung zur Datenverarbeitung widerrufen",
+  "profile.revokeConsentTitle": "Einwilligung widerrufen",
+  "profile.revokeConsentDesc": "Die Verarbeitung deiner Daten basiert ausschließlich auf deiner Einwilligung (Art. 7 DSGVO).\n\nDer Widerruf der Einwilligung führt zur dauerhaften Löschung deines Kontos innerhalb von 30 Tagen, einschließlich aller zugehörigen personenbezogenen Daten.\n\nDieser Vorgang ist identisch mit \"Konto löschen\". Innerhalb der 30 Tage kannst du die Anfrage durch Anmelden widerrufen.\n\nBestätigst du den Widerruf der Einwilligung und die Kontolöschung?",
 };
 
 export default de;

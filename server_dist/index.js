@@ -11480,7 +11480,8 @@ async function registerRoutes(app2) {
       storage.getUserPhotos(userId),
       storage.getRoutes(userId),
       pool.query(
-        `SELECT m.id AS message_id, m.conversation_id, m.message_type, m.content, m.created_at
+        `SELECT m.id AS message_id, m.conversation_id, m.message_type, m.content,
+                m.image_url, m.latitude, m.longitude, m.created_at
          FROM messages m
          WHERE m.sender_id = $1
          ORDER BY m.created_at DESC`,
@@ -11535,6 +11536,9 @@ async function registerRoutes(app2) {
         conversationId: m.conversation_id,
         messageType: m.message_type,
         content: m.content ?? null,
+        imageUrl: m.image_url ?? null,
+        latitude: m.latitude ?? null,
+        longitude: m.longitude ?? null,
         sentAt: m.created_at
       })),
       contestEntries: contestResult.rows.map((e) => ({

@@ -105,6 +105,7 @@ export default function ProfileScreen() {
   const t = useT();
   const locale = useLocale();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showRevokeConsentModal, setShowRevokeConsentModal] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [isDownloadingManual, setIsDownloadingManual] = useState(false);
   const [isDownloadingEula, setIsDownloadingEula] = useState(false);
@@ -808,6 +809,7 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
+        <MenuItem icon="shield-checkmark-outline" label={t("profile.revokeConsent")} onPress={() => setShowRevokeConsentModal(true)} color={Colors.accentRed} />
         <MenuItem icon="trash-outline" label={t("common.delete") + " account"} onPress={handleDeleteAccount} color={Colors.accentRed} />
       </View>
 
@@ -829,6 +831,24 @@ export default function ProfileScreen() {
               </Pressable>
               <Pressable style={styles.modalBtnConfirm} onPress={() => { setShowLogoutModal(false); doLogout(); }}>
                 <Text style={styles.modalBtnConfirmText}>{t("profile.logout")}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={showRevokeConsentModal} transparent animationType="fade" onRequestClose={() => setShowRevokeConsentModal(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setShowRevokeConsentModal(false)}>
+          <View style={[styles.modalContent, { maxHeight: "80%" }]}>
+            <Ionicons name="shield-checkmark-outline" size={32} color={Colors.accentRed} />
+            <Text style={[styles.modalTitle, { fontSize: 16, fontWeight: "700", marginBottom: 8 }]}>{t("profile.revokeConsentTitle")}</Text>
+            <Text style={[styles.modalTitle, { fontSize: 13, fontWeight: "400", lineHeight: 20, textAlign: "left" }]}>{t("profile.revokeConsentDesc")}</Text>
+            <View style={styles.modalButtons}>
+              <Pressable style={styles.modalBtnCancel} onPress={() => setShowRevokeConsentModal(false)}>
+                <Text style={styles.modalBtnCancelText}>{t("common.cancel")}</Text>
+              </Pressable>
+              <Pressable style={styles.modalBtnConfirm} onPress={() => { setShowRevokeConsentModal(false); handleRequestDeletion(); }}>
+                <Text style={styles.modalBtnConfirmText}>{t("common.confirm")}</Text>
               </Pressable>
             </View>
           </View>
