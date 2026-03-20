@@ -3917,7 +3917,7 @@ router.post("/register", registerLimiter, async (req, res) => {
       birthYear: data.birthYear,
       region: data.region,
       country: data.country,
-      eulaAccepted: data.eulaAccepted,
+      eulaAccepted: true,
       privacyAccepted: true,
       consentAcceptedAt: /* @__PURE__ */ new Date(),
       invitationCode: data.invitationCode,
@@ -11475,6 +11475,25 @@ async function registerRoutes(app2) {
     if (!req.session.userId) return res.status(401).json({ message: "Non autenticato" });
     const user = await storage.getUser(req.session.userId);
     if (!user) return res.status(404).json({ message: "Utente non trovato" });
+    const userId = user.id;
+    const [photos, gpsRoutes, sentMessagesResult, contestResult] = await Promise.all([
+      storage.getUserPhotos(userId),
+      storage.getRoutes(userId),
+      pool.query(
+        `SELECT m.id AS message_id, m.conversation_id, m.message_type, m.content, m.created_at
+         FROM messages m
+         WHERE m.sender_id = $1
+         ORDER BY m.created_at DESC`,
+        [userId]
+      ),
+      pool.query(
+        `SELECT id, photo_url, caption, week_number, year, votes_count, is_approved, created_at
+         FROM photo_contest_entries
+         WHERE user_id = $1
+         ORDER BY created_at DESC`,
+        [userId]
+      )
+    ]);
     const exportData = {
       exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
       user: {
@@ -11493,7 +11512,41 @@ async function registerRoutes(app2) {
         privacyAccepted: user.privacyAccepted,
         consentAcceptedAt: user.consentAcceptedAt ?? null,
         createdAt: user.createdAt ?? null
-      }
+      },
+      photos: photos.map((p) => ({
+        id: p.id,
+        photoUrl: p.photoUrl,
+        sortOrder: p.sortOrder,
+        isApproved: p.isApproved,
+        uploadedAt: p.createdAt
+      })),
+      gpsRoutes: gpsRoutes.map((r) => ({
+        id: r.id,
+        title: r.title ?? null,
+        status: r.status,
+        totalDistanceKm: r.totalDistanceKm ?? 0,
+        durationSeconds: r.durationSeconds ?? 0,
+        startedAt: r.startedAt,
+        stoppedAt: r.stoppedAt ?? null,
+        createdAt: r.createdAt
+      })),
+      sentMessages: sentMessagesResult.rows.map((m) => ({
+        id: m.message_id,
+        conversationId: m.conversation_id,
+        messageType: m.message_type,
+        content: m.content ?? null,
+        sentAt: m.created_at
+      })),
+      contestEntries: contestResult.rows.map((e) => ({
+        id: e.id,
+        photoUrl: e.photo_url ?? null,
+        caption: e.caption ?? null,
+        weekNumber: e.week_number,
+        year: e.year,
+        votesReceived: e.votes_count,
+        isApproved: e.is_approved,
+        submittedAt: e.created_at
+      }))
     };
     const json = JSON.stringify(exportData, null, 2);
     const filename = `BikerLink-UserData-${user.nickname}-${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.json`;
