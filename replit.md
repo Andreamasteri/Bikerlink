@@ -248,6 +248,11 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - Endpoint: `GET /api/settings/primal-user`, setting key: `primal_user_enabled`
 - Gli utenti Primal saltano la verifica email (login/registrazione senza blocco)
 
+### GDPR (Marzo 2026)
+- **Task #109**: Tracciabilità consensi — colonne `eula_accepted`, `eula_accepted_at`, `privacy_accepted`, `privacy_accepted_at` in `users`. Migration: `migrations/0002_gdpr_consent_fields.sql`
+- **Task #110**: Export dati completo art. 20 — `GET /api/user/export-data` include foto, percorsi GPS, messaggi inviati, contest
+- **Task #111**: Revoca consenso — voce "Revoca consenso" nel profilo (Modal, chiama `POST /api/users/me/request-deletion`). Privacy policy aggiornata in 5 lingue con tutti i dati raccolti (anno nascita, paese, regione, tipo utente)
+
 ### Email SMTP (Gmail)
 - Servizio email: `server/email.ts` con nodemailer + Gmail SMTP
 - Credenziali: lette da DB (`gmail_user`, `gmail_app_password` in app_settings), fallback su env vars `GMAIL_USER` / `GMAIL_APP_PASSWORD`
@@ -259,4 +264,37 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - `sendVerificationEmail()` invia email HTML brandizzata con codice 6 cifre
 - `sendEmail()` funzione generica per usi futuri
 - Se email fallisce, notifica admin come backup (non crasha)
+
+## Generazione APK Android (EAS Build)
+
+### Prerequisiti
+1. Account Expo su [expo.dev](https://expo.dev) (gratuito)
+2. EAS CLI installata: `npm install -g eas-cli`
+3. Login: `eas login`
+4. Collegare il progetto: `eas init --id <APP_ID>` (solo prima volta, crea il progetto su expo.dev)
+
+### Build APK per test interni (profilo `preview`)
+```bash
+eas build --platform android --profile preview
+```
+- Produce un file `.apk` installabile direttamente su qualsiasi Android
+- Non richiede Play Store
+- Il link per il download appare al termine del build su expo.dev
+
+### Build AAB per Play Store (profilo `production`)
+```bash
+eas build --platform android --profile production
+```
+- Produce un `.aab` ottimizzato per la distribuzione su Google Play
+
+### Configurazione (già pronta)
+- `eas.json`: profili `preview` (APK) e `production` (AAB) configurati
+- `app.json`: package `com.bikerlink.app`, version `1.0.0`, versionCode `1`
+- Icone adaptive Android presenti in `assets/images/`
+- Immagini Play Store presenti: `playstore-icon.png`, `playstore-feature-graphic.png`
+
+### Note
+- Il keystore Android viene generato automaticamente da EAS al primo build
+- `google-services.json` NON necessario (nessun modulo Firebase)
+- Per aumentare la versione: incrementare `versionCode` in `app.json` e `version` prima di ogni nuovo build
 
