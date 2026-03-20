@@ -15,18 +15,18 @@
       }
     },
     "preview": {
+      "distribution": "internal",
       "android": {
-        "buildType": "apk",
-        "distribution": "internal"
+        "buildType": "apk"
       },
       "env": {
         "EXPO_PUBLIC_DOMAIN": "biker-link.replit.app"
       }
     },
     "production": {
+      "distribution": "store",
       "android": {
-        "buildType": "app-bundle",
-        "distribution": "store"
+        "buildType": "app-bundle"
       },
       "env": {
         "EXPO_PUBLIC_DOMAIN": "biker-link.replit.app"

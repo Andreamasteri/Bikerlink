@@ -312,4 +312,5 @@ Produce un `.aab` ottimizzato per la distribuzione su Google Play.
 - Per nuova versione: incrementare `versionCode` in `app.json` prima di ogni nuovo build
 - EAS account: andreamasteri, progetto: @andreamasteri/bikerlink
 - NON aggiornare keyboard-controller a 2.x senza testare compatibilità New Arch
+- `react-native-reanimated` è in `expo.install.exclude` perché usiamo intenzionalmente la versione 3.x invece della 4.x (che Expo SDK 54 si aspetta). La 4.x richiede `newArchEnabled: true`, incompatibile con keyboard-controller 1.18.5. NON rimuovere questo exclude né aggiornare reanimated a 4.x senza aggiornare prima keyboard-controller a una versione compatibile con New Architecture.
 
