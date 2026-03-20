@@ -267,34 +267,45 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 
 ## Generazione APK Android (EAS Build)
 
-### Prerequisiti
-1. Account Expo su [expo.dev](https://expo.dev) (gratuito)
-2. EAS CLI installata: `npm install -g eas-cli`
-3. Login: `eas login`
-4. Collegare il progetto: `eas init --id <APP_ID>` (solo prima volta, crea il progetto su expo.dev)
+### Ultimo APK stabile
+- **Build #5** completato con successo — 2026-03-20
+- **APK download**: https://expo.dev/artifacts/eas/3FhcAXH2J1R5L79rCFFUyo.apk
+- **ID build**: 15ae449a-9b04-4311-8848-afa1b2f1bcee
+- **Log**: `eas-build-log.txt`
+
+### Configurazione stabile (CRITICA — non modificare)
+- `newArchEnabled: true` — **OBBLIGATORIO**: react-native-reanimated 4.x richiede New Architecture
+- `react-native-reanimated: ~4.1.1` — versione ufficiale per Expo SDK 54
+- `react-native-worklets: ^0.7.4` — peer dep obbligatoria di reanimated 4.x
+- `react-native-maps: 1.18.0` — pinnato, in `expo.install.exclude`
+- `react-native-worklets` — in `expo.install.exclude` (versione controllata manualmente)
+- `expo-doctor`: 17/17 checks passed
+
+### Come lanciare un nuovo build
+```bash
+EXPO_TOKEN=$EXPO_TOKEN npx eas-cli@latest build --platform android --profile preview --non-interactive
+```
+- **Non usare** `npm install -g eas-cli` — usare sempre `npx eas-cli@latest`
+- Il build richiede 20-40 min sul piano free tier
 
 ### Build APK per test interni (profilo `preview`)
-```bash
-eas build --platform android --profile preview
-```
-- Produce un file `.apk` installabile direttamente su qualsiasi Android
-- Non richiede Play Store
-- Il link per il download appare al termine del build su expo.dev
+Produce un file `.apk` installabile direttamente su qualsiasi Android, non richiede Play Store.
 
 ### Build AAB per Play Store (profilo `production`)
 ```bash
-eas build --platform android --profile production
+EXPO_TOKEN=$EXPO_TOKEN npx eas-cli@latest build --platform android --profile production --non-interactive
 ```
-- Produce un `.aab` ottimizzato per la distribuzione su Google Play
+Produce un `.aab` ottimizzato per la distribuzione su Google Play.
 
 ### Configurazione (già pronta)
 - `eas.json`: profili `preview` (APK) e `production` (AAB) configurati
 - `app.json`: package `com.bikerlink.app`, version `1.0.0`, versionCode `1`
+- Keystore: Build Credentials NX-Is9EQ1Y (su EAS remote, account andreamasteri)
 - Icone adaptive Android presenti in `assets/images/`
-- Immagini Play Store presenti: `playstore-icon.png`, `playstore-feature-graphic.png`
+- Immagini Play Store: `playstore-icon.png`, `playstore-feature-graphic.png`
 
 ### Note
-- Il keystore Android viene generato automaticamente da EAS al primo build
 - `google-services.json` NON necessario (nessun modulo Firebase)
-- Per aumentare la versione: incrementare `versionCode` in `app.json` e `version` prima di ogni nuovo build
+- Per nuova versione: incrementare `versionCode` in `app.json` prima di ogni nuovo build
+- EAS account: andreamasteri, progetto: @andreamasteri/bikerlink
 

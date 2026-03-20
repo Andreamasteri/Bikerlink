@@ -3,27 +3,47 @@ EAS Build Log — BikerLink Android APK
 
 Build #1 (ERRORED) — 2026-03-20 12:22
   ID: 740e5271-f1de-4e63-92a7-8ea13f9e1b5b
-  Causa: EAS_BUILD_UNKNOWN_GRADLE_ERROR — newArchEnabled: true incompatibile
-  Fix applicato: newArchEnabled: false in app.json
+  Causa: EAS_BUILD_UNKNOWN_GRADLE_ERROR — major version mismatches nelle dipendenze
   URL: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/740e5271-f1de-4e63-92a7-8ea13f9e1b5b
 
 Build #2 (ERRORED) — 2026-03-20 12:40
   ID: 793959ca-48a0-4894-92b2-314eb79286be
   Causa: EAS_BUILD_UNKNOWN_GRADLE_ERROR — major version mismatch nelle dipendenze native
-  Fix applicato: corrette 4 dipendenze incompatibili con Expo SDK 54 (expo-doctor 17/17 checks passed)
-    - expo-document-picker: 55.0.8 → ~14.0.8
-    - expo-sharing: 55.0.11 → ~14.0.8
-    - @react-native-async-storage/async-storage: 3.0.1 → 2.2.0
-    - @expo/vector-icons: 14.0.4 → ^15.0.3
-    - react-native-keyboard-controller: 1.20.6 → 1.18.5
-    - eas-cli rimosso dalle project dependencies (usare npx eas-cli@latest)
-    - react-native-maps aggiunto a expo.install.exclude (pin intenzionale a 1.18.0)
+  Fix: corrette 4 dipendenze incompatibili con Expo SDK 54
   URL: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/793959ca-48a0-4894-92b2-314eb79286be
 
-Build #3 (IN QUEUE) — 2026-03-20 13:26
+Build #3 (ERRORED) — 2026-03-20 13:26
   ID: 56a4e5cf-fb60-4b4b-87bb-7726f980bee7
-  Profilo: preview (APK Android, distribuzione interna)
-  expo-doctor: 17/17 checks passed. No issues detected!
+  Causa: react-native-reanimated:assertNewArchitectureEnabledTask — newArchEnabled: false incompatibile con reanimated 4.x
   URL: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/56a4e5cf-fb60-4b4b-87bb-7726f980bee7
-  Download APK: disponibile su expo.dev al termine del build (piano free: 20-40 min)
-  Comando per verificare: EXPO_TOKEN=$EXPO_TOKEN npx eas-cli@latest build:list --platform android --limit 1
+
+Build #4 (ERRORED) — 2026-03-20 13:45
+  ID: 7dab794d-d359-49be-bb16-51ec100d6ae8
+  Causa: stessa — newArchEnabled: false + reanimated 4.x
+  URL: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/7dab794d-d359-49be-bb16-51ec100d6ae8
+
+Build #5 (FINISHED ✅) — 2026-03-20 15:10
+  ID: 15ae449a-9b04-4311-8848-afa1b2f1bcee
+  Profilo: preview (APK Android, distribuzione interna)
+  Fix applicati rispetto ai build precedenti:
+    - newArchEnabled: true (riabilitato — richiesto da reanimated 4.x)
+    - react-native-reanimated: mantenuto ~4.1.1 (versione ufficiale SDK 54)
+    - react-native-worklets: mantenuto (peer dep obbligatoria di reanimated 4.x)
+    - expo-document-picker: ~14.0.8 (SDK 54 compat)
+    - expo-sharing: ~14.0.8 (SDK 54 compat)
+    - @react-native-async-storage/async-storage: ^2.2.0 (SDK 54 compat)
+    - @expo/vector-icons: ^15.1.1 (SDK 54 compat)
+    - react-native-keyboard-controller: ^1.18.5 (SDK 54 compat)
+    - react-native-maps: 1.18.0 in expo.install.exclude
+    - react-native-worklets in expo.install.exclude
+    - expo-doctor: 17/17 checks passed
+  Download APK: https://expo.dev/artifacts/eas/3FhcAXH2J1R5L79rCFFUyo.apk
+  URL build: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/15ae449a-9b04-4311-8848-afa1b2f1bcee
+
+CONFIGURAZIONE FINALE STABILE:
+  newArchEnabled: true (OBBLIGATORIO con reanimated 4.x)
+  react-native-reanimated: ~4.1.1
+  react-native-worklets: ^0.7.4
+  react-native-maps: 1.18.0 (pinned, in expo.install.exclude)
+  react-native-keyboard-controller: ^1.18.5
+  expo-doctor: 17/17 checks passed
