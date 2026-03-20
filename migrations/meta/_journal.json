@@ -15,6 +15,13 @@
       "when": 1742327400000,
       "tag": "0001_user_blocks",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1742553600000,
+      "tag": "0002_gdpr_consent_fields",
+      "breakpoints": true
     }
   ]
 }
