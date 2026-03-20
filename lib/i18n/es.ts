@@ -28,7 +28,7 @@ const es: Record<string, string> = {
   "register.step3.title": "Tus datos",
   "register.step4.title": "Términos y condiciones",
   "register.step4.accept": "Acepto los términos y condiciones",
-  "register.step4.acceptPrivacy": "He leído y acepto la Política de privacidad",
+  "register.step4.acceptPrivacyPre": "He leído y acepto la",
   "register.step4.privacyRequired": "Debes aceptar la Política de privacidad",
   "register.next": "Siguiente",
   "register.back": "Atrás",

@@ -719,20 +719,24 @@ export default function RegisterScreen() {
         <Text style={styles.checkboxLabel}>{t("register.step4.accept")}</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.checkboxRow}
-        onPress={() => setPrivacyAccepted(!privacyAccepted)}
-        testID="privacy-checkbox"
-      >
-        <View style={[styles.checkbox, privacyAccepted && styles.checkboxChecked]}>
-          {privacyAccepted && <Ionicons name="checkmark" size={16} color={Colors.background} />}
+      <View style={styles.checkboxRow}>
+        <TouchableOpacity
+          onPress={() => setPrivacyAccepted(!privacyAccepted)}
+          testID="privacy-checkbox"
+        >
+          <View style={[styles.checkbox, privacyAccepted && styles.checkboxChecked]}>
+            {privacyAccepted && <Ionicons name="checkmark" size={16} color={Colors.background} />}
+          </View>
+        </TouchableOpacity>
+        <View style={styles.privacyCheckboxLabel}>
+          <TouchableOpacity onPress={() => setPrivacyAccepted(!privacyAccepted)}>
+            <Text style={styles.checkboxLabel}>{t("register.step4.acceptPrivacyPre")} </Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push("/privacy-policy")}>
+            <Text style={styles.privacyLinkInline}>Privacy Policy</Text>
+          </TouchableOpacity>
         </View>
-        <Text style={styles.checkboxLabel}>{t("register.step4.acceptPrivacy")}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => router.push("/privacy-policy")} style={styles.privacyLinkRow}>
-        <Ionicons name="document-text-outline" size={14} color={Colors.accent} />
-        <Text style={styles.privacyLink}>Privacy Policy</Text>
-      </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -1174,17 +1178,23 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   privacyLink: {
-    marginTop: 0,
+    marginTop: 10,
     fontSize: 12,
     color: Colors.accent,
+    textAlign: "center" as const,
     textDecorationLine: "underline" as const,
   },
-  privacyLinkRow: {
+  privacyLinkInline: {
+    fontSize: 14,
+    color: Colors.accent,
+    textDecorationLine: "underline" as const,
+    fontFamily: "Inter_500Medium",
+  },
+  privacyCheckboxLabel: {
+    flex: 1,
     flexDirection: "row" as const,
+    flexWrap: "wrap" as const,
     alignItems: "center" as const,
-    gap: 4,
-    marginTop: 6,
-    marginLeft: 36,
   },
   inviteSection: {
     marginTop: 8,

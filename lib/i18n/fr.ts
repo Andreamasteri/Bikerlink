@@ -28,7 +28,7 @@ const fr: Record<string, string> = {
   "register.step3.title": "Tes informations",
   "register.step4.title": "Conditions générales",
   "register.step4.accept": "J'accepte les conditions générales",
-  "register.step4.acceptPrivacy": "J'ai lu et j'accepte la Politique de confidentialité",
+  "register.step4.acceptPrivacyPre": "J'ai lu et j'accepte la",
   "register.step4.privacyRequired": "Vous devez accepter la Politique de confidentialité",
   "register.next": "Suivant",
   "register.back": "Retour",
