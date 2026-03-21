@@ -2,6 +2,8 @@ import React, { createContext, useContext, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { MapProvider } from "@/lib/map-tiles";
 
+const VALID_PROVIDERS: MapProvider[] = ["carto_light", "carto_dark", "osm"];
+
 interface MapConfig {
   enabled: boolean;
   provider: MapProvider;
@@ -28,9 +30,13 @@ export function MapSettingsProvider({ children }: { children: ReactNode }) {
     retry: false,
   });
 
+  const rawProvider = data?.provider as MapProvider | undefined;
+  const provider: MapProvider =
+    rawProvider && VALID_PROVIDERS.includes(rawProvider) ? rawProvider : "carto_light";
+
   const value: MapConfig = {
     enabled: data?.enabled !== false,
-    provider: (data?.provider ?? "carto_light") as MapProvider,
+    provider,
     isLoading,
   };
 
