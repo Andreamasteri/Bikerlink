@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo, ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest, getQueryFn } from "@/lib/query-client";
+import { queryClient, apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import type { User } from "@shared/schema";
 
 type SafeUser = Omit<User, "password">;
@@ -26,12 +26,33 @@ function useLoginMutation() {
         try {
           await queryClient.fetchQuery({ queryKey: ["/api/settings/maps"] });
         } catch {}
+        let profileLat: number | null = null;
+        let profileLng: number | null = null;
         try {
-          await queryClient.fetchQuery({ queryKey: ["/api/users/profile"] });
+          const profile = await queryClient.fetchQuery<{ latitude?: number | null; longitude?: number | null }>({
+            queryKey: ["/api/users/profile"],
+          });
+          if (profile?.latitude != null && profile?.longitude != null) {
+            profileLat = Number(profile.latitude);
+            profileLng = Number(profile.longitude);
+          }
         } catch {}
-        queryClient.invalidateQueries();
-        queryClient.fetchQuery({ queryKey: ["/api/users/nearby"] }).catch(() => {});
+        if (profileLat !== null && profileLng !== null) {
+          const baseUrl = getApiUrl();
+          const nearbyUrl = new URL("/api/users/nearby", baseUrl);
+          nearbyUrl.searchParams.set("lat", profileLat.toString());
+          nearbyUrl.searchParams.set("lng", profileLng.toString());
+          fetch(nearbyUrl.toString(), { credentials: "include" })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+              if (data) {
+                queryClient.setQueryData(["/api/users/nearby", profileLat, profileLng, undefined], data);
+              }
+            })
+            .catch(() => {});
+        }
         apiRequest("POST", "/api/matching/trigger").catch(() => {});
+        queryClient.invalidateQueries();
       })();
     },
   });
