@@ -37,22 +37,22 @@ function useLoginMutation() {
             profileLng = Number(profile.longitude);
           }
         } catch {}
-        if (profileLat !== null && profileLng !== null) {
-          const captureLat = profileLat;
-          const captureLng = profileLng;
-          queryClient.fetchQuery({
-            queryKey: ["/api/users/nearby", captureLat, captureLng, undefined],
+        const nearbyLat = profileLat ?? 41.9028;
+        const nearbyLng = profileLng ?? 12.4964;
+        try {
+          await queryClient.fetchQuery({
+            queryKey: ["/api/users/nearby", nearbyLat, nearbyLng, undefined],
             queryFn: async () => {
               const baseUrl = getApiUrl();
               const url = new URL("/api/users/nearby", baseUrl);
-              url.searchParams.set("lat", captureLat.toString());
-              url.searchParams.set("lng", captureLng.toString());
+              url.searchParams.set("lat", nearbyLat.toString());
+              url.searchParams.set("lng", nearbyLng.toString());
               const res = await fetch(url.toString(), { credentials: "include" });
               if (!res.ok) return [];
               return res.json();
             },
-          }).catch(() => {});
-        }
+          });
+        } catch {}
         queryClient.fetchQuery({
           queryKey: ["/api/matching/trigger"],
           queryFn: async () => {
