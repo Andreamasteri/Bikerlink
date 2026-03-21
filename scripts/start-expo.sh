@@ -7,6 +7,7 @@ BACKEND_WAIT_SECONDS=120
 FLOCK_FILE="/tmp/start-expo.flock"
 LOCK_FILE="/tmp/start-expo.lock"
 PID_FILE="/tmp/metro.pid"
+PREWARM_PID=0
 
 # ── Lock atomico con flock (kernel-level, nessuna race condition) ──────────────
 exec 9>>"$FLOCK_FILE"
@@ -20,6 +21,9 @@ echo $$ > "$LOCK_FILE"
 
 cleanup() {
   rm -f "$LOCK_FILE"
+  if [ "$PREWARM_PID" -gt 0 ]; then
+    kill "$PREWARM_PID" 2>/dev/null || true
+  fi
   # Il flock viene rilasciato automaticamente alla chiusura del fd 9 (quando bash esce)
 }
 trap cleanup EXIT
@@ -30,8 +34,18 @@ trap cleanup EXIT
 export NODE_OPTIONS="--max-old-space-size=1024"
 
 # ── Funzioni di utilita' ────────────────────────────────────────────────────────
+
+# Usato durante l'avvio (breve timeout).
 port_is_open() {
   curl -s --max-time 2 --connect-timeout 1 -o /dev/null "http://localhost:$1/" 2>/dev/null
+}
+
+# Usato durante il monitoring: timeout lungo (60s) perche' Metro puo' essere
+# impegnato nella compilazione del bundle Android (~28s per 1635 moduli) e
+# non rispondere immediatamente. Se Metro e' morto, curl riceve connection
+# refused istantaneamente (non aspetta il timeout).
+port_is_alive() {
+  curl -s --max-time 60 --connect-timeout 3 -o /dev/null "http://localhost:$1/" 2>/dev/null
 }
 
 kill_port() {
@@ -80,6 +94,34 @@ wait_for_backend() {
   echo "Attenzione: backend non risponde dopo ${BACKEND_WAIT_SECONDS}s, avvio Metro comunque."
 }
 
+# ── Pre-warm bundle in background (fire-and-forget) ───────────────────────────
+# Avvia la compilazione del bundle Android PRIMA che Expo Go si connetta.
+# Gira in background in parallelo con il monitoring loop.
+# Una volta compilato, Metro lo mette in cache su disco: le connessioni
+# successive di Expo Go ricevono il bundle in pochi secondi.
+start_prewarm() {
+  local log_file="$1"
+  local BUNDLE_BASE="http://localhost:${PORT}/node_modules/expo-router/entry.bundle"
+  local BUNDLE_PARAMS="dev=true&hot=false&lazy=true&transform.engine=hermes&transform.bytecode=1&transform.routerRoot=app&unstable_transformProfile=hermes-stable"
+
+  echo "Pre-warm bundle Android avviato in background (max 300s)..." | tee -a "$log_file"
+  (
+    PW_START=$(date +%s)
+    curl -s --max-time 300 --connect-timeout 10 \
+      -o /dev/null \
+      "${BUNDLE_BASE}?platform=android&${BUNDLE_PARAMS}" 2>/dev/null
+    EXIT_CODE=$?
+    PW_END=$(date +%s)
+    PW_ELAPSED=$((PW_END - PW_START))
+    if [ "$EXIT_CODE" -eq 0 ]; then
+      echo "Pre-warm bundle completato in ${PW_ELAPSED}s — Expo Go servira' dalla cache" >> "$log_file"
+    else
+      echo "Pre-warm bundle terminato (exit ${EXIT_CODE}) dopo ${PW_ELAPSED}s" >> "$log_file"
+    fi
+  ) &
+  PREWARM_PID=$!
+}
+
 wait_for_backend
 
 SESSION_TS=$(date +%Y%m%d-%H%M%S)
@@ -90,6 +132,12 @@ for retry in $(seq 1 $MAX_RETRIES); do
   echo "Log ciclo: $LOG_FILE"
   echo "NODE_OPTIONS: $NODE_OPTIONS" | tee -a "$LOG_FILE"
   echo "Orario avvio: $(date)" | tee -a "$LOG_FILE"
+
+  # Ferma un eventuale pre-warm precedente prima del retry
+  if [ "$PREWARM_PID" -gt 0 ]; then
+    kill "$PREWARM_PID" 2>/dev/null || true
+  fi
+  PREWARM_PID=0
 
   METRO_STARTED=0
   METRO_PID=0
@@ -117,7 +165,6 @@ for retry in $(seq 1 $MAX_RETRIES); do
     echo $METRO_PID > "$PID_FILE"
 
     # Aspetta fino a 300s che Metro binds su porta 8081
-    # Il crawl iniziale senza cache puo' richiedere 2-3 minuti.
     echo "Attendo che Metro si avvii sulla porta $PORT (max 300s)..." | tee -a "$LOG_FILE"
     for i in $(seq 1 300); do
       if port_is_open $PORT; then
@@ -150,11 +197,21 @@ for retry in $(seq 1 $MAX_RETRIES); do
   fi
 
   if [ $METRO_STARTED -eq 1 ]; then
+    # ── Avvia pre-warm in background, poi entra nel monitoring loop ──────────
+    # Il pre-warm gira in parallelo: Metro resta disponibile durante la
+    # compilazione. Il monitoring usa port_is_alive (timeout 8s) per evitare
+    # falsi positivi quando Metro e' impegnato nella compilazione del bundle.
+    start_prewarm "$LOG_FILE"
+
     echo "Metro in esecuzione, monitoraggio porta $PORT..." | tee -a "$LOG_FILE"
     while true; do
       sleep 15
-      if ! port_is_open $PORT; then
+      if ! port_is_alive $PORT; then
         echo "Metro giu': porta $PORT non risponde — $(date)" | tee -a "$LOG_FILE"
+        if [ "$PREWARM_PID" -gt 0 ]; then
+          kill "$PREWARM_PID" 2>/dev/null || true
+        fi
+        PREWARM_PID=0
         break
       fi
     done
