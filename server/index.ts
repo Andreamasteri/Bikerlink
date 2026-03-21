@@ -156,9 +156,6 @@ function serveLandingPage({
   const baseUrl = `${protocol}://${host}`;
   const expsUrl = `${host}`;
 
-  log(`baseUrl`, baseUrl);
-  log(`expsUrl`, expsUrl);
-
   const html = landingPageTemplate
     .replace(/BASE_URL_PLACEHOLDER/g, baseUrl)
     .replace(/EXPS_URL_PLACEHOLDER/g, expsUrl)

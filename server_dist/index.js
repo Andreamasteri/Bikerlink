@@ -12035,8 +12035,6 @@ function serveLandingPage({
   const host = forwardedHost || req.get("host");
   const baseUrl = `${protocol}://${host}`;
   const expsUrl = `${host}`;
-  log(`baseUrl`, baseUrl);
-  log(`expsUrl`, expsUrl);
   const html = landingPageTemplate.replace(/BASE_URL_PLACEHOLDER/g, baseUrl).replace(/EXPS_URL_PLACEHOLDER/g, expsUrl).replace(/APP_NAME_PLACEHOLDER/g, appName);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.status(200).send(html);

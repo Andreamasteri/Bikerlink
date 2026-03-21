@@ -293,7 +293,7 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - **ID build**: e881560b-f36c-4494-bd58-586b08078b8c
 
 ### Configurazione stabile (CRITICA — non modificare)
-- `newArchEnabled: false` — **OBBLIGATORIO**: `react-native-keyboard-controller 1.18.5` crasha su dispositivi fisici con New Architecture
+- `newArchEnabled: false` — **OBBLIGATORIO**: `react-native-reanimated 3.x` richiede Old Architecture (4.x richiederebbe New Arch)
 - `react-native-reanimated: ~3.19.5` — versione 3.x compatibile old arch (4.x richiederebbe New Arch)
 - `react-native-worklets`: RIMOSSO (era peer dep di reanimated 4.x, non necessario con 3.x)
 - `react-native-maps: 1.18.0` — pinnato, in `expo.install.exclude`
@@ -330,6 +330,5 @@ Produce un `.aab` ottimizzato per la distribuzione su Google Play.
 - `google-services.json` NON necessario (nessun modulo Firebase)
 - Per nuova versione: incrementare `versionCode` in `app.json` prima di ogni nuovo build
 - EAS account: andreamasteri, progetto: @andreamasteri/bikerlink
-- NON aggiornare keyboard-controller a 2.x senza testare compatibilità New Arch
-- `react-native-reanimated` è in `expo.install.exclude` perché usiamo intenzionalmente la versione 3.x invece della 4.x (che Expo SDK 54 si aspetta). La 4.x richiede `newArchEnabled: true`, incompatibile con keyboard-controller 1.18.5. NON rimuovere questo exclude né aggiornare reanimated a 4.x senza aggiornare prima keyboard-controller a una versione compatibile con New Architecture.
+- `react-native-reanimated` è in `expo.install.exclude` perché usiamo intenzionalmente la versione 3.x invece della 4.x (che Expo SDK 54 si aspetta). La 4.x richiede `newArchEnabled: true`, quindi NON rimuovere questo exclude né aggiornare reanimated a 4.x senza impostare `newArchEnabled: true` in app.json.
 
