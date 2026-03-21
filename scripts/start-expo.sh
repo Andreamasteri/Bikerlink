@@ -4,70 +4,61 @@ PORT=8081
 BACKEND_PORT=5000
 MAX_RETRIES=3
 BACKEND_WAIT_SECONDS=120
+FLOCK_FILE="/tmp/start-expo.flock"
 LOCK_FILE="/tmp/start-expo.lock"
 PID_FILE="/tmp/metro.pid"
 
+# ── Lock atomico con flock (kernel-level, nessuna race condition) ──────────────
+exec 9>>"$FLOCK_FILE"
+if ! flock -n 9; then
+  echo "Un'altra istanza di start-expo.sh e' gia' in esecuzione. Uscita."
+  exit 0
+fi
+
+# Scrivi il PID per compatibilita' con Watchdog (che controlla kill -0 sul PID)
+echo $$ > "$LOCK_FILE"
+
 cleanup() {
   rm -f "$LOCK_FILE"
+  # Il flock viene rilasciato automaticamente alla chiusura del fd 9 (quando bash esce)
 }
 trap cleanup EXIT
 
-if [ -f "$LOCK_FILE" ]; then
-  LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null)
-  if kill -0 "$LOCK_PID" 2>/dev/null; then
-    echo "Un'altra istanza di start-expo.sh è già in esecuzione (PID: $LOCK_PID). Uscita."
-    exit 0
-  else
-    echo "Lock file obsoleto trovato, continuo."
-    rm -f "$LOCK_FILE"
-  fi
-fi
+# ── Configurazione Node.js ─────────────────────────────────────────────────────
+# cgroup limit: 8192MB. maxWorkers=1 (metro.config.js) = 2 processi Node totali.
+# 2 x 1024MB = 2048MB per Metro + ~3GB backend+OS = ~5GB < 8GB limite cgroup.
+export NODE_OPTIONS="--max-old-space-size=1024"
 
-echo $$ > "$LOCK_FILE"
-
-# Limita la memoria di Node.js per prevenire OOM kill (valore fisso per questo script)
-export NODE_OPTIONS="--max-old-space-size=2048"
-
-# nc è sempre disponibile — usa solo nc per verificare lo stato della porta
+# ── Funzioni di utilita' ────────────────────────────────────────────────────────
 port_is_open() {
-  nc -z -w1 localhost "$1" >/dev/null 2>&1
+  curl -s --max-time 2 --connect-timeout 1 -o /dev/null "http://localhost:$1/" 2>/dev/null
 }
 
 kill_port() {
   echo "Killing processi su porta $PORT..."
-
-  # Kill per porta (fuser e lsof potrebbero non essere disponibili, ignora errori)
   fuser -k -9 ${PORT}/tcp 2>/dev/null || true
   lsof -ti:${PORT} 2>/dev/null | xargs kill -9 2>/dev/null || true
-
-  # Kill per pattern (il processo Metro reale)
   pkill -9 -f "expo start --localhost" 2>/dev/null || true
   pkill -9 -f "node_modules/.bin/expo" 2>/dev/null || true
   pkill -9 -f "node_modules/expo/build/cli" 2>/dev/null || true
   pkill -9 -f "@expo/cli" 2>/dev/null || true
 
-  # Kill PID Metro noto dal file
   if [ -f "$PID_FILE" ]; then
     OLD_PID=$(cat "$PID_FILE" 2>/dev/null)
     if [ -n "$OLD_PID" ]; then
       kill -9 "$OLD_PID" 2>/dev/null || true
-      # Killa anche i figli del processo npm
       pkill -9 -P "$OLD_PID" 2>/dev/null || true
     fi
     rm -f "$PID_FILE"
   fi
 
-  # Attendi con nc (affidabile su tutti i sistemi) che la porta sia libera
   for i in $(seq 1 20); do
     if ! port_is_open $PORT; then
       echo "Porta $PORT libera dopo ${i}s"
       return 0
     fi
-    # Ri-prova kill ogni 3 secondi se la porta è ancora occupata
     if [ $((i % 3)) -eq 0 ]; then
       fuser -k -9 ${PORT}/tcp 2>/dev/null || true
-      pkill -9 -f "expo start --localhost" 2>/dev/null || true
-      pkill -9 -f "node_modules/.bin/expo" 2>/dev/null || true
     fi
     sleep 1
   done
@@ -125,7 +116,8 @@ for retry in $(seq 1 $MAX_RETRIES); do
     METRO_PID=$!
     echo $METRO_PID > "$PID_FILE"
 
-    # Aspetta fino a 300s che Metro binds su port 8081 (il crawl iniziale senza cache puo' richiedere >90s)
+    # Aspetta fino a 300s che Metro binds su porta 8081
+    # Il crawl iniziale senza cache puo' richiedere 2-3 minuti.
     echo "Attendo che Metro si avvii sulla porta $PORT (max 300s)..." | tee -a "$LOG_FILE"
     for i in $(seq 1 300); do
       if port_is_open $PORT; then
@@ -135,10 +127,10 @@ for retry in $(seq 1 $MAX_RETRIES); do
         METRO_STARTED=1
         break
       fi
-      # Se npm e' morto E la porta non e' ancora aperta, aspetta 60s per il processo orphan
+      # npm e' uscito (launcher): aspetta fino a 120s che il processo Metro orphan apra la porta
       if ! kill -0 $METRO_PID 2>/dev/null; then
-        echo "npm (PID $METRO_PID) uscito al secondo $i, attendo 60s per il processo Metro..." | tee -a "$LOG_FILE"
-        for j in $(seq 1 60); do
+        echo "npm (PID $METRO_PID) uscito al secondo $i, attendo 120s per il processo Metro..." | tee -a "$LOG_FILE"
+        for j in $(seq 1 120); do
           if port_is_open $PORT; then
             END_TIME=$(date +%s)
             ELAPSED=$((END_TIME - START_TIME))
@@ -159,7 +151,6 @@ for retry in $(seq 1 $MAX_RETRIES); do
 
   if [ $METRO_STARTED -eq 1 ]; then
     echo "Metro in esecuzione, monitoraggio porta $PORT..." | tee -a "$LOG_FILE"
-    # Mantieni il workflow vivo monitorando la porta con nc
     while true; do
       sleep 15
       if ! port_is_open $PORT; then

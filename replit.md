@@ -212,7 +212,7 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 
 - **MAI usare `configureWorkflow()`** per riavviare workflow — riscrive la sezione `[[ports]]` nel `.replit` e rompe il mapping delle porte. Usare SOLO `restart_workflow`.
 - **Configurazione porte nel `.replit` NON va mai toccata.** Mapping corretto: `5000→5000`, `8081→80`, `8082→3000`.
-- Metro zombie risolto: lo script `scripts/start-expo.sh` massacra automaticamente i processi sulla porta 8081 prima di avviare Metro. Il workflow "Start Frontend" usa questo script.
+- Metro: `scripts/start-expo.sh` usa `flock` (lock atomico) + `curl` per port-check (nc NON è disponibile nel Nix env). `watchdog.sh` usa `flock` per impedire istanze parallele. Entrambi scrivono PID in `/tmp/start-expo.lock` / usano `/tmp/start-expo.flock` e `/tmp/watchdog.flock`. Root cause storico crash: `nc` inesistente → `port_is_open` sempre false → Metro mai rilevato → timeout 300s → retry esauriti.
 - react-native-maps: usare componenti con pattern `.web.tsx` per compatibilità web
 - KeyboardProvider: escluso su web (causa errore hooks)
 - react-native-maps pinnato a 1.18.0 per compatibilità Expo Go

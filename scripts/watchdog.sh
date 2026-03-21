@@ -10,6 +10,13 @@ FRONTEND_RESTART_COOLDOWN=120
 
 mkdir -p "$(dirname "$LOG_FILE")"
 
+# ── Lock atomico: una sola istanza Watchdog per volta ──────────────────────────
+exec 9>>"/tmp/watchdog.flock"
+if ! flock -n 9; then
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Altra istanza Watchdog gia' in esecuzione. Uscita." >> "$LOG_FILE"
+  exit 0
+fi
+
 log() {
   local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
   echo "$msg"
