@@ -925,6 +925,9 @@ router.put("/settings/motoclub_include_zav", async (req: Request, res: Response)
 router.put("/settings/maps_enabled", async (req: Request, res: Response) => {
   try {
     const { value } = req.body as { value: string };
+    if (value !== "true" && value !== "false") {
+      return res.status(400).json({ message: "Valore non valido: usare 'true' o 'false'" });
+    }
     const setting = await storage.upsertAppSetting("maps_enabled", value);
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,

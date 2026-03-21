@@ -22,7 +22,6 @@ function useLoginMutation() {
     },
     onSuccess: (user: SafeUser) => {
       queryClient.setQueryData(["/api/auth/me"], user);
-      queryClient.invalidateQueries();
       (async () => {
         try {
           await queryClient.fetchQuery({ queryKey: ["/api/settings/maps"] });
@@ -30,6 +29,7 @@ function useLoginMutation() {
         try {
           await queryClient.fetchQuery({ queryKey: ["/api/users/profile"] });
         } catch {}
+        queryClient.invalidateQueries();
         queryClient.fetchQuery({ queryKey: ["/api/users/nearby"] }).catch(() => {});
         apiRequest("POST", "/api/matching/trigger").catch(() => {});
       })();

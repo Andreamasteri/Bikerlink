@@ -1017,7 +1017,7 @@ export default function AdminSettings() {
         <View style={styles.synecoHeader}>
           <View style={styles.synecoInfo}>
             <Ionicons name="map" size={20} color={Colors.accent} />
-            <Text style={styles.synecoLabel}>Mappe a Tile</Text>
+            <Text style={styles.synecoLabel}>Sistema Mappe</Text>
           </View>
           <Switch
             value={mapsEnabled}
