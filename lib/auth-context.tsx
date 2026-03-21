@@ -38,18 +38,20 @@ function useLoginMutation() {
           }
         } catch {}
         if (profileLat !== null && profileLng !== null) {
-          const baseUrl = getApiUrl();
-          const nearbyUrl = new URL("/api/users/nearby", baseUrl);
-          nearbyUrl.searchParams.set("lat", profileLat.toString());
-          nearbyUrl.searchParams.set("lng", profileLng.toString());
-          fetch(nearbyUrl.toString(), { credentials: "include" })
-            .then((r) => (r.ok ? r.json() : null))
-            .then((data) => {
-              if (data) {
-                queryClient.setQueryData(["/api/users/nearby", profileLat, profileLng, undefined], data);
-              }
-            })
-            .catch(() => {});
+          const captureLat = profileLat;
+          const captureLng = profileLng;
+          queryClient.fetchQuery({
+            queryKey: ["/api/users/nearby", captureLat, captureLng, undefined],
+            queryFn: async () => {
+              const baseUrl = getApiUrl();
+              const url = new URL("/api/users/nearby", baseUrl);
+              url.searchParams.set("lat", captureLat.toString());
+              url.searchParams.set("lng", captureLng.toString());
+              const res = await fetch(url.toString(), { credentials: "include" });
+              if (!res.ok) return [];
+              return res.json();
+            },
+          }).catch(() => {});
         }
         apiRequest("POST", "/api/matching/trigger").catch(() => {});
         queryClient.invalidateQueries();

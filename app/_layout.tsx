@@ -38,7 +38,7 @@ import { queryClient, apiRequest } from "@/lib/query-client";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { LocationProvider } from "@/lib/location-context";
 import { LanguageProvider, useLanguage } from "@/lib/language-context";
-import { MapSettingsProvider } from "@/lib/map-context";
+import { MapSettingsProvider, useMapConfig } from "@/lib/map-context";
 import Colors from "@/constants/colors";
 
 SplashScreen.preventAutoHideAsync();
@@ -97,6 +97,13 @@ function AppStateHandler() {
 
 function StartupGate({ ready, children }: { ready: boolean; children: React.ReactNode }) {
   if (!ready) return null;
+  return <>{children}</>;
+}
+
+function MapReadyGate({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const { isLoading } = useMapConfig();
+  if (user && isLoading) return null;
   return <>{children}</>;
 }
 
@@ -166,8 +173,10 @@ export default function RootLayout() {
             <MapSettingsProvider>
               <LocationProvider>
                 <StartupGate ready={ready}>
-                  <AppStateHandler />
-                  <LanguageKeyedRoot />
+                  <MapReadyGate>
+                    <AppStateHandler />
+                    <LanguageKeyedRoot />
+                  </MapReadyGate>
                 </StartupGate>
               </LocationProvider>
             </MapSettingsProvider>

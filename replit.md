@@ -126,13 +126,15 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 
 - **UrlTile overlay**: `InteractiveMap.tsx` usa `UrlTile` da react-native-maps per sovrapporre tile personalizzati alla mappa
 - **Provider supportati**: Carto Light (`carto_light`), Carto Dark (`carto_dark`), OpenStreetMap (`osm`)
-- **Controlli admin**: sezione "Mappe a Tile" in `admin/settings.tsx` con toggle on/off + picker provider
-- **Settings DB**: `maps_enabled` (default "true") e `maps_provider` (default "carto_light") via `upsertAppSetting`
-- **API**: `GET /api/settings/maps` → `{ enabled, provider }`. Incluso anche in `/api/settings/all`
-- **Startup sequenziale post-login**: in `lib/auth-context.tsx`, dopo login si esegue in sequenza: 1) prefetch map config, 2) prefetch user profile, 3) prefetch nearby users, 4) trigger matching engine
-- **Rimozione PROVIDER_GOOGLE e customMapStyle**: `InteractiveMap.tsx` usa ora il provider default (Apple Maps iOS / OSM Android) + UrlTile overlay, no più stile dark Google
-- **Props `mapsEnabled`/`mapsProvider`**: aggiunte a `InteractiveMapProps`, passate da `app/(tabs)/index.tsx` via `useSetting()`
-- **Settings context aggiornato**: `lib/settings-context.ts` include `mapsEnabled: boolean` e `mapsProvider: MapProvider`
+- **Controlli admin**: sezione "Sistema Mappe" in `admin/settings.tsx` con toggle on/off + dropdown Modal per provider
+- **Settings DB**: `maps_enabled` (default "true") e `maps_provider` (default "carto_light") seeded in `server/seed.ts`
+- **API**: `GET /api/settings/maps` → `{ enabled, provider }`. Incluso anche in `/api/settings/all`, più endpoint espliciti `/api/settings/maps-enabled` e `/api/settings/maps-provider`
+- **Admin PUT espliciti**: `PUT /api/admin/settings/maps_enabled` (valida "true"/"false") e `PUT /api/admin/settings/maps_provider` (valida provider)
+- **Startup sequenziale post-login**: in `lib/auth-context.tsx`, dopo login: 1) prefetch map config, 2) prefetch profile + estrazione lat/lng, 3) prefetch nearby (con queryClient.fetchQuery + queryFn custom se coords disponibili), 4) matching trigger fire-and-forget, 5) invalidateQueries globale
+- **PROVIDER_GOOGLE**: mantenuto su Android (necessario per UrlTile overlay con MapView). Quando mappe disabilitate: `customMapStyle` dark applicato (stile di default pre-tile). Quando mappe abilitate: `customMapStyle=undefined` + UrlTile
+- **Map context**: `lib/map-context.tsx` espone `MapSettingsProvider` (gated su `!!user`, provider normalization fallback) e `useMapConfig()`. `lib/map-tiles.ts` contiene TileConfig constants
+- **InteractiveMap**: usa `useMapConfig()` da context (non più props `mapsEnabled`/`mapsProvider`). Props rimossi da `InteractiveMapProps` e da `app/(tabs)/index.tsx`
+- **MapReadyGate**: componente in `_layout.tsx` che blocca il rendering finché map config è caricata (quando utente autenticato)
 
 ## Funzionalità Recenti
 
