@@ -21,7 +21,7 @@ config.resolver.platforms = ["ios", "android", "web"];
 
 config.maxWorkers = 1;
 
-config.cacheVersion = "v3-optimized";
+config.cacheVersion = "v4-clean-" + process.version;
 
 config.transformer = {
   ...config.transformer,

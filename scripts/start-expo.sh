@@ -26,7 +26,7 @@ fi
 echo $$ > "$LOCK_FILE"
 
 # Limita la memoria di Node.js per prevenire OOM kill (valore fisso per questo script)
-export NODE_OPTIONS="--max-old-space-size=384"
+export NODE_OPTIONS="--max-old-space-size=2048"
 
 # nc è sempre disponibile — usa solo nc per verificare lo stato della porta
 port_is_open() {
@@ -99,50 +99,63 @@ for retry in $(seq 1 $MAX_RETRIES); do
   echo "Log ciclo: $LOG_FILE"
   echo "NODE_OPTIONS: $NODE_OPTIONS" | tee -a "$LOG_FILE"
   echo "Orario avvio: $(date)" | tee -a "$LOG_FILE"
-  echo "Pulizia porta $PORT..." | tee -a "$LOG_FILE"
-  kill_port
 
-  # Verifica con nc che la porta sia davvero libera
-  if port_is_open $PORT; then
-    echo "Porta $PORT ancora occupata dopo kill completo, salto tentativo $retry" | tee -a "$LOG_FILE"
-    if [ $retry -lt $MAX_RETRIES ]; then
-      sleep 3
-    fi
-    continue
-  fi
-
-  echo "Porta $PORT libera, avvio Metro..." | tee -a "$LOG_FILE"
-  START_TIME=$(date +%s)
-  npm run expo:dev >> "$LOG_FILE" 2>&1 &
-  METRO_PID=$!
-  echo $METRO_PID > "$PID_FILE"
-
-  # Aspetta fino a 90s che Metro binds su port 8081 — usa nc per il check
-  echo "Attendo che Metro si avvii sulla porta $PORT (max 90s)..." | tee -a "$LOG_FILE"
   METRO_STARTED=0
-  for i in $(seq 1 90); do
+  METRO_PID=0
+
+  # Se Metro e' gia' attivo su porta $PORT, adottalo senza ucciderlo
+  if port_is_open $PORT; then
+    echo "Metro gia' attivo su porta $PORT — adotto senza restart" | tee -a "$LOG_FILE"
+    METRO_STARTED=1
+  else
+    echo "Pulizia porta $PORT..." | tee -a "$LOG_FILE"
+    kill_port
+
     if port_is_open $PORT; then
-      END_TIME=$(date +%s)
-      ELAPSED=$((END_TIME - START_TIME))
-      echo "Metro avviato con successo sulla porta $PORT dopo ${ELAPSED}s" | tee -a "$LOG_FILE"
-      METRO_STARTED=1
-      break
+      echo "Porta $PORT ancora occupata dopo kill completo, salto tentativo $retry" | tee -a "$LOG_FILE"
+      if [ $retry -lt $MAX_RETRIES ]; then
+        sleep 3
+      fi
+      continue
     fi
-    # Se npm è morto E la porta non è ancora aperta, aspetta altri 5s per l'orphan
-    if ! kill -0 $METRO_PID 2>/dev/null; then
-      sleep 5
+
+    echo "Porta $PORT libera, avvio Metro..." | tee -a "$LOG_FILE"
+    START_TIME=$(date +%s)
+    npm run expo:dev >> "$LOG_FILE" 2>&1 &
+    METRO_PID=$!
+    echo $METRO_PID > "$PID_FILE"
+
+    # Aspetta fino a 300s che Metro binds su port 8081 (il crawl iniziale senza cache puo' richiedere >90s)
+    echo "Attendo che Metro si avvii sulla porta $PORT (max 300s)..." | tee -a "$LOG_FILE"
+    for i in $(seq 1 300); do
       if port_is_open $PORT; then
         END_TIME=$(date +%s)
         ELAPSED=$((END_TIME - START_TIME))
-        echo "Metro avviato (come processo orphan) dopo ${ELAPSED}s" | tee -a "$LOG_FILE"
+        echo "Metro avviato con successo sulla porta $PORT dopo ${ELAPSED}s" | tee -a "$LOG_FILE"
         METRO_STARTED=1
-      else
-        echo "npm (PID $METRO_PID) morto e porta $PORT non aperta al secondo $i" | tee -a "$LOG_FILE"
+        break
       fi
-      break
-    fi
-    sleep 1
-  done
+      # Se npm e' morto E la porta non e' ancora aperta, aspetta 60s per il processo orphan
+      if ! kill -0 $METRO_PID 2>/dev/null; then
+        echo "npm (PID $METRO_PID) uscito al secondo $i, attendo 60s per il processo Metro..." | tee -a "$LOG_FILE"
+        for j in $(seq 1 60); do
+          if port_is_open $PORT; then
+            END_TIME=$(date +%s)
+            ELAPSED=$((END_TIME - START_TIME))
+            echo "Metro avviato (come processo orphan) dopo ${ELAPSED}s" | tee -a "$LOG_FILE"
+            METRO_STARTED=1
+            break
+          fi
+          sleep 1
+        done
+        break
+      fi
+      if [ $((i % 30)) -eq 0 ]; then
+        echo "  ...ancora in attesa di Metro (${i}s / 300s)..." | tee -a "$LOG_FILE"
+      fi
+      sleep 1
+    done
+  fi
 
   if [ $METRO_STARTED -eq 1 ]; then
     echo "Metro in esecuzione, monitoraggio porta $PORT..." | tee -a "$LOG_FILE"
@@ -150,19 +163,23 @@ for retry in $(seq 1 $MAX_RETRIES); do
     while true; do
       sleep 15
       if ! port_is_open $PORT; then
-        echo "Metro giù: porta $PORT non risponde — $(date)" | tee -a "$LOG_FILE"
+        echo "Metro giu': porta $PORT non risponde — $(date)" | tee -a "$LOG_FILE"
         break
       fi
     done
     echo "Metro terminato su porta $PORT" | tee -a "$LOG_FILE"
-    kill $METRO_PID 2>/dev/null || true
+    if [ $METRO_PID -ne 0 ]; then
+      kill $METRO_PID 2>/dev/null || true
+    fi
     if [ $retry -lt $MAX_RETRIES ]; then
       echo "Riavvio in corso..." | tee -a "$LOG_FILE"
       sleep 5
     fi
   else
     echo "Metro crashato al tentativo $retry — $(date)" | tee -a "$LOG_FILE"
-    kill $METRO_PID 2>/dev/null || true
+    if [ $METRO_PID -ne 0 ]; then
+      kill $METRO_PID 2>/dev/null || true
+    fi
     if [ $retry -lt $MAX_RETRIES ]; then
       echo "Riprovo tra 5 secondi..." | tee -a "$LOG_FILE"
       sleep 5
