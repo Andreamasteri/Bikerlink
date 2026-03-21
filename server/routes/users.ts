@@ -181,7 +181,13 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
     if (latitude !== undefined) updateData.latitude = latitude;
     if (longitude !== undefined) updateData.longitude = longitude;
     if (searchPreference !== undefined) updateData.searchPreference = searchPreference;
-    if (preferredMapStyle !== undefined) updateData.preferredMapStyle = preferredMapStyle;
+    const validMapStyles = ["carto_light", "carto_dark", "esri_gray"];
+    if (preferredMapStyle !== undefined) {
+      if (preferredMapStyle !== null && !validMapStyles.includes(preferredMapStyle)) {
+        return res.status(400).json({ message: "Stile mappa non valido" });
+      }
+      updateData.preferredMapStyle = preferredMapStyle;
+    }
 
     if (isAvailable === true) {
       await storage.updateUser(userId, { ghostMode: false } as any);

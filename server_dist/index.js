@@ -4341,7 +4341,13 @@ router2.put("/profile/dynamic", requireAuth, async (req, res) => {
     if (latitude !== void 0) updateData.latitude = latitude;
     if (longitude !== void 0) updateData.longitude = longitude;
     if (searchPreference !== void 0) updateData.searchPreference = searchPreference;
-    if (preferredMapStyle !== void 0) updateData.preferredMapStyle = preferredMapStyle;
+    const validMapStyles = ["carto_light", "carto_dark", "esri_gray"];
+    if (preferredMapStyle !== void 0) {
+      if (preferredMapStyle !== null && !validMapStyles.includes(preferredMapStyle)) {
+        return res.status(400).json({ message: "Stile mappa non valido" });
+      }
+      updateData.preferredMapStyle = preferredMapStyle;
+    }
     if (isAvailable === true) {
       await storage.updateUser(userId, { ghostMode: false });
     }
