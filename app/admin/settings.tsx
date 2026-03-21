@@ -573,6 +573,7 @@ export default function AdminSettings() {
   const [donationText, setDonationText] = useState("");
   const [donationTextPassword, setDonationTextPassword] = useState("");
   const [showDonationTextPasswordModal, setShowDonationTextPasswordModal] = useState(false);
+  const [showProviderDropdown, setShowProviderDropdown] = useState(false);
 
   React.useEffect(() => {
     if (donationData?.text !== undefined) {
@@ -1031,37 +1032,66 @@ export default function AdminSettings() {
           {mapsEnabled ? "Tile personalizzati attivi sulla mappa" : "Mappa con stile di default (no tile overlay)"}
         </Text>
         {mapsEnabled && (
-          <View style={{ marginTop: 12, gap: 8 }}>
-            <Text style={[styles.synecoDesc, { marginBottom: 4 }]}>Provider tile:</Text>
-            {(["carto_light", "carto_dark", "osm"] as const).map((provider) => {
-              const labels: Record<string, string> = {
+          <View style={{ marginTop: 12 }}>
+            <Text style={[styles.synecoDesc, { marginBottom: 6 }]}>Provider tile:</Text>
+            {(() => {
+              const providerLabels: Record<string, string> = {
                 carto_light: "Carto Light",
                 carto_dark: "Carto Dark",
                 osm: "OpenStreetMap",
               };
-              const active = mapsProvider === provider;
               return (
-                <TouchableOpacity
-                  key={provider}
-                  style={[
-                    styles.providerOption,
-                    active && styles.providerOptionActive,
-                  ]}
-                  onPress={() => mapsProviderMutation.mutate(provider)}
-                  disabled={mapsProviderMutation.isPending}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name={active ? "radio-button-on" : "radio-button-off"}
-                    size={18}
-                    color={active ? Colors.accent : Colors.textSecondary}
-                  />
-                  <Text style={[styles.providerLabel, active && { color: Colors.accent }]}>
-                    {labels[provider]}
-                  </Text>
-                </TouchableOpacity>
+                <>
+                  <TouchableOpacity
+                    style={styles.dropdownButton}
+                    onPress={() => setShowProviderDropdown(true)}
+                    disabled={mapsProviderMutation.isPending}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.dropdownButtonText}>
+                      {providerLabels[mapsProvider] ?? mapsProvider}
+                    </Text>
+                    <Ionicons name="chevron-down" size={16} color={Colors.textSecondary} />
+                  </TouchableOpacity>
+                  <Modal
+                    visible={showProviderDropdown}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setShowProviderDropdown(false)}
+                  >
+                    <TouchableOpacity
+                      style={styles.dropdownOverlay}
+                      activeOpacity={1}
+                      onPress={() => setShowProviderDropdown(false)}
+                    >
+                      <View style={styles.dropdownMenu}>
+                        {(["carto_light", "carto_dark", "osm"] as const).map((p) => (
+                          <TouchableOpacity
+                            key={p}
+                            style={[
+                              styles.dropdownMenuItem,
+                              mapsProvider === p && styles.dropdownMenuItemActive,
+                            ]}
+                            onPress={() => {
+                              setShowProviderDropdown(false);
+                              mapsProviderMutation.mutate(p);
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[styles.dropdownMenuItemText, mapsProvider === p && { color: Colors.accent }]}>
+                              {providerLabels[p]}
+                            </Text>
+                            {mapsProvider === p && (
+                              <Ionicons name="checkmark" size={16} color={Colors.accent} />
+                            )}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </TouchableOpacity>
+                  </Modal>
+                </>
               );
-            })}
+            })()}
           </View>
         )}
       </View>
@@ -1810,6 +1840,26 @@ const styles = StyleSheet.create({
   },
   providerOptionActive: { borderColor: Colors.accent, backgroundColor: Colors.surfaceLight },
   providerLabel: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.textSecondary },
+  dropdownButton: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingVertical: 10, paddingHorizontal: 14,
+    borderRadius: 8, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.background,
+  },
+  dropdownButtonText: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.text },
+  dropdownOverlay: {
+    flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 24,
+  },
+  dropdownMenu: {
+    backgroundColor: Colors.surface, borderRadius: 12, overflow: "hidden",
+    width: "100%", maxWidth: 280, borderWidth: 1, borderColor: Colors.border,
+  },
+  dropdownMenuItem: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingVertical: 14, paddingHorizontal: 16,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  dropdownMenuItemActive: { backgroundColor: Colors.surfaceLight },
+  dropdownMenuItemText: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.text },
   privacyCard: {
     backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginTop: 16,
     borderWidth: 1, borderColor: Colors.accent,

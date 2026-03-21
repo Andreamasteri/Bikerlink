@@ -1,5 +1,6 @@
 import React, { createContext, useContext, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth-context";
 import type { MapProvider } from "@/lib/map-tiles";
 
 const VALID_PROVIDERS: MapProvider[] = ["carto_light", "carto_dark", "osm"];
@@ -24,10 +25,13 @@ const defaultConfig: MapConfig = {
 const MapContext = createContext<MapConfig>(defaultConfig);
 
 export function MapSettingsProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+
   const { data, isLoading } = useQuery<MapsApiResponse>({
     queryKey: ["/api/settings/maps"],
     staleTime: 120000,
     retry: false,
+    enabled: !!user,
   });
 
   const rawProvider = data?.provider as MapProvider | undefined;
