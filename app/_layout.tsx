@@ -9,7 +9,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
-import { Platform, AppState } from "react-native";
+import { Platform, AppState, ActivityIndicator, View, StyleSheet } from "react-native";
 
 if (Platform.OS === "web" && typeof window !== "undefined") {
   const link = document.createElement("link");
@@ -103,7 +103,13 @@ function StartupGate({ ready, children }: { ready: boolean; children: React.Reac
 function MapReadyGate({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { isLoading } = useMapConfig();
-  if (user && isLoading) return null;
+  if (user && isLoading) {
+    return (
+      <View style={styles.mapGateLoader}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
   return <>{children}</>;
 }
 
@@ -186,3 +192,12 @@ export default function RootLayout() {
     </ErrorBoundary>
   );
 }
+
+const styles = StyleSheet.create({
+  mapGateLoader: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.background,
+  },
+});
