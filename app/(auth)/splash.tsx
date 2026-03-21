@@ -235,9 +235,11 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     letterSpacing: 4,
     textAlign: "center",
-    textShadowColor: "rgba(212, 160, 23, 0.5)",
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 20,
+    ...Platform.select({
+      ios: { textShadowColor: "rgba(212, 160, 23, 0.5)", textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 20 },
+      android: { textShadowColor: "rgba(212, 160, 23, 0.5)", textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 20 },
+      web: { textShadow: "0px 0px 20px rgba(212, 160, 23, 0.5)" },
+    }),
   },
   tagline: {
     fontSize: 18,
@@ -247,9 +249,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
     letterSpacing: 1.5,
     textAlign: "center",
-    textShadowColor: "rgba(0, 0, 0, 0.8)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
+    ...Platform.select({
+      ios: { textShadowColor: "rgba(0, 0, 0, 0.8)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+      android: { textShadowColor: "rgba(0, 0, 0, 0.8)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+      web: { textShadow: "0px 1px 6px rgba(0, 0, 0, 0.8)" },
+    }),
   },
   lineAccent: {
     width: 60,

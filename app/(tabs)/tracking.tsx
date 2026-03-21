@@ -846,16 +846,24 @@ const styles = StyleSheet.create({
   controlRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 4 },
   controlBtn: {
     width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center",
-    elevation: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25, shadowRadius: 4,
+    elevation: 4,
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 },
+      android: {},
+      web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.25)" },
+    }),
   },
   controlLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#fff", marginTop: 2 },
   controlPlaceholder: { width: 80 },
   mainBtn: {
     width: 120, height: 120, borderRadius: 60,
     alignItems: "center", justifyContent: "center",
-    elevation: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8,
+    elevation: 8,
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+      android: {},
+      web: { boxShadow: "0px 4px 8px rgba(0,0,0,0.3)" },
+    }),
   },
   hint: {
     fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary,

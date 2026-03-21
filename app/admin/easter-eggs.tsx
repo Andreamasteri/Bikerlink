@@ -405,11 +405,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
     elevation: 5,
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4 },
+      android: {},
+      web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.3)" },
+    }),
   },
   fabSecondary: {
     backgroundColor: Colors.surface,

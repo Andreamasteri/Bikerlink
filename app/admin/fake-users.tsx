@@ -1561,10 +1561,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     elevation: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 5 },
+      android: {},
+      web: { boxShadow: "0px 3px 5px rgba(0,0,0,0.3)" },
+    }),
   },
   modalOverlay: {
     flex: 1,

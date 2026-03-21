@@ -398,10 +398,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 16,
     elevation: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+      android: {},
+      web: { boxShadow: "0px 4px 8px rgba(0,0,0,0.3)" },
+    }),
   },
   ghostBlock: {
     alignItems: "center",

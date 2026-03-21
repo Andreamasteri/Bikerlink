@@ -449,11 +449,12 @@ const sosMarkerStyles = StyleSheet.create({
     gap: 2,
     borderWidth: 2,
     borderColor: "#fff",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
     elevation: 6,
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 4 },
+      android: {},
+      web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.4)" },
+    }),
   },
   label: {
     color: "#fff",

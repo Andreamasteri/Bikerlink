@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, TextInput, Modal } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, TextInput, Modal, Platform } from "react-native";
 import { KeyboardAvoidingView } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -173,8 +173,12 @@ const styles = StyleSheet.create({
   emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", marginTop: 40 },
   fab: {
     position: "absolute", bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28,
-    backgroundColor: Colors.accent, alignItems: "center", justifyContent: "center",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5,
+    backgroundColor: Colors.accent, alignItems: "center", justifyContent: "center", elevation: 5,
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4 },
+      android: {},
+      web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.3)" },
+    }),
   },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
   modalContent: { backgroundColor: Colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "80%" },

@@ -142,9 +142,11 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     textAlign: "center",
     transform: [{ rotate: "-5deg" }],
-    textShadowColor: "rgba(0,0,0,0.8)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+    ...Platform.select({
+      ios: { textShadowColor: "rgba(0,0,0,0.8)", textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8 },
+      android: { textShadowColor: "rgba(0,0,0,0.8)", textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8 },
+      web: { textShadow: "0px 2px 8px rgba(0,0,0,0.8)" },
+    }),
   },
   tagline: {
     fontSize: 18,
@@ -153,9 +155,11 @@ const styles = StyleSheet.create({
     color: Colors.text,
     marginTop: 8,
     textAlign: "center",
-    textShadowColor: "rgba(0,0,0,0.8)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    ...Platform.select({
+      ios: { textShadowColor: "rgba(0,0,0,0.8)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+      android: { textShadowColor: "rgba(0,0,0,0.8)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+      web: { textShadow: "0px 1px 4px rgba(0,0,0,0.8)" },
+    }),
   },
   buttons: {
     width: "100%",

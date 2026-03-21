@@ -617,11 +617,12 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
     elevation: 6,
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 5 },
+      android: {},
+      web: { boxShadow: "0px 3px 5px rgba(0,0,0,0.3)" },
+    }),
   },
   createModalContainer: {
     flex: 1,
