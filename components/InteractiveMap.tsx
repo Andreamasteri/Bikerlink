@@ -239,11 +239,11 @@ export default function InteractiveMap({
       >
         {tileConfig ? (
           <UrlTile
+            key={resolvedProvider}
             urlTemplate={tileConfig.urlTemplate}
             maximumZ={tileConfig.maximumZ}
             flipY={false}
-            zIndex={-1}
-            shouldReplaceMapContent={tileConfig.shouldReplaceMapContent}
+            shouldReplaceMapContent={false}
           />
         ) : null}
 
