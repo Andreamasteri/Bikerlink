@@ -33,7 +33,6 @@ if (Platform.OS === "web" && typeof window !== "undefined") {
   });
 }
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient, apiRequest } from "@/lib/query-client";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
@@ -95,17 +94,16 @@ function AppStateHandler() {
   return null;
 }
 
+function StartupGate({ ready, children }: { ready: boolean; children: React.ReactNode }) {
+  if (!ready) return null;
+  return <>{children}</>;
+}
+
 function LanguageKeyedRoot() {
   const { renderKey } = useLanguage();
   return (
     <GestureHandlerRootView style={{ flex: 1 }} key={renderKey}>
-      {Platform.OS === "web" ? (
-        <RootLayoutNav />
-      ) : (
-        <KeyboardProvider>
-          <RootLayoutNav />
-        </KeyboardProvider>
-      )}
+      <RootLayoutNav />
     </GestureHandlerRootView>
   );
 }
@@ -149,7 +147,6 @@ export default function RootLayout() {
       SplashScreen.hideAsync().catch(() => {});
     };
 
-    // Forza l'avvio dopo 5s se useFonts rimane pending (Android/new arch)
     const timeout = setTimeout(forceReady, 5000);
 
     if (fontsLoaded || fontError) {
@@ -160,16 +157,16 @@ export default function RootLayout() {
     return () => clearTimeout(timeout);
   }, [fontsLoaded, fontError]);
 
-  if (!ready) return null;
-
   return (
     <ErrorBoundary>
       <LanguageProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <LocationProvider>
-              <AppStateHandler />
-              <LanguageKeyedRoot />
+              <StartupGate ready={ready}>
+                <AppStateHandler />
+                <LanguageKeyedRoot />
+              </StartupGate>
             </LocationProvider>
           </AuthProvider>
         </QueryClientProvider>
