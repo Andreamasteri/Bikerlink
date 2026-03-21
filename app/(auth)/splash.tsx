@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -6,16 +6,9 @@ import {
   ImageBackground,
   Dimensions,
   Platform,
-} from "react-native";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withDelay,
-  withSequence,
+  Animated,
   Easing,
-  interpolate,
-} from "react-native-reanimated";
+} from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Colors from "@/constants/colors";
@@ -55,33 +48,95 @@ export default function SplashAnimatedScreen() {
   const router = useRouter();
   const [splashMessage, setSplashMessage] = useState<string | null>(null);
 
-  const bgOpacity = useSharedValue(0);
-  const overlayOpacity = useSharedValue(1);
-  const titleTranslateY = useSharedValue(30);
-  const titleOpacity = useSharedValue(0);
-  const titleScale = useSharedValue(0.8);
-  const taglineOpacity = useSharedValue(0);
-  const taglineTranslateY = useSharedValue(20);
-  const glowOpacity = useSharedValue(0);
+  const bgOpacity = useRef(new Animated.Value(0)).current;
+  const overlayOpacity = useRef(new Animated.Value(1)).current;
+  const titleTranslateY = useRef(new Animated.Value(30)).current;
+  const titleOpacity = useRef(new Animated.Value(0)).current;
+  const titleScale = useRef(new Animated.Value(0.8)).current;
+  const taglineOpacity = useRef(new Animated.Value(0)).current;
+  const taglineTranslateY = useRef(new Animated.Value(20)).current;
+  const glowOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     pickSplashMessage().then(msg => setSplashMessage(msg));
 
-    bgOpacity.value = withTiming(1, { duration: 1200, easing: Easing.out(Easing.cubic) });
-    overlayOpacity.value = withTiming(0.55, { duration: 1400, easing: Easing.out(Easing.cubic) });
-
-    titleOpacity.value = withDelay(400, withTiming(1, { duration: 800, easing: Easing.out(Easing.cubic) }));
-    titleTranslateY.value = withDelay(400, withTiming(0, { duration: 900, easing: Easing.out(Easing.back(1.2)) }));
-    titleScale.value = withDelay(400, withTiming(1, { duration: 900, easing: Easing.out(Easing.back(1.1)) }));
-
-    taglineOpacity.value = withDelay(1000, withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) }));
-    taglineTranslateY.value = withDelay(1000, withTiming(0, { duration: 700, easing: Easing.out(Easing.cubic) }));
-
-    glowOpacity.value = withDelay(1200, withSequence(
-      withTiming(0.6, { duration: 800, easing: Easing.inOut(Easing.sin) }),
-      withTiming(0.3, { duration: 800, easing: Easing.inOut(Easing.sin) }),
-      withTiming(0.5, { duration: 800, easing: Easing.inOut(Easing.sin) })
-    ));
+    Animated.parallel([
+      Animated.timing(bgOpacity, {
+        toValue: 1,
+        duration: 1200,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(overlayOpacity, {
+        toValue: 0.55,
+        duration: 1400,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.sequence([
+        Animated.delay(400),
+        Animated.parallel([
+          Animated.timing(titleOpacity, {
+            toValue: 1,
+            duration: 800,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(titleTranslateY, {
+            toValue: 0,
+            duration: 900,
+            easing: Easing.out(Easing.back(1.2)),
+            useNativeDriver: true,
+          }),
+          Animated.timing(titleScale, {
+            toValue: 1,
+            duration: 900,
+            easing: Easing.out(Easing.back(1.1)),
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+      Animated.sequence([
+        Animated.delay(1000),
+        Animated.parallel([
+          Animated.timing(taglineOpacity, {
+            toValue: 1,
+            duration: 700,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(taglineTranslateY, {
+            toValue: 0,
+            duration: 700,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+      Animated.sequence([
+        Animated.delay(1200),
+        Animated.sequence([
+          Animated.timing(glowOpacity, {
+            toValue: 0.6,
+            duration: 800,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(glowOpacity, {
+            toValue: 0.3,
+            duration: 800,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(glowOpacity, {
+            toValue: 0.5,
+            duration: 800,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+    ]).start();
 
     const timeout = setTimeout(() => {
       router.replace("/(auth)/login");
@@ -90,56 +145,52 @@ export default function SplashAnimatedScreen() {
     return () => clearTimeout(timeout);
   }, []);
 
-  const bgAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: bgOpacity.value,
-  }));
-
-  const overlayAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: overlayOpacity.value,
-  }));
-
-  const titleAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: titleOpacity.value,
-    transform: [
-      { translateY: titleTranslateY.value },
-      { scale: titleScale.value },
-    ],
-  }));
-
-  const taglineAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: taglineOpacity.value,
-    transform: [{ translateY: taglineTranslateY.value }],
-  }));
-
-  const glowAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: glowOpacity.value,
-  }));
-
   const displayMessage = splashMessage || t("app.tagline");
 
   return (
     <View style={styles.container}>
       <AnimatedImageBackground
         source={require("@/assets/images/splash-bg.jpg")}
-        style={[styles.background, bgAnimatedStyle]}
+        style={[styles.background, { opacity: bgOpacity }]}
         resizeMode="cover"
       >
-        <Animated.View style={[styles.overlay, overlayAnimatedStyle]} />
+        <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]} />
 
         <View style={styles.content}>
-          <Animated.View style={[styles.glowContainer, glowAnimatedStyle]}>
+          <Animated.View style={[styles.glowContainer, { opacity: glowOpacity }]}>
             <View style={styles.glowCircle} />
           </Animated.View>
 
-          <Animated.View style={titleAnimatedStyle}>
+          <Animated.View
+            style={{
+              opacity: titleOpacity,
+              transform: [
+                { translateY: titleTranslateY },
+                { scale: titleScale },
+              ],
+            }}
+          >
             <Text style={styles.title}>{t("app.name")}</Text>
           </Animated.View>
 
-          <Animated.View style={taglineAnimatedStyle}>
+          <Animated.View
+            style={{
+              opacity: taglineOpacity,
+              transform: [{ translateY: taglineTranslateY }],
+            }}
+          >
             <Text style={styles.tagline}>{displayMessage}</Text>
           </Animated.View>
 
-          <Animated.View style={[styles.lineAccent, taglineAnimatedStyle]} />
+          <Animated.View
+            style={[
+              styles.lineAccent,
+              {
+                opacity: taglineOpacity,
+                transform: [{ translateY: taglineTranslateY }],
+              },
+            ]}
+          />
         </View>
       </AnimatedImageBackground>
     </View>
