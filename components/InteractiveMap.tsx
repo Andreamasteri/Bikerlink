@@ -243,7 +243,7 @@ export default function InteractiveMap({
             urlTemplate={tileConfig.urlTemplate}
             maximumZ={tileConfig.maximumZ}
             flipY={false}
-            shouldReplaceMapContent={false}
+            shouldReplaceMapContent={tileConfig.shouldReplaceMapContent}
           />
         ) : null}
 
