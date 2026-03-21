@@ -23,9 +23,20 @@ function useLoginMutation() {
     onSuccess: (user: SafeUser) => {
       queryClient.setQueryData(["/api/auth/me"], user);
       queryClient.invalidateQueries();
-      setTimeout(() => {
-        apiRequest("POST", "/api/matching/trigger").catch(() => {});
-      }, 5000);
+      (async () => {
+        try {
+          await queryClient.prefetchQuery({ queryKey: ["/api/settings/maps"] });
+        } catch {}
+        try {
+          await queryClient.prefetchQuery({ queryKey: ["/api/users/profile"] });
+        } catch {}
+        try {
+          await queryClient.prefetchQuery({ queryKey: ["/api/users/nearby"] });
+        } catch {}
+        try {
+          apiRequest("POST", "/api/matching/trigger").catch(() => {});
+        } catch {}
+      })();
     },
   });
 }

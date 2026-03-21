@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
+export type MapProvider = "carto_light" | "carto_dark" | "osm";
+
 interface AppSettings {
   synecoBranding: boolean;
   emailVerification: boolean;
@@ -8,6 +10,8 @@ interface AppSettings {
   customRoutes: boolean;
   paypalEmail: string;
   sosEnabled: boolean;
+  mapsEnabled: boolean;
+  mapsProvider: MapProvider;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -18,6 +22,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   customRoutes: true,
   paypalEmail: "",
   sosEnabled: true,
+  mapsEnabled: true,
+  mapsProvider: "carto_light",
 };
 
 export function useAppSettings() {

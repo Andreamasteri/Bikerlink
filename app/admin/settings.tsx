@@ -510,6 +510,52 @@ export default function AdminSettings() {
     },
   });
 
+  const { data: mapsData } = useQuery<{ enabled: boolean; provider: string }>({
+    queryKey: ["/api/settings/maps"],
+  });
+  const mapsEnabled = mapsData?.enabled !== false;
+  const mapsProvider = (mapsData?.provider || "carto_light") as "carto_light" | "carto_dark" | "osm";
+
+  const mapsEnabledMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/maps_enabled", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/maps"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const mapsProviderMutation = useMutation({
+    mutationFn: async (provider: string) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/maps_provider", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: provider }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/maps"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
   const [isUploadingEula, setIsUploadingEula] = useState(false);
 
   const [privacyPolicyText, setPrivacyPolicyText] = useState("");
@@ -965,6 +1011,59 @@ export default function AdminSettings() {
         <Text style={styles.synecoDesc}>
           {sosEnabled ? "Gli utenti possono inviare e accogliere richieste SOS" : "La funzione SOS è disattivata per tutti"}
         </Text>
+      </View>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="map" size={20} color={Colors.accent} />
+            <Text style={styles.synecoLabel}>Mappe a Tile</Text>
+          </View>
+          <Switch
+            value={mapsEnabled}
+            onValueChange={(val) => mapsEnabledMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: Colors.accent }}
+            thumbColor={mapsEnabled ? Colors.text : Colors.textSecondary}
+            disabled={mapsEnabledMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {mapsEnabled ? "Tile personalizzati attivi sulla mappa" : "Mappa con stile di default (no tile overlay)"}
+        </Text>
+        {mapsEnabled && (
+          <View style={{ marginTop: 12, gap: 8 }}>
+            <Text style={[styles.synecoDesc, { marginBottom: 4 }]}>Provider tile:</Text>
+            {(["carto_light", "carto_dark", "osm"] as const).map((provider) => {
+              const labels: Record<string, string> = {
+                carto_light: "Carto Light",
+                carto_dark: "Carto Dark",
+                osm: "OpenStreetMap",
+              };
+              const active = mapsProvider === provider;
+              return (
+                <TouchableOpacity
+                  key={provider}
+                  style={[
+                    styles.providerOption,
+                    active && styles.providerOptionActive,
+                  ]}
+                  onPress={() => mapsProviderMutation.mutate(provider)}
+                  disabled={mapsProviderMutation.isPending}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={active ? "radio-button-on" : "radio-button-off"}
+                    size={18}
+                    color={active ? Colors.accent : Colors.textSecondary}
+                  />
+                  <Text style={[styles.providerLabel, active && { color: Colors.accent }]}>
+                    {labels[provider]}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
       </View>
 
       <View style={styles.paidCard}>
@@ -1705,6 +1804,12 @@ const styles = StyleSheet.create({
   modeBtnActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
   modeBtnText: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.textSecondary },
   modeBtnTextActive: { color: Colors.background },
+  providerOption: {
+    flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8, paddingHorizontal: 12,
+    borderRadius: 8, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.background,
+  },
+  providerOptionActive: { borderColor: Colors.accent, backgroundColor: Colors.surfaceLight },
+  providerLabel: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.textSecondary },
   privacyCard: {
     backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginTop: 16,
     borderWidth: 1, borderColor: Colors.accent,

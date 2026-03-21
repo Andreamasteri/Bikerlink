@@ -122,6 +122,18 @@ constants/
 
 Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 
+## Sistema Mappe a Tile (Task #128)
+
+- **UrlTile overlay**: `InteractiveMap.tsx` usa `UrlTile` da react-native-maps per sovrapporre tile personalizzati alla mappa
+- **Provider supportati**: Carto Light (`carto_light`), Carto Dark (`carto_dark`), OpenStreetMap (`osm`)
+- **Controlli admin**: sezione "Mappe a Tile" in `admin/settings.tsx` con toggle on/off + picker provider
+- **Settings DB**: `maps_enabled` (default "true") e `maps_provider` (default "carto_light") via `upsertAppSetting`
+- **API**: `GET /api/settings/maps` → `{ enabled, provider }`. Incluso anche in `/api/settings/all`
+- **Startup sequenziale post-login**: in `lib/auth-context.tsx`, dopo login si esegue in sequenza: 1) prefetch map config, 2) prefetch user profile, 3) prefetch nearby users, 4) trigger matching engine
+- **Rimozione PROVIDER_GOOGLE e customMapStyle**: `InteractiveMap.tsx` usa ora il provider default (Apple Maps iOS / OSM Android) + UrlTile overlay, no più stile dark Google
+- **Props `mapsEnabled`/`mapsProvider`**: aggiunte a `InteractiveMapProps`, passate da `app/(tabs)/index.tsx` via `useSetting()`
+- **Settings context aggiornato**: `lib/settings-context.ts` include `mapsEnabled: boolean` e `mapsProvider: MapProvider`
+
 ## Funzionalità Recenti
 
 - **Garage (Biker/Coppia)**: form con Marca, Modello, Cilindrata, Tipo Moto, Stile Guida + max 3 foto per moto. API: `/api/motorcycles`

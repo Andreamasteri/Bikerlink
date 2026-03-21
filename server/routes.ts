@@ -295,9 +295,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/maps", async (_req, res) => {
+    try {
+      const [enabledSetting, providerSetting] = await Promise.all([
+        storage.getAppSetting("maps_enabled"),
+        storage.getAppSetting("maps_provider"),
+      ]);
+      res.json({
+        enabled: enabledSetting?.value !== "false",
+        provider: providerSetting?.value || "carto_light",
+      });
+    } catch {
+      res.json({ enabled: true, provider: "carto_light" });
+    }
+  });
+
   app.get("/api/settings/all", async (_req, res) => {
     try {
-      const [syneco, emailVerification, chatbot, autoMatching, customRoutes, paypal, sosEnabled] = await Promise.all([
+      const [syneco, emailVerification, chatbot, autoMatching, customRoutes, paypal, sosEnabled, mapsEnabled, mapsProvider] = await Promise.all([
         storage.getAppSetting("syneco_branding_visible"),
         storage.getAppSetting("email_verification_enabled"),
         storage.getAppSetting("chatbot_enabled"),
@@ -305,6 +320,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getAppSetting("custom_routes_enabled"),
         storage.getAppSetting("paypal_email"),
         storage.getAppSetting("sos_enabled"),
+        storage.getAppSetting("maps_enabled"),
+        storage.getAppSetting("maps_provider"),
       ]);
       res.json({
         synecoBranding: syneco?.value === "true",
@@ -314,6 +331,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customRoutes: customRoutes?.value !== "false",
         paypalEmail: paypal?.value || "",
         sosEnabled: sosEnabled?.value !== "false",
+        mapsEnabled: mapsEnabled?.value !== "false",
+        mapsProvider: mapsProvider?.value || "carto_light",
       });
     } catch {
       res.json({
@@ -324,6 +343,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customRoutes: true,
         paypalEmail: "",
         sosEnabled: true,
+        mapsEnabled: true,
+        mapsProvider: "carto_light",
       });
     }
   });

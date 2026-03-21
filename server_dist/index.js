@@ -11282,16 +11282,32 @@ async function registerRoutes(app2) {
       res.json({ mode: "single", message: "", list: [] });
     }
   });
+  app2.get("/api/settings/maps", async (_req, res) => {
+    try {
+      const [enabledSetting, providerSetting] = await Promise.all([
+        storage.getAppSetting("maps_enabled"),
+        storage.getAppSetting("maps_provider")
+      ]);
+      res.json({
+        enabled: enabledSetting?.value !== "false",
+        provider: providerSetting?.value || "carto_light"
+      });
+    } catch {
+      res.json({ enabled: true, provider: "carto_light" });
+    }
+  });
   app2.get("/api/settings/all", async (_req, res) => {
     try {
-      const [syneco, emailVerification, chatbot, autoMatching, customRoutes2, paypal, sosEnabled] = await Promise.all([
+      const [syneco, emailVerification, chatbot, autoMatching, customRoutes2, paypal, sosEnabled, mapsEnabled, mapsProvider] = await Promise.all([
         storage.getAppSetting("syneco_branding_visible"),
         storage.getAppSetting("email_verification_enabled"),
         storage.getAppSetting("chatbot_enabled"),
         storage.getAppSetting("auto_matching_enabled"),
         storage.getAppSetting("custom_routes_enabled"),
         storage.getAppSetting("paypal_email"),
-        storage.getAppSetting("sos_enabled")
+        storage.getAppSetting("sos_enabled"),
+        storage.getAppSetting("maps_enabled"),
+        storage.getAppSetting("maps_provider")
       ]);
       res.json({
         synecoBranding: syneco?.value === "true",
@@ -11300,7 +11316,9 @@ async function registerRoutes(app2) {
         autoMatching: autoMatching?.value !== "false",
         customRoutes: customRoutes2?.value !== "false",
         paypalEmail: paypal?.value || "",
-        sosEnabled: sosEnabled?.value !== "false"
+        sosEnabled: sosEnabled?.value !== "false",
+        mapsEnabled: mapsEnabled?.value !== "false",
+        mapsProvider: mapsProvider?.value || "carto_light"
       });
     } catch {
       res.json({
@@ -11310,7 +11328,9 @@ async function registerRoutes(app2) {
         autoMatching: true,
         customRoutes: true,
         paypalEmail: "",
-        sosEnabled: true
+        sosEnabled: true,
+        mapsEnabled: true,
+        mapsProvider: "carto_light"
       });
     }
   });
