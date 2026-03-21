@@ -38,6 +38,7 @@ import { queryClient, apiRequest } from "@/lib/query-client";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { LocationProvider } from "@/lib/location-context";
 import { LanguageProvider, useLanguage } from "@/lib/language-context";
+import { MapSettingsProvider } from "@/lib/map-context";
 import Colors from "@/constants/colors";
 
 SplashScreen.preventAutoHideAsync();
@@ -162,12 +163,14 @@ export default function RootLayout() {
       <LanguageProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <LocationProvider>
-              <StartupGate ready={ready}>
-                <AppStateHandler />
-                <LanguageKeyedRoot />
-              </StartupGate>
-            </LocationProvider>
+            <MapSettingsProvider>
+              <LocationProvider>
+                <StartupGate ready={ready}>
+                  <AppStateHandler />
+                  <LanguageKeyedRoot />
+                </StartupGate>
+              </LocationProvider>
+            </MapSettingsProvider>
           </AuthProvider>
         </QueryClientProvider>
       </LanguageProvider>

@@ -13,7 +13,8 @@ import * as Location from "expo-location";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
-import type { MapProvider } from "@/lib/settings-context";
+import { useMapConfig } from "@/lib/map-context";
+import { getTileConfig } from "@/lib/map-tiles";
 
 interface MapUser {
   id: string;
@@ -62,8 +63,6 @@ interface InteractiveMapProps {
   filterZavorrina: boolean;
   filterCoppia: boolean;
   filterBarTopOffset?: number;
-  mapsEnabled?: boolean;
-  mapsProvider?: MapProvider;
   onToggleFilterBiker: () => void;
   onToggleFilterZavorrina: () => void;
   onToggleFilterCoppia: () => void;
@@ -79,11 +78,19 @@ const ITALY_REGION: Region = {
   longitudeDelta: 8,
 };
 
-const TILE_URLS: Record<MapProvider, string> = {
-  carto_light: "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-  carto_dark: "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-  osm: "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
-};
+const DEFAULT_MAP_STYLE = [
+  { elementType: "geometry", stylers: [{ color: "#2D2D2D" }] },
+  { elementType: "labels.icon", stylers: [{ visibility: "on" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#aaaaaa" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#2D2D2D" }] },
+  { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#757575" }] },
+  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#333333" }] },
+  { featureType: "road", elementType: "geometry.fill", stylers: [{ color: "#4a4a4a" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#2D2D2D" }] },
+  { featureType: "road.highway", elementType: "geometry.fill", stylers: [{ color: "#5a5a5a" }] },
+  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#1a3a5c" }] },
+];
 
 function getUserMarkerColor(userType: string, sex?: string | null): string {
   if (userType === "coppia") return Colors.accent;
@@ -113,8 +120,6 @@ export default function InteractiveMap({
   filterZavorrina,
   filterCoppia,
   filterBarTopOffset,
-  mapsEnabled = true,
-  mapsProvider = "carto_light",
   onToggleFilterBiker,
   onToggleFilterZavorrina,
   onToggleFilterCoppia,
@@ -122,6 +127,7 @@ export default function InteractiveMap({
   onEasterEggPress,
   onReady,
 }: InteractiveMapProps) {
+  const { enabled: mapsEnabled, provider: mapsProvider } = useMapConfig();
   const mapRef = useRef<MapView>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
@@ -198,7 +204,7 @@ export default function InteractiveMap({
     }
   }, [userLocation]);
 
-  const tileUrl = mapsEnabled ? TILE_URLS[mapsProvider] : null;
+  const tileConfig = mapsEnabled ? getTileConfig(mapsProvider) : null;
 
   return (
     <View style={styles.container}>
@@ -207,17 +213,18 @@ export default function InteractiveMap({
         style={styles.map}
         initialRegion={region}
         provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
+        customMapStyle={tileConfig ? undefined : DEFAULT_MAP_STYLE}
         showsUserLocation={!!userLocation}
         showsMyLocationButton={false}
         onMapReady={onReady}
       >
-        {tileUrl ? (
+        {tileConfig ? (
           <UrlTile
-            urlTemplate={tileUrl}
-            maximumZ={19}
+            urlTemplate={tileConfig.urlTemplate}
+            maximumZ={tileConfig.maximumZ}
             flipY={false}
             zIndex={-1}
-            shouldReplaceMapContent={true}
+            shouldReplaceMapContent={tileConfig.shouldReplaceMapContent}
           />
         ) : null}
 

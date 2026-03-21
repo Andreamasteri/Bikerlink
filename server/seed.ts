@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { db } from "./db";
-import { users, userProfiles } from "@shared/schema";
+import { users, userProfiles, appSettings } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { pool } from "./db";
 
@@ -66,6 +66,24 @@ async function seed() {
     console.log(
       `Created user "${user.nickname}" (${user.role}) with id ${user.id}`,
     );
+  }
+
+  const defaultMapsSettings = [
+    { key: "maps_enabled", value: "true" },
+    { key: "maps_provider", value: "carto_light" },
+  ];
+  for (const setting of defaultMapsSettings) {
+    const existing = await db
+      .select()
+      .from(appSettings)
+      .where(eq(appSettings.key, setting.key))
+      .limit(1);
+    if (existing.length === 0) {
+      await db.insert(appSettings).values({ key: setting.key, value: setting.value });
+      console.log(`Seeded app setting "${setting.key}" = "${setting.value}"`);
+    } else {
+      console.log(`App setting "${setting.key}" already exists, skipping.`);
+    }
   }
 
   console.log("Seed completed.");

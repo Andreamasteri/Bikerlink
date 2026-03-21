@@ -70,8 +70,6 @@ export default function MapScreen() {
   const [showSosDetail, setShowSosDetail] = useState(false);
   const [offlineCountdown, setOfflineCountdown] = useState<{ online: number }>({ online: 0 });
   const sosEnabled = useSetting("sosEnabled");
-  const mapsEnabled = useSetting("mapsEnabled");
-  const mapsProvider = useSetting("mapsProvider");
   const [mapReady, setMapReady] = useState(false);
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [showAreaModal, setShowAreaModal] = useState(false);
@@ -702,8 +700,6 @@ export default function MapScreen() {
             filterBiker={filterBiker}
             filterZavorrina={filterZavorrina}
             filterCoppia={filterCoppia}
-            mapsEnabled={mapsEnabled}
-            mapsProvider={mapsProvider}
             onToggleFilterBiker={() => setFilterBiker((p) => !p)}
             onToggleFilterZavorrina={() => setFilterZavorrina((p) => !p)}
             onToggleFilterCoppia={() => setFilterCoppia((p) => !p)}
@@ -736,8 +732,6 @@ export default function MapScreen() {
             filterZavorrina={filterZavorrina}
             filterCoppia={filterCoppia}
             filterBarTopOffset={Platform.OS === "web" ? 67 : insets.top}
-            mapsEnabled={mapsEnabled}
-            mapsProvider={mapsProvider}
             onToggleFilterBiker={() => setFilterBiker((p) => !p)}
             onToggleFilterZavorrina={() => setFilterZavorrina((p) => !p)}
             onToggleFilterCoppia={() => setFilterCoppia((p) => !p)}
