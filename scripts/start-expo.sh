@@ -7,7 +7,7 @@ BACKEND_WAIT_SECONDS=120
 FLOCK_FILE="/tmp/start-expo.flock"
 LOCK_FILE="/tmp/start-expo.lock"
 PID_FILE="/tmp/metro.pid"
-PREWARM_PID=0
+PREWARM_PID=0   # PID del curl iOS (fire-and-forget, globale per cleanup)
 
 # ── Lock atomico con flock (kernel-level, nessuna race condition) ──────────────
 exec 9>>"$FLOCK_FILE"
@@ -94,32 +94,81 @@ wait_for_backend() {
   echo "Attenzione: backend non risponde dopo ${BACKEND_WAIT_SECONDS}s, avvio Metro comunque."
 }
 
-# ── Pre-warm bundle in background (fire-and-forget) ───────────────────────────
-# Avvia la compilazione del bundle Android PRIMA che Expo Go si connetta.
-# Gira in background in parallelo con il monitoring loop.
-# Una volta compilato, Metro lo mette in cache su disco: le connessioni
-# successive di Expo Go ricevono il bundle in pochi secondi.
-start_prewarm() {
+# ── Pre-warm bundle Android + iOS ─────────────────────────────────────────────
+# Strategia:
+#   1. Android: bloccante — attende il completamento (o timeout 300s) prima di
+#      entrare nel monitoring loop. Crash detection via exit code curl (7/18/52).
+#   2. iOS: fire-and-forget in background — il monitoring loop inizia gia' dopo
+#      che ALMENO UNO (Android) ha terminato, soddisfando il requisito.
+#
+# Perche' non usiamo HTTP check durante l'attesa:
+#   Durante la compilazione del bundle (~28s, 1635 moduli) Metro e' occupato e
+#   non risponde all'HTTP entro 2s → falso positivo "Metro giu'". Monitorare il
+#   PID del curl evita questo problema: se curl esce con codice 7/18/52 significa
+#   che Metro e' davvero morto (TCP RST), non che e' impegnato.
+#
+# Restituisce 0 (ok/timeout graceful) o 1 (Metro morto durante Android prewarm).
+prewarm_bundles() {
   local log_file="$1"
   local BUNDLE_BASE="http://localhost:${PORT}/node_modules/expo-router/entry.bundle"
   local BUNDLE_PARAMS="dev=true&hot=false&lazy=true&transform.engine=hermes&transform.bytecode=1&transform.routerRoot=app&unstable_transformProfile=hermes-stable"
+  local PW_TIMEOUT=300
 
-  echo "Pre-warm bundle Android avviato in background (max 300s)..." | tee -a "$log_file"
-  (
-    PW_START=$(date +%s)
-    curl -s --max-time 300 --connect-timeout 10 \
-      -o /dev/null \
-      "${BUNDLE_BASE}?platform=android&${BUNDLE_PARAMS}" 2>/dev/null
-    EXIT_CODE=$?
-    PW_END=$(date +%s)
-    PW_ELAPSED=$((PW_END - PW_START))
-    if [ "$EXIT_CODE" -eq 0 ]; then
-      echo "Pre-warm bundle completato in ${PW_ELAPSED}s — Expo Go servira' dalla cache" >> "$log_file"
-    else
-      echo "Pre-warm bundle terminato (exit ${EXIT_CODE}) dopo ${PW_ELAPSED}s" >> "$log_file"
+  # ── 1. Android pre-warm (bloccante) ──────────────────────────────────────
+  echo "Pre-warm bundle Android avviato (max ${PW_TIMEOUT}s)..." | tee -a "$log_file"
+  local PW_START=$(date +%s)
+
+  curl -s --max-time "$PW_TIMEOUT" --connect-timeout 10 \
+    -o /dev/null \
+    "${BUNDLE_BASE}?platform=android&${BUNDLE_PARAMS}" 2>/dev/null &
+  local ANDROID_PID=$!
+
+  # Polling sul PID del curl (non HTTP) — evita falsi positivi da compilazione lenta
+  local android_done=0
+  local android_exit=0
+  for i in $(seq 1 $((PW_TIMEOUT + 10))); do
+    if ! kill -0 "$ANDROID_PID" 2>/dev/null; then
+      wait "$ANDROID_PID" 2>/dev/null
+      android_exit=$?
+      android_done=1
+      break
     fi
-  ) &
+    if [ $((i % 30)) -eq 0 ]; then
+      echo "  ...pre-warm Android in corso (${i}s / ${PW_TIMEOUT}s)..." | tee -a "$log_file"
+    fi
+    sleep 1
+  done
+
+  # Forza terminazione se timeout
+  if [ "$android_done" -eq 0 ]; then
+    kill "$ANDROID_PID" 2>/dev/null || true
+  fi
+
+  local PW_END=$(date +%s)
+  local PW_ELAPSED=$((PW_END - PW_START))
+
+  if [ "$android_done" -eq 1 ] && [ "$android_exit" -eq 0 ]; then
+    echo "Pre-warm bundle Android completato in ${PW_ELAPSED}s — bundle in cache" | tee -a "$log_file"
+  elif [ "$android_done" -eq 1 ] && { [ "$android_exit" -eq 7 ] || [ "$android_exit" -eq 18 ] || [ "$android_exit" -eq 52 ]; }; then
+    echo "Metro caduto durante pre-warm Android (curl exit ${android_exit}, ${PW_ELAPSED}s)" | tee -a "$log_file"
+    return 1  # Segnala crash Metro al retry loop
+  elif [ "$android_done" -eq 1 ]; then
+    echo "Pre-warm bundle Android terminato (exit ${android_exit}) dopo ${PW_ELAPSED}s — fallback graceful" | tee -a "$log_file"
+  else
+    echo "Pre-warm bundle Android timeout (${PW_ELAPSED}s) — Metro servira' il bundle alla prima richiesta" | tee -a "$log_file"
+  fi
+
+  # ── 2. iOS pre-warm (background, fire-and-forget) ─────────────────────────
+  # Almeno un pre-warm (Android) e' gia' completato: il monitoring loop puo'
+  # partire. iOS gira in background e il suo PID e' tracciato globalmente
+  # per essere terminato in caso di retry o di uscita dello script.
+  echo "Pre-warm bundle iOS avviato in background..." | tee -a "$log_file"
+  curl -s --max-time "$PW_TIMEOUT" --connect-timeout 10 \
+    -o /dev/null \
+    "${BUNDLE_BASE}?platform=ios&${BUNDLE_PARAMS}" 2>/dev/null &
   PREWARM_PID=$!
+
+  return 0
 }
 
 wait_for_backend
@@ -133,7 +182,7 @@ for retry in $(seq 1 $MAX_RETRIES); do
   echo "NODE_OPTIONS: $NODE_OPTIONS" | tee -a "$LOG_FILE"
   echo "Orario avvio: $(date)" | tee -a "$LOG_FILE"
 
-  # Ferma un eventuale pre-warm precedente prima del retry
+  # Ferma eventuale iOS pre-warm precedente (kill 0 guard)
   if [ "$PREWARM_PID" -gt 0 ]; then
     kill "$PREWARM_PID" 2>/dev/null || true
   fi
@@ -197,12 +246,22 @@ for retry in $(seq 1 $MAX_RETRIES); do
   fi
 
   if [ $METRO_STARTED -eq 1 ]; then
-    # ── Avvia pre-warm in background, poi entra nel monitoring loop ──────────
-    # Il pre-warm gira in parallelo: Metro resta disponibile durante la
-    # compilazione. Il monitoring usa port_is_alive (timeout 8s) per evitare
-    # falsi positivi quando Metro e' impegnato nella compilazione del bundle.
-    start_prewarm "$LOG_FILE"
+    # ── Pre-warm Android (bloccante) + iOS (background) ─────────────────────
+    # Il monitoring loop inizia SOLO DOPO che almeno un pre-warm e' completato.
+    # Se Metro cade durante il pre-warm Android, prewarm_bundles restituisce 1.
+    if ! prewarm_bundles "$LOG_FILE"; then
+      echo "Metro caduto durante pre-warm — riavvio (tentativo $retry)..." | tee -a "$LOG_FILE"
+      if [ $METRO_PID -ne 0 ]; then
+        kill $METRO_PID 2>/dev/null || true
+      fi
+      if [ $retry -lt $MAX_RETRIES ]; then
+        sleep 5
+      fi
+      continue
+    fi
 
+    # Monitoring loop: usa port_is_alive (60s timeout) per tolerare la
+    # compilazione del bundle iOS in background senza falsi positivi.
     echo "Metro in esecuzione, monitoraggio porta $PORT..." | tee -a "$LOG_FILE"
     while true; do
       sleep 15
