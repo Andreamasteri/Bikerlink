@@ -1,8 +1,9 @@
 import bcrypt from "bcryptjs";
 import { db } from "./db";
-import { users, userProfiles, appSettings } from "@shared/schema";
+import { users, userProfiles } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { pool } from "./db";
+import { storage } from "./storage";
 
 const seedUsers = [
   {
@@ -68,22 +69,12 @@ async function seed() {
     );
   }
 
-  const defaultMapsSettings = [
-    { key: "maps_enabled", value: "true" },
-    { key: "maps_provider", value: "carto_light" },
-  ];
-  for (const setting of defaultMapsSettings) {
-    const existing = await db
-      .select()
-      .from(appSettings)
-      .where(eq(appSettings.key, setting.key))
-      .limit(1);
-    if (existing.length === 0) {
-      await db.insert(appSettings).values({ key: setting.key, value: setting.value });
-      console.log(`Seeded app setting "${setting.key}" = "${setting.value}"`);
-    } else {
-      console.log(`App setting "${setting.key}" already exists, skipping.`);
-    }
+  for (const [key, value] of [
+    ["maps_enabled", "true"],
+    ["maps_provider", "carto_light"],
+  ] as [string, string][]) {
+    await storage.upsertAppSetting(key, value);
+    console.log(`Seeded app setting "${key}" = "${value}"`);
   }
 
   console.log("Seed completed.");
