@@ -102,7 +102,7 @@ export default function AdminDashboard() {
 
   function handleItemPress(item: AdminItem) {
     if (item.route) {
-      router.push(item.route);
+      router.push(item.route as any);
     }
   }
 
