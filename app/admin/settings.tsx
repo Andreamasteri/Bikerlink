@@ -510,11 +510,12 @@ export default function AdminSettings() {
     },
   });
 
-  const { data: mapsData } = useQuery<{ enabled: boolean; provider: string }>({
+  const { data: mapsData } = useQuery<{ enabled: boolean; provider: string; userChoiceEnabled: boolean }>({
     queryKey: ["/api/settings/maps"],
   });
   const mapsEnabled = mapsData?.enabled !== false;
-  const mapsProvider = (mapsData?.provider || "carto_light") as "carto_light" | "carto_dark" | "osm";
+  const mapsProvider = (mapsData?.provider || "carto_light") as "carto_light" | "carto_dark" | "esri_gray";
+  const mapsUserChoiceEnabled = mapsData?.userChoiceEnabled !== false;
 
   const mapsEnabledMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
@@ -544,6 +545,26 @@ export default function AdminSettings() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ value: provider }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/maps"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const mapsUserChoiceMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/maps_user_choice_enabled", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
         credentials: "include",
       });
       if (!res.ok) throw new Error(await res.text());
@@ -1033,12 +1054,12 @@ export default function AdminSettings() {
         </Text>
         {mapsEnabled && (
           <View style={{ marginTop: 12 }}>
-            <Text style={[styles.synecoDesc, { marginBottom: 6 }]}>Provider tile:</Text>
+            <Text style={[styles.synecoDesc, { marginBottom: 6 }]}>Provider tile default (globale):</Text>
             {(() => {
               const providerLabels: Record<string, string> = {
-                carto_light: "Carto Light",
-                carto_dark: "Carto Dark",
-                osm: "OpenStreetMap",
+                esri_gray: "Base Map",
+                carto_light: "FullMap Light",
+                carto_dark: "FullMap",
               };
               return (
                 <>
@@ -1065,7 +1086,7 @@ export default function AdminSettings() {
                       onPress={() => setShowProviderDropdown(false)}
                     >
                       <View style={styles.dropdownMenu}>
-                        {(["carto_light", "carto_dark", "osm"] as const).map((p) => (
+                        {(["esri_gray", "carto_light", "carto_dark"] as const).map((p) => (
                           <TouchableOpacity
                             key={p}
                             style={[
@@ -1094,6 +1115,24 @@ export default function AdminSettings() {
             })()}
           </View>
         )}
+        <View style={[styles.synecoHeader, { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: Colors.border }]}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="person-circle-outline" size={18} color={Colors.textSecondary} />
+            <Text style={[styles.synecoDesc, { marginBottom: 0 }]}>Scelta stile utente</Text>
+          </View>
+          <Switch
+            value={mapsUserChoiceEnabled}
+            onValueChange={(val) => mapsUserChoiceMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: Colors.accent }}
+            thumbColor={mapsUserChoiceEnabled ? Colors.text : Colors.textSecondary}
+            disabled={mapsUserChoiceMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {mapsUserChoiceEnabled
+            ? "Gli utenti possono scegliere il proprio stile mappa"
+            : "Tutti gli utenti vedono il provider di default"}
+        </Text>
       </View>
 
       <View style={styles.paidCard}>

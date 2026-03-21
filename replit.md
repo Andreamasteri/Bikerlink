@@ -122,19 +122,23 @@ constants/
 
 Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 
-## Sistema Mappe a Tile (Task #128)
+## Sistema Mappe a Tile (Task #128 + #130)
 
 - **UrlTile overlay**: `InteractiveMap.tsx` usa `UrlTile` da react-native-maps per sovrapporre tile personalizzati alla mappa
-- **Provider supportati**: Carto Light (`carto_light`), Carto Dark (`carto_dark`), OpenStreetMap (`osm`)
-- **Controlli admin**: sezione "Sistema Mappe" in `admin/settings.tsx` con toggle on/off + dropdown Modal per provider
-- **Settings DB**: `maps_enabled` (default "true") e `maps_provider` (default "carto_light") seeded in `server/seed.ts`
-- **API**: `GET /api/settings/maps` → `{ enabled, provider }`. Incluso anche in `/api/settings/all`, più endpoint espliciti `/api/settings/maps-enabled` e `/api/settings/maps-provider`
-- **Admin PUT espliciti**: `PUT /api/admin/settings/maps_enabled` (valida "true"/"false") e `PUT /api/admin/settings/maps_provider` (valida provider)
-- **Startup sequenziale post-login**: in `lib/auth-context.tsx`, dopo login: 1) prefetch map config, 2) prefetch profile + estrazione lat/lng, 3) prefetch nearby (con queryClient.fetchQuery + queryFn custom se coords disponibili), 4) matching trigger fire-and-forget, 5) invalidateQueries globale
-- **PROVIDER_GOOGLE**: mantenuto su Android (necessario per UrlTile overlay con MapView). Quando mappe disabilitate: `customMapStyle` dark applicato (stile di default pre-tile). Quando mappe abilitate: `customMapStyle=undefined` + UrlTile
-- **Map context**: `lib/map-context.tsx` espone `MapSettingsProvider` (gated su `!!user`, provider normalization fallback) e `useMapConfig()`. `lib/map-tiles.ts` contiene TileConfig constants
-- **InteractiveMap**: usa `useMapConfig()` da context (non più props `mapsEnabled`/`mapsProvider`). Props rimossi da `InteractiveMapProps` e da `app/(tabs)/index.tsx`
-- **MapReadyGate**: componente in `_layout.tsx` che blocca il rendering finché map config è caricata (quando utente autenticato)
+- **Provider supportati**: Carto Light (`carto_light`), Carto Dark (`carto_dark`), ESRI Gray (`esri_gray` — usa `{z}/{y}/{x}` non `{z}/{x}/{y}`)
+- **Label utente**: "FullMap Light" / "FullMap" / "Base Map" (da `MAP_PROVIDER_LABELS` in `lib/map-tiles.ts`)
+- **Controlli admin**: sezione "Sistema Mappe" in `admin/settings.tsx` con due toggle: on/off globale + on/off scelta utente (`maps_user_choice_enabled`)
+- **Settings DB**: `maps_enabled`, `maps_provider`, `maps_user_choice_enabled` (default "true" tutti) — seeded in `server/index.ts`
+- **Colonna DB**: `user_profiles.preferred_map_style` (VARCHAR(20), nullable) — migrazione `ALTER TABLE IF NOT EXISTS`
+- **API**: `GET /api/settings/maps` → `{ enabled, provider, userChoiceEnabled }`. Endpoint aggiuntivi: `/api/settings/maps-enabled`, `/api/settings/maps-provider`, `/api/settings/maps-user-choice`
+- **Admin PUT espliciti**: `PUT /api/admin/settings/maps_enabled`, `maps_provider` (whitelist: carto_light, carto_dark, esri_gray), `maps_user_choice_enabled`
+- **Logica resolvedProvider**: maps_disabled → admin default; maps_enabled + !userChoice → admin default; maps_enabled + userChoice + userPref → userPref; fallback admin default
+- **Bottone sole/luna**: in `InteractiveMap.tsx`, visibile solo se `mapsEnabled=true && userChoiceEnabled=true && resolvedProvider ∈ {carto_light, carto_dark}`. Alterna e salva tramite `PUT /api/users/profile/dynamic`
+- **Selettore stile profilo**: card "Stile Mappa" in `profile.tsx`, visibile solo se `mapsEnabled=true && userChoiceEnabled=true`. 3 opzioni con icona + nome + descrizione
+- **PUT dynamic whitelist**: `preferredMapStyle` aggiunto alla whitelist in `server/routes/users.ts`
+- **Map context**: `lib/map-context.tsx` espone `MapSettingsProvider` con `resolvedProvider`, `adminProvider`, `userChoiceEnabled`, `enabled`, `isLoading`
+- **Startup sequenziale post-login**: in `lib/auth-context.tsx`, dopo login: 1) prefetch map config, 2) prefetch profile + estrazione lat/lng, 3) prefetch nearby, 4) matching trigger, 5) invalidateQueries
+- **MapReadyGate**: componente in `_layout.tsx` che blocca il rendering finché map config è caricata
 
 ## Funzionalità Recenti
 

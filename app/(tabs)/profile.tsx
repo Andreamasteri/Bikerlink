@@ -28,6 +28,8 @@ import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
+import { useMapConfig } from "@/lib/map-context";
+import { MAP_PROVIDER_LABELS, MAP_PROVIDER_DESCRIPTIONS, type MapProvider } from "@/lib/map-tiles";
 
 interface ProfileData {
   id: string;
@@ -53,6 +55,7 @@ interface ProfileData {
     easterEggsCollected: number;
     maxPickupDistance?: number;
     searchPreference?: string;
+    preferredMapStyle?: string | null;
   };
   photos?: Array<{
     id: string;
@@ -104,6 +107,7 @@ export default function ProfileScreen() {
   const { language, setLanguage } = useLanguage();
   const t = useT();
   const locale = useLocale();
+  const { enabled: mapsEnabled, userChoiceEnabled } = useMapConfig();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showRevokeConsentModal, setShowRevokeConsentModal] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
@@ -178,6 +182,15 @@ export default function ProfileScreen() {
   const searchPreferenceMutation = useMutation({
     mutationFn: async (value: "bikers" | "zavorrine" | "both") => {
       await apiRequest("PUT", "/api/users/profile/dynamic", { searchPreference: value });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+    },
+  });
+
+  const mapStyleMutation = useMutation({
+    mutationFn: async (value: MapProvider) => {
+      await apiRequest("PUT", "/api/users/profile/dynamic", { preferredMapStyle: value });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
@@ -676,6 +689,43 @@ export default function ProfileScreen() {
                   >
                     {opt.label}
                   </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      {mapsEnabled && userChoiceEnabled && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Stile Mappa</Text>
+          <View style={styles.mapStyleCard}>
+            {(["esri_gray", "carto_light", "carto_dark"] as MapProvider[]).map((p) => {
+              const currentStyle = (profile?.profile?.preferredMapStyle || null) as MapProvider | null;
+              const isSelected = currentStyle === p;
+              return (
+                <Pressable
+                  key={p}
+                  style={[styles.mapStyleOption, isSelected && styles.mapStyleOptionActive]}
+                  onPress={() => mapStyleMutation.mutate(p)}
+                  disabled={mapStyleMutation.isPending}
+                >
+                  <Ionicons
+                    name={p === "carto_dark" ? "moon" : p === "esri_gray" ? "map-outline" : "sunny"}
+                    size={20}
+                    color={isSelected ? Colors.accent : Colors.textSecondary}
+                  />
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={[styles.mapStyleName, isSelected && { color: Colors.accent }]}>
+                      {MAP_PROVIDER_LABELS[p]}
+                    </Text>
+                    <Text style={styles.mapStyleDesc} numberOfLines={2}>
+                      {MAP_PROVIDER_DESCRIPTIONS[p]}
+                    </Text>
+                  </View>
+                  {isSelected && (
+                    <Ionicons name="checkmark-circle" size={20} color={Colors.accent} />
+                  )}
                 </Pressable>
               );
             })}
@@ -1193,6 +1243,36 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     color: Colors.text,
     textAlign: "right",
+  },
+  mapStyleCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  mapStyleOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  mapStyleOptionActive: {
+    backgroundColor: Colors.accent + "14",
+  },
+  mapStyleName: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+    marginBottom: 2,
+  },
+  mapStyleDesc: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    lineHeight: 16,
   },
   searchPrefRow: {
     flexDirection: "row",

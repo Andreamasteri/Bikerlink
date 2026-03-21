@@ -174,13 +174,14 @@ router.get("/profile", requireAuth, async (req: Request, res: Response) => {
 router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const { isAvailable, latitude, longitude, searchPreference } = req.body;
+    const { isAvailable, latitude, longitude, searchPreference, preferredMapStyle } = req.body;
     const existingProfile = await storage.getUserProfile(userId);
     const updateData: Record<string, unknown> = {};
     if (typeof isAvailable === "boolean") updateData.isAvailable = isAvailable;
     if (latitude !== undefined) updateData.latitude = latitude;
     if (longitude !== undefined) updateData.longitude = longitude;
     if (searchPreference !== undefined) updateData.searchPreference = searchPreference;
+    if (preferredMapStyle !== undefined) updateData.preferredMapStyle = preferredMapStyle;
 
     if (isAvailable === true) {
       await storage.updateUser(userId, { ghostMode: false } as any);

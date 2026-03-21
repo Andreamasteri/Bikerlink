@@ -159,6 +159,7 @@ var init_schema = __esm({
       totalRides: (0, import_pg_core.integer)("total_rides").notNull().default(0),
       easterEggsCollected: (0, import_pg_core.integer)("easter_eggs_collected").notNull().default(0),
       searchPreference: (0, import_pg_core.varchar)("search_preference", { length: 20 }).notNull().default("both"),
+      preferredMapStyle: (0, import_pg_core.varchar)("preferred_map_style", { length: 20 }),
       adminOverrideUntil: (0, import_pg_core.timestamp)("admin_override_until"),
       updatedAt: (0, import_pg_core.timestamp)("updated_at").notNull().defaultNow()
     }, (table) => [
@@ -4333,13 +4334,14 @@ router2.get("/profile", requireAuth, async (req, res) => {
 router2.put("/profile/dynamic", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId;
-    const { isAvailable, latitude, longitude, searchPreference } = req.body;
+    const { isAvailable, latitude, longitude, searchPreference, preferredMapStyle } = req.body;
     const existingProfile = await storage.getUserProfile(userId);
     const updateData = {};
     if (typeof isAvailable === "boolean") updateData.isAvailable = isAvailable;
     if (latitude !== void 0) updateData.latitude = latitude;
     if (longitude !== void 0) updateData.longitude = longitude;
     if (searchPreference !== void 0) updateData.searchPreference = searchPreference;
+    if (preferredMapStyle !== void 0) updateData.preferredMapStyle = preferredMapStyle;
     if (isAvailable === true) {
       await storage.updateUser(userId, { ghostMode: false });
     }
@@ -9108,7 +9110,7 @@ router17.put("/settings/maps_enabled", async (req, res) => {
 router17.put("/settings/maps_provider", async (req, res) => {
   try {
     const { value } = req.body;
-    const allowed = ["carto_light", "carto_dark", "osm"];
+    const allowed = ["carto_light", "carto_dark", "esri_gray"];
     if (!allowed.includes(value)) {
       return res.status(400).json({ message: "Provider non valido" });
     }
@@ -9123,6 +9125,26 @@ router17.put("/settings/maps_provider", async (req, res) => {
     return res.json(setting);
   } catch (error) {
     console.error("Admin maps_provider error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router17.put("/settings/maps_user_choice_enabled", async (req, res) => {
+  try {
+    const { value } = req.body;
+    if (value !== "true" && value !== "false") {
+      return res.status(400).json({ message: "Valore non valido: usare 'true' o 'false'" });
+    }
+    const setting = await storage.upsertAppSetting("maps_user_choice_enabled", value);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId,
+      action: "update_setting",
+      targetType: "app_setting",
+      targetId: "maps_user_choice_enabled",
+      details: `maps_user_choice_enabled = ${value}`
+    });
+    return res.json(setting);
+  } catch (error) {
+    console.error("Admin maps_user_choice_enabled error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -11325,16 +11347,26 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/settings/maps", async (_req, res) => {
     try {
-      const [enabledSetting, providerSetting] = await Promise.all([
+      const [enabledSetting, providerSetting, userChoiceSetting] = await Promise.all([
         storage.getAppSetting("maps_enabled"),
-        storage.getAppSetting("maps_provider")
+        storage.getAppSetting("maps_provider"),
+        storage.getAppSetting("maps_user_choice_enabled")
       ]);
       res.json({
         enabled: enabledSetting?.value !== "false",
-        provider: providerSetting?.value || "carto_light"
+        provider: providerSetting?.value || "carto_light",
+        userChoiceEnabled: userChoiceSetting?.value !== "false"
       });
     } catch {
-      res.json({ enabled: true, provider: "carto_light" });
+      res.json({ enabled: true, provider: "carto_light", userChoiceEnabled: true });
+    }
+  });
+  app2.get("/api/settings/maps-user-choice", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("maps_user_choice_enabled");
+      res.json({ enabled: setting?.value !== "false" });
+    } catch {
+      res.json({ enabled: true });
     }
   });
   app2.get("/api/settings/maps-enabled", async (_req, res) => {
@@ -12149,6 +12181,11 @@ function setupErrorHandler(app2) {
     console.warn("[MIGRATION] users.ghost_mode:", e);
   }
   try {
+    await db.execute(import_drizzle_orm10.sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_map_style VARCHAR(20)`);
+  } catch (e) {
+    console.warn("[MIGRATION] user_profiles.preferred_map_style:", e);
+  }
+  try {
     await db.execute(import_drizzle_orm10.sql`
       CREATE TABLE IF NOT EXISTS user_blocks (
         id SERIAL PRIMARY KEY,
@@ -12173,6 +12210,8 @@ function setupErrorHandler(app2) {
     if (!listSetting) await storage2.upsertAppSetting("splash_messages_list", "[]");
     const motoclubZavSetting = await storage2.getAppSetting("motoclub_include_zav");
     if (!motoclubZavSetting) await storage2.upsertAppSetting("motoclub_include_zav", "true");
+    const mapsUserChoiceSetting = await storage2.getAppSetting("maps_user_choice_enabled");
+    if (!mapsUserChoiceSetting) await storage2.upsertAppSetting("maps_user_choice_enabled", "true");
   } catch (e) {
     console.warn("[SEED] splash settings:", e);
   }

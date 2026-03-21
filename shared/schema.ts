@@ -102,6 +102,7 @@ export const userProfiles = pgTable("user_profiles", {
   totalRides: integer("total_rides").notNull().default(0),
   easterEggsCollected: integer("easter_eggs_collected").notNull().default(0),
   searchPreference: varchar("search_preference", { length: 20 }).notNull().default("both"),
+  preferredMapStyle: varchar("preferred_map_style", { length: 20 }),
   adminOverrideUntil: timestamp("admin_override_until"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [

@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
 import {
   View,
   StyleSheet,
@@ -14,7 +15,8 @@ import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 import { useMapConfig } from "@/lib/map-context";
-import { getTileConfig } from "@/lib/map-tiles";
+import { getTileConfig, type MapProvider } from "@/lib/map-tiles";
+import { apiRequest, queryClient } from "@/lib/query-client";
 
 interface MapUser {
   id: string;
@@ -127,11 +129,28 @@ export default function InteractiveMap({
   onEasterEggPress,
   onReady,
 }: InteractiveMapProps) {
-  const { enabled: mapsEnabled, provider: mapsProvider } = useMapConfig();
+  const { enabled: mapsEnabled, resolvedProvider, userChoiceEnabled } = useMapConfig();
   const mapRef = useRef<MapView>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
   const [region, setRegion] = useState<Region>(ITALY_REGION);
+
+  const saveMapStyleMutation = useMutation({
+    mutationFn: async (style: MapProvider) => {
+      await apiRequest("PUT", "/api/users/profile/dynamic", { preferredMapStyle: style });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+    },
+  });
+
+  const handleToggleDayNight = useCallback(() => {
+    const next: MapProvider = resolvedProvider === "carto_light" ? "carto_dark" : "carto_light";
+    saveMapStyleMutation.mutate(next);
+  }, [resolvedProvider, saveMapStyleMutation]);
+
+  const showDayNightButton = mapsEnabled && userChoiceEnabled &&
+    (resolvedProvider === "carto_light" || resolvedProvider === "carto_dark");
 
   useEffect(() => {
     let cancelled = false;
@@ -204,7 +223,7 @@ export default function InteractiveMap({
     }
   }, [userLocation]);
 
-  const tileConfig = mapsEnabled ? getTileConfig(mapsProvider) : null;
+  const tileConfig = mapsEnabled ? getTileConfig(resolvedProvider) : null;
 
   return (
     <View style={styles.container}>
@@ -339,6 +358,21 @@ export default function InteractiveMap({
       </View>
 
       <View style={styles.controlsContainer}>
+        {showDayNightButton && (
+          <TouchableOpacity
+            style={styles.locationButton}
+            onPress={handleToggleDayNight}
+            activeOpacity={0.7}
+            disabled={saveMapStyleMutation.isPending}
+          >
+            <MaterialCommunityIcons
+              name={resolvedProvider === "carto_light" ? "weather-night" : "weather-sunny"}
+              size={22}
+              color={Colors.accent}
+            />
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           style={styles.locationButton}
           onPress={centerOnUser}

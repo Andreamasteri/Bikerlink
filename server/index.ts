@@ -304,6 +304,12 @@ function setupErrorHandler(app: express.Application) {
   }
 
   try {
+    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_map_style VARCHAR(20)`);
+  } catch (e) {
+    console.warn("[MIGRATION] user_profiles.preferred_map_style:", e);
+  }
+
+  try {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS user_blocks (
         id SERIAL PRIMARY KEY,
@@ -330,6 +336,8 @@ function setupErrorHandler(app: express.Application) {
     if (!listSetting) await storage.upsertAppSetting("splash_messages_list", "[]");
     const motoclubZavSetting = await storage.getAppSetting("motoclub_include_zav");
     if (!motoclubZavSetting) await storage.upsertAppSetting("motoclub_include_zav", "true");
+    const mapsUserChoiceSetting = await storage.getAppSetting("maps_user_choice_enabled");
+    if (!mapsUserChoiceSetting) await storage.upsertAppSetting("maps_user_choice_enabled", "true");
   } catch (e) {
     console.warn("[SEED] splash settings:", e);
   }

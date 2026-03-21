@@ -297,16 +297,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/settings/maps", async (_req, res) => {
     try {
-      const [enabledSetting, providerSetting] = await Promise.all([
+      const [enabledSetting, providerSetting, userChoiceSetting] = await Promise.all([
         storage.getAppSetting("maps_enabled"),
         storage.getAppSetting("maps_provider"),
+        storage.getAppSetting("maps_user_choice_enabled"),
       ]);
       res.json({
         enabled: enabledSetting?.value !== "false",
         provider: providerSetting?.value || "carto_light",
+        userChoiceEnabled: userChoiceSetting?.value !== "false",
       });
     } catch {
-      res.json({ enabled: true, provider: "carto_light" });
+      res.json({ enabled: true, provider: "carto_light", userChoiceEnabled: true });
+    }
+  });
+
+  app.get("/api/settings/maps-user-choice", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("maps_user_choice_enabled");
+      res.json({ enabled: setting?.value !== "false" });
+    } catch {
+      res.json({ enabled: true });
     }
   });
 
