@@ -922,6 +922,46 @@ router.put("/settings/motoclub_include_zav", async (req: Request, res: Response)
   }
 });
 
+router.put("/settings/maps_enabled", async (req: Request, res: Response) => {
+  try {
+    const { value } = req.body as { value: string };
+    const setting = await storage.upsertAppSetting("maps_enabled", value);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_setting",
+      targetType: "app_setting",
+      targetId: "maps_enabled",
+      details: `maps_enabled = ${value}`,
+    });
+    return res.json(setting);
+  } catch (error) {
+    console.error("Admin maps_enabled error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.put("/settings/maps_provider", async (req: Request, res: Response) => {
+  try {
+    const { value } = req.body as { value: string };
+    const allowed = ["carto_light", "carto_dark", "osm"];
+    if (!allowed.includes(value)) {
+      return res.status(400).json({ message: "Provider non valido" });
+    }
+    const setting = await storage.upsertAppSetting("maps_provider", value);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_setting",
+      targetType: "app_setting",
+      targetId: "maps_provider",
+      details: `maps_provider = ${value}`,
+    });
+    return res.json(setting);
+  } catch (error) {
+    console.error("Admin maps_provider error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/settings/:key", async (req: Request, res: Response) => {
   try {
     const key = req.params.key as string;

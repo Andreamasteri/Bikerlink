@@ -7,7 +7,7 @@ import {
   Text,
   ActivityIndicator,
 } from "react-native";
-import MapView, { Marker, Circle, UrlTile, Region } from "react-native-maps";
+import MapView, { Marker, Circle, UrlTile, Region, PROVIDER_GOOGLE } from "react-native-maps";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import Colors from "@/constants/colors";
@@ -206,6 +206,7 @@ export default function InteractiveMap({
         ref={mapRef}
         style={styles.map}
         initialRegion={region}
+        provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
         showsUserLocation={!!userLocation}
         showsMyLocationButton={false}
         onMapReady={onReady}
@@ -216,6 +217,7 @@ export default function InteractiveMap({
             maximumZ={19}
             flipY={false}
             zIndex={-1}
+            shouldReplaceMapContent={true}
           />
         ) : null}
 

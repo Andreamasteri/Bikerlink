@@ -25,17 +25,13 @@ function useLoginMutation() {
       queryClient.invalidateQueries();
       (async () => {
         try {
-          await queryClient.prefetchQuery({ queryKey: ["/api/settings/maps"] });
+          await queryClient.fetchQuery({ queryKey: ["/api/settings/maps"] });
         } catch {}
         try {
-          await queryClient.prefetchQuery({ queryKey: ["/api/users/profile"] });
+          await queryClient.fetchQuery({ queryKey: ["/api/users/profile"] });
         } catch {}
-        try {
-          await queryClient.prefetchQuery({ queryKey: ["/api/users/nearby"] });
-        } catch {}
-        try {
-          apiRequest("POST", "/api/matching/trigger").catch(() => {});
-        } catch {}
+        queryClient.fetchQuery({ queryKey: ["/api/users/nearby"] }).catch(() => {});
+        apiRequest("POST", "/api/matching/trigger").catch(() => {});
       })();
     },
   });

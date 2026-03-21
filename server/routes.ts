@@ -310,6 +310,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/maps-enabled", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("maps_enabled");
+      res.json({ enabled: setting?.value !== "false" });
+    } catch {
+      res.json({ enabled: true });
+    }
+  });
+
+  app.get("/api/settings/maps-provider", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("maps_provider");
+      res.json({ provider: setting?.value || "carto_light" });
+    } catch {
+      res.json({ provider: "carto_light" });
+    }
+  });
+
   app.get("/api/settings/all", async (_req, res) => {
     try {
       const [syneco, emailVerification, chatbot, autoMatching, customRoutes, paypal, sosEnabled, mapsEnabled, mapsProvider] = await Promise.all([

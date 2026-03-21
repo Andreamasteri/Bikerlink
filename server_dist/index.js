@@ -9085,6 +9085,44 @@ router17.put("/settings/motoclub_include_zav", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
+router17.put("/settings/maps_enabled", async (req, res) => {
+  try {
+    const { value } = req.body;
+    const setting = await storage.upsertAppSetting("maps_enabled", value);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId,
+      action: "update_setting",
+      targetType: "app_setting",
+      targetId: "maps_enabled",
+      details: `maps_enabled = ${value}`
+    });
+    return res.json(setting);
+  } catch (error) {
+    console.error("Admin maps_enabled error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router17.put("/settings/maps_provider", async (req, res) => {
+  try {
+    const { value } = req.body;
+    const allowed = ["carto_light", "carto_dark", "osm"];
+    if (!allowed.includes(value)) {
+      return res.status(400).json({ message: "Provider non valido" });
+    }
+    const setting = await storage.upsertAppSetting("maps_provider", value);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId,
+      action: "update_setting",
+      targetType: "app_setting",
+      targetId: "maps_provider",
+      details: `maps_provider = ${value}`
+    });
+    return res.json(setting);
+  } catch (error) {
+    console.error("Admin maps_provider error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
 router17.put("/settings/:key", async (req, res) => {
   try {
     const key = req.params.key;
@@ -11294,6 +11332,22 @@ async function registerRoutes(app2) {
       });
     } catch {
       res.json({ enabled: true, provider: "carto_light" });
+    }
+  });
+  app2.get("/api/settings/maps-enabled", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("maps_enabled");
+      res.json({ enabled: setting?.value !== "false" });
+    } catch {
+      res.json({ enabled: true });
+    }
+  });
+  app2.get("/api/settings/maps-provider", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("maps_provider");
+      res.json({ provider: setting?.value || "carto_light" });
+    } catch {
+      res.json({ provider: "carto_light" });
     }
   });
   app2.get("/api/settings/all", async (_req, res) => {

@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
+import type { Href } from "expo-router";
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
@@ -102,7 +103,7 @@ export default function AdminDashboard() {
 
   function handleItemPress(item: AdminItem) {
     if (item.route) {
-      router.push(item.route as any);
+      router.push(item.route as Href);
     }
   }
 
