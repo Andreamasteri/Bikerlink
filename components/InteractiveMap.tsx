@@ -131,6 +131,7 @@ export default function InteractiveMap({
 }: InteractiveMapProps) {
   const { enabled: mapsEnabled, resolvedProvider, userChoiceEnabled } = useMapConfig();
   const mapRef = useRef<MapView>(null);
+  const mapReadyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
   const [region, setRegion] = useState<Region>(ITALY_REGION);
@@ -223,9 +224,15 @@ export default function InteractiveMap({
     }
   }, [userLocation]);
 
+  useEffect(() => {
+    return () => {
+      if (mapReadyTimerRef.current) clearTimeout(mapReadyTimerRef.current);
+    };
+  }, []);
+
   const handleMapReady = useCallback(() => {
     onReady?.();
-    setTimeout(() => {
+    mapReadyTimerRef.current = setTimeout(() => {
       mapRef.current?.animateToRegion(region, 1);
     }, 100);
   }, [onReady, region]);
