@@ -41,3 +41,6 @@ yarn-error.*
 
 # Stress test logs
 logs/
+
+# Static build (generated artifacts — non includere nel repo)
+static-build/
