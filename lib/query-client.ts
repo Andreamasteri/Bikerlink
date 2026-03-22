@@ -8,7 +8,7 @@ export function getApiUrl(): string {
   let host = process.env.EXPO_PUBLIC_DOMAIN;
 
   if (!host) {
-    throw new Error("EXPO_PUBLIC_DOMAIN is not set");
+    host = "biker-link.replit.app";
   }
 
   let url = new URL(`https://${host}`);

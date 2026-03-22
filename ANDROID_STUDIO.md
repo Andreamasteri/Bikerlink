@@ -12,6 +12,17 @@ git clone https://github.com/Andreamasteri/Bikerlink.git
 cd Bikerlink
 ```
 
+## Configurazione ambiente
+
+Crea il file `.env` nella root del progetto:
+
+```bash
+cp .env.example .env
+```
+
+Il file dice all'app dove si trova il backend (`biker-link.replit.app`).
+Il fallback è già integrato nel codice, ma avere il `.env` esplicito è consigliato.
+
 ## Apri in Android Studio
 
 1. Avvia Android Studio
