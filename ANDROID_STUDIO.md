@@ -29,9 +29,17 @@ cd Bikerlink
 
 ## Build APK release (per distribuzione)
 
+> **ATTENZIONE — Keystore**: la configurazione attuale usa il keystore di debug
+> anche per la build release (default di expo prebuild). Va bene per test locali,
+> ma **non distribuire pubblicamente** un APK firmato con il debug keystore.
+> Prima della distribuzione, crea un keystore di produzione e configuralo in
+> `android/app/build.gradle` sotto `signingConfigs.release`.
+
 1. Menu **Build** → **Generate Signed Bundle / APK**
 2. Seleziona **APK**
-3. Crea o seleziona un keystore (tienilo al sicuro!)
+3. **Crea un nuovo keystore di produzione** (non usare quello debug già presente):
+   - Scegli un percorso sicuro fuori dalla cartella del progetto
+   - Annotati alias, password keystore e password chiave — non si recuperano!
 4. Build type: **release**
 5. APK si trova in: `android/app/build/outputs/apk/release/app-release.apk`
 
