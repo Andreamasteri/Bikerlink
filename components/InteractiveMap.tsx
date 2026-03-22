@@ -223,6 +223,13 @@ export default function InteractiveMap({
     }
   }, [userLocation]);
 
+  const handleMapReady = useCallback(() => {
+    onReady?.();
+    setTimeout(() => {
+      mapRef.current?.animateToRegion(region, 1);
+    }, 100);
+  }, [onReady, region]);
+
   const tileConfig = mapsEnabled ? getTileConfig(resolvedProvider) : null;
 
   return (
@@ -235,7 +242,7 @@ export default function InteractiveMap({
         customMapStyle={tileConfig ? undefined : DEFAULT_MAP_STYLE}
         showsUserLocation={!!userLocation}
         showsMyLocationButton={false}
-        onMapReady={onReady}
+        onMapReady={handleMapReady}
       >
         {tileConfig ? (
           <UrlTile

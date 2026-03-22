@@ -10,17 +10,17 @@ const TILE_CONFIGS: Record<MapProvider, TileConfig> = {
   carto_light: {
     urlTemplate: "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
     maximumZ: 19,
-    shouldReplaceMapContent: false,
+    shouldReplaceMapContent: true,
   },
   carto_dark: {
     urlTemplate: "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
     maximumZ: 19,
-    shouldReplaceMapContent: false,
+    shouldReplaceMapContent: true,
   },
   esri_gray: {
     urlTemplate: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
     maximumZ: 16,
-    shouldReplaceMapContent: false,
+    shouldReplaceMapContent: true,
   },
 };
 
