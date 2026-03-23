@@ -50,7 +50,7 @@ interface ProfileData {
 
 const MOTO_TYPES = [
   "Naked", "Sport", "Touring", "Adventure", "Enduro",
-  "Cruiser", "Cafe Racer", "Scrambler", "Custom", "Scooter",
+  "Cruiser", "Café Racer", "Scrambler", "Custom", "Scooter",
 ];
 
 const RIDING_STYLES = [

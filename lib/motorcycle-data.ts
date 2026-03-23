@@ -353,6 +353,7 @@ const MOTORCYCLE_DATA: Record<string, string[]> = {
     "Thunderbird 1600", "Thunderbird 1700", "Thunderbird Storm",
     "Rocket 3 R", "Rocket 3 GT",
     "Trident 660", "Speed 400",
+    "Bonneville T214 Bobber Black",
   ],
   "Ural": [
     "Gear Up", "CT", "Ranger",
