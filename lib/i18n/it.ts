@@ -266,6 +266,7 @@ const it: Record<string, string> = {
   "garage.warningMatchingPrecision": "Attenzione: specificare marca e modello precisi per usufruire del matching automatico",
   "garage.displacement": "Cilindrata cc",
   "garage.displacementPlaceholder": "es. \"821\"",
+  "garage.selectBrandFirst": "Seleziona prima la marca",
 
   "home.locationUnavailable": "Posizione non disponibile",
   "home.available": "Disponibili",

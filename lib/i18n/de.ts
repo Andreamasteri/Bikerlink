@@ -266,6 +266,7 @@ const de: Record<string, string> = {
   "garage.warningMatchingPrecision": "Achtung: Marke und Modell genau angeben, um das automatische Matching zu nutzen",
   "garage.displacement": "Hubraum cc",
   "garage.displacementPlaceholder": "z.B. \"821\"",
+  "garage.selectBrandFirst": "Zuerst Marke auswählen",
 
   "home.locationUnavailable": "Position nicht verfügbar",
   "home.available": "Verfügbar",

@@ -187,6 +187,7 @@ const MOTORCYCLE_DATA: Record<string, string[]> = {
     "NIKEN", "NIKEN GT",
     "XMAX 300", "XMAX 125",
     "TMAX 560", "TMAX 560 Tech Max",
+    "Yzinger TW-E",
   ],
   "Zero Motorcycles": [
     "SR/F", "SR/S", "DSR/X", "FX", "S", "DS", "FXE",

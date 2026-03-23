@@ -281,7 +281,7 @@ function WishlistScreen() {
               <MotoPicker
                 value={motoForm.model}
                 onValueChange={(m) => setMotoForm(p => ({ ...p, model: m }))}
-                placeholder={motoForm.brand ? t("garage.modelPlaceholder") : "Seleziona prima la marca"}
+                placeholder={motoForm.brand ? t("garage.modelPlaceholder") : t("garage.selectBrandFirst")}
                 items={getModelsForBrand(motoForm.brand)}
                 disabled={!motoForm.brand}
                 label={t("garage.model")}
@@ -580,7 +580,7 @@ function GarageContent() {
               <MotoPicker
                 value={form.model}
                 onValueChange={(m) => setForm(p => ({ ...p, model: m }))}
-                placeholder={form.brand ? t("garage.modelPlaceholder") : "Seleziona prima la marca"}
+                placeholder={form.brand ? t("garage.modelPlaceholder") : t("garage.selectBrandFirst")}
                 items={getModelsForBrand(form.brand)}
                 disabled={!form.brand}
                 label={t("garage.model")}

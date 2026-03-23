@@ -12,6 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useT } from "@/lib/language-context";
 
 interface MotoPickerProps {
   value: string;
@@ -33,6 +34,7 @@ export default function MotoPicker({
   const [visible, setVisible] = useState(false);
   const [search, setSearch] = useState("");
   const insets = useSafeAreaInsets();
+  const t = useT();
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -106,7 +108,7 @@ export default function MotoPicker({
             <Ionicons name="search" size={18} color={Colors.textSecondary} style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Cerca..."
+              placeholder={t("common.search") + "..."}
               placeholderTextColor={Colors.textSecondary}
               value={search}
               onChangeText={setSearch}
@@ -137,7 +139,7 @@ export default function MotoPicker({
             )}
             ListEmptyComponent={
               <View style={styles.empty}>
-                <Text style={styles.emptyText}>Nessun risultato</Text>
+                <Text style={styles.emptyText}>{t("common.noResults")}</Text>
               </View>
             }
             ItemSeparatorComponent={() => <View style={styles.separator} />}
