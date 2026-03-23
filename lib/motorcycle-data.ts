@@ -1,8 +1,8 @@
 const MOTORCYCLE_DATA: Record<string, string[]> = {
   "Aprilia": [
-    "RSV4", "RSV4 Factory",
-    "RSV Mille", "RSV Mille R",
-    "Tuono V4", "Tuono V4 Factory", "Tuono",
+    "RSV4",
+    "RSV Mille",
+    "Tuono V4", "Tuono",
     "RS", "Dorsoduro", "Shiver",
     "Caponord", "Futura", "Falco",
     "Pegaso Trail", "Pegaso Strada",
@@ -30,9 +30,8 @@ const MOTORCYCLE_DATA: Record<string, string[]> = {
     "R 1150 GS", "R 1100 GS",
     "S 1000 RR", "M 1000 RR", "S 1000 XR", "S 1000 R", "M 1000 R",
     "F 900 R", "F 900 XR",
-    "F 850 GS", "F 850 GS Adventure",
-    "F 750 GS", "F 700 GS", "F 650 GS",
-    "K 1600 GT", "K 1600 GTL", "K 1600 B",
+    "F 850 GS", "F 750 GS", "F 700 GS", "F 650 GS",
+    "K 1600 GT", "K 1600 GTL",
     "K 1300 R", "K 1300 S", "K 1300 GT",
     "HP2", "HP4",
     "G 310 R", "G 310 GS", "CE 04",
@@ -169,7 +168,7 @@ const MOTORCYCLE_DATA: Record<string, string[]> = {
   ],
   "Moto Guzzi": [
     "V7", "V9 Bobber", "V9 Roamer",
-    "V85 TT", "V85 TT Travel",
+    "V85 TT",
     "Breva", "Stelvio", "Norge", "Griso",
     "California", "Eldorado",
   ],
