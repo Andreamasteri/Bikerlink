@@ -12,6 +12,9 @@ PID_FILE="/tmp/metro.pid"
 PREWARM_ANDROID_PID=0
 PREWARM_IOS_PID=0
 
+# ── Pulizia temp orfani da sessioni precedenti ────────────────────────────────
+find /tmp -maxdepth 1 -name "metro-opt-cycle*" -mmin +120 -delete 2>/dev/null || true
+
 # ── Lock atomico con flock (kernel-level, nessuna race condition) ──────────────
 exec 9>>"$FLOCK_FILE"
 if ! flock -n 9; then
@@ -19,7 +22,6 @@ if ! flock -n 9; then
   exit 0
 fi
 
-# Scrivi il PID per compatibilita' con Watchdog (che controlla kill -0 sul PID)
 echo $$ > "$LOCK_FILE"
 
 cleanup() {
@@ -30,7 +32,6 @@ cleanup() {
   if [ "$PREWARM_IOS_PID" -gt 0 ]; then
     kill "$PREWARM_IOS_PID" 2>/dev/null || true
   fi
-  # Il flock viene rilasciato automaticamente alla chiusura del fd 9 (quando bash esce)
 }
 trap cleanup EXIT
 

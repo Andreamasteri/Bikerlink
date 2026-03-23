@@ -7,20 +7,43 @@ HEALTH_CHECK_INTERVAL=60
 CHECK_INTERVAL=10
 RESTART_COOLDOWN=60
 FRONTEND_RESTART_COOLDOWN=120
+LOG_MAX_BYTES=1048576
 
 mkdir -p "$(dirname "$LOG_FILE")"
 
-# ── Lock atomico: una sola istanza Watchdog per volta ──────────────────────────
 exec 9>>"/tmp/watchdog.flock"
 if ! flock -n 9; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Altra istanza Watchdog gia' in esecuzione. Uscita." >> "$LOG_FILE"
   exit 0
 fi
 
+RUNNING=1
+
+graceful_shutdown() {
+  log "WATCHDOG: ricevuto segnale di arresto, uscita pulita..."
+  RUNNING=0
+}
+trap graceful_shutdown SIGTERM SIGINT
+
 log() {
   local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
   echo "$msg"
   echo "$msg" >> "$LOG_FILE"
+}
+
+rotate_log() {
+  if [ -f "$LOG_FILE" ]; then
+    local size
+    size=$(stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)
+    if [ "$size" -gt "$LOG_MAX_BYTES" ]; then
+      local lines
+      lines=$(wc -l < "$LOG_FILE")
+      local keep=$((lines / 2))
+      tail -n "$keep" "$LOG_FILE" > "${LOG_FILE}.tmp" 2>/dev/null
+      mv "${LOG_FILE}.tmp" "$LOG_FILE" 2>/dev/null
+      log "LOG ROTAZIONE: file troncato da ${size} bytes (mantenute ultime $keep righe)"
+    fi
+  fi
 }
 
 is_port_open() {
@@ -90,7 +113,9 @@ log "  Backend port: $BACKEND_PORT"
 log "  Frontend port: $FRONTEND_PORT"
 log "  Health check interval: ${HEALTH_CHECK_INTERVAL}s"
 log "  Check interval: ${CHECK_INTERVAL}s"
-log "  Restart cooldown: ${RESTART_COOLDOWN}s (riprova ogni ${RESTART_COOLDOWN}s se il servizio resta giu')"
+log "  Restart cooldown backend: ${RESTART_COOLDOWN}s"
+log "  Restart cooldown frontend: ${FRONTEND_RESTART_COOLDOWN}s"
+log "  Log max size: $((LOG_MAX_BYTES / 1024))KB (rotazione automatica)"
 log "========================================="
 
 last_health_check=0
@@ -98,8 +123,9 @@ last_backend_restart=0
 last_frontend_restart=0
 backend_down_since=0
 frontend_down_since=0
+check_count=0
 
-while true; do
+while [ "$RUNNING" -eq 1 ]; do
   now=$(date +%s)
 
   if is_port_open "$BACKEND_PORT"; then
@@ -143,5 +169,12 @@ while true; do
     last_health_check=$now
   fi
 
+  check_count=$((check_count + 1))
+  if [ $((check_count % 60)) -eq 0 ]; then
+    rotate_log
+  fi
+
   sleep "$CHECK_INTERVAL"
 done
+
+log "WATCHDOG: arresto completato."
