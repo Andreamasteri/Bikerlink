@@ -143,6 +143,7 @@ var init_schema = __esm({
       isDefault: (0, import_pg_core.boolean)("is_default").notNull().default(false),
       isForSale: (0, import_pg_core.boolean)("is_for_sale").notNull().default(false),
       saleDescription: (0, import_pg_core.text)("sale_description"),
+      motoDescription: (0, import_pg_core.text)("moto_description"),
       createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow()
     }, (table) => [
       (0, import_pg_core.index)("user_motorcycles_user_id_idx").on(table.userId)
@@ -5401,7 +5402,7 @@ router4.post("/", requireAuth3, async (req, res) => {
     if (user.userType !== "biker" && user.userType !== "coppia" && user.userType !== "admin") {
       return res.status(403).json({ message: "Solo biker, coppie e admin possono aggiungere moto" });
     }
-    const { brand, model, year, displacement, motorcycleType, ridingStyle, photoUrl, isForSale, saleDescription, isDefault } = req.body;
+    const { brand, model, year, displacement, motorcycleType, ridingStyle, photoUrl, isForSale, saleDescription, isDefault, motoDescription } = req.body;
     if (!brand || !model) {
       return res.status(400).json({ message: "Marca e modello sono obbligatori" });
     }
@@ -5417,7 +5418,8 @@ router4.post("/", requireAuth3, async (req, res) => {
       photoUrl: photoUrl || null,
       isDefault: isDefaultBool,
       isForSale: isForSale || false,
-      saleDescription: saleDescription || null
+      saleDescription: saleDescription || null,
+      motoDescription: motoDescription || null
     });
     if (isDefaultBool) {
       await db.update(userMotorcycles).set({ isDefault: false }).where((0, import_drizzle_orm4.and)((0, import_drizzle_orm4.eq)(userMotorcycles.userId, userId), (0, import_drizzle_orm4.ne)(userMotorcycles.id, motorcycle.id)));
@@ -5475,7 +5477,7 @@ router4.put("/:id", requireAuth3, async (req, res) => {
     if (existing.userId !== userId) {
       return res.status(403).json({ message: "Non autorizzato" });
     }
-    const allowedFields = ["brand", "model", "year", "displacement", "motorcycleType", "ridingStyle", "photoUrl", "isForSale", "saleDescription", "isDefault"];
+    const allowedFields = ["brand", "model", "year", "displacement", "motorcycleType", "ridingStyle", "photoUrl", "isForSale", "saleDescription", "isDefault", "motoDescription"];
     const updateData = {};
     for (const field of allowedFields) {
       if (req.body[field] !== void 0) {
