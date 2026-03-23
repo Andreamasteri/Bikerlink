@@ -429,10 +429,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(users.status, "active"),
-          or(
-            sql`${users.nickname} ILIKE ${pattern}`,
-            sql`${users.email} ILIKE ${pattern}`
-          )
+          sql`${users.nickname} ILIKE ${pattern}`
         )
       )
       .limit(20);
