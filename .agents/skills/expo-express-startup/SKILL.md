@@ -22,10 +22,13 @@ Questo sistema garantisce che backend e frontend si avviino in ordine corretto, 
 │  ┌──────▼───────────────────────────────────┐    │
 │  │             Watchdog                      │    │
 │  │ controlla ogni 10s, riavvia se crash      │    │
+│  │ graceful shutdown su SIGTERM/SIGINT        │    │
+│  │ rotazione log automatica (>1MB)           │    │
 │  └───────────────────────────────────────────┘    │
 │  ┌───────────────────────────────────────────┐    │
 │  │          riavvia-tutto.sh                 │    │
-│  │ opzione nucleare: kill tutto + pulisci    │    │
+│  │ opzione nucleare: kill + pulisci cache    │    │
+│  │ + rimuovi tutti i lock/flock/pid orfani   │    │
 │  └───────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────┘
 ```
@@ -39,10 +42,15 @@ Questo sistema garantisce che backend e frontend si avviino in ordine corretto, 
 | Lock file PID | start-backend.sh | Impedisce avvii duplicati |
 | flock kernel-level | start-expo.sh, watchdog.sh | Lock atomico senza race condition |
 | Retry loop (MAX_RETRIES=3) | start-backend.sh, start-expo.sh | Auto-recovery su crash |
+| Rebuild condizionale | start-backend.sh | Salta esbuild se i sorgenti non sono cambiati (~3-5s risparmiati) |
 | Pre-warm bundle parallelo | start-expo.sh | Android+iOS compilati subito, Expo Go veloce |
+| Pulizia temp orfani | start-expo.sh | Elimina log Metro vecchi >2h all'avvio |
 | Cooldown riavvio | watchdog.sh | Evita restart loop (60s backend, 120s frontend) |
+| Graceful shutdown | watchdog.sh | trap SIGTERM/SIGINT, uscita pulita senza zombie |
+| Rotazione log automatica | watchdog.sh | Tronca watchdog.log quando >1MB (ogni ~10 min) |
 | Monitoring porta (non PID) | start-expo.sh | Metro può essere orphan process |
 | port_is_alive timeout=60s | start-expo.sh | Evita falsi positivi durante compilazione bundle |
+| Pulizia lock/flock/pid completa | riavvia-tutto.sh | Rimuove tutti i file orfani da /tmp/ |
 
 ---
 
@@ -63,6 +71,8 @@ Vedi sezioni sotto. Placeholder da sostituire:
 - `BACKEND_HEALTH_ENDPOINT` → endpoint health (es. `/api/auth/me` o `/api/health`)
 - `WORKSPACE_PATH` → path assoluto del progetto (es. `/home/runner/workspace`)
 - `EXPO_ENTRY_BUNDLE` → entry point bundle (es. `node_modules/expo-router/entry.bundle`)
+- `SOURCE_DIRS` → directory sorgenti server (es. `server/ shared/`) per il rebuild condizionale
+- `LOG_MAX_BYTES` → dimensione massima log watchdog (es. `1048576` = 1MB)
 
 ### 3. Rendi eseguibili gli script
 ```bash
@@ -146,22 +156,22 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Lock file: impedisce al Watchdog di fare pkill mentre questo script gestisce il backend
 if [ -f "$LOCK_FILE" ]; then
   LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null)
   if kill -0 "$LOCK_PID" 2>/dev/null; then
     echo "Un'altra istanza di start-backend.sh è già in esecuzione (PID: $LOCK_PID). Uscita."
     exit 0
   else
-    echo "Lock file obsoleto trovato, continuo."
+    echo "Lock file obsoleto trovato (PID $LOCK_PID morto), rimuovo."
     rm -f "$LOCK_FILE"
   fi
 fi
 
 echo $$ > "$LOCK_FILE"
 
+rm -f /tmp/start-backend.flock 2>/dev/null
+
 kill_port() {
-  # Adatta i pkill ai nomi dei processi del tuo backend
   pkill -9 -f "node.*server_dist" 2>/dev/null || true
   pkill -9 -f "tsx server" 2>/dev/null || true
 
@@ -183,26 +193,42 @@ kill_port() {
   echo "Attenzione: porta $PORT ancora occupata dopo 15s"
 }
 
-BUILD_MAX_RETRIES=3
-BUILD_OK=0
-for build_try in $(seq 1 $BUILD_MAX_RETRIES); do
-  echo "Compilazione TypeScript server (tentativo $build_try/$BUILD_MAX_RETRIES)..."
-  BUILD_CMD  # <-- sostituisci con il tuo comando, es: npm run server:build
-  if [ $? -eq 0 ]; then
-    BUILD_OK=1
-    break
+needs_rebuild() {
+  if [ ! -f "server_dist/index.js" ]; then
+    return 0
   fi
-  echo "Compilazione fallita al tentativo $build_try"
-  if [ $build_try -lt $BUILD_MAX_RETRIES ]; then
-    echo "Attendo 5 secondi prima di riprovare..."
-    sleep 5
+  local newest_src
+  newest_src=$(find SOURCE_DIRS -name '*.ts' -newer server_dist/index.js 2>/dev/null | head -1)
+  if [ -n "$newest_src" ]; then
+    return 0
   fi
-done
-if [ $BUILD_OK -ne 1 ]; then
-  echo "ERRORE: compilazione server fallita dopo $BUILD_MAX_RETRIES tentativi"
-  exit 1
+  return 1
+}
+
+if needs_rebuild; then
+  BUILD_MAX_RETRIES=3
+  BUILD_OK=0
+  for build_try in $(seq 1 $BUILD_MAX_RETRIES); do
+    echo "Compilazione TypeScript server (tentativo $build_try/$BUILD_MAX_RETRIES)..."
+    BUILD_CMD
+    if [ $? -eq 0 ]; then
+      BUILD_OK=1
+      break
+    fi
+    echo "Compilazione fallita al tentativo $build_try"
+    if [ $build_try -lt $BUILD_MAX_RETRIES ]; then
+      echo "Attendo 5 secondi prima di riprovare..."
+      sleep 5
+    fi
+  done
+  if [ $BUILD_OK -ne 1 ]; then
+    echo "ERRORE: compilazione server fallita dopo $BUILD_MAX_RETRIES tentativi"
+    exit 1
+  fi
+  echo "Compilazione completata."
+else
+  echo "server_dist/index.js aggiornato — skip rebuild (risparmio ~3-5s)"
 fi
-echo "Compilazione completata."
 
 for retry in $(seq 1 $MAX_RETRIES); do
   echo "=== Tentativo $retry/$MAX_RETRIES ==="
@@ -212,7 +238,7 @@ for retry in $(seq 1 $MAX_RETRIES); do
   sleep 3
 
   echo "Porta $PORT libera, avvio backend..."
-  NODE_ENV=production BACKEND_CMD &  # <-- sostituisci, es: node server_dist/index.js
+  NODE_ENV=production BACKEND_CMD &
   SERVER_PID=$!
 
   sleep 8
@@ -231,6 +257,8 @@ for retry in $(seq 1 $MAX_RETRIES); do
   while true; do
     sleep 10
     if ! kill -0 $SERVER_PID 2>/dev/null; then
+      EXIT_CODE=$?
+      echo "Backend terminato (PID: $SERVER_PID)"
       wait $SERVER_PID 2>/dev/null
       REAL_EXIT=$(( $? ))
       if [ $REAL_EXIT -eq 137 ] || [ $REAL_EXIT -eq 143 ] || [ $REAL_EXIT -eq 0 ]; then
@@ -270,7 +298,8 @@ PID_FILE="/tmp/metro.pid"
 PREWARM_ANDROID_PID=0
 PREWARM_IOS_PID=0
 
-# Lock atomico kernel-level (no race condition)
+find /tmp -maxdepth 1 -name "metro-opt-cycle*" -mmin +120 -delete 2>/dev/null || true
+
 exec 9>>"$FLOCK_FILE"
 if ! flock -n 9; then
   echo "Un'altra istanza di start-expo.sh e' gia' in esecuzione. Uscita."
@@ -290,14 +319,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Limite memoria Node (adatta al tuo piano Replit)
 export NODE_OPTIONS="--max-old-space-size=1024"
 
 port_is_open() {
   curl -s --max-time 2 --connect-timeout 1 -o /dev/null "http://localhost:$1/" 2>/dev/null
 }
 
-# Timeout lungo: Metro può essere occupato a compilare (~28s per 1635 moduli)
 port_is_alive() {
   curl -s --max-time 60 --connect-timeout 3 -o /dev/null "http://localhost:$1/" 2>/dev/null
 }
@@ -336,7 +363,6 @@ kill_port() {
 wait_for_backend() {
   echo "Attendo che il backend sia pronto sulla porta $BACKEND_PORT..."
   for i in $(seq 1 $BACKEND_WAIT_SECONDS); do
-    # Sostituisci BACKEND_HEALTH_ENDPOINT con il tuo endpoint (es. /api/auth/me o /api/health)
     if curl -s --max-time 1 "http://localhost:$BACKEND_PORT/BACKEND_HEALTH_ENDPOINT" >/dev/null 2>&1; then
       echo "Backend pronto dopo ${i}s."
       return 0
@@ -351,9 +377,6 @@ wait_for_backend() {
 
 prewarm_bundles() {
   local log_file="$1"
-  # Sostituisci EXPO_ENTRY_BUNDLE con il tuo entry point
-  # Es. expo-router: node_modules/expo-router/entry.bundle
-  # Es. bare: index.bundle
   local BUNDLE_BASE="http://localhost:${PORT}/EXPO_ENTRY_BUNDLE"
   local BUNDLE_PARAMS="dev=true&hot=false&lazy=true&transform.engine=hermes&transform.bytecode=1&transform.routerRoot=app&unstable_transformProfile=hermes-stable"
   local PW_TIMEOUT=300
@@ -445,7 +468,7 @@ for retry in $(seq 1 $MAX_RETRIES); do
 
     echo "Porta $PORT libera, avvio Metro..." | tee -a "$LOG_FILE"
     START_TIME=$(date +%s)
-    npm run expo:dev >> "$LOG_FILE" 2>&1 &  # <-- usa il tuo script npm
+    npm run expo:dev >> "$LOG_FILE" 2>&1 &
     METRO_PID=$!
     echo $METRO_PID > "$PID_FILE"
 
@@ -525,24 +548,47 @@ exit 1
 BACKEND_PORT=BACKEND_PORT
 FRONTEND_PORT=FRONTEND_PORT
 LOG_FILE="WORKSPACE_PATH/logs/watchdog.log"
-HEALTH_CHECK_INTERVAL=60   # secondi tra health check approfonditi
-CHECK_INTERVAL=10           # secondi tra i controlli porta
-RESTART_COOLDOWN=60         # cooldown riavvio backend
-FRONTEND_RESTART_COOLDOWN=120  # cooldown riavvio frontend (Metro è lento)
+HEALTH_CHECK_INTERVAL=60
+CHECK_INTERVAL=10
+RESTART_COOLDOWN=60
+FRONTEND_RESTART_COOLDOWN=120
+LOG_MAX_BYTES=LOG_MAX_BYTES
 
 mkdir -p "$(dirname "$LOG_FILE")"
 
-# Lock atomico: una sola istanza Watchdog per volta
 exec 9>>"/tmp/watchdog.flock"
 if ! flock -n 9; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Altra istanza Watchdog gia' in esecuzione. Uscita." >> "$LOG_FILE"
   exit 0
 fi
 
+RUNNING=1
+
+graceful_shutdown() {
+  log "WATCHDOG: ricevuto segnale di arresto, uscita pulita..."
+  RUNNING=0
+}
+trap graceful_shutdown SIGTERM SIGINT
+
 log() {
   local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
   echo "$msg"
   echo "$msg" >> "$LOG_FILE"
+}
+
+rotate_log() {
+  if [ -f "$LOG_FILE" ]; then
+    local size
+    size=$(stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)
+    if [ "$size" -gt "$LOG_MAX_BYTES" ]; then
+      local lines
+      lines=$(wc -l < "$LOG_FILE")
+      local keep=$((lines / 2))
+      tail -n "$keep" "$LOG_FILE" > "${LOG_FILE}.tmp" 2>/dev/null
+      mv "${LOG_FILE}.tmp" "$LOG_FILE" 2>/dev/null
+      log "LOG ROTAZIONE: file troncato da ${size} bytes (mantenute ultime $keep righe)"
+    fi
+  fi
 }
 
 is_port_open() {
@@ -558,13 +604,12 @@ restart_backend() {
   if [ -f "$BACKEND_LOCK_FILE" ]; then
     LOCK_PID=$(cat "$BACKEND_LOCK_FILE" 2>/dev/null)
     if kill -0 "$LOCK_PID" 2>/dev/null; then
-      log "Start-backend già in esecuzione (PID: $LOCK_PID), attendo..."
+      log "Start-backend già in esecuzione (PID: $LOCK_PID), attendo che il backend si avvii..."
       return 0
     fi
     rm -f "$BACKEND_LOCK_FILE"
   fi
 
-  # Adatta ai nomi processo del tuo backend
   pkill -f "node server_dist/index.js" 2>/dev/null || true
   pkill -f "tsx server" 2>/dev/null || true
   lsof -ti:"$BACKEND_PORT" 2>/dev/null | xargs kill -9 2>/dev/null || true
@@ -581,7 +626,7 @@ restart_frontend() {
   if [ -f "$LOCK_FILE" ]; then
     LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null)
     if kill -0 "$LOCK_PID" 2>/dev/null; then
-      log "Start-expo già in esecuzione (PID: $LOCK_PID), attendo..."
+      log "Start-expo già in esecuzione (PID: $LOCK_PID), attendo che Metro si avvii..."
       return 0
     fi
     rm -f "$LOCK_FILE"
@@ -599,7 +644,6 @@ restart_frontend() {
 
 health_check() {
   local response
-  # Sostituisci con il tuo endpoint /api/health
   response=$(curl -s --max-time 5 "http://localhost:$BACKEND_PORT/api/health" 2>&1)
   if echo "$response" | grep -q '"status":"ok"'; then
     log "HEALTH CHECK OK: /api/health risponde correttamente"
@@ -616,6 +660,7 @@ log "  Health check interval: ${HEALTH_CHECK_INTERVAL}s"
 log "  Check interval: ${CHECK_INTERVAL}s"
 log "  Restart cooldown backend: ${RESTART_COOLDOWN}s"
 log "  Restart cooldown frontend: ${FRONTEND_RESTART_COOLDOWN}s"
+log "  Log max size: $((LOG_MAX_BYTES / 1024))KB (rotazione automatica)"
 log "========================================="
 
 last_health_check=0
@@ -623,8 +668,9 @@ last_backend_restart=0
 last_frontend_restart=0
 backend_down_since=0
 frontend_down_since=0
+check_count=0
 
-while true; do
+while [ "$RUNNING" -eq 1 ]; do
   now=$(date +%s)
 
   if is_port_open "$BACKEND_PORT"; then
@@ -668,8 +714,15 @@ while true; do
     last_health_check=$now
   fi
 
+  check_count=$((check_count + 1))
+  if [ $((check_count % 60)) -eq 0 ]; then
+    rotate_log
+  fi
+
   sleep "$CHECK_INTERVAL"
 done
+
+log "WATCHDOG: arresto completato."
 ```
 
 ---
@@ -697,6 +750,14 @@ rm -rf /tmp/haste-* 2>/dev/null
 rm -rf /tmp/react-* 2>/dev/null
 echo "    Cache eliminata!"
 
+echo ">>> Pulizia lock e temp orfani..."
+rm -f /tmp/start-backend.lock /tmp/start-backend.flock 2>/dev/null
+rm -f /tmp/start-expo.lock /tmp/start-expo.flock 2>/dev/null
+rm -f /tmp/watchdog.flock 2>/dev/null
+rm -f /tmp/metro.pid 2>/dev/null
+rm -f /tmp/metro-opt-cycle* 2>/dev/null
+echo "    Lock e temp eliminati!"
+
 echo ">>> Verifica porte..."
 if fuser BACKEND_PORT/tcp 2>/dev/null; then
   echo "    ATTENZIONE: porta BACKEND_PORT ancora occupata"
@@ -710,7 +771,7 @@ else
 fi
 
 echo ""
-echo ">>> Cache pulita, processi terminati."
+echo ">>> Cache pulita, processi terminati, lock rimossi."
 echo ">>> Riavvia i workflow 'Start Backend' e 'Start Frontend' per completare."
 echo "============================================"
 ```
@@ -724,4 +785,7 @@ echo "============================================"
 - **port_is_alive vs port_is_open**: durante la compilazione del bundle (~28-60s) Metro non risponde in 2s. Usa `max-time 60` nel monitoring loop per evitare falsi restart.
 - **flock vs lock file**: usa `flock` (kernel-level) dove le race condition sono critiche (start-expo, watchdog); usa il lock file PID dove serve solo impedire avvii duplicati (start-backend).
 - **NODE_OPTIONS memory**: `--max-old-space-size=1024` è calibrato per Replit con limite cgroup 8GB. Adatta al tuo piano.
-- **Log file watchdog**: `/home/runner/workspace/logs/watchdog.log` — controlla qui per vedere i crash e i riavvii automatici.
+- **Log file watchdog**: il file di log viene ruotato automaticamente quando supera LOG_MAX_BYTES (default 1MB). La rotazione mantiene la metà più recente delle righe.
+- **Rebuild condizionale**: `needs_rebuild()` confronta il mtime di `server_dist/index.js` con i sorgenti `.ts`. Se nessun sorgente è più recente, salta la compilazione (~3-5s risparmiati per riavvio).
+- **Graceful shutdown watchdog**: il trap SIGTERM/SIGINT imposta `RUNNING=0` e il loop esce pulitamente al ciclo successivo, senza processi zombie.
+- **Pulizia temp orfani**: `start-expo.sh` elimina i log Metro più vecchi di 2 ore all'avvio. `riavvia-tutto.sh` rimuove tutti i file lock/flock/pid da `/tmp/`.
