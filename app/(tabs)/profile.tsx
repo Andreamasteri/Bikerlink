@@ -628,6 +628,19 @@ export default function ProfileScreen() {
         </View>
       )}
 
+      <View style={styles.section}>
+        <Pressable style={styles.garageCard} onPress={() => router.push("/garage" as any)}>
+          {isBikerOrCoppia ? (
+            <MaterialCommunityIcons name="motorbike" size={28} color={Colors.accent} />
+          ) : (
+            <Ionicons name="heart" size={28} color={Colors.accent} />
+          )}
+          <Text style={styles.garageCardLabel}>
+            {isBikerOrCoppia ? "Il Mio Garage" : "La Mia Wishlist"}
+          </Text>
+        </Pressable>
+      </View>
+
       {currentUserType === "biker" && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Ricerca Match con ...</Text>
@@ -732,17 +745,6 @@ export default function ProfileScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Menu</Text>
-        <Pressable style={styles.menuItem} onPress={() => router.push("/garage" as any)}>
-          {isBikerOrCoppia ? (
-            <MaterialCommunityIcons name="motorbike" size={22} color={Colors.text} />
-          ) : (
-            <Ionicons name="heart" size={22} color={Colors.text} />
-          )}
-          <Text style={styles.menuLabel}>
-            {isBikerOrCoppia ? "Il Mio Garage" : "La Mia Wishlist"}
-          </Text>
-          <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
-        </Pressable>
         <MenuItem icon="create" label="Modifica Profilo" onPress={() => router.push("/profile/edit" as any)} />
         <MenuItem icon="bug" label="Segnala un Bug" onPress={() => router.push("/feedback/bug" as any)} color={Colors.accentRed} />
         <MenuItem icon="bulb" label="Richiedi Funzione" onPress={() => router.push("/feedback/feature" as any)} color={Colors.accent} />
@@ -989,7 +991,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     backgroundColor: Colors.surface,
     borderRadius: 12,
-    paddingVertical: 18,
+    paddingVertical: 10,
   },
   statItem: {
     flex: 1,
@@ -997,16 +999,33 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   statValue: {
-    fontSize: 22,
+    fontSize: 16,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 9,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
     textTransform: "uppercase" as const,
     letterSpacing: 0.5,
+  },
+  garageCard: {
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.accent + "55",
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+  },
+  garageCardLabel: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
   },
   statDivider: {
     width: 1,
