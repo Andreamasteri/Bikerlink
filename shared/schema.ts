@@ -80,6 +80,7 @@ export const userMotorcycles = pgTable("user_motorcycles", {
   isDefault: boolean("is_default").notNull().default(false),
   isForSale: boolean("is_for_sale").notNull().default(false),
   saleDescription: text("sale_description"),
+  motoDescription: text("moto_description"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("user_motorcycles_user_id_idx").on(table.userId),

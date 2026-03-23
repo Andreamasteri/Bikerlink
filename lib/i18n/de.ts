@@ -264,6 +264,8 @@ const de: Record<string, string> = {
   "garage.motoForSaleDesc": "Es wird in deinem Profil und auf dem Club-Marktplatz angezeigt",
   "garage.saleDescription": "Verkaufsbeschreibung",
   "garage.salePlaceholder": "Preis, Zustand, Notizen...",
+  "garage.motoDescription": "Motorbeschreibung",
+  "garage.motoDescriptionPlaceholder": "Erzähl uns von deinem Motorrad...",
   "garage.warningMatchingPrecision": "Achtung: Marke und Modell genau angeben, um das automatische Matching zu nutzen",
   "garage.displacement": "Hubraum cc",
   "garage.displacementPlaceholder": "z.B. \"821\"",

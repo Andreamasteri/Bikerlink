@@ -16,7 +16,7 @@ import {
   Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
@@ -474,6 +474,9 @@ export default function ProfileScreen() {
         <Text style={styles.nickname}>
           {profile?.nickname ?? user?.nickname ?? ""}
         </Text>
+        <Text style={styles.userEmail}>
+          {profile?.email ?? user?.email ?? ""}
+        </Text>
         {profile?.isPrimal === true && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
             <Ionicons name="star" size={14} color="#FFD700" />
@@ -625,38 +628,6 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Info</Text>
-        <View style={styles.infoCard}>
-          <InfoRow
-            icon="mail-outline"
-            label="Email"
-            value={profile?.email ?? user?.email ?? ""}
-          />
-          {(profile?.phone || user?.phone) && (
-            <InfoRow
-              icon="call-outline"
-              label={t("auth.phone")}
-              value={profile?.phone ?? user?.phone ?? ""}
-            />
-          )}
-          {(profile?.birthYear || user?.birthYear) && (
-            <InfoRow
-              icon="calendar-outline"
-              label={t("auth.birthYear")}
-              value={String(profile?.birthYear ?? user?.birthYear ?? "")}
-            />
-          )}
-          {profile?.coupleSexConfig && (
-            <InfoRow
-              icon="people-outline"
-              label={t("register.step2.coupleConfig")}
-              value={profile.coupleSexConfig}
-            />
-          )}
-        </View>
-      </View>
-
       {currentUserType === "biker" && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Ricerca Match con ...</Text>
@@ -761,11 +732,17 @@ export default function ProfileScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Menu</Text>
-        <MenuItem
-          icon={profile?.userType === "biker" || profile?.userType === "coppia" ? "build" : "heart"}
-          label={profile?.userType === "biker" || profile?.userType === "coppia" ? "Il Mio Garage" : "La Mia Wishlist"}
-          onPress={() => router.push("/garage" as any)}
-        />
+        <Pressable style={styles.menuItem} onPress={() => router.push("/garage" as any)}>
+          {isBikerOrCoppia ? (
+            <MaterialCommunityIcons name="motorbike" size={22} color={Colors.text} />
+          ) : (
+            <Ionicons name="heart" size={22} color={Colors.text} />
+          )}
+          <Text style={styles.menuLabel}>
+            {isBikerOrCoppia ? "Il Mio Garage" : "La Mia Wishlist"}
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
+        </Pressable>
         <MenuItem icon="create" label="Modifica Profilo" onPress={() => router.push("/profile/edit" as any)} />
         <MenuItem icon="bug" label="Segnala un Bug" onPress={() => router.push("/feedback/bug" as any)} color={Colors.accentRed} />
         <MenuItem icon="bulb" label="Richiedi Funzione" onPress={() => router.push("/feedback/feature" as any)} color={Colors.accent} />
@@ -963,6 +940,13 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     color: Colors.text,
     marginTop: 12,
+  },
+  userEmail: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginTop: 2,
+    marginBottom: 6,
   },
   badges: {
     flexDirection: "row",

@@ -365,6 +365,7 @@ function GarageContent() {
     isDefault: false,
     isForSale: false,
     saleDescription: "",
+    motoDescription: "",
   });
 
   const { data: marketplaceData } = useQuery<{ enabled: boolean }>({
@@ -419,7 +420,7 @@ function GarageContent() {
   });
 
   const resetForm = () => {
-    setForm({ brand: "", model: "", displacement: "", motorcycleType: "", ridingStyle: "", isDefault: false, isForSale: false, saleDescription: "" });
+    setForm({ brand: "", model: "", displacement: "", motorcycleType: "", ridingStyle: "", isDefault: false, isForSale: false, saleDescription: "", motoDescription: "" });
     setEditingId(null);
   };
 
@@ -439,6 +440,7 @@ function GarageContent() {
       isDefault: moto.isDefault || false,
       isForSale: moto.isForSale || false,
       saleDescription: moto.saleDescription || "",
+      motoDescription: moto.motoDescription || "",
     });
     setShowForm(true);
   };
@@ -613,6 +615,17 @@ function GarageContent() {
                   <OptionButton key={s.value} label={s.label} selected={form.ridingStyle === s.value} onPress={() => setForm(p => ({ ...p, ridingStyle: s.value }))} />
                 ))}
               </View>
+
+              <Text style={styles.label}>{t("garage.motoDescription")}</Text>
+              <TextInput
+                style={[styles.input, { minHeight: 80, textAlignVertical: "top" }]}
+                placeholder={t("garage.motoDescriptionPlaceholder")}
+                placeholderTextColor={Colors.textSecondary}
+                value={form.motoDescription}
+                onChangeText={(v) => setForm(p => ({ ...p, motoDescription: v }))}
+                multiline
+                maxLength={500}
+              />
 
               <Pressable style={styles.defaultRow} onPress={() => setForm(p => ({ ...p, isDefault: !p.isDefault }))}>
                 <View style={[styles.checkbox, form.isDefault && styles.checkboxChecked]}>

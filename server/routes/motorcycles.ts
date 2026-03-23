@@ -49,7 +49,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Solo biker, coppie e admin possono aggiungere moto" });
     }
 
-    const { brand, model, year, displacement, motorcycleType, ridingStyle, photoUrl, isForSale, saleDescription, isDefault } = req.body;
+    const { brand, model, year, displacement, motorcycleType, ridingStyle, photoUrl, isForSale, saleDescription, isDefault, motoDescription } = req.body;
 
     if (!brand || !model) {
       return res.status(400).json({ message: "Marca e modello sono obbligatori" });
@@ -69,6 +69,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       isDefault: isDefaultBool,
       isForSale: isForSale || false,
       saleDescription: saleDescription || null,
+      motoDescription: motoDescription || null,
     });
 
     if (isDefaultBool) {
@@ -136,7 +137,7 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Non autorizzato" });
     }
 
-    const allowedFields = ["brand", "model", "year", "displacement", "motorcycleType", "ridingStyle", "photoUrl", "isForSale", "saleDescription", "isDefault"];
+    const allowedFields = ["brand", "model", "year", "displacement", "motorcycleType", "ridingStyle", "photoUrl", "isForSale", "saleDescription", "isDefault", "motoDescription"];
     const updateData: Record<string, unknown> = {};
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {

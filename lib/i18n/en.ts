@@ -264,6 +264,8 @@ const en: Record<string, string> = {
   "garage.motoForSaleDesc": "It will be shown on your profile and the club marketplace",
   "garage.saleDescription": "Sale description",
   "garage.salePlaceholder": "Price, condition, notes...",
+  "garage.motoDescription": "Bike Description",
+  "garage.motoDescriptionPlaceholder": "Tell us about your bike...",
   "garage.warningMatchingPrecision": "Warning: specify exact brand and model to use automatic matching",
   "garage.displacement": "Displacement cc",
   "garage.displacementPlaceholder": "e.g. \"821\"",
