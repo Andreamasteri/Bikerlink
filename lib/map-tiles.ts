@@ -26,13 +26,13 @@ const TILE_CONFIGS: Record<MapProvider, TileConfig> = {
 
 export const MAP_PROVIDER_LABELS: Record<MapProvider, string> = {
   esri_gray: "Base Map",
-  carto_light: "FullMap Light",
+  carto_light: "Mappa Dettagliata Light & Dark",
   carto_dark: "FullMap",
 };
 
 export const MAP_PROVIDER_DESCRIPTIONS: Record<MapProvider, string> = {
   esri_gray: "Mappa base. Utile se hai poco segnale o preferisci il minimalismo.",
-  carto_light: "Mappa dettagliata, chiara.",
+  carto_light: "Mappa dettagliata con modalità chiara e scura. Cambia tema con il toggle sulla mappa.",
   carto_dark: "Mappa dettagliata, modalità notte.",
 };
 

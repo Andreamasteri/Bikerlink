@@ -1064,7 +1064,7 @@ export default function AdminSettings() {
             {(() => {
               const providerLabels: Record<string, string> = {
                 esri_gray: "Base Map",
-                carto_light: "FullMap Light",
+                carto_light: "Mappa Dettagliata Light & Dark",
                 carto_dark: "FullMap",
               };
               return (
