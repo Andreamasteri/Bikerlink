@@ -7,72 +7,136 @@ export interface EuropeanZone {
 }
 
 export const EUROPEAN_ZONES: EuropeanZone[] = [
+  // ── ITALIA (20 regioni) ───────────────────────────────────────────────────────
   { region: "Lombardia", country: "IT", lat: 45.46, lng: 9.19, spokenLanguages: ["Italiano"] },
+  { region: "Piemonte", country: "IT", lat: 45.07, lng: 7.69, spokenLanguages: ["Italiano"] },
+  { region: "Veneto", country: "IT", lat: 45.44, lng: 12.31, spokenLanguages: ["Italiano"] },
+  { region: "Emilia-Romagna", country: "IT", lat: 44.50, lng: 11.34, spokenLanguages: ["Italiano"] },
+  { region: "Toscana", country: "IT", lat: 43.77, lng: 11.25, spokenLanguages: ["Italiano"] },
   { region: "Lazio", country: "IT", lat: 41.90, lng: 12.50, spokenLanguages: ["Italiano"] },
   { region: "Campania", country: "IT", lat: 40.85, lng: 14.27, spokenLanguages: ["Italiano"] },
+  { region: "Puglia", country: "IT", lat: 41.12, lng: 16.87, spokenLanguages: ["Italiano"] },
+  { region: "Calabria", country: "IT", lat: 38.91, lng: 16.59, spokenLanguages: ["Italiano"] },
   { region: "Sicilia", country: "IT", lat: 37.60, lng: 14.02, spokenLanguages: ["Italiano"] },
   { region: "Sardegna", country: "IT", lat: 39.22, lng: 9.12, spokenLanguages: ["Italiano"] },
+  { region: "Liguria", country: "IT", lat: 44.41, lng: 8.93, spokenLanguages: ["Italiano"] },
+  { region: "Marche", country: "IT", lat: 43.62, lng: 13.52, spokenLanguages: ["Italiano"] },
+  { region: "Umbria", country: "IT", lat: 43.11, lng: 12.39, spokenLanguages: ["Italiano"] },
+  { region: "Abruzzo", country: "IT", lat: 42.35, lng: 13.40, spokenLanguages: ["Italiano"] },
+  { region: "Trentino-Alto Adige", country: "IT", lat: 46.07, lng: 11.12, spokenLanguages: ["Italiano"] },
+  { region: "Friuli Venezia Giulia", country: "IT", lat: 46.06, lng: 13.23, spokenLanguages: ["Italiano"] },
+  { region: "Basilicata", country: "IT", lat: 40.64, lng: 15.80, spokenLanguages: ["Italiano"] },
+  { region: "Molise", country: "IT", lat: 41.56, lng: 14.66, spokenLanguages: ["Italiano"] },
+  { region: "Valle d'Aosta", country: "IT", lat: 45.74, lng: 7.43, spokenLanguages: ["Italiano"] },
 
+  // ── GERMANIA (11 Länder) ───────────────────────────────────────────────────────
   { region: "Bayern", country: "DE", lat: 48.14, lng: 11.58, spokenLanguages: ["Deutsch"] },
   { region: "Nordrhein-Westfalen", country: "DE", lat: 51.23, lng: 6.78, spokenLanguages: ["Deutsch"] },
   { region: "Baden-Württemberg", country: "DE", lat: 48.78, lng: 9.18, spokenLanguages: ["Deutsch"] },
   { region: "Berlin", country: "DE", lat: 52.52, lng: 13.41, spokenLanguages: ["Deutsch"] },
   { region: "Hamburg", country: "DE", lat: 53.55, lng: 9.99, spokenLanguages: ["Deutsch"] },
+  { region: "Niedersachsen", country: "DE", lat: 52.37, lng: 9.73, spokenLanguages: ["Deutsch"] },
+  { region: "Hessen", country: "DE", lat: 50.11, lng: 8.68, spokenLanguages: ["Deutsch"] },
+  { region: "Sachsen", country: "DE", lat: 51.05, lng: 13.74, spokenLanguages: ["Deutsch"] },
+  { region: "Rheinland-Pfalz", country: "DE", lat: 49.99, lng: 8.27, spokenLanguages: ["Deutsch"] },
+  { region: "Thüringen", country: "DE", lat: 50.98, lng: 11.03, spokenLanguages: ["Deutsch"] },
+  { region: "Brandenburg", country: "DE", lat: 52.40, lng: 12.97, spokenLanguages: ["Deutsch"] },
 
+  // ── FRANCIA (11 regioni) ───────────────────────────────────────────────────────
   { region: "Île-de-France", country: "FR", lat: 48.86, lng: 2.35, spokenLanguages: ["Français"] },
   { region: "Provence-Alpes-Côte d'Azur", country: "FR", lat: 43.30, lng: 5.37, spokenLanguages: ["Français"] },
   { region: "Occitanie", country: "FR", lat: 43.60, lng: 1.44, spokenLanguages: ["Français"] },
   { region: "Bretagne", country: "FR", lat: 48.11, lng: -1.68, spokenLanguages: ["Français"] },
   { region: "Grand Est", country: "FR", lat: 48.57, lng: 7.75, spokenLanguages: ["Français"] },
+  { region: "Auvergne-Rhône-Alpes", country: "FR", lat: 45.76, lng: 4.83, spokenLanguages: ["Français"] },
+  { region: "Hauts-de-France", country: "FR", lat: 50.63, lng: 3.06, spokenLanguages: ["Français"] },
+  { region: "Nouvelle-Aquitaine", country: "FR", lat: 44.84, lng: -0.58, spokenLanguages: ["Français"] },
+  { region: "Normandie", country: "FR", lat: 49.18, lng: -0.36, spokenLanguages: ["Français"] },
+  { region: "Pays de la Loire", country: "FR", lat: 47.22, lng: -1.55, spokenLanguages: ["Français"] },
+  { region: "Bourgogne-Franche-Comté", country: "FR", lat: 47.32, lng: 5.04, spokenLanguages: ["Français"] },
 
+  // ── SPAGNA (8 comunità) ───────────────────────────────────────────────────────
   { region: "Cataluña", country: "ES", lat: 41.39, lng: 2.17, spokenLanguages: ["Español"] },
   { region: "Comunidad de Madrid", country: "ES", lat: 40.42, lng: -3.70, spokenLanguages: ["Español"] },
   { region: "Andalucía", country: "ES", lat: 37.39, lng: -5.98, spokenLanguages: ["Español"] },
   { region: "País Vasco", country: "ES", lat: 43.26, lng: -2.93, spokenLanguages: ["Español"] },
+  { region: "Comunidad Valenciana", country: "ES", lat: 39.47, lng: -0.38, spokenLanguages: ["Español"] },
+  { region: "Galicia", country: "ES", lat: 42.88, lng: -8.54, spokenLanguages: ["Español"] },
+  { region: "Aragón", country: "ES", lat: 41.65, lng: -0.88, spokenLanguages: ["Español"] },
+  { region: "Castilla y León", country: "ES", lat: 41.65, lng: -4.72, spokenLanguages: ["Español"] },
 
+  // ── POLONIA (3 voivodati) ───────────────────────────────────────────────────────
   { region: "Mazowieckie", country: "PL", lat: 52.23, lng: 21.01, spokenLanguages: ["English"] },
   { region: "Małopolskie", country: "PL", lat: 50.06, lng: 19.94, spokenLanguages: ["English"] },
   { region: "Śląskie", country: "PL", lat: 50.26, lng: 19.03, spokenLanguages: ["English"] },
 
+  // ── PAESI BASSI (3 province) ───────────────────────────────────────────────────
   { region: "Noord-Holland", country: "NL", lat: 52.37, lng: 4.90, spokenLanguages: ["Nederlands"] },
   { region: "Zuid-Holland", country: "NL", lat: 51.92, lng: 4.48, spokenLanguages: ["Nederlands"] },
+  { region: "Noord-Brabant", country: "NL", lat: 51.56, lng: 5.08, spokenLanguages: ["Nederlands"] },
 
+  // ── BELGIO (2 regioni) ─────────────────────────────────────────────────────────
   { region: "Bruxelles", country: "BE", lat: 50.85, lng: 4.35, spokenLanguages: ["Français"] },
   { region: "Antwerpen", country: "BE", lat: 51.22, lng: 4.40, spokenLanguages: ["Nederlands"] },
 
+  // ── SVIZZERA (2 cantoni) ───────────────────────────────────────────────────────
   { region: "Zürich", country: "CH", lat: 47.38, lng: 8.54, spokenLanguages: ["Deutsch"] },
   { region: "Genève", country: "CH", lat: 46.20, lng: 6.15, spokenLanguages: ["Français"] },
 
+  // ── AUSTRIA (3 Länder) ─────────────────────────────────────────────────────────
   { region: "Wien", country: "AT", lat: 48.21, lng: 16.37, spokenLanguages: ["Deutsch"] },
   { region: "Tirol", country: "AT", lat: 47.26, lng: 11.39, spokenLanguages: ["Deutsch"] },
+  { region: "Steiermark", country: "AT", lat: 47.07, lng: 15.44, spokenLanguages: ["Deutsch"] },
 
+  // ── SVEZIA (3 regioni) ─────────────────────────────────────────────────────────
   { region: "Stockholm", country: "SE", lat: 59.33, lng: 18.07, spokenLanguages: ["English"] },
   { region: "Göteborg", country: "SE", lat: 57.71, lng: 11.97, spokenLanguages: ["English"] },
+  { region: "Skåne", country: "SE", lat: 55.60, lng: 13.00, spokenLanguages: ["English"] },
 
+  // ── PORTOGALLO (2 regioni) ─────────────────────────────────────────────────────
   { region: "Lisboa", country: "PT", lat: 38.72, lng: -9.14, spokenLanguages: ["Português"] },
+  { region: "Norte", country: "PT", lat: 41.15, lng: -8.61, spokenLanguages: ["Português"] },
 
+  // ── GRECIA (2 regioni) ─────────────────────────────────────────────────────────
   { region: "Attiki", country: "GR", lat: 37.98, lng: 23.73, spokenLanguages: ["Greek"] },
+  { region: "Kentriki Makedonia", country: "GR", lat: 40.64, lng: 22.94, spokenLanguages: ["Greek"] },
 
+  // ── REPUBBLICA CECA (2 regioni) ────────────────────────────────────────────────
   { region: "Praha", country: "CZ", lat: 50.08, lng: 14.44, spokenLanguages: ["English"] },
+  { region: "Jihomoravský", country: "CZ", lat: 49.20, lng: 16.61, spokenLanguages: ["English"] },
 
+  // ── UNGHERIA ──────────────────────────────────────────────────────────────────
   { region: "Budapest", country: "HU", lat: 47.50, lng: 19.04, spokenLanguages: ["English"] },
 
+  // ── ROMANIA (2 regioni) ────────────────────────────────────────────────────────
   { region: "București", country: "RO", lat: 44.43, lng: 26.10, spokenLanguages: ["English"] },
+  { region: "Cluj", country: "RO", lat: 46.77, lng: 23.59, spokenLanguages: ["English"] },
 
+  // ── CROAZIA (2 regioni) ────────────────────────────────────────────────────────
   { region: "Zagreb", country: "HR", lat: 45.81, lng: 15.98, spokenLanguages: ["English"] },
+  { region: "Splitsko-dalmatinska", country: "HR", lat: 43.51, lng: 16.44, spokenLanguages: ["English"] },
 
+  // ── DANIMARCA ────────────────────────────────────────────────────────────────
   { region: "København", country: "DK", lat: 55.68, lng: 12.57, spokenLanguages: ["English"] },
 
+  // ── FINLANDIA ────────────────────────────────────────────────────────────────
   { region: "Helsinki", country: "FI", lat: 60.17, lng: 24.94, spokenLanguages: ["English"] },
 
+  // ── NORVEGIA (2 regioni) ───────────────────────────────────────────────────────
   { region: "Oslo", country: "NO", lat: 59.91, lng: 10.75, spokenLanguages: ["English"] },
+  { region: "Vestland", country: "NO", lat: 60.39, lng: 5.33, spokenLanguages: ["English"] },
 
+  // ── SLOVACCHIA ───────────────────────────────────────────────────────────────
   { region: "Bratislava", country: "SK", lat: 48.15, lng: 17.11, spokenLanguages: ["English"] },
 
+  // ── SLOVENIA ─────────────────────────────────────────────────────────────────
   { region: "Ljubljana", country: "SI", lat: 46.06, lng: 14.51, spokenLanguages: ["English"] },
 
+  // ── SERBIA (2 regioni) ─────────────────────────────────────────────────────────
   { region: "Beograd", country: "RS", lat: 44.79, lng: 20.45, spokenLanguages: ["English"] },
+  { region: "Vojvodina", country: "RS", lat: 45.25, lng: 19.84, spokenLanguages: ["English"] },
 
+  // ── IRLANDA ──────────────────────────────────────────────────────────────────
   { region: "Dublin", country: "IE", lat: 53.35, lng: -6.26, spokenLanguages: ["English"] },
 ];
 
@@ -310,7 +374,7 @@ const WELCOME_MESSAGES: Record<string, string[]> = {
 };
 
 export function randOffset(): number {
-  return (Math.random() - 0.5) * 0.8;
+  return (Math.random() - 0.5) * 2.0;
 }
 
 export function randBirthYear(): number {

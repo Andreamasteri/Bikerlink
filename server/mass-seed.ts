@@ -13,8 +13,8 @@ import {
   distributeUniformly, generateUniqueNickname, generateUniqueEmail,
 } from "./mass-seed-data";
 
-const SEED_TAG = "mass_seed_eu_v1";
-const OLD_SEED_TAG = "mass_seed_2420";
+const SEED_TAG = "mass_seed_5k_v1";
+const OLD_SEED_TAGS = ["mass_seed_eu_v1", "mass_seed_2420"];
 
 interface MassSeedStatus {
   running: boolean;
@@ -108,13 +108,13 @@ function logSeedError(context: string, err: unknown): void {
 function buildSpecs(): UserSpec[] {
   const specs: UserSpec[] = [];
   const categories: { userType: "biker" | "zavorrina" | "coppia"; sex: "M" | "F"; coupleSexConfig: string | null; count: number }[] = [
-    { userType: "biker", sex: "M", coupleSexConfig: null, count: 1500 },
-    { userType: "biker", sex: "F", coupleSexConfig: null, count: 200 },
-    { userType: "coppia", sex: "M", coupleSexConfig: "M+F", count: 100 },
-    { userType: "coppia", sex: "M", coupleSexConfig: "M+M", count: 50 },
-    { userType: "coppia", sex: "F", coupleSexConfig: "F+F", count: 20 },
-    { userType: "zavorrina", sex: "F", coupleSexConfig: null, count: 500 },
-    { userType: "zavorrina", sex: "M", coupleSexConfig: null, count: 50 },
+    { userType: "biker", sex: "M", coupleSexConfig: null, count: 3000 },
+    { userType: "biker", sex: "F", coupleSexConfig: null, count: 500 },
+    { userType: "coppia", sex: "M", coupleSexConfig: "M+F", count: 300 },
+    { userType: "coppia", sex: "M", coupleSexConfig: "M+M", count: 150 },
+    { userType: "coppia", sex: "F", coupleSexConfig: "F+F", count: 50 },
+    { userType: "zavorrina", sex: "F", coupleSexConfig: null, count: 850 },
+    { userType: "zavorrina", sex: "M", coupleSexConfig: null, count: 150 },
   ];
 
   const zoneCount = EUROPEAN_ZONES.length;
@@ -173,13 +173,18 @@ async function ensureOfficialAccount(): Promise<string> {
 }
 
 async function cleanupOldSeedUsers(): Promise<void> {
-  const oldTaggedUsers = await db.select({ id: users.id })
-    .from(users)
-    .where(eq(users.invitationCode, OLD_SEED_TAG));
+  const allOldUsers: { id: string }[] = [];
+  for (const tag of OLD_SEED_TAGS) {
+    const tagged = await db.select({ id: users.id })
+      .from(users)
+      .where(eq(users.invitationCode, tag));
+    allOldUsers.push(...tagged);
+  }
+  const oldTaggedUsers = allOldUsers;
 
   if (oldTaggedUsers.length === 0) return;
 
-  console.log(`[mass-seed] Cleaning up ${oldTaggedUsers.length} old Italian-only seed users...`);
+  console.log(`[mass-seed] Cleaning up ${oldTaggedUsers.length} old seed users (tags: ${OLD_SEED_TAGS.join(", ")})...`);
 
   const CLEANUP_BATCH = 100;
   for (let i = 0; i < oldTaggedUsers.length; i += CLEANUP_BATCH) {

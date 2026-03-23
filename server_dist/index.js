@@ -1892,7 +1892,7 @@ var init_storage = __esm({
 
 // server/mass-seed-data.ts
 function randOffset() {
-  return (Math.random() - 0.5) * 0.8;
+  return (Math.random() - 0.5) * 2;
 }
 function randBirthYear() {
   return 1970 + Math.floor(Math.random() * 36);
@@ -1961,50 +1961,114 @@ var init_mass_seed_data = __esm({
   "server/mass-seed-data.ts"() {
     "use strict";
     EUROPEAN_ZONES = [
+      // ── ITALIA (20 regioni) ───────────────────────────────────────────────────────
       { region: "Lombardia", country: "IT", lat: 45.46, lng: 9.19, spokenLanguages: ["Italiano"] },
+      { region: "Piemonte", country: "IT", lat: 45.07, lng: 7.69, spokenLanguages: ["Italiano"] },
+      { region: "Veneto", country: "IT", lat: 45.44, lng: 12.31, spokenLanguages: ["Italiano"] },
+      { region: "Emilia-Romagna", country: "IT", lat: 44.5, lng: 11.34, spokenLanguages: ["Italiano"] },
+      { region: "Toscana", country: "IT", lat: 43.77, lng: 11.25, spokenLanguages: ["Italiano"] },
       { region: "Lazio", country: "IT", lat: 41.9, lng: 12.5, spokenLanguages: ["Italiano"] },
       { region: "Campania", country: "IT", lat: 40.85, lng: 14.27, spokenLanguages: ["Italiano"] },
+      { region: "Puglia", country: "IT", lat: 41.12, lng: 16.87, spokenLanguages: ["Italiano"] },
+      { region: "Calabria", country: "IT", lat: 38.91, lng: 16.59, spokenLanguages: ["Italiano"] },
       { region: "Sicilia", country: "IT", lat: 37.6, lng: 14.02, spokenLanguages: ["Italiano"] },
       { region: "Sardegna", country: "IT", lat: 39.22, lng: 9.12, spokenLanguages: ["Italiano"] },
+      { region: "Liguria", country: "IT", lat: 44.41, lng: 8.93, spokenLanguages: ["Italiano"] },
+      { region: "Marche", country: "IT", lat: 43.62, lng: 13.52, spokenLanguages: ["Italiano"] },
+      { region: "Umbria", country: "IT", lat: 43.11, lng: 12.39, spokenLanguages: ["Italiano"] },
+      { region: "Abruzzo", country: "IT", lat: 42.35, lng: 13.4, spokenLanguages: ["Italiano"] },
+      { region: "Trentino-Alto Adige", country: "IT", lat: 46.07, lng: 11.12, spokenLanguages: ["Italiano"] },
+      { region: "Friuli Venezia Giulia", country: "IT", lat: 46.06, lng: 13.23, spokenLanguages: ["Italiano"] },
+      { region: "Basilicata", country: "IT", lat: 40.64, lng: 15.8, spokenLanguages: ["Italiano"] },
+      { region: "Molise", country: "IT", lat: 41.56, lng: 14.66, spokenLanguages: ["Italiano"] },
+      { region: "Valle d'Aosta", country: "IT", lat: 45.74, lng: 7.43, spokenLanguages: ["Italiano"] },
+      // ── GERMANIA (11 Länder) ───────────────────────────────────────────────────────
       { region: "Bayern", country: "DE", lat: 48.14, lng: 11.58, spokenLanguages: ["Deutsch"] },
       { region: "Nordrhein-Westfalen", country: "DE", lat: 51.23, lng: 6.78, spokenLanguages: ["Deutsch"] },
       { region: "Baden-W\xFCrttemberg", country: "DE", lat: 48.78, lng: 9.18, spokenLanguages: ["Deutsch"] },
       { region: "Berlin", country: "DE", lat: 52.52, lng: 13.41, spokenLanguages: ["Deutsch"] },
       { region: "Hamburg", country: "DE", lat: 53.55, lng: 9.99, spokenLanguages: ["Deutsch"] },
+      { region: "Niedersachsen", country: "DE", lat: 52.37, lng: 9.73, spokenLanguages: ["Deutsch"] },
+      { region: "Hessen", country: "DE", lat: 50.11, lng: 8.68, spokenLanguages: ["Deutsch"] },
+      { region: "Sachsen", country: "DE", lat: 51.05, lng: 13.74, spokenLanguages: ["Deutsch"] },
+      { region: "Rheinland-Pfalz", country: "DE", lat: 49.99, lng: 8.27, spokenLanguages: ["Deutsch"] },
+      { region: "Th\xFCringen", country: "DE", lat: 50.98, lng: 11.03, spokenLanguages: ["Deutsch"] },
+      { region: "Brandenburg", country: "DE", lat: 52.4, lng: 12.97, spokenLanguages: ["Deutsch"] },
+      // ── FRANCIA (11 regioni) ───────────────────────────────────────────────────────
       { region: "\xCEle-de-France", country: "FR", lat: 48.86, lng: 2.35, spokenLanguages: ["Fran\xE7ais"] },
       { region: "Provence-Alpes-C\xF4te d'Azur", country: "FR", lat: 43.3, lng: 5.37, spokenLanguages: ["Fran\xE7ais"] },
       { region: "Occitanie", country: "FR", lat: 43.6, lng: 1.44, spokenLanguages: ["Fran\xE7ais"] },
       { region: "Bretagne", country: "FR", lat: 48.11, lng: -1.68, spokenLanguages: ["Fran\xE7ais"] },
       { region: "Grand Est", country: "FR", lat: 48.57, lng: 7.75, spokenLanguages: ["Fran\xE7ais"] },
+      { region: "Auvergne-Rh\xF4ne-Alpes", country: "FR", lat: 45.76, lng: 4.83, spokenLanguages: ["Fran\xE7ais"] },
+      { region: "Hauts-de-France", country: "FR", lat: 50.63, lng: 3.06, spokenLanguages: ["Fran\xE7ais"] },
+      { region: "Nouvelle-Aquitaine", country: "FR", lat: 44.84, lng: -0.58, spokenLanguages: ["Fran\xE7ais"] },
+      { region: "Normandie", country: "FR", lat: 49.18, lng: -0.36, spokenLanguages: ["Fran\xE7ais"] },
+      { region: "Pays de la Loire", country: "FR", lat: 47.22, lng: -1.55, spokenLanguages: ["Fran\xE7ais"] },
+      { region: "Bourgogne-Franche-Comt\xE9", country: "FR", lat: 47.32, lng: 5.04, spokenLanguages: ["Fran\xE7ais"] },
+      // ── SPAGNA (8 comunità) ───────────────────────────────────────────────────────
       { region: "Catalu\xF1a", country: "ES", lat: 41.39, lng: 2.17, spokenLanguages: ["Espa\xF1ol"] },
       { region: "Comunidad de Madrid", country: "ES", lat: 40.42, lng: -3.7, spokenLanguages: ["Espa\xF1ol"] },
       { region: "Andaluc\xEDa", country: "ES", lat: 37.39, lng: -5.98, spokenLanguages: ["Espa\xF1ol"] },
       { region: "Pa\xEDs Vasco", country: "ES", lat: 43.26, lng: -2.93, spokenLanguages: ["Espa\xF1ol"] },
+      { region: "Comunidad Valenciana", country: "ES", lat: 39.47, lng: -0.38, spokenLanguages: ["Espa\xF1ol"] },
+      { region: "Galicia", country: "ES", lat: 42.88, lng: -8.54, spokenLanguages: ["Espa\xF1ol"] },
+      { region: "Arag\xF3n", country: "ES", lat: 41.65, lng: -0.88, spokenLanguages: ["Espa\xF1ol"] },
+      { region: "Castilla y Le\xF3n", country: "ES", lat: 41.65, lng: -4.72, spokenLanguages: ["Espa\xF1ol"] },
+      // ── POLONIA (3 voivodati) ───────────────────────────────────────────────────────
       { region: "Mazowieckie", country: "PL", lat: 52.23, lng: 21.01, spokenLanguages: ["English"] },
       { region: "Ma\u0142opolskie", country: "PL", lat: 50.06, lng: 19.94, spokenLanguages: ["English"] },
       { region: "\u015Al\u0105skie", country: "PL", lat: 50.26, lng: 19.03, spokenLanguages: ["English"] },
+      // ── PAESI BASSI (3 province) ───────────────────────────────────────────────────
       { region: "Noord-Holland", country: "NL", lat: 52.37, lng: 4.9, spokenLanguages: ["Nederlands"] },
       { region: "Zuid-Holland", country: "NL", lat: 51.92, lng: 4.48, spokenLanguages: ["Nederlands"] },
+      { region: "Noord-Brabant", country: "NL", lat: 51.56, lng: 5.08, spokenLanguages: ["Nederlands"] },
+      // ── BELGIO (2 regioni) ─────────────────────────────────────────────────────────
       { region: "Bruxelles", country: "BE", lat: 50.85, lng: 4.35, spokenLanguages: ["Fran\xE7ais"] },
       { region: "Antwerpen", country: "BE", lat: 51.22, lng: 4.4, spokenLanguages: ["Nederlands"] },
+      // ── SVIZZERA (2 cantoni) ───────────────────────────────────────────────────────
       { region: "Z\xFCrich", country: "CH", lat: 47.38, lng: 8.54, spokenLanguages: ["Deutsch"] },
       { region: "Gen\xE8ve", country: "CH", lat: 46.2, lng: 6.15, spokenLanguages: ["Fran\xE7ais"] },
+      // ── AUSTRIA (3 Länder) ─────────────────────────────────────────────────────────
       { region: "Wien", country: "AT", lat: 48.21, lng: 16.37, spokenLanguages: ["Deutsch"] },
       { region: "Tirol", country: "AT", lat: 47.26, lng: 11.39, spokenLanguages: ["Deutsch"] },
+      { region: "Steiermark", country: "AT", lat: 47.07, lng: 15.44, spokenLanguages: ["Deutsch"] },
+      // ── SVEZIA (3 regioni) ─────────────────────────────────────────────────────────
       { region: "Stockholm", country: "SE", lat: 59.33, lng: 18.07, spokenLanguages: ["English"] },
       { region: "G\xF6teborg", country: "SE", lat: 57.71, lng: 11.97, spokenLanguages: ["English"] },
+      { region: "Sk\xE5ne", country: "SE", lat: 55.6, lng: 13, spokenLanguages: ["English"] },
+      // ── PORTOGALLO (2 regioni) ─────────────────────────────────────────────────────
       { region: "Lisboa", country: "PT", lat: 38.72, lng: -9.14, spokenLanguages: ["Portugu\xEAs"] },
+      { region: "Norte", country: "PT", lat: 41.15, lng: -8.61, spokenLanguages: ["Portugu\xEAs"] },
+      // ── GRECIA (2 regioni) ─────────────────────────────────────────────────────────
       { region: "Attiki", country: "GR", lat: 37.98, lng: 23.73, spokenLanguages: ["Greek"] },
+      { region: "Kentriki Makedonia", country: "GR", lat: 40.64, lng: 22.94, spokenLanguages: ["Greek"] },
+      // ── REPUBBLICA CECA (2 regioni) ────────────────────────────────────────────────
       { region: "Praha", country: "CZ", lat: 50.08, lng: 14.44, spokenLanguages: ["English"] },
+      { region: "Jihomoravsk\xFD", country: "CZ", lat: 49.2, lng: 16.61, spokenLanguages: ["English"] },
+      // ── UNGHERIA ──────────────────────────────────────────────────────────────────
       { region: "Budapest", country: "HU", lat: 47.5, lng: 19.04, spokenLanguages: ["English"] },
+      // ── ROMANIA (2 regioni) ────────────────────────────────────────────────────────
       { region: "Bucure\u0219ti", country: "RO", lat: 44.43, lng: 26.1, spokenLanguages: ["English"] },
+      { region: "Cluj", country: "RO", lat: 46.77, lng: 23.59, spokenLanguages: ["English"] },
+      // ── CROAZIA (2 regioni) ────────────────────────────────────────────────────────
       { region: "Zagreb", country: "HR", lat: 45.81, lng: 15.98, spokenLanguages: ["English"] },
+      { region: "Splitsko-dalmatinska", country: "HR", lat: 43.51, lng: 16.44, spokenLanguages: ["English"] },
+      // ── DANIMARCA ────────────────────────────────────────────────────────────────
       { region: "K\xF8benhavn", country: "DK", lat: 55.68, lng: 12.57, spokenLanguages: ["English"] },
+      // ── FINLANDIA ────────────────────────────────────────────────────────────────
       { region: "Helsinki", country: "FI", lat: 60.17, lng: 24.94, spokenLanguages: ["English"] },
+      // ── NORVEGIA (2 regioni) ───────────────────────────────────────────────────────
       { region: "Oslo", country: "NO", lat: 59.91, lng: 10.75, spokenLanguages: ["English"] },
+      { region: "Vestland", country: "NO", lat: 60.39, lng: 5.33, spokenLanguages: ["English"] },
+      // ── SLOVACCHIA ───────────────────────────────────────────────────────────────
       { region: "Bratislava", country: "SK", lat: 48.15, lng: 17.11, spokenLanguages: ["English"] },
+      // ── SLOVENIA ─────────────────────────────────────────────────────────────────
       { region: "Ljubljana", country: "SI", lat: 46.06, lng: 14.51, spokenLanguages: ["English"] },
+      // ── SERBIA (2 regioni) ─────────────────────────────────────────────────────────
       { region: "Beograd", country: "RS", lat: 44.79, lng: 20.45, spokenLanguages: ["English"] },
+      { region: "Vojvodina", country: "RS", lat: 45.25, lng: 19.84, spokenLanguages: ["English"] },
+      // ── IRLANDA ──────────────────────────────────────────────────────────────────
       { region: "Dublin", country: "IE", lat: 53.35, lng: -6.26, spokenLanguages: ["English"] }
     ];
     MALE_NAMES = [
@@ -2775,13 +2839,13 @@ function logSeedError(context, err) {
 function buildSpecs() {
   const specs = [];
   const categories = [
-    { userType: "biker", sex: "M", coupleSexConfig: null, count: 1500 },
-    { userType: "biker", sex: "F", coupleSexConfig: null, count: 200 },
-    { userType: "coppia", sex: "M", coupleSexConfig: "M+F", count: 100 },
-    { userType: "coppia", sex: "M", coupleSexConfig: "M+M", count: 50 },
-    { userType: "coppia", sex: "F", coupleSexConfig: "F+F", count: 20 },
-    { userType: "zavorrina", sex: "F", coupleSexConfig: null, count: 500 },
-    { userType: "zavorrina", sex: "M", coupleSexConfig: null, count: 50 }
+    { userType: "biker", sex: "M", coupleSexConfig: null, count: 3e3 },
+    { userType: "biker", sex: "F", coupleSexConfig: null, count: 500 },
+    { userType: "coppia", sex: "M", coupleSexConfig: "M+F", count: 300 },
+    { userType: "coppia", sex: "M", coupleSexConfig: "M+M", count: 150 },
+    { userType: "coppia", sex: "F", coupleSexConfig: "F+F", count: 50 },
+    { userType: "zavorrina", sex: "F", coupleSexConfig: null, count: 850 },
+    { userType: "zavorrina", sex: "M", coupleSexConfig: null, count: 150 }
   ];
   const zoneCount = EUROPEAN_ZONES.length;
   for (const cat of categories) {
@@ -2834,9 +2898,14 @@ async function ensureOfficialAccount() {
   return user.id;
 }
 async function cleanupOldSeedUsers() {
-  const oldTaggedUsers = await db.select({ id: users.id }).from(users).where((0, import_drizzle_orm6.eq)(users.invitationCode, OLD_SEED_TAG));
+  const allOldUsers = [];
+  for (const tag of OLD_SEED_TAGS) {
+    const tagged = await db.select({ id: users.id }).from(users).where((0, import_drizzle_orm6.eq)(users.invitationCode, tag));
+    allOldUsers.push(...tagged);
+  }
+  const oldTaggedUsers = allOldUsers;
   if (oldTaggedUsers.length === 0) return;
-  console.log(`[mass-seed] Cleaning up ${oldTaggedUsers.length} old Italian-only seed users...`);
+  console.log(`[mass-seed] Cleaning up ${oldTaggedUsers.length} old seed users (tags: ${OLD_SEED_TAGS.join(", ")})...`);
   const CLEANUP_BATCH = 100;
   for (let i = 0; i < oldTaggedUsers.length; i += CLEANUP_BATCH) {
     const batch = oldTaggedUsers.slice(i, i + CLEANUP_BATCH);
@@ -3210,7 +3279,7 @@ async function massSeedFakeUsers() {
     massSeedStatus.running = false;
   }
 }
-var import_bcryptjs2, import_drizzle_orm6, SEED_TAG, OLD_SEED_TAG, massSeedStatus, BATCH_SIZE, seedErrors;
+var import_bcryptjs2, import_drizzle_orm6, SEED_TAG, OLD_SEED_TAGS, massSeedStatus, BATCH_SIZE, seedErrors;
 var init_mass_seed = __esm({
   "server/mass-seed.ts"() {
     "use strict";
@@ -3220,8 +3289,8 @@ var init_mass_seed = __esm({
     init_schema();
     import_drizzle_orm6 = require("drizzle-orm");
     init_mass_seed_data();
-    SEED_TAG = "mass_seed_eu_v1";
-    OLD_SEED_TAG = "mass_seed_2420";
+    SEED_TAG = "mass_seed_5k_v1";
+    OLD_SEED_TAGS = ["mass_seed_eu_v1", "mass_seed_2420"];
     massSeedStatus = { running: false, created: 0, total: 0, error: null };
     BATCH_SIZE = 50;
     seedErrors = [];

@@ -349,7 +349,7 @@ export default function FakeUsersAdmin() {
       }
       setMassSeedRunning(true);
       setMassSeedCreated(0);
-      setMassSeedTotal(2420);
+      setMassSeedTotal(5000);
       pollRef.current = setInterval(pollStatus, 3000);
     } catch (e: any) {
       setMassSeedError(e.message || "Errore di rete");
@@ -729,7 +729,7 @@ export default function FakeUsersAdmin() {
             <Text style={styles.massSeedTitle}>Generazione Massiva</Text>
           </View>
           <Text style={styles.massSeedDesc}>
-            Genera 2420 utenti fake (1500 biker M, 200 biker F, 170 coppie, 500 zav F, 50 zav M) distribuiti uniformemente nelle 20 regioni italiane.
+            Genera 5000 utenti fake (3000 biker M, 500 biker F, 500 coppie, 850 zav F, 150 zav M) distribuiti uniformemente in tutta Europa.
           </Text>
           {massSeedRunning && (
             <View style={styles.massSeedProgress}>
@@ -758,7 +758,7 @@ export default function FakeUsersAdmin() {
             ) : (
               <>
                 <Ionicons name="flash" size={18} color="#000" />
-                <Text style={styles.massSeedBtnText}>Genera 2420 utenti</Text>
+                <Text style={styles.massSeedBtnText}>Genera 5000 utenti</Text>
               </>
             )}
           </TouchableOpacity>
@@ -1122,7 +1122,7 @@ export default function FakeUsersAdmin() {
           <View style={styles.pwdModalContainer}>
             <Text style={styles.pwdModalTitle}>Generazione Massiva</Text>
             <Text style={styles.pwdModalDesc}>
-              Verranno generati 2420 utenti fake distribuiti uniformemente in tutte le 20 regioni italiane.{"\n\n"}Questo processo richiederà qualche minuto.
+              Verranno generati 5000 utenti fake distribuiti uniformemente in tutta Europa (88 zone).{"\n\n"}Questo processo richiederà qualche minuto.
             </Text>
             <View style={styles.pwdModalButtons}>
               <TouchableOpacity
