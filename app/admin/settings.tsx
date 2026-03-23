@@ -330,6 +330,11 @@ export default function AdminSettings() {
   });
   const ghostModeEnabled = ghostModeData?.enabled === true;
 
+  const { data: phoneFieldData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/phone-field-enabled"],
+  });
+  const phoneFieldEnabled = phoneFieldData?.enabled === true;
+
   const protectedToggleMutation = useMutation({
     mutationFn: async ({ key, value, adminPassword }: { key: string; value: string; adminPassword: string }) => {
       const baseUrl = getApiUrl();
@@ -354,6 +359,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/gps-required"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/marketplace-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/ghost-mode-enabled"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/phone-field-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
       setProtectedToggle(null);
       setProtectedPassword("");
@@ -1275,6 +1281,25 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {emailVerifEnabled ? "Attiva la verifica email per le nuove registrazioni" : "La verifica email è disattivata"}
+        </Text>
+      </View>
+
+      <View style={styles.emailVerifCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="call-outline" size={20} color={Colors.accent} />
+            <Text style={styles.synecoLabel}>Campo telefono in registrazione</Text>
+          </View>
+          <Switch
+            value={phoneFieldEnabled}
+            onValueChange={(val) => setProtectedToggle({ key: "phone_field_enabled", value: val, label: "Campo telefono in registrazione" })}
+            trackColor={{ false: Colors.border, true: Colors.accent }}
+            thumbColor={phoneFieldEnabled ? Colors.text : Colors.textSecondary}
+            disabled={protectedToggleMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {phoneFieldEnabled ? "Il campo telefono è visibile durante la registrazione" : "Il campo telefono è nascosto nella registrazione (default)"}
         </Text>
       </View>
 

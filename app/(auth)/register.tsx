@@ -263,6 +263,11 @@ export default function RegisterScreen() {
   });
   const emailVerifEnabled = emailVerifData?.enabled === true;
 
+  const { data: phoneFieldData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/phone-field-enabled"],
+  });
+  const phoneFieldEnabled = phoneFieldData?.enabled === true;
+
   const [step, setStep] = useState(1);
   const [error, setError] = useState("");
 
@@ -591,6 +596,11 @@ export default function RegisterScreen() {
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>{t("register.step3.title")}</Text>
 
+      <View style={styles.privacyNoticeCard}>
+        <Ionicons name="information-circle-outline" size={20} color={Colors.accent} style={{ marginTop: 2 }} />
+        <Text style={styles.privacyNoticeText}>{t("register.privacyNotice")}</Text>
+      </View>
+
       <View style={styles.inputWrapper}>
         <Ionicons name="at" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
         <TextInput
@@ -631,27 +641,29 @@ export default function RegisterScreen() {
         )}
       </View>
 
-      <View style={styles.phoneRow}>
-        <TouchableOpacity
-          style={styles.prefixButton}
-          onPress={() => setShowPrefixModal(true)}
-          testID="reg-phone-prefix"
-        >
-          <Text style={styles.prefixText}>{phonePrefix}</Text>
-          <Ionicons name="chevron-down" size={14} color={Colors.textSecondary} />
-        </TouchableOpacity>
-        <View style={styles.phoneInputWrapper}>
-          <TextInput
-            style={styles.phoneInput}
-            placeholder={`${t("auth.phone")} (opzionale)`}
-            placeholderTextColor={Colors.textSecondary}
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-            testID="reg-phone"
-          />
+      {phoneFieldEnabled && (
+        <View style={styles.phoneRow}>
+          <TouchableOpacity
+            style={styles.prefixButton}
+            onPress={() => setShowPrefixModal(true)}
+            testID="reg-phone-prefix"
+          >
+            <Text style={styles.prefixText}>{phonePrefix}</Text>
+            <Ionicons name="chevron-down" size={14} color={Colors.textSecondary} />
+          </TouchableOpacity>
+          <View style={styles.phoneInputWrapper}>
+            <TextInput
+              style={styles.phoneInput}
+              placeholder={`${t("auth.phone")} (opzionale)`}
+              placeholderTextColor={Colors.textSecondary}
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              testID="reg-phone"
+            />
+          </View>
         </View>
-      </View>
+      )}
 
       <View style={styles.inputWrapper}>
         <Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
@@ -1121,6 +1133,23 @@ const styles = StyleSheet.create({
     right: 14,
     height: "100%",
     justifyContent: "center",
+  },
+  privacyNoticeCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.accent + "44",
+    padding: 14,
+    marginBottom: 16,
+  },
+  privacyNoticeText: {
+    flex: 1,
+    color: Colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
   },
   phoneRow: {
     flexDirection: "row",

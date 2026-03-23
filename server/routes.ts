@@ -244,6 +244,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/phone-field-enabled", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("phone_field_enabled");
+      const enabled = setting?.value === "true";
+      res.json({ enabled });
+    } catch {
+      res.json({ enabled: false });
+    }
+  });
+
   app.get("/api/settings/home-message", async (_req, res) => {
     try {
       const [enabledSetting, textSetting] = await Promise.all([

@@ -10,6 +10,7 @@ interface AdminUser {
   id: string;
   nickname: string;
   email: string;
+  phone?: string;
   userType: string;
   role: string;
   status: string;
@@ -165,7 +166,7 @@ export default function AdminUsers() {
     if (hideFake && u.isFake === true) return false;
     if (!searchText) return true;
     const q = searchText.toLowerCase();
-    return u.nickname.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+    return u.nickname.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.phone?.toLowerCase().includes(q) ?? false);
   });
 
   function openEditModal(user: AdminUser) {
@@ -464,7 +465,7 @@ export default function AdminUsers() {
           <Ionicons name="search" size={18} color={Colors.textSecondary} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Cerca per nickname o email..."
+            placeholder="Cerca per nickname, email o telefono..."
             placeholderTextColor="#666"
             value={searchText}
             onChangeText={setSearchText}
