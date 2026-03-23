@@ -4,6 +4,7 @@
 - Android Studio (scarica da https://developer.android.com/studio)
 - JDK 17+ (installato automaticamente con Android Studio)
 - Android SDK API 34 (installato dal SDK Manager di Android Studio)
+- Node.js 18+ (scarica da https://nodejs.org/ — versione LTS)
 
 ## Clona il progetto
 
@@ -12,7 +13,20 @@ git clone https://github.com/Andreamasteri/Bikerlink.git
 cd Bikerlink
 ```
 
-## Configurazione ambiente (OBBLIGATORIO)
+## 1. Installa le dipendenze Node.js (OBBLIGATORIO — senza questo il build si blocca)
+
+Dalla **root** del progetto clonato (NON dalla cartella `android/`):
+
+```bash
+node --version    # verifica: deve essere v18.x.x o superiore
+npm install       # scarica tutti i moduli React Native e Expo (~2-3 minuti)
+```
+
+Perché è obbligatorio: il file `android/app/build.gradle` esegue comandi `node`
+per trovare i path di React Native. Se `node_modules/` non esiste, Gradle non
+trova i pacchetti e il build si blocca senza un messaggio di errore chiaro.
+
+## 2. Configurazione ambiente (OBBLIGATORIO)
 
 Crea il file `.env` nella root del progetto:
 
@@ -24,7 +38,7 @@ Il file dice all'app dove si trova il backend (`biker-link.replit.app`).
 Un fallback è integrato nel codice per i build locali, ma il file `.env` esplicito
 è richiesto per garantire il corretto funzionamento in tutti gli scenari di build.
 
-## Apri in Android Studio
+## 3. Apri in Android Studio
 
 1. Avvia Android Studio
 2. **Open** → seleziona la cartella `android/` dentro il progetto clonato
@@ -61,6 +75,17 @@ Un fallback è integrato nel codice per i build locali, ma il file `.env` esplic
 2. Su Android: **Impostazioni** → **Sicurezza** → attiva **Origini sconosciute**
    (o "Installa app sconosciute" su Android 8+)
 3. Apri il file APK dal file manager del telefono
+
+## Warning Gradle — cosa significano
+
+Durante il build potresti vedere questi warning (sono normali, non bloccanti):
+
+- `"Properties should be assigned using the 'propName = value' syntax"`
+- `"Retrieving attribute with a null key"`
+
+Sono avvisi di compatibilità futura generati dal plugin React Native/Expo.
+Non impediscono il build con Gradle 8.x. Diventano errori solo in Gradle 10.0+.
+Puoi ignorarli tranquillamente.
 
 ## Note importanti
 
