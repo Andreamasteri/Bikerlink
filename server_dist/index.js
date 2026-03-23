@@ -800,10 +800,7 @@ var init_storage = __esm({
         const results = await db.select({ user: users, profile: userProfiles }).from(users).leftJoin(userProfiles, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where(
           (0, import_drizzle_orm2.and)(
             (0, import_drizzle_orm2.eq)(users.status, "active"),
-            (0, import_drizzle_orm2.or)(
-              import_drizzle_orm2.sql`${users.nickname} ILIKE ${pattern}`,
-              import_drizzle_orm2.sql`${users.email} ILIKE ${pattern}`
-            )
+            import_drizzle_orm2.sql`${users.nickname} ILIKE ${pattern}`
           )
         ).limit(20);
         return results.map((r) => ({ user: r.user, profile: r.profile }));
