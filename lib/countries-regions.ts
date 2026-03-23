@@ -599,7 +599,6 @@ export const EUROPEAN_COUNTRIES: CountryData[] = [
       { name: "Volgograd", latitude: 48.7080, longitude: 44.5133 },
     ],
   },
-  // ── NORD AMERICA ──────────────────────────────────────────────────────────
   {
     code: "US", name: "United States", flag: "🇺🇸",
     regions: [
@@ -673,7 +672,6 @@ export const EUROPEAN_COUNTRIES: CountryData[] = [
       { name: "Yukon", latitude: 64.2823, longitude: -135.0000 },
     ],
   },
-  // ── SUD AMERICA ───────────────────────────────────────────────────────────
   {
     code: "BR", name: "Brasil", flag: "🇧🇷",
     regions: [
@@ -824,9 +822,8 @@ export const EUROPEAN_COUNTRIES: CountryData[] = [
       { name: "Loja", latitude: -3.9931, longitude: -79.2042 },
     ],
   },
-  // ── NORD AFRICA ───────────────────────────────────────────────────────────
   {
-    code: "MA", name: "Maroc", flag: "🇲🇦",
+    code: "MA", name: "Marocco", flag: "🇲🇦",
     regions: [
       { name: "Rabat-Salé-Kénitra", latitude: 34.0133, longitude: -6.8326 },
       { name: "Casablanca-Settat", latitude: 33.5731, longitude: -7.5898 },
@@ -841,7 +838,7 @@ export const EUROPEAN_COUNTRIES: CountryData[] = [
     ],
   },
   {
-    code: "DZ", name: "Algérie", flag: "🇩🇿",
+    code: "DZ", name: "Algeria", flag: "🇩🇿",
     regions: [
       { name: "Alger", latitude: 36.7372, longitude: 3.0865 },
       { name: "Oran", latitude: 35.6969, longitude: -0.6331 },
@@ -856,7 +853,7 @@ export const EUROPEAN_COUNTRIES: CountryData[] = [
     ],
   },
   {
-    code: "TN", name: "Tunisie", flag: "🇹🇳",
+    code: "TN", name: "Tunisia", flag: "🇹🇳",
     regions: [
       { name: "Tunis", latitude: 36.8190, longitude: 10.1658 },
       { name: "Sfax", latitude: 34.7406, longitude: 10.7603 },
@@ -882,7 +879,7 @@ export const EUROPEAN_COUNTRIES: CountryData[] = [
     ],
   },
   {
-    code: "EG", name: "Egypt", flag: "🇪🇬",
+    code: "EG", name: "Egitto", flag: "🇪🇬",
     regions: [
       { name: "Cairo", latitude: 30.0444, longitude: 31.2357 },
       { name: "Alexandria", latitude: 31.2001, longitude: 29.9187 },
