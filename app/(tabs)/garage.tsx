@@ -21,6 +21,8 @@ import { apiRequest, queryClient } from "@/lib/query-client";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Switch } from "react-native";
 import { useT } from "@/lib/language-context";
+import MotoPicker from "@/components/MotoPicker";
+import { MOTORCYCLE_BRANDS, getModelsForBrand } from "@/lib/motorcycle-data";
 
 const MOTO_TYPES = [
   { value: "sportiva", label: "Sportiva" },
@@ -267,21 +269,22 @@ function WishlistScreen() {
               </View>
 
               <Text style={styles.label}>{t("garage.brand")}</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={t("garage.brandPlaceholder")}
-                placeholderTextColor={Colors.textSecondary}
+              <MotoPicker
                 value={motoForm.brand}
-                onChangeText={(v) => setMotoForm(p => ({ ...p, brand: v }))}
+                onValueChange={(b) => setMotoForm(p => ({ ...p, brand: b, model: "" }))}
+                placeholder={t("garage.brandPlaceholder")}
+                items={MOTORCYCLE_BRANDS}
+                label={t("garage.brand")}
               />
 
               <Text style={styles.label}>{t("garage.model")}</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={t("garage.modelPlaceholder")}
-                placeholderTextColor={Colors.textSecondary}
+              <MotoPicker
                 value={motoForm.model}
-                onChangeText={(v) => setMotoForm(p => ({ ...p, model: v }))}
+                onValueChange={(m) => setMotoForm(p => ({ ...p, model: m }))}
+                placeholder={motoForm.brand ? t("garage.modelPlaceholder") : "Seleziona prima la marca"}
+                items={getModelsForBrand(motoForm.brand)}
+                disabled={!motoForm.brand}
+                label={t("garage.model")}
               />
 
               <Text style={styles.label}>{t("garage.motoType")}</Text>
@@ -565,21 +568,22 @@ function GarageContent() {
               </View>
 
               <Text style={styles.label}>{t("garage.brand")} *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={t("garage.brandPlaceholder")}
-                placeholderTextColor={Colors.textSecondary}
+              <MotoPicker
                 value={form.brand}
-                onChangeText={(v) => setForm(p => ({ ...p, brand: v }))}
+                onValueChange={(b) => setForm(p => ({ ...p, brand: b, model: "" }))}
+                placeholder={t("garage.brandPlaceholder")}
+                items={MOTORCYCLE_BRANDS}
+                label={t("garage.brand")}
               />
 
               <Text style={styles.label}>{t("garage.model")} *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={t("garage.modelPlaceholder")}
-                placeholderTextColor={Colors.textSecondary}
+              <MotoPicker
                 value={form.model}
-                onChangeText={(v) => setForm(p => ({ ...p, model: v }))}
+                onValueChange={(m) => setForm(p => ({ ...p, model: m }))}
+                placeholder={form.brand ? t("garage.modelPlaceholder") : "Seleziona prima la marca"}
+                items={getModelsForBrand(form.brand)}
+                disabled={!form.brand}
+                label={t("garage.model")}
               />
 
               <Text style={styles.label}>{t("garage.displacement")}</Text>
