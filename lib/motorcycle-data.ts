@@ -28,21 +28,6 @@ const MOTORCYCLE_DATA: Record<string, string[]> = {
     "DB5", "DB7", "DB9", "DB10",
     "HB3", "HB4", "Digitale SS",
   ],
-  "Brixton": [
-    "Cromwell 125", "Cromwell 250",
-    "Felsberg 125", "Felsberg 250",
-    "Rayburn 125",
-  ],
-  "BSA": [
-    "Gold Star 650",
-  ],
-  "Buell": [
-    "XB9R Firebolt", "XB9S Lightning",
-    "XB12R Firebolt", "XB12S Lightning",
-    "XB12Scg Lightning", "XB12Ss Long Lightning",
-    "XB12X Ulysses",
-    "1125R", "1125CR", "Blast",
-  ],
   "BMW Motorrad": [
     "R 1250 GS", "R 1250 GS Adventure", "R 1250 RT",
     "R 1200 GS", "R 1200 GS Adventure",
@@ -62,6 +47,21 @@ const MOTORCYCLE_DATA: Record<string, string[]> = {
     "K 1300 R", "K 1300 S", "K 1300 GT",
     "HP2 Enduro", "HP2 Megamoto", "HP2 Sport", "HP4",
     "G 310 R", "G 310 GS", "CE 04",
+  ],
+  "Brixton": [
+    "Cromwell 125", "Cromwell 250",
+    "Felsberg 125", "Felsberg 250",
+    "Rayburn 125",
+  ],
+  "BSA": [
+    "Gold Star 650",
+  ],
+  "Buell": [
+    "XB9R Firebolt", "XB9S Lightning",
+    "XB12R Firebolt", "XB12S Lightning",
+    "XB12Scg Lightning", "XB12Ss Long Lightning",
+    "XB12X Ulysses",
+    "1125R", "1125CR", "Blast",
   ],
   "Cagiva": [
     "Raptor 650", "Raptor 1000",
@@ -281,8 +281,7 @@ const MOTORCYCLE_DATA: Record<string, string[]> = {
     "Rush 1000", "Lucky Explorer 9.5",
   ],
   "Norton": [
-    "Commando 961 Sport", "Commando 961 Cafe Racer",
-    "Commando 961 SE", "Commando 961 Café Racer",
+    "Commando 961 Sport", "Commando 961 Café Racer", "Commando 961 SE",
     "Atlas Ranger", "Atlas Nomad",
     "Dominator SS", "Superlight 650", "Ranger",
     "V4 RR", "V4 CR",
@@ -333,7 +332,7 @@ const MOTORCYCLE_DATA: Record<string, string[]> = {
   ],
   "Triumph": [
     "Bonneville T100", "Bonneville T120",
-    "Bonneville Bobber", "Bonneville Speedmaster 865",
+    "Bonneville Bobber", "Bonneville T214 Bobber Black",
     "Speedmaster 865", "Speedmaster 1200",
     "America 865",
     "Scrambler 400 X", "Scrambler 900",
@@ -353,7 +352,6 @@ const MOTORCYCLE_DATA: Record<string, string[]> = {
     "Thunderbird 1600", "Thunderbird 1700", "Thunderbird Storm",
     "Rocket 3 R", "Rocket 3 GT",
     "Trident 660", "Speed 400",
-    "Bonneville T214 Bobber Black",
   ],
   "Ural": [
     "Gear Up", "CT", "Ranger",
@@ -397,14 +395,15 @@ const MOTORCYCLE_DATA: Record<string, string[]> = {
     "XMAX 300", "XMAX 125",
     "TMAX 560", "TMAX 560 Tech Max",
     "Majesty 400", "YP 400 Majesty", "YP 125 Majesty",
-    "Yzinger TW-E",
   ],
   "Zero Motorcycles": [
     "SR/F", "SR/S", "DSR/X", "FX", "S", "DS", "FXE",
   ],
 };
 
-export const MOTORCYCLE_BRANDS: string[] = Object.keys(MOTORCYCLE_DATA).sort();
+export const MOTORCYCLE_BRANDS: string[] = Object.keys(MOTORCYCLE_DATA).sort(
+  (a, b) => a.localeCompare(b, undefined, { sensitivity: "base" })
+);
 
 export function getModelsForBrand(brand: string): string[] {
   return MOTORCYCLE_DATA[brand] || [];
