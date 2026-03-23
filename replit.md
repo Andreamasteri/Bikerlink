@@ -283,7 +283,15 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - `sendEmail()` funzione generica per usi futuri
 - Se email fallisce, notifica admin come backup (non crasha)
 
-## Generazione APK Android (EAS Build)
+## Generazione APK Android
+
+### Build locale con Android Studio
+Il progetto include la cartella `android/` (generata da expo prebuild) e le istruzioni
+complete in `ANDROID_STUDIO.md`. Prerequisito obbligatorio: installare le dipendenze
+Node.js dalla root del progetto prima di aprire Android Studio (senza questo passo
+Gradle non trova i path di React Native e il build si blocca).
+
+### EAS Build (cloud)
 
 ### Ultimo APK stabile (Build #8 — preview build)
 - **Build #8** completato — 2026-03-20 — Profilo: preview (APK standalone)
