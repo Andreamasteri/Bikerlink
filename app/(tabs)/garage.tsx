@@ -32,6 +32,7 @@ const MOTO_TYPES = [
   { value: "touring", label: "Touring" },
   { value: "naked", label: "Naked" },
   { value: "enduro", label: "Enduro" },
+  { value: "cafe_racer", label: "Café Racer" },
   { value: "altro", label: "Altro" },
 ] as const;
 
@@ -586,7 +587,10 @@ function GarageContent() {
                 label={t("garage.model")}
               />
 
-              <Text style={styles.label}>{t("garage.displacement")}</Text>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>{t("garage.displacement")}</Text>
+                <Text style={styles.optionalLabel}>{t("common.optional")}</Text>
+              </View>
               <TextInput
                 style={styles.input}
                 placeholder={t("garage.displacementPlaceholder")}
@@ -712,6 +716,8 @@ const styles = StyleSheet.create({
   },
   warningText: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.warning, flex: 1 },
   label: { fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.text, marginTop: 12, marginBottom: 6 },
+  labelRow: { flexDirection: "row", alignItems: "baseline", gap: 6, marginTop: 12, marginBottom: 6 },
+  optionalLabel: { fontSize: 12, fontFamily: "Inter_400Regular", fontStyle: "italic", color: Colors.textSecondary },
   input: {
     backgroundColor: Colors.background,
     borderWidth: 1,
