@@ -991,7 +991,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     backgroundColor: Colors.surface,
     borderRadius: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   statItem: {
     flex: 1,
@@ -1021,6 +1021,11 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent + "55",
     paddingVertical: 18,
     paddingHorizontal: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   garageCardLabel: {
     fontSize: 15,
