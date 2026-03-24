@@ -59,13 +59,17 @@ const PLACEMENT_CYCLE: Record<string, string> = {
 function CampaignCard({
   item,
   onToggle,
+  onRestart,
   onDelete,
   onUpdatePlacement,
+  isRestarting,
 }: {
   item: Campaign;
   onToggle: (id: string, isActive: boolean) => void;
+  onRestart: (id: string) => void;
   onDelete: (item: Campaign) => void;
   onUpdatePlacement: (id: string, placement: string) => void;
+  isRestarting: boolean;
 }) {
   const imageUri = item.imageUrl
     ? item.imageUrl.startsWith("http")
@@ -107,9 +111,26 @@ function CampaignCard({
           </View>
         </View>
         <View style={styles.cardActions}>
-          <TouchableOpacity onPress={() => onToggle(item.id, !item.isActive)} style={styles.actionBtn}>
-            <MaterialIcons name={item.isActive ? "pause-circle-filled" : "play-circle-filled"} size={28} color={item.isActive ? Colors.warning : Colors.success} />
-          </TouchableOpacity>
+          {item.isActive ? (
+            <TouchableOpacity onPress={() => onToggle(item.id, false)} style={styles.actionBtn}>
+              <MaterialIcons name="pause-circle-filled" size={28} color={Colors.warning} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              onPress={() => onRestart(item.id)}
+              disabled={isRestarting}
+              style={styles.restartBtn}
+            >
+              {isRestarting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <MaterialIcons name="play-arrow" size={18} color="#fff" />
+                  <Text style={styles.restartBtnText}>Riavvia</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
           <TouchableOpacity onPress={() => onDelete(item)} style={styles.actionBtn}>
             <MaterialIcons name="delete-outline" size={26} color={Colors.error} />
           </TouchableOpacity>
@@ -125,6 +146,7 @@ export default function AdminAds() {
   const [activeTab, setActiveTab] = useState<TabKey>("biker");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [restartingIds, setRestartingIds] = useState<Set<string>>(new Set());
 
   const [formName, setFormName] = useState("");
   const [formLinkUrl, setFormLinkUrl] = useState("");
@@ -205,6 +227,22 @@ export default function AdminAds() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] }),
   });
+
+  async function handleRestart(id: string) {
+    setRestartingIds((prev) => new Set(prev).add(id));
+    try {
+      await apiRequest("PUT", `/api/admin/advertisements/${id}`, { isActive: false });
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await apiRequest("PUT", `/api/admin/advertisements/${id}`, { isActive: true });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+    } finally {
+      setRestartingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
 
   function resetForm() {
     setFormName("");
@@ -328,8 +366,10 @@ export default function AdminAds() {
             <CampaignCard
               item={item}
               onToggle={(id, isActive) => toggleMutation.mutate({ id, isActive })}
+              onRestart={handleRestart}
               onDelete={handleDelete}
               onUpdatePlacement={(id, placement) => updatePlacementMutation.mutate({ id, placement })}
+              isRestarting={restartingIds.has(item.id)}
             />
           )}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 80 }}
@@ -592,6 +632,22 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     padding: 4,
+  },
+  restartBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.success,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    gap: 4,
+    minWidth: 80,
+    justifyContent: "center",
+  },
+  restartBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: "#fff",
   },
   emptyContainer: {
     alignItems: "center",
