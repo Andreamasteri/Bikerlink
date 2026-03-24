@@ -192,6 +192,10 @@ export default function ChatConversationScreen() {
 
   const conversation = conversations?.find((c) => c.id === id);
   const isMotoclub = conversation?.conversationType === "motoclub";
+  const isGroupLike =
+    conversation?.conversationType === "group" ||
+    conversation?.conversationType === "contact" ||
+    conversation?.conversationType === "motoclub";
 
   const { data: messages, isLoading } = useQuery<ChatMessage[]>({
     queryKey: ["/api/chat/conversations", id, "messages"],
@@ -309,10 +313,6 @@ export default function ChatConversationScreen() {
   );
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
-  const isGroupLike =
-    conversation?.conversationType === "group" ||
-    conversation?.conversationType === "contact" ||
-    conversation?.conversationType === "motoclub";
 
   return (
     <KeyboardAvoidingView
