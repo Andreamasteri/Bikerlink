@@ -112,23 +112,28 @@ function CampaignCard({
         </View>
         <View style={styles.cardActions}>
           {item.isActive ? (
-            <TouchableOpacity onPress={() => onToggle(item.id, false)} style={styles.actionBtn}>
-              <MaterialIcons name="pause-circle-filled" size={28} color={Colors.warning} />
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity onPress={() => onToggle(item.id, false)} style={styles.actionBtn}>
+                <MaterialIcons name="pause-circle-filled" size={28} color={Colors.warning} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => onRestart(item.id)}
+                disabled={isRestarting}
+                style={styles.restartBtn}
+              >
+                {isRestarting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <MaterialIcons name="play-arrow" size={18} color="#fff" />
+                    <Text style={styles.restartBtnText}>Riavvia</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </>
           ) : (
-            <TouchableOpacity
-              onPress={() => onRestart(item.id)}
-              disabled={isRestarting}
-              style={styles.restartBtn}
-            >
-              {isRestarting ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <MaterialIcons name="play-arrow" size={18} color="#fff" />
-                  <Text style={styles.restartBtnText}>Riavvia</Text>
-                </>
-              )}
+            <TouchableOpacity onPress={() => onToggle(item.id, true)} style={styles.actionBtn}>
+              <MaterialIcons name="play-circle-filled" size={28} color={Colors.success} />
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={() => onDelete(item)} style={styles.actionBtn}>
