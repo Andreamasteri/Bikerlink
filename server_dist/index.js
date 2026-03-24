@@ -7608,7 +7608,25 @@ router12.get("/conversations/:id/messages", async (req, res) => {
       storage.getConversationParticipants(id)
     ]);
     if (!participants.find((p) => p.userId === userId)) {
-      return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+      if (conversation?.conversationType === "motoclub") {
+        const clubRow = await db.select({ id: motoClubs.id }).from(motoClubs).where((0, import_drizzle_orm6.eq)(motoClubs.conversationId, id)).limit(1);
+        if (clubRow[0]) {
+          const membership = await db.select({ userId: motoClubMembers.userId }).from(motoClubMembers).where((0, import_drizzle_orm6.and)(
+            (0, import_drizzle_orm6.eq)(motoClubMembers.clubId, clubRow[0].id),
+            (0, import_drizzle_orm6.eq)(motoClubMembers.userId, userId),
+            (0, import_drizzle_orm6.eq)(motoClubMembers.status, "active")
+          )).limit(1);
+          if (membership[0]) {
+            await storage.addConversationParticipant({ conversationId: id, userId });
+          } else {
+            return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+          }
+        } else {
+          return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+        }
+      } else {
+        return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+      }
     }
     const isDirectConv = conversation && (conversation.conversationType === "direct" || conversation.conversationType === "private" || conversation.conversationType === "contact");
     if (isDirectConv && participants.length === 2) {
@@ -7648,7 +7666,24 @@ router12.post("/conversations/:id/messages", async (req, res) => {
       storage.getConversationParticipants(id)
     ]);
     if (!participants.find((p) => p.userId === userId)) {
-      return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+      if (conversation?.conversationType === "motoclub") {
+        const clubRow = await db.select({ id: motoClubs.id }).from(motoClubs).where((0, import_drizzle_orm6.eq)(motoClubs.conversationId, id)).limit(1);
+        if (clubRow[0]) {
+          const membership = await db.select({ userId: motoClubMembers.userId }).from(motoClubMembers).where((0, import_drizzle_orm6.and)(
+            (0, import_drizzle_orm6.eq)(motoClubMembers.clubId, clubRow[0].id),
+            (0, import_drizzle_orm6.eq)(motoClubMembers.userId, userId),
+            (0, import_drizzle_orm6.eq)(motoClubMembers.status, "active")
+          )).limit(1);
+          if (!membership[0]) {
+            return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+          }
+          await storage.addConversationParticipant({ conversationId: id, userId });
+        } else {
+          return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+        }
+      } else {
+        return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+      }
     }
     const isDirectConv = conversation && (conversation.conversationType === "direct" || conversation.conversationType === "private" || conversation.conversationType === "contact");
     if (isDirectConv && participants.length === 2) {

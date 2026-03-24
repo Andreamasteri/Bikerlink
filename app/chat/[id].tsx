@@ -214,8 +214,10 @@ export default function ChatConversationScreen() {
   const filteredMessages = useMemo(() => {
     if (!messages) return [];
     if (activeHashtags.length === 0) return messages;
-    return messages.filter((m) => messageMatchesHashtags(m.content, activeHashtags));
-  }, [messages, activeHashtags]);
+    return messages.filter(
+      (m) => m.senderId === userId || messageMatchesHashtags(m.content, activeHashtags)
+    );
+  }, [messages, activeHashtags, userId]);
 
   const sendMutation = useMutation({
     mutationFn: async (data: { messageType: string; content?: string; latitude?: number; longitude?: number }) => {
@@ -225,6 +227,10 @@ export default function ChatConversationScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", id, "messages"] });
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+    },
+    onError: (error: Error) => {
+      const msg = error?.message || "Impossibile inviare il messaggio.";
+      Alert.alert("Errore invio", msg.replace(/^\d+:\s*/, ""));
     },
   });
 

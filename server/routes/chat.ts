@@ -603,7 +603,33 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
       storage.getConversationParticipants(id),
     ]);
     if (!participants.find((p) => p.userId === userId)) {
-      return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+      if (conversation?.conversationType === "motoclub") {
+        const clubRow = await db
+          .select({ id: motoClubs.id })
+          .from(motoClubs)
+          .where(eq(motoClubs.conversationId, id))
+          .limit(1);
+        if (clubRow[0]) {
+          const membership = await db
+            .select({ userId: motoClubMembers.userId })
+            .from(motoClubMembers)
+            .where(and(
+              eq(motoClubMembers.clubId, clubRow[0].id),
+              eq(motoClubMembers.userId, userId),
+              eq(motoClubMembers.status, "active"),
+            ))
+            .limit(1);
+          if (membership[0]) {
+            await storage.addConversationParticipant({ conversationId: id, userId });
+          } else {
+            return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+          }
+        } else {
+          return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+        }
+      } else {
+        return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+      }
     }
 
     const isDirectConv = conversation && (
@@ -657,7 +683,32 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
       storage.getConversationParticipants(id),
     ]);
     if (!participants.find((p) => p.userId === userId)) {
-      return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+      if (conversation?.conversationType === "motoclub") {
+        const clubRow = await db
+          .select({ id: motoClubs.id })
+          .from(motoClubs)
+          .where(eq(motoClubs.conversationId, id))
+          .limit(1);
+        if (clubRow[0]) {
+          const membership = await db
+            .select({ userId: motoClubMembers.userId })
+            .from(motoClubMembers)
+            .where(and(
+              eq(motoClubMembers.clubId, clubRow[0].id),
+              eq(motoClubMembers.userId, userId),
+              eq(motoClubMembers.status, "active"),
+            ))
+            .limit(1);
+          if (!membership[0]) {
+            return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+          }
+          await storage.addConversationParticipant({ conversationId: id, userId });
+        } else {
+          return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+        }
+      } else {
+        return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+      }
     }
 
     const isDirectConv = conversation && (
