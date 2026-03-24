@@ -201,9 +201,8 @@ async function runWishlistMatching(): Promise<number> {
 
 function baseModelName(model: string): string {
   return model.toLowerCase()
-    .replace(/\s+\d+\s+/g, " ")
-    .replace(/\s+\d+$/g, "")
-    .trim();
+    .replace(/\s+/g, "")
+    .replace(/[^a-z0-9]/g, "");
 }
 
 async function runBikerBikerMatching(): Promise<number> {
@@ -223,7 +222,13 @@ async function runBikerBikerMatching(): Promise<number> {
       buckets.get(key)!.push({ userId: bm.userId, brand: bm.motorcycle.brand, model: bm.motorcycle.model });
     }
 
-    console.log(`[BikerBikerMatching] bucket creati: ${buckets.size}`);
+    const bucketsWithMultiple = [...buckets.values()].filter(m => m.length > 1);
+    console.log(`[BikerBikerMatching] bucket creati: ${buckets.size}, con più di 1 membro: ${bucketsWithMultiple.length}`);
+    for (const [key, members] of buckets.entries()) {
+      if (members.length > 1) {
+        console.log(`[BikerBikerMatching] bucket "${key}" → ${members.length} utenti`);
+      }
+    }
 
     let matchCount = 0;
     let skipCount = 0;

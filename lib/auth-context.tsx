@@ -53,15 +53,7 @@ function useLoginMutation() {
             },
           });
         } catch {}
-        queryClient.fetchQuery({
-          queryKey: ["/api/matching/trigger"],
-          queryFn: async () => {
-            const baseUrl = getApiUrl();
-            const url = new URL("/api/matching/trigger", baseUrl);
-            const res = await fetch(url.toString(), { method: "POST", credentials: "include" });
-            return res.ok ? res.json().catch(() => null) : null;
-          },
-        }).catch(() => {});
+        apiRequest("POST", "/api/matching/trigger").catch(() => {});
         queryClient.invalidateQueries();
       })();
     },
