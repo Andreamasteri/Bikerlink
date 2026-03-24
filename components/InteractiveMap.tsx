@@ -131,10 +131,9 @@ export default function InteractiveMap({
 }: InteractiveMapProps) {
   const { enabled: mapsEnabled, resolvedProvider, userChoiceEnabled } = useMapConfig();
   const mapRef = useRef<MapView>(null);
-  const mapReadyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
-  const [region, setRegion] = useState<Region>(ITALY_REGION);
+  const region: Region = ITALY_REGION;
   const [mapIsReady, setMapIsReady] = useState(false);
 
   const saveMapStyleMutation = useMutation({
@@ -168,11 +167,6 @@ export default function InteractiveMap({
                   longitude: position.coords.longitude,
                 };
                 setUserLocation(loc);
-                setRegion({
-                  ...loc,
-                  latitudeDelta: 0.1,
-                  longitudeDelta: 0.1,
-                });
                 setLocationLoading(false);
               },
               () => { if (!cancelled) setLocationLoading(false); }
@@ -193,11 +187,6 @@ export default function InteractiveMap({
               longitude: loc.coords.longitude,
             };
             setUserLocation(coords);
-            setRegion({
-              ...coords,
-              latitudeDelta: 0.1,
-              longitudeDelta: 0.1,
-            });
           }
           if (!cancelled) setLocationLoading(false);
         }
@@ -224,12 +213,6 @@ export default function InteractiveMap({
       });
     }
   }, [userLocation]);
-
-  useEffect(() => {
-    return () => {
-      if (mapReadyTimerRef.current) clearTimeout(mapReadyTimerRef.current);
-    };
-  }, []);
 
   useEffect(() => {
     if (userLocation && mapIsReady && mapRef.current) {
