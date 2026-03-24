@@ -192,10 +192,6 @@ export default function ChatConversationScreen() {
 
   const conversation = conversations?.find((c) => c.id === id);
   const isMotoclub = conversation?.conversationType === "motoclub";
-  const isGroupLike =
-    conversation?.conversationType === "group" ||
-    conversation?.conversationType === "contact" ||
-    conversation?.conversationType === "motoclub";
 
   const { data: messages, isLoading } = useQuery<ChatMessage[]>({
     queryKey: ["/api/chat/conversations", id, "messages"],
@@ -250,7 +246,7 @@ export default function ChatConversationScreen() {
   const handleSend = useCallback(() => {
     let text = inputText.trim();
     if (!text) return;
-    if (isGroupLike && autoHashtag && activeHashtags.length > 0) {
+    if (isMotoclub && autoHashtag && activeHashtags.length > 0) {
       const suffix = " " + activeHashtags.join(" ");
       if (!text.toLowerCase().includes(activeHashtags[0])) {
         text = text + suffix;
@@ -258,7 +254,7 @@ export default function ChatConversationScreen() {
     }
     setInputText("");
     sendMutation.mutate({ messageType: "text", content: text });
-  }, [inputText, sendMutation, isGroupLike, autoHashtag, activeHashtags]);
+  }, [inputText, sendMutation, isMotoclub, autoHashtag, activeHashtags]);
 
   const handleSendLocation = useCallback(async () => {
     if (Platform.OS === "web") {
@@ -326,7 +322,7 @@ export default function ChatConversationScreen() {
         </TouchableOpacity>
         <View style={styles.topBarInfo}>
           <Text style={styles.topBarTitle} numberOfLines={1}>{getTitle()}</Text>
-          {isGroupLike && conversation && (
+          {isMotoclub && conversation && (
             <Text style={styles.topBarSubtitle}>
               {conversation.participants.length} partecipanti
             </Text>
@@ -341,7 +337,7 @@ export default function ChatConversationScreen() {
             <Ionicons name="people-outline" size={20} color={Colors.textSecondary} />
           </TouchableOpacity>
         )}
-        {isGroupLike && (
+        {isMotoclub && (
           <TouchableOpacity
             onPress={() => setShowHashtagPanel((v) => !v)}
             style={[styles.hashtagBtn, showHashtagPanel && styles.hashtagBtnActive]}
@@ -368,7 +364,7 @@ export default function ChatConversationScreen() {
         })()}
       </View>
 
-      {isGroupLike && showHashtagPanel && (
+      {isMotoclub && showHashtagPanel && (
         <View style={styles.hashtagPanel}>
           <View style={styles.hashtagInputRow}>
             <Ionicons name="search" size={16} color={Colors.textSecondary} />
@@ -503,7 +499,7 @@ export default function ChatConversationScreen() {
             value={inputText}
             onChangeText={setInputText}
             placeholder={
-              isGroupLike && autoHashtag && activeHashtags.length > 0
+              isMotoclub && autoHashtag && activeHashtags.length > 0
                 ? `Scrivi... (${activeHashtags.join(" ")} in auto)`
                 : t("chat.typeMessage")
             }
