@@ -575,18 +575,25 @@ export async function massSeedFakeUsers(): Promise<void> {
 
       if (insertedUsers.length > 0) {
         try {
-          const approvedClubs = await db.select({ id: motoClubs.id }).from(motoClubs).where(eq(motoClubs.isApproved, true));
+          const approvedClubs = await db.select({ id: motoClubs.id, conversationId: motoClubs.conversationId }).from(motoClubs).where(eq(motoClubs.isApproved, true));
           if (approvedClubs.length > 0) {
             const clubMemberRows: { clubId: string; userId: string; role: string; status: string }[] = [];
+            const convParticipantRows: { conversationId: string; userId: string }[] = [];
             for (const newUser of insertedUsers) {
               const count = 1 + Math.floor(Math.random() * 3);
               const shuffled = [...approvedClubs].sort(() => Math.random() - 0.5).slice(0, count);
               for (const club of shuffled) {
                 clubMemberRows.push({ clubId: club.id, userId: newUser.id, role: "member", status: "active" });
+                if (club.conversationId) {
+                  convParticipantRows.push({ conversationId: club.conversationId, userId: newUser.id });
+                }
               }
             }
             if (clubMemberRows.length > 0) {
               await db.insert(motoClubMembers).values(clubMemberRows).onConflictDoNothing();
+            }
+            if (convParticipantRows.length > 0) {
+              await db.insert(conversationParticipants).values(convParticipantRows).onConflictDoNothing();
             }
           }
         } catch (err: unknown) {

@@ -3245,18 +3245,25 @@ async function massSeedFakeUsers() {
       }
       if (insertedUsers.length > 0) {
         try {
-          const approvedClubs = await db.select({ id: motoClubs.id }).from(motoClubs).where((0, import_drizzle_orm7.eq)(motoClubs.isApproved, true));
+          const approvedClubs = await db.select({ id: motoClubs.id, conversationId: motoClubs.conversationId }).from(motoClubs).where((0, import_drizzle_orm7.eq)(motoClubs.isApproved, true));
           if (approvedClubs.length > 0) {
             const clubMemberRows = [];
+            const convParticipantRows = [];
             for (const newUser of insertedUsers) {
               const count3 = 1 + Math.floor(Math.random() * 3);
               const shuffled = [...approvedClubs].sort(() => Math.random() - 0.5).slice(0, count3);
               for (const club of shuffled) {
                 clubMemberRows.push({ clubId: club.id, userId: newUser.id, role: "member", status: "active" });
+                if (club.conversationId) {
+                  convParticipantRows.push({ conversationId: club.conversationId, userId: newUser.id });
+                }
               }
             }
             if (clubMemberRows.length > 0) {
               await db.insert(motoClubMembers).values(clubMemberRows).onConflictDoNothing();
+            }
+            if (convParticipantRows.length > 0) {
+              await db.insert(conversationParticipants).values(convParticipantRows).onConflictDoNothing();
             }
           }
         } catch (err) {
@@ -4577,12 +4584,12 @@ router2.get("/online-list", requireAuth, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq10, and: and7, lt, or: or3, isNull, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq11, and: and8, lt, or: or3, isNull, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const offlineConds = [eq10(usersTable.status, "active"), or3(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt)), eq10(usersTable.ghostMode, false)];
+      const offlineConds = [eq11(usersTable.status, "active"), or3(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt)), eq11(usersTable.ghostMode, false)];
       if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
-      const offlineResults = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(usersTable).leftJoin(profilesTable, eq10(profilesTable.userId, usersTable.id)).where(and7(...offlineConds)).orderBy(sqlTag`distance`);
+      const offlineResults = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(usersTable).leftJoin(profilesTable, eq11(profilesTable.userId, usersTable.id)).where(and8(...offlineConds)).orderBy(sqlTag`distance`);
       const offlineOnly = offlineResults.filter((r) => !onlineIdSet.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...allResults, ...offlineOnly];
     }
@@ -4693,12 +4700,12 @@ router2.get("/biker-available-list", requireAuth, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq10, and: and7, or: or3, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq11, and: and8, or: or3, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const bikerConds = [eq10(usersTable.status, "active"), or3(eq10(usersTable.userType, "biker"), eq10(usersTable.userType, "coppia")), eq10(usersTable.ghostMode, false)];
+      const bikerConds = [eq11(usersTable.status, "active"), or3(eq11(usersTable.userType, "biker"), eq11(usersTable.userType, "coppia")), eq11(usersTable.ghostMode, false)];
       if (countriesParam && countriesParam.length > 0) bikerConds.push(inArr(usersTable.country, countriesParam));
-      const allBikers = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq10(usersTable.id, profilesTable.userId)).where(and7(...bikerConds)).orderBy(sqlTag`distance`);
+      const allBikers = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq11(usersTable.id, profilesTable.userId)).where(and8(...bikerConds)).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));
       const offlineOnly = allBikers.filter((r) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
@@ -4750,12 +4757,12 @@ router2.get("/zavorrine-available-list", requireAuth, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq10, and: and7, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq11, and: and8, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const zavConds = [eq10(usersTable.status, "active"), eq10(usersTable.userType, "zavorrina"), eq10(usersTable.ghostMode, false)];
+      const zavConds = [eq11(usersTable.status, "active"), eq11(usersTable.userType, "zavorrina"), eq11(usersTable.ghostMode, false)];
       if (countriesParam && countriesParam.length > 0) zavConds.push(inArr(usersTable.country, countriesParam));
-      const allZav = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq10(usersTable.id, profilesTable.userId)).where(and7(...zavConds)).orderBy(sqlTag`distance`);
+      const allZav = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq11(usersTable.id, profilesTable.userId)).where(and8(...zavConds)).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));
       const offlineOnly = allZav.filter((r) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
@@ -5339,10 +5346,20 @@ router3.post("/:id/join", requireAuth2, async (req, res) => {
     }
     await db.update(motoClubInvites).set({ status: "accepted" }).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubInvites.clubId, clubId), (0, import_drizzle_orm3.eq)(motoClubInvites.userId, userId)));
     let convId = club.conversationId;
+    const conversationWasNew = !convId;
     if (!convId) {
       convId = await createClubConversation(clubId, club.name);
     }
-    if (convId) await addMemberToConversation(convId, userId);
+    if (convId) {
+      await addMemberToConversation(convId, userId);
+      if (conversationWasNew) {
+        const existingMembers = await db.select({ userId: motoClubMembers.userId }).from(motoClubMembers).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubMembers.clubId, clubId), (0, import_drizzle_orm3.eq)(motoClubMembers.status, "active")));
+        const participantRows = existingMembers.filter((m) => m.userId !== userId).map((m) => ({ conversationId: convId, userId: m.userId }));
+        if (participantRows.length > 0) {
+          await db.insert(conversationParticipants).values(participantRows).onConflictDoNothing();
+        }
+      }
+    }
     await db.update(motoClubs).set({ activityScore: import_drizzle_orm3.sql`activity_score + 2`, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm3.eq)(motoClubs.id, clubId));
     await notifyTopMembersOfNewJoin(clubId, userId, club.name);
     return res.json({ message: "Sei entrato nel club" });
@@ -8822,8 +8839,8 @@ router17.get("/easter-eggs/:id/stats", async (req, res) => {
     }
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { collectedEasterEggs: collectedEasterEggs2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq10, count: count3 } = await import("drizzle-orm");
-    const [result] = await db2.select({ count: count3() }).from(collectedEasterEggs2).where(eq10(collectedEasterEggs2.easterEggId, id));
+    const { eq: eq11, count: count3 } = await import("drizzle-orm");
+    const [result] = await db2.select({ count: count3() }).from(collectedEasterEggs2).where(eq11(collectedEasterEggs2.easterEggId, id));
     return res.json({ eggId: id, collectionsCount: result?.count || 0 });
   } catch (error) {
     console.error("Admin get easter egg stats error:", error);
@@ -9988,15 +10005,15 @@ router17.put("/fake-users/toggle-all", async (req, res) => {
     }
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { users: usersTable, userProfiles: userProfiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq10 } = await import("drizzle-orm");
+    const { eq: eq11 } = await import("drizzle-orm");
     await storage.upsertAppSetting("fake_users_enabled", enabled ? "true" : "false");
-    const fakeUsers = await db2.select().from(usersTable).where(eq10(usersTable.isFake, true));
+    const fakeUsers = await db2.select().from(usersTable).where(eq11(usersTable.isFake, true));
     const newLoginAt = enabled ? /* @__PURE__ */ new Date() : /* @__PURE__ */ new Date("2020-01-01");
     for (const fakeUser of fakeUsers) {
-      await db2.update(userProfiles2).set({ isAvailable: enabled }).where(eq10(userProfiles2.userId, fakeUser.id));
+      await db2.update(userProfiles2).set({ isAvailable: enabled }).where(eq11(userProfiles2.userId, fakeUser.id));
       const userUpdate = { lastLoginAt: newLoginAt };
       if (enabled && !fakeUser.country) userUpdate.country = "IT";
-      await db2.update(usersTable).set(userUpdate).where(eq10(usersTable.id, fakeUser.id));
+      await db2.update(usersTable).set(userUpdate).where(eq11(usersTable.id, fakeUser.id));
     }
     return res.json({ message: `Tutti gli utenti fake sono stati ${enabled ? "abilitati" : "disabilitati"}`, count: fakeUsers.length });
   } catch (error) {
@@ -12181,6 +12198,7 @@ async function autoSeedFakeUsers() {
 // server/index.ts
 init_db();
 var import_drizzle_orm11 = require("drizzle-orm");
+init_schema();
 var fs9 = __toESM(require("fs"));
 var path9 = __toESM(require("path"));
 var app = (0, import_express21.default)();
@@ -12350,6 +12368,43 @@ function configureExpoAndLanding(app2) {
   });
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }
+async function initMissingClubConversations() {
+  try {
+    const clubs = await db.select({ id: motoClubs.id, name: motoClubs.name, conversationId: motoClubs.conversationId }).from(motoClubs).where((0, import_drizzle_orm11.eq)(motoClubs.isApproved, true));
+    let synced = 0;
+    for (const club of clubs) {
+      try {
+        let convId = club.conversationId;
+        if (convId) {
+          const existing = await db.select({ id: conversations.id }).from(conversations).where((0, import_drizzle_orm11.eq)(conversations.id, convId)).limit(1);
+          if (existing.length === 0) {
+            convId = null;
+            await db.update(motoClubs).set({ conversationId: null, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm11.eq)(motoClubs.id, club.id));
+          }
+        }
+        if (!convId) {
+          const [conv] = await db.insert(conversations).values({
+            conversationType: "motoclub",
+            title: `Club ${club.name}`
+          }).returning();
+          convId = conv.id;
+          await db.update(motoClubs).set({ conversationId: convId, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm11.eq)(motoClubs.id, club.id));
+        }
+        const members = await db.select({ userId: motoClubMembers.userId }).from(motoClubMembers).where((0, import_drizzle_orm11.and)((0, import_drizzle_orm11.eq)(motoClubMembers.clubId, club.id), (0, import_drizzle_orm11.eq)(motoClubMembers.status, "active")));
+        if (members.length > 0) {
+          const rows = members.map((m) => ({ conversationId: convId, userId: m.userId }));
+          await db.insert(conversationParticipants).values(rows).onConflictDoNothing();
+        }
+        synced++;
+      } catch (clubErr) {
+        console.warn(`[INIT] initMissingClubConversations error for club ${club.id}:`, clubErr);
+      }
+    }
+    console.log(`[INIT] Club conversations synced for ${synced}/${clubs.length} approved clubs`);
+  } catch (e) {
+    console.warn("[INIT] initMissingClubConversations error:", e);
+  }
+}
 function setupErrorHandler(app2) {
   app2.use((err, _req, res, next) => {
     const error = err;
@@ -12424,6 +12479,7 @@ function setupErrorHandler(app2) {
   }
   await autoSeedEssentialUsers();
   await autoSeedFakeUsers();
+  await initMissingClubConversations();
   try {
     const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
     const modeSetting = await storage2.getAppSetting("splash_message_mode");
