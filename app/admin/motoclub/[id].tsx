@@ -248,6 +248,7 @@ export default function AdminClubDetail() {
   const remaining = totalCount - allMembers.length;
 
   return (
+    <>
     <FlatList
       style={[styles.container, { paddingTop: topPad }]}
       data={allMembers}
@@ -415,6 +416,7 @@ export default function AdminClubDetail() {
         </View>
       </View>
     </Modal>
+    </>
   );
 }
 
