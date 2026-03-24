@@ -4070,7 +4070,9 @@ router.post("/login", loginLimiter, async (req, res) => {
     await storage.updateUser(user.id, { lastLoginAt: /* @__PURE__ */ new Date() });
     const userRecord = await storage.getUser(user.id);
     if (!userRecord?.ghostMode) {
-      await storage.updateUserProfile(user.id, { isAvailable: true }).catch(() => {
+      const availSetting = await storage.getAppSetting("user_available_on_login").catch(() => null);
+      const availableOnLogin = availSetting?.value !== "false";
+      await storage.updateUserProfile(user.id, { isAvailable: availableOnLogin }).catch(() => {
       });
     }
     req.session.userId = user.id;
@@ -9093,7 +9095,7 @@ router17.post("/migrate/verify-real-users", async (_req, res) => {
 router17.put("/settings/toggle-protected", async (req, res) => {
   try {
     const { key, value, adminPassword } = req.body;
-    const allowedKeys = ["email_verification_enabled", "ads_enabled", "syneco_branding_visible", "donation_enabled", "donation_text", "gps_required", "marketplace_enabled", "fake_users_enabled", "ghost_mode_enabled", "phone_field_enabled"];
+    const allowedKeys = ["email_verification_enabled", "ads_enabled", "syneco_branding_visible", "donation_enabled", "donation_text", "gps_required", "marketplace_enabled", "fake_users_enabled", "ghost_mode_enabled", "phone_field_enabled", "user_available_on_login"];
     if (!allowedKeys.includes(key)) {
       return res.status(400).json({ message: "Chiave non valida" });
     }
@@ -11377,6 +11379,15 @@ async function registerRoutes(app2) {
       res.json({ enabled });
     } catch {
       res.json({ enabled: false });
+    }
+  });
+  app2.get("/api/settings/user-available-on-login", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("user_available_on_login");
+      const enabled = setting?.value !== "false";
+      res.json({ enabled });
+    } catch {
+      res.json({ enabled: true });
     }
   });
   app2.get("/api/settings/home-message", async (_req, res) => {

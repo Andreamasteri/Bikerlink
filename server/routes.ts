@@ -254,6 +254,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/user-available-on-login", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("user_available_on_login");
+      const enabled = setting?.value !== "false";
+      res.json({ enabled });
+    } catch {
+      res.json({ enabled: true });
+    }
+  });
+
   app.get("/api/settings/home-message", async (_req, res) => {
     try {
       const [enabledSetting, textSetting] = await Promise.all([

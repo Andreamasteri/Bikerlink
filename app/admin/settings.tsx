@@ -335,6 +335,11 @@ export default function AdminSettings() {
   });
   const phoneFieldEnabled = phoneFieldData?.enabled === true;
 
+  const { data: userAvailableData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/user-available-on-login"],
+  });
+  const userAvailableOnLogin = userAvailableData?.enabled !== false;
+
   const protectedToggleMutation = useMutation({
     mutationFn: async ({ key, value, adminPassword }: { key: string; value: string; adminPassword: string }) => {
       const baseUrl = getApiUrl();
@@ -1300,6 +1305,25 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {phoneFieldEnabled ? "Il campo telefono è visibile durante la registrazione" : "Il campo telefono è nascosto nella registrazione (default)"}
+        </Text>
+      </View>
+
+      <View style={styles.emailVerifCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="radio-button-on-outline" size={20} color={Colors.success} />
+            <Text style={styles.synecoLabel}>Utente Disponibile all'accesso</Text>
+          </View>
+          <Switch
+            value={userAvailableOnLogin}
+            onValueChange={(val) => setProtectedToggle({ key: "user_available_on_login", value: val, label: "Utente Disponibile all'accesso" })}
+            trackColor={{ false: Colors.border, true: Colors.success }}
+            thumbColor={userAvailableOnLogin ? Colors.text : Colors.textSecondary}
+            disabled={protectedToggleMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {userAvailableOnLogin ? "Gli utenti risultano disponibili appena effettuato il login" : "Gli utenti risultano non disponibili al login (devono attivarsi manualmente)"}
         </Text>
       </View>
 
