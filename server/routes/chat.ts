@@ -1,5 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
+import { db } from "../db";
+import { motoClubs, motoClubMembers, users } from "@shared/schema";
+import { eq, and, ne } from "drizzle-orm";
 
 const router = Router();
 
@@ -744,6 +747,73 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
               console.error("Fake bot reply error:", err);
             }
           }, delay);
+        }
+      }
+    }
+
+    // Per conversazioni motoclub: fake reply da un membro casuale del club
+    if (conversation?.conversationType === "motoclub") {
+      const chatbotSetting = await storage.getAppSetting("chatbot_enabled");
+      if (chatbotSetting?.value !== "false") {
+        const clubRow = await db
+          .select({ id: motoClubs.id })
+          .from(motoClubs)
+          .where(eq(motoClubs.conversationId, id))
+          .limit(1);
+
+        if (clubRow[0]) {
+          const fakeMembers = await db
+            .select({ userId: motoClubMembers.userId })
+            .from(motoClubMembers)
+            .innerJoin(users, eq(motoClubMembers.userId, users.id))
+            .where(and(
+              eq(motoClubMembers.clubId, clubRow[0].id),
+              eq(motoClubMembers.status, "active"),
+              eq(users.isFake, true),
+              ne(motoClubMembers.userId, userId),
+            ));
+
+          if (fakeMembers.length > 0) {
+            const randomFake = fakeMembers[Math.floor(Math.random() * fakeMembers.length)];
+            const fakeUserId = randomFake.userId;
+            const fakeUser = await storage.getUser(fakeUserId);
+            const fakeProfile = await storage.getUserProfile(fakeUserId);
+            const fakeMotoList = await storage.getUserMotorcycles(fakeUserId);
+            const firstMoto = fakeMotoList[0];
+            const senderUserForCtx = await storage.getUser(userId);
+            const fakeCtx: FakeUserContext = {
+              nickname: fakeUser?.nickname || "Rider",
+              region: fakeUser?.region || undefined,
+              bio: fakeProfile?.bio || undefined,
+              brand: firstMoto?.brand || undefined,
+              model: firstMoto?.model || undefined,
+              userType: fakeUser?.userType || undefined,
+              sex: fakeUser?.sex || undefined,
+              senderUserType: senderUserForCtx?.userType || undefined,
+              senderSex: senderUserForCtx?.sex || undefined,
+              senderNickname: senderUserForCtx?.nickname || undefined,
+            };
+            const contentLen = finalContent?.length || 0;
+            const delay = contentLen > 50 ? 2500 + Math.random() * 2000 : 1500 + Math.random() * 2000;
+            setTimeout(async () => {
+              try {
+                const replyText = getFakeBotReply(finalContent || "", id, fakeCtx);
+                await storage.createMessage({
+                  conversationId: id,
+                  senderId: fakeUserId,
+                  messageType: "text",
+                  content: replyText,
+                  imageUrl: null,
+                  latitude: null,
+                  longitude: null,
+                  isFiltered: false,
+                });
+                await storage.updateConversationTimestamp(id);
+              } catch (err) {
+                console.error("Motoclub fake reply error:", err);
+              }
+            }, delay);
+          }
         }
       }
     }

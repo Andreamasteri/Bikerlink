@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Alert, Platform, ActivityIndicator,
+  Alert, Platform, ActivityIndicator, Modal, TextInput,
 } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
@@ -141,6 +141,27 @@ export default function AdminClubDetail() {
       router.back();
     },
     onError: () => Alert.alert("Errore", "Impossibile eliminare il club"),
+  });
+
+  const [simModalVisible, setSimModalVisible] = useState(false);
+  const [simMessage, setSimMessage] = useState("");
+  const [simCount, setSimCount] = useState(1);
+
+  const simulateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/admin/motoclubs/${id}/simulate-activity`, {
+        message: simMessage.trim() || undefined,
+        count: simCount,
+      });
+      return res.json();
+    },
+    onSuccess: (data: { message: string; count: number }) => {
+      setSimModalVisible(false);
+      setSimMessage("");
+      setSimCount(1);
+      Alert.alert("Fatto", data.message);
+    },
+    onError: () => Alert.alert("Errore", "Impossibile simulare attività"),
   });
 
   function handleRemoveMember(member: Member) {
@@ -309,7 +330,15 @@ export default function AdminClubDetail() {
               )}
             </TouchableOpacity>
           )}
-          <View style={[styles.dangerZone, { marginTop: 24, marginBottom: insets.bottom + 20 }]}>
+          <TouchableOpacity
+            style={styles.simulateBtn}
+            onPress={() => setSimModalVisible(true)}
+          >
+            <Ionicons name="chatbubbles-outline" size={18} color={Colors.accent} />
+            <Text style={styles.simulateBtnText}>Simula attività chat</Text>
+          </TouchableOpacity>
+
+          <View style={[styles.dangerZone, { marginTop: 16, marginBottom: insets.bottom + 20 }]}>
             <Text style={styles.dangerTitle}>Zona pericolosa</Text>
             <TouchableOpacity
               style={styles.deleteBtn}
@@ -325,6 +354,67 @@ export default function AdminClubDetail() {
         </View>
       }
     />
+
+    <Modal
+      visible={simModalVisible}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setSimModalVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>Simula attività chat</Text>
+          <Text style={styles.modalSub}>
+            I fake member del club invieranno messaggi nella chat comune.
+          </Text>
+
+          <Text style={styles.modalLabel}>Messaggio (opzionale)</Text>
+          <TextInput
+            style={styles.modalInput}
+            placeholder="Es: #weekend giro domenica?"
+            placeholderTextColor={Colors.textSecondary}
+            value={simMessage}
+            onChangeText={setSimMessage}
+            multiline
+            maxLength={200}
+          />
+
+          <Text style={styles.modalLabel}>Numero di messaggi</Text>
+          <View style={styles.countRow}>
+            {[1, 2, 3, 5, 10].map((n) => (
+              <TouchableOpacity
+                key={n}
+                style={[styles.countBtn, simCount === n && styles.countBtnActive]}
+                onPress={() => setSimCount(n)}
+              >
+                <Text style={[styles.countBtnText, simCount === n && styles.countBtnTextActive]}>
+                  {n}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.modalActions}>
+            <TouchableOpacity
+              style={styles.modalCancel}
+              onPress={() => { setSimModalVisible(false); setSimMessage(""); setSimCount(1); }}
+            >
+              <Text style={styles.modalCancelText}>Annulla</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalConfirm, simulateMutation.isPending && { opacity: 0.6 }]}
+              onPress={() => simulateMutation.mutate()}
+              disabled={simulateMutation.isPending}
+            >
+              {simulateMutation.isPending
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={styles.modalConfirmText}>Invia</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -452,6 +542,118 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   deleteBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: "#fff",
+  },
+  simulateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.accent + "55",
+    backgroundColor: Colors.accent + "11",
+    marginTop: 16,
+  },
+  simulateBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.accent,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+  },
+  modalCard: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    gap: 12,
+  },
+  modalTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    color: Colors.text,
+  },
+  modalSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+  },
+  modalLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginTop: 4,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    padding: 12,
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: Colors.text,
+    minHeight: 70,
+    textAlignVertical: "top",
+  },
+  countRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  countBtn: {
+    width: 44,
+    height: 38,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  countBtnActive: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent + "22",
+  },
+  countBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  countBtnTextActive: {
+    color: Colors.accent,
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 8,
+  },
+  modalCancel: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: "center",
+  },
+  modalCancelText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: Colors.textSecondary,
+  },
+  modalConfirm: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 10,
+    backgroundColor: Colors.accent,
+    alignItems: "center",
+  },
+  modalConfirmText: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
     color: "#fff",

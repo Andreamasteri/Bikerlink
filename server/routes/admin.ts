@@ -1951,6 +1951,71 @@ router.delete("/motoclubs/:id/members/:userId", async (req: Request, res: Respon
   }
 });
 
+router.post("/motoclubs/:id/simulate-activity", async (req: Request, res: Response) => {
+  try {
+    const { id: clubId } = req.params;
+    const { message, count = 1 } = req.body as { message?: string; count?: number };
+
+    const [club] = await db.select().from(motoClubs).where(eq(motoClubs.id, clubId)).limit(1);
+    if (!club) return res.status(404).json({ message: "Club non trovato" });
+    if (!club.conversationId) return res.status(400).json({ message: "Il club non ha una conversazione associata" });
+
+    const fakeMembers = await db
+      .select({ userId: motoClubMembers.userId })
+      .from(motoClubMembers)
+      .innerJoin(users, eq(motoClubMembers.userId, users.id))
+      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active"), eq(users.isFake, true)));
+
+    if (fakeMembers.length === 0) {
+      return res.status(400).json({ message: "Nessun utente fake nel club" });
+    }
+
+    const safeCount = Math.min(Math.max(1, count), 10);
+
+    for (let i = 0; i < safeCount; i++) {
+      const randomFake = fakeMembers[Math.floor(Math.random() * fakeMembers.length)];
+      const fakeUser = await storage.getUser(randomFake.userId);
+
+      const defaultMessages = [
+        "Ciao biker! 🏍️",
+        "Bella giornata per uscire 🌤️",
+        "Qualcuno ha in programma un giro?",
+        "Saluti da " + (fakeUser?.region || "Italia") + " 🇮🇹",
+        "Chi viene con me nel weekend? 🏁",
+      ];
+      const finalText = message?.trim() || defaultMessages[i % defaultMessages.length];
+
+      const delay = i * (800 + Math.random() * 400);
+      const convId = club.conversationId;
+      const senderId = randomFake.userId;
+      setTimeout(async () => {
+        try {
+          await storage.createMessage({
+            conversationId: convId,
+            senderId,
+            messageType: "text",
+            content: finalText,
+            imageUrl: null,
+            latitude: null,
+            longitude: null,
+            isFiltered: false,
+          });
+          await storage.updateConversationTimestamp(convId);
+        } catch (e) {
+          console.error("simulate-activity error:", e);
+        }
+      }, delay);
+
+      inserted.push(senderId);
+    }
+
+    return res.json({ message: `${safeCount} messaggi simulati in coda`, count: safeCount });
+  } catch (e) {
+    console.error("simulate-activity error:", e);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 router.post("/mass-seed-fake-users", async (_req: Request, res: Response) => {
   try {
     const { getMassSeedStatus, massSeedFakeUsers } = await import("../mass-seed");
