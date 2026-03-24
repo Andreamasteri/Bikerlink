@@ -13,7 +13,9 @@ export class ErrorBoundary extends Component<
   ErrorBoundaryState
 > {
   state: ErrorBoundaryState = { error: null };
-  private retryCount = 0;
+
+  private autoRetryCount = 0;
+  private lastErrorKey: string | null = null;
 
   static defaultProps: {
     FallbackComponent: ComponentType<ErrorFallbackProps>;
@@ -26,13 +28,24 @@ export class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: { componentStack: string }): void {
+    const errorKey = error.message;
+    if (errorKey !== this.lastErrorKey) {
+      this.autoRetryCount = 0;
+      this.lastErrorKey = errorKey;
+    }
     if (typeof this.props.onError === "function") {
       this.props.onError(error, info.componentStack);
     }
   }
 
+  autoRetry = (): void => {
+    this.autoRetryCount += 1;
+    this.setState({ error: null });
+  };
+
   resetError = (): void => {
-    this.retryCount += 1;
+    this.autoRetryCount = 0;
+    this.lastErrorKey = null;
     this.setState({ error: null });
   };
 
@@ -43,7 +56,8 @@ export class ErrorBoundary extends Component<
       <FallbackComponent
         error={this.state.error}
         resetError={this.resetError}
-        retryCount={this.retryCount}
+        autoRetry={this.autoRetry}
+        autoRetryCount={this.autoRetryCount}
       />
     ) : (
       this.props.children

@@ -17,7 +17,8 @@ import { Feather } from "@expo/vector-icons";
 export type ErrorFallbackProps = {
   error: Error;
   resetError: () => void;
-  retryCount?: number;
+  autoRetry?: () => void;
+  autoRetryCount?: number;
 };
 
 const MAX_AUTO_RETRIES = 3;
@@ -25,23 +26,29 @@ const AUTO_RETRY_SECONDS = 5;
 
 function isNetworkError(error: Error): boolean {
   const msg = (error.message ?? "").toLowerCase();
+  const name = (error.name ?? "").toLowerCase();
   return (
+    name === "networkerror" ||
     msg.includes("network request failed") ||
     msg.includes("failed to fetch") ||
     msg.includes("network error") ||
     msg.includes("networkerror") ||
     msg.includes("backend unavailable") ||
-    msg.includes("502") ||
-    msg.includes("503") ||
     msg.includes("econnrefused") ||
     msg.includes("econnreset") ||
     msg.includes("etimedout") ||
-    msg.includes("fetch") ||
-    error.name === "NetworkError"
+    msg.includes("502") ||
+    msg.includes("503") ||
+    msg.includes("fetch")
   );
 }
 
-export function ErrorFallback({ error, resetError, retryCount = 0 }: ErrorFallbackProps) {
+export function ErrorFallback({
+  error,
+  resetError,
+  autoRetry,
+  autoRetryCount = 0,
+}: ErrorFallbackProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const insets = useSafeAreaInsets();
@@ -53,7 +60,6 @@ export function ErrorFallback({ error, resetError, retryCount = 0 }: ErrorFallba
     textSecondary: isDark ? "rgba(255, 255, 255, 0.7)" : "rgba(0, 0, 0, 0.7)",
     link: "#007AFF",
     buttonText: "#FFFFFF",
-    warning: isDark ? "#FF9F0A" : "#FF9500",
   };
 
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -61,7 +67,7 @@ export function ErrorFallback({ error, resetError, retryCount = 0 }: ErrorFallba
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const networkError = isNetworkError(error);
-  const canAutoRetry = networkError && retryCount < MAX_AUTO_RETRIES;
+  const canAutoRetry = networkError && autoRetryCount < MAX_AUTO_RETRIES && !!autoRetry;
 
   useEffect(() => {
     if (!canAutoRetry) return;
@@ -73,7 +79,7 @@ export function ErrorFallback({ error, resetError, retryCount = 0 }: ErrorFallba
         if (prev <= 1) {
           clearInterval(timerRef.current!);
           timerRef.current = null;
-          resetError();
+          autoRetry!();
           return AUTO_RETRY_SECONDS;
         }
         return prev - 1;
@@ -86,14 +92,14 @@ export function ErrorFallback({ error, resetError, retryCount = 0 }: ErrorFallba
         timerRef.current = null;
       }
     };
-  }, [canAutoRetry, retryCount]);
+  }, [canAutoRetry, autoRetryCount]);
 
   const handleRetryNow = () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    resetError();
+    autoRetry!();
   };
 
   const handleRestart = async () => {
@@ -119,42 +125,105 @@ export function ErrorFallback({ error, resetError, retryCount = 0 }: ErrorFallba
     default: "monospace",
   });
 
-  if (canAutoRetry) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
-        {__DEV__ ? (
-          <Pressable
-            onPress={() => setIsModalVisible(true)}
-            accessibilityLabel="Vedi dettagli errore"
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              styles.topButton,
+  const devButton = __DEV__ ? (
+    <Pressable
+      onPress={() => setIsModalVisible(true)}
+      accessibilityLabel="Vedi dettagli errore"
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.topButton,
+        {
+          top: insets.top + 16,
+          backgroundColor: theme.backgroundSecondary,
+          opacity: pressed ? 0.8 : 1,
+        },
+      ]}
+    >
+      <Feather name="alert-circle" size={20} color={theme.text} />
+    </Pressable>
+  ) : null;
+
+  const devModal = __DEV__ ? (
+    <Modal
+      visible={isModalVisible}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={() => setIsModalVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View
+          style={[styles.modalContainer, { backgroundColor: theme.background }]}
+        >
+          <View
+            style={[
+              styles.modalHeader,
               {
-                top: insets.top + 16,
-                backgroundColor: theme.backgroundSecondary,
-                opacity: pressed ? 0.8 : 1,
+                borderBottomColor: isDark
+                  ? "rgba(255, 255, 255, 0.1)"
+                  : "rgba(0, 0, 0, 0.1)",
               },
             ]}
           >
-            <Feather name="alert-circle" size={20} color={theme.text} />
-          </Pressable>
-        ) : null}
+            <Text style={[styles.modalTitle, { color: theme.text }]}>
+              Dettagli errore
+            </Text>
+            <Pressable
+              onPress={() => setIsModalVisible(false)}
+              accessibilityLabel="Chiudi dettagli errore"
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.closeButton,
+                { opacity: pressed ? 0.6 : 1 },
+              ]}
+            >
+              <Feather name="x" size={24} color={theme.text} />
+            </Pressable>
+          </View>
+          <ScrollView
+            style={styles.modalScrollView}
+            contentContainerStyle={[
+              styles.modalScrollContent,
+              { paddingBottom: insets.bottom + 16 },
+            ]}
+            showsVerticalScrollIndicator
+          >
+            <View
+              style={[
+                styles.errorContainer,
+                { backgroundColor: theme.backgroundSecondary },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.errorText,
+                  { color: theme.text, fontFamily: monoFont },
+                ]}
+                selectable
+              >
+                {formatErrorDetails()}
+              </Text>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  ) : null;
 
+  if (canAutoRetry) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        {devButton}
         <View style={styles.content}>
           <ActivityIndicator size="large" color={theme.link} />
-
           <Text style={[styles.title, { color: theme.text }]}>
             Connessione persa
           </Text>
-
           <Text style={[styles.message, { color: theme.textSecondary }]}>
             {`Riprovo automaticamente in ${countdown}s...`}
           </Text>
-
           <Text style={[styles.retryInfo, { color: theme.textSecondary }]}>
-            {`Tentativo ${retryCount + 1} di ${MAX_AUTO_RETRIES}`}
+            {`Tentativo ${autoRetryCount + 1} di ${MAX_AUTO_RETRIES}`}
           </Text>
-
           <Pressable
             onPress={handleRetryNow}
             style={({ pressed }) => [
@@ -171,110 +240,23 @@ export function ErrorFallback({ error, resetError, retryCount = 0 }: ErrorFallba
             </Text>
           </Pressable>
         </View>
-
-        {__DEV__ ? (
-          <Modal
-            visible={isModalVisible}
-            animationType="slide"
-            transparent={true}
-            onRequestClose={() => setIsModalVisible(false)}
-          >
-            <View style={styles.modalOverlay}>
-              <View
-                style={[
-                  styles.modalContainer,
-                  { backgroundColor: theme.background },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.modalHeader,
-                    {
-                      borderBottomColor: isDark
-                        ? "rgba(255, 255, 255, 0.1)"
-                        : "rgba(0, 0, 0, 0.1)",
-                    },
-                  ]}
-                >
-                  <Text style={[styles.modalTitle, { color: theme.text }]}>
-                    Dettagli errore
-                  </Text>
-                  <Pressable
-                    onPress={() => setIsModalVisible(false)}
-                    accessibilityLabel="Chiudi dettagli errore"
-                    accessibilityRole="button"
-                    style={({ pressed }) => [
-                      styles.closeButton,
-                      { opacity: pressed ? 0.6 : 1 },
-                    ]}
-                  >
-                    <Feather name="x" size={24} color={theme.text} />
-                  </Pressable>
-                </View>
-                <ScrollView
-                  style={styles.modalScrollView}
-                  contentContainerStyle={[
-                    styles.modalScrollContent,
-                    { paddingBottom: insets.bottom + 16 },
-                  ]}
-                  showsVerticalScrollIndicator
-                >
-                  <View
-                    style={[
-                      styles.errorContainer,
-                      { backgroundColor: theme.backgroundSecondary },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.errorText,
-                        { color: theme.text, fontFamily: monoFont },
-                      ]}
-                      selectable
-                    >
-                      {formatErrorDetails()}
-                    </Text>
-                  </View>
-                </ScrollView>
-              </View>
-            </View>
-          </Modal>
-        ) : null}
+        {devModal}
       </View>
     );
   }
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {__DEV__ ? (
-        <Pressable
-          onPress={() => setIsModalVisible(true)}
-          accessibilityLabel="Vedi dettagli errore"
-          accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.topButton,
-            {
-              top: insets.top + 16,
-              backgroundColor: theme.backgroundSecondary,
-              opacity: pressed ? 0.8 : 1,
-            },
-          ]}
-        >
-          <Feather name="alert-circle" size={20} color={theme.text} />
-        </Pressable>
-      ) : null}
-
+      {devButton}
       <View style={styles.content}>
         <Text style={[styles.title, { color: theme.text }]}>
           {networkError ? "Connessione persa" : "Qualcosa è andato storto"}
         </Text>
-
         <Text style={[styles.message, { color: theme.textSecondary }]}>
           {networkError
             ? "Controlla la connessione e riprova."
             : "Ricarica l'app per continuare."}
         </Text>
-
         <Pressable
           onPress={handleRestart}
           style={({ pressed }) => [
@@ -291,79 +273,7 @@ export function ErrorFallback({ error, resetError, retryCount = 0 }: ErrorFallba
           </Text>
         </Pressable>
       </View>
-
-      {__DEV__ ? (
-        <Modal
-          visible={isModalVisible}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setIsModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View
-              style={[
-                styles.modalContainer,
-                { backgroundColor: theme.background },
-              ]}
-            >
-              <View
-                style={[
-                  styles.modalHeader,
-                  {
-                    borderBottomColor: isDark
-                      ? "rgba(255, 255, 255, 0.1)"
-                      : "rgba(0, 0, 0, 0.1)",
-                  },
-                ]}
-              >
-                <Text style={[styles.modalTitle, { color: theme.text }]}>
-                  Dettagli errore
-                </Text>
-                <Pressable
-                  onPress={() => setIsModalVisible(false)}
-                  accessibilityLabel="Chiudi dettagli errore"
-                  accessibilityRole="button"
-                  style={({ pressed }) => [
-                    styles.closeButton,
-                    { opacity: pressed ? 0.6 : 1 },
-                  ]}
-                >
-                  <Feather name="x" size={24} color={theme.text} />
-                </Pressable>
-              </View>
-
-              <ScrollView
-                style={styles.modalScrollView}
-                contentContainerStyle={[
-                  styles.modalScrollContent,
-                  { paddingBottom: insets.bottom + 16 },
-                ]}
-                showsVerticalScrollIndicator
-              >
-                <View
-                  style={[
-                    styles.errorContainer,
-                    { backgroundColor: theme.backgroundSecondary },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.errorText,
-                      {
-                        color: theme.text,
-                        fontFamily: monoFont,
-                      },
-                    ]}
-                    selectable
-                  >
-                    {formatErrorDetails()}
-                  </Text>
-                </View>
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-      ) : null}
+      {devModal}
     </View>
   );
 }
@@ -417,7 +327,12 @@ const styles = StyleSheet.create({
     minWidth: 200,
     elevation: 3,
     ...Platform.select({
-      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
       android: {},
       web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.1)" },
     }),
