@@ -135,6 +135,7 @@ export default function InteractiveMap({
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
   const [region, setRegion] = useState<Region>(ITALY_REGION);
+  const [mapIsReady, setMapIsReady] = useState(false);
 
   const saveMapStyleMutation = useMutation({
     mutationFn: async (style: MapProvider) => {
@@ -230,12 +231,19 @@ export default function InteractiveMap({
     };
   }, []);
 
+  useEffect(() => {
+    if (userLocation && mapIsReady && mapRef.current) {
+      mapRef.current.animateToRegion(
+        { ...userLocation, latitudeDelta: 0.1, longitudeDelta: 0.1 },
+        500
+      );
+    }
+  }, [userLocation, mapIsReady]);
+
   const handleMapReady = useCallback(() => {
     onReady?.();
-    mapReadyTimerRef.current = setTimeout(() => {
-      mapRef.current?.animateToRegion(region, 1);
-    }, 100);
-  }, [onReady, region]);
+    setMapIsReady(true);
+  }, [onReady]);
 
   const tileConfig = mapsEnabled ? getTileConfig(resolvedProvider) : null;
 

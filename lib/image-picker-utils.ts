@@ -39,13 +39,13 @@ export function showImagePickerMenu(
   onResult: (uri: string) => void,
   options: PickImageOptions = {}
 ) {
-  const { aspect = [1, 1], quality = 0.8, allowsEditing = true } = options;
+  const { aspect, quality = 0.8, allowsEditing = true } = options;
 
   const launchGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing,
-      aspect,
+      ...(aspect ? { aspect } : {}),
       quality,
     });
     if (!result.canceled && result.assets[0]) {
@@ -59,7 +59,7 @@ export function showImagePickerMenu(
 
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing,
-      aspect,
+      ...(aspect ? { aspect } : {}),
       quality,
     });
     if (!result.canceled && result.assets[0]) {

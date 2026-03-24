@@ -260,7 +260,7 @@ export default function AdminAds() {
       (uri) => {
         setFormImageUri(uri);
       },
-      { aspect: [16, 9], quality: 0.8 }
+      { quality: 0.8 }
     );
   }, []);
 

@@ -1562,13 +1562,13 @@ const styles = StyleSheet.create({
   },
   adImage: {
     width: "100%",
-    height: 160,
+    height: 200,
     borderRadius: 10,
   },
   adPlaceholder: {
     backgroundColor: Colors.accent + "15",
     padding: 16,
-    height: 160,
+    height: 200,
     alignItems: "center",
     justifyContent: "center",
   },
