@@ -8261,7 +8261,7 @@ async function runWishlistMatching() {
   }
 }
 function baseModelName(model) {
-  return model.toLowerCase().replace(/\s+\d+\s+/g, " ").replace(/\s+\d+$/g, "").trim();
+  return model.toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9]/g, "");
 }
 async function runBikerBikerMatching() {
   try {
@@ -8278,7 +8278,13 @@ async function runBikerBikerMatching() {
       if (!buckets.has(key)) buckets.set(key, []);
       buckets.get(key).push({ userId: bm.userId, brand: bm.motorcycle.brand, model: bm.motorcycle.model });
     }
-    console.log(`[BikerBikerMatching] bucket creati: ${buckets.size}`);
+    const bucketsWithMultiple = [...buckets.values()].filter((m) => m.length > 1);
+    console.log(`[BikerBikerMatching] bucket creati: ${buckets.size}, con pi\xF9 di 1 membro: ${bucketsWithMultiple.length}`);
+    for (const [key, members] of buckets.entries()) {
+      if (members.length > 1) {
+        console.log(`[BikerBikerMatching] bucket "${key}" \u2192 ${members.length} utenti`);
+      }
+    }
     let matchCount = 0;
     let skipCount = 0;
     const MAX_MATCHES_PER_RUN = 200;
