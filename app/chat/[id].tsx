@@ -194,7 +194,7 @@ export default function ChatConversationScreen() {
   const isMotoclub = conversation?.conversationType === "motoclub";
 
   const isMotoclubRef = useRef(false);
-  if (isMotoclub) isMotoclubRef.current = true;
+  if (conversations !== undefined) isMotoclubRef.current = isMotoclub;
 
   const { data: messages, isLoading } = useQuery<ChatMessage[]>({
     queryKey: ["/api/chat/conversations", id, "messages"],
@@ -227,6 +227,9 @@ export default function ChatConversationScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
     },
   });
+
+  const sendMutateRef = useRef(sendMutation.mutate);
+  sendMutateRef.current = sendMutation.mutate;
 
   const deleteConversationMutation = useMutation({
     mutationFn: async () => {
@@ -264,8 +267,8 @@ export default function ChatConversationScreen() {
       }
     }
     setInputText("");
-    sendMutation.mutate({ messageType: "text", content: text });
-  }, [sendMutation]);
+    sendMutateRef.current({ messageType: "text", content: text });
+  }, []);
 
   const handleSendLocation = useCallback(async () => {
     if (Platform.OS === "web") {
