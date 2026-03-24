@@ -52,6 +52,13 @@ is_port_open() {
   nc -z -w2 localhost "$port" >/dev/null 2>&1
 }
 
+metro_is_ready() {
+  local status
+  status=$(curl -s --max-time 5 --connect-timeout 3 \
+    "http://localhost:$FRONTEND_PORT/status" 2>/dev/null)
+  echo "$status" | grep -q "packager-status:running"
+}
+
 restart_backend() {
   log "CRASH RILEVATO: backend (porta $BACKEND_PORT) non risponde. Avvio riavvio..."
 
@@ -146,10 +153,14 @@ while [ "$RUNNING" -eq 1 ]; do
     fi
   fi
 
-  if is_port_open "$FRONTEND_PORT"; then
+  if metro_is_ready; then
     if [ "$frontend_down_since" -gt 0 ]; then
-      log "FRONTEND RECUPERATO: porta $FRONTEND_PORT risponde di nuovo"
+      log "FRONTEND RECUPERATO: Metro pronto a servire asset (porta $FRONTEND_PORT)"
       frontend_down_since=0
+    fi
+  elif is_port_open "$FRONTEND_PORT"; then
+    if [ "$frontend_down_since" -gt 0 ]; then
+      log "FRONTEND IN AVVIO: porta $FRONTEND_PORT aperta, attendo che Metro sia pronto..."
     fi
   else
     if [ "$frontend_down_since" -eq 0 ]; then

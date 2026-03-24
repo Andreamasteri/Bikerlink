@@ -54,6 +54,19 @@ port_is_alive() {
   curl -s --max-time 60 --connect-timeout 3 -o /dev/null "http://localhost:$1/" 2>/dev/null
 }
 
+# Usato nel monitoring loop dopo il pre-warm: controlla che Metro sia davvero
+# pronto a servire asset (non solo che la porta sia aperta).
+# /status risponde "packager-status:running" solo quando Metro e' inizializzato.
+# Timeout 10s: /status e' leggero e risponde rapidamente anche durante la
+# compilazione del secondo bundle in background. Connection refused istantaneo
+# se Metro e' morto.
+metro_is_alive() {
+  local status
+  status=$(curl -s --max-time 10 --connect-timeout 5 \
+    "http://localhost:$PORT/status" 2>/dev/null)
+  echo "$status" | grep -q "packager-status:running"
+}
+
 kill_port() {
   echo "Killing processi su porta $PORT..."
   fuser -k -9 ${PORT}/tcp 2>/dev/null || true
@@ -271,13 +284,14 @@ for retry in $(seq 1 $MAX_RETRIES); do
     # "Metro in esecuzione, monitoraggio".
     prewarm_bundles "$LOG_FILE"
 
-    # ── Monitoring loop: usa port_is_alive (60s) per tollerare la            ─
-    # compilazione del secondo bundle in background senza falsi positivi.     ─
+    # ── Monitoring loop: usa metro_is_alive (/status) per verificare che     ─
+    # Metro sia davvero pronto a servire asset, non solo che la porta sia     ─
+    # aperta. /status risponde rapidamente anche durante compilazione bundle. ─
     echo "Metro in esecuzione, monitoraggio porta $PORT..." | tee -a "$LOG_FILE"
     while true; do
       sleep 15
-      if ! port_is_alive $PORT; then
-        echo "Metro giu': porta $PORT non risponde — $(date)" | tee -a "$LOG_FILE"
+      if ! metro_is_alive; then
+        echo "Metro giu': /status non risponde — $(date)" | tee -a "$LOG_FILE"
         kill_prewarm
         break
       fi
