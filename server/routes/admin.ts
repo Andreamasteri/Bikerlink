@@ -1970,22 +1970,33 @@ router.post("/motoclubs/:id/simulate-activity", async (req: Request, res: Respon
       return res.status(400).json({ message: "Nessun utente fake nel club" });
     }
 
+    const CLUB_HASHTAGS = [
+      "#touring", "#raduno", "#weekend", "#gita", "#escursione",
+      "#motociclismo", "#club", "#ride", "#bikers",
+    ];
+    const CLUB_MESSAGES = [
+      "Ciao a tutti! Qualcuno disponibile questo weekend per una gita?",
+      "Ragazzi, chi viene al raduno il mese prossimo?",
+      "Bella giornata per girare! Voi avete in programma qualcosa?",
+      "Ho appena finito il tagliando, moto pronta per partire!",
+      "Qualcuno conosce un bel percorso di montagna da fare insieme?",
+      "Buonasera a tutto il club! Quando organizziamo la prossima uscita?",
+      "Ho visto che il meteo questo fine settimana è ottimo, andiamo?",
+      "Nuovo membro qui! Felice di far parte del club 🤙",
+      "Qualcuno ha già fatto il percorso del passo sabato scorso?",
+      "Per chi è interessato, sto organizzando una piccola gita domenica.",
+    ];
+
     const safeCount = Math.min(Math.max(1, count), 10);
+    const shuffledFakes = [...fakeMembers].sort(() => Math.random() - 0.5);
 
     for (let i = 0; i < safeCount; i++) {
-      const randomFake = fakeMembers[Math.floor(Math.random() * fakeMembers.length)];
-      const fakeUser = await storage.getUser(randomFake.userId);
+      const randomFake = shuffledFakes[i % shuffledFakes.length];
+      const hashtag = CLUB_HASHTAGS[Math.floor(Math.random() * CLUB_HASHTAGS.length)];
+      const baseMsg = CLUB_MESSAGES[Math.floor(Math.random() * CLUB_MESSAGES.length)];
+      const finalText = message?.trim() || `${hashtag} ${baseMsg}`;
 
-      const defaultMessages = [
-        "Ciao biker! 🏍️",
-        "Bella giornata per uscire 🌤️",
-        "Qualcuno ha in programma un giro?",
-        "Saluti da " + (fakeUser?.region || "Italia") + " 🇮🇹",
-        "Chi viene con me nel weekend? 🏁",
-      ];
-      const finalText = message?.trim() || defaultMessages[i % defaultMessages.length];
-
-      const delay = i * (800 + Math.random() * 400);
+      const delay = i * 1500;
       const convId = club.conversationId;
       const senderId = randomFake.userId;
       setTimeout(async () => {
@@ -2005,11 +2016,9 @@ router.post("/motoclubs/:id/simulate-activity", async (req: Request, res: Respon
           console.error("simulate-activity error:", e);
         }
       }, delay);
-
-      inserted.push(senderId);
     }
 
-    return res.json({ message: `${safeCount} messaggi simulati in coda`, count: safeCount });
+    return res.json({ message: `Simulazione avviata: ${safeCount} messaggi in invio`, count: safeCount });
   } catch (e) {
     console.error("simulate-activity error:", e);
     return res.status(500).json({ message: "Errore interno" });
