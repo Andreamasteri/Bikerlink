@@ -158,16 +158,19 @@ while [ "$RUNNING" -eq 1 ]; do
       log "FRONTEND RECUPERATO: Metro pronto a servire asset (porta $FRONTEND_PORT)"
       frontend_down_since=0
     fi
-  elif is_port_open "$FRONTEND_PORT"; then
-    if [ "$frontend_down_since" -gt 0 ]; then
-      log "FRONTEND IN AVVIO: porta $FRONTEND_PORT aperta, attendo che Metro sia pronto..."
-    fi
   else
+    # /status non risponde: Metro e' giù oppure ancora in inizializzazione.
+    # Segna sempre il timestamp di inizio problema (per timeout di stuck detection).
     if [ "$frontend_down_since" -eq 0 ]; then
       frontend_down_since=$now
     fi
     time_since_last_restart=$((now - last_frontend_restart))
-    if [ "$time_since_last_restart" -ge "$FRONTEND_RESTART_COOLDOWN" ]; then
+    time_down=$((now - frontend_down_since))
+    if is_port_open "$FRONTEND_PORT" && [ "$time_down" -lt 60 ]; then
+      # Porta TCP aperta e problema recente (<60s): Metro sta inizializzando.
+      # Non riavviare — dagli tempo di compilare il bundle.
+      log "FRONTEND IN AVVIO: porta $FRONTEND_PORT aperta, attendo Metro (${time_down}s/60s)..."
+    elif [ "$time_since_last_restart" -ge "$FRONTEND_RESTART_COOLDOWN" ]; then
       restart_frontend
       last_frontend_restart=$now
     else
