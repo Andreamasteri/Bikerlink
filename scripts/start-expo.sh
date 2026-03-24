@@ -213,6 +213,11 @@ for retry in $(seq 1 $MAX_RETRIES); do
     echo "Porta $PORT libera, avvio Metro..." | tee -a "$LOG_FILE"
     echo "EXPO_PACKAGER_PROXY_URL=https://$REPLIT_EXPO_DEV_DOMAIN" | tee -a "$LOG_FILE"
     START_TIME=$(date +%s)
+    # Nota: usiamo il comando diretto invece di `npm run expo:dev` perche' dobbiamo
+    # passare REPLIT_EXPO_DEV_DOMAIN (porta 8081, Metro) invece di REPLIT_DEV_DOMAIN
+    # (porta 5000, backend) per EXPO_PACKAGER_PROXY_URL e REACT_NATIVE_PACKAGER_HOSTNAME.
+    # Il comando e' identico allo script expo:dev (npx expo start --localhost),
+    # senza pre/post hook (solo postinstall esiste in package.json).
     EXPO_PACKAGER_PROXY_URL="https://$REPLIT_EXPO_DEV_DOMAIN" \
     REACT_NATIVE_PACKAGER_HOSTNAME="$REPLIT_EXPO_DEV_DOMAIN" \
     EXPO_PUBLIC_DOMAIN="$REPLIT_DEV_DOMAIN:5000" \
