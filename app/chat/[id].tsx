@@ -246,7 +246,7 @@ export default function ChatConversationScreen() {
   const handleSend = useCallback(() => {
     let text = inputText.trim();
     if (!text) return;
-    if (isMotoclub && autoHashtag && activeHashtags.length > 0) {
+    if (isGroupLike && autoHashtag && activeHashtags.length > 0) {
       const suffix = " " + activeHashtags.join(" ");
       if (!text.toLowerCase().includes(activeHashtags[0])) {
         text = text + suffix;
@@ -254,7 +254,7 @@ export default function ChatConversationScreen() {
     }
     setInputText("");
     sendMutation.mutate({ messageType: "text", content: text });
-  }, [inputText, sendMutation, isMotoclub, autoHashtag, activeHashtags]);
+  }, [inputText, sendMutation, isGroupLike, autoHashtag, activeHashtags]);
 
   const handleSendLocation = useCallback(async () => {
     if (Platform.OS === "web") {
@@ -341,7 +341,7 @@ export default function ChatConversationScreen() {
             <Ionicons name="people-outline" size={20} color={Colors.textSecondary} />
           </TouchableOpacity>
         )}
-        {isMotoclub && (
+        {isGroupLike && (
           <TouchableOpacity
             onPress={() => setShowHashtagPanel((v) => !v)}
             style={[styles.hashtagBtn, showHashtagPanel && styles.hashtagBtnActive]}
@@ -368,7 +368,7 @@ export default function ChatConversationScreen() {
         })()}
       </View>
 
-      {isMotoclub && showHashtagPanel && (
+      {isGroupLike && showHashtagPanel && (
         <View style={styles.hashtagPanel}>
           <View style={styles.hashtagInputRow}>
             <Ionicons name="search" size={16} color={Colors.textSecondary} />
@@ -503,7 +503,7 @@ export default function ChatConversationScreen() {
             value={inputText}
             onChangeText={setInputText}
             placeholder={
-              isMotoclub && autoHashtag && activeHashtags.length > 0
+              isGroupLike && autoHashtag && activeHashtags.length > 0
                 ? `Scrivi... (${activeHashtags.join(" ")} in auto)`
                 : t("chat.typeMessage")
             }
