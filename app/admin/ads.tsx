@@ -235,6 +235,9 @@ export default function AdminAds() {
       await new Promise((resolve) => setTimeout(resolve, 2000));
       await apiRequest("PUT", `/api/admin/advertisements/${id}`, { isActive: true });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+    } catch {
+      Alert.alert("Errore", "Riavvio campagna non riuscito. Riprova.");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
     } finally {
       setRestartingIds((prev) => {
         const next = new Set(prev);
