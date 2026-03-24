@@ -193,6 +193,9 @@ export default function ChatConversationScreen() {
   const conversation = conversations?.find((c) => c.id === id);
   const isMotoclub = conversation?.conversationType === "motoclub";
 
+  const isMotoclubRef = useRef(false);
+  if (isMotoclub) isMotoclubRef.current = true;
+
   const { data: messages, isLoading } = useQuery<ChatMessage[]>({
     queryKey: ["/api/chat/conversations", id, "messages"],
     refetchInterval: 5000,
@@ -200,6 +203,13 @@ export default function ChatConversationScreen() {
   });
 
   const activeHashtags = useMemo(() => parseHashtagsFromInput(hashtagInput), [hashtagInput]);
+
+  const autoHashtagRef = useRef(false);
+  autoHashtagRef.current = autoHashtag;
+  const activeHashtagsRef = useRef<string[]>([]);
+  activeHashtagsRef.current = activeHashtags;
+  const inputTextRef = useRef("");
+  inputTextRef.current = inputText;
 
   const filteredMessages = useMemo(() => {
     if (!messages) return [];
@@ -244,17 +254,18 @@ export default function ChatConversationScreen() {
   }, [deleteConversationMutation]);
 
   const handleSend = useCallback(() => {
-    let text = inputText.trim();
+    let text = inputTextRef.current.trim();
     if (!text) return;
-    if (isMotoclub && autoHashtag && activeHashtags.length > 0) {
-      const suffix = " " + activeHashtags.join(" ");
-      if (!text.toLowerCase().includes(activeHashtags[0])) {
+    const tags = activeHashtagsRef.current;
+    if (isMotoclubRef.current && autoHashtagRef.current && tags.length > 0) {
+      const suffix = " " + tags.join(" ");
+      if (!text.toLowerCase().includes(tags[0])) {
         text = text + suffix;
       }
     }
     setInputText("");
     sendMutation.mutate({ messageType: "text", content: text });
-  }, [inputText, sendMutation, isMotoclub, autoHashtag, activeHashtags]);
+  }, [sendMutation]);
 
   const handleSendLocation = useCallback(async () => {
     if (Platform.OS === "web") {
