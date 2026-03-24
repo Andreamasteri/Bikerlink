@@ -1,4 +1,5 @@
 const { getDefaultConfig } = require("expo/metro-config");
+const { FileStore } = require("metro-cache");
 const path = require("path");
 
 const config = getDefaultConfig(__dirname);
@@ -7,6 +8,7 @@ config.resolver.blockList = [
   /\/\.local\//,
   /\/logs\//,
   /\/node_modules\/.cache\//,
+  /\/\.metro-cache\//,
   /\/server_dist\//,
   /\/server\//,
   /\/scripts\//,
@@ -21,7 +23,11 @@ config.resolver.platforms = ["ios", "android", "web"];
 
 config.maxWorkers = 1;
 
-config.cacheVersion = "v4-clean-" + process.version;
+config.cacheVersion = "v5";
+
+config.cacheStores = [
+  new FileStore({ root: path.join(__dirname, ".metro-cache") }),
+];
 
 config.transformer = {
   ...config.transformer,
