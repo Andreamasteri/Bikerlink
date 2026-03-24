@@ -1404,7 +1404,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   mapContainer: {
-    height: 220,
+    height: 253,
     marginHorizontal: 16,
     borderRadius: 12,
     overflow: "hidden",
@@ -1562,13 +1562,13 @@ const styles = StyleSheet.create({
   },
   adImage: {
     width: "100%",
-    height: 200,
+    height: 240,
     borderRadius: 10,
   },
   adPlaceholder: {
     backgroundColor: Colors.accent + "15",
     padding: 16,
-    height: 200,
+    height: 240,
     alignItems: "center",
     justifyContent: "center",
   },
