@@ -776,6 +776,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
           if (fakeMembers.length > 0) {
             const randomFake = fakeMembers[Math.floor(Math.random() * fakeMembers.length)];
             const fakeUserId = randomFake.userId;
+            storage.recordFakeUserInteraction(fakeUserId, userId, "chat_message").catch(() => {});
             const fakeUser = await storage.getUser(fakeUserId);
             const fakeProfile = await storage.getUserProfile(fakeUserId);
             const fakeMotoList = await storage.getUserMotorcycles(fakeUserId);
