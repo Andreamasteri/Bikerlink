@@ -218,6 +218,12 @@ for retry in $(seq 1 $MAX_RETRIES); do
     # (porta 5000, backend) per EXPO_PACKAGER_PROXY_URL e REACT_NATIVE_PACKAGER_HOSTNAME.
     # Il comando e' identico allo script expo:dev (npx expo start --localhost),
     # senza pre/post hook (solo postinstall esiste in package.json).
+    #
+    # NOTA CACHE: `expo start` NON supporta il flag --cache-dir (opzione non riconosciuta).
+    # La cache persistente e' configurata in metro.config.js tramite FileStore di metro-cache
+    # con root: path.join(__dirname, '.metro-cache'). Questo salva i moduli compilati in
+    # /home/runner/workspace/.metro-cache che sopravvive ai riavvii dell'ambiente Replit,
+    # riducendo i cold-start successivi da ~64s a pochi secondi.
     EXPO_PACKAGER_PROXY_URL="https://$REPLIT_EXPO_DEV_DOMAIN" \
     REACT_NATIVE_PACKAGER_HOSTNAME="$REPLIT_EXPO_DEV_DOMAIN" \
     EXPO_PUBLIC_DOMAIN="$REPLIT_DEV_DOMAIN" \
