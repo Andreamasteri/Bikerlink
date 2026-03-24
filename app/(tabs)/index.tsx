@@ -1013,13 +1013,6 @@ export default function MapScreen() {
                 )}
               </View>
             )}
-            {myAds.length > 1 && (
-              <View style={styles.adDots}>
-                {myAds.map((_: any, i: number) => (
-                  <View key={i} style={[styles.adDot, i === adIndex % myAds.length && styles.adDotActive]} />
-                ))}
-              </View>
-            )}
           </Pressable>
           {(activeSosQuery.data || []).length > 0 && (
             <Pressable style={styles.sosOverlay} onPress={() => setShowSosDetail(true)}>
@@ -1325,7 +1318,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 8,
   },
   titleRow: {
     flexDirection: "row" as const,
@@ -1363,7 +1356,7 @@ const styles = StyleSheet.create({
     flexDirection: "row" as const,
     alignItems: "center" as const,
     backgroundColor: Colors.surface,
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: Platform.OS === "web" ? 10 : 8,
     borderWidth: 1,
@@ -1378,7 +1371,7 @@ const styles = StyleSheet.create({
   },
   searchResultsContainer: {
     backgroundColor: Colors.surface,
-    borderRadius: 12,
+    borderRadius: 10,
     marginTop: 4,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -1411,9 +1404,9 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   mapContainer: {
-    height: 280,
+    height: 220,
     marginHorizontal: 16,
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: "hidden",
     position: "relative",
   },
@@ -1472,12 +1465,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   statsChipText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.text },
-  statsRow: { flexDirection: "row", paddingHorizontal: 16, gap: 8, marginTop: 12 },
+  statsRow: { flexDirection: "row", paddingHorizontal: 16, gap: 8, marginTop: 8 },
   statCard: {
     flex: 1,
     backgroundColor: Colors.surface,
     borderRadius: 10,
-    paddingVertical: 8,
+    paddingVertical: 6,
     paddingHorizontal: 8,
     alignItems: "center",
     gap: 2,
@@ -1493,9 +1486,9 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
   listSheet: {
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
     maxHeight: "80%",
   },
   listSheetHeader: {
@@ -1509,9 +1502,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.background,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 6,
     gap: 12,
   },
   offlineToggle: {
@@ -1559,46 +1552,28 @@ const styles = StyleSheet.create({
   distanceText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.accent },
   adWrapper: {
     marginHorizontal: 16,
-    marginTop: 8,
+    marginTop: 4,
     position: "relative" as const,
   },
   adBanner: {
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: "hidden",
     backgroundColor: Colors.surface,
   },
   adImage: {
     width: "100%",
-    height: 280,
-    borderRadius: 12,
+    height: 160,
+    borderRadius: 10,
   },
   adPlaceholder: {
     backgroundColor: Colors.accent + "15",
     padding: 16,
-    height: 280,
+    height: 160,
     alignItems: "center",
     justifyContent: "center",
   },
   adText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: Colors.accent },
   adSubText: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 4 },
-  adDots: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 6,
-  },
-  adDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.textSecondary + "40",
-  },
-  adDotActive: {
-    backgroundColor: Colors.accent,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
   detailOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.6)",
