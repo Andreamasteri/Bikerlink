@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { reloadAppAsync } from "expo";
 import {
   StyleSheet,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   Text,
   Modal,
+  ActivityIndicator,
   useColorScheme,
   Platform,
 } from "react-native";
@@ -16,9 +17,31 @@ import { Feather } from "@expo/vector-icons";
 export type ErrorFallbackProps = {
   error: Error;
   resetError: () => void;
+  retryCount?: number;
 };
 
-export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
+const MAX_AUTO_RETRIES = 3;
+const AUTO_RETRY_SECONDS = 5;
+
+function isNetworkError(error: Error): boolean {
+  const msg = (error.message ?? "").toLowerCase();
+  return (
+    msg.includes("network request failed") ||
+    msg.includes("failed to fetch") ||
+    msg.includes("network error") ||
+    msg.includes("networkerror") ||
+    msg.includes("backend unavailable") ||
+    msg.includes("502") ||
+    msg.includes("503") ||
+    msg.includes("econnrefused") ||
+    msg.includes("econnreset") ||
+    msg.includes("etimedout") ||
+    msg.includes("fetch") ||
+    error.name === "NetworkError"
+  );
+}
+
+export function ErrorFallback({ error, resetError, retryCount = 0 }: ErrorFallbackProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const insets = useSafeAreaInsets();
@@ -30,9 +53,48 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
     textSecondary: isDark ? "rgba(255, 255, 255, 0.7)" : "rgba(0, 0, 0, 0.7)",
     link: "#007AFF",
     buttonText: "#FFFFFF",
+    warning: isDark ? "#FF9F0A" : "#FF9500",
   };
 
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [countdown, setCountdown] = useState(AUTO_RETRY_SECONDS);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const networkError = isNetworkError(error);
+  const canAutoRetry = networkError && retryCount < MAX_AUTO_RETRIES;
+
+  useEffect(() => {
+    if (!canAutoRetry) return;
+
+    setCountdown(AUTO_RETRY_SECONDS);
+
+    timerRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          timerRef.current = null;
+          resetError();
+          return AUTO_RETRY_SECONDS;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [canAutoRetry, retryCount]);
+
+  const handleRetryNow = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    resetError();
+  };
 
   const handleRestart = async () => {
     try {
@@ -44,7 +106,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
   };
 
   const formatErrorDetails = (): string => {
-    let details = `Error: ${error.message}\n\n`;
+    let details = `Errore: ${error.message}\n\n`;
     if (error.stack) {
       details += `Stack Trace:\n${error.stack}`;
     }
@@ -57,12 +119,137 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
     default: "monospace",
   });
 
+  if (canAutoRetry) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        {__DEV__ ? (
+          <Pressable
+            onPress={() => setIsModalVisible(true)}
+            accessibilityLabel="Vedi dettagli errore"
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.topButton,
+              {
+                top: insets.top + 16,
+                backgroundColor: theme.backgroundSecondary,
+                opacity: pressed ? 0.8 : 1,
+              },
+            ]}
+          >
+            <Feather name="alert-circle" size={20} color={theme.text} />
+          </Pressable>
+        ) : null}
+
+        <View style={styles.content}>
+          <ActivityIndicator size="large" color={theme.link} />
+
+          <Text style={[styles.title, { color: theme.text }]}>
+            Connessione persa
+          </Text>
+
+          <Text style={[styles.message, { color: theme.textSecondary }]}>
+            {`Riprovo automaticamente in ${countdown}s...`}
+          </Text>
+
+          <Text style={[styles.retryInfo, { color: theme.textSecondary }]}>
+            {`Tentativo ${retryCount + 1} di ${MAX_AUTO_RETRIES}`}
+          </Text>
+
+          <Pressable
+            onPress={handleRetryNow}
+            style={({ pressed }) => [
+              styles.button,
+              {
+                backgroundColor: theme.link,
+                opacity: pressed ? 0.9 : 1,
+                transform: [{ scale: pressed ? 0.98 : 1 }],
+              },
+            ]}
+          >
+            <Text style={[styles.buttonText, { color: theme.buttonText }]}>
+              Riprova ora
+            </Text>
+          </Pressable>
+        </View>
+
+        {__DEV__ ? (
+          <Modal
+            visible={isModalVisible}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setIsModalVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View
+                style={[
+                  styles.modalContainer,
+                  { backgroundColor: theme.background },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.modalHeader,
+                    {
+                      borderBottomColor: isDark
+                        ? "rgba(255, 255, 255, 0.1)"
+                        : "rgba(0, 0, 0, 0.1)",
+                    },
+                  ]}
+                >
+                  <Text style={[styles.modalTitle, { color: theme.text }]}>
+                    Dettagli errore
+                  </Text>
+                  <Pressable
+                    onPress={() => setIsModalVisible(false)}
+                    accessibilityLabel="Chiudi dettagli errore"
+                    accessibilityRole="button"
+                    style={({ pressed }) => [
+                      styles.closeButton,
+                      { opacity: pressed ? 0.6 : 1 },
+                    ]}
+                  >
+                    <Feather name="x" size={24} color={theme.text} />
+                  </Pressable>
+                </View>
+                <ScrollView
+                  style={styles.modalScrollView}
+                  contentContainerStyle={[
+                    styles.modalScrollContent,
+                    { paddingBottom: insets.bottom + 16 },
+                  ]}
+                  showsVerticalScrollIndicator
+                >
+                  <View
+                    style={[
+                      styles.errorContainer,
+                      { backgroundColor: theme.backgroundSecondary },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.errorText,
+                        { color: theme.text, fontFamily: monoFont },
+                      ]}
+                      selectable
+                    >
+                      {formatErrorDetails()}
+                    </Text>
+                  </View>
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
+        ) : null}
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {__DEV__ ? (
         <Pressable
           onPress={() => setIsModalVisible(true)}
-          accessibilityLabel="View error details"
+          accessibilityLabel="Vedi dettagli errore"
           accessibilityRole="button"
           style={({ pressed }) => [
             styles.topButton,
@@ -79,11 +266,13 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
 
       <View style={styles.content}>
         <Text style={[styles.title, { color: theme.text }]}>
-          Something went wrong
+          {networkError ? "Connessione persa" : "Qualcosa è andato storto"}
         </Text>
 
         <Text style={[styles.message, { color: theme.textSecondary }]}>
-          Please reload the app to continue.
+          {networkError
+            ? "Controlla la connessione e riprova."
+            : "Ricarica l'app per continuare."}
         </Text>
 
         <Pressable
@@ -98,7 +287,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
           ]}
         >
           <Text style={[styles.buttonText, { color: theme.buttonText }]}>
-            Try Again
+            Riprova
           </Text>
         </Pressable>
       </View>
@@ -128,11 +317,11 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
                 ]}
               >
                 <Text style={[styles.modalTitle, { color: theme.text }]}>
-                  Error Details
+                  Dettagli errore
                 </Text>
                 <Pressable
                   onPress={() => setIsModalVisible(false)}
-                  accessibilityLabel="Close error details"
+                  accessibilityLabel="Chiudi dettagli errore"
                   accessibilityRole="button"
                   style={({ pressed }) => [
                     styles.closeButton,
@@ -205,6 +394,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: "center",
     lineHeight: 24,
+  },
+  retryInfo: {
+    fontSize: 13,
+    textAlign: "center",
   },
   topButton: {
     position: "absolute",
