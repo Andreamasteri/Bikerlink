@@ -211,8 +211,12 @@ for retry in $(seq 1 $MAX_RETRIES); do
     fi
 
     echo "Porta $PORT libera, avvio Metro..." | tee -a "$LOG_FILE"
+    echo "EXPO_PACKAGER_PROXY_URL=https://$REPLIT_EXPO_DEV_DOMAIN" | tee -a "$LOG_FILE"
     START_TIME=$(date +%s)
-    npm run expo:dev >> "$LOG_FILE" 2>&1 &
+    EXPO_PACKAGER_PROXY_URL="https://$REPLIT_EXPO_DEV_DOMAIN" \
+    REACT_NATIVE_PACKAGER_HOSTNAME="$REPLIT_EXPO_DEV_DOMAIN" \
+    EXPO_PUBLIC_DOMAIN="$REPLIT_DEV_DOMAIN:5000" \
+    npx expo start --localhost >> "$LOG_FILE" 2>&1 &
     METRO_PID=$!
     echo $METRO_PID > "$PID_FILE"
 
