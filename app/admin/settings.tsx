@@ -365,6 +365,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/marketplace-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/ghost-mode-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/phone-field-enabled"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/user-available-on-login"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
       setProtectedToggle(null);
       setProtectedPassword("");
