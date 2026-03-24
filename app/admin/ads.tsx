@@ -59,17 +59,13 @@ const PLACEMENT_CYCLE: Record<string, string> = {
 function CampaignCard({
   item,
   onToggle,
-  onRestart,
   onDelete,
   onUpdatePlacement,
-  isRestarting,
 }: {
   item: Campaign;
   onToggle: (id: string, isActive: boolean) => void;
-  onRestart: (id: string) => void;
   onDelete: (item: Campaign) => void;
   onUpdatePlacement: (id: string, placement: string) => void;
-  isRestarting: boolean;
 }) {
   const imageUri = item.imageUrl
     ? item.imageUrl.startsWith("http")
@@ -112,25 +108,9 @@ function CampaignCard({
         </View>
         <View style={styles.cardActions}>
           {item.isActive ? (
-            <>
-              <TouchableOpacity onPress={() => onToggle(item.id, false)} style={styles.actionBtn}>
-                <MaterialIcons name="pause-circle-filled" size={28} color={Colors.warning} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => onRestart(item.id)}
-                disabled={isRestarting}
-                style={styles.restartBtn}
-              >
-                {isRestarting ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <MaterialIcons name="play-arrow" size={18} color="#fff" />
-                    <Text style={styles.restartBtnText}>Riavvia</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity onPress={() => onToggle(item.id, false)} style={styles.actionBtn}>
+              <MaterialIcons name="pause-circle-filled" size={28} color={Colors.warning} />
+            </TouchableOpacity>
           ) : (
             <TouchableOpacity onPress={() => onToggle(item.id, true)} style={styles.actionBtn}>
               <MaterialIcons name="play-circle-filled" size={28} color={Colors.success} />
@@ -151,7 +131,7 @@ export default function AdminAds() {
   const [activeTab, setActiveTab] = useState<TabKey>("biker");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [restartingIds, setRestartingIds] = useState<Set<string>>(new Set());
+  const [isRestartingAll, setIsRestartingAll] = useState(false);
 
   const [formName, setFormName] = useState("");
   const [formLinkUrl, setFormLinkUrl] = useState("");
@@ -185,6 +165,8 @@ export default function AdminAds() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/my-ads"] });
       setShowCreateModal(false);
       resetForm();
     },
@@ -198,7 +180,11 @@ export default function AdminAds() {
       const res = await apiRequest("PUT", `/api/admin/advertisements/${id}`, { isActive });
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/my-ads"] });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -207,6 +193,8 @@ export default function AdminAds() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/my-ads"] });
       flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
     },
   });
@@ -230,25 +218,33 @@ export default function AdminAds() {
       const res = await apiRequest("PUT", `/api/admin/advertisements/${id}`, { placement });
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/my-ads"] });
+    },
   });
 
-  async function handleRestart(id: string) {
-    setRestartingIds((prev) => new Set(prev).add(id));
+  async function handleRestartAll() {
+    const activeCampaigns = campaigns.filter((c) => c.isActive);
+    if (activeCampaigns.length === 0) return;
+    setIsRestartingAll(true);
     try {
-      await apiRequest("PUT", `/api/admin/advertisements/${id}`, { isActive: false });
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      await apiRequest("PUT", `/api/admin/advertisements/${id}`, { isActive: true });
+      for (const campaign of activeCampaigns) {
+        await apiRequest("PUT", `/api/admin/advertisements/${campaign.id}`, { isActive: false });
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await apiRequest("PUT", `/api/admin/advertisements/${campaign.id}`, { isActive: true });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/my-ads"] });
     } catch {
-      Alert.alert("Errore", "Riavvio campagna non riuscito. Riprova.");
+      Alert.alert("Errore", "Riavvio campagne non riuscito. Riprova.");
       queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/my-ads"] });
     } finally {
-      setRestartingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
+      setIsRestartingAll(false);
     }
   }
 
@@ -350,6 +346,17 @@ export default function AdminAds() {
         <Text style={styles.countText}>{campaigns.length} campagn{campaigns.length === 1 ? "a" : "e"}</Text>
         <View style={styles.toolbarActions}>
           <TouchableOpacity
+            onPress={handleRestartAll}
+            disabled={isRestartingAll || campaigns.filter((c) => c.isActive).length === 0}
+            style={styles.toolbarBtn}
+          >
+            {isRestartingAll ? (
+              <ActivityIndicator size="small" color={Colors.accent} />
+            ) : (
+              <MaterialIcons name="replay" size={20} color={campaigns.filter((c) => c.isActive).length > 0 ? Colors.accent : Colors.textSecondary} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
             onPress={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] })}
             style={styles.toolbarBtn}
           >
@@ -374,10 +381,8 @@ export default function AdminAds() {
             <CampaignCard
               item={item}
               onToggle={(id, isActive) => toggleMutation.mutate({ id, isActive })}
-              onRestart={handleRestart}
               onDelete={handleDelete}
               onUpdatePlacement={(id, placement) => updatePlacementMutation.mutate({ id, placement })}
-              isRestarting={restartingIds.has(item.id)}
             />
           )}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 80 }}
@@ -640,22 +645,6 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     padding: 4,
-  },
-  restartBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.success,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    gap: 4,
-    minWidth: 80,
-    justifyContent: "center",
-  },
-  restartBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: "#fff",
   },
   emptyContainer: {
     alignItems: "center",
