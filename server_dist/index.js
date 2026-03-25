@@ -4922,15 +4922,14 @@ async function captureFirstAvailabilityLocation(userId, requestLat, requestLng, 
     });
     if (!currentUser.region) {
       (async () => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5e3);
         try {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 5e3);
           const nomUrl = `https://nominatim.openstreetmap.org/reverse?lat=${resolvedLat}&lon=${resolvedLng}&format=json&accept-language=it`;
           const nomRes = await fetch(nomUrl, {
             headers: { "User-Agent": "BikerLink/1.0" },
             signal: controller.signal
           });
-          clearTimeout(timeout);
           if (nomRes.ok) {
             const nomData = await nomRes.json();
             const state = nomData.address?.state;
@@ -4943,6 +4942,8 @@ async function captureFirstAvailabilityLocation(userId, requestLat, requestLng, 
           }
         } catch (geoErr) {
           console.warn("[captureFirstAvailabilityLocation] geocoding fallito:", geoErr);
+        } finally {
+          clearTimeout(timeout);
         }
       })();
     }
