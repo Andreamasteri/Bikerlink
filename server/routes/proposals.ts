@@ -133,6 +133,7 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
 
         return {
           ...match,
+          isSupermatch: match.isSupermatch ?? false,
           bikerNickname: biker?.nickname,
           bikerType: biker?.userType,
           zavarrinaNickname: zavorrina?.nickname,
@@ -308,6 +309,7 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
         const biker2 = await storage.getUser(match.biker2Id);
         return {
           ...match,
+          isSupermatch: match.isSupermatch ?? false,
           biker1Nickname: biker1?.nickname,
           biker2Nickname: biker2?.nickname,
         };

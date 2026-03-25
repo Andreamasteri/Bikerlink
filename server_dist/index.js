@@ -5775,6 +5775,7 @@ router5.get("/garage-matches", requireAuth4, async (req, res) => {
         const wishlistMoto = await storage.getWishlistMoto(match.wishlistMotoId);
         return {
           ...match,
+          isSupermatch: match.isSupermatch ?? false,
           bikerNickname: biker?.nickname,
           bikerType: biker?.userType,
           zavarrinaNickname: zavorrina?.nickname,
@@ -5929,6 +5930,7 @@ router5.get("/biker-matches", requireAuth4, async (req, res) => {
         const biker2 = await storage.getUser(match.biker2Id);
         return {
           ...match,
+          isSupermatch: match.isSupermatch ?? false,
           biker1Nickname: biker1?.nickname,
           biker2Nickname: biker2?.nickname
         };

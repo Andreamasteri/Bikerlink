@@ -464,18 +464,20 @@ export default function MatchScreen() {
   const allGarageMatches = garageMatches || [];
   const allBikerMatches = bikerMatches || [];
 
+  const matchSortScore = (m: any): number => {
+    const isSuper = !!m.isSupermatch;
+    const isNew = m.status === "new";
+    if (isSuper && isNew) return 3;
+    if (isSuper) return 2;
+    if (isNew) return 1;
+    return 0;
+  };
   const visibleGarageMatches = allGarageMatches
     .filter((m: any) => m.status !== "rejected")
-    .sort((a: any, b: any) => {
-      if (!!a.isSupermatch === !!b.isSupermatch) return 0;
-      return a.isSupermatch ? -1 : 1;
-    });
+    .sort((a: any, b: any) => matchSortScore(b) - matchSortScore(a));
   const visibleBikerMatches = allBikerMatches
     .filter((m: any) => m.status !== "rejected")
-    .sort((a: any, b: any) => {
-      if (!!a.isSupermatch === !!b.isSupermatch) return 0;
-      return a.isSupermatch ? -1 : 1;
-    });
+    .sort((a: any, b: any) => matchSortScore(b) - matchSortScore(a));
   const visibleProposalMatches = allProposalMatches.filter((m: any) => m.status !== "rejected" && m.status !== "expired");
 
   const newGarageMatches = visibleGarageMatches.filter((m: any) => m.status === "new");
