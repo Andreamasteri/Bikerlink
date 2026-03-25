@@ -8253,6 +8253,7 @@ async function runWishlistMatching() {
     }
     const wishlistMotos = await storage.getAllWishlistMotosWithUsers(matchingCountries);
     const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers(matchingCountries);
+    const shuffledBikers = [...bikerMotorcycles].sort(() => Math.random() - 0.5);
     console.log(`[WishlistMatching] wishlist entries: ${wishlistMotos.length}, biker motorcycles: ${bikerMotorcycles.length}`);
     if (wishlistMotos.length === 0 || bikerMotorcycles.length === 0) {
       if (wishlistMotos.length === 0) console.warn("[WishlistMatching] WARN: nessuna wishlist trovata");
@@ -8267,7 +8268,7 @@ async function runWishlistMatching() {
       for (const wm of wishlistMotos) {
         const zavarrinaId = wm.userId;
         const wish = wm.wishlistMoto;
-        for (const bm of bikerMotorcycles) {
+        for (const bm of shuffledBikers) {
           if (matchCount >= MAX_MATCHES_PER_RUN) break outer;
           const bikerId = bm.userId;
           const moto = bm.motorcycle;

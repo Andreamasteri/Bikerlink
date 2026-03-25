@@ -287,6 +287,7 @@ export default function AdminSettings() {
   const [protectedToggle, setProtectedToggle] = useState<{ key: string; value: boolean; label: string } | null>(null);
   const [protectedPassword, setProtectedPassword] = useState("");
   const [matchingCountries, setMatchingCountries] = useState<string[]>([]);
+  const [matchingTriggerFeedback, setMatchingTriggerFeedback] = useState<string | null>(null);
 
   const { data: settings = [], isLoading } = useQuery<AppSetting[]>({
     queryKey: ["/api/admin/settings"],
@@ -503,6 +504,44 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/auto-matching"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
+  });
+
+  const { data: matchingStats, refetch: refetchMatchingStats } = useQuery<{
+    totalZavarrinaMatches: number;
+    totalBikerBikerMatches: number;
+    lastCycle: { completedAt: string; durationMs: number; zavarrinaMatchesNew: number; bikerBikerMatchesNew: number } | null;
+  }>({
+    queryKey: ["/api/admin/matching-stats"],
+    refetchInterval: 30000,
+  });
+
+  const matchingTriggerMutation = useMutation({
+    mutationFn: async () => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/matching/trigger", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json() as Promise<{ started: boolean; reason?: string }>;
+    },
+    onSuccess: (data) => {
+      if (data.started) {
+        setMatchingTriggerFeedback("Ciclo avviato");
+      } else if (data.reason?.startsWith("debounced")) {
+        const match = data.reason.match(/last run (\d+)s ago/);
+        const sec = match ? match[1] : "?";
+        setMatchingTriggerFeedback(`Debounce attivo (ultimo ciclo ${sec}s fa)`);
+      } else if (data.reason === "already_running") {
+        setMatchingTriggerFeedback("Già in esecuzione");
+      } else {
+        setMatchingTriggerFeedback(data.reason ?? "Risposta inattesa");
+      }
+      setTimeout(() => setMatchingTriggerFeedback(null), 5000);
+      refetchMatchingStats();
+    },
+    onError: () => setMatchingTriggerFeedback("Errore nel trigger"),
   });
 
   const { data: matchingCountriesData } = useQuery<{ countries: string[] }>({
@@ -1022,6 +1061,52 @@ export default function AdminSettings() {
         <Text style={styles.synecoDesc}>
           {autoMatchEnabled ? "Il motore di matching automatico è attivo" : "Il matching automatico è disattivato"}
         </Text>
+      </View>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="bar-chart" size={20} color={Colors.warning} />
+            <Text style={styles.synecoLabel}>Status Matching</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => matchingTriggerMutation.mutate()}
+            disabled={matchingTriggerMutation.isPending}
+            style={[styles.triggerBtn, matchingTriggerMutation.isPending && { opacity: 0.5 }]}
+          >
+            {matchingTriggerMutation.isPending
+              ? <ActivityIndicator size="small" color={Colors.text} />
+              : <Text style={styles.triggerBtnText}>Esegui Ora</Text>}
+          </TouchableOpacity>
+        </View>
+        <View style={styles.matchingStatsRow}>
+          <View style={styles.matchingStatItem}>
+            <Text style={styles.matchingStatValue}>{matchingStats?.totalZavarrinaMatches ?? "—"}</Text>
+            <Text style={styles.matchingStatLabel}>Match Garage</Text>
+          </View>
+          <View style={styles.matchingStatDivider} />
+          <View style={styles.matchingStatItem}>
+            <Text style={styles.matchingStatValue}>{matchingStats?.totalBikerBikerMatches ?? "—"}</Text>
+            <Text style={styles.matchingStatLabel}>Match Biker</Text>
+          </View>
+        </View>
+        {matchingStats?.lastCycle ? (
+          <View style={styles.lastCycleBox}>
+            <Text style={styles.lastCycleTitle}>Ultimo ciclo</Text>
+            <Text style={styles.lastCycleText}>
+              {new Date(matchingStats.lastCycle.completedAt).toLocaleString("it-IT")}
+              {"  ·  "}{Math.round(matchingStats.lastCycle.durationMs / 1000)}s
+            </Text>
+            <Text style={styles.lastCycleText}>
+              +{matchingStats.lastCycle.zavarrinaMatchesNew} garage  ·  +{matchingStats.lastCycle.bikerBikerMatchesNew} biker
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.synecoDesc}>Nessun ciclo eseguito in questa sessione</Text>
+        )}
+        {matchingTriggerFeedback && (
+          <Text style={[styles.synecoDesc, { color: Colors.warning, marginTop: 6 }]}>{matchingTriggerFeedback}</Text>
+        )}
       </View>
 
       <View style={styles.paidCard}>
@@ -1967,6 +2052,22 @@ const styles = StyleSheet.create({
   synecoInfo: { flexDirection: "row", alignItems: "center", gap: 10 },
   synecoLabel: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.text },
   synecoDesc: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, marginTop: 8 },
+  triggerBtn: {
+    backgroundColor: Colors.warning, paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 8, minWidth: 90, alignItems: "center",
+  },
+  triggerBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#000" },
+  matchingStatsRow: { flexDirection: "row", alignItems: "center", marginTop: 12 },
+  matchingStatItem: { flex: 1, alignItems: "center" },
+  matchingStatValue: { fontFamily: "Inter_700Bold", fontSize: 22, color: Colors.warning },
+  matchingStatLabel: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  matchingStatDivider: { width: 1, height: 36, backgroundColor: Colors.border, marginHorizontal: 8 },
+  lastCycleBox: {
+    marginTop: 12, padding: 10, borderRadius: 8,
+    backgroundColor: Colors.warning + "15", borderWidth: 1, borderColor: Colors.warning + "40",
+  },
+  lastCycleTitle: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.warning, marginBottom: 4 },
+  lastCycleText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
   loadingText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", marginTop: 40 },
   emailVerifCard: {
     backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 16,

@@ -126,6 +126,7 @@ async function runWishlistMatching(): Promise<number> {
 
     const wishlistMotos = await storage.getAllWishlistMotosWithUsers(matchingCountries);
     const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers(matchingCountries);
+    const shuffledBikers = [...bikerMotorcycles].sort(() => Math.random() - 0.5);
 
     console.log(`[WishlistMatching] wishlist entries: ${wishlistMotos.length}, biker motorcycles: ${bikerMotorcycles.length}`);
 
@@ -145,7 +146,7 @@ async function runWishlistMatching(): Promise<number> {
       const zavarrinaId = wm.userId;
       const wish = wm.wishlistMoto;
 
-      for (const bm of bikerMotorcycles) {
+      for (const bm of shuffledBikers) {
         if (matchCount >= MAX_MATCHES_PER_RUN) break outer;
 
         const bikerId = bm.userId;
