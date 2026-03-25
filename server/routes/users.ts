@@ -236,7 +236,7 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
 
     if (isAvailable === true) {
       await storage.updateUser(userId, { ghostMode: false } as any);
-      captureFirstAvailabilityLocation(userId, latitude, longitude, existingProfile?.latitude, existingProfile?.longitude);
+      await captureFirstAvailabilityLocation(userId, latitude, longitude, existingProfile?.latitude, existingProfile?.longitude);
     }
 
     if (existingProfile) {
@@ -313,7 +313,7 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
     if (longitude !== undefined) updateData.longitude = longitude;
 
     if (isAvailable === true) {
-      captureFirstAvailabilityLocation(userId, latitude, longitude, existingProfile?.latitude, existingProfile?.longitude);
+      await captureFirstAvailabilityLocation(userId, latitude, longitude, existingProfile?.latitude, existingProfile?.longitude);
     }
 
     if (existingProfile) {
