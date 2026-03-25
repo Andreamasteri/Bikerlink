@@ -12726,57 +12726,6 @@ function setupErrorHandler(app2) {
     next();
   });
   setupErrorHandler(app);
-  try {
-    await db.execute(import_drizzle_orm12.sql`ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS image_url TEXT`);
-  } catch (e) {
-    console.warn("[MIGRATION] invitation_codes.image_url:", e);
-  }
-  try {
-    await db.execute(import_drizzle_orm12.sql`ALTER TABLE ad_campaigns ADD COLUMN IF NOT EXISTS placement VARCHAR(30) NOT NULL DEFAULT 'all'`);
-  } catch (e) {
-    console.warn("[MIGRATION] ad_campaigns.placement:", e);
-  }
-  try {
-    await db.execute(import_drizzle_orm12.sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ghost_mode BOOLEAN NOT NULL DEFAULT false`);
-  } catch (e) {
-    console.warn("[MIGRATION] users.ghost_mode:", e);
-  }
-  try {
-    await db.execute(import_drizzle_orm12.sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_map_style VARCHAR(20)`);
-  } catch (e) {
-    console.warn("[MIGRATION] user_profiles.preferred_map_style:", e);
-  }
-  try {
-    await db.execute(import_drizzle_orm12.sql`
-      CREATE TABLE IF NOT EXISTS user_blocks (
-        id SERIAL PRIMARY KEY,
-        blocker_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        blocked_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        created_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
-    await db.execute(import_drizzle_orm12.sql`CREATE UNIQUE INDEX IF NOT EXISTS user_blocks_unique_idx ON user_blocks (blocker_id, blocked_id)`);
-    await db.execute(import_drizzle_orm12.sql`CREATE INDEX IF NOT EXISTS user_blocks_blocker_idx ON user_blocks (blocker_id)`);
-    await db.execute(import_drizzle_orm12.sql`CREATE INDEX IF NOT EXISTS user_blocks_blocked_idx ON user_blocks (blocked_id)`);
-  } catch (e) {
-    console.warn("[MIGRATION] user_blocks:", e);
-  }
-  await autoSeedEssentialUsers();
-  await autoSeedFakeUsers();
-  await initMissingClubConversations();
-  try {
-    const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
-    const modeSetting = await storage2.getAppSetting("splash_message_mode");
-    if (!modeSetting) await storage2.upsertAppSetting("splash_message_mode", "single");
-    const listSetting = await storage2.getAppSetting("splash_messages_list");
-    if (!listSetting) await storage2.upsertAppSetting("splash_messages_list", "[]");
-    const motoclubZavSetting = await storage2.getAppSetting("motoclub_include_zav");
-    if (!motoclubZavSetting) await storage2.upsertAppSetting("motoclub_include_zav", "true");
-    const mapsUserChoiceSetting = await storage2.getAppSetting("maps_user_choice_enabled");
-    if (!mapsUserChoiceSetting) await storage2.upsertAppSetting("maps_user_choice_enabled", "true");
-  } catch (e) {
-    console.warn("[SEED] splash settings:", e);
-  }
   const port = parseInt(process.env.PORT || "5000", 10);
   server.listen(
     {
@@ -12787,6 +12736,62 @@ function setupErrorHandler(app2) {
     () => {
       log(`express server serving on port ${port}`);
       startMatchingEngine();
+      (async () => {
+        try {
+          await db.execute(import_drizzle_orm12.sql`ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS image_url TEXT`);
+        } catch (e) {
+          console.warn("[MIGRATION] invitation_codes.image_url:", e);
+        }
+        try {
+          await db.execute(import_drizzle_orm12.sql`ALTER TABLE ad_campaigns ADD COLUMN IF NOT EXISTS placement VARCHAR(30) NOT NULL DEFAULT 'all'`);
+        } catch (e) {
+          console.warn("[MIGRATION] ad_campaigns.placement:", e);
+        }
+        try {
+          await db.execute(import_drizzle_orm12.sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ghost_mode BOOLEAN NOT NULL DEFAULT false`);
+        } catch (e) {
+          console.warn("[MIGRATION] users.ghost_mode:", e);
+        }
+        try {
+          await db.execute(import_drizzle_orm12.sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_map_style VARCHAR(20)`);
+        } catch (e) {
+          console.warn("[MIGRATION] user_profiles.preferred_map_style:", e);
+        }
+        try {
+          await db.execute(import_drizzle_orm12.sql`
+            CREATE TABLE IF NOT EXISTS user_blocks (
+              id SERIAL PRIMARY KEY,
+              blocker_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              blocked_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              created_at TIMESTAMP DEFAULT NOW()
+            )
+          `);
+          await db.execute(import_drizzle_orm12.sql`CREATE UNIQUE INDEX IF NOT EXISTS user_blocks_unique_idx ON user_blocks (blocker_id, blocked_id)`);
+          await db.execute(import_drizzle_orm12.sql`CREATE INDEX IF NOT EXISTS user_blocks_blocker_idx ON user_blocks (blocker_id)`);
+          await db.execute(import_drizzle_orm12.sql`CREATE INDEX IF NOT EXISTS user_blocks_blocked_idx ON user_blocks (blocked_id)`);
+        } catch (e) {
+          console.warn("[MIGRATION] user_blocks:", e);
+        }
+        await autoSeedEssentialUsers();
+        await autoSeedFakeUsers();
+        await initMissingClubConversations();
+        try {
+          const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+          const modeSetting = await storage2.getAppSetting("splash_message_mode");
+          if (!modeSetting) await storage2.upsertAppSetting("splash_message_mode", "single");
+          const listSetting = await storage2.getAppSetting("splash_messages_list");
+          if (!listSetting) await storage2.upsertAppSetting("splash_messages_list", "[]");
+          const motoclubZavSetting = await storage2.getAppSetting("motoclub_include_zav");
+          if (!motoclubZavSetting) await storage2.upsertAppSetting("motoclub_include_zav", "true");
+          const mapsUserChoiceSetting = await storage2.getAppSetting("maps_user_choice_enabled");
+          if (!mapsUserChoiceSetting) await storage2.upsertAppSetting("maps_user_choice_enabled", "true");
+        } catch (e) {
+          console.warn("[SEED] splash settings:", e);
+        }
+        console.log("[INIT] Background initialization completed");
+      })().catch((err) => {
+        console.error("[INIT] Background initialization error:", err);
+      });
     }
   );
 })();

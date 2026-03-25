@@ -107,6 +107,13 @@ function PerformanceCard({ data }: { data: PerformanceData }) {
   );
 }
 
+function resolvePhotoUrl(photoUrl: string | null): string | null {
+  if (!photoUrl) return null;
+  if (photoUrl.startsWith("http://") || photoUrl.startsWith("https://")) return photoUrl;
+  const base = getApiUrl().replace(/\/$/, "");
+  return `${base}${photoUrl.startsWith("/") ? "" : "/"}${photoUrl}`;
+}
+
 function ContestEntryCard({
   entry,
   onVote,
@@ -123,12 +130,14 @@ function ContestEntryCard({
     } catch {}
   }
 
+  const photoUri = resolvePhotoUrl(entry.photoUrl);
+
   return (
     <View style={styles.photoCard}>
       {perfData ? (
         <PerformanceCard data={perfData} />
-      ) : entry.photoUrl ? (
-        <Image source={{ uri: entry.photoUrl }} style={styles.cardImage} />
+      ) : photoUri ? (
+        <Image source={{ uri: photoUri }} style={styles.cardImage} />
       ) : (
         <View style={[styles.cardImage, { justifyContent: "center", alignItems: "center" }]}>
           <Ionicons name="image-outline" size={32} color={Colors.textSecondary} />
