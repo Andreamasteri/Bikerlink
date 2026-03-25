@@ -3152,6 +3152,10 @@ async function massSeedFakeUsers() {
       return;
     }
     massSeedStatus.created = existingTagged.length;
+    if (existingTagged.length > 0) {
+      storage.upsertAppSetting("mass_seed_created_checkpoint", existingTagged.length.toString()).catch(() => {
+      });
+    }
     const existingUsers = await db.select({ nickname: users.nickname, email: users.email }).from(users);
     for (const u of existingUsers) {
       usedNicknames.add(u.nickname.toLowerCase());
