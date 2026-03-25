@@ -117,10 +117,12 @@ function resolvePhotoUrl(photoUrl: string | null): string | null {
 function ContestEntryCard({
   entry,
   onVote,
+  onDelete,
   votingDisabled,
 }: {
   entry: ContestEntry;
   onVote: (id: string) => void;
+  onDelete: (id: string) => void;
   votingDisabled: boolean;
 }) {
   let perfData: PerformanceData | null = null;
@@ -143,6 +145,11 @@ function ContestEntryCard({
           <Ionicons name="image-outline" size={32} color={Colors.textSecondary} />
         </View>
       )}
+      {entry.isOwn ? (
+        <Pressable style={styles.deleteBtn} onPress={() => onDelete(entry.id)}>
+          <Ionicons name="trash" size={16} color="#FFF" />
+        </Pressable>
+      ) : null}
       {entry.caption ? (
         <Text style={styles.caption} numberOfLines={2}>
           {entry.caption}
@@ -181,6 +188,18 @@ export default function ContestScreen() {
 
   const { data, isLoading, refetch } = useQuery<ContestResponse>({
     queryKey: ["/api/contest/entries"],
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (entryId: string) => {
+      await apiRequest("DELETE", `/api/contest/entries/${entryId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contest/entries"] });
+    },
+    onError: () => {
+      Alert.alert("Errore", "Impossibile eliminare la foto");
+    },
   });
 
   const voteMutation = useMutation({
@@ -244,6 +263,24 @@ export default function ContestScreen() {
     },
   });
 
+  const handleDelete = useCallback(
+    (entryId: string) => {
+      Alert.alert(
+        "Elimina foto",
+        "Sei sicuro di voler eliminare questa foto dal contest?",
+        [
+          { text: "Annulla", style: "cancel" },
+          {
+            text: "Elimina",
+            style: "destructive",
+            onPress: () => deleteMutation.mutate(entryId),
+          },
+        ]
+      );
+    },
+    [deleteMutation]
+  );
+
   const handleVote = useCallback(
     (entryId: string) => {
       voteMutation.mutate(entryId);
@@ -275,10 +312,11 @@ export default function ContestScreen() {
       <ContestEntryCard
         entry={item}
         onVote={handleVote}
+        onDelete={handleDelete}
         votingDisabled={votingDisabled}
       />
     ),
-    [handleVote, votingDisabled]
+    [handleVote, handleDelete, votingDisabled]
   );
 
   if (isLoading) {
@@ -441,6 +479,19 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
     marginBottom: 8,
+    position: "relative",
+  },
+  deleteBtn: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 14,
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
   },
   cardImage: {
     width: "100%",

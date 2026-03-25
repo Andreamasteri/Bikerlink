@@ -191,6 +191,7 @@ export interface IStorage {
 
   getPhotoContestEntries(weekNumber: number, year: number): Promise<PhotoContestEntry[]>;
   createPhotoContestEntry(entry: InsertPhotoContestEntry): Promise<PhotoContestEntry>;
+  deletePhotoContestEntry(id: string): Promise<void>;
   createPhotoVote(vote: InsertPhotoVote): Promise<PhotoVote>;
   getPhotoVote(entryId: string, userId: string): Promise<PhotoVote | undefined>;
   getDailyVoteCount(userId: string, voteDate: string): Promise<DailyVoteCount | undefined>;
@@ -702,6 +703,10 @@ export class DatabaseStorage implements IStorage {
   async createPhotoContestEntry(data: InsertPhotoContestEntry): Promise<PhotoContestEntry> {
     const [entry] = await db.insert(photoContestEntries).values(data).returning();
     return entry;
+  }
+
+  async deletePhotoContestEntry(id: string): Promise<void> {
+    await db.delete(photoContestEntries).where(eq(photoContestEntries.id, id));
   }
 
   async createPhotoVote(data: InsertPhotoVote): Promise<PhotoVote> {

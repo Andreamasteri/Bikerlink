@@ -1037,6 +1037,9 @@ var init_storage = __esm({
         const [entry] = await db.insert(photoContestEntries).values(data).returning();
         return entry;
       }
+      async deletePhotoContestEntry(id) {
+        await db.delete(photoContestEntries).where((0, import_drizzle_orm2.eq)(photoContestEntries.id, id));
+      }
       async createPhotoVote(data) {
         const [vote] = await db.insert(photoVotes).values(data).returning();
         return vote;
@@ -7262,6 +7265,25 @@ router10.post("/entries/:id/vote", async (req, res) => {
     return res.json({ message: "Voto registrato" });
   } catch (error) {
     console.error("Contest vote error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router10.delete("/entries/:id", async (req, res) => {
+  try {
+    const userId = requireAuth7(req, res);
+    if (!userId) return;
+    const { id } = req.params;
+    const entry = await storage.getPhotoContestEntry(id);
+    if (!entry) {
+      return res.status(404).json({ message: "Foto non trovata" });
+    }
+    if (entry.userId !== userId) {
+      return res.status(403).json({ message: "Non puoi eliminare questa foto" });
+    }
+    await storage.deletePhotoContestEntry(id);
+    return res.json({ message: "Foto eliminata" });
+  } catch (error) {
+    console.error("Contest delete entry error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

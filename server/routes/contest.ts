@@ -184,6 +184,30 @@ router.post("/entries/:id/vote", async (req: Request, res: Response) => {
   }
 });
 
+router.delete("/entries/:id", async (req: Request, res: Response) => {
+  try {
+    const userId = requireAuth(req, res);
+    if (!userId) return;
+
+    const { id } = req.params;
+
+    const entry = await storage.getPhotoContestEntry(id);
+    if (!entry) {
+      return res.status(404).json({ message: "Foto non trovata" });
+    }
+
+    if (entry.userId !== userId) {
+      return res.status(403).json({ message: "Non puoi eliminare questa foto" });
+    }
+
+    await storage.deletePhotoContestEntry(id);
+    return res.json({ message: "Foto eliminata" });
+  } catch (error) {
+    console.error("Contest delete entry error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.get("/winners", async (req: Request, res: Response) => {
   try {
     const userId = requireAuth(req, res);
