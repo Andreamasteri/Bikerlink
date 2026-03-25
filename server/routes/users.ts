@@ -298,6 +298,38 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
     if (latitude !== undefined) updateData.latitude = latitude;
     if (longitude !== undefined) updateData.longitude = longitude;
 
+    if (isAvailable === true) {
+      try {
+        const currentUser = await storage.getUser(userId);
+        if (currentUser && currentUser.firstLoginLat === null) {
+          const resolvedLat = latitude ?? existingProfile?.latitude;
+          const resolvedLng = longitude ?? existingProfile?.longitude;
+          if (resolvedLat !== undefined && resolvedLat !== null &&
+              resolvedLng !== undefined && resolvedLng !== null) {
+            await storage.updateUser(userId, {
+              firstLoginLat: resolvedLat,
+              firstLoginLng: resolvedLng,
+            } as any);
+            if (!currentUser.region) {
+              const nomUrl = `https://nominatim.openstreetmap.org/reverse?lat=${resolvedLat}&lon=${resolvedLng}&format=json&accept-language=it`;
+              const nomRes = await fetch(nomUrl, { headers: { "User-Agent": "BikerLink/1.0" } });
+              if (nomRes.ok) {
+                const nomData = await nomRes.json() as { address?: { state?: string; country_code?: string } };
+                const state = nomData.address?.state;
+                const countryCode = nomData.address?.country_code;
+                if (state && countryCode === "it") {
+                  await storage.updateUser(userId, { region: state } as any);
+                  createRegionalClubInvite(userId, state).catch(() => {});
+                }
+              }
+            }
+          }
+        }
+      } catch (geoErr) {
+        console.warn("[me/availability] Prima disponibilità GPS fallita:", geoErr);
+      }
+    }
+
     if (existingProfile) {
       const profile = await storage.updateUserProfile(userId, updateData as any);
       return res.json(profile);
