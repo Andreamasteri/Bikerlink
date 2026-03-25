@@ -1052,7 +1052,7 @@ export default function AdminSettings() {
               >
                 <Text style={styles.countryChipFlag}>{c.flag}</Text>
                 <Text style={[styles.countryChipText, isSelected && styles.countryChipTextSelected]}>
-                  {c.code}
+                  {c.name}
                 </Text>
               </TouchableOpacity>
             );
