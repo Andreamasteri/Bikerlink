@@ -26,7 +26,7 @@ interface MassSeedStatus {
 let massSeedStatus: MassSeedStatus = { running: false, created: 0, total: 0, error: null };
 
 export async function getMassSeedStatus(): Promise<MassSeedStatus> {
-  if (!massSeedStatus.running && massSeedStatus.created === 0 && massSeedStatus.total === 0) {
+  if (!massSeedStatus.running && massSeedStatus.created === 0) {
     try {
       const checkpoint = await storage.getAppSetting("mass_seed_created_checkpoint");
       if (checkpoint?.value) {
@@ -706,7 +706,7 @@ export async function massSeedFakeUsers(): Promise<void> {
 
       massSeedStatus.created += insertedUsers.length;
 
-      if (batchStart % (BATCH_SIZE * 5) === 0) {
+      if (batchStart > 0 && batchStart % (BATCH_SIZE * 5) === 0) {
         console.log(`[mass-seed] Progress: ${massSeedStatus.created}/${massSeedStatus.total}`);
         storage.upsertAppSetting("mass_seed_created_checkpoint", massSeedStatus.created.toString()).catch(() => {});
       }

@@ -2854,7 +2854,7 @@ __export(mass_seed_exports, {
   massSeedFakeUsers: () => massSeedFakeUsers
 });
 async function getMassSeedStatus() {
-  if (!massSeedStatus.running && massSeedStatus.created === 0 && massSeedStatus.total === 0) {
+  if (!massSeedStatus.running && massSeedStatus.created === 0) {
     try {
       const checkpoint = await storage.getAppSetting("mass_seed_created_checkpoint");
       if (checkpoint?.value) {
@@ -3380,7 +3380,7 @@ async function massSeedFakeUsers() {
         }
       }
       massSeedStatus.created += insertedUsers.length;
-      if (batchStart % (BATCH_SIZE * 5) === 0) {
+      if (batchStart > 0 && batchStart % (BATCH_SIZE * 5) === 0) {
         console.log(`[mass-seed] Progress: ${massSeedStatus.created}/${massSeedStatus.total}`);
         storage.upsertAppSetting("mass_seed_created_checkpoint", massSeedStatus.created.toString()).catch(() => {
         });
