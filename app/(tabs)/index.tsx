@@ -229,7 +229,7 @@ export default function MapScreen() {
         if (!cancelled) setLocationLoading(false);
       }
     }
-    initMapLocation().catch((err) => console.warn("[index] initMapLocation unhandled:", err));
+    initMapLocation();
     return () => { cancelled = true; };
   }, [fetchGPSLocation, getRegionFallback, user?.region, user?.country, profileLat, profileLng]);
 
