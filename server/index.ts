@@ -403,20 +403,22 @@ function setupErrorHandler(app: express.Application) {
         }
 
         try {
-          await db.execute(sql`
-            DELETE FROM moto_club_invites
-            WHERE club_id IN (
-              SELECT id FROM moto_clubs WHERE club_type = 'model'
-            )
-          `);
-          await db.execute(sql`
-            DELETE FROM moto_club_members
-            WHERE club_id IN (
-              SELECT id FROM moto_clubs WHERE club_type = 'model'
-            )
-          `);
-          await db.execute(sql`DELETE FROM moto_clubs WHERE club_type = 'model'`);
-          await db.execute(sql`DELETE FROM moto_club_requests WHERE club_type = 'model'`);
+          const [{ modelCount }] = (await db.execute(
+            sql`SELECT COUNT(*) AS "modelCount" FROM moto_clubs WHERE club_type = 'model'`
+          )).rows as [{ modelCount: string }];
+          if (Number(modelCount) > 0) {
+            await db.execute(sql`
+              DELETE FROM moto_club_invites
+              WHERE club_id IN (SELECT id FROM moto_clubs WHERE club_type = 'model')
+            `);
+            await db.execute(sql`
+              DELETE FROM moto_club_members
+              WHERE club_id IN (SELECT id FROM moto_clubs WHERE club_type = 'model')
+            `);
+            await db.execute(sql`DELETE FROM moto_clubs WHERE club_type = 'model'`);
+            await db.execute(sql`DELETE FROM moto_club_requests WHERE club_type = 'model'`);
+            console.log("[MIGRATION] Removed", modelCount, "model clubs and related records");
+          }
         } catch (e) {
           console.warn("[MIGRATION] cleanup model clubs:", e);
         }

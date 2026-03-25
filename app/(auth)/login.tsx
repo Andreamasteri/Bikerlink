@@ -48,7 +48,7 @@ export default function LoginScreen() {
     }
 
     loginMutation.mutate(
-      { identifier: identifier.trim(), password, ...gpsCoords },
+      { identifier: identifier.trim(), password, ...(gpsCoords ?? {}) },
       {
         onSuccess: () => {
           router.replace("/(tabs)");
