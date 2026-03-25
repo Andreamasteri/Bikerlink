@@ -173,8 +173,15 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (Platform.OS === "web") return;
-    const prev = (global as any).ErrorUtils?.getGlobalHandler?.();
-    (global as any).ErrorUtils?.setGlobalHandler?.((error: Error, isFatal?: boolean) => {
+    type ErrorHandler = (error: Error, isFatal?: boolean) => void;
+    interface ErrorUtilsType {
+      getGlobalHandler: () => ErrorHandler;
+      setGlobalHandler: (callback: ErrorHandler) => void;
+    }
+    const errorUtils = (globalThis as typeof globalThis & { ErrorUtils?: ErrorUtilsType }).ErrorUtils;
+    if (!errorUtils) return;
+    const prev = errorUtils.getGlobalHandler();
+    errorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
       console.error("[GlobalError]", error?.message, "isFatal:", isFatal);
       if (prev) prev(error, isFatal);
     });
