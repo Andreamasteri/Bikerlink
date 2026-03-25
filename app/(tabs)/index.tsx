@@ -204,14 +204,14 @@ export default function MapScreen() {
         if (user?.region) {
           if (!cancelled) setLocation(getRegionCoordinates(user.region, user.country));
           if (!cancelled) setLocationLoading(false);
-          fetchGPSLocation();
+          await fetchGPSLocation().catch(() => {});
           return;
         }
 
         if (profileLat != null && profileLng != null && !isNaN(Number(profileLat)) && !isNaN(Number(profileLng))) {
           if (!cancelled) setLocation({ latitude: Number(profileLat), longitude: Number(profileLng) });
           if (!cancelled) setLocationLoading(false);
-          fetchGPSLocation();
+          await fetchGPSLocation().catch(() => {});
           return;
         }
 
