@@ -68,7 +68,7 @@ export default function CreateMotoclub() {
   });
 
   const { data: searchResults = [] } = useQuery<UserResult[]>({
-    queryKey: ["/api/users/search", debouncedSearch],
+    queryKey: [`/api/users/search?q=${encodeURIComponent(debouncedSearch)}`],
     enabled: debouncedSearch.length >= 2,
   });
 

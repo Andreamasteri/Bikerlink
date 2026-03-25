@@ -10416,6 +10416,15 @@ router17.post("/motoclubs/requests/:id/approve", async (req, res) => {
     for (const uid of invitedUserIds) {
       try {
         await db.insert(motoClubInvites).values({ clubId: newClub.id, userId: uid, status: "pending" }).onConflictDoNothing();
+        await storage.createNotification({
+          userId: uid,
+          title: "Sei stato invitato in un Motoclub!",
+          body: `Sei invitato a unirti al club "${request.name}"`,
+          notificationType: "motoclub_invite",
+          referenceType: "motoclub",
+          referenceId: newClub.id
+        }).catch(() => {
+        });
       } catch {
       }
     }
@@ -10443,7 +10452,11 @@ router17.post("/motoclubs/requests/:id/approve", async (req, res) => {
       } catch (e) {
         console.error("[approve motoclub] DM error:", e);
       }
-      await db.update(feedbackTickets).set({ status: "resolved", updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm9.and)((0, import_drizzle_orm9.eq)(feedbackTickets.userId, request.requestedBy), (0, import_drizzle_orm9.eq)(feedbackTickets.status, "open")));
+      await db.update(feedbackTickets).set({ status: "resolved", updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm9.and)(
+        (0, import_drizzle_orm9.eq)(feedbackTickets.userId, request.requestedBy),
+        (0, import_drizzle_orm9.eq)(feedbackTickets.status, "open"),
+        import_drizzle_orm9.sql`${feedbackTickets.message} LIKE ${"%Request ID: " + requestId + "%"}`
+      ));
     }
     await db.insert(moderatorLogs).values({
       moderatorId: adminId,
