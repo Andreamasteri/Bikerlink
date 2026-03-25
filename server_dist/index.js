@@ -10394,7 +10394,7 @@ router17.post("/motoclubs/requests/:id/approve", async (req, res) => {
     const inviteRadiusKm = request.inviteRadiusKm;
     const inviteUserIdsJson = request.inviteUserIds;
     const invitedUserIds = /* @__PURE__ */ new Set();
-    if (inviteRadiusKm && request.latitude && request.longitude) {
+    if (inviteRadiusKm && request.latitude != null && request.longitude != null) {
       const lat = request.latitude;
       const lng = request.longitude;
       const nearbyUsers = await db.select({ userId: userProfiles.userId }).from(userProfiles).where(

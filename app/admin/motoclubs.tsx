@@ -84,7 +84,7 @@ export default function AdminMotoclubs() {
   });
 
   const systemRequests = useMemo(() => requests.filter((r) => !r.requestedBy), [requests]);
-  const userCreationRequests = useMemo(() => requests.filter((r) => !!r.requestedBy), [requests]);
+  const userCreationRequests = useMemo(() => requests.filter((r) => !!r.requestedBy && r.clubType === "custom"), [requests]);
 
   const pendingCount = systemRequests.filter((r) => r.status === "pending").length;
   const userPendingCount = userCreationRequests.filter((r) => r.status === "pending").length;

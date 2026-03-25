@@ -1868,7 +1868,7 @@ router.post("/motoclubs/requests/:id/approve", async (req: Request, res: Respons
     const inviteUserIdsJson = (request as any).inviteUserIds as string | null;
     const invitedUserIds = new Set<string>();
 
-    if (inviteRadiusKm && (request as any).latitude && (request as any).longitude) {
+    if (inviteRadiusKm && (request as any).latitude != null && (request as any).longitude != null) {
       const lat = (request as any).latitude as number;
       const lng = (request as any).longitude as number;
       const nearbyUsers = await db
