@@ -17,7 +17,7 @@ async function captureFirstAvailabilityLocation(
 ): Promise<void> {
   try {
     const currentUser = await storage.getUser(userId);
-    if (!currentUser || currentUser.firstLoginLat !== null) return;
+    if (!currentUser || (currentUser.firstLoginLat !== null && currentUser.firstLoginLng !== null)) return;
     const resolvedLat = requestLat ?? profileLat;
     const resolvedLng = requestLng ?? profileLng;
     if (resolvedLat == null || resolvedLng == null) return;

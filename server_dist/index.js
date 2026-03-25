@@ -4912,7 +4912,7 @@ var router3 = (0, import_express3.Router)();
 async function captureFirstAvailabilityLocation(userId, requestLat, requestLng, profileLat, profileLng) {
   try {
     const currentUser = await storage.getUser(userId);
-    if (!currentUser || currentUser.firstLoginLat !== null) return;
+    if (!currentUser || currentUser.firstLoginLat !== null && currentUser.firstLoginLng !== null) return;
     const resolvedLat = requestLat ?? profileLat;
     const resolvedLng = requestLng ?? profileLng;
     if (resolvedLat == null || resolvedLng == null) return;
