@@ -185,6 +185,7 @@ export default function RootLayout() {
       console.error("[GlobalError]", error?.message, "isFatal:", isFatal);
       if (prev) prev(error, isFatal);
     });
+    return () => { errorUtils.setGlobalHandler(prev); };
   }, []);
 
   return (
