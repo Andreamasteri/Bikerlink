@@ -2853,7 +2853,19 @@ __export(mass_seed_exports, {
   getMassSeedStatus: () => getMassSeedStatus,
   massSeedFakeUsers: () => massSeedFakeUsers
 });
-function getMassSeedStatus() {
+async function getMassSeedStatus() {
+  if (!massSeedStatus.running && massSeedStatus.created === 0 && massSeedStatus.total === 0) {
+    try {
+      const checkpoint = await storage.getAppSetting("mass_seed_created_checkpoint");
+      if (checkpoint?.value) {
+        const saved = parseInt(checkpoint.value, 10);
+        if (!isNaN(saved) && saved > 0) {
+          return { ...massSeedStatus, created: saved, total: 5e3 };
+        }
+      }
+    } catch {
+    }
+  }
   return { ...massSeedStatus };
 }
 function logSeedError(context, err) {
@@ -3097,6 +3109,8 @@ async function massSeedFakeUsers() {
   const allSpecs = buildSpecs();
   const TARGET = allSpecs.length;
   massSeedStatus = { running: true, created: 0, total: TARGET, error: null };
+  storage.upsertAppSetting("mass_seed_created_checkpoint", "0").catch(() => {
+  });
   const usedNicknames = /* @__PURE__ */ new Set();
   const usedEmails = /* @__PURE__ */ new Set();
   try {
@@ -10808,7 +10822,7 @@ router17.post("/motoclubs/:id/simulate-activity", async (req, res) => {
 router17.post("/mass-seed-fake-users", async (_req, res) => {
   try {
     const { getMassSeedStatus: getMassSeedStatus2, massSeedFakeUsers: massSeedFakeUsers2 } = await Promise.resolve().then(() => (init_mass_seed(), mass_seed_exports));
-    const status = getMassSeedStatus2();
+    const status = await getMassSeedStatus2();
     if (status.running) {
       return res.status(409).json({ message: "Generazione gi\xE0 in corso", ...status });
     }
@@ -10822,18 +10836,7 @@ router17.post("/mass-seed-fake-users", async (_req, res) => {
 router17.get("/mass-seed-status", async (_req, res) => {
   try {
     const { getMassSeedStatus: getMassSeedStatus2 } = await Promise.resolve().then(() => (init_mass_seed(), mass_seed_exports));
-    const status = getMassSeedStatus2();
-    if (!status.running && status.created === 0 && status.total === 0) {
-      const checkpoint = await storage.getAppSetting("mass_seed_created_checkpoint");
-      if (checkpoint?.value) {
-        const saved = parseInt(checkpoint.value, 10);
-        if (!isNaN(saved) && saved > 0) {
-          status.created = saved;
-          status.total = 5e3;
-        }
-      }
-    }
-    return res.json(status);
+    return res.json(await getMassSeedStatus2());
   } catch (error) {
     console.error("Admin mass seed status error:", error);
     return res.status(500).json({ message: "Errore interno del server" });

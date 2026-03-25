@@ -25,7 +25,18 @@ interface MassSeedStatus {
 
 let massSeedStatus: MassSeedStatus = { running: false, created: 0, total: 0, error: null };
 
-export function getMassSeedStatus(): MassSeedStatus {
+export async function getMassSeedStatus(): Promise<MassSeedStatus> {
+  if (!massSeedStatus.running && massSeedStatus.created === 0 && massSeedStatus.total === 0) {
+    try {
+      const checkpoint = await storage.getAppSetting("mass_seed_created_checkpoint");
+      if (checkpoint?.value) {
+        const saved = parseInt(checkpoint.value, 10);
+        if (!isNaN(saved) && saved > 0) {
+          return { ...massSeedStatus, created: saved, total: 5000 };
+        }
+      }
+    } catch {}
+  }
   return { ...massSeedStatus };
 }
 
@@ -384,6 +395,7 @@ export async function massSeedFakeUsers(): Promise<void> {
   const allSpecs = buildSpecs();
   const TARGET = allSpecs.length;
   massSeedStatus = { running: true, created: 0, total: TARGET, error: null };
+  storage.upsertAppSetting("mass_seed_created_checkpoint", "0").catch(() => {});
   const usedNicknames = new Set<string>();
   const usedEmails = new Set<string>();
 
