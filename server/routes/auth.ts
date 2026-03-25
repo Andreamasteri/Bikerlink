@@ -207,35 +207,11 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Credenziali non valide" });
     }
 
-    const isFirstLogin = !user.firstLoginAt;
-    const gpsLat = typeof req.body.lat === "number" ? req.body.lat : null;
-    const gpsLng = typeof req.body.lng === "number" ? req.body.lng : null;
-
     const updateData: Record<string, unknown> = { lastLoginAt: new Date() };
-    if (isFirstLogin) {
+    if (!user.firstLoginAt) {
       updateData.firstLoginAt = new Date();
-      if (gpsLat !== null) updateData.firstLoginLat = gpsLat;
-      if (gpsLng !== null) updateData.firstLoginLng = gpsLng;
     }
     await storage.updateUser(user.id, updateData as any);
-
-    if (isFirstLogin && !user.region && gpsLat !== null && gpsLng !== null) {
-      try {
-        const nomUrl = `https://nominatim.openstreetmap.org/reverse?lat=${gpsLat}&lon=${gpsLng}&format=json&accept-language=it`;
-        const nomRes = await fetch(nomUrl, { headers: { "User-Agent": "BikerLink/1.0" } });
-        if (nomRes.ok) {
-          const nomData = await nomRes.json() as { address?: { state?: string; country_code?: string } };
-          const state = nomData.address?.state;
-          const countryCode = nomData.address?.country_code;
-          if (state && countryCode === "it") {
-            await storage.updateUser(user.id, { region: state } as any);
-            user = { ...user, region: state };
-          }
-        }
-      } catch (geoErr) {
-        console.warn("[Login] Nominatim reverse geocoding fallito:", geoErr);
-      }
-    }
 
     const effectiveRegion = user.region;
     const effectiveCountry = user.country;

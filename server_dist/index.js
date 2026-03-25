@@ -4712,33 +4712,11 @@ router2.post("/login", loginLimiter, async (req, res) => {
     if (!validPassword) {
       return res.status(401).json({ message: "Credenziali non valide" });
     }
-    const isFirstLogin = !user.firstLoginAt;
-    const gpsLat = typeof req.body.lat === "number" ? req.body.lat : null;
-    const gpsLng = typeof req.body.lng === "number" ? req.body.lng : null;
     const updateData = { lastLoginAt: /* @__PURE__ */ new Date() };
-    if (isFirstLogin) {
+    if (!user.firstLoginAt) {
       updateData.firstLoginAt = /* @__PURE__ */ new Date();
-      if (gpsLat !== null) updateData.firstLoginLat = gpsLat;
-      if (gpsLng !== null) updateData.firstLoginLng = gpsLng;
     }
     await storage.updateUser(user.id, updateData);
-    if (isFirstLogin && !user.region && gpsLat !== null && gpsLng !== null) {
-      try {
-        const nomUrl = `https://nominatim.openstreetmap.org/reverse?lat=${gpsLat}&lon=${gpsLng}&format=json&accept-language=it`;
-        const nomRes = await fetch(nomUrl, { headers: { "User-Agent": "BikerLink/1.0" } });
-        if (nomRes.ok) {
-          const nomData = await nomRes.json();
-          const state = nomData.address?.state;
-          const countryCode = nomData.address?.country_code;
-          if (state && countryCode === "it") {
-            await storage.updateUser(user.id, { region: state });
-            user = { ...user, region: state };
-          }
-        }
-      } catch (geoErr) {
-        console.warn("[Login] Nominatim reverse geocoding fallito:", geoErr);
-      }
-    }
     const effectiveRegion = user.region;
     const effectiveCountry = user.country;
     if (effectiveRegion && (!effectiveCountry || effectiveCountry === "IT")) {
@@ -5096,6 +5074,33 @@ router3.put("/profile/dynamic", requireAuth2, async (req, res) => {
     }
     if (isAvailable === true) {
       await storage.updateUser(userId, { ghostMode: false });
+      if (latitude !== void 0 && longitude !== void 0) {
+        const currentUser = await storage.getUser(userId);
+        if (currentUser && currentUser.firstLoginLat === null) {
+          await storage.updateUser(userId, {
+            firstLoginLat: latitude,
+            firstLoginLng: longitude
+          });
+          if (!currentUser.region) {
+            try {
+              const nomUrl = `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=it`;
+              const nomRes = await fetch(nomUrl, { headers: { "User-Agent": "BikerLink/1.0" } });
+              if (nomRes.ok) {
+                const nomData = await nomRes.json();
+                const state = nomData.address?.state;
+                const countryCode = nomData.address?.country_code;
+                if (state && countryCode === "it") {
+                  await storage.updateUser(userId, { region: state });
+                  createRegionalClubInvite(userId, state).catch(() => {
+                  });
+                }
+              }
+            } catch (geoErr) {
+              console.warn("[Available] Nominatim reverse geocoding fallito:", geoErr);
+            }
+          }
+        }
+      }
     }
     if (existingProfile) {
       const profile = await storage.updateUserProfile(userId, updateData);
