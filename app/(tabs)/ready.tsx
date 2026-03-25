@@ -39,25 +39,32 @@ export default function ReadyToRideScreen() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+    async function initLocation() {
       try {
         if (Platform.OS === "web") {
           if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
-              (pos) => setLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+              (pos) => {
+                if (!cancelled) setLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+              },
               () => {},
               { timeout: 5000 }
             );
           }
         } else {
           const { status } = await Location.requestForegroundPermissionsAsync();
-          if (status === "granted") {
+          if (status === "granted" && !cancelled) {
             const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-            setLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+            if (!cancelled) setLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
           }
         }
-      } catch {}
-    })();
+      } catch (err) {
+        console.warn("[ready] Location init fallita:", err);
+      }
+    }
+    initLocation();
+    return () => { cancelled = true; };
   }, []);
 
   const { data, isLoading } = useQuery({

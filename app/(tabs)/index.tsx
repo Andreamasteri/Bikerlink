@@ -198,29 +198,39 @@ export default function MapScreen() {
   const profileLng = typedUser?.profileLongitude;
 
   useEffect(() => {
-    (async () => {
-      if (user?.region) {
-        setLocation(getRegionCoordinates(user.region, user.country));
-        setLocationLoading(false);
-        fetchGPSLocation();
-        return;
-      }
+    let cancelled = false;
+    async function initMapLocation() {
+      try {
+        if (user?.region) {
+          if (!cancelled) setLocation(getRegionCoordinates(user.region, user.country));
+          if (!cancelled) setLocationLoading(false);
+          fetchGPSLocation();
+          return;
+        }
 
-      if (profileLat != null && profileLng != null && !isNaN(Number(profileLat)) && !isNaN(Number(profileLng))) {
-        setLocation({ latitude: Number(profileLat), longitude: Number(profileLng) });
-        setLocationLoading(false);
-        fetchGPSLocation();
-        return;
-      }
+        if (profileLat != null && profileLng != null && !isNaN(Number(profileLat)) && !isNaN(Number(profileLng))) {
+          if (!cancelled) setLocation({ latitude: Number(profileLat), longitude: Number(profileLng) });
+          if (!cancelled) setLocationLoading(false);
+          fetchGPSLocation();
+          return;
+        }
 
-      const gps = await fetchGPSLocation();
-      if (gps) {
-        setLocation(gps);
-      } else {
-        setLocation(getRegionFallback());
+        const gps = await fetchGPSLocation();
+        if (!cancelled) {
+          if (gps) {
+            setLocation(gps);
+          } else {
+            setLocation(getRegionFallback());
+          }
+          setLocationLoading(false);
+        }
+      } catch (err) {
+        console.warn("[index] initMapLocation fallita:", err);
+        if (!cancelled) setLocationLoading(false);
       }
-      setLocationLoading(false);
-    })();
+    }
+    initMapLocation();
+    return () => { cancelled = true; };
   }, [fetchGPSLocation, getRegionFallback, user?.region, user?.country, profileLat, profileLng]);
 
   const handleCenterPosition = useCallback(async () => {

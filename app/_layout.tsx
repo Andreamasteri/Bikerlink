@@ -171,6 +171,15 @@ export default function RootLayout() {
     return () => clearTimeout(timeout);
   }, [fontsLoaded, fontError]);
 
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    const prev = (global as any).ErrorUtils?.getGlobalHandler?.();
+    (global as any).ErrorUtils?.setGlobalHandler?.((error: Error, isFatal?: boolean) => {
+      console.error("[GlobalError]", error?.message, "isFatal:", isFatal);
+      if (prev) prev(error, isFatal);
+    });
+  }, []);
+
   return (
     <ErrorBoundary>
       <LanguageProvider>
