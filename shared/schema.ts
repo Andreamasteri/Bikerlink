@@ -44,6 +44,9 @@ export const users = pgTable("users", {
   autoJoinClubs: boolean("auto_join_clubs").notNull().default(true),
   ghostMode: boolean("ghost_mode").notNull().default(false),
   lastLoginAt: timestamp("last_login_at"),
+  firstLoginAt: timestamp("first_login_at"),
+  firstLoginLat: doublePrecision("first_login_lat"),
+  firstLoginLng: doublePrecision("first_login_lng"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -804,9 +807,14 @@ export const motoClubs = pgTable("moto_clubs", {
   clubType: varchar("club_type", { length: 20 }).notNull(),
   brandName: varchar("brand_name", { length: 100 }),
   modelName: varchar("model_name", { length: 100 }),
+  region: varchar("region", { length: 100 }),
+  country: varchar("country", { length: 2 }),
   description: text("description"),
   logoUrl: text("logo_url"),
+  coverUrl: text("cover_url"),
   isApproved: boolean("is_approved").notNull().default(false),
+  isFeatured: boolean("is_featured").notNull().default(false),
+  memberCount: integer("member_count").notNull().default(0),
   activityScore: integer("activity_score").notNull().default(0),
   conversationId: varchar("conversation_id", { length: 36 }),
   parentClubId: varchar("parent_club_id", { length: 36 }),
@@ -819,6 +827,7 @@ export const motoClubs = pgTable("moto_clubs", {
 }, (table) => [
   index("moto_clubs_type_idx").on(table.clubType),
   index("moto_clubs_brand_idx").on(table.brandName),
+  index("moto_clubs_region_idx").on(table.region),
 ]);
 
 export const motoClubMembers = pgTable("moto_club_members", {

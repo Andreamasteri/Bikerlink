@@ -50,31 +50,27 @@ const SEED_BRANDS = [
   { name: "Zero Motorcycles", brandName: "Zero", logoUrl: null },
 ];
 
-const SEED_MODELS = [
-  { name: "BMW R 1250 GS", brandName: "BMW", modelName: "R 1250 GS" },
-  { name: "BMW R 1200 GS", brandName: "BMW", modelName: "R 1200 GS" },
-  { name: "BMW S 1000 RR", brandName: "BMW", modelName: "S 1000 RR" },
-  { name: "Ducati Panigale V4", brandName: "Ducati", modelName: "Panigale V4" },
-  { name: "Ducati Monster", brandName: "Ducati", modelName: "Monster" },
-  { name: "Ducati Multistrada", brandName: "Ducati", modelName: "Multistrada" },
-  { name: "Ducati Scrambler", brandName: "Ducati", modelName: "Scrambler" },
-  { name: "Harley-Davidson Sportster", brandName: "Harley-Davidson", modelName: "Sportster" },
-  { name: "Harley-Davidson Road King", brandName: "Harley-Davidson", modelName: "Road King" },
-  { name: "Harley-Davidson Fat Boy", brandName: "Harley-Davidson", modelName: "Fat Boy" },
-  { name: "Honda Africa Twin", brandName: "Honda", modelName: "Africa Twin" },
-  { name: "Honda CB1000R", brandName: "Honda", modelName: "CB1000R" },
-  { name: "Yamaha MT-09", brandName: "Yamaha", modelName: "MT-09" },
-  { name: "Yamaha Ténéré 700", brandName: "Yamaha", modelName: "Ténéré 700" },
-  { name: "Kawasaki Z900", brandName: "Kawasaki", modelName: "Z900" },
-  { name: "Kawasaki Ninja ZX-10R", brandName: "Kawasaki", modelName: "Ninja ZX-10R" },
-  { name: "KTM 1290 Super Adventure", brandName: "KTM", modelName: "1290 Super Adventure" },
-  { name: "KTM Duke 390", brandName: "KTM", modelName: "Duke 390" },
-  { name: "Triumph Bonneville", brandName: "Triumph", modelName: "Bonneville" },
-  { name: "Triumph Tiger 900", brandName: "Triumph", modelName: "Tiger 900" },
-  { name: "Aprilia RSV4", brandName: "Aprilia", modelName: "RSV4" },
-  { name: "Aprilia Tuono", brandName: "Aprilia", modelName: "Tuono" },
-  { name: "Moto Guzzi V7", brandName: "Moto Guzzi", modelName: "V7" },
-  { name: "MV Agusta Brutale", brandName: "MV Agusta", modelName: "Brutale" },
+const SEED_REGIONS = [
+  { region: "Piemonte", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/Coat_of_arms_of_Piedmont.svg/150px-Coat_of_arms_of_Piedmont.svg.png" },
+  { region: "Valle d'Aosta", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Coat_of_arms_of_Aosta_Valley.svg/150px-Coat_of_arms_of_Aosta_Valley.svg.png" },
+  { region: "Lombardia", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Coat_of_arms_of_Lombardy.svg/150px-Coat_of_arms_of_Lombardy.svg.png" },
+  { region: "Trentino-Alto Adige", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Coat_of_Arms_of_Trentino-Alto_Adige.svg/150px-Coat_of_Arms_of_Trentino-Alto_Adige.svg.png" },
+  { region: "Veneto", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/Coat_of_arms_of_Veneto.svg/150px-Coat_of_arms_of_Veneto.svg.png" },
+  { region: "Friuli-Venezia Giulia", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/72/Coat_of_arms_of_Friuli-Venezia_Giulia.svg/150px-Coat_of_arms_of_Friuli-Venezia_Giulia.svg.png" },
+  { region: "Liguria", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Coat_of_arms_of_Liguria.svg/150px-Coat_of_arms_of_Liguria.svg.png" },
+  { region: "Emilia-Romagna", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Coat_of_arms_of_Emilia-Romagna.svg/150px-Coat_of_arms_of_Emilia-Romagna.svg.png" },
+  { region: "Toscana", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Coat_of_arms_of_Tuscany.svg/150px-Coat_of_arms_of_Tuscany.svg.png" },
+  { region: "Umbria", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Coat_of_arms_of_Umbria.svg/150px-Coat_of_arms_of_Umbria.svg.png" },
+  { region: "Marche", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Coat_of_arms_of_Marche.svg/150px-Coat_of_arms_of_Marche.svg.png" },
+  { region: "Lazio", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Coat_of_arms_of_Lazio.svg/150px-Coat_of_arms_of_Lazio.svg.png" },
+  { region: "Abruzzo", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Coat_of_arms_of_Abruzzo.svg/150px-Coat_of_arms_of_Abruzzo.svg.png" },
+  { region: "Molise", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Coat_of_arms_of_Molise.svg/150px-Coat_of_arms_of_Molise.svg.png" },
+  { region: "Campania", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Coat_of_arms_of_Campania.svg/150px-Coat_of_arms_of_Campania.svg.png" },
+  { region: "Puglia", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Coat_of_arms_of_Apulia.svg/150px-Coat_of_arms_of_Apulia.svg.png" },
+  { region: "Basilicata", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Coat_of_arms_of_Basilicata.svg/150px-Coat_of_arms_of_Basilicata.svg.png" },
+  { region: "Calabria", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Coat_of_arms_of_Calabria.svg/150px-Coat_of_arms_of_Calabria.svg.png" },
+  { region: "Sicilia", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Coat_of_Arms_of_Sicily.svg/150px-Coat_of_Arms_of_Sicily.svg.png" },
+  { region: "Sardegna", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Coat_of_arms_of_Sardinia.svg/150px-Coat_of_arms_of_Sardinia.svg.png" },
 ];
 
 async function seedMotoclubs() {
@@ -92,23 +88,75 @@ async function seedMotoclubs() {
         activityScore: 0,
       });
     }
-    for (const m of SEED_MODELS) {
+    for (const r of SEED_REGIONS) {
       await db.insert(motoClubs).values({
-        name: m.name,
-        clubType: "model",
-        brandName: m.brandName,
-        modelName: m.modelName,
+        name: `Motoclub ${r.region}`,
+        clubType: "region",
+        region: r.region,
+        country: "IT",
+        logoUrl: r.logoUrl,
         isApproved: true,
         activityScore: 0,
       });
     }
-    console.log("[Motoclub] Seed completato:", SEED_BRANDS.length, "brand,", SEED_MODELS.length, "modelli");
+    console.log("[Motoclub] Seed completato:", SEED_BRANDS.length, "brand,", SEED_REGIONS.length, "regionali");
   } catch (e) {
     console.error("[Motoclub seed error]", e);
   }
 }
 
 seedMotoclubs();
+
+export async function createRegionalClubInvite(userId: string, region: string): Promise<void> {
+  try {
+    const user = await storage.getUser(userId);
+    if (!user || user.autoJoinClubs === false) return;
+
+    const [regionalClub] = await db.select()
+      .from(motoClubs)
+      .where(
+        and(
+          eq(motoClubs.isApproved, true),
+          eq(motoClubs.clubType, "region"),
+          eq(motoClubs.region!, region)
+        )
+      )
+      .limit(1);
+
+    if (!regionalClub) return;
+
+    const isMember = await db.select()
+      .from(motoClubMembers)
+      .where(and(eq(motoClubMembers.clubId, regionalClub.id), eq(motoClubMembers.userId, userId)))
+      .limit(1);
+
+    if (isMember.length > 0) return;
+
+    const hasInvite = await db.select()
+      .from(motoClubInvites)
+      .where(and(eq(motoClubInvites.clubId, regionalClub.id), eq(motoClubInvites.userId, userId)))
+      .limit(1);
+
+    if (hasInvite.length > 0) return;
+
+    await db.insert(motoClubInvites).values({
+      clubId: regionalClub.id,
+      userId,
+      status: "pending",
+    });
+
+    await storage.createNotification({
+      userId,
+      title: "Motoclub Regionale",
+      body: `Sei di ${region}? Unisciti al club "${regionalClub.name}"!`,
+      notificationType: "motoclub_invite",
+      referenceType: "motoclub",
+      referenceId: regionalClub.id,
+    });
+  } catch (e) {
+    console.error("[createRegionalClubInvite error]", e);
+  }
+}
 
 export async function createClubInvitesForMoto(userId: string, brand: string, model: string) {
   try {
@@ -120,10 +168,8 @@ export async function createClubInvitesForMoto(userId: string, brand: string, mo
       .where(
         and(
           eq(motoClubs.isApproved, true),
-          or(
-            and(eq(motoClubs.clubType, "brand"), ilike(motoClubs.brandName, brand)),
-            and(eq(motoClubs.clubType, "model"), ilike(motoClubs.brandName, brand), ilike(motoClubs.modelName, model))
-          )
+          eq(motoClubs.clubType, "brand"),
+          ilike(motoClubs.brandName!, brand)
         )
       );
 

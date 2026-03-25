@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
+import * as Location from "expo-location";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -27,14 +28,27 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setError("");
     if (!identifier.trim() || !password.trim()) {
       setError("Inserisci email/nickname e password");
       return;
     }
+
+    let gpsCoords: { lat: number; lng: number } | undefined;
+    try {
+      if (Platform.OS !== "web") {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === "granted") {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          gpsCoords = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+        }
+      }
+    } catch {
+    }
+
     loginMutation.mutate(
-      { identifier: identifier.trim(), password },
+      { identifier: identifier.trim(), password, ...gpsCoords },
       {
         onSuccess: () => {
           router.replace("/(tabs)");

@@ -117,6 +117,9 @@ var init_schema = __esm({
       autoJoinClubs: (0, import_pg_core.boolean)("auto_join_clubs").notNull().default(true),
       ghostMode: (0, import_pg_core.boolean)("ghost_mode").notNull().default(false),
       lastLoginAt: (0, import_pg_core.timestamp)("last_login_at"),
+      firstLoginAt: (0, import_pg_core.timestamp)("first_login_at"),
+      firstLoginLat: (0, import_pg_core.doublePrecision)("first_login_lat"),
+      firstLoginLng: (0, import_pg_core.doublePrecision)("first_login_lng"),
       createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow(),
       updatedAt: (0, import_pg_core.timestamp)("updated_at").notNull().defaultNow()
     });
@@ -640,9 +643,14 @@ var init_schema = __esm({
       clubType: (0, import_pg_core.varchar)("club_type", { length: 20 }).notNull(),
       brandName: (0, import_pg_core.varchar)("brand_name", { length: 100 }),
       modelName: (0, import_pg_core.varchar)("model_name", { length: 100 }),
+      region: (0, import_pg_core.varchar)("region", { length: 100 }),
+      country: (0, import_pg_core.varchar)("country", { length: 2 }),
       description: (0, import_pg_core.text)("description"),
       logoUrl: (0, import_pg_core.text)("logo_url"),
+      coverUrl: (0, import_pg_core.text)("cover_url"),
       isApproved: (0, import_pg_core.boolean)("is_approved").notNull().default(false),
+      isFeatured: (0, import_pg_core.boolean)("is_featured").notNull().default(false),
+      memberCount: (0, import_pg_core.integer)("member_count").notNull().default(0),
       activityScore: (0, import_pg_core.integer)("activity_score").notNull().default(0),
       conversationId: (0, import_pg_core.varchar)("conversation_id", { length: 36 }),
       parentClubId: (0, import_pg_core.varchar)("parent_club_id", { length: 36 }),
@@ -653,7 +661,8 @@ var init_schema = __esm({
       updatedAt: (0, import_pg_core.timestamp)("updated_at").notNull().defaultNow()
     }, (table) => [
       (0, import_pg_core.index)("moto_clubs_type_idx").on(table.clubType),
-      (0, import_pg_core.index)("moto_clubs_brand_idx").on(table.brandName)
+      (0, import_pg_core.index)("moto_clubs_brand_idx").on(table.brandName),
+      (0, import_pg_core.index)("moto_clubs_region_idx").on(table.region)
     ]);
     motoClubMembers = (0, import_pg_core.pgTable)("moto_club_members", {
       id: (0, import_pg_core.varchar)("id", { length: 36 }).primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
@@ -3262,12 +3271,16 @@ async function massSeedFakeUsers() {
       }
       if (insertedUsers.length > 0) {
         try {
-          const approvedClubs = await db.select({ id: motoClubs.id, conversationId: motoClubs.conversationId }).from(motoClubs).innerJoin(conversations, (0, import_drizzle_orm7.eq)(motoClubs.conversationId, conversations.id)).where((0, import_drizzle_orm7.eq)(motoClubs.isApproved, true));
-          if (approvedClubs.length > 0) {
-            const clubMemberRows = [];
-            const convParticipantRows = [];
-            for (const newUser of insertedUsers) {
-              const count3 = 1 + Math.floor(Math.random() * 3);
+          const approvedClubs = await db.select({ id: motoClubs.id, conversationId: motoClubs.conversationId, clubType: motoClubs.clubType, region: motoClubs.region }).from(motoClubs).innerJoin(conversations, (0, import_drizzle_orm7.eq)(motoClubs.conversationId, conversations.id)).where(and((0, import_drizzle_orm7.eq)(motoClubs.isApproved, true), (0, import_drizzle_orm7.eq)(motoClubs.clubType, "brand")));
+          const approvedRegionalClubs = await db.select({ id: motoClubs.id, conversationId: motoClubs.conversationId, region: motoClubs.region }).from(motoClubs).innerJoin(conversations, (0, import_drizzle_orm7.eq)(motoClubs.conversationId, conversations.id)).where(and((0, import_drizzle_orm7.eq)(motoClubs.isApproved, true), (0, import_drizzle_orm7.eq)(motoClubs.clubType, "region")));
+          const regionalClubByRegion = new Map(approvedRegionalClubs.map((c) => [c.region, c]));
+          const clubMemberRows = [];
+          const convParticipantRows = [];
+          for (const newUser of insertedUsers) {
+            const meta = specMeta.find((m) => m.nickname === newUser.nickname);
+            const spec = meta?.spec;
+            if (approvedClubs.length > 0) {
+              const count3 = 1 + Math.floor(Math.random() * 2);
               const shuffled = [...approvedClubs].sort(() => Math.random() - 0.5).slice(0, count3);
               for (const club of shuffled) {
                 clubMemberRows.push({ clubId: club.id, userId: newUser.id, role: "member", status: "active" });
@@ -3276,19 +3289,28 @@ async function massSeedFakeUsers() {
                 }
               }
             }
-            if (clubMemberRows.length > 0) {
-              try {
-                await db.insert(motoClubMembers).values(clubMemberRows).onConflictDoNothing();
-              } catch (err) {
-                logSeedError("batch-club-member-insert", err);
+            if (spec?.region && spec.country === "IT") {
+              const regionalClub = regionalClubByRegion.get(spec.region);
+              if (regionalClub) {
+                clubMemberRows.push({ clubId: regionalClub.id, userId: newUser.id, role: "member", status: "active" });
+                if (regionalClub.conversationId) {
+                  convParticipantRows.push({ conversationId: regionalClub.conversationId, userId: newUser.id });
+                }
               }
             }
-            if (convParticipantRows.length > 0) {
-              try {
-                await db.insert(conversationParticipants).values(convParticipantRows).onConflictDoNothing();
-              } catch (err) {
-                logSeedError("batch-conv-participant-insert", err);
-              }
+          }
+          if (clubMemberRows.length > 0) {
+            try {
+              await db.insert(motoClubMembers).values(clubMemberRows).onConflictDoNothing();
+            } catch (err) {
+              logSeedError("batch-club-member-insert", err);
+            }
+          }
+          if (convParticipantRows.length > 0) {
+            try {
+              await db.insert(conversationParticipants).values(convParticipantRows).onConflictDoNothing();
+            } catch (err) {
+              logSeedError("batch-conv-participant-insert", err);
             }
           }
         } catch (err) {
@@ -3724,7 +3746,7 @@ init_db();
 init_storage();
 
 // server/routes/auth.ts
-var import_express = require("express");
+var import_express2 = require("express");
 var import_bcryptjs = __toESM(require("bcryptjs"));
 var import_crypto = __toESM(require("crypto"));
 var import_express_rate_limit = __toESM(require("express-rate-limit"));
@@ -3945,1079 +3967,14 @@ async function sendPasswordResetEmail(to, nickname, token) {
   return sendEmail(to, subject, html);
 }
 
-// server/routes/auth.ts
-var router = (0, import_express.Router)();
-var loginLimiter = (0, import_express_rate_limit.default)({
-  windowMs: 15 * 60 * 1e3,
-  max: 5,
-  message: { message: "Troppi tentativi. Riprova pi\xF9 tardi." },
-  standardHeaders: true,
-  legacyHeaders: false
-});
-var registerLimiter = (0, import_express_rate_limit.default)({
-  windowMs: 60 * 60 * 1e3,
-  max: 3,
-  message: { message: "Troppi tentativi. Riprova pi\xF9 tardi." },
-  standardHeaders: true,
-  legacyHeaders: false
-});
-var forgotPasswordLimiter = (0, import_express_rate_limit.default)({
-  windowMs: 60 * 60 * 1e3,
-  max: 3,
-  message: { message: "Troppi tentativi. Riprova pi\xF9 tardi." },
-  standardHeaders: true,
-  legacyHeaders: false
-});
-router.post("/register", registerLimiter, async (req, res) => {
-  try {
-    const parsed = registerSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.errors[0].message });
-    }
-    const data = parsed.data;
-    if (data.birthYear) {
-      const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-      const age = currentYear - data.birthYear;
-      if (age < 18) {
-        return res.status(400).json({ message: "Devi avere almeno 18 anni per registrarti" });
-      }
-    }
-    const existingEmail = await storage.getUserByEmail(data.email);
-    if (existingEmail) {
-      return res.status(409).json({ message: "Email gi\xE0 registrata" });
-    }
-    const reservedNicknames = ["admin", "administrator", "administrators", "amministratore", "amministratori", "mod", "moderator", "moderatore"];
-    if (reservedNicknames.includes(data.nickname.toLowerCase())) {
-      return res.status(400).json({ message: "Nickname non disponibile" });
-    }
-    const existingNickname = await storage.getUserByNickname(data.nickname);
-    if (existingNickname) {
-      return res.status(409).json({ message: "Nickname gi\xE0 in uso" });
-    }
-    let invitationGiftMessage = null;
-    let invitationImageUrl = null;
-    let invitationCodeStr = null;
-    if (data.invitationCode) {
-      const invitation = await storage.getInvitationCode(data.invitationCode);
-      if (!invitation || !invitation.isActive || invitation.currentUses >= invitation.maxUses) {
-        return res.status(400).json({ message: "Codice invito non valido" });
-      }
-      if (invitation.expiresAt && new Date(invitation.expiresAt) < /* @__PURE__ */ new Date()) {
-        return res.status(400).json({ message: "Codice invito scaduto" });
-      }
-      await storage.incrementInvitationCodeUses(invitation.id);
-      invitationGiftMessage = invitation.giftMessage ?? null;
-      invitationImageUrl = invitation.imageUrl ?? null;
-      invitationCodeStr = invitation.code;
-    }
-    const hashedPassword = await import_bcryptjs.default.hash(data.password, 12);
-    const primalSetting = await storage.getAppSetting("primal_user_enabled");
-    const isPrimal = primalSetting?.value === "true";
-    const user = await storage.createUser({
-      nickname: data.nickname,
-      email: data.email,
-      phone: data.phone,
-      password: hashedPassword,
-      userType: data.userType,
-      sex: data.sex,
-      coupleSexConfig: data.coupleSexConfig,
-      birthYear: data.birthYear,
-      region: data.region,
-      country: data.country,
-      eulaAccepted: true,
-      privacyAccepted: true,
-      consentAcceptedAt: /* @__PURE__ */ new Date(),
-      invitationCode: data.invitationCode,
-      isPrimal
-    });
-    await storage.createUserProfile({ userId: user.id });
-    if (invitationCodeStr) {
-      try {
-        const registrationDate = /* @__PURE__ */ new Date();
-        const expiryDate = new Date(registrationDate.getTime() + 5 * 24 * 60 * 60 * 1e3);
-        await sendInvitationGiftEmail(user.email, invitationCodeStr, invitationImageUrl, invitationGiftMessage, expiryDate);
-      } catch (e) {
-        console.warn("[EMAIL] Errore invio gift email (non bloccante):", e);
-      }
-    }
-    const emailVerifSetting = await storage.getAppSetting("email_verification_enabled");
-    const emailVerificationEnabled = emailVerifSetting?.value === "true";
-    if (emailVerificationEnabled && !isPrimal) {
-      const token = import_crypto.default.randomBytes(3).toString("hex").toUpperCase();
-      const expiresAt = new Date(Date.now() + 30 * 60 * 1e3);
-      await storage.createEmailVerificationToken(user.id, token, expiresAt);
-      const emailSent = await sendVerificationEmail(user.email, user.nickname, token);
-      if (emailSent) {
-        console.log(`[EMAIL VERIFICATION] Email inviata a ${user.email}`);
-      } else {
-        console.warn(`[EMAIL VERIFICATION] Email NON inviata a ${user.email} - fallback notifica admin`);
-      }
-      try {
-        const adminUser = await storage.getUserByNickname("admin");
-        if (adminUser) {
-          await storage.createNotification({
-            userId: adminUser.id,
-            title: "Nuova registrazione - Verifica Email",
-            body: `L'utente ${user.nickname} (${user.email}) si \xE8 registrato. Codice verifica: ${token}${emailSent ? " (email inviata)" : " (email NON inviata - SMTP non configurato)"}`,
-            notificationType: "system",
-            referenceType: "user",
-            referenceId: user.id
-          });
-        }
-      } catch (e) {
-        console.error("Failed to notify admin about email verification:", e);
-      }
-      const { password: _2, ...safeUser2 } = user;
-      return res.status(201).json({ ...safeUser2, requiresEmailVerification: true, giftMessage: invitationGiftMessage });
-    }
-    if (isPrimal) {
-      await storage.markUserEmailVerified(user.id);
-    }
-    req.session.userId = user.id;
-    const { password: _, ...safeUser } = user;
-    return res.status(201).json({ ...safeUser, giftMessage: invitationGiftMessage });
-  } catch (error) {
-    console.error("Register error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router.post("/login", loginLimiter, async (req, res) => {
-  try {
-    const parsed = loginSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.errors[0].message });
-    }
-    const { identifier, password } = parsed.data;
-    let user = await storage.getUserByEmail(identifier);
-    if (!user) {
-      user = await storage.getUserByNickname(identifier);
-    }
-    if (!user) {
-      return res.status(401).json({ message: "Credenziali non valide" });
-    }
-    if (user.status === "blocked" || user.status === "suspended") {
-      return res.status(403).json({ message: "Account sospeso o bloccato" });
-    }
-    const emailVerifSetting = await storage.getAppSetting("email_verification_enabled");
-    if (emailVerifSetting?.value === "true" && !user.emailVerified && !user.isPrimal && user.role !== "admin") {
-      return res.status(403).json({ message: "Verifica la tua email prima di accedere. Controlla la tua casella di posta." });
-    }
-    const validPassword = await import_bcryptjs.default.compare(password, user.password);
-    if (!validPassword) {
-      return res.status(401).json({ message: "Credenziali non valide" });
-    }
-    await storage.updateUser(user.id, { lastLoginAt: /* @__PURE__ */ new Date() });
-    const userRecord = await storage.getUser(user.id);
-    if (!userRecord?.ghostMode) {
-      const availSetting = await storage.getAppSetting("user_available_on_login").catch(() => null);
-      const availableOnLogin = availSetting?.value !== "false";
-      await storage.updateUserProfile(user.id, { isAvailable: availableOnLogin }).catch(() => {
-      });
-    }
-    req.session.userId = user.id;
-    const { password: _, ...safeUser } = user;
-    return res.json(safeUser);
-  } catch (error) {
-    console.error("Login error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router.post("/logout", (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      return res.status(500).json({ message: "Errore durante il logout" });
-    }
-    res.clearCookie("connect.sid");
-    return res.json({ message: "Logout effettuato" });
-  });
-});
-router.get("/me", async (req, res) => {
-  try {
-    if (!req.session.userId) {
-      return res.status(401).json({ message: "Non autenticato" });
-    }
-    const user = await storage.getUser(req.session.userId);
-    if (!user) {
-      return res.status(401).json({ message: "Utente non trovato" });
-    }
-    const { password: _, ...safeUser } = user;
-    const profile = await storage.getUserProfile(user.id);
-    return res.json({
-      ...safeUser,
-      profileLatitude: profile?.latitude ?? null,
-      profileLongitude: profile?.longitude ?? null
-    });
-  } catch (error) {
-    console.error("Me error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email || typeof email !== "string") {
-      return res.status(400).json({ message: "Inserisci un'email valida" });
-    }
-    const user = await storage.getUserByEmail(email.trim().toLowerCase());
-    if (!user) {
-      return res.json({ message: "Se l'email \xE8 registrata, riceverai un link di recupero" });
-    }
-    const token = import_crypto.default.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1e3);
-    await storage.createPasswordResetToken(user.id, token, expiresAt);
-    const emailSent = await sendPasswordResetEmail(user.email, user.nickname, token);
-    if (emailSent) {
-      console.log(`[PASSWORD RESET] Email di reset inviata a ${user.email}`);
-    } else {
-      console.warn(`[PASSWORD RESET] Email NON inviata a ${user.email}`);
-    }
-    return res.json({ message: "Se l'email \xE8 registrata, riceverai un link di recupero" });
-  } catch (error) {
-    console.error("Forgot password error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router.post("/reset-password", async (req, res) => {
-  try {
-    const { token, password } = req.body;
-    if (!token || !password) {
-      return res.status(400).json({ message: "Token e password richiesti" });
-    }
-    if (password.length < 8) {
-      return res.status(400).json({ message: "La password deve avere almeno 8 caratteri" });
-    }
-    const resetToken = await storage.getPasswordResetToken(token);
-    if (!resetToken) {
-      return res.status(400).json({ message: "Token non valido o gi\xE0 utilizzato" });
-    }
-    if (new Date(resetToken.expiresAt) < /* @__PURE__ */ new Date()) {
-      return res.status(400).json({ message: "Token scaduto" });
-    }
-    const hashedPassword = await import_bcryptjs.default.hash(password, 12);
-    await storage.updateUser(resetToken.userId, { password: hashedPassword });
-    await storage.markPasswordResetTokenUsed(token);
-    return res.json({ message: "Password aggiornata con successo" });
-  } catch (error) {
-    console.error("Reset password error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router.post("/verify-email", async (req, res) => {
-  try {
-    const { email, token } = req.body;
-    if (!email || !token) {
-      return res.status(400).json({ message: "Email e codice richiesti" });
-    }
-    const user = await storage.getUserByEmail(email);
-    if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
-    }
-    const verif = await storage.getEmailVerificationToken(token.toUpperCase());
-    if (!verif || verif.userId !== user.id) {
-      return res.status(400).json({ message: "Codice non valido" });
-    }
-    if (new Date(verif.expiresAt) < /* @__PURE__ */ new Date()) {
-      return res.status(400).json({ message: "Codice scaduto. Richiedi un nuovo codice." });
-    }
-    await storage.markUserEmailVerified(user.id);
-    await storage.deleteEmailVerificationTokens(user.id);
-    req.session.userId = user.id;
-    const { password: _, ...safeUser } = user;
-    return res.json({ ...safeUser, emailVerified: true });
-  } catch (error) {
-    console.error("Verify email error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router.post("/resend-verification", async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ message: "Email richiesta" });
-    }
-    const user = await storage.getUserByEmail(email);
-    if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
-    }
-    if (user.emailVerified) {
-      return res.status(400).json({ message: "Email gi\xE0 verificata" });
-    }
-    await storage.deleteEmailVerificationTokens(user.id);
-    const token = import_crypto.default.randomBytes(3).toString("hex").toUpperCase();
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1e3);
-    await storage.createEmailVerificationToken(user.id, token, expiresAt);
-    const emailSent = await sendVerificationEmail(user.email, user.nickname, token);
-    if (!emailSent) {
-      console.warn(`[EMAIL VERIFICATION] Resend: email NON inviata a ${user.email}`);
-    }
-    return res.json({ message: "Nuovo codice inviato" });
-  } catch (error) {
-    console.error("Resend verification error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router.get("/email-configured", async (_req, res) => {
-  try {
-    const userSetting = await storage.getAppSetting("gmail_user");
-    const passSetting = await storage.getAppSetting("gmail_app_password");
-    const configured = !!(userSetting?.value && passSetting?.value || process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
-    return res.json({ configured });
-  } catch {
-    return res.json({ configured: false });
-  }
-});
-router.post("/heartbeat", async (req, res) => {
-  try {
-    const userId = req.session?.userId;
-    if (!userId) return res.status(401).json({ ok: false });
-    await storage.updateUser(userId, { lastLoginAt: /* @__PURE__ */ new Date() });
-    return res.json({ ok: true });
-  } catch {
-    return res.status(500).json({ ok: false });
-  }
-});
-var auth_default = router;
-
-// server/routes/users.ts
-var import_express2 = require("express");
-var import_multer = __toESM(require("multer"));
-var import_path2 = __toESM(require("path"));
-var import_fs2 = __toESM(require("fs"));
-init_storage();
-
-// server/constants.ts
-var PROTECTED_NICKNAMES = ["BikerLink_Official"];
-function isProtectedUser(nickname) {
-  return PROTECTED_NICKNAMES.includes(nickname);
-}
-
-// server/routes/users.ts
-var router2 = (0, import_express2.Router)();
-var uploadsDir = import_path2.default.join(process.cwd(), "uploads", "photos");
-if (!import_fs2.default.existsSync(uploadsDir)) {
-  import_fs2.default.mkdirSync(uploadsDir, { recursive: true });
-}
-var photoStorage = import_multer.default.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
-    cb(null, uniqueSuffix + import_path2.default.extname(file.originalname));
-  }
-});
-var upload = (0, import_multer.default)({
-  storage: photoStorage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Tipo di file non supportato. Usa JPEG, PNG o WebP."));
-    }
-  }
-});
-function requireAuth(req, res, next) {
-  if (!req.session.userId) {
-    return res.status(401).json({ message: "Non autenticato" });
-  }
-  next();
-}
-router2.get("/", requireAuth, async (req, res) => {
-  try {
-    const requesterId = req.session.userId;
-    const blockedIds = await storage.getBlockedUserIds(requesterId);
-    const blockedSet = new Set(blockedIds);
-    const allUsers = await storage.getAllUsers();
-    const results = allUsers.filter((u) => !blockedSet.has(u.id) && u.id !== requesterId).map((u) => ({
-      id: u.id,
-      nickname: u.nickname,
-      avatarUrl: u.avatarUrl,
-      userType: u.userType
-    }));
-    return res.json(results);
-  } catch (error) {
-    console.error("Get users error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router2.get("/me", requireAuth, async (req, res) => {
-  try {
-    const userId = req.session.userId;
-    const user = await storage.getUser(userId);
-    if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
-    }
-    const { password: _, ...safeUser } = user;
-    const profile = await storage.getUserProfile(userId);
-    const photos = await storage.getUserPhotos(userId);
-    const motorcycles = await storage.getUserMotorcycles(userId);
-    return res.json({
-      ...safeUser,
-      profile,
-      photos,
-      motorcycles
-    });
-  } catch (error) {
-    console.error("Get user profile error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router2.put("/me", requireAuth, async (req, res) => {
-  try {
-    const userId = req.session.userId;
-    const allowedUserFields = ["nickname", "phone", "sex", "coupleSexConfig", "birthYear", "region", "country", "avatarUrl"];
-    const userUpdate = {};
-    for (const field of allowedUserFields) {
-      if (req.body[field] !== void 0) {
-        userUpdate[field] = req.body[field];
-      }
-    }
-    if (Object.keys(userUpdate).length > 0) {
-      if (userUpdate.nickname) {
-        const reservedNicknames = ["admin", "administrator", "administrators", "amministratore", "amministratori", "mod", "moderator", "moderatore"];
-        if (reservedNicknames.includes(userUpdate.nickname.toLowerCase())) {
-          return res.status(400).json({ message: "Nickname non disponibile" });
-        }
-        const existing = await storage.getUserByNickname(userUpdate.nickname);
-        if (existing && existing.id !== userId) {
-          return res.status(409).json({ message: "Nickname gi\xE0 in uso" });
-        }
-      }
-      await storage.updateUser(userId, userUpdate);
-    }
-    const allowedProfileFields = ["bio", "maxPickupDistance", "latitude", "longitude"];
-    const profileUpdate = {};
-    for (const field of allowedProfileFields) {
-      if (req.body[field] !== void 0) {
-        profileUpdate[field] = req.body[field];
-      }
-    }
-    if (Object.keys(profileUpdate).length > 0) {
-      const existingProfile = await storage.getUserProfile(userId);
-      if (existingProfile) {
-        await storage.updateUserProfile(userId, profileUpdate);
-      } else {
-        await storage.createUserProfile({ userId, ...profileUpdate });
-      }
-    }
-    const user = await storage.getUser(userId);
-    if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
-    }
-    const { password: _, ...safeUser } = user;
-    const profile = await storage.getUserProfile(userId);
-    const photos = await storage.getUserPhotos(userId);
-    const motorcycles = await storage.getUserMotorcycles(userId);
-    return res.json({
-      ...safeUser,
-      profile,
-      photos,
-      motorcycles
-    });
-  } catch (error) {
-    console.error("Update user profile error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router2.get("/profile", requireAuth, async (req, res) => {
-  try {
-    const userId = req.session.userId;
-    const user = await storage.getUser(userId);
-    if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
-    }
-    const { password: _, ...safeUser } = user;
-    const profile = await storage.getUserProfile(userId);
-    return res.json({
-      ...safeUser,
-      ...profile || {}
-    });
-  } catch (error) {
-    console.error("Get user profile error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router2.put("/profile/dynamic", requireAuth, async (req, res) => {
-  try {
-    const userId = req.session.userId;
-    const { isAvailable, latitude, longitude, searchPreference, preferredMapStyle } = req.body;
-    const existingProfile = await storage.getUserProfile(userId);
-    const updateData = {};
-    if (typeof isAvailable === "boolean") updateData.isAvailable = isAvailable;
-    if (latitude !== void 0) updateData.latitude = latitude;
-    if (longitude !== void 0) updateData.longitude = longitude;
-    if (searchPreference !== void 0) updateData.searchPreference = searchPreference;
-    const validMapStyles = ["carto_light", "carto_dark", "esri_gray"];
-    if (preferredMapStyle !== void 0) {
-      if (preferredMapStyle !== null && !validMapStyles.includes(preferredMapStyle)) {
-        return res.status(400).json({ message: "Stile mappa non valido" });
-      }
-      updateData.preferredMapStyle = preferredMapStyle;
-    }
-    if (isAvailable === true) {
-      await storage.updateUser(userId, { ghostMode: false });
-    }
-    if (existingProfile) {
-      const profile = await storage.updateUserProfile(userId, updateData);
-      return res.json(profile);
-    } else {
-      const profile = await storage.createUserProfile({ userId, ...updateData });
-      return res.json(profile);
-    }
-  } catch (error) {
-    console.error("Update dynamic profile error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router2.put("/me/ghost-mode", requireAuth, async (req, res) => {
-  try {
-    const userId = req.session.userId;
-    const { enabled } = req.body;
-    if (typeof enabled !== "boolean") {
-      return res.status(400).json({ message: "enabled deve essere un booleano" });
-    }
-    const ghostModeSetting = await storage.getAppSetting("ghost_mode_enabled");
-    if (ghostModeSetting?.value !== "true") {
-      return res.status(403).json({ message: "Ghost Mode non attivo su questa piattaforma" });
-    }
-    await storage.updateUser(userId, { ghostMode: enabled });
-    if (enabled) {
-      const existingProfile = await storage.getUserProfile(userId);
-      if (existingProfile) {
-        await storage.updateUserProfile(userId, { isAvailable: false });
-      }
-    }
-    return res.json({ ghostMode: enabled });
-  } catch (error) {
-    console.error("Ghost mode toggle error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router2.put("/location", requireAuth, async (req, res) => {
-  try {
-    const userId = req.session.userId;
-    const { latitude, longitude } = req.body;
-    if (latitude === void 0 || longitude === void 0) {
-      return res.status(400).json({ message: "Latitudine e longitudine richieste" });
-    }
-    const existingProfile = await storage.getUserProfile(userId);
-    if (existingProfile) {
-      await storage.updateUserProfile(userId, { latitude, longitude });
-    } else {
-      await storage.createUserProfile({ userId, latitude, longitude });
-    }
-    return res.json({ message: "Posizione aggiornata" });
-  } catch (error) {
-    console.error("Update location error:", error);
-    return res.status(500).json({ message: "Errore aggiornamento posizione" });
-  }
-});
-router2.put("/me/availability", requireAuth, async (req, res) => {
-  try {
-    const userId = req.session.userId;
-    const { isAvailable, latitude, longitude } = req.body;
-    if (typeof isAvailable !== "boolean") {
-      return res.status(400).json({ message: "isAvailable deve essere un booleano" });
-    }
-    const existingProfile = await storage.getUserProfile(userId);
-    const updateData = { isAvailable };
-    if (latitude !== void 0) updateData.latitude = latitude;
-    if (longitude !== void 0) updateData.longitude = longitude;
-    if (existingProfile) {
-      const profile = await storage.updateUserProfile(userId, updateData);
-      return res.json(profile);
-    } else {
-      const profile = await storage.createUserProfile({ userId, ...updateData });
-      return res.json(profile);
-    }
-  } catch (error) {
-    console.error("Toggle availability error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router2.get("/:id/public", requireAuth, async (req, res) => {
-  try {
-    const userId = req.params.id;
-    const requesterId = req.session.userId;
-    const targetUser = await storage.getUser(userId);
-    if (!targetUser) {
-      return res.status(404).json({ message: "Utente non trovato" });
-    }
-    const isBlockedRelation = await storage.isBlocked(requesterId, userId);
-    if (isBlockedRelation && requesterId !== userId) {
-      return res.status(403).json({ message: "Non puoi visualizzare questo profilo" });
-    }
-    if (targetUser.isFake && requesterId !== userId) {
-      storage.recordFakeUserInteraction(userId, requesterId, "profile_view").catch(() => {
-      });
-    }
-    const profile = await storage.getUserProfile(userId);
-    const motorcycles = await storage.getUserMotorcycles(userId);
-    const photos = await storage.getUserPhotos(userId);
-    const approvedPhotos = photos.filter((p) => p.isApproved);
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
-    const isOnline = !targetUser.ghostMode && targetUser.lastLoginAt != null && new Date(targetUser.lastLoginAt) >= fifteenMinutesAgo;
-    return res.json({
-      id: targetUser.id,
-      nickname: targetUser.nickname,
-      userType: targetUser.userType,
-      sex: targetUser.sex,
-      coupleSexConfig: targetUser.coupleSexConfig,
-      birthYear: targetUser.birthYear,
-      region: targetUser.region,
-      country: targetUser.country,
-      avatarUrl: targetUser.avatarUrl,
-      bio: profile?.bio || null,
-      motorcycles,
-      photos: approvedPhotos,
-      isOnline,
-      isAvailable: (profile?.isAvailable || false) && !targetUser.ghostMode
-    });
-  } catch (error) {
-    console.error("Get public user profile error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router2.get("/online-count", requireAuth, async (req, res) => {
-  try {
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
-    const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
-    const count3 = await storage.countOnlineUsers(fifteenMinutesAgo, countriesParam);
-    return res.json({ count: count3 });
-  } catch (error) {
-    console.error("Online count error:", error);
-    return res.json({ count: 0 });
-  }
-});
-router2.get("/available-count", requireAuth, async (req, res) => {
-  try {
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
-    const count3 = await storage.countAvailableUsers(fifteenMinutesAgo);
-    return res.json({ count: count3 });
-  } catch (error) {
-    console.error("Available count error:", error);
-    return res.json({ count: 0 });
-  }
-});
-router2.get("/online-list", requireAuth, async (req, res) => {
-  try {
-    const requesterId = req.session.userId;
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
-    const lat = req.query.lat ? parseFloat(req.query.lat) : void 0;
-    const lng = req.query.lng ? parseFloat(req.query.lng) : void 0;
-    const includeOffline = req.query.includeOffline === "true";
-    const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
-    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
-    const onlineResults = await storage.getOnlineUsersList(fifteenMinutesAgo, lat, lng, countriesParam);
-    let allResults = onlineResults.filter((r) => !blockedIds.has(r.user.id));
-    const onlineIdSet = new Set(allResults.map((r) => r.user.id));
-    if (includeOffline) {
-      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq11, and: and8, lt, or: or3, isNull, inArray: inArr } = await import("drizzle-orm");
-      const { sql: sqlTag } = await import("drizzle-orm");
-      const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const offlineConds = [eq11(usersTable.status, "active"), or3(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt)), eq11(usersTable.ghostMode, false)];
-      if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
-      const offlineResults = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(usersTable).leftJoin(profilesTable, eq11(profilesTable.userId, usersTable.id)).where(and8(...offlineConds)).orderBy(sqlTag`distance`);
-      const offlineOnly = offlineResults.filter((r) => !onlineIdSet.has(r.user.id) && !blockedIds.has(r.user.id));
-      allResults = [...allResults, ...offlineOnly];
-    }
-    const motorcyclesMap = {};
-    for (const item of allResults) {
-      if (!motorcyclesMap[item.user.id]) {
-        motorcyclesMap[item.user.id] = await storage.getUserMotorcycles(item.user.id);
-      }
-    }
-    const mapped = allResults.map((item) => {
-      const motos = motorcyclesMap[item.user.id] || [];
-      const firstMoto = motos[0];
-      return {
-        id: item.user.id,
-        nickname: item.user.nickname,
-        userType: item.user.userType,
-        sex: item.user.sex,
-        region: item.user.region,
-        country: item.user.country,
-        birthYear: item.user.birthYear,
-        bio: item.profile?.bio || null,
-        moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
-        ridingStyle: firstMoto?.ridingStyle || null,
-        distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
-        isAvailable: item.profile?.isAvailable || false,
-        isOnline: onlineIdSet.has(item.user.id)
-      };
-    });
-    return res.json(mapped);
-  } catch (error) {
-    console.error("Online list error:", error);
-    return res.status(500).json({ message: "Errore interno" });
-  }
-});
-router2.get("/available-list", requireAuth, async (req, res) => {
-  try {
-    const requesterId = req.session.userId;
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
-    const lat = req.query.lat ? parseFloat(req.query.lat) : void 0;
-    const lng = req.query.lng ? parseFloat(req.query.lng) : void 0;
-    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
-    const allItems = await storage.getAvailableUsersList(fifteenMinutesAgo, lat, lng);
-    const results = allItems.filter((r) => !blockedIds.has(r.user.id));
-    const motorcyclesMap = {};
-    for (const item of results) {
-      if (!motorcyclesMap[item.user.id]) {
-        motorcyclesMap[item.user.id] = await storage.getUserMotorcycles(item.user.id);
-      }
-    }
-    const mapped = results.map((item) => {
-      const motos = motorcyclesMap[item.user.id] || [];
-      const firstMoto = motos[0];
-      return {
-        id: item.user.id,
-        nickname: item.user.nickname,
-        userType: item.user.userType,
-        sex: item.user.sex,
-        region: item.user.region,
-        country: item.user.country,
-        birthYear: item.user.birthYear,
-        bio: item.profile?.bio || null,
-        moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
-        ridingStyle: firstMoto?.ridingStyle || null,
-        distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
-        isAvailable: true
-      };
-    });
-    return res.json(mapped);
-  } catch (error) {
-    console.error("Available list error:", error);
-    return res.status(500).json({ message: "Errore interno" });
-  }
-});
-router2.get("/biker-available-count", requireAuth, async (req, res) => {
-  try {
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
-    const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
-    const count3 = await storage.countAvailableBikers(fifteenMinutesAgo, countriesParam);
-    return res.json({ count: count3 });
-  } catch (error) {
-    console.error("Biker available count error:", error);
-    return res.json({ count: 0 });
-  }
-});
-router2.get("/zavorrine-available-count", requireAuth, async (req, res) => {
-  try {
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
-    const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
-    const count3 = await storage.countAvailableZavorrine(fifteenMinutesAgo, countriesParam);
-    return res.json({ count: count3 });
-  } catch (error) {
-    console.error("Zavorrine available count error:", error);
-    return res.json({ count: 0 });
-  }
-});
-router2.get("/biker-available-list", requireAuth, async (req, res) => {
-  try {
-    const requesterId = req.session.userId;
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
-    const lat = req.query.lat ? parseFloat(req.query.lat) : void 0;
-    const lng = req.query.lng ? parseFloat(req.query.lng) : void 0;
-    const includeOffline = req.query.includeOffline === "true";
-    const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
-    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
-    const onlineResultsRaw = await storage.getAvailableBikersList(fifteenMinutesAgo, lat, lng, countriesParam);
-    const onlineResults = onlineResultsRaw.filter((r) => !blockedIds.has(r.user.id));
-    let allResults = onlineResults;
-    if (includeOffline) {
-      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq11, and: and8, or: or3, inArray: inArr } = await import("drizzle-orm");
-      const { sql: sqlTag } = await import("drizzle-orm");
-      const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const bikerConds = [eq11(usersTable.status, "active"), or3(eq11(usersTable.userType, "biker"), eq11(usersTable.userType, "coppia")), eq11(usersTable.ghostMode, false)];
-      if (countriesParam && countriesParam.length > 0) bikerConds.push(inArr(usersTable.country, countriesParam));
-      const allBikers = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq11(usersTable.id, profilesTable.userId)).where(and8(...bikerConds)).orderBy(sqlTag`distance`);
-      const onlineIds = new Set(onlineResults.map((r) => r.user.id));
-      const offlineOnly = allBikers.filter((r) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
-      allResults = [...onlineResults, ...offlineOnly];
-    }
-    const motorcyclesMap = {};
-    for (const item of allResults) {
-      if (!motorcyclesMap[item.user.id]) {
-        motorcyclesMap[item.user.id] = await storage.getUserMotorcycles(item.user.id);
-      }
-    }
-    const onlineAvailableIds = new Set(onlineResults.map((r) => r.user.id));
-    const mapped = allResults.map((item) => {
-      const motos = motorcyclesMap[item.user.id] || [];
-      const firstMoto = motos[0];
-      return {
-        id: item.user.id,
-        nickname: item.user.nickname,
-        userType: item.user.userType,
-        sex: item.user.sex,
-        region: item.user.region,
-        country: item.user.country,
-        birthYear: item.user.birthYear,
-        bio: item.profile?.bio || null,
-        moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
-        ridingStyle: firstMoto?.ridingStyle || null,
-        distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
-        isAvailable: item.profile?.isAvailable || false,
-        isOnline: onlineAvailableIds.has(item.user.id)
-      };
-    });
-    return res.json(mapped);
-  } catch (error) {
-    console.error("Biker available list error:", error);
-    return res.status(500).json({ message: "Errore interno" });
-  }
-});
-router2.get("/zavorrine-available-list", requireAuth, async (req, res) => {
-  try {
-    const requesterId = req.session.userId;
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
-    const lat = req.query.lat ? parseFloat(req.query.lat) : void 0;
-    const lng = req.query.lng ? parseFloat(req.query.lng) : void 0;
-    const includeOffline = req.query.includeOffline === "true";
-    const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
-    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
-    const onlineResultsRaw = await storage.getAvailableZavorrinaList(fifteenMinutesAgo, lat, lng, countriesParam);
-    const onlineResults = onlineResultsRaw.filter((r) => !blockedIds.has(r.user.id));
-    let allResults = onlineResults;
-    if (includeOffline) {
-      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq11, and: and8, inArray: inArr } = await import("drizzle-orm");
-      const { sql: sqlTag } = await import("drizzle-orm");
-      const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const zavConds = [eq11(usersTable.status, "active"), eq11(usersTable.userType, "zavorrina"), eq11(usersTable.ghostMode, false)];
-      if (countriesParam && countriesParam.length > 0) zavConds.push(inArr(usersTable.country, countriesParam));
-      const allZav = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq11(usersTable.id, profilesTable.userId)).where(and8(...zavConds)).orderBy(sqlTag`distance`);
-      const onlineIds = new Set(onlineResults.map((r) => r.user.id));
-      const offlineOnly = allZav.filter((r) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
-      allResults = [...onlineResults, ...offlineOnly];
-    }
-    const motorcyclesMap = {};
-    for (const item of allResults) {
-      if (!motorcyclesMap[item.user.id]) {
-        motorcyclesMap[item.user.id] = await storage.getUserMotorcycles(item.user.id);
-      }
-    }
-    const onlineAvailableIds = new Set(onlineResults.map((r) => r.user.id));
-    const mapped = allResults.map((item) => {
-      const motos = motorcyclesMap[item.user.id] || [];
-      const firstMoto = motos[0];
-      return {
-        id: item.user.id,
-        nickname: item.user.nickname,
-        userType: item.user.userType,
-        sex: item.user.sex,
-        region: item.user.region,
-        country: item.user.country,
-        birthYear: item.user.birthYear,
-        bio: item.profile?.bio || null,
-        moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
-        ridingStyle: firstMoto?.ridingStyle || null,
-        distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
-        isAvailable: item.profile?.isAvailable || false,
-        isOnline: onlineAvailableIds.has(item.user.id)
-      };
-    });
-    return res.json(mapped);
-  } catch (error) {
-    console.error("Zavorrine available list error:", error);
-    return res.status(500).json({ message: "Errore interno" });
-  }
-});
-router2.get("/nearby", requireAuth, async (req, res) => {
-  try {
-    const requesterId = req.session.userId;
-    const lat = parseFloat(req.query.lat);
-    const lng = parseFloat(req.query.lng);
-    const radius = parseFloat(req.query.radius) || 50;
-    const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
-    if (isNaN(lat) || isNaN(lng)) {
-      return res.status(400).json({ message: "Parametri lat e lng richiesti" });
-    }
-    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
-    const nearbyUsers = await storage.getNearbyUsers(lat, lng, radius, countriesParam);
-    const results = nearbyUsers.filter((item) => !blockedIds.has(item.user.id)).map((item) => {
-      return {
-        id: item.user.id,
-        nickname: item.user.nickname,
-        userType: item.user.userType,
-        sex: item.user.sex,
-        birthYear: item.user.birthYear,
-        region: item.user.region,
-        country: item.user.country,
-        avatarUrl: item.user.avatarUrl,
-        latitude: item.profile?.latitude,
-        longitude: item.profile?.longitude,
-        isAvailable: item.profile?.isAvailable || false,
-        bio: item.profile?.bio || null,
-        distance: Math.round(item.distance * 10) / 10
-      };
-    }).filter((item) => item.latitude != null && item.longitude != null && !isNaN(item.latitude) && !isNaN(item.longitude));
-    return res.json(results);
-  } catch (error) {
-    console.error("Nearby users error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router2.get("/search", requireAuth, async (req, res) => {
-  try {
-    const requesterId = req.session.userId;
-    const q = (req.query.q || "").trim();
-    if (q.length < 2) {
-      return res.json([]);
-    }
-    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
-    const results = await storage.searchUsers(q);
-    const safeResults = results.filter((item) => !blockedIds.has(item.user.id)).map((item) => {
-      return {
-        id: item.user.id,
-        nickname: item.user.nickname,
-        userType: item.user.userType,
-        sex: item.user.sex,
-        birthYear: item.user.birthYear,
-        region: item.user.region,
-        country: item.user.country,
-        avatarUrl: item.user.avatarUrl,
-        latitude: item.profile?.latitude || null,
-        longitude: item.profile?.longitude || null,
-        isAvailable: item.profile?.isAvailable || false,
-        bio: item.profile?.bio || null
-      };
-    });
-    return res.json(safeResults);
-  } catch (error) {
-    console.error("Search users error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router2.post("/me/photos", requireAuth, upload.single("photo"), async (req, res) => {
-  try {
-    const userId = req.session.userId;
-    const user = await storage.getUser(userId);
-    if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
-    }
-    if (user.userType === "zavorrina") {
-      const count3 = await storage.getUserPhotoCount(userId);
-      if (count3 >= 3) {
-        if (req.file) {
-          import_fs2.default.unlinkSync(req.file.path);
-        }
-        return res.status(400).json({ message: "Massimo 3 foto consentite per le zavorrine" });
-      }
-    }
-    if (!req.file) {
-      return res.status(400).json({ message: "Nessuna foto caricata" });
-    }
-    const photoUrl = `/uploads/photos/${req.file.filename}`;
-    const sortOrder = await storage.getUserPhotoCount(userId);
-    const photo = await storage.createUserPhoto({
-      userId,
-      photoUrl,
-      sortOrder,
-      isApproved: true
-    });
-    return res.status(201).json(photo);
-  } catch (error) {
-    console.error("Upload photo error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router2.delete("/me/photos/:id", requireAuth, async (req, res) => {
-  try {
-    const userId = req.session.userId;
-    const photoId = req.params.id;
-    const photo = await storage.getUserPhoto(photoId);
-    if (!photo) {
-      return res.status(404).json({ message: "Foto non trovata" });
-    }
-    if (photo.userId !== userId) {
-      return res.status(403).json({ message: "Non autorizzato" });
-    }
-    const filePath = import_path2.default.join(process.cwd(), photo.photoUrl);
-    if (import_fs2.default.existsSync(filePath)) {
-      import_fs2.default.unlinkSync(filePath);
-    }
-    await storage.deleteUserPhoto(photoId);
-    return res.json({ message: "Foto eliminata" });
-  } catch (error) {
-    console.error("Delete photo error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router2.post("/me/request-deletion", requireAuth, async (req, res) => {
-  try {
-    const userId = req.session.userId;
-    await storage.requestUserDeletion(userId);
-    req.session.destroy(() => {
-    });
-    return res.json({ message: "Richiesta di cancellazione inviata. Il tuo account sar\xE0 eliminato tra 30 giorni." });
-  } catch (error) {
-    console.error("Request deletion error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router2.post("/me/cancel-deletion", requireAuth, async (req, res) => {
-  try {
-    const userId = req.session.userId;
-    await storage.cancelUserDeletion(userId);
-    return res.json({ message: "Richiesta di cancellazione annullata." });
-  } catch (error) {
-    console.error("Cancel deletion error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router2.post("/:id/block", requireAuth, async (req, res) => {
-  try {
-    const blockerId = req.session.userId;
-    const blockedId = req.params.id;
-    if (blockerId === blockedId) {
-      return res.status(400).json({ message: "Non puoi bloccare te stesso" });
-    }
-    const targetUser = await storage.getUser(blockedId);
-    if (!targetUser) {
-      return res.status(404).json({ message: "Utente non trovato" });
-    }
-    if (isProtectedUser(targetUser.nickname)) {
-      return res.status(403).json({ message: "Utente di sistema non modificabile" });
-    }
-    const alreadyBlocked = await storage.isBlocked(blockerId, blockedId);
-    if (alreadyBlocked) {
-      return res.status(409).json({ message: "Utente gi\xE0 bloccato" });
-    }
-    await storage.blockUser(blockerId, blockedId);
-    return res.json({ message: "Utente bloccato con successo" });
-  } catch (error) {
-    console.error("Block user error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-var users_default = router2;
-
-// server/routes/motorcycles.ts
-var import_express4 = require("express");
-var import_path3 = __toESM(require("path"));
-var import_fs3 = __toESM(require("fs"));
-var import_drizzle_orm4 = require("drizzle-orm");
-init_db();
-init_schema();
-init_storage();
-
 // server/routes/motoclubs.ts
-var import_express3 = require("express");
+var import_express = require("express");
 init_db();
 init_storage();
 init_schema();
 var import_drizzle_orm3 = require("drizzle-orm");
-var router3 = (0, import_express3.Router)();
-function requireAuth2(req, res, next) {
+var router = (0, import_express.Router)();
+function requireAuth(req, res, next) {
   if (!req.session.userId) {
     return res.status(401).json({ message: "Non autenticato" });
   }
@@ -5045,31 +4002,27 @@ var SEED_BRANDS = [
   { name: "Moto Morini", brandName: "Moto Morini", logoUrl: null },
   { name: "Zero Motorcycles", brandName: "Zero", logoUrl: null }
 ];
-var SEED_MODELS = [
-  { name: "BMW R 1250 GS", brandName: "BMW", modelName: "R 1250 GS" },
-  { name: "BMW R 1200 GS", brandName: "BMW", modelName: "R 1200 GS" },
-  { name: "BMW S 1000 RR", brandName: "BMW", modelName: "S 1000 RR" },
-  { name: "Ducati Panigale V4", brandName: "Ducati", modelName: "Panigale V4" },
-  { name: "Ducati Monster", brandName: "Ducati", modelName: "Monster" },
-  { name: "Ducati Multistrada", brandName: "Ducati", modelName: "Multistrada" },
-  { name: "Ducati Scrambler", brandName: "Ducati", modelName: "Scrambler" },
-  { name: "Harley-Davidson Sportster", brandName: "Harley-Davidson", modelName: "Sportster" },
-  { name: "Harley-Davidson Road King", brandName: "Harley-Davidson", modelName: "Road King" },
-  { name: "Harley-Davidson Fat Boy", brandName: "Harley-Davidson", modelName: "Fat Boy" },
-  { name: "Honda Africa Twin", brandName: "Honda", modelName: "Africa Twin" },
-  { name: "Honda CB1000R", brandName: "Honda", modelName: "CB1000R" },
-  { name: "Yamaha MT-09", brandName: "Yamaha", modelName: "MT-09" },
-  { name: "Yamaha T\xE9n\xE9r\xE9 700", brandName: "Yamaha", modelName: "T\xE9n\xE9r\xE9 700" },
-  { name: "Kawasaki Z900", brandName: "Kawasaki", modelName: "Z900" },
-  { name: "Kawasaki Ninja ZX-10R", brandName: "Kawasaki", modelName: "Ninja ZX-10R" },
-  { name: "KTM 1290 Super Adventure", brandName: "KTM", modelName: "1290 Super Adventure" },
-  { name: "KTM Duke 390", brandName: "KTM", modelName: "Duke 390" },
-  { name: "Triumph Bonneville", brandName: "Triumph", modelName: "Bonneville" },
-  { name: "Triumph Tiger 900", brandName: "Triumph", modelName: "Tiger 900" },
-  { name: "Aprilia RSV4", brandName: "Aprilia", modelName: "RSV4" },
-  { name: "Aprilia Tuono", brandName: "Aprilia", modelName: "Tuono" },
-  { name: "Moto Guzzi V7", brandName: "Moto Guzzi", modelName: "V7" },
-  { name: "MV Agusta Brutale", brandName: "MV Agusta", modelName: "Brutale" }
+var SEED_REGIONS = [
+  { region: "Piemonte", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/Coat_of_arms_of_Piedmont.svg/150px-Coat_of_arms_of_Piedmont.svg.png" },
+  { region: "Valle d'Aosta", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Coat_of_arms_of_Aosta_Valley.svg/150px-Coat_of_arms_of_Aosta_Valley.svg.png" },
+  { region: "Lombardia", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Coat_of_arms_of_Lombardy.svg/150px-Coat_of_arms_of_Lombardy.svg.png" },
+  { region: "Trentino-Alto Adige", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Coat_of_Arms_of_Trentino-Alto_Adige.svg/150px-Coat_of_Arms_of_Trentino-Alto_Adige.svg.png" },
+  { region: "Veneto", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/Coat_of_arms_of_Veneto.svg/150px-Coat_of_arms_of_Veneto.svg.png" },
+  { region: "Friuli-Venezia Giulia", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/72/Coat_of_arms_of_Friuli-Venezia_Giulia.svg/150px-Coat_of_arms_of_Friuli-Venezia_Giulia.svg.png" },
+  { region: "Liguria", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Coat_of_arms_of_Liguria.svg/150px-Coat_of_arms_of_Liguria.svg.png" },
+  { region: "Emilia-Romagna", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Coat_of_arms_of_Emilia-Romagna.svg/150px-Coat_of_arms_of_Emilia-Romagna.svg.png" },
+  { region: "Toscana", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Coat_of_arms_of_Tuscany.svg/150px-Coat_of_arms_of_Tuscany.svg.png" },
+  { region: "Umbria", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Coat_of_arms_of_Umbria.svg/150px-Coat_of_arms_of_Umbria.svg.png" },
+  { region: "Marche", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Coat_of_arms_of_Marche.svg/150px-Coat_of_arms_of_Marche.svg.png" },
+  { region: "Lazio", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Coat_of_arms_of_Lazio.svg/150px-Coat_of_arms_of_Lazio.svg.png" },
+  { region: "Abruzzo", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Coat_of_arms_of_Abruzzo.svg/150px-Coat_of_arms_of_Abruzzo.svg.png" },
+  { region: "Molise", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Coat_of_arms_of_Molise.svg/150px-Coat_of_arms_of_Molise.svg.png" },
+  { region: "Campania", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Coat_of_arms_of_Campania.svg/150px-Coat_of_arms_of_Campania.svg.png" },
+  { region: "Puglia", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Coat_of_arms_of_Apulia.svg/150px-Coat_of_arms_of_Apulia.svg.png" },
+  { region: "Basilicata", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Coat_of_arms_of_Basilicata.svg/150px-Coat_of_arms_of_Basilicata.svg.png" },
+  { region: "Calabria", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Coat_of_arms_of_Calabria.svg/150px-Coat_of_arms_of_Calabria.svg.png" },
+  { region: "Sicilia", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Coat_of_Arms_of_Sicily.svg/150px-Coat_of_Arms_of_Sicily.svg.png" },
+  { region: "Sardegna", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Coat_of_arms_of_Sardinia.svg/150px-Coat_of_arms_of_Sardinia.svg.png" }
 ];
 async function seedMotoclubs() {
   try {
@@ -5085,22 +4038,56 @@ async function seedMotoclubs() {
         activityScore: 0
       });
     }
-    for (const m of SEED_MODELS) {
+    for (const r of SEED_REGIONS) {
       await db.insert(motoClubs).values({
-        name: m.name,
-        clubType: "model",
-        brandName: m.brandName,
-        modelName: m.modelName,
+        name: `Motoclub ${r.region}`,
+        clubType: "region",
+        region: r.region,
+        country: "IT",
+        logoUrl: r.logoUrl,
         isApproved: true,
         activityScore: 0
       });
     }
-    console.log("[Motoclub] Seed completato:", SEED_BRANDS.length, "brand,", SEED_MODELS.length, "modelli");
+    console.log("[Motoclub] Seed completato:", SEED_BRANDS.length, "brand,", SEED_REGIONS.length, "regionali");
   } catch (e) {
     console.error("[Motoclub seed error]", e);
   }
 }
 seedMotoclubs();
+async function createRegionalClubInvite(userId, region) {
+  try {
+    const user = await storage.getUser(userId);
+    if (!user || user.autoJoinClubs === false) return;
+    const [regionalClub] = await db.select().from(motoClubs).where(
+      (0, import_drizzle_orm3.and)(
+        (0, import_drizzle_orm3.eq)(motoClubs.isApproved, true),
+        (0, import_drizzle_orm3.eq)(motoClubs.clubType, "region"),
+        (0, import_drizzle_orm3.eq)(motoClubs.region, region)
+      )
+    ).limit(1);
+    if (!regionalClub) return;
+    const isMember = await db.select().from(motoClubMembers).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubMembers.clubId, regionalClub.id), (0, import_drizzle_orm3.eq)(motoClubMembers.userId, userId))).limit(1);
+    if (isMember.length > 0) return;
+    const hasInvite = await db.select().from(motoClubInvites).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubInvites.clubId, regionalClub.id), (0, import_drizzle_orm3.eq)(motoClubInvites.userId, userId))).limit(1);
+    if (hasInvite.length > 0) return;
+    await db.insert(motoClubInvites).values({
+      clubId: regionalClub.id,
+      userId,
+      status: "pending"
+    });
+    await storage.createNotification({
+      userId,
+      title: "Motoclub Regionale",
+      body: `Sei di ${region}? Unisciti al club "${regionalClub.name}"!`,
+      notificationType: "motoclub_invite",
+      referenceType: "motoclub",
+      referenceId: regionalClub.id
+    });
+  } catch (e) {
+    console.error("[createRegionalClubInvite error]", e);
+  }
+}
 async function createClubInvitesForMoto(userId, brand, model) {
   try {
     const user = await storage.getUser(userId);
@@ -5108,10 +4095,8 @@ async function createClubInvitesForMoto(userId, brand, model) {
     const matchingClubs = await db.select().from(motoClubs).where(
       (0, import_drizzle_orm3.and)(
         (0, import_drizzle_orm3.eq)(motoClubs.isApproved, true),
-        (0, import_drizzle_orm3.or)(
-          (0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubs.clubType, "brand"), (0, import_drizzle_orm3.ilike)(motoClubs.brandName, brand)),
-          (0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubs.clubType, "model"), (0, import_drizzle_orm3.ilike)(motoClubs.brandName, brand), (0, import_drizzle_orm3.ilike)(motoClubs.modelName, model))
-        )
+        (0, import_drizzle_orm3.eq)(motoClubs.clubType, "brand"),
+        (0, import_drizzle_orm3.ilike)(motoClubs.brandName, brand)
       )
     );
     for (const club of matchingClubs) {
@@ -5183,7 +4168,7 @@ async function notifyTopMembersOfNewJoin(clubId, newUserId, clubName) {
     console.error("[notifyTopMembers error]", e);
   }
 }
-router3.get("/", requireAuth2, async (req, res) => {
+router.get("/", requireAuth, async (req, res) => {
   try {
     const { type, search, country, region, language } = req.query;
     let query = db.select({
@@ -5227,7 +4212,7 @@ router3.get("/", requireAuth2, async (req, res) => {
     return res.status(500).json({ message: "Errore interno" });
   }
 });
-router3.get("/featured", requireAuth2, async (_req, res) => {
+router.get("/featured", requireAuth, async (_req, res) => {
   try {
     const [club] = await db.select({
       club: motoClubs,
@@ -5238,7 +4223,7 @@ router3.get("/featured", requireAuth2, async (_req, res) => {
     return res.status(500).json({ message: "Errore interno" });
   }
 });
-router3.get("/invites", requireAuth2, async (req, res) => {
+router.get("/invites", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId;
     const invites = await db.select({
@@ -5250,7 +4235,7 @@ router3.get("/invites", requireAuth2, async (req, res) => {
     return res.status(500).json({ message: "Errore interno" });
   }
 });
-router3.get("/:id", requireAuth2, async (req, res) => {
+router.get("/:id", requireAuth, async (req, res) => {
   try {
     const clubId = req.params.id;
     const [club] = await db.select().from(motoClubs).where((0, import_drizzle_orm3.eq)(motoClubs.id, clubId)).limit(1);
@@ -5273,7 +4258,7 @@ router3.get("/:id", requireAuth2, async (req, res) => {
     return res.status(500).json({ message: "Errore interno" });
   }
 });
-router3.get("/:id/marketplace", requireAuth2, async (req, res) => {
+router.get("/:id/marketplace", requireAuth, async (req, res) => {
   try {
     const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
     const marketplaceSetting = await storage2.getAppSetting("marketplace_enabled");
@@ -5311,7 +4296,7 @@ router3.get("/:id/marketplace", requireAuth2, async (req, res) => {
     return res.status(500).json({ message: "Errore interno" });
   }
 });
-router3.get("/:id/detail", requireAuth2, async (req, res) => {
+router.get("/:id/detail", requireAuth, async (req, res) => {
   try {
     const clubId = req.params.id;
     const userId = req.session.userId;
@@ -5342,7 +4327,7 @@ router3.get("/:id/detail", requireAuth2, async (req, res) => {
     return res.status(500).json({ message: "Errore interno" });
   }
 });
-router3.get("/:id/stats", requireAuth2, async (req, res) => {
+router.get("/:id/stats", requireAuth, async (req, res) => {
   try {
     const clubId = req.params.id;
     const members = await db.select({ userId: motoClubMembers.userId }).from(motoClubMembers).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubMembers.clubId, clubId), (0, import_drizzle_orm3.eq)(motoClubMembers.status, "active")));
@@ -5361,7 +4346,7 @@ router3.get("/:id/stats", requireAuth2, async (req, res) => {
     return res.status(500).json({ message: "Errore interno" });
   }
 });
-router3.post("/:id/join", requireAuth2, async (req, res) => {
+router.post("/:id/join", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId;
     const clubId = req.params.id;
@@ -5400,7 +4385,7 @@ router3.post("/:id/join", requireAuth2, async (req, res) => {
     return res.status(500).json({ message: "Errore interno" });
   }
 });
-router3.post("/:id/leave", requireAuth2, async (req, res) => {
+router.post("/:id/leave", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId;
     const clubId = req.params.id;
@@ -5414,7 +4399,7 @@ router3.post("/:id/leave", requireAuth2, async (req, res) => {
     return res.status(500).json({ message: "Errore interno" });
   }
 });
-router3.put("/invites/:id/respond", requireAuth2, async (req, res) => {
+router.put("/invites/:id/respond", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId;
     const inviteId = req.params.id;
@@ -5447,7 +4432,7 @@ router3.put("/invites/:id/respond", requireAuth2, async (req, res) => {
     return res.status(500).json({ message: "Errore interno" });
   }
 });
-router3.post("/request", requireAuth2, async (req, res) => {
+router.post("/request", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId;
     const { name, clubType, brandName, modelName } = req.body;
@@ -5469,7 +4454,7 @@ router3.post("/request", requireAuth2, async (req, res) => {
     return res.status(500).json({ message: "Errore interno" });
   }
 });
-router3.get("/me/clubs", requireAuth2, async (req, res) => {
+router.get("/me/clubs", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId;
     const clubs = await db.select({
@@ -5481,7 +4466,7 @@ router3.get("/me/clubs", requireAuth2, async (req, res) => {
     return res.status(500).json({ message: "Errore interno" });
   }
 });
-router3.post("/creation-request", requireAuth2, async (req, res) => {
+router.post("/creation-request", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId;
     const creationEnabled = await storage.getAppSetting("motoclub_user_creation_enabled");
@@ -5541,7 +4526,7 @@ router3.post("/creation-request", requireAuth2, async (req, res) => {
     return res.status(500).json({ message: "Errore interno" });
   }
 });
-router3.get("/creation-request/status", requireAuth2, async (req, res) => {
+router.get("/creation-request/status", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId;
     const [request] = await db.select().from(motoClubRequests).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubRequests.requestedBy, userId), (0, import_drizzle_orm3.eq)(motoClubRequests.clubType, "custom"))).orderBy((0, import_drizzle_orm3.desc)(motoClubRequests.createdAt)).limit(1);
@@ -5556,9 +4541,1106 @@ router3.get("/creation-request/status", requireAuth2, async (req, res) => {
     return res.status(500).json({ message: "Errore interno" });
   }
 });
-var motoclubs_default = router3;
+var motoclubs_default = router;
+
+// server/routes/auth.ts
+var router2 = (0, import_express2.Router)();
+var loginLimiter = (0, import_express_rate_limit.default)({
+  windowMs: 15 * 60 * 1e3,
+  max: 5,
+  message: { message: "Troppi tentativi. Riprova pi\xF9 tardi." },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+var registerLimiter = (0, import_express_rate_limit.default)({
+  windowMs: 60 * 60 * 1e3,
+  max: 3,
+  message: { message: "Troppi tentativi. Riprova pi\xF9 tardi." },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+var forgotPasswordLimiter = (0, import_express_rate_limit.default)({
+  windowMs: 60 * 60 * 1e3,
+  max: 3,
+  message: { message: "Troppi tentativi. Riprova pi\xF9 tardi." },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+router2.post("/register", registerLimiter, async (req, res) => {
+  try {
+    const parsed = registerSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0].message });
+    }
+    const data = parsed.data;
+    if (data.birthYear) {
+      const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+      const age = currentYear - data.birthYear;
+      if (age < 18) {
+        return res.status(400).json({ message: "Devi avere almeno 18 anni per registrarti" });
+      }
+    }
+    const existingEmail = await storage.getUserByEmail(data.email);
+    if (existingEmail) {
+      return res.status(409).json({ message: "Email gi\xE0 registrata" });
+    }
+    const reservedNicknames = ["admin", "administrator", "administrators", "amministratore", "amministratori", "mod", "moderator", "moderatore"];
+    if (reservedNicknames.includes(data.nickname.toLowerCase())) {
+      return res.status(400).json({ message: "Nickname non disponibile" });
+    }
+    const existingNickname = await storage.getUserByNickname(data.nickname);
+    if (existingNickname) {
+      return res.status(409).json({ message: "Nickname gi\xE0 in uso" });
+    }
+    let invitationGiftMessage = null;
+    let invitationImageUrl = null;
+    let invitationCodeStr = null;
+    if (data.invitationCode) {
+      const invitation = await storage.getInvitationCode(data.invitationCode);
+      if (!invitation || !invitation.isActive || invitation.currentUses >= invitation.maxUses) {
+        return res.status(400).json({ message: "Codice invito non valido" });
+      }
+      if (invitation.expiresAt && new Date(invitation.expiresAt) < /* @__PURE__ */ new Date()) {
+        return res.status(400).json({ message: "Codice invito scaduto" });
+      }
+      await storage.incrementInvitationCodeUses(invitation.id);
+      invitationGiftMessage = invitation.giftMessage ?? null;
+      invitationImageUrl = invitation.imageUrl ?? null;
+      invitationCodeStr = invitation.code;
+    }
+    const hashedPassword = await import_bcryptjs.default.hash(data.password, 12);
+    const primalSetting = await storage.getAppSetting("primal_user_enabled");
+    const isPrimal = primalSetting?.value === "true";
+    const user = await storage.createUser({
+      nickname: data.nickname,
+      email: data.email,
+      phone: data.phone,
+      password: hashedPassword,
+      userType: data.userType,
+      sex: data.sex,
+      coupleSexConfig: data.coupleSexConfig,
+      birthYear: data.birthYear,
+      region: data.region,
+      country: data.country,
+      eulaAccepted: true,
+      privacyAccepted: true,
+      consentAcceptedAt: /* @__PURE__ */ new Date(),
+      invitationCode: data.invitationCode,
+      isPrimal
+    });
+    await storage.createUserProfile({ userId: user.id });
+    if (data.region) {
+      createRegionalClubInvite(user.id, data.region).catch(() => {
+      });
+    }
+    if (invitationCodeStr) {
+      try {
+        const registrationDate = /* @__PURE__ */ new Date();
+        const expiryDate = new Date(registrationDate.getTime() + 5 * 24 * 60 * 60 * 1e3);
+        await sendInvitationGiftEmail(user.email, invitationCodeStr, invitationImageUrl, invitationGiftMessage, expiryDate);
+      } catch (e) {
+        console.warn("[EMAIL] Errore invio gift email (non bloccante):", e);
+      }
+    }
+    const emailVerifSetting = await storage.getAppSetting("email_verification_enabled");
+    const emailVerificationEnabled = emailVerifSetting?.value === "true";
+    if (emailVerificationEnabled && !isPrimal) {
+      const token = import_crypto.default.randomBytes(3).toString("hex").toUpperCase();
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1e3);
+      await storage.createEmailVerificationToken(user.id, token, expiresAt);
+      const emailSent = await sendVerificationEmail(user.email, user.nickname, token);
+      if (emailSent) {
+        console.log(`[EMAIL VERIFICATION] Email inviata a ${user.email}`);
+      } else {
+        console.warn(`[EMAIL VERIFICATION] Email NON inviata a ${user.email} - fallback notifica admin`);
+      }
+      try {
+        const adminUser = await storage.getUserByNickname("admin");
+        if (adminUser) {
+          await storage.createNotification({
+            userId: adminUser.id,
+            title: "Nuova registrazione - Verifica Email",
+            body: `L'utente ${user.nickname} (${user.email}) si \xE8 registrato. Codice verifica: ${token}${emailSent ? " (email inviata)" : " (email NON inviata - SMTP non configurato)"}`,
+            notificationType: "system",
+            referenceType: "user",
+            referenceId: user.id
+          });
+        }
+      } catch (e) {
+        console.error("Failed to notify admin about email verification:", e);
+      }
+      const { password: _2, ...safeUser2 } = user;
+      return res.status(201).json({ ...safeUser2, requiresEmailVerification: true, giftMessage: invitationGiftMessage });
+    }
+    if (isPrimal) {
+      await storage.markUserEmailVerified(user.id);
+    }
+    req.session.userId = user.id;
+    const { password: _, ...safeUser } = user;
+    return res.status(201).json({ ...safeUser, giftMessage: invitationGiftMessage });
+  } catch (error) {
+    console.error("Register error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router2.post("/login", loginLimiter, async (req, res) => {
+  try {
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0].message });
+    }
+    const { identifier, password } = parsed.data;
+    let user = await storage.getUserByEmail(identifier);
+    if (!user) {
+      user = await storage.getUserByNickname(identifier);
+    }
+    if (!user) {
+      return res.status(401).json({ message: "Credenziali non valide" });
+    }
+    if (user.status === "blocked" || user.status === "suspended") {
+      return res.status(403).json({ message: "Account sospeso o bloccato" });
+    }
+    const emailVerifSetting = await storage.getAppSetting("email_verification_enabled");
+    if (emailVerifSetting?.value === "true" && !user.emailVerified && !user.isPrimal && user.role !== "admin") {
+      return res.status(403).json({ message: "Verifica la tua email prima di accedere. Controlla la tua casella di posta." });
+    }
+    const validPassword = await import_bcryptjs.default.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(401).json({ message: "Credenziali non valide" });
+    }
+    const isFirstLogin = !user.firstLoginAt;
+    const gpsLat = typeof req.body.lat === "number" ? req.body.lat : null;
+    const gpsLng = typeof req.body.lng === "number" ? req.body.lng : null;
+    const updateData = { lastLoginAt: /* @__PURE__ */ new Date() };
+    if (isFirstLogin) {
+      updateData.firstLoginAt = /* @__PURE__ */ new Date();
+      if (gpsLat !== null) updateData.firstLoginLat = gpsLat;
+      if (gpsLng !== null) updateData.firstLoginLng = gpsLng;
+    }
+    await storage.updateUser(user.id, updateData);
+    if (isFirstLogin && !user.region && gpsLat !== null && gpsLng !== null) {
+      try {
+        const nomUrl = `https://nominatim.openstreetmap.org/reverse?lat=${gpsLat}&lon=${gpsLng}&format=json&accept-language=it`;
+        const nomRes = await fetch(nomUrl, { headers: { "User-Agent": "BikerLink/1.0" } });
+        if (nomRes.ok) {
+          const nomData = await nomRes.json();
+          const state = nomData.address?.state;
+          if (state) {
+            await storage.updateUser(user.id, { region: state });
+            user = { ...user, region: state };
+          }
+        }
+      } catch (geoErr) {
+        console.warn("[Login] Nominatim reverse geocoding fallito:", geoErr);
+      }
+    }
+    const effectiveRegion = user.region;
+    if (effectiveRegion) {
+      createRegionalClubInvite(user.id, effectiveRegion).catch(() => {
+      });
+    }
+    const userRecord = await storage.getUser(user.id);
+    if (!userRecord?.ghostMode) {
+      const availSetting = await storage.getAppSetting("user_available_on_login").catch(() => null);
+      const availableOnLogin = availSetting?.value !== "false";
+      await storage.updateUserProfile(user.id, { isAvailable: availableOnLogin }).catch(() => {
+      });
+    }
+    req.session.userId = user.id;
+    const { password: _, ...safeUser } = userRecord ?? user;
+    return res.json(safeUser);
+  } catch (error) {
+    console.error("Login error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router2.post("/logout", (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ message: "Errore durante il logout" });
+    }
+    res.clearCookie("connect.sid");
+    return res.json({ message: "Logout effettuato" });
+  });
+});
+router2.get("/me", async (req, res) => {
+  try {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Non autenticato" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user) {
+      return res.status(401).json({ message: "Utente non trovato" });
+    }
+    const { password: _, ...safeUser } = user;
+    const profile = await storage.getUserProfile(user.id);
+    return res.json({
+      ...safeUser,
+      profileLatitude: profile?.latitude ?? null,
+      profileLongitude: profile?.longitude ?? null
+    });
+  } catch (error) {
+    console.error("Me error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router2.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({ message: "Inserisci un'email valida" });
+    }
+    const user = await storage.getUserByEmail(email.trim().toLowerCase());
+    if (!user) {
+      return res.json({ message: "Se l'email \xE8 registrata, riceverai un link di recupero" });
+    }
+    const token = import_crypto.default.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1e3);
+    await storage.createPasswordResetToken(user.id, token, expiresAt);
+    const emailSent = await sendPasswordResetEmail(user.email, user.nickname, token);
+    if (emailSent) {
+      console.log(`[PASSWORD RESET] Email di reset inviata a ${user.email}`);
+    } else {
+      console.warn(`[PASSWORD RESET] Email NON inviata a ${user.email}`);
+    }
+    return res.json({ message: "Se l'email \xE8 registrata, riceverai un link di recupero" });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router2.post("/reset-password", async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) {
+      return res.status(400).json({ message: "Token e password richiesti" });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ message: "La password deve avere almeno 8 caratteri" });
+    }
+    const resetToken = await storage.getPasswordResetToken(token);
+    if (!resetToken) {
+      return res.status(400).json({ message: "Token non valido o gi\xE0 utilizzato" });
+    }
+    if (new Date(resetToken.expiresAt) < /* @__PURE__ */ new Date()) {
+      return res.status(400).json({ message: "Token scaduto" });
+    }
+    const hashedPassword = await import_bcryptjs.default.hash(password, 12);
+    await storage.updateUser(resetToken.userId, { password: hashedPassword });
+    await storage.markPasswordResetTokenUsed(token);
+    return res.json({ message: "Password aggiornata con successo" });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router2.post("/verify-email", async (req, res) => {
+  try {
+    const { email, token } = req.body;
+    if (!email || !token) {
+      return res.status(400).json({ message: "Email e codice richiesti" });
+    }
+    const user = await storage.getUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    const verif = await storage.getEmailVerificationToken(token.toUpperCase());
+    if (!verif || verif.userId !== user.id) {
+      return res.status(400).json({ message: "Codice non valido" });
+    }
+    if (new Date(verif.expiresAt) < /* @__PURE__ */ new Date()) {
+      return res.status(400).json({ message: "Codice scaduto. Richiedi un nuovo codice." });
+    }
+    await storage.markUserEmailVerified(user.id);
+    await storage.deleteEmailVerificationTokens(user.id);
+    req.session.userId = user.id;
+    const { password: _, ...safeUser } = user;
+    return res.json({ ...safeUser, emailVerified: true });
+  } catch (error) {
+    console.error("Verify email error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router2.post("/resend-verification", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Email richiesta" });
+    }
+    const user = await storage.getUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    if (user.emailVerified) {
+      return res.status(400).json({ message: "Email gi\xE0 verificata" });
+    }
+    await storage.deleteEmailVerificationTokens(user.id);
+    const token = import_crypto.default.randomBytes(3).toString("hex").toUpperCase();
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1e3);
+    await storage.createEmailVerificationToken(user.id, token, expiresAt);
+    const emailSent = await sendVerificationEmail(user.email, user.nickname, token);
+    if (!emailSent) {
+      console.warn(`[EMAIL VERIFICATION] Resend: email NON inviata a ${user.email}`);
+    }
+    return res.json({ message: "Nuovo codice inviato" });
+  } catch (error) {
+    console.error("Resend verification error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router2.get("/email-configured", async (_req, res) => {
+  try {
+    const userSetting = await storage.getAppSetting("gmail_user");
+    const passSetting = await storage.getAppSetting("gmail_app_password");
+    const configured = !!(userSetting?.value && passSetting?.value || process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+    return res.json({ configured });
+  } catch {
+    return res.json({ configured: false });
+  }
+});
+router2.post("/heartbeat", async (req, res) => {
+  try {
+    const userId = req.session?.userId;
+    if (!userId) return res.status(401).json({ ok: false });
+    await storage.updateUser(userId, { lastLoginAt: /* @__PURE__ */ new Date() });
+    return res.json({ ok: true });
+  } catch {
+    return res.status(500).json({ ok: false });
+  }
+});
+var auth_default = router2;
+
+// server/routes/users.ts
+var import_express3 = require("express");
+var import_multer = __toESM(require("multer"));
+var import_path2 = __toESM(require("path"));
+var import_fs2 = __toESM(require("fs"));
+init_storage();
+
+// server/constants.ts
+var PROTECTED_NICKNAMES = ["BikerLink_Official"];
+function isProtectedUser(nickname) {
+  return PROTECTED_NICKNAMES.includes(nickname);
+}
+
+// server/routes/users.ts
+var router3 = (0, import_express3.Router)();
+var uploadsDir = import_path2.default.join(process.cwd(), "uploads", "photos");
+if (!import_fs2.default.existsSync(uploadsDir)) {
+  import_fs2.default.mkdirSync(uploadsDir, { recursive: true });
+}
+var photoStorage = import_multer.default.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
+    cb(null, uniqueSuffix + import_path2.default.extname(file.originalname));
+  }
+});
+var upload = (0, import_multer.default)({
+  storage: photoStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Tipo di file non supportato. Usa JPEG, PNG o WebP."));
+    }
+  }
+});
+function requireAuth2(req, res, next) {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: "Non autenticato" });
+  }
+  next();
+}
+router3.get("/", requireAuth2, async (req, res) => {
+  try {
+    const requesterId = req.session.userId;
+    const blockedIds = await storage.getBlockedUserIds(requesterId);
+    const blockedSet = new Set(blockedIds);
+    const allUsers = await storage.getAllUsers();
+    const results = allUsers.filter((u) => !blockedSet.has(u.id) && u.id !== requesterId).map((u) => ({
+      id: u.id,
+      nickname: u.nickname,
+      avatarUrl: u.avatarUrl,
+      userType: u.userType
+    }));
+    return res.json(results);
+  } catch (error) {
+    console.error("Get users error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router3.get("/me", requireAuth2, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    const { password: _, ...safeUser } = user;
+    const profile = await storage.getUserProfile(userId);
+    const photos = await storage.getUserPhotos(userId);
+    const motorcycles = await storage.getUserMotorcycles(userId);
+    return res.json({
+      ...safeUser,
+      profile,
+      photos,
+      motorcycles
+    });
+  } catch (error) {
+    console.error("Get user profile error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router3.put("/me", requireAuth2, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const allowedUserFields = ["nickname", "phone", "sex", "coupleSexConfig", "birthYear", "region", "country", "avatarUrl"];
+    const userUpdate = {};
+    for (const field of allowedUserFields) {
+      if (req.body[field] !== void 0) {
+        userUpdate[field] = req.body[field];
+      }
+    }
+    if (Object.keys(userUpdate).length > 0) {
+      if (userUpdate.nickname) {
+        const reservedNicknames = ["admin", "administrator", "administrators", "amministratore", "amministratori", "mod", "moderator", "moderatore"];
+        if (reservedNicknames.includes(userUpdate.nickname.toLowerCase())) {
+          return res.status(400).json({ message: "Nickname non disponibile" });
+        }
+        const existing = await storage.getUserByNickname(userUpdate.nickname);
+        if (existing && existing.id !== userId) {
+          return res.status(409).json({ message: "Nickname gi\xE0 in uso" });
+        }
+      }
+      await storage.updateUser(userId, userUpdate);
+    }
+    const allowedProfileFields = ["bio", "maxPickupDistance", "latitude", "longitude"];
+    const profileUpdate = {};
+    for (const field of allowedProfileFields) {
+      if (req.body[field] !== void 0) {
+        profileUpdate[field] = req.body[field];
+      }
+    }
+    if (Object.keys(profileUpdate).length > 0) {
+      const existingProfile = await storage.getUserProfile(userId);
+      if (existingProfile) {
+        await storage.updateUserProfile(userId, profileUpdate);
+      } else {
+        await storage.createUserProfile({ userId, ...profileUpdate });
+      }
+    }
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    const { password: _, ...safeUser } = user;
+    const profile = await storage.getUserProfile(userId);
+    const photos = await storage.getUserPhotos(userId);
+    const motorcycles = await storage.getUserMotorcycles(userId);
+    return res.json({
+      ...safeUser,
+      profile,
+      photos,
+      motorcycles
+    });
+  } catch (error) {
+    console.error("Update user profile error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router3.get("/profile", requireAuth2, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    const { password: _, ...safeUser } = user;
+    const profile = await storage.getUserProfile(userId);
+    return res.json({
+      ...safeUser,
+      ...profile || {}
+    });
+  } catch (error) {
+    console.error("Get user profile error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router3.put("/profile/dynamic", requireAuth2, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const { isAvailable, latitude, longitude, searchPreference, preferredMapStyle } = req.body;
+    const existingProfile = await storage.getUserProfile(userId);
+    const updateData = {};
+    if (typeof isAvailable === "boolean") updateData.isAvailable = isAvailable;
+    if (latitude !== void 0) updateData.latitude = latitude;
+    if (longitude !== void 0) updateData.longitude = longitude;
+    if (searchPreference !== void 0) updateData.searchPreference = searchPreference;
+    const validMapStyles = ["carto_light", "carto_dark", "esri_gray"];
+    if (preferredMapStyle !== void 0) {
+      if (preferredMapStyle !== null && !validMapStyles.includes(preferredMapStyle)) {
+        return res.status(400).json({ message: "Stile mappa non valido" });
+      }
+      updateData.preferredMapStyle = preferredMapStyle;
+    }
+    if (isAvailable === true) {
+      await storage.updateUser(userId, { ghostMode: false });
+    }
+    if (existingProfile) {
+      const profile = await storage.updateUserProfile(userId, updateData);
+      return res.json(profile);
+    } else {
+      const profile = await storage.createUserProfile({ userId, ...updateData });
+      return res.json(profile);
+    }
+  } catch (error) {
+    console.error("Update dynamic profile error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router3.put("/me/ghost-mode", requireAuth2, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const { enabled } = req.body;
+    if (typeof enabled !== "boolean") {
+      return res.status(400).json({ message: "enabled deve essere un booleano" });
+    }
+    const ghostModeSetting = await storage.getAppSetting("ghost_mode_enabled");
+    if (ghostModeSetting?.value !== "true") {
+      return res.status(403).json({ message: "Ghost Mode non attivo su questa piattaforma" });
+    }
+    await storage.updateUser(userId, { ghostMode: enabled });
+    if (enabled) {
+      const existingProfile = await storage.getUserProfile(userId);
+      if (existingProfile) {
+        await storage.updateUserProfile(userId, { isAvailable: false });
+      }
+    }
+    return res.json({ ghostMode: enabled });
+  } catch (error) {
+    console.error("Ghost mode toggle error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router3.put("/location", requireAuth2, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const { latitude, longitude } = req.body;
+    if (latitude === void 0 || longitude === void 0) {
+      return res.status(400).json({ message: "Latitudine e longitudine richieste" });
+    }
+    const existingProfile = await storage.getUserProfile(userId);
+    if (existingProfile) {
+      await storage.updateUserProfile(userId, { latitude, longitude });
+    } else {
+      await storage.createUserProfile({ userId, latitude, longitude });
+    }
+    return res.json({ message: "Posizione aggiornata" });
+  } catch (error) {
+    console.error("Update location error:", error);
+    return res.status(500).json({ message: "Errore aggiornamento posizione" });
+  }
+});
+router3.put("/me/availability", requireAuth2, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const { isAvailable, latitude, longitude } = req.body;
+    if (typeof isAvailable !== "boolean") {
+      return res.status(400).json({ message: "isAvailable deve essere un booleano" });
+    }
+    const existingProfile = await storage.getUserProfile(userId);
+    const updateData = { isAvailable };
+    if (latitude !== void 0) updateData.latitude = latitude;
+    if (longitude !== void 0) updateData.longitude = longitude;
+    if (existingProfile) {
+      const profile = await storage.updateUserProfile(userId, updateData);
+      return res.json(profile);
+    } else {
+      const profile = await storage.createUserProfile({ userId, ...updateData });
+      return res.json(profile);
+    }
+  } catch (error) {
+    console.error("Toggle availability error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router3.get("/:id/public", requireAuth2, async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const requesterId = req.session.userId;
+    const targetUser = await storage.getUser(userId);
+    if (!targetUser) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    const isBlockedRelation = await storage.isBlocked(requesterId, userId);
+    if (isBlockedRelation && requesterId !== userId) {
+      return res.status(403).json({ message: "Non puoi visualizzare questo profilo" });
+    }
+    if (targetUser.isFake && requesterId !== userId) {
+      storage.recordFakeUserInteraction(userId, requesterId, "profile_view").catch(() => {
+      });
+    }
+    const profile = await storage.getUserProfile(userId);
+    const motorcycles = await storage.getUserMotorcycles(userId);
+    const photos = await storage.getUserPhotos(userId);
+    const approvedPhotos = photos.filter((p) => p.isApproved);
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
+    const isOnline = !targetUser.ghostMode && targetUser.lastLoginAt != null && new Date(targetUser.lastLoginAt) >= fifteenMinutesAgo;
+    return res.json({
+      id: targetUser.id,
+      nickname: targetUser.nickname,
+      userType: targetUser.userType,
+      sex: targetUser.sex,
+      coupleSexConfig: targetUser.coupleSexConfig,
+      birthYear: targetUser.birthYear,
+      region: targetUser.region,
+      country: targetUser.country,
+      avatarUrl: targetUser.avatarUrl,
+      bio: profile?.bio || null,
+      motorcycles,
+      photos: approvedPhotos,
+      isOnline,
+      isAvailable: (profile?.isAvailable || false) && !targetUser.ghostMode
+    });
+  } catch (error) {
+    console.error("Get public user profile error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router3.get("/online-count", requireAuth2, async (req, res) => {
+  try {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
+    const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
+    const count3 = await storage.countOnlineUsers(fifteenMinutesAgo, countriesParam);
+    return res.json({ count: count3 });
+  } catch (error) {
+    console.error("Online count error:", error);
+    return res.json({ count: 0 });
+  }
+});
+router3.get("/available-count", requireAuth2, async (req, res) => {
+  try {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
+    const count3 = await storage.countAvailableUsers(fifteenMinutesAgo);
+    return res.json({ count: count3 });
+  } catch (error) {
+    console.error("Available count error:", error);
+    return res.json({ count: 0 });
+  }
+});
+router3.get("/online-list", requireAuth2, async (req, res) => {
+  try {
+    const requesterId = req.session.userId;
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
+    const lat = req.query.lat ? parseFloat(req.query.lat) : void 0;
+    const lng = req.query.lng ? parseFloat(req.query.lng) : void 0;
+    const includeOffline = req.query.includeOffline === "true";
+    const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
+    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
+    const onlineResults = await storage.getOnlineUsersList(fifteenMinutesAgo, lat, lng, countriesParam);
+    let allResults = onlineResults.filter((r) => !blockedIds.has(r.user.id));
+    const onlineIdSet = new Set(allResults.map((r) => r.user.id));
+    if (includeOffline) {
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq11, and: and9, lt, or: or3, isNull, inArray: inArr } = await import("drizzle-orm");
+      const { sql: sqlTag } = await import("drizzle-orm");
+      const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
+      const offlineConds = [eq11(usersTable.status, "active"), or3(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt)), eq11(usersTable.ghostMode, false)];
+      if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
+      const offlineResults = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(usersTable).leftJoin(profilesTable, eq11(profilesTable.userId, usersTable.id)).where(and9(...offlineConds)).orderBy(sqlTag`distance`);
+      const offlineOnly = offlineResults.filter((r) => !onlineIdSet.has(r.user.id) && !blockedIds.has(r.user.id));
+      allResults = [...allResults, ...offlineOnly];
+    }
+    const motorcyclesMap = {};
+    for (const item of allResults) {
+      if (!motorcyclesMap[item.user.id]) {
+        motorcyclesMap[item.user.id] = await storage.getUserMotorcycles(item.user.id);
+      }
+    }
+    const mapped = allResults.map((item) => {
+      const motos = motorcyclesMap[item.user.id] || [];
+      const firstMoto = motos[0];
+      return {
+        id: item.user.id,
+        nickname: item.user.nickname,
+        userType: item.user.userType,
+        sex: item.user.sex,
+        region: item.user.region,
+        country: item.user.country,
+        birthYear: item.user.birthYear,
+        bio: item.profile?.bio || null,
+        moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
+        ridingStyle: firstMoto?.ridingStyle || null,
+        distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
+        isAvailable: item.profile?.isAvailable || false,
+        isOnline: onlineIdSet.has(item.user.id)
+      };
+    });
+    return res.json(mapped);
+  } catch (error) {
+    console.error("Online list error:", error);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+router3.get("/available-list", requireAuth2, async (req, res) => {
+  try {
+    const requesterId = req.session.userId;
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
+    const lat = req.query.lat ? parseFloat(req.query.lat) : void 0;
+    const lng = req.query.lng ? parseFloat(req.query.lng) : void 0;
+    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
+    const allItems = await storage.getAvailableUsersList(fifteenMinutesAgo, lat, lng);
+    const results = allItems.filter((r) => !blockedIds.has(r.user.id));
+    const motorcyclesMap = {};
+    for (const item of results) {
+      if (!motorcyclesMap[item.user.id]) {
+        motorcyclesMap[item.user.id] = await storage.getUserMotorcycles(item.user.id);
+      }
+    }
+    const mapped = results.map((item) => {
+      const motos = motorcyclesMap[item.user.id] || [];
+      const firstMoto = motos[0];
+      return {
+        id: item.user.id,
+        nickname: item.user.nickname,
+        userType: item.user.userType,
+        sex: item.user.sex,
+        region: item.user.region,
+        country: item.user.country,
+        birthYear: item.user.birthYear,
+        bio: item.profile?.bio || null,
+        moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
+        ridingStyle: firstMoto?.ridingStyle || null,
+        distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
+        isAvailable: true
+      };
+    });
+    return res.json(mapped);
+  } catch (error) {
+    console.error("Available list error:", error);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+router3.get("/biker-available-count", requireAuth2, async (req, res) => {
+  try {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
+    const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
+    const count3 = await storage.countAvailableBikers(fifteenMinutesAgo, countriesParam);
+    return res.json({ count: count3 });
+  } catch (error) {
+    console.error("Biker available count error:", error);
+    return res.json({ count: 0 });
+  }
+});
+router3.get("/zavorrine-available-count", requireAuth2, async (req, res) => {
+  try {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
+    const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
+    const count3 = await storage.countAvailableZavorrine(fifteenMinutesAgo, countriesParam);
+    return res.json({ count: count3 });
+  } catch (error) {
+    console.error("Zavorrine available count error:", error);
+    return res.json({ count: 0 });
+  }
+});
+router3.get("/biker-available-list", requireAuth2, async (req, res) => {
+  try {
+    const requesterId = req.session.userId;
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
+    const lat = req.query.lat ? parseFloat(req.query.lat) : void 0;
+    const lng = req.query.lng ? parseFloat(req.query.lng) : void 0;
+    const includeOffline = req.query.includeOffline === "true";
+    const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
+    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
+    const onlineResultsRaw = await storage.getAvailableBikersList(fifteenMinutesAgo, lat, lng, countriesParam);
+    const onlineResults = onlineResultsRaw.filter((r) => !blockedIds.has(r.user.id));
+    let allResults = onlineResults;
+    if (includeOffline) {
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq11, and: and9, or: or3, inArray: inArr } = await import("drizzle-orm");
+      const { sql: sqlTag } = await import("drizzle-orm");
+      const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
+      const bikerConds = [eq11(usersTable.status, "active"), or3(eq11(usersTable.userType, "biker"), eq11(usersTable.userType, "coppia")), eq11(usersTable.ghostMode, false)];
+      if (countriesParam && countriesParam.length > 0) bikerConds.push(inArr(usersTable.country, countriesParam));
+      const allBikers = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq11(usersTable.id, profilesTable.userId)).where(and9(...bikerConds)).orderBy(sqlTag`distance`);
+      const onlineIds = new Set(onlineResults.map((r) => r.user.id));
+      const offlineOnly = allBikers.filter((r) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
+      allResults = [...onlineResults, ...offlineOnly];
+    }
+    const motorcyclesMap = {};
+    for (const item of allResults) {
+      if (!motorcyclesMap[item.user.id]) {
+        motorcyclesMap[item.user.id] = await storage.getUserMotorcycles(item.user.id);
+      }
+    }
+    const onlineAvailableIds = new Set(onlineResults.map((r) => r.user.id));
+    const mapped = allResults.map((item) => {
+      const motos = motorcyclesMap[item.user.id] || [];
+      const firstMoto = motos[0];
+      return {
+        id: item.user.id,
+        nickname: item.user.nickname,
+        userType: item.user.userType,
+        sex: item.user.sex,
+        region: item.user.region,
+        country: item.user.country,
+        birthYear: item.user.birthYear,
+        bio: item.profile?.bio || null,
+        moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
+        ridingStyle: firstMoto?.ridingStyle || null,
+        distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
+        isAvailable: item.profile?.isAvailable || false,
+        isOnline: onlineAvailableIds.has(item.user.id)
+      };
+    });
+    return res.json(mapped);
+  } catch (error) {
+    console.error("Biker available list error:", error);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+router3.get("/zavorrine-available-list", requireAuth2, async (req, res) => {
+  try {
+    const requesterId = req.session.userId;
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
+    const lat = req.query.lat ? parseFloat(req.query.lat) : void 0;
+    const lng = req.query.lng ? parseFloat(req.query.lng) : void 0;
+    const includeOffline = req.query.includeOffline === "true";
+    const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
+    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
+    const onlineResultsRaw = await storage.getAvailableZavorrinaList(fifteenMinutesAgo, lat, lng, countriesParam);
+    const onlineResults = onlineResultsRaw.filter((r) => !blockedIds.has(r.user.id));
+    let allResults = onlineResults;
+    if (includeOffline) {
+      const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+      const { eq: eq11, and: and9, inArray: inArr } = await import("drizzle-orm");
+      const { sql: sqlTag } = await import("drizzle-orm");
+      const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
+      const zavConds = [eq11(usersTable.status, "active"), eq11(usersTable.userType, "zavorrina"), eq11(usersTable.ghostMode, false)];
+      if (countriesParam && countriesParam.length > 0) zavConds.push(inArr(usersTable.country, countriesParam));
+      const allZav = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq11(usersTable.id, profilesTable.userId)).where(and9(...zavConds)).orderBy(sqlTag`distance`);
+      const onlineIds = new Set(onlineResults.map((r) => r.user.id));
+      const offlineOnly = allZav.filter((r) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
+      allResults = [...onlineResults, ...offlineOnly];
+    }
+    const motorcyclesMap = {};
+    for (const item of allResults) {
+      if (!motorcyclesMap[item.user.id]) {
+        motorcyclesMap[item.user.id] = await storage.getUserMotorcycles(item.user.id);
+      }
+    }
+    const onlineAvailableIds = new Set(onlineResults.map((r) => r.user.id));
+    const mapped = allResults.map((item) => {
+      const motos = motorcyclesMap[item.user.id] || [];
+      const firstMoto = motos[0];
+      return {
+        id: item.user.id,
+        nickname: item.user.nickname,
+        userType: item.user.userType,
+        sex: item.user.sex,
+        region: item.user.region,
+        country: item.user.country,
+        birthYear: item.user.birthYear,
+        bio: item.profile?.bio || null,
+        moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
+        ridingStyle: firstMoto?.ridingStyle || null,
+        distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
+        isAvailable: item.profile?.isAvailable || false,
+        isOnline: onlineAvailableIds.has(item.user.id)
+      };
+    });
+    return res.json(mapped);
+  } catch (error) {
+    console.error("Zavorrine available list error:", error);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+router3.get("/nearby", requireAuth2, async (req, res) => {
+  try {
+    const requesterId = req.session.userId;
+    const lat = parseFloat(req.query.lat);
+    const lng = parseFloat(req.query.lng);
+    const radius = parseFloat(req.query.radius) || 50;
+    const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
+    if (isNaN(lat) || isNaN(lng)) {
+      return res.status(400).json({ message: "Parametri lat e lng richiesti" });
+    }
+    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
+    const nearbyUsers = await storage.getNearbyUsers(lat, lng, radius, countriesParam);
+    const results = nearbyUsers.filter((item) => !blockedIds.has(item.user.id)).map((item) => {
+      return {
+        id: item.user.id,
+        nickname: item.user.nickname,
+        userType: item.user.userType,
+        sex: item.user.sex,
+        birthYear: item.user.birthYear,
+        region: item.user.region,
+        country: item.user.country,
+        avatarUrl: item.user.avatarUrl,
+        latitude: item.profile?.latitude,
+        longitude: item.profile?.longitude,
+        isAvailable: item.profile?.isAvailable || false,
+        bio: item.profile?.bio || null,
+        distance: Math.round(item.distance * 10) / 10
+      };
+    }).filter((item) => item.latitude != null && item.longitude != null && !isNaN(item.latitude) && !isNaN(item.longitude));
+    return res.json(results);
+  } catch (error) {
+    console.error("Nearby users error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router3.get("/search", requireAuth2, async (req, res) => {
+  try {
+    const requesterId = req.session.userId;
+    const q = (req.query.q || "").trim();
+    if (q.length < 2) {
+      return res.json([]);
+    }
+    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
+    const results = await storage.searchUsers(q);
+    const safeResults = results.filter((item) => !blockedIds.has(item.user.id)).map((item) => {
+      return {
+        id: item.user.id,
+        nickname: item.user.nickname,
+        userType: item.user.userType,
+        sex: item.user.sex,
+        birthYear: item.user.birthYear,
+        region: item.user.region,
+        country: item.user.country,
+        avatarUrl: item.user.avatarUrl,
+        latitude: item.profile?.latitude || null,
+        longitude: item.profile?.longitude || null,
+        isAvailable: item.profile?.isAvailable || false,
+        bio: item.profile?.bio || null
+      };
+    });
+    return res.json(safeResults);
+  } catch (error) {
+    console.error("Search users error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router3.post("/me/photos", requireAuth2, upload.single("photo"), async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    if (user.userType === "zavorrina") {
+      const count3 = await storage.getUserPhotoCount(userId);
+      if (count3 >= 3) {
+        if (req.file) {
+          import_fs2.default.unlinkSync(req.file.path);
+        }
+        return res.status(400).json({ message: "Massimo 3 foto consentite per le zavorrine" });
+      }
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: "Nessuna foto caricata" });
+    }
+    const photoUrl = `/uploads/photos/${req.file.filename}`;
+    const sortOrder = await storage.getUserPhotoCount(userId);
+    const photo = await storage.createUserPhoto({
+      userId,
+      photoUrl,
+      sortOrder,
+      isApproved: true
+    });
+    return res.status(201).json(photo);
+  } catch (error) {
+    console.error("Upload photo error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router3.delete("/me/photos/:id", requireAuth2, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const photoId = req.params.id;
+    const photo = await storage.getUserPhoto(photoId);
+    if (!photo) {
+      return res.status(404).json({ message: "Foto non trovata" });
+    }
+    if (photo.userId !== userId) {
+      return res.status(403).json({ message: "Non autorizzato" });
+    }
+    const filePath = import_path2.default.join(process.cwd(), photo.photoUrl);
+    if (import_fs2.default.existsSync(filePath)) {
+      import_fs2.default.unlinkSync(filePath);
+    }
+    await storage.deleteUserPhoto(photoId);
+    return res.json({ message: "Foto eliminata" });
+  } catch (error) {
+    console.error("Delete photo error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router3.post("/me/request-deletion", requireAuth2, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    await storage.requestUserDeletion(userId);
+    req.session.destroy(() => {
+    });
+    return res.json({ message: "Richiesta di cancellazione inviata. Il tuo account sar\xE0 eliminato tra 30 giorni." });
+  } catch (error) {
+    console.error("Request deletion error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router3.post("/me/cancel-deletion", requireAuth2, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    await storage.cancelUserDeletion(userId);
+    return res.json({ message: "Richiesta di cancellazione annullata." });
+  } catch (error) {
+    console.error("Cancel deletion error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router3.post("/:id/block", requireAuth2, async (req, res) => {
+  try {
+    const blockerId = req.session.userId;
+    const blockedId = req.params.id;
+    if (blockerId === blockedId) {
+      return res.status(400).json({ message: "Non puoi bloccare te stesso" });
+    }
+    const targetUser = await storage.getUser(blockedId);
+    if (!targetUser) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    if (isProtectedUser(targetUser.nickname)) {
+      return res.status(403).json({ message: "Utente di sistema non modificabile" });
+    }
+    const alreadyBlocked = await storage.isBlocked(blockerId, blockedId);
+    if (alreadyBlocked) {
+      return res.status(409).json({ message: "Utente gi\xE0 bloccato" });
+    }
+    await storage.blockUser(blockerId, blockedId);
+    return res.json({ message: "Utente bloccato con successo" });
+  } catch (error) {
+    console.error("Block user error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+var users_default = router3;
 
 // server/routes/motorcycles.ts
+var import_express4 = require("express");
+var import_path3 = __toESM(require("path"));
+var import_fs3 = __toESM(require("fs"));
+var import_drizzle_orm4 = require("drizzle-orm");
+init_db();
+init_schema();
+init_storage();
 var router4 = (0, import_express4.Router)();
 var uploadsDir2 = import_path3.default.join(process.cwd(), "uploads", "motorcycles");
 if (!import_fs3.default.existsSync(uploadsDir2)) {

@@ -5,6 +5,7 @@ import rateLimit from "express-rate-limit";
 import { registerSchema, loginSchema } from "@shared/schema";
 import { storage } from "../storage";
 import { sendVerificationEmail, sendPasswordResetEmail, sendInvitationGiftEmail } from "../email";
+import { createClubInvitesForMoto, createRegionalClubInvite } from "./motoclubs";
 
 declare module "express-session" {
   interface SessionData {
@@ -112,6 +113,10 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
 
     await storage.createUserProfile({ userId: user.id });
 
+    if (data.region) {
+      createRegionalClubInvite(user.id, data.region).catch(() => {});
+    }
+
     if (invitationCodeStr) {
       try {
         const registrationDate = new Date();
@@ -202,7 +207,40 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Credenziali non valide" });
     }
 
-    await storage.updateUser(user.id, { lastLoginAt: new Date() } as any);
+    const isFirstLogin = !user.firstLoginAt;
+    const gpsLat = typeof req.body.lat === "number" ? req.body.lat : null;
+    const gpsLng = typeof req.body.lng === "number" ? req.body.lng : null;
+
+    const updateData: Record<string, unknown> = { lastLoginAt: new Date() };
+    if (isFirstLogin) {
+      updateData.firstLoginAt = new Date();
+      if (gpsLat !== null) updateData.firstLoginLat = gpsLat;
+      if (gpsLng !== null) updateData.firstLoginLng = gpsLng;
+    }
+    await storage.updateUser(user.id, updateData as any);
+
+    if (isFirstLogin && !user.region && gpsLat !== null && gpsLng !== null) {
+      try {
+        const nomUrl = `https://nominatim.openstreetmap.org/reverse?lat=${gpsLat}&lon=${gpsLng}&format=json&accept-language=it`;
+        const nomRes = await fetch(nomUrl, { headers: { "User-Agent": "BikerLink/1.0" } });
+        if (nomRes.ok) {
+          const nomData = await nomRes.json() as { address?: { state?: string } };
+          const state = nomData.address?.state;
+          if (state) {
+            await storage.updateUser(user.id, { region: state } as any);
+            user = { ...user, region: state };
+          }
+        }
+      } catch (geoErr) {
+        console.warn("[Login] Nominatim reverse geocoding fallito:", geoErr);
+      }
+    }
+
+    const effectiveRegion = user.region;
+    if (effectiveRegion) {
+      createRegionalClubInvite(user.id, effectiveRegion).catch(() => {});
+    }
+
     const userRecord = await storage.getUser(user.id);
     if (!userRecord?.ghostMode) {
       const availSetting = await storage.getAppSetting("user_available_on_login").catch(() => null);
@@ -212,7 +250,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
 
     req.session.userId = user.id;
 
-    const { password: _, ...safeUser } = user;
+    const { password: _, ...safeUser } = userRecord ?? user;
     return res.json(safeUser);
   } catch (error) {
     console.error("Login error:", error);
