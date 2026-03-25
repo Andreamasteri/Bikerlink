@@ -318,6 +318,11 @@ export default function AdminSettings() {
   });
   const primalEnabled = primalData?.enabled === true;
 
+  const { data: motoclubCreationData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/motoclub-user-creation"],
+  });
+  const motoclubCreationEnabled = motoclubCreationData?.enabled === true;
+
   const { data: customRoutesData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/custom-routes"],
   });
@@ -502,6 +507,25 @@ export default function AdminSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/auto-matching"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const motoclubCreationMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/motoclub_user_creation_enabled", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/motoclub-user-creation"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
   });
@@ -1060,6 +1084,25 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {autoMatchEnabled ? "Il motore di matching automatico è attivo" : "Il matching automatico è disattivato"}
+        </Text>
+      </View>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="people" size={20} color={Colors.warning} />
+            <Text style={styles.synecoLabel}>Creazione Motoclub da Utenti</Text>
+          </View>
+          <Switch
+            value={motoclubCreationEnabled}
+            onValueChange={(val) => motoclubCreationMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: Colors.warning }}
+            thumbColor={motoclubCreationEnabled ? Colors.text : Colors.textSecondary}
+            disabled={motoclubCreationMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {motoclubCreationEnabled ? "Gli utenti possono richiedere la creazione di nuovi motoclub" : "Creazione motoclub da utenti disabilitata"}
         </Text>
       </View>
 

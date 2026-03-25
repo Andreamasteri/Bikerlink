@@ -299,6 +299,17 @@ export default function MotoclubScreen() {
   });
   const marketplaceEnabled = marketplaceData?.enabled !== false;
 
+  const { data: motoclubCreationData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/motoclub-user-creation"],
+  });
+  const motoclubCreationEnabled = motoclubCreationData?.enabled === true;
+
+  const { data: creationStatus } = useQuery<{ status: string } | null>({
+    queryKey: ["/api/motoclubs/creation-request/status"],
+    enabled: motoclubCreationEnabled,
+  });
+  const hasPendingRequest = creationStatus?.status === "pending";
+
   const { data: marketplaceMotos = {}, refetch: refetchMarket } = useQuery<Record<string, MarketplaceMoto[]>>({
     queryKey: ["/api/motoclubs/marketplace-all", myClubs.map(c => c.id).join(",")],
     queryFn: async () => {
@@ -590,6 +601,25 @@ export default function MotoclubScreen() {
           }}
         />
       )}
+
+      {motoclubCreationEnabled && !hasPendingRequest && (
+        <TouchableOpacity
+          style={[styles.fab, { bottom: (Platform.OS === "web" ? 34 : insets.bottom) + 16 }]}
+          onPress={() => router.push("/motoclub/create" as any)}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="add" size={26} color="#fff" />
+        </TouchableOpacity>
+      )}
+      {motoclubCreationEnabled && hasPendingRequest && (
+        <TouchableOpacity
+          style={[styles.fab, { bottom: (Platform.OS === "web" ? 34 : insets.bottom) + 16, backgroundColor: Colors.warning }]}
+          onPress={() => router.push("/motoclub/create" as any)}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="time" size={22} color="#fff" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -871,5 +901,20 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderLeftWidth: 3,
     borderLeftColor: "#FF9800",
+  },
+  fab: {
+    position: "absolute",
+    right: 20,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: Colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 6,
   },
 });

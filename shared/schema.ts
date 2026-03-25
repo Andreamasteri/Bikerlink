@@ -809,6 +809,9 @@ export const motoClubs = pgTable("moto_clubs", {
   isApproved: boolean("is_approved").notNull().default(false),
   activityScore: integer("activity_score").notNull().default(0),
   conversationId: varchar("conversation_id", { length: 36 }),
+  parentClubId: varchar("parent_club_id", { length: 36 }),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
   createdBy: varchar("created_by", { length: 36 })
     .references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -869,6 +872,11 @@ export const motoClubRequests = pgTable("moto_club_requests", {
   reviewedBy: varchar("reviewed_by", { length: 36 })
     .references(() => users.id, { onDelete: "set null" }),
   reviewNote: text("review_note"),
+  parentClubId: varchar("parent_club_id", { length: 36 }),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
+  inviteRadiusKm: integer("invite_radius_km"),
+  inviteUserIds: text("invite_user_ids"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

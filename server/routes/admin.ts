@@ -5,9 +5,10 @@ import path from "path";
 import bcrypt from "bcryptjs";
 import { storage } from "../storage";
 import { db } from "../db";
-import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches } from "@shared/schema";
+import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches } from "@shared/schema";
 import { createClubInvitesForMoto } from "./motoclubs";
-import { eq, and, ne, desc, sql, count, notExists, inArray } from "drizzle-orm";
+import { eq, and, ne, desc, sql, count, notExists, inArray, lte } from "drizzle-orm";
+import { sendEmail } from "../email";
 import { MOTORCYCLES, pickRandomN, getMotoYear } from "../mass-seed-data";
 import { getLastMatchingCycleMeta } from "../matching-engine";
 import { isProtectedUser } from "../constants";
@@ -1849,6 +1850,9 @@ router.post("/motoclubs/requests/:id/approve", async (req: Request, res: Respons
       modelName: request.modelName,
       isApproved: true,
       createdBy: request.requestedBy ?? null,
+      parentClubId: (request as any).parentClubId ?? null,
+      latitude: (request as any).latitude ?? null,
+      longitude: (request as any).longitude ?? null,
     }).returning();
 
     const [conv] = await db.insert(conversations).values({
@@ -1860,15 +1864,75 @@ router.post("/motoclubs/requests/:id/approve", async (req: Request, res: Respons
       .set({ conversationId: conv.id })
       .where(eq(motoClubs.id, newClub.id));
 
+    const inviteRadiusKm = (request as any).inviteRadiusKm as number | null;
+    const inviteUserIdsJson = (request as any).inviteUserIds as string | null;
+    const invitedUserIds = new Set<string>();
+
+    if (inviteRadiusKm && (request as any).latitude && (request as any).longitude) {
+      const lat = (request as any).latitude as number;
+      const lng = (request as any).longitude as number;
+      const nearbyUsers = await db
+        .select({ userId: userProfiles.userId })
+        .from(userProfiles)
+        .where(
+          sql`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude})))) <= ${inviteRadiusKm}`
+        )
+        .limit(200);
+      nearbyUsers.forEach(r => { if (r.userId !== request.requestedBy) invitedUserIds.add(r.userId); });
+    }
+
+    if (inviteUserIdsJson) {
+      try {
+        const ids: string[] = JSON.parse(inviteUserIdsJson);
+        ids.forEach(id => { if (id !== request.requestedBy) invitedUserIds.add(id); });
+      } catch {}
+    }
+
+    for (const uid of invitedUserIds) {
+      try {
+        await db.insert(motoClubInvites).values({ clubId: newClub.id, userId: uid, status: "pending" }).onConflictDoNothing();
+      } catch {}
+    }
+
+    if (request.requestedBy) {
+      try {
+        const [dmConv] = await db.insert(conversations).values({
+          conversationType: "private",
+          title: null,
+        }).returning();
+        await db.insert(conversationParticipants).values([
+          { conversationId: dmConv.id, userId: adminId },
+          { conversationId: dmConv.id, userId: request.requestedBy },
+        ]);
+        await storage.createMessage({
+          conversationId: dmConv.id,
+          senderId: adminId,
+          messageType: "text",
+          content: `Il tuo motoclub "${request.name}" è stato approvato e creato! Puoi trovarlo nella sezione Motoclub.`,
+          imageUrl: null,
+          latitude: null,
+          longitude: null,
+          isFiltered: false,
+        });
+        await storage.updateConversationTimestamp(dmConv.id);
+      } catch (e) {
+        console.error("[approve motoclub] DM error:", e);
+      }
+
+      await db.update(feedbackTickets)
+        .set({ status: "resolved", updatedAt: new Date() })
+        .where(and(eq(feedbackTickets.userId, request.requestedBy), eq(feedbackTickets.status, "open")));
+    }
+
     await db.insert(moderatorLogs).values({
       moderatorId: adminId,
       action: "approve_motoclub_request",
       targetType: "motoclub_request",
       targetId: requestId,
-      details: `Approvata richiesta: ${request.name}`,
+      details: `Approvata richiesta: ${request.name} (${invitedUserIds.size} inviti inviati)`,
     });
 
-    return res.json({ message: "Richiesta approvata", club: newClub });
+    return res.json({ message: "Richiesta approvata", club: newClub, invitesSent: invitedUserIds.size });
   } catch (e) {
     console.error("[approve motoclub request]", e);
     return res.status(500).json({ message: "Errore interno" });
@@ -1881,9 +1945,38 @@ router.post("/motoclubs/requests/:id/reject", async (req: Request, res: Response
     const requestId = req.params.id;
     const { note } = req.body as { note?: string };
 
+    const [request] = await db.select().from(motoClubRequests).where(eq(motoClubRequests.id, requestId)).limit(1);
+
     await db.update(motoClubRequests)
       .set({ status: "rejected", reviewedBy: adminId, reviewNote: note ?? null, updatedAt: new Date() })
       .where(eq(motoClubRequests.id, requestId));
+
+    if (request?.requestedBy) {
+      try {
+        const [dmConv] = await db.insert(conversations).values({
+          conversationType: "private",
+          title: null,
+        }).returning();
+        await db.insert(conversationParticipants).values([
+          { conversationId: dmConv.id, userId: adminId },
+          { conversationId: dmConv.id, userId: request.requestedBy },
+        ]);
+        const noteText = note ? ` Motivazione: ${note}` : "";
+        await storage.createMessage({
+          conversationId: dmConv.id,
+          senderId: adminId,
+          messageType: "text",
+          content: `La richiesta di creazione del motoclub "${request.name}" non è stata approvata.${noteText}`,
+          imageUrl: null,
+          latitude: null,
+          longitude: null,
+          isFiltered: false,
+        });
+        await storage.updateConversationTimestamp(dmConv.id);
+      } catch (e) {
+        console.error("[reject motoclub] DM error:", e);
+      }
+    }
 
     await db.insert(moderatorLogs).values({
       moderatorId: adminId,

@@ -19,6 +19,12 @@ interface ClubRequest {
   status: string;
   reviewNote: string | null;
   createdAt: string;
+  requestedBy?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  inviteRadiusKm?: number | null;
+  inviteUserIds?: string | null;
+  parentClubId?: string | null;
 }
 
 interface Club {
@@ -63,7 +69,7 @@ function StatusBadge({ status }: { status: string }) {
 export default function AdminMotoclubs() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [tab, setTab] = useState<"requests" | "clubs">("requests");
+  const [tab, setTab] = useState<"requests" | "clubs" | "user_creation">("requests");
   const [search, setSearch] = useState("");
   const [rejectModal, setRejectModal] = useState<{ id: string; name: string } | null>(null);
   const [rejectNote, setRejectNote] = useState("");
@@ -77,17 +83,30 @@ export default function AdminMotoclubs() {
     queryKey: ["/api/admin/motoclubs"],
   });
 
-  const pendingCount = requests.filter((r) => r.status === "pending").length;
+  const systemRequests = useMemo(() => requests.filter((r) => !r.requestedBy), [requests]);
+  const userCreationRequests = useMemo(() => requests.filter((r) => !!r.requestedBy), [requests]);
+
+  const pendingCount = systemRequests.filter((r) => r.status === "pending").length;
+  const userPendingCount = userCreationRequests.filter((r) => r.status === "pending").length;
   const totalMembers = clubs.reduce((sum, c) => sum + c.memberCount, 0);
 
   const displayedRequests = useMemo(() => {
-    let list = showAllRequests ? requests : requests.filter((r) => r.status === "pending");
+    let list = showAllRequests ? systemRequests : systemRequests.filter((r) => r.status === "pending");
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter((r) => r.name.toLowerCase().includes(q) || r.brandName?.toLowerCase().includes(q) || r.modelName?.toLowerCase().includes(q));
     }
     return list;
-  }, [requests, search, showAllRequests]);
+  }, [systemRequests, search, showAllRequests]);
+
+  const displayedUserCreation = useMemo(() => {
+    let list = showAllRequests ? userCreationRequests : userCreationRequests.filter((r) => r.status === "pending");
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((r) => r.name.toLowerCase().includes(q));
+    }
+    return list;
+  }, [userCreationRequests, search, showAllRequests]);
 
   const displayedClubs = useMemo(() => {
     if (!search.trim()) return clubs;
@@ -164,6 +183,75 @@ export default function AdminMotoclubs() {
               <Text style={styles.cardSub}>
                 {[item.brandName, item.modelName].filter(Boolean).join(" ")}
               </Text>
+            )}
+          </View>
+          <Text style={styles.cardDate}>
+            {new Date(item.createdAt).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}
+          </Text>
+          {item.reviewNote && (
+            <Text style={[styles.cardSub, { color: Colors.error, marginTop: 4 }]}>
+              Nota: {item.reviewNote}
+            </Text>
+          )}
+          {isPending && (
+            <View style={styles.requestActions}>
+              <TouchableOpacity
+                style={[styles.actionPill, { backgroundColor: Colors.success }]}
+                onPress={() => handleApprove(item)}
+                disabled={approveMutation.isPending}
+              >
+                <MaterialIcons name="check" size={14} color="#fff" />
+                <Text style={styles.actionPillText}>Approva</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionPill, { backgroundColor: Colors.error }]}
+                onPress={() => { setRejectNote(""); setRejectModal({ id: item.id, name: item.name }); }}
+              >
+                <MaterialIcons name="close" size={14} color="#fff" />
+                <Text style={styles.actionPillText}>Rifiuta</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  function renderUserCreation({ item }: { item: ClubRequest }) {
+    const isPending = item.status === "pending";
+    let inviteCount = 0;
+    try { inviteCount = item.inviteUserIds ? JSON.parse(item.inviteUserIds).length : 0; } catch {}
+    return (
+      <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: Colors.warning }]}>
+        <View style={styles.cardIconWrap}>
+          <Ionicons name="people-circle-outline" size={22} color={Colors.warning} />
+        </View>
+        <View style={styles.cardBody}>
+          <View style={styles.cardRow}>
+            <Text style={styles.cardName}>{item.name}</Text>
+            <StatusBadge status={item.status} />
+          </View>
+          {item.parentClubId && (
+            <Text style={styles.cardSub}>Sub-club di: {item.parentClubId.slice(0, 8)}...</Text>
+          )}
+          <View style={styles.cardRow}>
+            {item.latitude && item.longitude && (
+              <View style={styles.statChip}>
+                <Ionicons name="location" size={12} color={Colors.textSecondary} />
+                <Text style={styles.statChipText}>{item.latitude.toFixed(3)}, {item.longitude.toFixed(3)}</Text>
+              </View>
+            )}
+            {item.inviteRadiusKm && (
+              <View style={styles.statChip}>
+                <Ionicons name="radio-button-on" size={12} color={Colors.textSecondary} />
+                <Text style={styles.statChipText}>{item.inviteRadiusKm} km</Text>
+              </View>
+            )}
+            {inviteCount > 0 && (
+              <View style={styles.statChip}>
+                <Ionicons name="people" size={12} color={Colors.textSecondary} />
+                <Text style={styles.statChipText}>{inviteCount} utenti</Text>
+              </View>
             )}
           </View>
           <Text style={styles.cardDate}>
@@ -289,6 +377,14 @@ export default function AdminMotoclubs() {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
+          style={[styles.tabBtn, tab === "user_creation" && styles.tabBtnActive]}
+          onPress={() => setTab("user_creation")}
+        >
+          <Text style={[styles.tabBtnText, tab === "user_creation" && styles.tabBtnTextActive]}>
+            Da Utenti{userPendingCount > 0 ? ` (${userPendingCount})` : ""}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={[styles.tabBtn, tab === "clubs" && styles.tabBtnActive]}
           onPress={() => setTab("clubs")}
         >
@@ -298,8 +394,8 @@ export default function AdminMotoclubs() {
         </TouchableOpacity>
       </View>
 
-      {/* Show all / only pending toggle (requests tab only) */}
-      {tab === "requests" && (
+      {/* Show all / only pending toggle (requests tabs only) */}
+      {(tab === "requests" || tab === "user_creation") && (
         <TouchableOpacity style={styles.toggleRow} onPress={() => setShowAllRequests((v) => !v)}>
           <Text style={styles.toggleText}>
             {showAllRequests ? "Mostra solo in attesa" : "Mostra tutte le richieste"}
@@ -310,18 +406,20 @@ export default function AdminMotoclubs() {
 
       <FlatList
         key={tab}
-        data={(tab === "requests" ? displayedRequests : displayedClubs) as any[]}
+        data={(tab === "requests" ? displayedRequests : tab === "user_creation" ? displayedUserCreation : displayedClubs) as any[]}
         keyExtractor={(item) => item.id}
-        renderItem={(tab === "requests" ? renderRequest : renderClub) as any}
+        renderItem={(tab === "requests" ? renderRequest : tab === "user_creation" ? renderUserCreation : renderClub) as any}
         contentContainerStyle={{ padding: 14, paddingBottom: insets.bottom + 24 }}
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
             <Ionicons name="shield-outline" size={48} color={Colors.border} />
             <Text style={styles.emptyText}>
-              {(tab === "requests" ? loadingReqs : loadingClubs)
+              {(tab === "requests" || tab === "user_creation" ? loadingReqs : loadingClubs)
                 ? "Caricamento..."
                 : tab === "requests"
                 ? "Nessuna richiesta"
+                : tab === "user_creation"
+                ? "Nessuna richiesta da utenti"
                 : "Nessun club attivo"}
             </Text>
           </View>

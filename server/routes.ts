@@ -28,6 +28,9 @@ import customRoutesRouter from "./routes/custom-routes";
 import sosRoutes from "./routes/sos";
 import motoclubsRoutes from "./routes/motoclubs";
 import { triggerMatchingRun } from "./matching-engine";
+import { db } from "./db";
+import { users } from "@shared/schema";
+import { ilike } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const PgStore = connectPgSimple(session);
@@ -241,6 +244,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ enabled: setting?.value !== "false" });
     } catch {
       res.json({ enabled: true });
+    }
+  });
+
+  app.get("/api/settings/motoclub-user-creation", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("motoclub_user_creation_enabled");
+      res.json({ enabled: setting?.value === "true" });
+    } catch {
+      res.json({ enabled: false });
+    }
+  });
+
+  app.get("/api/users/search", async (req, res) => {
+    if (!req.session?.userId) return res.status(401).json({ message: "Non autenticato" });
+    try {
+      const { q } = req.query as { q?: string };
+      if (!q || q.trim().length < 2) return res.json([]);
+      const results = await db
+        .select({ id: users.id, nickname: users.nickname, userType: users.userType })
+        .from(users)
+        .where(ilike(users.nickname, `%${q.trim()}%`))
+        .limit(30);
+      return res.json(results);
+    } catch {
+      return res.status(500).json({ message: "Errore interno" });
     }
   });
 

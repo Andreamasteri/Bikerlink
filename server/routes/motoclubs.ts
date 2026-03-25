@@ -6,6 +6,7 @@ import {
   motoClubMembers,
   motoClubInvites,
   motoClubRequests,
+  feedbackTickets,
   conversations,
   conversationParticipants,
   messages,
@@ -15,6 +16,7 @@ import {
   userMotorcycles,
 } from "@shared/schema";
 import { eq, and, ilike, or, sql, desc, ne, count } from "drizzle-orm";
+import { sendEmail } from "../email";
 
 const router = Router();
 
@@ -657,6 +659,104 @@ router.get("/me/clubs", requireAuth, async (req: Request, res: Response) => {
       .where(and(eq(motoClubMembers.userId, userId), eq(motoClubMembers.status, "active")));
 
     return res.json(clubs.map(r => ({ ...r.club, joinedAt: r.member.joinedAt, role: r.member.role })));
+  } catch (e) {
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+router.post("/creation-request", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+
+    const creationEnabled = await storage.getAppSetting("motoclub_user_creation_enabled");
+    if (creationEnabled?.value !== "true") {
+      return res.status(403).json({ message: "Creazione motoclub non abilitata" });
+    }
+
+    const { name, parentClubId, latitude, longitude, inviteRadiusKm, inviteUserIds } = req.body as {
+      name: string;
+      parentClubId?: string;
+      latitude?: number;
+      longitude?: number;
+      inviteRadiusKm?: number;
+      inviteUserIds?: string[];
+    };
+
+    if (!name || name.trim().length < 2) {
+      return res.status(400).json({ message: "Nome obbligatorio (min 2 caratteri)" });
+    }
+
+    const user = await storage.getUser(userId);
+
+    const [request] = await db.insert(motoClubRequests).values({
+      name: name.trim(),
+      clubType: "custom",
+      requestedBy: userId,
+      status: "pending",
+      parentClubId: parentClubId ?? null,
+      latitude: latitude ?? null,
+      longitude: longitude ?? null,
+      inviteRadiusKm: inviteRadiusKm ?? null,
+      inviteUserIds: inviteUserIds && inviteUserIds.length > 0 ? JSON.stringify(inviteUserIds) : null,
+    }).returning();
+
+    await db.insert(feedbackTickets).values({
+      userId,
+      ticketType: "suggestion",
+      subject: `Richiesta creazione Motoclub: ${name}`,
+      message: [
+        `Utente: ${user?.nickname ?? userId}`,
+        `Nome club: ${name}`,
+        parentClubId ? `Sub-club di: ${parentClubId}` : "Elenco principale",
+        latitude && longitude ? `Posizione: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}` : "Nessuna posizione",
+        inviteRadiusKm ? `Raggio inviti: ${inviteRadiusKm} km` : "",
+        inviteUserIds && inviteUserIds.length > 0 ? `Utenti invitati: ${inviteUserIds.length}` : "",
+        `Request ID: ${request.id}`,
+      ].filter(Boolean).join("\n"),
+      status: "open",
+    });
+
+    const adminEmail = process.env.ADMIN_EMAIL || "bikerlinkapp@gmail.com";
+    await sendEmail(
+      adminEmail,
+      `[BikerLink] Nuova richiesta Motoclub: ${name}`,
+      `<p>Un utente ha richiesto la creazione di un nuovo motoclub:</p>
+      <ul>
+        <li><strong>Utente:</strong> ${user?.nickname ?? userId}</li>
+        <li><strong>Nome:</strong> ${name}</li>
+        <li><strong>Tipo:</strong> ${parentClubId ? "Sub-club" : "Elenco principale"}</li>
+        ${latitude && longitude ? `<li><strong>Posizione:</strong> ${latitude.toFixed(4)}, ${longitude.toFixed(4)}</li>` : ""}
+        ${inviteRadiusKm ? `<li><strong>Raggio inviti:</strong> ${inviteRadiusKm} km</li>` : ""}
+        ${inviteUserIds && inviteUserIds.length > 0 ? `<li><strong>Inviti manuali:</strong> ${inviteUserIds.length} utenti</li>` : ""}
+        <li><strong>Request ID:</strong> ${request.id}</li>
+      </ul>
+      <p>Vai al pannello admin per approvare o rifiutare.</p>`
+    ).catch(e => console.error("[creation-request] email error:", e));
+
+    return res.status(201).json({ success: true, requestId: request.id });
+  } catch (e) {
+    console.error("[POST /creation-request]", e);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+router.get("/creation-request/status", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const [request] = await db
+      .select()
+      .from(motoClubRequests)
+      .where(and(eq(motoClubRequests.requestedBy, userId), eq(motoClubRequests.clubType, "custom")))
+      .orderBy(desc(motoClubRequests.createdAt))
+      .limit(1);
+
+    if (!request) return res.json(null);
+    return res.json({
+      status: request.status,
+      name: request.name,
+      createdAt: request.createdAt,
+      reviewNote: request.reviewNote,
+    });
   } catch (e) {
     return res.status(500).json({ message: "Errore interno" });
   }

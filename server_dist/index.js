@@ -645,6 +645,9 @@ var init_schema = __esm({
       isApproved: (0, import_pg_core.boolean)("is_approved").notNull().default(false),
       activityScore: (0, import_pg_core.integer)("activity_score").notNull().default(0),
       conversationId: (0, import_pg_core.varchar)("conversation_id", { length: 36 }),
+      parentClubId: (0, import_pg_core.varchar)("parent_club_id", { length: 36 }),
+      latitude: (0, import_pg_core.doublePrecision)("latitude"),
+      longitude: (0, import_pg_core.doublePrecision)("longitude"),
       createdBy: (0, import_pg_core.varchar)("created_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
       createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow(),
       updatedAt: (0, import_pg_core.timestamp)("updated_at").notNull().defaultNow()
@@ -685,6 +688,11 @@ var init_schema = __esm({
       status: (0, import_pg_core.varchar)("status", { length: 20 }).notNull().default("pending"),
       reviewedBy: (0, import_pg_core.varchar)("reviewed_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
       reviewNote: (0, import_pg_core.text)("review_note"),
+      parentClubId: (0, import_pg_core.varchar)("parent_club_id", { length: 36 }),
+      latitude: (0, import_pg_core.doublePrecision)("latitude"),
+      longitude: (0, import_pg_core.doublePrecision)("longitude"),
+      inviteRadiusKm: (0, import_pg_core.integer)("invite_radius_km"),
+      inviteUserIds: (0, import_pg_core.text)("invite_user_ids"),
       createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow(),
       updatedAt: (0, import_pg_core.timestamp)("updated_at").notNull().defaultNow()
     });
@@ -5452,6 +5460,81 @@ router3.get("/me/clubs", requireAuth2, async (req, res) => {
       member: motoClubMembers
     }).from(motoClubMembers).innerJoin(motoClubs, (0, import_drizzle_orm3.eq)(motoClubs.id, motoClubMembers.clubId)).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubMembers.userId, userId), (0, import_drizzle_orm3.eq)(motoClubMembers.status, "active")));
     return res.json(clubs.map((r) => ({ ...r.club, joinedAt: r.member.joinedAt, role: r.member.role })));
+  } catch (e) {
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+router3.post("/creation-request", requireAuth2, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const creationEnabled = await storage.getAppSetting("motoclub_user_creation_enabled");
+    if (creationEnabled?.value !== "true") {
+      return res.status(403).json({ message: "Creazione motoclub non abilitata" });
+    }
+    const { name, parentClubId, latitude, longitude, inviteRadiusKm, inviteUserIds } = req.body;
+    if (!name || name.trim().length < 2) {
+      return res.status(400).json({ message: "Nome obbligatorio (min 2 caratteri)" });
+    }
+    const user = await storage.getUser(userId);
+    const [request] = await db.insert(motoClubRequests).values({
+      name: name.trim(),
+      clubType: "custom",
+      requestedBy: userId,
+      status: "pending",
+      parentClubId: parentClubId ?? null,
+      latitude: latitude ?? null,
+      longitude: longitude ?? null,
+      inviteRadiusKm: inviteRadiusKm ?? null,
+      inviteUserIds: inviteUserIds && inviteUserIds.length > 0 ? JSON.stringify(inviteUserIds) : null
+    }).returning();
+    await db.insert(feedbackTickets).values({
+      userId,
+      ticketType: "suggestion",
+      subject: `Richiesta creazione Motoclub: ${name}`,
+      message: [
+        `Utente: ${user?.nickname ?? userId}`,
+        `Nome club: ${name}`,
+        parentClubId ? `Sub-club di: ${parentClubId}` : "Elenco principale",
+        latitude && longitude ? `Posizione: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}` : "Nessuna posizione",
+        inviteRadiusKm ? `Raggio inviti: ${inviteRadiusKm} km` : "",
+        inviteUserIds && inviteUserIds.length > 0 ? `Utenti invitati: ${inviteUserIds.length}` : "",
+        `Request ID: ${request.id}`
+      ].filter(Boolean).join("\n"),
+      status: "open"
+    });
+    const adminEmail = process.env.ADMIN_EMAIL || "bikerlinkapp@gmail.com";
+    await sendEmail(
+      adminEmail,
+      `[BikerLink] Nuova richiesta Motoclub: ${name}`,
+      `<p>Un utente ha richiesto la creazione di un nuovo motoclub:</p>
+      <ul>
+        <li><strong>Utente:</strong> ${user?.nickname ?? userId}</li>
+        <li><strong>Nome:</strong> ${name}</li>
+        <li><strong>Tipo:</strong> ${parentClubId ? "Sub-club" : "Elenco principale"}</li>
+        ${latitude && longitude ? `<li><strong>Posizione:</strong> ${latitude.toFixed(4)}, ${longitude.toFixed(4)}</li>` : ""}
+        ${inviteRadiusKm ? `<li><strong>Raggio inviti:</strong> ${inviteRadiusKm} km</li>` : ""}
+        ${inviteUserIds && inviteUserIds.length > 0 ? `<li><strong>Inviti manuali:</strong> ${inviteUserIds.length} utenti</li>` : ""}
+        <li><strong>Request ID:</strong> ${request.id}</li>
+      </ul>
+      <p>Vai al pannello admin per approvare o rifiutare.</p>`
+    ).catch((e) => console.error("[creation-request] email error:", e));
+    return res.status(201).json({ success: true, requestId: request.id });
+  } catch (e) {
+    console.error("[POST /creation-request]", e);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+router3.get("/creation-request/status", requireAuth2, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const [request] = await db.select().from(motoClubRequests).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubRequests.requestedBy, userId), (0, import_drizzle_orm3.eq)(motoClubRequests.clubType, "custom"))).orderBy((0, import_drizzle_orm3.desc)(motoClubRequests.createdAt)).limit(1);
+    if (!request) return res.json(null);
+    return res.json({
+      status: request.status,
+      name: request.name,
+      createdAt: request.createdAt,
+      reviewNote: request.reviewNote
+    });
   } catch (e) {
     return res.status(500).json({ message: "Errore interno" });
   }
@@ -10298,21 +10381,78 @@ router17.post("/motoclubs/requests/:id/approve", async (req, res) => {
       brandName: request.brandName,
       modelName: request.modelName,
       isApproved: true,
-      createdBy: request.requestedBy ?? null
+      createdBy: request.requestedBy ?? null,
+      parentClubId: request.parentClubId ?? null,
+      latitude: request.latitude ?? null,
+      longitude: request.longitude ?? null
     }).returning();
     const [conv] = await db.insert(conversations).values({
       conversationType: "motoclub",
       title: `Club ${request.name}`
     }).returning();
     await db.update(motoClubs).set({ conversationId: conv.id }).where((0, import_drizzle_orm9.eq)(motoClubs.id, newClub.id));
+    const inviteRadiusKm = request.inviteRadiusKm;
+    const inviteUserIdsJson = request.inviteUserIds;
+    const invitedUserIds = /* @__PURE__ */ new Set();
+    if (inviteRadiusKm && request.latitude && request.longitude) {
+      const lat = request.latitude;
+      const lng = request.longitude;
+      const nearbyUsers = await db.select({ userId: userProfiles.userId }).from(userProfiles).where(
+        import_drizzle_orm9.sql`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude})))) <= ${inviteRadiusKm}`
+      ).limit(200);
+      nearbyUsers.forEach((r) => {
+        if (r.userId !== request.requestedBy) invitedUserIds.add(r.userId);
+      });
+    }
+    if (inviteUserIdsJson) {
+      try {
+        const ids = JSON.parse(inviteUserIdsJson);
+        ids.forEach((id) => {
+          if (id !== request.requestedBy) invitedUserIds.add(id);
+        });
+      } catch {
+      }
+    }
+    for (const uid of invitedUserIds) {
+      try {
+        await db.insert(motoClubInvites).values({ clubId: newClub.id, userId: uid, status: "pending" }).onConflictDoNothing();
+      } catch {
+      }
+    }
+    if (request.requestedBy) {
+      try {
+        const [dmConv] = await db.insert(conversations).values({
+          conversationType: "private",
+          title: null
+        }).returning();
+        await db.insert(conversationParticipants).values([
+          { conversationId: dmConv.id, userId: adminId },
+          { conversationId: dmConv.id, userId: request.requestedBy }
+        ]);
+        await storage.createMessage({
+          conversationId: dmConv.id,
+          senderId: adminId,
+          messageType: "text",
+          content: `Il tuo motoclub "${request.name}" \xE8 stato approvato e creato! Puoi trovarlo nella sezione Motoclub.`,
+          imageUrl: null,
+          latitude: null,
+          longitude: null,
+          isFiltered: false
+        });
+        await storage.updateConversationTimestamp(dmConv.id);
+      } catch (e) {
+        console.error("[approve motoclub] DM error:", e);
+      }
+      await db.update(feedbackTickets).set({ status: "resolved", updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm9.and)((0, import_drizzle_orm9.eq)(feedbackTickets.userId, request.requestedBy), (0, import_drizzle_orm9.eq)(feedbackTickets.status, "open")));
+    }
     await db.insert(moderatorLogs).values({
       moderatorId: adminId,
       action: "approve_motoclub_request",
       targetType: "motoclub_request",
       targetId: requestId,
-      details: `Approvata richiesta: ${request.name}`
+      details: `Approvata richiesta: ${request.name} (${invitedUserIds.size} inviti inviati)`
     });
-    return res.json({ message: "Richiesta approvata", club: newClub });
+    return res.json({ message: "Richiesta approvata", club: newClub, invitesSent: invitedUserIds.size });
   } catch (e) {
     console.error("[approve motoclub request]", e);
     return res.status(500).json({ message: "Errore interno" });
@@ -10323,7 +10463,34 @@ router17.post("/motoclubs/requests/:id/reject", async (req, res) => {
     const adminId = req.session.userId;
     const requestId = req.params.id;
     const { note } = req.body;
+    const [request] = await db.select().from(motoClubRequests).where((0, import_drizzle_orm9.eq)(motoClubRequests.id, requestId)).limit(1);
     await db.update(motoClubRequests).set({ status: "rejected", reviewedBy: adminId, reviewNote: note ?? null, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm9.eq)(motoClubRequests.id, requestId));
+    if (request?.requestedBy) {
+      try {
+        const [dmConv] = await db.insert(conversations).values({
+          conversationType: "private",
+          title: null
+        }).returning();
+        await db.insert(conversationParticipants).values([
+          { conversationId: dmConv.id, userId: adminId },
+          { conversationId: dmConv.id, userId: request.requestedBy }
+        ]);
+        const noteText = note ? ` Motivazione: ${note}` : "";
+        await storage.createMessage({
+          conversationId: dmConv.id,
+          senderId: adminId,
+          messageType: "text",
+          content: `La richiesta di creazione del motoclub "${request.name}" non \xE8 stata approvata.${noteText}`,
+          imageUrl: null,
+          latitude: null,
+          longitude: null,
+          isFiltered: false
+        });
+        await storage.updateConversationTimestamp(dmConv.id);
+      } catch (e) {
+        console.error("[reject motoclub] DM error:", e);
+      }
+    }
     await db.insert(moderatorLogs).values({
       moderatorId: adminId,
       action: "reject_motoclub_request",
@@ -10588,7 +10755,7 @@ router17.get("/db-stats", async (_req, res) => {
       users: usersTable,
       userProfiles: userProfiles2,
       conversations: conversations2,
-      messages: messages2,
+      messages: messages3,
       motoClubs: motoClubs2,
       motoClubMembers: motoClubMembers2,
       motoClubRequests: motoClubRequests2,
@@ -10652,8 +10819,8 @@ router17.get("/db-stats", async (_req, res) => {
       db.select({ id: userProfiles2.id, createdAt: userProfiles2.updatedAt, label: userProfiles2.userId }).from(userProfiles2).orderBy(descFn(userProfiles2.updatedAt)).limit(5),
       db.select({ total: countFn() }).from(conversations2),
       db.select({ id: conversations2.id, createdAt: conversations2.createdAt, label: conversations2.title, conversationType: conversations2.conversationType }).from(conversations2).orderBy(descFn(conversations2.createdAt)).limit(5),
-      db.select({ total: countFn() }).from(messages2),
-      db.select({ id: messages2.id, createdAt: messages2.createdAt, label: messages2.content, messageType: messages2.messageType }).from(messages2).orderBy(descFn(messages2.createdAt)).limit(5),
+      db.select({ total: countFn() }).from(messages3),
+      db.select({ id: messages3.id, createdAt: messages3.createdAt, label: messages3.content, messageType: messages3.messageType }).from(messages3).orderBy(descFn(messages3.createdAt)).limit(5),
       db.select({ total: countFn() }).from(motoClubs2),
       db.select({ id: motoClubs2.id, createdAt: motoClubs2.createdAt, label: motoClubs2.name, clubType: motoClubs2.clubType, isApproved: motoClubs2.isApproved }).from(motoClubs2).orderBy(descFn(motoClubs2.createdAt)).limit(5),
       db.select({ total: countFn() }).from(motoClubMembers2),
@@ -11403,6 +11570,9 @@ router20.put("/:id/accept", async (req, res) => {
 var sos_default = router20;
 
 // server/routes.ts
+init_db();
+init_schema();
+var import_drizzle_orm10 = require("drizzle-orm");
 async function registerRoutes(app2) {
   const PgStore = (0, import_connect_pg_simple.default)(import_express_session.default);
   app2.use(
@@ -11597,6 +11767,25 @@ async function registerRoutes(app2) {
       res.json({ enabled: setting?.value !== "false" });
     } catch {
       res.json({ enabled: true });
+    }
+  });
+  app2.get("/api/settings/motoclub-user-creation", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("motoclub_user_creation_enabled");
+      res.json({ enabled: setting?.value === "true" });
+    } catch {
+      res.json({ enabled: false });
+    }
+  });
+  app2.get("/api/users/search", async (req, res) => {
+    if (!req.session?.userId) return res.status(401).json({ message: "Non autenticato" });
+    try {
+      const { q } = req.query;
+      if (!q || q.trim().length < 2) return res.json([]);
+      const results = await db.select({ id: users.id, nickname: users.nickname, userType: users.userType }).from(users).where((0, import_drizzle_orm10.ilike)(users.nickname, `%${q.trim()}%`)).limit(30);
+      return res.json(results);
+    } catch {
+      return res.status(500).json({ message: "Errore interno" });
     }
   });
   app2.get("/api/settings/phone-field-enabled", async (_req, res) => {
@@ -12006,7 +12195,7 @@ async function registerRoutes(app2) {
 var import_bcryptjs4 = __toESM(require("bcryptjs"));
 init_db();
 init_schema();
-var import_drizzle_orm10 = require("drizzle-orm");
+var import_drizzle_orm11 = require("drizzle-orm");
 var essentialUsers = [
   {
     nickname: "admin",
@@ -12028,7 +12217,7 @@ var essentialUsers = [
 async function autoSeedEssentialUsers() {
   try {
     for (const userData of essentialUsers) {
-      const existing = await db.select().from(users).where((0, import_drizzle_orm10.eq)(users.email, userData.email)).limit(1);
+      const existing = await db.select().from(users).where((0, import_drizzle_orm11.eq)(users.email, userData.email)).limit(1);
       if (existing.length > 0) {
         continue;
       }
@@ -12134,17 +12323,17 @@ var fakeCoppie = [
 ];
 async function autoSeedFakeUsers() {
   try {
-    const skipSetting = await db.select().from(appSettings).where((0, import_drizzle_orm10.eq)(appSettings.key, "skip_fake_user_seed")).limit(1);
+    const skipSetting = await db.select().from(appSettings).where((0, import_drizzle_orm11.eq)(appSettings.key, "skip_fake_user_seed")).limit(1);
     if (skipSetting.length > 0 && skipSetting[0].value === "true") {
       console.log("Auto-seed fake users skipped (admin deleted all fake users)");
       return;
     }
-    const massSeedTagged = await db.select({ id: users.id }).from(users).where(import_drizzle_orm10.sql`${users.invitationCode} IN ('mass_seed_2420', 'mass_seed_eu_v1')`).limit(1);
+    const massSeedTagged = await db.select({ id: users.id }).from(users).where(import_drizzle_orm11.sql`${users.invitationCode} IN ('mass_seed_2420', 'mass_seed_eu_v1')`).limit(1);
     if (massSeedTagged.length > 0) {
       console.log("Auto-seed fake users skipped (mass-seeded population exists)");
       return;
     }
-    const existingFakes = await db.select().from(users).where((0, import_drizzle_orm10.eq)(users.isFake, true)).limit(11);
+    const existingFakes = await db.select().from(users).where((0, import_drizzle_orm11.eq)(users.isFake, true)).limit(11);
     if (existingFakes.length > 10) {
       return;
     }
@@ -12279,7 +12468,7 @@ async function autoSeedFakeUsers() {
 
 // server/index.ts
 init_db();
-var import_drizzle_orm11 = require("drizzle-orm");
+var import_drizzle_orm12 = require("drizzle-orm");
 init_schema();
 var fs9 = __toESM(require("fs"));
 var path9 = __toESM(require("path"));
@@ -12452,16 +12641,16 @@ function configureExpoAndLanding(app2) {
 }
 async function initMissingClubConversations() {
   try {
-    const clubs = await db.select({ id: motoClubs.id, name: motoClubs.name, conversationId: motoClubs.conversationId }).from(motoClubs).where((0, import_drizzle_orm11.eq)(motoClubs.isApproved, true));
+    const clubs = await db.select({ id: motoClubs.id, name: motoClubs.name, conversationId: motoClubs.conversationId }).from(motoClubs).where((0, import_drizzle_orm12.eq)(motoClubs.isApproved, true));
     let synced = 0;
     for (const club of clubs) {
       try {
         let convId = club.conversationId;
         if (convId) {
-          const existing = await db.select({ id: conversations.id }).from(conversations).where((0, import_drizzle_orm11.eq)(conversations.id, convId)).limit(1);
+          const existing = await db.select({ id: conversations.id }).from(conversations).where((0, import_drizzle_orm12.eq)(conversations.id, convId)).limit(1);
           if (existing.length === 0) {
             convId = null;
-            await db.update(motoClubs).set({ conversationId: null, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm11.eq)(motoClubs.id, club.id));
+            await db.update(motoClubs).set({ conversationId: null, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm12.eq)(motoClubs.id, club.id));
           }
         }
         if (!convId) {
@@ -12470,9 +12659,9 @@ async function initMissingClubConversations() {
             title: `Club ${club.name}`
           }).returning();
           convId = conv.id;
-          await db.update(motoClubs).set({ conversationId: convId, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm11.eq)(motoClubs.id, club.id));
+          await db.update(motoClubs).set({ conversationId: convId, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm12.eq)(motoClubs.id, club.id));
         }
-        const members = await db.select({ userId: motoClubMembers.userId }).from(motoClubMembers).where((0, import_drizzle_orm11.and)((0, import_drizzle_orm11.eq)(motoClubMembers.clubId, club.id), (0, import_drizzle_orm11.eq)(motoClubMembers.status, "active")));
+        const members = await db.select({ userId: motoClubMembers.userId }).from(motoClubMembers).where((0, import_drizzle_orm12.and)((0, import_drizzle_orm12.eq)(motoClubMembers.clubId, club.id), (0, import_drizzle_orm12.eq)(motoClubMembers.status, "active")));
         if (members.length > 0) {
           const rows = members.map((m) => ({ conversationId: convId, userId: m.userId }));
           await db.insert(conversationParticipants).values(rows).onConflictDoNothing();
@@ -12525,27 +12714,27 @@ function setupErrorHandler(app2) {
   });
   setupErrorHandler(app);
   try {
-    await db.execute(import_drizzle_orm11.sql`ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS image_url TEXT`);
+    await db.execute(import_drizzle_orm12.sql`ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS image_url TEXT`);
   } catch (e) {
     console.warn("[MIGRATION] invitation_codes.image_url:", e);
   }
   try {
-    await db.execute(import_drizzle_orm11.sql`ALTER TABLE ad_campaigns ADD COLUMN IF NOT EXISTS placement VARCHAR(30) NOT NULL DEFAULT 'all'`);
+    await db.execute(import_drizzle_orm12.sql`ALTER TABLE ad_campaigns ADD COLUMN IF NOT EXISTS placement VARCHAR(30) NOT NULL DEFAULT 'all'`);
   } catch (e) {
     console.warn("[MIGRATION] ad_campaigns.placement:", e);
   }
   try {
-    await db.execute(import_drizzle_orm11.sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ghost_mode BOOLEAN NOT NULL DEFAULT false`);
+    await db.execute(import_drizzle_orm12.sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ghost_mode BOOLEAN NOT NULL DEFAULT false`);
   } catch (e) {
     console.warn("[MIGRATION] users.ghost_mode:", e);
   }
   try {
-    await db.execute(import_drizzle_orm11.sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_map_style VARCHAR(20)`);
+    await db.execute(import_drizzle_orm12.sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_map_style VARCHAR(20)`);
   } catch (e) {
     console.warn("[MIGRATION] user_profiles.preferred_map_style:", e);
   }
   try {
-    await db.execute(import_drizzle_orm11.sql`
+    await db.execute(import_drizzle_orm12.sql`
       CREATE TABLE IF NOT EXISTS user_blocks (
         id SERIAL PRIMARY KEY,
         blocker_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -12553,9 +12742,9 @@ function setupErrorHandler(app2) {
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
-    await db.execute(import_drizzle_orm11.sql`CREATE UNIQUE INDEX IF NOT EXISTS user_blocks_unique_idx ON user_blocks (blocker_id, blocked_id)`);
-    await db.execute(import_drizzle_orm11.sql`CREATE INDEX IF NOT EXISTS user_blocks_blocker_idx ON user_blocks (blocker_id)`);
-    await db.execute(import_drizzle_orm11.sql`CREATE INDEX IF NOT EXISTS user_blocks_blocked_idx ON user_blocks (blocked_id)`);
+    await db.execute(import_drizzle_orm12.sql`CREATE UNIQUE INDEX IF NOT EXISTS user_blocks_unique_idx ON user_blocks (blocker_id, blocked_id)`);
+    await db.execute(import_drizzle_orm12.sql`CREATE INDEX IF NOT EXISTS user_blocks_blocker_idx ON user_blocks (blocker_id)`);
+    await db.execute(import_drizzle_orm12.sql`CREATE INDEX IF NOT EXISTS user_blocks_blocked_idx ON user_blocks (blocked_id)`);
   } catch (e) {
     console.warn("[MIGRATION] user_blocks:", e);
   }
