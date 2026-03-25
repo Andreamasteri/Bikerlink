@@ -326,6 +326,7 @@ const de: Record<string, string> = {
   "match.emptyProposalsTitle": "Keine Vorschlag-Matches",
   "match.emptyProposalsDesc": "Erstelle einen Vorschlag im Tab Vorschläge und das System findet automatisch kompatible Biker oder Sozias!",
   "match.sameMoto": "Gleiches Motorrad",
+  "match.superMatch": "Supermatch!!",
 
   "proposals.detail.notFound": "Vorschlag nicht gefunden",
   "proposals.detail.description": "Beschreibung",

@@ -62,10 +62,12 @@ function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress
   const isNew = match.status === "new";
   const isAccepted = match.status === "accepted";
   const isRejected = match.status === "rejected";
+  const isSuperMatch = !!(match.isSupermatch);
 
-  const statusColor = isAccepted ? Colors.success : isRejected ? Colors.accentRed : Colors.accent;
-  const statusLabel = isAccepted ? t("match.accepted") : isRejected ? t("match.rejected") : t("match.garage");
-  const statusIcon: keyof typeof Ionicons.glyphMap = isAccepted ? "checkmark-circle" : isRejected ? "close-circle" : "bicycle";
+  const SUPERMATCH_COLOR = "#FF8C00";
+  const statusColor = isAccepted ? Colors.success : isRejected ? Colors.accentRed : (isSuperMatch && isNew) ? SUPERMATCH_COLOR : Colors.accent;
+  const statusLabel = isAccepted ? t("match.accepted") : isRejected ? t("match.rejected") : (isSuperMatch && isNew) ? t("match.superMatch") : t("match.garage");
+  const statusIcon: keyof typeof Ionicons.glyphMap = isAccepted ? "checkmark-circle" : isRejected ? "close-circle" : (isSuperMatch && isNew) ? "flash" : "bicycle";
 
   const createdDate = match.createdAt
     ? new Date(match.createdAt).toLocaleDateString(locale, {
@@ -76,6 +78,7 @@ function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress
   return (
     <View style={[
       styles.matchCard,
+      isSuperMatch && isNew && styles.matchCardSupermatch,
       isAccepted && styles.matchCardAccepted,
       isRejected && styles.matchCardDimmed,
     ]}>
@@ -182,10 +185,12 @@ function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, onChatP
   const isNew = match.status === "new";
   const isAccepted = match.status === "accepted";
   const isRejected = match.status === "rejected";
+  const isSuperMatch = !!(match.isSupermatch);
 
-  const statusColor = isAccepted ? Colors.success : isRejected ? Colors.accentRed : Colors.accent;
-  const statusLabel = isAccepted ? t("match.accepted") : isRejected ? t("match.rejected") : t("match.sameMoto");
-  const statusIcon: keyof typeof Ionicons.glyphMap = isAccepted ? "checkmark-circle" : isRejected ? "close-circle" : "bicycle";
+  const SUPERMATCH_COLOR = "#FF8C00";
+  const statusColor = isAccepted ? Colors.success : isRejected ? Colors.accentRed : (isSuperMatch && isNew) ? SUPERMATCH_COLOR : Colors.accent;
+  const statusLabel = isAccepted ? t("match.accepted") : isRejected ? t("match.rejected") : (isSuperMatch && isNew) ? t("match.superMatch") : t("match.sameMoto");
+  const statusIcon: keyof typeof Ionicons.glyphMap = isAccepted ? "checkmark-circle" : isRejected ? "close-circle" : (isSuperMatch && isNew) ? "flash" : "bicycle";
 
   const createdDate = match.createdAt
     ? new Date(match.createdAt).toLocaleDateString(locale, {
@@ -196,6 +201,7 @@ function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, onChatP
   return (
     <View style={[
       styles.matchCard,
+      isSuperMatch && isNew && styles.matchCardSupermatch,
       isAccepted && styles.matchCardAccepted,
       isRejected && styles.matchCardDimmed,
     ]}>
@@ -458,8 +464,18 @@ export default function MatchScreen() {
   const allGarageMatches = garageMatches || [];
   const allBikerMatches = bikerMatches || [];
 
-  const visibleGarageMatches = allGarageMatches.filter((m: any) => m.status !== "rejected");
-  const visibleBikerMatches = allBikerMatches.filter((m: any) => m.status !== "rejected");
+  const visibleGarageMatches = allGarageMatches
+    .filter((m: any) => m.status !== "rejected")
+    .sort((a: any, b: any) => {
+      if (!!a.isSupermatch === !!b.isSupermatch) return 0;
+      return a.isSupermatch ? -1 : 1;
+    });
+  const visibleBikerMatches = allBikerMatches
+    .filter((m: any) => m.status !== "rejected")
+    .sort((a: any, b: any) => {
+      if (!!a.isSupermatch === !!b.isSupermatch) return 0;
+      return a.isSupermatch ? -1 : 1;
+    });
   const visibleProposalMatches = allProposalMatches.filter((m: any) => m.status !== "rejected" && m.status !== "expired");
 
   const newGarageMatches = visibleGarageMatches.filter((m: any) => m.status === "new");
@@ -1043,6 +1059,11 @@ const styles = StyleSheet.create({
   matchCardAccepted: {
     borderColor: Colors.success + "50",
     backgroundColor: Colors.success + "08",
+  },
+  matchCardSupermatch: {
+    backgroundColor: "#FF8C001F",
+    borderColor: "#FF8C0099",
+    borderWidth: 2,
   },
   matchCardDimmed: {
     opacity: 0.6,

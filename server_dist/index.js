@@ -557,6 +557,7 @@ var init_schema = __esm({
       bikerMotorcycleId: (0, import_pg_core.varchar)("biker_motorcycle_id", { length: 36 }).notNull().references(() => userMotorcycles.id, { onDelete: "cascade" }),
       wishlistMotoId: (0, import_pg_core.varchar)("wishlist_moto_id", { length: 36 }).notNull().references(() => zavarrinaWishlistMotos.id, { onDelete: "cascade" }),
       status: (0, import_pg_core.varchar)("status", { length: 20 }).notNull().default("new"),
+      isSupermatch: (0, import_pg_core.boolean)("is_supermatch").notNull().default(false),
       createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow()
     }, (table) => [
       (0, import_pg_core.index)("matches_biker_id_idx").on(table.bikerId),
@@ -570,6 +571,7 @@ var init_schema = __esm({
       motorcycleBrand: (0, import_pg_core.varchar)("motorcycle_brand", { length: 100 }).notNull(),
       motorcycleModel: (0, import_pg_core.varchar)("motorcycle_model", { length: 100 }).notNull(),
       status: (0, import_pg_core.varchar)("status", { length: 20 }).notNull().default("new"),
+      isSupermatch: (0, import_pg_core.boolean)("is_supermatch").notNull().default(false),
       createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow()
     }, (table) => [
       (0, import_pg_core.index)("biker_biker_biker1_idx").on(table.biker1Id),
@@ -8284,12 +8286,14 @@ async function runWishlistMatching() {
             skipCount++;
             continue;
           }
+          const isSupermatch = !!(wish.brand && moto.brand && wish.brand.toLowerCase() === moto.brand.toLowerCase() && wish.model && moto.model && wish.model.toLowerCase() === moto.model.toLowerCase() && wish.motorcycleType && moto.motorcycleType && wish.motorcycleType.toLowerCase() === moto.motorcycleType.toLowerCase() && wish.ridingStyle && moto.ridingStyle && wish.ridingStyle.toLowerCase() === moto.ridingStyle.toLowerCase());
           await storage.createMatch({
             bikerId,
             zavarrinaId,
             bikerMotorcycleId: moto.id,
             wishlistMotoId: wish.id,
-            status: "new"
+            status: "new",
+            isSupermatch
           });
           existingKeys.add(key);
           matchCount++;
@@ -8327,7 +8331,13 @@ async function runBikerBikerMatching() {
       if (!bm.motorcycle.brand) continue;
       const key = bm.motorcycle.brand.toLowerCase();
       if (!buckets.has(key)) buckets.set(key, []);
-      buckets.get(key).push({ userId: bm.userId, brand: bm.motorcycle.brand, model: bm.motorcycle.model || "" });
+      buckets.get(key).push({
+        userId: bm.userId,
+        brand: bm.motorcycle.brand,
+        model: bm.motorcycle.model || "",
+        motorcycleType: bm.motorcycle.motorcycleType || "",
+        ridingStyle: bm.motorcycle.ridingStyle || ""
+      });
     }
     const bucketsWithMultiple = [...buckets.values()].filter((m) => m.length > 1);
     console.log(`[BikerBikerMatching] bucket creati: ${buckets.size}, con pi\xF9 di 1 membro: ${bucketsWithMultiple.length}`);
@@ -8350,12 +8360,14 @@ async function runBikerBikerMatching() {
           const m2 = uniqueMembers[j];
           const idA = m1.userId < m2.userId ? m1.userId : m2.userId;
           const idB = m1.userId < m2.userId ? m2.userId : m1.userId;
+          const isSupermatch = !!(m1.model && m2.model && m1.model.toLowerCase() === m2.model.toLowerCase() && m1.motorcycleType && m2.motorcycleType && m1.motorcycleType.toLowerCase() === m2.motorcycleType.toLowerCase() && m1.ridingStyle && m2.ridingStyle && m1.ridingStyle.toLowerCase() === m2.ridingStyle.toLowerCase());
           const inserted = await storage.createBikerBikerMatch({
             biker1Id: idA,
             biker2Id: idB,
             motorcycleBrand: m1.brand,
             motorcycleModel: m1.model,
-            status: "new"
+            status: "new",
+            isSupermatch
           });
           if (inserted) matchCount++;
           else skipCount++;

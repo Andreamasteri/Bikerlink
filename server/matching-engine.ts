@@ -170,12 +170,28 @@ async function runWishlistMatching(): Promise<number> {
         const key = `${bikerId}:${zavarrinaId}:${moto.id}:${wish.id}`;
         if (existingKeys.has(key)) { skipCount++; continue; }
 
+        const isSupermatch = !!(
+          wish.brand &&
+          moto.brand &&
+          wish.brand.toLowerCase() === moto.brand.toLowerCase() &&
+          wish.model &&
+          moto.model &&
+          wish.model.toLowerCase() === moto.model.toLowerCase() &&
+          wish.motorcycleType &&
+          moto.motorcycleType &&
+          wish.motorcycleType.toLowerCase() === moto.motorcycleType.toLowerCase() &&
+          wish.ridingStyle &&
+          moto.ridingStyle &&
+          wish.ridingStyle.toLowerCase() === moto.ridingStyle.toLowerCase()
+        );
+
         await storage.createMatch({
           bikerId,
           zavarrinaId,
           bikerMotorcycleId: moto.id,
           wishlistMotoId: wish.id,
           status: "new",
+          isSupermatch,
         });
 
         existingKeys.add(key);
@@ -218,12 +234,18 @@ async function runBikerBikerMatching(): Promise<number> {
       return 0;
     }
 
-    const buckets = new Map<string, Array<{ userId: string; brand: string; model: string }>>();
+    const buckets = new Map<string, Array<{ userId: string; brand: string; model: string; motorcycleType: string; ridingStyle: string }>>();
     for (const bm of bikerMotorcycles) {
       if (!bm.motorcycle.brand) continue;
       const key = bm.motorcycle.brand.toLowerCase();
       if (!buckets.has(key)) buckets.set(key, []);
-      buckets.get(key)!.push({ userId: bm.userId, brand: bm.motorcycle.brand, model: bm.motorcycle.model || "" });
+      buckets.get(key)!.push({
+        userId: bm.userId,
+        brand: bm.motorcycle.brand,
+        model: bm.motorcycle.model || "",
+        motorcycleType: bm.motorcycle.motorcycleType || "",
+        ridingStyle: bm.motorcycle.ridingStyle || "",
+      });
     }
 
     const bucketsWithMultiple = [...buckets.values()].filter(m => m.length > 1);
@@ -254,12 +276,22 @@ async function runBikerBikerMatching(): Promise<number> {
           const idA = m1.userId < m2.userId ? m1.userId : m2.userId;
           const idB = m1.userId < m2.userId ? m2.userId : m1.userId;
 
+          const isSupermatch = !!(
+            m1.model && m2.model &&
+            m1.model.toLowerCase() === m2.model.toLowerCase() &&
+            m1.motorcycleType && m2.motorcycleType &&
+            m1.motorcycleType.toLowerCase() === m2.motorcycleType.toLowerCase() &&
+            m1.ridingStyle && m2.ridingStyle &&
+            m1.ridingStyle.toLowerCase() === m2.ridingStyle.toLowerCase()
+          );
+
           const inserted = await storage.createBikerBikerMatch({
             biker1Id: idA,
             biker2Id: idB,
             motorcycleBrand: m1.brand,
             motorcycleModel: m1.model,
             status: "new",
+            isSupermatch,
           });
           if (inserted) matchCount++;
           else skipCount++;

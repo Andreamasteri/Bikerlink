@@ -326,6 +326,7 @@ const en: Record<string, string> = {
   "match.emptyProposalsTitle": "No proposal matches",
   "match.emptyProposalsDesc": "Create a proposal in the Proposals tab and the system will automatically find compatible bikers or pillions!",
   "match.sameMoto": "Same motorcycle",
+  "match.superMatch": "Supermatch!!",
 
   "proposals.detail.notFound": "Proposal not found",
   "proposals.detail.description": "Description",

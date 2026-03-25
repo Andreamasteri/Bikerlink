@@ -683,6 +683,7 @@ export const bikerZavarrinaMatches = pgTable("biker_zavorrina_matches", {
     .notNull()
     .references(() => zavarrinaWishlistMotos.id, { onDelete: "cascade" }),
   status: varchar("status", { length: 20 }).notNull().default("new"),
+  isSupermatch: boolean("is_supermatch").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("matches_biker_id_idx").on(table.bikerId),
@@ -703,6 +704,7 @@ export const bikerBikerMatches = pgTable("biker_biker_matches", {
   motorcycleBrand: varchar("motorcycle_brand", { length: 100 }).notNull(),
   motorcycleModel: varchar("motorcycle_model", { length: 100 }).notNull(),
   status: varchar("status", { length: 20 }).notNull().default("new"),
+  isSupermatch: boolean("is_supermatch").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("biker_biker_biker1_idx").on(table.biker1Id),
