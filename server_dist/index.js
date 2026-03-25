@@ -1478,18 +1478,23 @@ var init_storage = __esm({
         );
         return rejected.length;
       }
-      async getAllWishlistMotosWithUsers() {
-        const results = await db.select({
+      async getAllWishlistMotosWithUsers(countries) {
+        let query = db.select({
           wishlistMoto: zavarrinaWishlistMotos,
           userId: zavarrinaWishlists.userId
-        }).from(zavarrinaWishlistMotos).innerJoin(zavarrinaWishlists, (0, import_drizzle_orm2.eq)(zavarrinaWishlists.id, zavarrinaWishlistMotos.wishlistId));
-        return results;
+        }).from(zavarrinaWishlistMotos).innerJoin(zavarrinaWishlists, (0, import_drizzle_orm2.eq)(zavarrinaWishlists.id, zavarrinaWishlistMotos.wishlistId)).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, zavarrinaWishlists.userId));
+        if (countries && countries.length > 0) {
+          return query.where((0, import_drizzle_orm2.inArray)(users.country, countries));
+        }
+        return query;
       }
-      async getAllBikerMotorcyclesWithUsers() {
+      async getAllBikerMotorcyclesWithUsers(countries) {
+        const baseCondition = (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.userType, "biker"), (0, import_drizzle_orm2.eq)(users.userType, "coppia"), (0, import_drizzle_orm2.eq)(users.userType, "admin"));
+        const condition = countries && countries.length > 0 ? (0, import_drizzle_orm2.and)(baseCondition, (0, import_drizzle_orm2.inArray)(users.country, countries)) : baseCondition;
         const results = await db.select({
           motorcycle: userMotorcycles,
           userId: userMotorcycles.userId
-        }).from(userMotorcycles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userMotorcycles.userId)).where((0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.userType, "biker"), (0, import_drizzle_orm2.eq)(users.userType, "coppia"), (0, import_drizzle_orm2.eq)(users.userType, "admin")));
+        }).from(userMotorcycles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userMotorcycles.userId)).where(condition);
         return results;
       }
       async findExistingBikerZavarrinaMatch(bikerId, zavarrinaId, bikerMotorcycleId, wishlistMotoId) {
@@ -8233,8 +8238,17 @@ async function runMatching() {
 }
 async function runWishlistMatching() {
   try {
-    const wishlistMotos = await storage.getAllWishlistMotosWithUsers();
-    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
+    const countriesSetting = await storage.getAppSetting("matching_countries");
+    let matchingCountries;
+    if (countriesSetting?.value) {
+      try {
+        matchingCountries = JSON.parse(countriesSetting.value);
+      } catch {
+      }
+      if (!Array.isArray(matchingCountries) || matchingCountries.length === 0) matchingCountries = void 0;
+    }
+    const wishlistMotos = await storage.getAllWishlistMotosWithUsers(matchingCountries);
+    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers(matchingCountries);
     console.log(`[WishlistMatching] wishlist entries: ${wishlistMotos.length}, biker motorcycles: ${bikerMotorcycles.length}`);
     if (wishlistMotos.length === 0 || bikerMotorcycles.length === 0) {
       if (wishlistMotos.length === 0) console.warn("[WishlistMatching] WARN: nessuna wishlist trovata");
@@ -8255,11 +8269,7 @@ async function runWishlistMatching() {
           const moto = bm.motorcycle;
           if (bikerId === zavarrinaId) continue;
           let compatible = false;
-          if (wish.brand && wish.model) {
-            if (moto.brand && moto.model && wish.brand.toLowerCase() === moto.brand.toLowerCase() && (moto.model.toLowerCase().includes(wish.model.toLowerCase()) || wish.model.toLowerCase().includes(moto.model.toLowerCase()))) {
-              compatible = true;
-            }
-          } else if (wish.brand) {
+          if (wish.brand) {
             if (moto.brand && wish.brand.toLowerCase() === moto.brand.toLowerCase()) {
               compatible = true;
             }
@@ -8295,12 +8305,18 @@ async function runWishlistMatching() {
     return 0;
   }
 }
-function baseModelName(model) {
-  return model.toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9]/g, "");
-}
 async function runBikerBikerMatching() {
   try {
-    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
+    const countriesSetting = await storage.getAppSetting("matching_countries");
+    let matchingCountries;
+    if (countriesSetting?.value) {
+      try {
+        matchingCountries = JSON.parse(countriesSetting.value);
+      } catch {
+      }
+      if (!Array.isArray(matchingCountries) || matchingCountries.length === 0) matchingCountries = void 0;
+    }
+    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers(matchingCountries);
     console.log(`[BikerBikerMatching] moto biker trovate: ${bikerMotorcycles.length}`);
     if (bikerMotorcycles.length < 2) {
       console.warn("[BikerBikerMatching] WARN: meno di 2 moto biker trovate, matching impossibile");
@@ -8308,10 +8324,10 @@ async function runBikerBikerMatching() {
     }
     const buckets = /* @__PURE__ */ new Map();
     for (const bm of bikerMotorcycles) {
-      if (!bm.motorcycle.brand || !bm.motorcycle.model) continue;
-      const key = `${bm.motorcycle.brand.toLowerCase()}|${baseModelName(bm.motorcycle.model)}`;
+      if (!bm.motorcycle.brand) continue;
+      const key = bm.motorcycle.brand.toLowerCase();
       if (!buckets.has(key)) buckets.set(key, []);
-      buckets.get(key).push({ userId: bm.userId, brand: bm.motorcycle.brand, model: bm.motorcycle.model });
+      buckets.get(key).push({ userId: bm.userId, brand: bm.motorcycle.brand, model: bm.motorcycle.model || "" });
     }
     const bucketsWithMultiple = [...buckets.values()].filter((m) => m.length > 1);
     console.log(`[BikerBikerMatching] bucket creati: ${buckets.size}, con pi\xF9 di 1 membro: ${bucketsWithMultiple.length}`);
@@ -9339,6 +9355,16 @@ router17.put("/settings/maps_user_choice_enabled", async (req, res) => {
     return res.json(setting);
   } catch (error) {
     console.error("Admin maps_user_choice_enabled error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router17.get("/settings/matching_countries", async (_req, res) => {
+  try {
+    const setting = await storage.getAppSetting("matching_countries");
+    const countries = setting?.value ? JSON.parse(setting.value) || [] : [];
+    return res.json({ countries });
+  } catch (error) {
+    console.error("Admin get matching_countries error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

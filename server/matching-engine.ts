@@ -117,8 +117,15 @@ async function runMatching(): Promise<number> {
 
 async function runWishlistMatching(): Promise<number> {
   try {
-    const wishlistMotos = await storage.getAllWishlistMotosWithUsers();
-    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
+    const countriesSetting = await storage.getAppSetting("matching_countries");
+    let matchingCountries: string[] | undefined;
+    if (countriesSetting?.value) {
+      try { matchingCountries = JSON.parse(countriesSetting.value); } catch {}
+      if (!Array.isArray(matchingCountries) || matchingCountries.length === 0) matchingCountries = undefined;
+    }
+
+    const wishlistMotos = await storage.getAllWishlistMotosWithUsers(matchingCountries);
+    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers(matchingCountries);
 
     console.log(`[WishlistMatching] wishlist entries: ${wishlistMotos.length}, biker motorcycles: ${bikerMotorcycles.length}`);
 
@@ -148,17 +155,7 @@ async function runWishlistMatching(): Promise<number> {
 
         let compatible = false;
 
-        if (wish.brand && wish.model) {
-          if (
-            moto.brand &&
-            moto.model &&
-            wish.brand.toLowerCase() === moto.brand.toLowerCase() &&
-            (moto.model.toLowerCase().includes(wish.model.toLowerCase()) ||
-             wish.model.toLowerCase().includes(moto.model.toLowerCase()))
-          ) {
-            compatible = true;
-          }
-        } else if (wish.brand) {
+        if (wish.brand) {
           if (moto.brand && wish.brand.toLowerCase() === moto.brand.toLowerCase()) {
             compatible = true;
           }
@@ -207,7 +204,14 @@ function baseModelName(model: string): string {
 
 async function runBikerBikerMatching(): Promise<number> {
   try {
-    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
+    const countriesSetting = await storage.getAppSetting("matching_countries");
+    let matchingCountries: string[] | undefined;
+    if (countriesSetting?.value) {
+      try { matchingCountries = JSON.parse(countriesSetting.value); } catch {}
+      if (!Array.isArray(matchingCountries) || matchingCountries.length === 0) matchingCountries = undefined;
+    }
+
+    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers(matchingCountries);
     console.log(`[BikerBikerMatching] moto biker trovate: ${bikerMotorcycles.length}`);
     if (bikerMotorcycles.length < 2) {
       console.warn("[BikerBikerMatching] WARN: meno di 2 moto biker trovate, matching impossibile");
@@ -216,10 +220,10 @@ async function runBikerBikerMatching(): Promise<number> {
 
     const buckets = new Map<string, Array<{ userId: string; brand: string; model: string }>>();
     for (const bm of bikerMotorcycles) {
-      if (!bm.motorcycle.brand || !bm.motorcycle.model) continue;
-      const key = `${bm.motorcycle.brand.toLowerCase()}|${baseModelName(bm.motorcycle.model)}`;
+      if (!bm.motorcycle.brand) continue;
+      const key = bm.motorcycle.brand.toLowerCase();
       if (!buckets.has(key)) buckets.set(key, []);
-      buckets.get(key)!.push({ userId: bm.userId, brand: bm.motorcycle.brand, model: bm.motorcycle.model });
+      buckets.get(key)!.push({ userId: bm.userId, brand: bm.motorcycle.brand, model: bm.motorcycle.model || "" });
     }
 
     const bucketsWithMultiple = [...buckets.values()].filter(m => m.length > 1);

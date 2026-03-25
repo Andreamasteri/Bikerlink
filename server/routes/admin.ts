@@ -986,6 +986,17 @@ router.put("/settings/maps_user_choice_enabled", async (req: Request, res: Respo
   }
 });
 
+router.get("/settings/matching_countries", async (_req: Request, res: Response) => {
+  try {
+    const setting = await storage.getAppSetting("matching_countries");
+    const countries: string[] = setting?.value ? (JSON.parse(setting.value) || []) : [];
+    return res.json({ countries });
+  } catch (error) {
+    console.error("Admin get matching_countries error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/settings/:key", async (req: Request, res: Response) => {
   try {
     const key = req.params.key as string;

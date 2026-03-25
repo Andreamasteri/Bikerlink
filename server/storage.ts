@@ -306,8 +306,8 @@ export interface IStorage {
   deleteGarageMatch(id: string, userId: string): Promise<boolean>;
   resetGarageMatchToNew(id: string, userId: string): Promise<boolean>;
   deleteRejectedGarageMatches(userId: string): Promise<number>;
-  getAllWishlistMotosWithUsers(): Promise<{ wishlistMoto: any; userId: string }[]>;
-  getAllBikerMotorcyclesWithUsers(): Promise<{ motorcycle: any; userId: string }[]>;
+  getAllWishlistMotosWithUsers(countries?: string[]): Promise<{ wishlistMoto: any; userId: string }[]>;
+  getAllBikerMotorcyclesWithUsers(countries?: string[]): Promise<{ motorcycle: any; userId: string }[]>;
   findExistingBikerZavarrinaMatch(bikerId: string, zavarrinaId: string, bikerMotorcycleId: string, wishlistMotoId: string): Promise<BikerZavarrinaMatch | undefined>;
   getAllExistingBikerZavarrinaMatchKeys(): Promise<Set<string>>;
   getAllExistingProposalMatchKeys(): Promise<Set<string>>;
@@ -1282,22 +1282,30 @@ export class DatabaseStorage implements IStorage {
     return rejected.length;
   }
 
-  async getAllWishlistMotosWithUsers(): Promise<{ wishlistMoto: any; userId: string }[]> {
-    const results = await db.select({
+  async getAllWishlistMotosWithUsers(countries?: string[]): Promise<{ wishlistMoto: any; userId: string }[]> {
+    let query = db.select({
       wishlistMoto: zavarrinaWishlistMotos,
       userId: zavarrinaWishlists.userId,
     }).from(zavarrinaWishlistMotos)
-      .innerJoin(zavarrinaWishlists, eq(zavarrinaWishlists.id, zavarrinaWishlistMotos.wishlistId));
-    return results;
+      .innerJoin(zavarrinaWishlists, eq(zavarrinaWishlists.id, zavarrinaWishlistMotos.wishlistId))
+      .innerJoin(users, eq(users.id, zavarrinaWishlists.userId));
+    if (countries && countries.length > 0) {
+      return query.where(inArray(users.country, countries));
+    }
+    return query;
   }
 
-  async getAllBikerMotorcyclesWithUsers(): Promise<{ motorcycle: any; userId: string }[]> {
+  async getAllBikerMotorcyclesWithUsers(countries?: string[]): Promise<{ motorcycle: any; userId: string }[]> {
+    const baseCondition = or(eq(users.userType, "biker"), eq(users.userType, "coppia"), eq(users.userType, "admin"))!;
+    const condition = countries && countries.length > 0
+      ? and(baseCondition, inArray(users.country, countries))
+      : baseCondition;
     const results = await db.select({
       motorcycle: userMotorcycles,
       userId: userMotorcycles.userId,
     }).from(userMotorcycles)
       .innerJoin(users, eq(users.id, userMotorcycles.userId))
-      .where(or(eq(users.userType, "biker"), eq(users.userType, "coppia"), eq(users.userType, "admin")));
+      .where(condition);
     return results;
   }
 

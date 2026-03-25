@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Switch, Modal } from "react-native";
+import React, { useState, useMemo, useEffect } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Switch, Modal, ScrollView } from "react-native";
+import { EUROPEAN_COUNTRIES } from "@/lib/countries-regions";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -285,6 +286,7 @@ export default function AdminSettings() {
   const [editValue, setEditValue] = useState("");
   const [protectedToggle, setProtectedToggle] = useState<{ key: string; value: boolean; label: string } | null>(null);
   const [protectedPassword, setProtectedPassword] = useState("");
+  const [matchingCountries, setMatchingCountries] = useState<string[]>([]);
 
   const { data: settings = [], isLoading } = useQuery<AppSetting[]>({
     queryKey: ["/api/admin/settings"],
@@ -500,6 +502,34 @@ export default function AdminSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/auto-matching"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const { data: matchingCountriesData } = useQuery<{ countries: string[] }>({
+    queryKey: ["/api/admin/settings/matching_countries"],
+  });
+
+  useEffect(() => {
+    if (matchingCountriesData?.countries) {
+      setMatchingCountries(matchingCountriesData.countries);
+    }
+  }, [matchingCountriesData]);
+
+  const matchingCountriesMutation = useMutation({
+    mutationFn: async (countries: string[]) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/matching_countries", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: JSON.stringify(countries) }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/matching_countries"] });
     },
   });
 
@@ -949,6 +979,12 @@ export default function AdminSettings() {
     );
   }
 
+  const sortedMatchingCountries = useMemo(() => {
+    const itEntry = EUROPEAN_COUNTRIES.find((c) => c.code === "IT");
+    const rest = EUROPEAN_COUNTRIES.filter((c) => c.code !== "IT").sort((a, b) => a.name.localeCompare(b.name));
+    return itEntry ? [itEntry, ...rest] : rest;
+  }, []);
+
   const eulaSettingDef = defaultSettings.find(s => s.key === "eula_text")!;
   const splashSetting = defaultSettings.find(s => s.key === "splash_message")!;
   const maintenanceSetting = defaultSettings.find(s => s.key === "maintenance_mode")!;
@@ -986,6 +1022,49 @@ export default function AdminSettings() {
         <Text style={styles.synecoDesc}>
           {autoMatchEnabled ? "Il motore di matching automatico è attivo" : "Il matching automatico è disattivato"}
         </Text>
+      </View>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="flag" size={20} color={Colors.warning} />
+            <Text style={styles.synecoLabel}>Paesi Matching</Text>
+          </View>
+          {matchingCountriesMutation.isPending && <ActivityIndicator size="small" color={Colors.warning} />}
+        </View>
+        <Text style={styles.synecoDesc}>
+          {matchingCountries.length === 0
+            ? "Tutti i paesi (nessun filtro)"
+            : `${matchingCountries.length} ${matchingCountries.length === 1 ? "paese selezionato" : "paesi selezionati"}`}
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10, marginBottom: 8 }}>
+          {sortedMatchingCountries.map((c) => {
+            const isSelected = matchingCountries.includes(c.code);
+            return (
+              <TouchableOpacity
+                key={c.code}
+                onPress={() => {
+                  setMatchingCountries((prev) =>
+                    prev.includes(c.code) ? prev.filter((x) => x !== c.code) : [...prev, c.code]
+                  );
+                }}
+                style={[styles.countryChip, isSelected && styles.countryChipSelected]}
+              >
+                <Text style={styles.countryChipFlag}>{c.flag}</Text>
+                <Text style={[styles.countryChipText, isSelected && styles.countryChipTextSelected]}>
+                  {c.code}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+        <TouchableOpacity
+          style={[styles.saveBtn, { alignSelf: "flex-end", marginTop: 4 }]}
+          onPress={() => matchingCountriesMutation.mutate(matchingCountries)}
+          disabled={matchingCountriesMutation.isPending}
+        >
+          <Text style={styles.saveBtnText}>Salva Paesi</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.paidCard}>
@@ -2019,5 +2098,23 @@ const styles = StyleSheet.create({
   },
   protectedConfirmText: {
     fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.background,
+  },
+  countryChip: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16,
+    borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.background,
+    marginRight: 6,
+  },
+  countryChipSelected: {
+    borderColor: Colors.warning, backgroundColor: Colors.warning + "22",
+  },
+  countryChipFlag: {
+    fontSize: 14,
+  },
+  countryChipText: {
+    fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.textSecondary,
+  },
+  countryChipTextSelected: {
+    color: Colors.warning, fontFamily: "Inter_600SemiBold",
   },
 });
