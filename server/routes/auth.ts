@@ -238,7 +238,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     }
 
     const effectiveRegion = user.region;
-    const effectiveCountry = (user as any).country;
+    const effectiveCountry = user.country;
     if (effectiveRegion && (!effectiveCountry || effectiveCountry === "IT")) {
       createRegionalClubInvite(user.id, effectiveRegion).catch(() => {});
     }
