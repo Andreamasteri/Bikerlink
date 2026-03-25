@@ -224,9 +224,10 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
         const nomUrl = `https://nominatim.openstreetmap.org/reverse?lat=${gpsLat}&lon=${gpsLng}&format=json&accept-language=it`;
         const nomRes = await fetch(nomUrl, { headers: { "User-Agent": "BikerLink/1.0" } });
         if (nomRes.ok) {
-          const nomData = await nomRes.json() as { address?: { state?: string } };
+          const nomData = await nomRes.json() as { address?: { state?: string; country_code?: string } };
           const state = nomData.address?.state;
-          if (state) {
+          const countryCode = nomData.address?.country_code;
+          if (state && countryCode === "it") {
             await storage.updateUser(user.id, { region: state } as any);
             user = { ...user, region: state };
           }
@@ -237,7 +238,8 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     }
 
     const effectiveRegion = user.region;
-    if (effectiveRegion) {
+    const effectiveCountry = (user as any).country;
+    if (effectiveRegion && (!effectiveCountry || effectiveCountry === "IT")) {
       createRegionalClubInvite(user.id, effectiveRegion).catch(() => {});
     }
 

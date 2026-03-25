@@ -75,31 +75,43 @@ const SEED_REGIONS = [
 
 async function seedMotoclubs() {
   try {
-    const existing = await db.select({ id: motoClubs.id }).from(motoClubs).limit(1);
-    if (existing.length > 0) return;
+    const [{ brandCount }] = await db
+      .select({ brandCount: sql<number>`count(*)` })
+      .from(motoClubs)
+      .where(eq(motoClubs.clubType, "brand"));
+    const [{ regionCount }] = await db
+      .select({ regionCount: sql<number>`count(*)` })
+      .from(motoClubs)
+      .where(eq(motoClubs.clubType, "region"));
 
-    for (const b of SEED_BRANDS) {
-      await db.insert(motoClubs).values({
-        name: b.name,
-        clubType: "brand",
-        brandName: b.brandName,
-        logoUrl: b.logoUrl ?? null,
-        isApproved: true,
-        activityScore: 0,
-      });
+    if (Number(brandCount) === 0) {
+      for (const b of SEED_BRANDS) {
+        await db.insert(motoClubs).values({
+          name: b.name,
+          clubType: "brand",
+          brandName: b.brandName,
+          logoUrl: b.logoUrl ?? null,
+          isApproved: true,
+          activityScore: 0,
+        });
+      }
+      console.log("[Motoclub] Seed brand:", SEED_BRANDS.length, "club");
     }
-    for (const r of SEED_REGIONS) {
-      await db.insert(motoClubs).values({
-        name: `Motoclub ${r.region}`,
-        clubType: "region",
-        region: r.region,
-        country: "IT",
-        logoUrl: r.logoUrl,
-        isApproved: true,
-        activityScore: 0,
-      });
+
+    if (Number(regionCount) === 0) {
+      for (const r of SEED_REGIONS) {
+        await db.insert(motoClubs).values({
+          name: `Motoclub ${r.region}`,
+          clubType: "region",
+          region: r.region,
+          country: "IT",
+          logoUrl: r.logoUrl,
+          isApproved: true,
+          activityScore: 0,
+        });
+      }
+      console.log("[Motoclub] Seed regionali:", SEED_REGIONS.length, "club");
     }
-    console.log("[Motoclub] Seed completato:", SEED_BRANDS.length, "brand,", SEED_REGIONS.length, "regionali");
   } catch (e) {
     console.error("[Motoclub seed error]", e);
   }

@@ -4026,30 +4026,35 @@ var SEED_REGIONS = [
 ];
 async function seedMotoclubs() {
   try {
-    const existing = await db.select({ id: motoClubs.id }).from(motoClubs).limit(1);
-    if (existing.length > 0) return;
-    for (const b of SEED_BRANDS) {
-      await db.insert(motoClubs).values({
-        name: b.name,
-        clubType: "brand",
-        brandName: b.brandName,
-        logoUrl: b.logoUrl ?? null,
-        isApproved: true,
-        activityScore: 0
-      });
+    const [{ brandCount }] = await db.select({ brandCount: import_drizzle_orm3.sql`count(*)` }).from(motoClubs).where((0, import_drizzle_orm3.eq)(motoClubs.clubType, "brand"));
+    const [{ regionCount }] = await db.select({ regionCount: import_drizzle_orm3.sql`count(*)` }).from(motoClubs).where((0, import_drizzle_orm3.eq)(motoClubs.clubType, "region"));
+    if (Number(brandCount) === 0) {
+      for (const b of SEED_BRANDS) {
+        await db.insert(motoClubs).values({
+          name: b.name,
+          clubType: "brand",
+          brandName: b.brandName,
+          logoUrl: b.logoUrl ?? null,
+          isApproved: true,
+          activityScore: 0
+        });
+      }
+      console.log("[Motoclub] Seed brand:", SEED_BRANDS.length, "club");
     }
-    for (const r of SEED_REGIONS) {
-      await db.insert(motoClubs).values({
-        name: `Motoclub ${r.region}`,
-        clubType: "region",
-        region: r.region,
-        country: "IT",
-        logoUrl: r.logoUrl,
-        isApproved: true,
-        activityScore: 0
-      });
+    if (Number(regionCount) === 0) {
+      for (const r of SEED_REGIONS) {
+        await db.insert(motoClubs).values({
+          name: `Motoclub ${r.region}`,
+          clubType: "region",
+          region: r.region,
+          country: "IT",
+          logoUrl: r.logoUrl,
+          isApproved: true,
+          activityScore: 0
+        });
+      }
+      console.log("[Motoclub] Seed regionali:", SEED_REGIONS.length, "club");
     }
-    console.log("[Motoclub] Seed completato:", SEED_BRANDS.length, "brand,", SEED_REGIONS.length, "regionali");
   } catch (e) {
     console.error("[Motoclub seed error]", e);
   }
@@ -4725,7 +4730,8 @@ router2.post("/login", loginLimiter, async (req, res) => {
         if (nomRes.ok) {
           const nomData = await nomRes.json();
           const state = nomData.address?.state;
-          if (state) {
+          const countryCode = nomData.address?.country_code;
+          if (state && countryCode === "it") {
             await storage.updateUser(user.id, { region: state });
             user = { ...user, region: state };
           }
@@ -4735,7 +4741,8 @@ router2.post("/login", loginLimiter, async (req, res) => {
       }
     }
     const effectiveRegion = user.region;
-    if (effectiveRegion) {
+    const effectiveCountry = user.country;
+    if (effectiveRegion && (!effectiveCountry || effectiveCountry === "IT")) {
       createRegionalClubInvite(user.id, effectiveRegion).catch(() => {
       });
     }
@@ -12855,6 +12862,40 @@ function setupErrorHandler(app2) {
           await db.execute(import_drizzle_orm12.sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS preferred_map_style VARCHAR(20)`);
         } catch (e) {
           console.warn("[MIGRATION] user_profiles.preferred_map_style:", e);
+        }
+        try {
+          await db.execute(import_drizzle_orm12.sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS first_login_at TIMESTAMP`);
+          await db.execute(import_drizzle_orm12.sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS first_login_lat DOUBLE PRECISION`);
+          await db.execute(import_drizzle_orm12.sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS first_login_lng DOUBLE PRECISION`);
+        } catch (e) {
+          console.warn("[MIGRATION] users.first_login_at/lat/lng:", e);
+        }
+        try {
+          await db.execute(import_drizzle_orm12.sql`ALTER TABLE moto_clubs ADD COLUMN IF NOT EXISTS region VARCHAR(100)`);
+          await db.execute(import_drizzle_orm12.sql`ALTER TABLE moto_clubs ADD COLUMN IF NOT EXISTS country VARCHAR(2)`);
+          await db.execute(import_drizzle_orm12.sql`ALTER TABLE moto_clubs ADD COLUMN IF NOT EXISTS is_featured BOOLEAN NOT NULL DEFAULT false`);
+          await db.execute(import_drizzle_orm12.sql`ALTER TABLE moto_clubs ADD COLUMN IF NOT EXISTS member_count INTEGER NOT NULL DEFAULT 0`);
+          await db.execute(import_drizzle_orm12.sql`ALTER TABLE moto_clubs ADD COLUMN IF NOT EXISTS cover_url TEXT`);
+        } catch (e) {
+          console.warn("[MIGRATION] moto_clubs columns:", e);
+        }
+        try {
+          await db.execute(import_drizzle_orm12.sql`
+            DELETE FROM moto_club_invites
+            WHERE club_id IN (
+              SELECT id FROM moto_clubs WHERE club_type = 'model'
+            )
+          `);
+          await db.execute(import_drizzle_orm12.sql`
+            DELETE FROM moto_club_members
+            WHERE club_id IN (
+              SELECT id FROM moto_clubs WHERE club_type = 'model'
+            )
+          `);
+          await db.execute(import_drizzle_orm12.sql`DELETE FROM moto_clubs WHERE club_type = 'model'`);
+          await db.execute(import_drizzle_orm12.sql`DELETE FROM moto_club_requests WHERE club_type = 'model'`);
+        } catch (e) {
+          console.warn("[MIGRATION] cleanup model clubs:", e);
         }
         try {
           await db.execute(import_drizzle_orm12.sql`

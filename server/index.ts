@@ -385,6 +385,43 @@ function setupErrorHandler(app: express.Application) {
         }
 
         try {
+          await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS first_login_at TIMESTAMP`);
+          await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS first_login_lat DOUBLE PRECISION`);
+          await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS first_login_lng DOUBLE PRECISION`);
+        } catch (e) {
+          console.warn("[MIGRATION] users.first_login_at/lat/lng:", e);
+        }
+
+        try {
+          await db.execute(sql`ALTER TABLE moto_clubs ADD COLUMN IF NOT EXISTS region VARCHAR(100)`);
+          await db.execute(sql`ALTER TABLE moto_clubs ADD COLUMN IF NOT EXISTS country VARCHAR(2)`);
+          await db.execute(sql`ALTER TABLE moto_clubs ADD COLUMN IF NOT EXISTS is_featured BOOLEAN NOT NULL DEFAULT false`);
+          await db.execute(sql`ALTER TABLE moto_clubs ADD COLUMN IF NOT EXISTS member_count INTEGER NOT NULL DEFAULT 0`);
+          await db.execute(sql`ALTER TABLE moto_clubs ADD COLUMN IF NOT EXISTS cover_url TEXT`);
+        } catch (e) {
+          console.warn("[MIGRATION] moto_clubs columns:", e);
+        }
+
+        try {
+          await db.execute(sql`
+            DELETE FROM moto_club_invites
+            WHERE club_id IN (
+              SELECT id FROM moto_clubs WHERE club_type = 'model'
+            )
+          `);
+          await db.execute(sql`
+            DELETE FROM moto_club_members
+            WHERE club_id IN (
+              SELECT id FROM moto_clubs WHERE club_type = 'model'
+            )
+          `);
+          await db.execute(sql`DELETE FROM moto_clubs WHERE club_type = 'model'`);
+          await db.execute(sql`DELETE FROM moto_club_requests WHERE club_type = 'model'`);
+        } catch (e) {
+          console.warn("[MIGRATION] cleanup model clubs:", e);
+        }
+
+        try {
           await db.execute(sql`
             CREATE TABLE IF NOT EXISTS user_blocks (
               id SERIAL PRIMARY KEY,
