@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "node:http";
 import path from "node:path";
 import fs from "node:fs";
+import { initState } from "./init-state";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import multer from "multer";
@@ -712,7 +713,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok" });
+    res.json({ status: "ok", initializing: initState.initializing });
   });
 
   const httpServer = createServer(app);

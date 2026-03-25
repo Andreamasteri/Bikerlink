@@ -1,6 +1,7 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
+import { initState } from "./init-state";
 import { startMatchingEngine } from "./matching-engine";
 import { autoSeedEssentialUsers, autoSeedFakeUsers } from "./auto-seed";
 import { db } from "./db";
@@ -418,8 +419,10 @@ function setupErrorHandler(app: express.Application) {
         }
 
         console.log("[INIT] Background initialization completed");
+        initState.initializing = false;
       })().catch((err) => {
         console.error("[INIT] Background initialization error:", err);
+        initState.initializing = false;
       });
     },
   );

@@ -3700,6 +3700,13 @@ var import_express21 = __toESM(require("express"));
 var import_node_http = require("node:http");
 var import_node_path = __toESM(require("node:path"));
 var import_node_fs = __toESM(require("node:fs"));
+
+// server/init-state.ts
+var initState = {
+  initializing: true
+};
+
+// server/routes.ts
 var import_express_session = __toESM(require("express-session"));
 var import_connect_pg_simple = __toESM(require("connect-pg-simple"));
 var import_multer4 = __toESM(require("multer"));
@@ -12192,7 +12199,7 @@ async function registerRoutes(app2) {
     res.json({ ok: true, ...result });
   });
   app2.get("/api/health", (_req, res) => {
-    res.json({ status: "ok" });
+    res.json({ status: "ok", initializing: initState.initializing });
   });
   const httpServer = (0, import_node_http.createServer)(app2);
   Promise.resolve().then(() => (init_backup_service(), backup_service_exports)).then(({ startScheduler: startScheduler2 }) => {
@@ -12789,8 +12796,10 @@ function setupErrorHandler(app2) {
           console.warn("[SEED] splash settings:", e);
         }
         console.log("[INIT] Background initialization completed");
+        initState.initializing = false;
       })().catch((err) => {
         console.error("[INIT] Background initialization error:", err);
+        initState.initializing = false;
       });
     }
   );
