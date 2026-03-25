@@ -5074,16 +5074,19 @@ router3.put("/profile/dynamic", requireAuth2, async (req, res) => {
     }
     if (isAvailable === true) {
       await storage.updateUser(userId, { ghostMode: false });
-      if (latitude !== void 0 && longitude !== void 0) {
+      try {
         const currentUser = await storage.getUser(userId);
         if (currentUser && currentUser.firstLoginLat === null) {
-          await storage.updateUser(userId, {
-            firstLoginLat: latitude,
-            firstLoginLng: longitude
-          });
-          if (!currentUser.region) {
-            try {
-              const nomUrl = `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=it`;
+          const profile = await storage.getUserProfile(userId);
+          const resolvedLat = latitude ?? profile?.latitude;
+          const resolvedLng = longitude ?? profile?.longitude;
+          if (resolvedLat !== void 0 && resolvedLat !== null && resolvedLng !== void 0 && resolvedLng !== null) {
+            await storage.updateUser(userId, {
+              firstLoginLat: resolvedLat,
+              firstLoginLng: resolvedLng
+            });
+            if (!currentUser.region) {
+              const nomUrl = `https://nominatim.openstreetmap.org/reverse?lat=${resolvedLat}&lon=${resolvedLng}&format=json&accept-language=it`;
               const nomRes = await fetch(nomUrl, { headers: { "User-Agent": "BikerLink/1.0" } });
               if (nomRes.ok) {
                 const nomData = await nomRes.json();
@@ -5095,11 +5098,11 @@ router3.put("/profile/dynamic", requireAuth2, async (req, res) => {
                   });
                 }
               }
-            } catch (geoErr) {
-              console.warn("[Available] Nominatim reverse geocoding fallito:", geoErr);
             }
           }
         }
+      } catch (geoErr) {
+        console.warn("[Available] Prima disponibilit\xE0 GPS fallita:", geoErr);
       }
     }
     if (existingProfile) {

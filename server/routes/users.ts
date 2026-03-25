@@ -193,16 +193,20 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
     if (isAvailable === true) {
       await storage.updateUser(userId, { ghostMode: false } as any);
 
-      if (latitude !== undefined && longitude !== undefined) {
+      try {
         const currentUser = await storage.getUser(userId);
         if (currentUser && currentUser.firstLoginLat === null) {
-          await storage.updateUser(userId, {
-            firstLoginLat: latitude,
-            firstLoginLng: longitude,
-          } as any);
-          if (!currentUser.region) {
-            try {
-              const nomUrl = `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=it`;
+          const profile = await storage.getUserProfile(userId);
+          const resolvedLat = latitude ?? profile?.latitude;
+          const resolvedLng = longitude ?? profile?.longitude;
+          if (resolvedLat !== undefined && resolvedLat !== null &&
+              resolvedLng !== undefined && resolvedLng !== null) {
+            await storage.updateUser(userId, {
+              firstLoginLat: resolvedLat,
+              firstLoginLng: resolvedLng,
+            } as any);
+            if (!currentUser.region) {
+              const nomUrl = `https://nominatim.openstreetmap.org/reverse?lat=${resolvedLat}&lon=${resolvedLng}&format=json&accept-language=it`;
               const nomRes = await fetch(nomUrl, { headers: { "User-Agent": "BikerLink/1.0" } });
               if (nomRes.ok) {
                 const nomData = await nomRes.json() as { address?: { state?: string; country_code?: string } };
@@ -213,11 +217,11 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
                   createRegionalClubInvite(userId, state).catch(() => {});
                 }
               }
-            } catch (geoErr) {
-              console.warn("[Available] Nominatim reverse geocoding fallito:", geoErr);
             }
           }
         }
+      } catch (geoErr) {
+        console.warn("[Available] Prima disponibilità GPS fallita:", geoErr);
       }
     }
 
