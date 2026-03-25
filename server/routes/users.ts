@@ -26,26 +26,29 @@ async function captureFirstAvailabilityLocation(
       firstLoginLng: resolvedLng,
     } as any);
     if (!currentUser.region) {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
-      try {
-        const nomUrl = `https://nominatim.openstreetmap.org/reverse?lat=${resolvedLat}&lon=${resolvedLng}&format=json&accept-language=it`;
-        const nomRes = await fetch(nomUrl, {
-          headers: { "User-Agent": "BikerLink/1.0" },
-          signal: controller.signal,
-        });
-        if (nomRes.ok) {
-          const nomData = await nomRes.json() as { address?: { state?: string; country_code?: string } };
-          const state = nomData.address?.state;
-          const countryCode = nomData.address?.country_code;
-          if (state && countryCode === "it") {
-            await storage.updateUser(userId, { region: state } as any);
-            createRegionalClubInvite(userId, state).catch(() => {});
+      (async () => {
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 5000);
+          const nomUrl = `https://nominatim.openstreetmap.org/reverse?lat=${resolvedLat}&lon=${resolvedLng}&format=json&accept-language=it`;
+          const nomRes = await fetch(nomUrl, {
+            headers: { "User-Agent": "BikerLink/1.0" },
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+          if (nomRes.ok) {
+            const nomData = await nomRes.json() as { address?: { state?: string; country_code?: string } };
+            const state = nomData.address?.state;
+            const countryCode = nomData.address?.country_code;
+            if (state && countryCode === "it") {
+              await storage.updateUser(userId, { region: state } as any);
+              createRegionalClubInvite(userId, state).catch(() => {});
+            }
           }
+        } catch (geoErr) {
+          console.warn("[captureFirstAvailabilityLocation] geocoding fallito:", geoErr);
         }
-      } finally {
-        clearTimeout(timeout);
-      }
+      })();
     }
   } catch (err) {
     console.warn("[captureFirstAvailabilityLocation] fallita:", err);
