@@ -2159,7 +2159,18 @@ router.post("/mass-seed-fake-users", async (_req: Request, res: Response) => {
 router.get("/mass-seed-status", async (_req: Request, res: Response) => {
   try {
     const { getMassSeedStatus } = await import("../mass-seed");
-    return res.json(getMassSeedStatus());
+    const status = getMassSeedStatus();
+    if (!status.running && status.created === 0 && status.total === 0) {
+      const checkpoint = await storage.getAppSetting("mass_seed_created_checkpoint");
+      if (checkpoint?.value) {
+        const saved = parseInt(checkpoint.value, 10);
+        if (!isNaN(saved) && saved > 0) {
+          status.created = saved;
+          status.total = 5000;
+        }
+      }
+    }
+    return res.json(status);
   } catch (error) {
     console.error("Admin mass seed status error:", error);
     return res.status(500).json({ message: "Errore interno del server" });

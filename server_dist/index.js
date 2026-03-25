@@ -2966,86 +2966,130 @@ async function reconcileExistingUsers(officialId) {
     sex: users.sex,
     nickname: users.nickname
   }).from(users).where((0, import_drizzle_orm7.eq)(users.invitationCode, SEED_TAG));
+  if (taggedUsers.length === 0) return;
+  console.log(`[mass-seed] Reconcile bulk start for ${taggedUsers.length} users...`);
+  const taggedIds = taggedUsers.map((u) => u.id);
+  const [existingProfiles, existingMotoRows, existingWishlists, officialConvRows] = await Promise.all([
+    db.select({ userId: userProfiles.userId }).from(userProfiles).where((0, import_drizzle_orm7.inArray)(userProfiles.userId, taggedIds)),
+    db.select({ userId: userMotorcycles.userId }).from(userMotorcycles).where((0, import_drizzle_orm7.inArray)(userMotorcycles.userId, taggedIds)),
+    db.select({ userId: zavarrinaWishlists.userId }).from(zavarrinaWishlists).where((0, import_drizzle_orm7.inArray)(zavarrinaWishlists.userId, taggedIds)),
+    db.select({ convId: conversationParticipants.conversationId }).from(conversationParticipants).where((0, import_drizzle_orm7.eq)(conversationParticipants.userId, officialId))
+  ]);
+  const profileUserIds = new Set(existingProfiles.map((p) => p.userId));
+  const motoCountByUser = /* @__PURE__ */ new Map();
+  for (const row of existingMotoRows) {
+    motoCountByUser.set(row.userId, (motoCountByUser.get(row.userId) ?? 0) + 1);
+  }
+  const wishlistUserIds = new Set(existingWishlists.map((w) => w.userId));
+  const officialConvSet = new Set(officialConvRows.map((c) => c.convId));
+  const taggedUserConvRows = await db.select({
+    convId: conversationParticipants.conversationId,
+    userId: conversationParticipants.userId
+  }).from(conversationParticipants).where((0, import_drizzle_orm7.inArray)(conversationParticipants.userId, taggedIds));
+  const usersWithOfficialConv = /* @__PURE__ */ new Set();
+  for (const row of taggedUserConvRows) {
+    if (officialConvSet.has(row.convId)) {
+      usersWithOfficialConv.add(row.userId);
+    }
+  }
+  const missingProfileRows = [];
+  const missingMotoRows = [];
   for (const u of taggedUsers) {
-    const [profileExists] = await db.select({ id: userProfiles.id }).from(userProfiles).where((0, import_drizzle_orm7.eq)(userProfiles.userId, u.id)).limit(1);
-    if (!profileExists) {
-      try {
-        const zone = pickRandom(EUROPEAN_ZONES);
-        await db.insert(userProfiles).values({
-          userId: u.id,
-          isAvailable: Math.random() > 0.3,
-          latitude: zone.lat + randOffset(),
-          longitude: zone.lng + randOffset(),
-          maxPickupDistance: 20 + Math.floor(Math.random() * 80),
-          bio: getBio(u.userType, u.sex)
-        }).onConflictDoNothing();
-      } catch (err) {
-        logSeedError(`reconcile-profile-${u.id}`, err);
-      }
+    if (!profileUserIds.has(u.id)) {
+      const zone = pickRandom(EUROPEAN_ZONES);
+      missingProfileRows.push({
+        userId: u.id,
+        isAvailable: Math.random() > 0.3,
+        latitude: zone.lat + randOffset(),
+        longitude: zone.lng + randOffset(),
+        maxPickupDistance: 20 + Math.floor(Math.random() * 80),
+        bio: getBio(u.userType, u.sex)
+      });
     }
     if (u.userType === "biker" || u.userType === "coppia") {
-      const existingMotos = await db.select({ id: userMotorcycles.id }).from(userMotorcycles).where((0, import_drizzle_orm7.eq)(userMotorcycles.userId, u.id));
-      if (existingMotos.length < 2) {
-        const needed = 2 - existingMotos.length;
-        const motos = pickRandomN(MOTORCYCLES, needed);
+      const count3 = motoCountByUser.get(u.id) ?? 0;
+      if (count3 < 2) {
+        const motos = pickRandomN(MOTORCYCLES, 2 - count3);
         for (const moto of motos) {
-          try {
-            await db.insert(userMotorcycles).values({
-              userId: u.id,
-              brand: moto.brand,
-              model: moto.model,
-              year: getMotoYear(),
-              displacement: moto.displacement,
-              motorcycleType: moto.type,
-              ridingStyle: moto.style
-            });
-          } catch (err) {
-            logSeedError(`reconcile-moto-${u.id}`, err);
-          }
+          missingMotoRows.push({
+            userId: u.id,
+            brand: moto.brand,
+            model: moto.model,
+            year: getMotoYear(),
+            displacement: moto.displacement,
+            motorcycleType: moto.type,
+            ridingStyle: moto.style
+          });
         }
       }
     }
-    if (u.userType === "zavorrina") {
-      const existingWl = await storage.getWishlist(u.id);
-      if (!existingWl) {
-        try {
-          const wishlist = await storage.createOrUpdateWishlist(u.id, "Cerco un biker per bei giri in moto");
-          const desiredMotos = pickRandomN(MOTORCYCLES, 2 + Math.floor(Math.random() * 2));
-          const wishlistMotoValues = desiredMotos.map((m) => ({
-            wishlistId: wishlist.id,
-            brand: m.brand,
-            model: m.model,
-            motorcycleType: m.type,
-            ridingStyle: m.style
-          }));
-          await db.insert(zavarrinaWishlistMotos).values(wishlistMotoValues);
-        } catch (err) {
-          logSeedError(`reconcile-wishlist-${u.id}`, err);
-        }
-      }
+  }
+  if (missingProfileRows.length > 0) {
+    try {
+      await db.insert(userProfiles).values(missingProfileRows).onConflictDoNothing();
+    } catch (err) {
+      logSeedError("reconcile-bulk-profiles", err);
     }
-    const officialConvs = await db.select({ convId: conversationParticipants.conversationId }).from(conversationParticipants).where((0, import_drizzle_orm7.eq)(conversationParticipants.userId, officialId));
-    const userConvs = await db.select({ convId: conversationParticipants.conversationId }).from(conversationParticipants).where((0, import_drizzle_orm7.eq)(conversationParticipants.userId, u.id));
-    const officialConvSet = new Set(officialConvs.map((c) => c.convId));
-    const hasOfficialConv = userConvs.some((c) => officialConvSet.has(c.convId));
-    if (!hasOfficialConv) {
-      try {
-        const [conv] = await db.insert(conversations).values({ conversationType: "private" }).returning();
-        await db.insert(conversationParticipants).values([
+  }
+  if (missingMotoRows.length > 0) {
+    try {
+      await db.insert(userMotorcycles).values(missingMotoRows);
+    } catch (err) {
+      logSeedError("reconcile-bulk-motos", err);
+    }
+  }
+  const zavarrine = taggedUsers.filter((u) => u.userType === "zavorrina" && !wishlistUserIds.has(u.id));
+  for (const u of zavarrine) {
+    try {
+      const wishlist = await storage.createOrUpdateWishlist(u.id, "Cerco un biker per bei giri in moto");
+      const desiredMotos = pickRandomN(MOTORCYCLES, 2 + Math.floor(Math.random() * 2));
+      const wishlistMotoValues = desiredMotos.map((m) => ({
+        wishlistId: wishlist.id,
+        brand: m.brand,
+        model: m.model,
+        motorcycleType: m.type,
+        ridingStyle: m.style
+      }));
+      await db.insert(zavarrinaWishlistMotos).values(wishlistMotoValues);
+    } catch (err) {
+      logSeedError(`reconcile-wishlist-${u.id}`, err);
+    }
+  }
+  const usersNeedingConv = taggedUsers.filter((u) => !usersWithOfficialConv.has(u.id));
+  const CONV_BATCH = 100;
+  for (let i = 0; i < usersNeedingConv.length; i += CONV_BATCH) {
+    const batch = usersNeedingConv.slice(i, i + CONV_BATCH);
+    try {
+      const convRows = batch.map(() => ({ conversationType: "private" }));
+      const createdConvs = await db.insert(conversations).values(convRows).returning();
+      const participantRows = [];
+      const messageRows = [];
+      for (let j = 0; j < createdConvs.length; j++) {
+        const conv = createdConvs[j];
+        const u = batch[j];
+        participantRows.push(
           { conversationId: conv.id, userId: officialId },
           { conversationId: conv.id, userId: u.id }
-        ]).onConflictDoNothing();
-        await db.insert(messages).values({
+        );
+        messageRows.push({
           conversationId: conv.id,
           senderId: officialId,
           content: getWelcomeMessage(u.userType, u.sex),
           messageType: "text"
         });
-      } catch (err) {
-        logSeedError(`reconcile-conv-${u.id}`, err);
       }
+      if (participantRows.length > 0) {
+        await db.insert(conversationParticipants).values(participantRows).onConflictDoNothing();
+      }
+      if (messageRows.length > 0) {
+        await db.insert(messages).values(messageRows);
+      }
+    } catch (err) {
+      logSeedError(`reconcile-conv-batch-${i}`, err);
     }
+    await new Promise((r) => setTimeout(r, 5));
   }
+  console.log(`[mass-seed] Reconcile complete: ${taggedUsers.length} users checked, ${missingProfileRows.length} profiles added, ${usersNeedingConv.length} convs added`);
 }
 async function massSeedFakeUsers() {
   if (massSeedStatus.running) return;
@@ -3271,8 +3315,8 @@ async function massSeedFakeUsers() {
       }
       if (insertedUsers.length > 0) {
         try {
-          const approvedClubs = await db.select({ id: motoClubs.id, conversationId: motoClubs.conversationId, clubType: motoClubs.clubType, region: motoClubs.region }).from(motoClubs).innerJoin(conversations, (0, import_drizzle_orm7.eq)(motoClubs.conversationId, conversations.id)).where(and((0, import_drizzle_orm7.eq)(motoClubs.isApproved, true), (0, import_drizzle_orm7.eq)(motoClubs.clubType, "brand")));
-          const approvedRegionalClubs = await db.select({ id: motoClubs.id, conversationId: motoClubs.conversationId, region: motoClubs.region }).from(motoClubs).innerJoin(conversations, (0, import_drizzle_orm7.eq)(motoClubs.conversationId, conversations.id)).where(and((0, import_drizzle_orm7.eq)(motoClubs.isApproved, true), (0, import_drizzle_orm7.eq)(motoClubs.clubType, "region")));
+          const approvedClubs = await db.select({ id: motoClubs.id, conversationId: motoClubs.conversationId, clubType: motoClubs.clubType, region: motoClubs.region }).from(motoClubs).innerJoin(conversations, (0, import_drizzle_orm7.eq)(motoClubs.conversationId, conversations.id)).where((0, import_drizzle_orm7.and)((0, import_drizzle_orm7.eq)(motoClubs.isApproved, true), (0, import_drizzle_orm7.eq)(motoClubs.clubType, "brand")));
+          const approvedRegionalClubs = await db.select({ id: motoClubs.id, conversationId: motoClubs.conversationId, region: motoClubs.region }).from(motoClubs).innerJoin(conversations, (0, import_drizzle_orm7.eq)(motoClubs.conversationId, conversations.id)).where((0, import_drizzle_orm7.and)((0, import_drizzle_orm7.eq)(motoClubs.isApproved, true), (0, import_drizzle_orm7.eq)(motoClubs.clubType, "region")));
           const regionalClubByRegion = new Map(approvedRegionalClubs.map((c) => [c.region, c]));
           const clubMemberRows = [];
           const convParticipantRows = [];
@@ -3320,10 +3364,15 @@ async function massSeedFakeUsers() {
       massSeedStatus.created += insertedUsers.length;
       if (batchStart % (BATCH_SIZE * 5) === 0) {
         console.log(`[mass-seed] Progress: ${massSeedStatus.created}/${massSeedStatus.total}`);
+        storage.upsertAppSetting("mass_seed_created_checkpoint", massSeedStatus.created.toString()).catch(() => {
+        });
       }
+      await new Promise((r) => setTimeout(r, 10));
     }
     const errorSummary = seedErrors.length > 0 ? `Completato con ${seedErrors.length} errori parziali` : null;
     massSeedStatus.error = errorSummary;
+    storage.upsertAppSetting("mass_seed_created_checkpoint", massSeedStatus.created.toString()).catch(() => {
+    });
     console.log(`[mass-seed] Complete: ${massSeedStatus.created} users created, ${seedErrors.length} errors`);
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Errore sconosciuto";
@@ -10773,7 +10822,18 @@ router17.post("/mass-seed-fake-users", async (_req, res) => {
 router17.get("/mass-seed-status", async (_req, res) => {
   try {
     const { getMassSeedStatus: getMassSeedStatus2 } = await Promise.resolve().then(() => (init_mass_seed(), mass_seed_exports));
-    return res.json(getMassSeedStatus2());
+    const status = getMassSeedStatus2();
+    if (!status.running && status.created === 0 && status.total === 0) {
+      const checkpoint = await storage.getAppSetting("mass_seed_created_checkpoint");
+      if (checkpoint?.value) {
+        const saved = parseInt(checkpoint.value, 10);
+        if (!isNaN(saved) && saved > 0) {
+          status.created = saved;
+          status.total = 5e3;
+        }
+      }
+    }
+    return res.json(status);
   } catch (error) {
     console.error("Admin mass seed status error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
