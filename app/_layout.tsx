@@ -180,12 +180,12 @@ export default function RootLayout() {
     }
     const errorUtils = (globalThis as typeof globalThis & { ErrorUtils?: ErrorUtilsType }).ErrorUtils;
     if (!errorUtils) return;
-    const prev = errorUtils.getGlobalHandler();
-    errorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
+    const prev = errorUtils.getGlobalHandler?.();
+    errorUtils.setGlobalHandler?.((error: Error, isFatal?: boolean) => {
       console.error("[GlobalError]", error?.message, "isFatal:", isFatal, error?.stack);
       if (prev) prev(error, isFatal);
     });
-    return () => { errorUtils.setGlobalHandler(prev); };
+    return () => { if (prev) errorUtils.setGlobalHandler?.(prev); };
   }, []);
 
   return (
