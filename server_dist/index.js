@@ -1710,6 +1710,7 @@ var init_storage = __esm({
         WHERE id IN (
           SELECT c.id FROM conversations c
           LEFT JOIN conversation_participants cp ON cp.conversation_id = c.id
+          WHERE c.conversation_type != 'motoclub'
           GROUP BY c.id
           HAVING count(cp.id) = 0
         )
@@ -1721,6 +1722,7 @@ var init_storage = __esm({
           WHERE id IN (
             SELECT c.id FROM conversations c
             INNER JOIN conversation_participants cp ON cp.conversation_id = c.id
+            WHERE c.conversation_type != 'motoclub'
             GROUP BY c.id
             HAVING count(cp.id) = 1
               AND max(cp.user_id) = ${officialUser[0].id}
@@ -3260,7 +3262,7 @@ async function massSeedFakeUsers() {
       }
       if (insertedUsers.length > 0) {
         try {
-          const approvedClubs = await db.select({ id: motoClubs.id, conversationId: motoClubs.conversationId }).from(motoClubs).where((0, import_drizzle_orm7.eq)(motoClubs.isApproved, true));
+          const approvedClubs = await db.select({ id: motoClubs.id, conversationId: motoClubs.conversationId }).from(motoClubs).innerJoin(conversations, (0, import_drizzle_orm7.eq)(motoClubs.conversationId, conversations.id)).where((0, import_drizzle_orm7.eq)(motoClubs.isApproved, true));
           if (approvedClubs.length > 0) {
             const clubMemberRows = [];
             const convParticipantRows = [];
@@ -3275,14 +3277,22 @@ async function massSeedFakeUsers() {
               }
             }
             if (clubMemberRows.length > 0) {
-              await db.insert(motoClubMembers).values(clubMemberRows).onConflictDoNothing();
+              try {
+                await db.insert(motoClubMembers).values(clubMemberRows).onConflictDoNothing();
+              } catch (err) {
+                logSeedError("batch-club-member-insert", err);
+              }
             }
             if (convParticipantRows.length > 0) {
-              await db.insert(conversationParticipants).values(convParticipantRows).onConflictDoNothing();
+              try {
+                await db.insert(conversationParticipants).values(convParticipantRows).onConflictDoNothing();
+              } catch (err) {
+                logSeedError("batch-conv-participant-insert", err);
+              }
             }
           }
         } catch (err) {
-          logSeedError("batch-club-member-insert", err);
+          logSeedError("batch-club-query", err);
         }
       }
       massSeedStatus.created += insertedUsers.length;

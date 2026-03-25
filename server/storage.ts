@@ -1564,6 +1564,7 @@ export class DatabaseStorage implements IStorage {
         WHERE id IN (
           SELECT c.id FROM conversations c
           LEFT JOIN conversation_participants cp ON cp.conversation_id = c.id
+          WHERE c.conversation_type != 'motoclub'
           GROUP BY c.id
           HAVING count(cp.id) = 0
         )
@@ -1576,6 +1577,7 @@ export class DatabaseStorage implements IStorage {
           WHERE id IN (
             SELECT c.id FROM conversations c
             INNER JOIN conversation_participants cp ON cp.conversation_id = c.id
+            WHERE c.conversation_type != 'motoclub'
             GROUP BY c.id
             HAVING count(cp.id) = 1
               AND max(cp.user_id) = ${officialUser[0].id}

@@ -575,7 +575,11 @@ export async function massSeedFakeUsers(): Promise<void> {
 
       if (insertedUsers.length > 0) {
         try {
-          const approvedClubs = await db.select({ id: motoClubs.id, conversationId: motoClubs.conversationId }).from(motoClubs).where(eq(motoClubs.isApproved, true));
+          const approvedClubs = await db
+            .select({ id: motoClubs.id, conversationId: motoClubs.conversationId })
+            .from(motoClubs)
+            .innerJoin(conversations, eq(motoClubs.conversationId, conversations.id))
+            .where(eq(motoClubs.isApproved, true));
           if (approvedClubs.length > 0) {
             const clubMemberRows: { clubId: string; userId: string; role: string; status: string }[] = [];
             const convParticipantRows: { conversationId: string; userId: string }[] = [];
@@ -590,14 +594,22 @@ export async function massSeedFakeUsers(): Promise<void> {
               }
             }
             if (clubMemberRows.length > 0) {
-              await db.insert(motoClubMembers).values(clubMemberRows).onConflictDoNothing();
+              try {
+                await db.insert(motoClubMembers).values(clubMemberRows).onConflictDoNothing();
+              } catch (err: unknown) {
+                logSeedError("batch-club-member-insert", err);
+              }
             }
             if (convParticipantRows.length > 0) {
-              await db.insert(conversationParticipants).values(convParticipantRows).onConflictDoNothing();
+              try {
+                await db.insert(conversationParticipants).values(convParticipantRows).onConflictDoNothing();
+              } catch (err: unknown) {
+                logSeedError("batch-conv-participant-insert", err);
+              }
             }
           }
         } catch (err: unknown) {
-          logSeedError("batch-club-member-insert", err);
+          logSeedError("batch-club-query", err);
         }
       }
 
