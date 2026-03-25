@@ -4915,7 +4915,7 @@ async function captureFirstAvailabilityLocation(userId, requestLat, requestLng, 
     if (!currentUser || currentUser.firstLoginLat !== null && currentUser.firstLoginLng !== null) return;
     const resolvedLat = requestLat ?? profileLat;
     const resolvedLng = requestLng ?? profileLng;
-    if (resolvedLat == null || resolvedLng == null) return;
+    if (typeof resolvedLat !== "number" || typeof resolvedLng !== "number") return;
     await storage.updateUser(userId, {
       firstLoginLat: resolvedLat,
       firstLoginLng: resolvedLng
