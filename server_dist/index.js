@@ -3109,8 +3109,6 @@ async function massSeedFakeUsers() {
   const allSpecs = buildSpecs();
   const TARGET = allSpecs.length;
   massSeedStatus = { running: true, created: 0, total: TARGET, error: null };
-  storage.upsertAppSetting("mass_seed_created_checkpoint", "0").catch(() => {
-  });
   const usedNicknames = /* @__PURE__ */ new Set();
   const usedEmails = /* @__PURE__ */ new Set();
   try {
