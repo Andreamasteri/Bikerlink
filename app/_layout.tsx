@@ -182,7 +182,7 @@ export default function RootLayout() {
     if (!errorUtils) return;
     const prev = errorUtils.getGlobalHandler();
     errorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
-      console.error("[GlobalError]", error?.message, "isFatal:", isFatal);
+      console.error("[GlobalError]", error?.message, "isFatal:", isFatal, error?.stack);
       if (prev) prev(error, isFatal);
     });
     return () => { errorUtils.setGlobalHandler(prev); };

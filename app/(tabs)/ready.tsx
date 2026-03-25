@@ -63,7 +63,7 @@ export default function ReadyToRideScreen() {
         console.warn("[ready] Location init fallita:", err);
       }
     }
-    initLocation();
+    initLocation().catch((err) => console.warn("[ready] initLocation unhandled:", err));
     return () => { cancelled = true; };
   }, []);
 
