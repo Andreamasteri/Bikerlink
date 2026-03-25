@@ -117,7 +117,7 @@ async function seedMotoclubs() {
   }
 }
 
-seedMotoclubs();
+export { seedMotoclubs };
 
 export async function createRegionalClubInvite(userId: string, region: string): Promise<void> {
   try {

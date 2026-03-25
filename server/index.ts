@@ -7,6 +7,7 @@ import { autoSeedEssentialUsers, autoSeedFakeUsers } from "./auto-seed";
 import { db } from "./db";
 import { sql, eq, and } from "drizzle-orm";
 import { motoClubs, motoClubMembers, conversations, conversationParticipants } from "@shared/schema";
+import { seedMotoclubs } from "./routes/motoclubs";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -403,24 +404,20 @@ function setupErrorHandler(app: express.Application) {
         }
 
         try {
-          const [{ modelCount }] = (await db.execute(
-            sql`SELECT COUNT(*) AS "modelCount" FROM moto_clubs WHERE club_type = 'model'`
-          )).rows as [{ modelCount: string }];
-          if (Number(modelCount) > 0) {
-            await db.execute(sql`
-              DELETE FROM moto_club_invites
-              WHERE club_id IN (SELECT id FROM moto_clubs WHERE club_type = 'model')
-            `);
-            await db.execute(sql`
-              DELETE FROM moto_club_members
-              WHERE club_id IN (SELECT id FROM moto_clubs WHERE club_type = 'model')
-            `);
-            await db.execute(sql`DELETE FROM moto_clubs WHERE club_type = 'model'`);
-            await db.execute(sql`DELETE FROM moto_club_requests WHERE club_type = 'model'`);
-            console.log("[MIGRATION] Removed", modelCount, "model clubs and related records");
+          const { storage: st } = await import("./storage");
+          const alreadyReset = await st.getAppSetting("motoclub_brand_region_v2").catch(() => null);
+          if (!alreadyReset) {
+            console.log("[MIGRATION] Pulizia completa motoclub in corso...");
+            await db.execute(sql`DELETE FROM moto_club_invites`);
+            await db.execute(sql`DELETE FROM moto_club_requests`);
+            await db.execute(sql`DELETE FROM moto_club_members`);
+            await db.execute(sql`DELETE FROM moto_clubs`);
+            await st.upsertAppSetting("motoclub_brand_region_v2", "true");
+            console.log("[MIGRATION] Motoclub svuotati — riseed brand+region avviato...");
           }
+          await seedMotoclubs();
         } catch (e) {
-          console.warn("[MIGRATION] cleanup model clubs:", e);
+          console.warn("[MIGRATION] cleanup/reseed motoclub:", e);
         }
 
         try {
