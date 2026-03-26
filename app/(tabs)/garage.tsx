@@ -159,7 +159,7 @@ function WishlistScreen() {
 
   const getStyleLabel = (v: string) => RIDING_STYLES.find(t => t.value === v)?.label || v;
 
-  if (isLoading) {
+  if (isLoading || authIsLoading) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color={Colors.accent} />
@@ -564,7 +564,7 @@ function GarageContent() {
 
   return (
     <View style={styles.container}>
-      {isLoading ? (
+      {(isLoading || authIsLoading) ? (
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={Colors.accent} />
         </View>
