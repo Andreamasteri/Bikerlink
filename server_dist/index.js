@@ -11527,7 +11527,7 @@ router17.post("/reconcile-club-invites", async (req, res) => {
     const userId = req.body.userId || req.session.userId;
     const userMotos = await db.select().from(userMotorcycles).where((0, import_drizzle_orm9.eq)(userMotorcycles.userId, userId));
     if (userMotos.length === 0) {
-      return res.json({ invitesCreated: 0, message: "Nessuna moto nel garage" });
+      return res.json({ motorsChecked: 0, pendingInvites: 0, message: "Nessuna moto nel garage" });
     }
     for (const moto of userMotos) {
       await createClubInvitesForMoto(userId, moto.brand, moto.model);

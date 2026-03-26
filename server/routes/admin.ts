@@ -2649,7 +2649,7 @@ router.post("/reconcile-club-invites", async (req: Request, res: Response) => {
     const userMotos = await db.select().from(userMotorcycles).where(eq(userMotorcycles.userId, userId));
 
     if (userMotos.length === 0) {
-      return res.json({ invitesCreated: 0, message: "Nessuna moto nel garage" });
+      return res.json({ motorsChecked: 0, pendingInvites: 0, message: "Nessuna moto nel garage" });
     }
 
     for (const moto of userMotos) {
