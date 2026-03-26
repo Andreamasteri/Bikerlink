@@ -56,6 +56,10 @@ args = "Stress Test"
 task = "workflow.run"
 args = "Watchdog"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Diagnose"
+
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -113,6 +117,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/watchdog.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "Diagnose"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/diagnose-startup.sh"
 
 [workflows.workflow.metadata]
 outputType = "console"
