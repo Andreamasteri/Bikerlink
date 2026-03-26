@@ -6384,6 +6384,43 @@ async function runMatchingForUser(userId) {
     return { bikerBiker: 0, zavarrina: 0 };
   }
 }
+async function runProposalMatchingForUser(userId) {
+  try {
+    const activeProposals = await storage.getActiveProposalsWithLocation();
+    const userProposals = activeProposals.filter((p) => p.userId === userId);
+    if (userProposals.length === 0) return 0;
+    const existingKeys = await storage.getAllExistingProposalMatchKeys();
+    let matchCount = 0;
+    for (const up of userProposals) {
+      for (const other of activeProposals) {
+        if (other.userId === userId) continue;
+        if (!areCompatible(up, other)) continue;
+        const p1Id = up.id < other.id ? up.id : other.id;
+        const p2Id = up.id < other.id ? other.id : up.id;
+        if (existingKeys.has(`${p1Id}:${p2Id}`)) continue;
+        const p1 = up.id < other.id ? up : other;
+        const p2 = up.id < other.id ? other : up;
+        await storage.createProposalMatch({
+          proposalId1: p1.id,
+          proposalId2: p2.id,
+          userId1: p1.userId,
+          userId2: p2.userId,
+          status: "pending",
+          acceptedByUser1: false,
+          acceptedByUser2: false
+        });
+        existingKeys.add(`${p1Id}:${p2Id}`);
+        existingKeys.add(`${p2Id}:${p1Id}`);
+        matchCount++;
+      }
+    }
+    console.log(`[ProposalMatchingForUser] userId ${userId}: ${matchCount} nuovi match proposta`);
+    return matchCount;
+  } catch (error) {
+    console.error("[ProposalMatchingForUser] error:", error);
+    return 0;
+  }
+}
 var lastUserMatchingAt = /* @__PURE__ */ new Map();
 var USER_MATCH_DEBOUNCE_MS = 2 * 60 * 1e3;
 function triggerMatchingForUser(userId) {
@@ -6860,18 +6897,22 @@ router5.delete("/biker-matches/:matchId", requireAuth4, async (req, res) => {
 router5.post("/reset-and-rematch", requireAuth4, async (req, res) => {
   try {
     const userId = req.session.userId;
-    const [deletedGarage, deletedBiker] = await Promise.all([
+    const [deletedGarage, deletedBiker, deletedProposal] = await Promise.all([
       storage.deleteNewGarageMatches(userId),
-      storage.deleteNewBikerBikerMatches(userId)
+      storage.deleteNewBikerBikerMatches(userId),
+      storage.deletePendingProposalMatches(userId)
     ]);
-    const totalDeleted = deletedGarage + deletedBiker;
-    console.log(`[ResetAndRematch] user=${userId} deleted: garage=${deletedGarage} biker=${deletedBiker}`);
-    const result = await runMatchingForUser(userId);
-    const totalCreated = result.bikerBiker + result.zavarrina;
-    console.log(`[ResetAndRematch] user=${userId} created: bikerBiker=${result.bikerBiker} zavarrina=${result.zavarrina}`);
+    const totalDeleted = deletedGarage + deletedBiker + deletedProposal;
+    console.log(`[ResetAndRematch] user=${userId} deleted: garage=${deletedGarage} biker=${deletedBiker} proposal=${deletedProposal}`);
+    const [bikerResult, proposalCount] = await Promise.all([
+      runMatchingForUser(userId),
+      runProposalMatchingForUser(userId)
+    ]);
+    const totalCreated = bikerResult.bikerBiker + bikerResult.zavarrina + proposalCount;
+    console.log(`[ResetAndRematch] user=${userId} created: bikerBiker=${bikerResult.bikerBiker} zavarrina=${bikerResult.zavarrina} proposal=${proposalCount}`);
     return res.json({
-      deleted: { garage: deletedGarage, biker: deletedBiker, total: totalDeleted },
-      created: { bikerBiker: result.bikerBiker, zavarrina: result.zavarrina, total: totalCreated }
+      deleted: { garage: deletedGarage, biker: deletedBiker, proposal: deletedProposal, total: totalDeleted },
+      created: { bikerBiker: bikerResult.bikerBiker, zavarrina: bikerResult.zavarrina, proposal: proposalCount, total: totalCreated }
     });
   } catch (error) {
     console.error("Reset and rematch error:", error);

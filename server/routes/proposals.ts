@@ -3,7 +3,7 @@ import { storage } from "../storage";
 import { db } from "../db";
 import { motoClubMembers } from "@shared/schema";
 import { and, eq } from "drizzle-orm";
-import { runMatchingForUser } from "../matching-engine";
+import { runMatchingForUser, runProposalMatchingForUser } from "../matching-engine";
 
 const router = Router();
 
@@ -417,18 +417,22 @@ router.delete("/biker-matches/:matchId", requireAuth, async (req: Request, res: 
 router.post("/reset-and-rematch", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const [deletedGarage, deletedBiker] = await Promise.all([
+    const [deletedGarage, deletedBiker, deletedProposal] = await Promise.all([
       storage.deleteNewGarageMatches(userId),
       storage.deleteNewBikerBikerMatches(userId),
+      storage.deletePendingProposalMatches(userId),
     ]);
-    const totalDeleted = deletedGarage + deletedBiker;
-    console.log(`[ResetAndRematch] user=${userId} deleted: garage=${deletedGarage} biker=${deletedBiker}`);
-    const result = await runMatchingForUser(userId);
-    const totalCreated = result.bikerBiker + result.zavarrina;
-    console.log(`[ResetAndRematch] user=${userId} created: bikerBiker=${result.bikerBiker} zavarrina=${result.zavarrina}`);
+    const totalDeleted = deletedGarage + deletedBiker + deletedProposal;
+    console.log(`[ResetAndRematch] user=${userId} deleted: garage=${deletedGarage} biker=${deletedBiker} proposal=${deletedProposal}`);
+    const [bikerResult, proposalCount] = await Promise.all([
+      runMatchingForUser(userId),
+      runProposalMatchingForUser(userId),
+    ]);
+    const totalCreated = bikerResult.bikerBiker + bikerResult.zavarrina + proposalCount;
+    console.log(`[ResetAndRematch] user=${userId} created: bikerBiker=${bikerResult.bikerBiker} zavarrina=${bikerResult.zavarrina} proposal=${proposalCount}`);
     return res.json({
-      deleted: { garage: deletedGarage, biker: deletedBiker, total: totalDeleted },
-      created: { bikerBiker: result.bikerBiker, zavarrina: result.zavarrina, total: totalCreated },
+      deleted: { garage: deletedGarage, biker: deletedBiker, proposal: deletedProposal, total: totalDeleted },
+      created: { bikerBiker: bikerResult.bikerBiker, zavarrina: bikerResult.zavarrina, proposal: proposalCount, total: totalCreated },
     });
   } catch (error) {
     console.error("Reset and rematch error:", error);

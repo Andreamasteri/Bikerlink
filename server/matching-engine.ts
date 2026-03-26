@@ -480,6 +480,51 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
   }
 }
 
+export async function runProposalMatchingForUser(userId: string): Promise<number> {
+  try {
+    const activeProposals = await storage.getActiveProposalsWithLocation();
+    const userProposals = activeProposals.filter(p => p.userId === userId);
+    if (userProposals.length === 0) return 0;
+
+    const existingKeys = await storage.getAllExistingProposalMatchKeys();
+    let matchCount = 0;
+
+    for (const up of userProposals) {
+      for (const other of activeProposals) {
+        if (other.userId === userId) continue;
+        if (!areCompatible(up, other)) continue;
+
+        const p1Id = up.id < other.id ? up.id : other.id;
+        const p2Id = up.id < other.id ? other.id : up.id;
+        if (existingKeys.has(`${p1Id}:${p2Id}`)) continue;
+
+        const p1 = up.id < other.id ? up : other;
+        const p2 = up.id < other.id ? other : up;
+
+        await storage.createProposalMatch({
+          proposalId1: p1.id,
+          proposalId2: p2.id,
+          userId1: p1.userId,
+          userId2: p2.userId,
+          status: "pending",
+          acceptedByUser1: false,
+          acceptedByUser2: false,
+        });
+
+        existingKeys.add(`${p1Id}:${p2Id}`);
+        existingKeys.add(`${p2Id}:${p1Id}`);
+        matchCount++;
+      }
+    }
+
+    console.log(`[ProposalMatchingForUser] userId ${userId}: ${matchCount} nuovi match proposta`);
+    return matchCount;
+  } catch (error) {
+    console.error("[ProposalMatchingForUser] error:", error);
+    return 0;
+  }
+}
+
 const lastUserMatchingAt = new Map<string, number>();
 const USER_MATCH_DEBOUNCE_MS = 2 * 60 * 1000;
 
