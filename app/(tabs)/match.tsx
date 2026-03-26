@@ -457,9 +457,7 @@ export default function MatchScreen() {
 
   useEffect(() => {
     AsyncStorage.multiGet(["match_distance_mode", "match_distance_km"]).then(pairs => {
-      const mode = pairs[0][1];
       const km = pairs[1][1];
-      if (mode === "km" || mode === "all") setDistanceMode(mode as "all" | "km");
       if (km) setDistanceKm(km);
     }).catch(() => {});
   }, []);
@@ -1138,14 +1136,16 @@ const styles = StyleSheet.create({
   },
   distanceKmInput: {
     flex: 1,
-    height: 30,
+    height: 34,
     backgroundColor: Colors.surface,
     borderRadius: 8,
     paddingHorizontal: 10,
+    paddingVertical: 0,
     fontSize: 13,
     fontFamily: "Inter_500Medium",
     color: Colors.text,
     textAlign: "center" as const,
+    includeFontPadding: false,
   },
   removeBtn: {
     marginLeft: 4,
