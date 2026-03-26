@@ -15,7 +15,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { queryClient, getApiUrl, apiRequest } from "@/lib/query-client";
@@ -907,16 +907,22 @@ export default function MatchScreen() {
               maxLength={4}
             />
             <TouchableOpacity
-              style={styles.distanceKmApplyBtn}
+              style={[styles.distanceKmApplyBtn, (garageRefetching || bikerRefetching || proposalRefetching) && { opacity: 0.6 }]}
+              disabled={garageRefetching || bikerRefetching || proposalRefetching}
               onPress={() => {
                 const val = pendingKm.trim();
                 if (val) {
                   setDistanceKm(val);
                   AsyncStorage.multiSet([["match_distance_mode", "km"], ["match_distance_km", val]]).catch(() => {});
+                  Promise.all([garageRefetch(), bikerRefetch(), proposalRefetch()]).catch(() => {});
                 }
               }}
             >
-              <Text style={styles.distanceKmApplyText}>{t("match.applyFilter")}</Text>
+              {(garageRefetching || bikerRefetching || proposalRefetching) ? (
+                <ActivityIndicator size="small" color={Colors.background} />
+              ) : (
+                <MaterialCommunityIcons name="magnify" size={18} color={Colors.background} />
+              )}
             </TouchableOpacity>
           </>
         )}
