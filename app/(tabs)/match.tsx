@@ -455,19 +455,18 @@ export default function MatchScreen() {
   const [pendingMatchId, setPendingMatchId] = useState<string | null>(null);
   const [distanceMode, setDistanceMode] = useState<"all" | "km">("all");
   const [distanceKm, setDistanceKm] = useState<string>("50");
+  const [pendingKm, setPendingKm] = useState<string>("50");
 
   useFocusEffect(
     useCallback(() => {
-      setDistanceMode("all");
-      AsyncStorage.getItem("match_distance_km").then(km => {
-        if (km) setDistanceKm(km);
+      AsyncStorage.multiGet(["match_distance_mode", "match_distance_km"]).then(pairs => {
+        const mode = pairs[0][1];
+        const km = pairs[1][1];
+        if (mode === "all" || mode === "km") setDistanceMode(mode);
+        if (km) { setDistanceKm(km); setPendingKm(km); }
       }).catch(() => {});
     }, [])
   );
-
-  useEffect(() => {
-    AsyncStorage.multiSet([["match_distance_mode", distanceMode], ["match_distance_km", distanceKm]]).catch(() => {});
-  }, [distanceMode, distanceKm]);
 
   const { data: proposalMatches, isLoading: proposalLoading, refetch: proposalRefetch, isRefetching: proposalRefetching } = useQuery<any[]>({
     queryKey: ["/api/proposals/matches"],
@@ -876,7 +875,10 @@ export default function MatchScreen() {
         <Ionicons name="locate-outline" size={14} color={Colors.textSecondary} />
         <TouchableOpacity
           style={[styles.distanceModeBtn, distanceMode === "all" && styles.distanceModeBtnActive]}
-          onPress={() => setDistanceMode("all")}
+          onPress={() => {
+            setDistanceMode("all");
+            AsyncStorage.multiSet([["match_distance_mode", "all"], ["match_distance_km", distanceKm]]).catch(() => {});
+          }}
         >
           <Text style={[styles.distanceModeBtnText, distanceMode === "all" && styles.distanceModeBtnTextActive]}>
             {t("match.distanceFilterAll")}
@@ -884,22 +886,39 @@ export default function MatchScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.distanceModeBtn, distanceMode === "km" && styles.distanceModeBtnActive]}
-          onPress={() => setDistanceMode("km")}
+          onPress={() => {
+            setDistanceMode("km");
+            AsyncStorage.setItem("match_distance_mode", "km").catch(() => {});
+          }}
         >
           <Text style={[styles.distanceModeBtnText, distanceMode === "km" && styles.distanceModeBtnTextActive]}>
             {t("match.distanceFilterKm")}
           </Text>
         </TouchableOpacity>
         {distanceMode === "km" && (
-          <TextInput
-            style={styles.distanceKmInput}
-            value={distanceKm}
-            onChangeText={setDistanceKm}
-            keyboardType="numeric"
-            placeholder={t("match.distanceKmPlaceholder")}
-            placeholderTextColor={Colors.textSecondary}
-            maxLength={4}
-          />
+          <>
+            <TextInput
+              style={styles.distanceKmInput}
+              value={pendingKm}
+              onChangeText={setPendingKm}
+              keyboardType="numeric"
+              placeholder={t("match.distanceKmPlaceholder")}
+              placeholderTextColor={Colors.textSecondary}
+              maxLength={4}
+            />
+            <TouchableOpacity
+              style={styles.distanceKmApplyBtn}
+              onPress={() => {
+                const val = pendingKm.trim();
+                if (val) {
+                  setDistanceKm(val);
+                  AsyncStorage.multiSet([["match_distance_mode", "km"], ["match_distance_km", val]]).catch(() => {});
+                }
+              }}
+            >
+              <Text style={styles.distanceKmApplyText}>OK</Text>
+            </TouchableOpacity>
+          </>
         )}
       </View>
 
@@ -1098,6 +1117,19 @@ const styles = StyleSheet.create({
     color: Colors.text,
     textAlign: "center" as const,
     includeFontPadding: false,
+  },
+  distanceKmApplyBtn: {
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: Colors.accent,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  distanceKmApplyText: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    color: "#fff",
   },
   removeBtn: {
     marginLeft: 4,

@@ -22,6 +22,7 @@ function useLoginMutation() {
     },
     onSuccess: (user: SafeUser) => {
       queryClient.setQueryData(["/api/auth/me"], user);
+      queryClient.invalidateQueries();
       (async () => {
         try {
           await queryClient.fetchQuery({ queryKey: ["/api/settings/maps"] });
@@ -54,7 +55,6 @@ function useLoginMutation() {
           });
         } catch {}
         apiRequest("POST", "/api/matching/trigger").catch(() => {});
-        queryClient.invalidateQueries();
       })();
     },
   });
@@ -92,8 +92,8 @@ function useLogoutMutation() {
       await apiRequest("POST", "/api/auth/logout");
     },
     onSuccess: () => {
-      queryClient.setQueryData(["/api/auth/me"], null);
       queryClient.clear();
+      queryClient.setQueryData(["/api/auth/me"], null);
     },
   });
 }
