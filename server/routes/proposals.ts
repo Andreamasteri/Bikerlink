@@ -131,6 +131,9 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
         const bikerMoto = await storage.getUserMotorcycle(match.bikerMotorcycleId);
         const wishlistMoto = await storage.getWishlistMoto(match.wishlistMotoId);
 
+        const isBiker = match.bikerId === userId;
+        const otherUser = isBiker ? zavorrina : biker;
+
         return {
           ...match,
           isSupermatch: match.isSupermatch ?? false,
@@ -140,6 +143,8 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
           zavarrinaType: zavorrina?.userType,
           bikerMoto: bikerMoto ? { brand: bikerMoto.brand, model: bikerMoto.model, motorcycleType: bikerMoto.motorcycleType } : null,
           wishlistMoto: wishlistMoto ? { brand: wishlistMoto.brand, model: wishlistMoto.model, motorcycleType: wishlistMoto.motorcycleType } : null,
+          otherLat: otherUser?.firstLoginLat ?? null,
+          otherLng: otherUser?.firstLoginLng ?? null,
         };
       })
     );
@@ -307,11 +312,17 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
       filteredMatches.map(async (match) => {
         const biker1 = await storage.getUser(match.biker1Id);
         const biker2 = await storage.getUser(match.biker2Id);
+
+        const isBiker1 = match.biker1Id === userId;
+        const otherBiker = isBiker1 ? biker2 : biker1;
+
         return {
           ...match,
           isSupermatch: match.isSupermatch ?? false,
           biker1Nickname: biker1?.nickname,
           biker2Nickname: biker2?.nickname,
+          otherLat: otherBiker?.firstLoginLat ?? null,
+          otherLng: otherBiker?.firstLoginLng ?? null,
         };
       })
     );

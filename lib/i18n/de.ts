@@ -327,6 +327,10 @@ const de: Record<string, string> = {
   "match.emptyProposalsDesc": "Erstelle einen Vorschlag im Tab Vorschläge und das System findet automatisch kompatible Biker oder Sozias!",
   "match.sameMoto": "Gleiches Motorrad",
   "match.superMatch": "Supermatch!!",
+  "match.distanceFilter": "Entfernungsfilter",
+  "match.distanceFilterAll": "Alle",
+  "match.distanceFilterKm": "Radius",
+  "match.distanceKmPlaceholder": "km",
 
   "proposals.detail.notFound": "Vorschlag nicht gefunden",
   "proposals.detail.description": "Beschreibung",

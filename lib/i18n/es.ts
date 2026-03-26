@@ -327,6 +327,10 @@ const es: Record<string, string> = {
   "match.emptyProposalsDesc": "¡Crea una propuesta en la pestaña Propuestas y el sistema encontrará automáticamente bikers o pasajeras compatibles!",
   "match.sameMoto": "Misma moto",
   "match.superMatch": "¡Supermatch!!",
+  "match.distanceFilter": "Filtro distancia",
+  "match.distanceFilterAll": "Todos",
+  "match.distanceFilterKm": "Radio",
+  "match.distanceKmPlaceholder": "km",
 
   "proposals.detail.notFound": "Propuesta no encontrada",
   "proposals.detail.description": "Descripción",

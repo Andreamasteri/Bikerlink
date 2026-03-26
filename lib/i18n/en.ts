@@ -327,6 +327,10 @@ const en: Record<string, string> = {
   "match.emptyProposalsDesc": "Create a proposal in the Proposals tab and the system will automatically find compatible bikers or pillions!",
   "match.sameMoto": "Same motorcycle",
   "match.superMatch": "Supermatch!!",
+  "match.distanceFilter": "Distance filter",
+  "match.distanceFilterAll": "All",
+  "match.distanceFilterKm": "Radius",
+  "match.distanceKmPlaceholder": "km",
 
   "proposals.detail.notFound": "Proposal not found",
   "proposals.detail.description": "Description",

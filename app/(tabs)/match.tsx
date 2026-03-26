@@ -9,7 +9,9 @@ import {
   RefreshControl,
   Platform,
   Alert,
+  TextInput,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,6 +22,14 @@ import { useAuth } from "@/lib/auth-context";
 import { useT, useLocale } from "@/lib/language-context";
 
 import SynecoAd from "@/components/SynecoAd";
+
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 const SEARCH_TYPE_I18N: Record<string, string> = {
   find_a_friend: "FindAFriend",
@@ -442,6 +452,21 @@ export default function MatchScreen() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>("zavorrine");
   const [pendingMatchId, setPendingMatchId] = useState<string | null>(null);
+  const [distanceMode, setDistanceMode] = useState<"all" | "km">("all");
+  const [distanceKm, setDistanceKm] = useState<string>("50");
+
+  useEffect(() => {
+    AsyncStorage.multiGet(["match_distance_mode", "match_distance_km"]).then(pairs => {
+      const mode = pairs[0][1];
+      const km = pairs[1][1];
+      if (mode === "km" || mode === "all") setDistanceMode(mode as "all" | "km");
+      if (km) setDistanceKm(km);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.multiSet([["match_distance_mode", distanceMode], ["match_distance_km", distanceKm]]).catch(() => {});
+  }, [distanceMode, distanceKm]);
 
   const { data: proposalMatches, isLoading: proposalLoading, refetch: proposalRefetch, isRefetching: proposalRefetching } = useQuery<any[]>({
     queryKey: ["/api/proposals/matches"],
@@ -472,11 +497,26 @@ export default function MatchScreen() {
     if (isNew) return 1;
     return 0;
   };
+
+  const myLat = user?.firstLoginLat != null ? parseFloat(String(user.firstLoginLat)) : null;
+  const myLng = user?.firstLoginLng != null ? parseFloat(String(user.firstLoginLng)) : null;
+  const kmLimit = parseFloat(distanceKm) || 50;
+
+  const passesDistanceFilter = (otherLat: any, otherLng: any, status: string): boolean => {
+    if (status !== "new") return true;
+    if (distanceMode !== "km") return true;
+    if (myLat === null || myLng === null || isNaN(myLat) || isNaN(myLng)) return true;
+    const lat2 = parseFloat(String(otherLat));
+    const lng2 = parseFloat(String(otherLng));
+    if (!lat2 || !lng2 || isNaN(lat2) || isNaN(lng2)) return true;
+    return haversineKm(myLat, myLng, lat2, lng2) <= kmLimit;
+  };
+
   const visibleGarageMatches = allGarageMatches
-    .filter((m: any) => m.status !== "rejected")
+    .filter((m: any) => m.status !== "rejected" && passesDistanceFilter(m.otherLat, m.otherLng, m.status))
     .sort((a: any, b: any) => matchSortScore(b) - matchSortScore(a));
   const visibleBikerMatches = allBikerMatches
-    .filter((m: any) => m.status !== "rejected")
+    .filter((m: any) => m.status !== "rejected" && passesDistanceFilter(m.otherLat, m.otherLng, m.status))
     .sort((a: any, b: any) => matchSortScore(b) - matchSortScore(a));
   const visibleProposalMatches = allProposalMatches.filter((m: any) => m.status !== "rejected" && m.status !== "expired");
 
@@ -881,6 +921,37 @@ export default function MatchScreen() {
         <Text style={styles.systemDescText}>{t("match.systemDesc")}</Text>
       </View>
 
+      <View style={styles.distanceFilterRow}>
+        <Ionicons name="locate-outline" size={14} color={Colors.textSecondary} />
+        <TouchableOpacity
+          style={[styles.distanceModeBtn, distanceMode === "all" && styles.distanceModeBtnActive]}
+          onPress={() => setDistanceMode("all")}
+        >
+          <Text style={[styles.distanceModeBtnText, distanceMode === "all" && styles.distanceModeBtnTextActive]}>
+            {t("match.distanceFilterAll")}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.distanceModeBtn, distanceMode === "km" && styles.distanceModeBtnActive]}
+          onPress={() => setDistanceMode("km")}
+        >
+          <Text style={[styles.distanceModeBtnText, distanceMode === "km" && styles.distanceModeBtnTextActive]}>
+            {t("match.distanceFilterKm")}
+          </Text>
+        </TouchableOpacity>
+        {distanceMode === "km" && (
+          <TextInput
+            style={styles.distanceKmInput}
+            value={distanceKm}
+            onChangeText={setDistanceKm}
+            keyboardType="numeric"
+            placeholder={t("match.distanceKmPlaceholder")}
+            placeholderTextColor={Colors.textSecondary}
+            maxLength={4}
+          />
+        )}
+      </View>
+
       <View style={[styles.tabRow, styles.tabRowSpaced]}>
         {tabs.map((tab) => (
           <TouchableOpacity
@@ -1036,6 +1107,44 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     lineHeight: 16,
+  },
+  distanceFilterRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: 12,
+    paddingBottom: 4,
+    gap: 6,
+  },
+  distanceModeBtn: {
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: Colors.surface,
+  },
+  distanceModeBtnActive: {
+    backgroundColor: Colors.accent + "20",
+    borderWidth: 1,
+    borderColor: Colors.accent + "40",
+  },
+  distanceModeBtnText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+  },
+  distanceModeBtnTextActive: {
+    color: Colors.accent,
+    fontFamily: "Inter_600SemiBold",
+  },
+  distanceKmInput: {
+    flex: 1,
+    height: 30,
+    backgroundColor: Colors.surface,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: Colors.text,
+    textAlign: "center" as const,
   },
   removeBtn: {
     marginLeft: 4,

@@ -291,7 +291,12 @@ export default function FakeUsersAdmin() {
     onSuccess: (data: any) => {
       const bb = data?.bikerBiker ?? 0;
       const zav = data?.zavarrina ?? 0;
-      setForceMatchingResult({ type: "success", text: `${bb} biker-biker + ${zav} zavarrina match creati` });
+      const total = bb + zav;
+      if (total === 0) {
+        setForceMatchingResult({ type: "success", text: "Nessun nuovo match trovato (già esistenti o nessuna coppia compatibile)" });
+      } else {
+        setForceMatchingResult({ type: "success", text: `${bb} biker-biker + ${zav} zavarrina match creati` });
+      }
     },
     onError: () => setForceMatchingResult({ type: "error", text: "Errore durante il matching" }),
   });

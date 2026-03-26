@@ -327,6 +327,10 @@ const it: Record<string, string> = {
   "match.emptyProposalsDesc": "Crea una proposta nella tab Proposte e il sistema troverà automaticamente biker o zavorrine compatibili!",
   "match.sameMoto": "Stessa moto",
   "match.superMatch": "Supermatch!!",
+  "match.distanceFilter": "Filtro distanza",
+  "match.distanceFilterAll": "Tutti",
+  "match.distanceFilterKm": "Raggio",
+  "match.distanceKmPlaceholder": "km",
 
   "proposals.detail.notFound": "Proposta non trovata",
   "proposals.detail.description": "Descrizione",

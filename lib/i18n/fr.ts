@@ -327,6 +327,10 @@ const fr: Record<string, string> = {
   "match.emptyProposalsDesc": "Créez une proposition dans l'onglet Propositions et le système trouvera automatiquement des bikers ou passagères compatibles !",
   "match.sameMoto": "Même moto",
   "match.superMatch": "Supermatch!!",
+  "match.distanceFilter": "Filtre distance",
+  "match.distanceFilterAll": "Tous",
+  "match.distanceFilterKm": "Rayon",
+  "match.distanceKmPlaceholder": "km",
 
   "proposals.detail.notFound": "Proposition introuvable",
   "proposals.detail.description": "Description",
