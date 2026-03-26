@@ -2427,14 +2427,25 @@ router.get("/db-stats", async (_req: Request, res: Response) => {
 router.post("/fake-users/wake-all", async (_req: Request, res: Response) => {
   try {
     const now = new Date();
-    const fakeUsers = await db.select({ id: users.id, country: users.country }).from(users).where(eq(users.isFake, true));
-    for (const fu of fakeUsers) {
-      const update: Record<string, unknown> = { lastLoginAt: now };
-      if (!fu.country) update.country = "IT";
-      await db.update(users).set(update as any).where(eq(users.id, fu.id));
-      await db.update(userProfiles).set({ isAvailable: true }).where(eq(userProfiles.userId, fu.id));
+    await db.update(users)
+      .set({ lastLoginAt: now })
+      .where(eq(users.isFake, true));
+    await db.update(users)
+      .set({ country: "IT" } as any)
+      .where(and(eq(users.isFake, true), sql`(${users.country} IS NULL OR ${users.country} = '')`));
+    const fakeIds = await db.select({ id: users.id }).from(users).where(eq(users.isFake, true));
+    const count = fakeIds.length;
+    if (count > 0) {
+      const ids = fakeIds.map(u => u.id);
+      const CHUNK = 500;
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        await db.update(userProfiles)
+          .set({ isAvailable: true })
+          .where(inArray(userProfiles.userId, ids.slice(i, i + CHUNK)));
+        await new Promise(r => setTimeout(r, 0));
+      }
     }
-    return res.json({ ok: true, count: fakeUsers.length });
+    return res.json({ ok: true, count });
   } catch (error) {
     console.error("Admin wake-all fake users error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -2443,15 +2454,33 @@ router.post("/fake-users/wake-all", async (_req: Request, res: Response) => {
 
 router.post("/fake-users/distribute-to-clubs", async (_req: Request, res: Response) => {
   try {
-    const fakeUsers = await db.select({ id: users.id }).from(users).where(eq(users.isFake, true));
-    const totals = { assigned: 0, skipped: 0, failed: 0 };
-    for (const fu of fakeUsers) {
-      const s = await assignFakeUserToClubs(fu.id);
-      totals.assigned += s.assigned;
-      totals.skipped += s.skipped;
-      totals.failed += s.failed;
+    const [fakeUsers, approvedClubs] = await Promise.all([
+      db.select({ id: users.id }).from(users).where(eq(users.isFake, true)),
+      db.select({ id: motoClubs.id }).from(motoClubs).where(eq(motoClubs.isApproved, true)),
+    ]);
+    if (approvedClubs.length === 0) {
+      return res.json({ ok: true, usersProcessed: fakeUsers.length, assigned: 0, skipped: 0, failed: 0 });
     }
-    return res.json({ ok: true, usersProcessed: fakeUsers.length, ...totals });
+    const rows: { clubId: string; userId: string; role: string; status: string }[] = [];
+    for (const fu of fakeUsers) {
+      const pickCount = Math.min(1 + Math.floor(Math.random() * 3), approvedClubs.length);
+      const shuffled = [...approvedClubs].sort(() => Math.random() - 0.5).slice(0, pickCount);
+      for (const club of shuffled) {
+        rows.push({ clubId: club.id, userId: fu.id, role: "member", status: "active" });
+      }
+    }
+    let assigned = 0;
+    const CHUNK = 500;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const result = await db.insert(motoClubMembers)
+        .values(rows.slice(i, i + CHUNK))
+        .onConflictDoNothing()
+        .returning({ id: motoClubMembers.id });
+      assigned += result.length;
+      await new Promise(r => setTimeout(r, 0));
+    }
+    const skipped = rows.length - assigned;
+    return res.json({ ok: true, usersProcessed: fakeUsers.length, assigned, skipped, failed: 0 });
   } catch (error) {
     console.error("Admin distribute-to-clubs error:", error);
     return res.status(500).json({ message: "Errore interno del server" });

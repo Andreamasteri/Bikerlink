@@ -11,6 +11,7 @@ import {
   TextInput,
   ActivityIndicator,
   Switch,
+  Alert,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
@@ -286,7 +287,7 @@ export default function FakeUsersAdmin() {
   const distributeMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/admin/fake-users/distribute-to-clubs", {}),
     onSuccess: (data: any) => {
-      setDistributeResult({ type: "success", text: `${data?.count ?? "?"} utenti fake distribuiti nei motoclub` });
+      setDistributeResult({ type: "success", text: `${data?.usersProcessed ?? "?"} utenti distribuiti (${data?.assigned ?? 0} assegnazioni)` });
     },
     onError: () => setDistributeResult({ type: "error", text: "Errore durante la distribuzione" }),
   });
