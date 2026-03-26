@@ -357,7 +357,9 @@ export default function MotoclubScreen() {
 
   const respondMut = useMutation({
     mutationFn: ({ id, action }: { id: string; action: "accept" | "reject" }) =>
-      apiRequest("PUT", `/api/motoclubs/invites/${id}/respond`, { action }),
+      apiRequest("PUT", `/api/motoclubs/invites/${id}/respond`, {
+        response: action === "accept" ? "accepted" : "declined",
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/motoclubs/invites"] });
       queryClient.invalidateQueries({ queryKey: ["/api/motoclubs/me/clubs"] });
