@@ -846,7 +846,7 @@ export default function FakeUsersAdmin() {
               ) : (
                 <>
                   <Ionicons name="git-compare" size={18} color="#fff" />
-                  <Text style={[styles.massSeedBtnText, { color: "#fff" }]}>Forza Matching</Text>
+                  <Text style={[styles.massSeedBtnText, { color: "#fff" }]}>⚡ Forza Matching</Text>
                 </>
               )}
             </TouchableOpacity>
