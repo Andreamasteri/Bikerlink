@@ -23,6 +23,7 @@ import { Switch } from "react-native";
 import { useT } from "@/lib/language-context";
 import MotoPicker from "@/components/MotoPicker";
 import { MOTORCYCLE_BRANDS, getModelsForBrand } from "@/lib/motorcycle-data";
+import { useRouter } from "expo-router";
 
 const MOTO_TYPES = [
   { value: "sportiva", label: "Sportiva" },
@@ -44,7 +45,8 @@ const RIDING_STYLES = [
 ] as const;
 
 function WishlistScreen() {
-  const { user } = useAuth();
+  const { user, isLoading: authIsLoading } = useAuth();
+  const router = useRouter();
   const t = useT();
   const insets = useSafeAreaInsets();
   const [showMotoForm, setShowMotoForm] = useState(false);
@@ -159,6 +161,21 @@ function WishlistScreen() {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color={Colors.accent} />
+      </View>
+    );
+  }
+
+  if (!authIsLoading && user === null) {
+    return (
+      <View style={[styles.empty, { flex: 1, justifyContent: "center" }]}>
+        <Ionicons name="lock-closed-outline" size={64} color={Colors.textSecondary} />
+        <Text style={styles.emptyText}>{t("auth.sessionExpired")}</Text>
+        <Pressable
+          style={sessionExpiredBtn}
+          onPress={() => router.replace("/(auth)/login")}
+        >
+          <Text style={sessionExpiredBtnText}>{t("auth.loginToContinue")}</Text>
+        </Pressable>
       </View>
     );
   }
@@ -351,7 +368,8 @@ export default function GarageScreen() {
 }
 
 function GarageContent() {
-  const { user } = useAuth();
+  const { user, isLoading: authIsLoading } = useAuth();
+  const router = useRouter();
   const t = useT();
   const insets = useSafeAreaInsets();
   const [showForm, setShowForm] = useState(false);
@@ -524,6 +542,21 @@ function GarageContent() {
       </Pressable>
     );
   };
+
+  if (!authIsLoading && user === null) {
+    return (
+      <View style={[styles.empty, { flex: 1, justifyContent: "center" }]}>
+        <Ionicons name="lock-closed-outline" size={64} color={Colors.textSecondary} />
+        <Text style={styles.emptyText}>{t("auth.sessionExpired")}</Text>
+        <Pressable
+          style={sessionExpiredBtn}
+          onPress={() => router.replace("/(auth)/login")}
+        >
+          <Text style={sessionExpiredBtnText}>{t("auth.loginToContinue")}</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -762,3 +795,18 @@ const styles = StyleSheet.create({
   saveBtn: { backgroundColor: Colors.accent, paddingVertical: 16, borderRadius: 10, alignItems: "center", marginTop: 20 },
   saveBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.background },
 });
+
+const sessionExpiredBtn = {
+  backgroundColor: Colors.accent,
+  paddingHorizontal: 24,
+  paddingVertical: 12,
+  borderRadius: 10,
+  alignItems: "center" as const,
+  marginTop: 8,
+};
+
+const sessionExpiredBtnText = {
+  fontSize: 16,
+  fontFamily: "Inter_600SemiBold",
+  color: "#fff",
+};

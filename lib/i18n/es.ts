@@ -3,6 +3,8 @@ const es: Record<string, string> = {
   "app.tagline": "Nunca irás solo",
 
   "auth.login": "Iniciar sesión",
+  "auth.sessionExpired": "Sesión expirada",
+  "auth.loginToContinue": "Inicia sesión para continuar",
   "auth.register": "Registrarse",
   "auth.logout": "Cerrar sesión",
   "auth.email": "Correo electrónico",

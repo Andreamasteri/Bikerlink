@@ -3,6 +3,8 @@ const de: Record<string, string> = {
   "app.tagline": "Du fährst nie allein",
 
   "auth.login": "Anmelden",
+  "auth.sessionExpired": "Sitzung abgelaufen",
+  "auth.loginToContinue": "Anmelden um fortzufahren",
   "auth.register": "Registrieren",
   "auth.logout": "Abmelden",
   "auth.email": "E-Mail",

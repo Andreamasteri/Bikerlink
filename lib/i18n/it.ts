@@ -5,6 +5,8 @@ const it: Record<string, string> = {
   "auth.login": "Accedi",
   "auth.register": "Registrati",
   "auth.logout": "Esci",
+  "auth.sessionExpired": "Sessione scaduta",
+  "auth.loginToContinue": "Accedi per continuare",
   "auth.email": "Email",
   "auth.password": "Password",
   "auth.nickname": "Nickname",
