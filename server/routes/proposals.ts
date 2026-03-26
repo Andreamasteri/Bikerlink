@@ -137,7 +137,7 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
         const isBiker = match.bikerId === userId;
         const otherUser = isBiker ? zavorrina : biker;
 
-        if (allowedCountries.length > 0 && otherUser?.country && !allowedCountries.includes(otherUser.country)) {
+        if (allowedCountries.length > 0 && (!otherUser?.country || !allowedCountries.includes(otherUser.country))) {
           return null;
         }
 
@@ -330,7 +330,7 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
         const isBiker1 = match.biker1Id === userId;
         const otherBiker = isBiker1 ? biker2 : biker1;
 
-        if (allowedCountries.length > 0 && otherBiker?.country && !allowedCountries.includes(otherBiker.country)) {
+        if (allowedCountries.length > 0 && (!otherBiker?.country || !allowedCountries.includes(otherBiker.country))) {
           return null;
         }
 

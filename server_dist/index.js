@@ -6075,7 +6075,7 @@ router5.get("/garage-matches", requireAuth4, async (req, res) => {
         const wishlistMoto = await storage.getWishlistMoto(match.wishlistMotoId);
         const isBiker = match.bikerId === userId;
         const otherUser = isBiker ? zavorrina : biker;
-        if (allowedCountries.length > 0 && otherUser?.country && !allowedCountries.includes(otherUser.country)) {
+        if (allowedCountries.length > 0 && (!otherUser?.country || !allowedCountries.includes(otherUser.country))) {
           return null;
         }
         return {
@@ -6243,7 +6243,7 @@ router5.get("/biker-matches", requireAuth4, async (req, res) => {
         const biker2 = await storage.getUser(match.biker2Id);
         const isBiker1 = match.biker1Id === userId;
         const otherBiker = isBiker1 ? biker2 : biker1;
-        if (allowedCountries.length > 0 && otherBiker?.country && !allowedCountries.includes(otherBiker.country)) {
+        if (allowedCountries.length > 0 && (!otherBiker?.country || !allowedCountries.includes(otherBiker.country))) {
           return null;
         }
         return {

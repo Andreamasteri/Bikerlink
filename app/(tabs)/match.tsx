@@ -1152,7 +1152,6 @@ const styles = StyleSheet.create({
     fontStyle: "italic" as const,
     color: Colors.textSecondary,
     marginTop: 4,
-    width: "100%" as any,
   },
   removeBtn: {
     marginLeft: 4,
