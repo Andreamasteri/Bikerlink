@@ -12043,7 +12043,9 @@ async function registerRoutes(app2) {
         maxAge: 30 * 24 * 60 * 60 * 1e3,
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "lax"
+        // Dev: no SameSite attribute (false) → compatible with HTTP localhost, curl, and React Native native client
+        // Prod: SameSite=Lax → CSRF protection for browser, React Native ignores SameSite anyway
+        sameSite: process.env.NODE_ENV === "production" ? "lax" : false
       }
     })
   );
