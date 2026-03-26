@@ -115,7 +115,7 @@ async function runMatching(): Promise<number> {
   }
 }
 
-async function runWishlistMatching(): Promise<number> {
+export async function runWishlistMatching(): Promise<number> {
   try {
     const countriesSetting = await storage.getAppSetting("matching_countries");
     let matchingCountries: string[] | undefined;
@@ -219,7 +219,7 @@ function baseModelName(model: string): string {
     .replace(/[^a-z0-9]/g, "");
 }
 
-async function runBikerBikerMatching(): Promise<number> {
+export async function runBikerBikerMatching(): Promise<number> {
   try {
     const countriesSetting = await storage.getAppSetting("matching_countries");
     let matchingCountries: string[] | undefined;
@@ -259,7 +259,7 @@ async function runBikerBikerMatching(): Promise<number> {
 
     let matchCount = 0;
     let skipCount = 0;
-    const MAX_MATCHES_PER_RUN = 200;
+    const MAX_MATCHES_PER_RUN = 1000;
 
     const shuffledBuckets = [...buckets.values()].sort(() => Math.random() - 0.5);
 

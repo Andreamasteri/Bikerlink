@@ -284,6 +284,18 @@ export default function FakeUsersAdmin() {
     onError: () => setWakeAllResult({ type: "error", text: "Errore durante l'operazione" }),
   });
   const [distributeResult, setDistributeResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const [forceMatchingResult, setForceMatchingResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const forceMatchingMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/force-matching", {}),
+    onSuccess: (data: any) => {
+      const bb = data?.bikerBiker ?? 0;
+      const zav = data?.zavarrina ?? 0;
+      setForceMatchingResult({ type: "success", text: `${bb} biker-biker + ${zav} zavarrina match creati` });
+    },
+    onError: () => setForceMatchingResult({ type: "error", text: "Errore durante il matching" }),
+  });
+
   const distributeMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/admin/fake-users/distribute-to-clubs", {}),
     onSuccess: (data: any) => {
@@ -810,6 +822,31 @@ export default function FakeUsersAdmin() {
                 <>
                   <Ionicons name="people" size={18} color="#fff" />
                   <Text style={[styles.massSeedBtnText, { color: "#fff" }]}>Distribuisci nei motoclub</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+          <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 12, gap: 8 }}>
+            <Text style={[styles.massSeedDesc, { marginBottom: 0 }]}>
+              Forza un ciclo di matching immediato (biker-biker e zavarrina) senza attendere il login utente.
+            </Text>
+            {!!forceMatchingResult && (
+              <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: forceMatchingResult.type === "success" ? Colors.success : Colors.error }}>
+                {forceMatchingResult.text}
+              </Text>
+            )}
+            <TouchableOpacity
+              style={[styles.massSeedBtn, { backgroundColor: "#9C27B0" }, forceMatchingMutation.isPending && styles.massSeedBtnDisabled]}
+              onPress={() => { setForceMatchingResult(null); forceMatchingMutation.mutate(); }}
+              disabled={forceMatchingMutation.isPending}
+              activeOpacity={0.7}
+            >
+              {forceMatchingMutation.isPending ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="git-compare" size={18} color="#fff" />
+                  <Text style={[styles.massSeedBtnText, { color: "#fff" }]}>Forza Matching</Text>
                 </>
               )}
             </TouchableOpacity>

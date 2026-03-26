@@ -10,7 +10,7 @@ import { createClubInvitesForMoto } from "./motoclubs";
 import { eq, and, ne, desc, sql, count, notExists, inArray, lte, isNull, or } from "drizzle-orm";
 import { sendEmail } from "../email";
 import { MOTORCYCLES, pickRandomN, getMotoYear } from "../mass-seed-data";
-import { getLastMatchingCycleMeta } from "../matching-engine";
+import { getLastMatchingCycleMeta, runBikerBikerMatching, runWishlistMatching } from "../matching-engine";
 import { isProtectedUser } from "../constants";
 
 const router = Router();
@@ -2163,6 +2163,19 @@ router.get("/mass-seed-status", async (_req: Request, res: Response) => {
   } catch (error) {
     console.error("Admin mass seed status error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/force-matching", async (_req: Request, res: Response) => {
+  try {
+    console.log("[Admin] Avvio force-matching richiesto dall'admin");
+    const bikerBiker = await runBikerBikerMatching();
+    const zavarrina = await runWishlistMatching();
+    console.log(`[Admin] Force-matching completato: ${bikerBiker} biker-biker, ${zavarrina} zavarrina`);
+    return res.json({ bikerBiker, zavarrina });
+  } catch (error) {
+    console.error("Admin force-matching error:", error);
+    return res.status(500).json({ message: "Errore durante il matching" });
   }
 });
 

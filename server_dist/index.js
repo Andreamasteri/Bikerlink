@@ -8650,7 +8650,7 @@ async function runBikerBikerMatching() {
     }
     let matchCount = 0;
     let skipCount = 0;
-    const MAX_MATCHES_PER_RUN = 200;
+    const MAX_MATCHES_PER_RUN = 1e3;
     const shuffledBuckets = [...buckets.values()].sort(() => Math.random() - 0.5);
     for (const members of shuffledBuckets) {
       if (members.length < 2) continue;
@@ -10864,6 +10864,18 @@ router17.get("/mass-seed-status", async (_req, res) => {
   } catch (error) {
     console.error("Admin mass seed status error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router17.post("/force-matching", async (_req, res) => {
+  try {
+    console.log("[Admin] Avvio force-matching richiesto dall'admin");
+    const bikerBiker = await runBikerBikerMatching();
+    const zavarrina = await runWishlistMatching();
+    console.log(`[Admin] Force-matching completato: ${bikerBiker} biker-biker, ${zavarrina} zavarrina`);
+    return res.json({ bikerBiker, zavarrina });
+  } catch (error) {
+    console.error("Admin force-matching error:", error);
+    return res.status(500).json({ message: "Errore durante il matching" });
   }
 });
 router17.get("/invitation-codes/stats", async (_req, res) => {
