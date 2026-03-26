@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -455,12 +456,14 @@ export default function MatchScreen() {
   const [distanceMode, setDistanceMode] = useState<"all" | "km">("all");
   const [distanceKm, setDistanceKm] = useState<string>("50");
 
-  useEffect(() => {
-    AsyncStorage.multiGet(["match_distance_mode", "match_distance_km"]).then(pairs => {
-      const km = pairs[1][1];
-      if (km) setDistanceKm(km);
-    }).catch(() => {});
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      setDistanceMode("all");
+      AsyncStorage.getItem("match_distance_km").then(km => {
+        if (km) setDistanceKm(km);
+      }).catch(() => {});
+    }, [])
+  );
 
   useEffect(() => {
     AsyncStorage.multiSet([["match_distance_mode", distanceMode], ["match_distance_km", distanceKm]]).catch(() => {});
