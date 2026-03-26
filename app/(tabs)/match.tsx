@@ -564,12 +564,7 @@ export default function MatchScreen() {
 
   const acceptGarageMutation = useMutation({
     mutationFn: async (matchId: string) => {
-      const url = new URL(`/api/proposals/garage-matches/${matchId}/accept`, getApiUrl());
-      const res = await globalThis.fetch(url.toString(), { method: "POST", credentials: "include" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: t("match.error") }));
-        throw new Error(err.message || t("match.errorAccept"));
-      }
+      const res = await apiRequest("POST", `/api/proposals/garage-matches/${matchId}/accept`);
       return res.json();
     },
     onSuccess: () => {
@@ -584,12 +579,7 @@ export default function MatchScreen() {
 
   const rejectGarageMutation = useMutation({
     mutationFn: async (matchId: string) => {
-      const url = new URL(`/api/proposals/garage-matches/${matchId}/reject`, getApiUrl());
-      const res = await globalThis.fetch(url.toString(), { method: "POST", credentials: "include" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: t("match.error") }));
-        throw new Error(err.message || t("match.errorReject"));
-      }
+      const res = await apiRequest("POST", `/api/proposals/garage-matches/${matchId}/reject`);
       return res.json();
     },
     onSuccess: () => {
@@ -600,12 +590,7 @@ export default function MatchScreen() {
 
   const removeGarageMatchMutation = useMutation({
     mutationFn: async (matchId: string) => {
-      const url = new URL(`/api/proposals/garage-matches/${matchId}`, getApiUrl());
-      const res = await globalThis.fetch(url.toString(), { method: "DELETE", credentials: "include" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: t("match.error") }));
-        throw new Error(err.message || t("match.error"));
-      }
+      const res = await apiRequest("DELETE", `/api/proposals/garage-matches/${matchId}`);
       return res.json();
     },
     onSuccess: () => {
@@ -616,12 +601,7 @@ export default function MatchScreen() {
 
   const acceptBikerMutation = useMutation({
     mutationFn: async (matchId: string) => {
-      const url = new URL(`/api/proposals/biker-matches/${matchId}/accept`, getApiUrl());
-      const res = await globalThis.fetch(url.toString(), { method: "POST", credentials: "include" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: t("match.error") }));
-        throw new Error(err.message || t("match.errorAccept"));
-      }
+      const res = await apiRequest("POST", `/api/proposals/biker-matches/${matchId}/accept`);
       return res.json();
     },
     onSuccess: () => {
@@ -636,12 +616,7 @@ export default function MatchScreen() {
 
   const rejectBikerMutation = useMutation({
     mutationFn: async (matchId: string) => {
-      const url = new URL(`/api/proposals/biker-matches/${matchId}/reject`, getApiUrl());
-      const res = await globalThis.fetch(url.toString(), { method: "POST", credentials: "include" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: t("match.error") }));
-        throw new Error(err.message || t("match.errorReject"));
-      }
+      const res = await apiRequest("POST", `/api/proposals/biker-matches/${matchId}/reject`);
       return res.json();
     },
     onSuccess: () => {
@@ -652,12 +627,7 @@ export default function MatchScreen() {
 
   const removeBikerMatchMutation = useMutation({
     mutationFn: async (matchId: string) => {
-      const url = new URL(`/api/proposals/biker-matches/${matchId}`, getApiUrl());
-      const res = await globalThis.fetch(url.toString(), { method: "DELETE", credentials: "include" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: t("match.error") }));
-        throw new Error(err.message || t("match.error"));
-      }
+      const res = await apiRequest("DELETE", `/api/proposals/biker-matches/${matchId}`);
       return res.json();
     },
     onSuccess: () => {
@@ -668,15 +638,7 @@ export default function MatchScreen() {
 
   const acceptMutation = useMutation({
     mutationFn: async (matchId: string) => {
-      const url = new URL(`/api/proposals/matches/${matchId}/accept`, getApiUrl());
-      const res = await globalThis.fetch(url.toString(), {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: t("match.error") }));
-        throw new Error(err.message || t("match.errorAccept"));
-      }
+      const res = await apiRequest("POST", `/api/proposals/matches/${matchId}/accept`);
       return res.json();
     },
     onSuccess: () => {
@@ -691,15 +653,7 @@ export default function MatchScreen() {
 
   const rejectMutation = useMutation({
     mutationFn: async (matchId: string) => {
-      const url = new URL(`/api/proposals/matches/${matchId}/reject`, getApiUrl());
-      const res = await globalThis.fetch(url.toString(), {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: t("match.error") }));
-        throw new Error(err.message || t("match.errorReject"));
-      }
+      const res = await apiRequest("POST", `/api/proposals/matches/${matchId}/reject`);
       return res.json();
     },
     onSuccess: () => {
@@ -710,12 +664,7 @@ export default function MatchScreen() {
 
   const removeProposalMatchMutation = useMutation({
     mutationFn: async (matchId: string) => {
-      const url = new URL(`/api/proposals/matches/${matchId}`, getApiUrl());
-      const res = await globalThis.fetch(url.toString(), { method: "DELETE", credentials: "include" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: t("match.error") }));
-        throw new Error(err.message || t("match.error"));
-      }
+      const res = await apiRequest("DELETE", `/api/proposals/matches/${matchId}`);
       return res.json();
     },
     onSuccess: () => {

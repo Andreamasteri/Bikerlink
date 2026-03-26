@@ -11,9 +11,15 @@ import { useQuery } from "@tanstack/react-query";
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const { isGpsGateActive, requestPermission } = useLocationGate();
   const prevUnreadRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!isLoading && user === null) {
+      router.replace("/(auth)/login");
+    }
+  }, [user, isLoading]);
 
   const isBikerOrCoppia = user?.userType === "biker" || user?.userType === "coppia";
 
