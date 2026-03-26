@@ -333,6 +333,7 @@ const de: Record<string, string> = {
   "match.distanceFilterAll": "Ausgewählte Länder",
   "match.distanceFilterKm": "Radius km",
   "match.distanceKmPlaceholder": "km",
+  "match.applyFilter": "OK",
 
   "proposals.detail.notFound": "Vorschlag nicht gefunden",
   "proposals.detail.description": "Beschreibung",

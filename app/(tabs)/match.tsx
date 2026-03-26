@@ -916,7 +916,7 @@ export default function MatchScreen() {
                 }
               }}
             >
-              <Text style={styles.distanceKmApplyText}>OK</Text>
+              <Text style={styles.distanceKmApplyText}>{t("match.applyFilter")}</Text>
             </TouchableOpacity>
           </>
         )}
