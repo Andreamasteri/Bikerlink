@@ -48,6 +48,13 @@ function formatTimeInput(val: string): string {
   return nums.slice(0, 2) + ":" + nums.slice(2, 4);
 }
 
+function formatDateDDMMYYYY(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = String(d.getFullYear());
+  return `${dd}/${mm}/${yyyy}`;
+}
+
 function parseDateAndTime(dateStr: string, timeStr: string): Date | null {
   const parts = dateStr.split("/");
   if (parts.length !== 3) return null;
@@ -489,6 +496,7 @@ export default function CreateProposalScreen() {
             )}
 
             <Text style={styles.sectionTitle}>Punto di partenza *</Text>
+            <Text style={styles.fieldHint}>Descrizione</Text>
             <TextInput
               style={styles.input}
               value={departureAddress}
@@ -567,9 +575,27 @@ export default function CreateProposalScreen() {
               </>
             )}
 
-            <Text style={styles.sectionTitle}>Data *</Text>
+            <View style={styles.dateLabelRow}>
+              <Text style={[styles.sectionTitle, { marginTop: 8, marginBottom: 0, flex: 1 }]}>Data *</Text>
+              <TouchableOpacity
+                style={styles.dateShortcutBtn}
+                onPress={() => setDateStr(formatDateDDMMYYYY(new Date()))}
+              >
+                <Text style={styles.dateShortcutText}>Oggi</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.dateShortcutBtn}
+                onPress={() => {
+                  const tomorrow = new Date();
+                  tomorrow.setDate(tomorrow.getDate() + 1);
+                  setDateStr(formatDateDDMMYYYY(tomorrow));
+                }}
+              >
+                <Text style={styles.dateShortcutText}>Domani</Text>
+              </TouchableOpacity>
+            </View>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { marginTop: 6 }]}
               value={dateStr}
               onChangeText={(v) => setDateStr(formatDateInput(v))}
               placeholder="GG/MM/AAAA"
@@ -608,6 +634,7 @@ export default function CreateProposalScreen() {
             {!needsDestination && (
               <>
                 <Text style={styles.sectionTitle}>Tappe di ritrovo</Text>
+                <Text style={styles.fieldHint}>Descrizione</Text>
                 {stops.map((s, i) => (
                   <View key={i} style={styles.stopRow}>
                     <Ionicons name="flag" size={16} color={Colors.accent} />
@@ -910,4 +937,30 @@ const styles = StyleSheet.create({
   clubChipText: { fontSize: 13, color: Colors.textSecondary, fontFamily: "Inter_500Medium" as const },
   clubChipTextActive: { color: Colors.text },
   clubNote: { fontSize: 12, color: Colors.accent, marginBottom: 8, fontFamily: "Inter_400Regular" as const },
+  fieldHint: {
+    fontStyle: "italic" as const,
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: -4,
+    marginBottom: 6,
+  },
+  dateLabelRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    marginTop: 8,
+  },
+  dateShortcutBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent + "15",
+  },
+  dateShortcutText: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+    color: Colors.accent,
+  },
 });
