@@ -120,7 +120,8 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
     const garageMatches = await storage.getMatchesForUser(userId);
 
     const countrySetting = await storage.getAppSetting("matching_countries");
-    const allowedCountries: string[] = countrySetting?.value ? JSON.parse(countrySetting.value) : [];
+    let allowedCountries: string[] = [];
+    try { allowedCountries = countrySetting?.value ? JSON.parse(countrySetting.value) : []; } catch { allowedCountries = []; }
 
     const filteredMatches = garageMatches.filter((match) => {
       const otherId = match.bikerId === userId ? match.zavarrinaId : match.bikerId;
@@ -315,7 +316,8 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
     const bikerMatchesList = await storage.getBikerBikerMatchesForUser(userId);
 
     const countrySetting = await storage.getAppSetting("matching_countries");
-    const allowedCountries: string[] = countrySetting?.value ? JSON.parse(countrySetting.value) : [];
+    let allowedCountries: string[] = [];
+    try { allowedCountries = countrySetting?.value ? JSON.parse(countrySetting.value) : []; } catch { allowedCountries = []; }
 
     const filteredMatches = bikerMatchesList.filter((match) => {
       const otherId = match.biker1Id === userId ? match.biker2Id : match.biker1Id;

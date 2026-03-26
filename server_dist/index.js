@@ -6062,7 +6062,12 @@ router5.get("/garage-matches", requireAuth4, async (req, res) => {
     const blockedIds = new Set(await storage.getBlockedUserIds(userId));
     const garageMatches = await storage.getMatchesForUser(userId);
     const countrySetting = await storage.getAppSetting("matching_countries");
-    const allowedCountries = countrySetting?.value ? JSON.parse(countrySetting.value) : [];
+    let allowedCountries = [];
+    try {
+      allowedCountries = countrySetting?.value ? JSON.parse(countrySetting.value) : [];
+    } catch {
+      allowedCountries = [];
+    }
     const filteredMatches = garageMatches.filter((match) => {
       const otherId = match.bikerId === userId ? match.zavarrinaId : match.bikerId;
       return !blockedIds.has(otherId);
@@ -6232,7 +6237,12 @@ router5.get("/biker-matches", requireAuth4, async (req, res) => {
     const blockedIds = new Set(await storage.getBlockedUserIds(userId));
     const bikerMatchesList = await storage.getBikerBikerMatchesForUser(userId);
     const countrySetting = await storage.getAppSetting("matching_countries");
-    const allowedCountries = countrySetting?.value ? JSON.parse(countrySetting.value) : [];
+    let allowedCountries = [];
+    try {
+      allowedCountries = countrySetting?.value ? JSON.parse(countrySetting.value) : [];
+    } catch {
+      allowedCountries = [];
+    }
     const filteredMatches = bikerMatchesList.filter((match) => {
       const otherId = match.biker1Id === userId ? match.biker2Id : match.biker1Id;
       return !blockedIds.has(otherId);
@@ -9870,10 +9880,38 @@ router17.put("/settings/maps_user_choice_enabled", async (req, res) => {
 router17.get("/settings/matching_countries", async (_req, res) => {
   try {
     const setting = await storage.getAppSetting("matching_countries");
-    const countries = setting?.value ? JSON.parse(setting.value) || [] : [];
+    let countries = [];
+    try {
+      countries = setting?.value ? JSON.parse(setting.value) || [] : [];
+    } catch {
+      countries = [];
+    }
     return res.json({ countries });
   } catch (error) {
     console.error("Admin get matching_countries error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router17.put("/settings/matching_countries", async (req, res) => {
+  try {
+    const { value } = req.body;
+    let countries = [];
+    try {
+      countries = value ? JSON.parse(value) : [];
+    } catch {
+      countries = [];
+    }
+    const setting = await storage.upsertAppSetting("matching_countries", JSON.stringify(countries));
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId,
+      action: "update_setting",
+      targetType: "app_setting",
+      targetId: "matching_countries",
+      details: `Paesi matching aggiornati: ${countries.join(", ") || "nessuno (tutti)"}`
+    });
+    return res.json(setting);
+  } catch (error) {
+    console.error("Admin update matching_countries error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

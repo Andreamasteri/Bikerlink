@@ -990,10 +990,31 @@ router.put("/settings/maps_user_choice_enabled", async (req: Request, res: Respo
 router.get("/settings/matching_countries", async (_req: Request, res: Response) => {
   try {
     const setting = await storage.getAppSetting("matching_countries");
-    const countries: string[] = setting?.value ? (JSON.parse(setting.value) || []) : [];
+    let countries: string[] = [];
+    try { countries = setting?.value ? (JSON.parse(setting.value) || []) : []; } catch { countries = []; }
     return res.json({ countries });
   } catch (error) {
     console.error("Admin get matching_countries error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.put("/settings/matching_countries", async (req: Request, res: Response) => {
+  try {
+    const { value } = req.body;
+    let countries: string[] = [];
+    try { countries = value ? JSON.parse(value) : []; } catch { countries = []; }
+    const setting = await storage.upsertAppSetting("matching_countries", JSON.stringify(countries));
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_setting",
+      targetType: "app_setting",
+      targetId: "matching_countries",
+      details: `Paesi matching aggiornati: ${countries.join(", ") || "nessuno (tutti)"}`,
+    });
+    return res.json(setting);
+  } catch (error) {
+    console.error("Admin update matching_countries error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
