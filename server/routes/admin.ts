@@ -1002,8 +1002,12 @@ router.get("/settings/matching_countries", async (_req: Request, res: Response) 
 router.put("/settings/matching_countries", async (req: Request, res: Response) => {
   try {
     const { value } = req.body;
-    let countries: string[] = [];
-    try { countries = value ? JSON.parse(value) : []; } catch { countries = []; }
+    let parsed: unknown;
+    try { parsed = value ? JSON.parse(value) : []; } catch { return res.status(400).json({ message: "Formato JSON non valido" }); }
+    if (!Array.isArray(parsed) || !parsed.every((c: unknown) => typeof c === "string" && /^[A-Z]{2}$/i.test(c))) {
+      return res.status(400).json({ message: "Deve essere un array di codici paese ISO a 2 lettere" });
+    }
+    const countries: string[] = parsed.map((c: string) => c.toUpperCase());
     const setting = await storage.upsertAppSetting("matching_countries", JSON.stringify(countries));
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,

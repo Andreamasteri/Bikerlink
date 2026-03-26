@@ -9895,12 +9895,16 @@ router17.get("/settings/matching_countries", async (_req, res) => {
 router17.put("/settings/matching_countries", async (req, res) => {
   try {
     const { value } = req.body;
-    let countries = [];
+    let parsed;
     try {
-      countries = value ? JSON.parse(value) : [];
+      parsed = value ? JSON.parse(value) : [];
     } catch {
-      countries = [];
+      return res.status(400).json({ message: "Formato JSON non valido" });
     }
+    if (!Array.isArray(parsed) || !parsed.every((c) => typeof c === "string" && /^[A-Z]{2}$/i.test(c))) {
+      return res.status(400).json({ message: "Deve essere un array di codici paese ISO a 2 lettere" });
+    }
+    const countries = parsed.map((c) => c.toUpperCase());
     const setting = await storage.upsertAppSetting("matching_countries", JSON.stringify(countries));
     await storage.createModeratorLog({
       moderatorId: req.session.userId,
