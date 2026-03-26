@@ -6097,6 +6097,7 @@ router5.post("/garage-matches/:id/accept", requireAuth4, async (req, res) => {
   try {
     const userId = req.session.userId;
     const matchId = req.params.id;
+    if (!matchId) return res.status(400).json({ message: "ID match mancante" });
     const match = await storage.getGarageMatch(matchId);
     if (!match) {
       return res.status(404).json({ message: "Match non trovato" });
@@ -6108,9 +6109,10 @@ router5.post("/garage-matches/:id/accept", requireAuth4, async (req, res) => {
       return res.status(400).json({ message: "Match gi\xE0 gestito" });
     }
     const updated = await storage.updateGarageMatch(matchId, { status: "accepted" });
+    if (!updated) return res.status(500).json({ message: "Aggiornamento match fallito" });
     return res.json(updated);
   } catch (error) {
-    console.error("Accept garage match error:", error);
+    console.error("Accept garage match error:", error instanceof Error ? error.message : error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -6118,6 +6120,7 @@ router5.post("/garage-matches/:id/reject", requireAuth4, async (req, res) => {
   try {
     const userId = req.session.userId;
     const matchId = req.params.id;
+    if (!matchId) return res.status(400).json({ message: "ID match mancante" });
     const match = await storage.getGarageMatch(matchId);
     if (!match) {
       return res.status(404).json({ message: "Match non trovato" });
@@ -6129,9 +6132,10 @@ router5.post("/garage-matches/:id/reject", requireAuth4, async (req, res) => {
       return res.status(400).json({ message: "Match gi\xE0 gestito" });
     }
     const updated = await storage.updateGarageMatch(matchId, { status: "rejected" });
+    if (!updated) return res.status(500).json({ message: "Aggiornamento match fallito" });
     return res.json(updated);
   } catch (error) {
-    console.error("Reject garage match error:", error);
+    console.error("Reject garage match error:", error instanceof Error ? error.message : error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -6252,14 +6256,16 @@ router5.post("/biker-matches/:id/accept", requireAuth4, async (req, res) => {
   try {
     const userId = req.session.userId;
     const matchId = req.params.id;
+    if (!matchId) return res.status(400).json({ message: "ID match mancante" });
     const match = await storage.getBikerBikerMatch(matchId);
     if (!match) return res.status(404).json({ message: "Match non trovato" });
     if (match.biker1Id !== userId && match.biker2Id !== userId) return res.status(403).json({ message: "Non autorizzato" });
     if (match.status !== "new") return res.status(400).json({ message: "Match gi\xE0 gestito" });
     const updated = await storage.updateBikerBikerMatch(matchId, { status: "accepted" });
+    if (!updated) return res.status(500).json({ message: "Aggiornamento match fallito" });
     return res.json(updated);
   } catch (error) {
-    console.error("Accept biker-biker match error:", error);
+    console.error("Accept biker-biker match error:", error instanceof Error ? error.message : error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -6267,14 +6273,16 @@ router5.post("/biker-matches/:id/reject", requireAuth4, async (req, res) => {
   try {
     const userId = req.session.userId;
     const matchId = req.params.id;
+    if (!matchId) return res.status(400).json({ message: "ID match mancante" });
     const match = await storage.getBikerBikerMatch(matchId);
     if (!match) return res.status(404).json({ message: "Match non trovato" });
     if (match.biker1Id !== userId && match.biker2Id !== userId) return res.status(403).json({ message: "Non autorizzato" });
     if (match.status !== "new") return res.status(400).json({ message: "Match gi\xE0 gestito" });
     const updated = await storage.updateBikerBikerMatch(matchId, { status: "rejected" });
+    if (!updated) return res.status(500).json({ message: "Aggiornamento match fallito" });
     return res.json(updated);
   } catch (error) {
-    console.error("Reject biker-biker match error:", error);
+    console.error("Reject biker-biker match error:", error instanceof Error ? error.message : error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
