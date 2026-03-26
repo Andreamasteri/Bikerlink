@@ -119,6 +119,9 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
     const blockedIds = new Set(await storage.getBlockedUserIds(userId));
     const garageMatches = await storage.getMatchesForUser(userId);
 
+    const countrySetting = await storage.getAppSetting("matching_countries");
+    const allowedCountries: string[] = countrySetting?.value ? JSON.parse(countrySetting.value) : [];
+
     const filteredMatches = garageMatches.filter((match) => {
       const otherId = match.bikerId === userId ? match.zavarrinaId : match.bikerId;
       return !blockedIds.has(otherId);
@@ -133,6 +136,10 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
 
         const isBiker = match.bikerId === userId;
         const otherUser = isBiker ? zavorrina : biker;
+
+        if (allowedCountries.length > 0 && otherUser?.country && !allowedCountries.includes(otherUser.country)) {
+          return null;
+        }
 
         return {
           ...match,
@@ -149,7 +156,7 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
       })
     );
 
-    return res.json(results);
+    return res.json(results.filter(Boolean));
   } catch (error) {
     console.error("Get garage matches error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -307,6 +314,9 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
     const blockedIds = new Set(await storage.getBlockedUserIds(userId));
     const bikerMatchesList = await storage.getBikerBikerMatchesForUser(userId);
 
+    const countrySetting = await storage.getAppSetting("matching_countries");
+    const allowedCountries: string[] = countrySetting?.value ? JSON.parse(countrySetting.value) : [];
+
     const filteredMatches = bikerMatchesList.filter((match) => {
       const otherId = match.biker1Id === userId ? match.biker2Id : match.biker1Id;
       return !blockedIds.has(otherId);
@@ -320,6 +330,10 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
         const isBiker1 = match.biker1Id === userId;
         const otherBiker = isBiker1 ? biker2 : biker1;
 
+        if (allowedCountries.length > 0 && otherBiker?.country && !allowedCountries.includes(otherBiker.country)) {
+          return null;
+        }
+
         return {
           ...match,
           isSupermatch: match.isSupermatch ?? false,
@@ -331,7 +345,7 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
       })
     );
 
-    return res.json(results);
+    return res.json(results.filter(Boolean));
   } catch (error) {
     console.error("Get biker-biker matches error:", error);
     return res.status(500).json({ message: "Errore interno del server" });

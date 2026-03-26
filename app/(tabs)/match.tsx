@@ -930,6 +930,9 @@ export default function MatchScreen() {
                 <MaterialCommunityIcons name="magnify" size={18} color={Colors.background} />
               )}
             </TouchableOpacity>
+            {(myLat == null || myLng == null) && (
+              <Text style={styles.distanceWarning}>{t("match.positionUnavailable")}</Text>
+            )}
           </>
         )}
       </View>
@@ -1142,6 +1145,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_700Bold",
     color: "#fff",
+  },
+  distanceWarning: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    fontStyle: "italic" as const,
+    color: Colors.textSecondary,
+    marginTop: 4,
+    width: "100%" as any,
   },
   removeBtn: {
     marginLeft: 4,

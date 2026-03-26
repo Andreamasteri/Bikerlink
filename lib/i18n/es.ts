@@ -333,6 +333,7 @@ const es: Record<string, string> = {
   "match.distanceFilterAll": "Estados seleccionados",
   "match.distanceFilterKm": "Radio km",
   "match.distanceKmPlaceholder": "km",
+  "match.positionUnavailable": "Ubicación no disponible — configura tu ubicación en el perfil.",
   "match.applyFilter": "OK",
 
   "proposals.detail.notFound": "Propuesta no encontrada",
