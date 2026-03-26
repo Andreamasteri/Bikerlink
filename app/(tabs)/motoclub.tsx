@@ -336,23 +336,25 @@ export default function MotoclubScreen() {
   const myClubIds = new Set(myClubs.map((c) => c.id));
   const myClubMap = new Map(myClubs.map((c) => [c.id, c]));
 
+  const invalidateClubLists = useCallback(() => {
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/motoclubs");
+      },
+    });
+  }, [queryClient]);
+
   const joinMut = useMutation({
     mutationFn: (clubId: string) =>
       apiRequest("POST", `/api/motoclubs/${clubId}/join`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/motoclubs"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/motoclubs/me/clubs"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/motoclubs/featured"] });
-    },
+    onSuccess: invalidateClubLists,
   });
 
   const leaveMut = useMutation({
     mutationFn: (clubId: string) =>
       apiRequest("POST", `/api/motoclubs/${clubId}/leave`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/motoclubs"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/motoclubs/me/clubs"] });
-    },
+    onSuccess: invalidateClubLists,
   });
 
   const respondMut = useMutation({
@@ -360,10 +362,7 @@ export default function MotoclubScreen() {
       apiRequest("PUT", `/api/motoclubs/invites/${id}/respond`, {
         response: action === "accept" ? "accepted" : "declined",
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/motoclubs/invites"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/motoclubs/me/clubs"] });
-    },
+    onSuccess: invalidateClubLists,
   });
 
   const handleJoin = useCallback(
