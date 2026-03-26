@@ -2652,64 +2652,28 @@ router.post("/reconcile-club-invites", async (req: Request, res: Response) => {
       return res.json({ invitesCreated: 0, message: "Nessuna moto nel garage" });
     }
 
-    let invitesCreated = 0;
     for (const moto of userMotos) {
-      const brandClubs = await db.select()
-        .from(motoClubs)
-        .where(
-          and(
-            eq(motoClubs.isApproved, true),
-            eq(motoClubs.clubType, "brand"),
-            ilike(motoClubs.brandName!, moto.brand)
-          )
-        );
-
-      for (const club of brandClubs) {
-        const isMember = await db.select()
-          .from(motoClubMembers)
-          .where(and(eq(motoClubMembers.clubId, club.id), eq(motoClubMembers.userId, userId)))
-          .limit(1);
-        if (isMember.length > 0) continue;
-
-        const hasInvite = await db.select()
-          .from(motoClubInvites)
-          .where(and(eq(motoClubInvites.clubId, club.id), eq(motoClubInvites.userId, userId)))
-          .limit(1);
-        if (hasInvite.length > 0) continue;
-
-        await db.insert(motoClubInvites).values({
-          clubId: club.id,
-          userId,
-          status: "pending",
-        });
-
-        await storage.createNotification({
-          userId,
-          title: "Ehi! Motoclub",
-          body: `Ci sono altre persone con una ${moto.brand}! Entra nel club "${club.name}"`,
-          notificationType: "motoclub_invite",
-          referenceType: "motoclub",
-          referenceId: club.id,
-        });
-
-        invitesCreated++;
-      }
+      await createClubInvitesForMoto(userId, moto.brand, moto.model);
     }
+
+    const invites = await db.select()
+      .from(motoClubInvites)
+      .where(and(eq(motoClubInvites.userId, userId), eq(motoClubInvites.status, "pending")));
 
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
       action: "reconcile_club_invites",
       targetType: "user",
       targetId: userId,
-      details: `Creati ${invitesCreated} inviti club per ${userMotos.length} moto`,
+      details: `Riconciliati inviti club per ${userMotos.length} moto, ${invites.length} inviti pending`,
     });
 
     return res.json({
-      invitesCreated,
       motorsChecked: userMotos.length,
-      message: invitesCreated > 0
-        ? `Creati ${invitesCreated} inviti club dal garage`
-        : "Tutti gli inviti club già presenti",
+      pendingInvites: invites.length,
+      message: invites.length > 0
+        ? `${invites.length} inviti club pending per ${userMotos.length} moto`
+        : "Tutti gli inviti club già presenti o accettati",
     });
   } catch (error) {
     console.error("Reconcile club invites error:", error);
@@ -2733,53 +2697,59 @@ router.post("/reconcile-fake-moto", async (req: Request, res: Response) => {
         )
       );
 
-    if (fakeUsersWithoutMoto.length === 0) {
-      return res.json({ reconciled: 0, message: "Tutti i fake biker hanno già moto nel garage" });
-    }
-
     let reconciledCount = 0;
     const BATCH_SIZE = 50;
 
-    for (let i = 0; i < fakeUsersWithoutMoto.length; i += BATCH_SIZE) {
-      const batch = fakeUsersWithoutMoto.slice(i, i + BATCH_SIZE);
-      const motoRows: {
-        userId: string;
-        brand: string;
-        model: string;
-        year: number;
-        displacement: number;
-        motorcycleType: string;
-        ridingStyle: string;
-      }[] = [];
+    if (fakeUsersWithoutMoto.length > 0) {
+      for (let i = 0; i < fakeUsersWithoutMoto.length; i += BATCH_SIZE) {
+        const batch = fakeUsersWithoutMoto.slice(i, i + BATCH_SIZE);
+        const motoRows: {
+          userId: string;
+          brand: string;
+          model: string;
+          year: number;
+          displacement: number;
+          motorcycleType: string;
+          ridingStyle: string;
+        }[] = [];
 
-      for (const u of batch) {
-        const motos = pickRandomN(MOTORCYCLES, 2 + Math.floor(Math.random() * 2));
-        for (const moto of motos) {
-          motoRows.push({
-            userId: u.id,
-            brand: moto.brand,
-            model: moto.model,
-            year: getMotoYear(),
-            displacement: moto.displacement,
-            motorcycleType: moto.type,
-            ridingStyle: moto.style,
-          });
+        for (const u of batch) {
+          const motos = pickRandomN(MOTORCYCLES, 2 + Math.floor(Math.random() * 2));
+          for (const moto of motos) {
+            motoRows.push({
+              userId: u.id,
+              brand: moto.brand,
+              model: moto.model,
+              year: getMotoYear(),
+              displacement: moto.displacement,
+              motorcycleType: moto.type,
+              ridingStyle: moto.style,
+            });
+          }
+          reconciledCount++;
         }
-        reconciledCount++;
-      }
 
-      if (motoRows.length > 0) {
-        await db.insert(userMotorcycles).values(motoRows).onConflictDoNothing();
+        if (motoRows.length > 0) {
+          await db.insert(userMotorcycles).values(motoRows).onConflictDoNothing();
+        }
       }
+      console.log(`[ReconcileFakeMoto] Riconciliati ${reconciledCount} utenti fake senza moto`);
     }
 
-    console.log(`[ReconcileFakeMoto] Riconciliati ${reconciledCount} utenti fake senza moto`);
+    const allFakeBikers = await db.select({ id: users.id })
+      .from(users)
+      .where(
+        and(
+          eq(users.isFake, true),
+          sql`${users.userType} IN ('biker', 'coppia')`
+        )
+      );
 
     let clubJoins = 0;
     const brandClubsCache = new Map<string, { id: string; name: string }[]>();
 
-    for (let i = 0; i < fakeUsersWithoutMoto.length; i += BATCH_SIZE) {
-      const batch = fakeUsersWithoutMoto.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < allFakeBikers.length; i += BATCH_SIZE) {
+      const batch = allFakeBikers.slice(i, i + BATCH_SIZE);
       for (const u of batch) {
         const userMotos = await db.select().from(userMotorcycles).where(eq(userMotorcycles.userId, u.id));
         const seenClubIds = new Set<string>();
@@ -2807,20 +2777,21 @@ router.post("/reconcile-fake-moto", async (req: Request, res: Response) => {
       }
     }
 
-    console.log(`[ReconcileFakeMoto] Auto-join brand clubs: ${clubJoins}`);
+    console.log(`[ReconcileFakeMoto] Auto-join brand clubs: ${clubJoins} for ${allFakeBikers.length} fake bikers`);
 
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
       action: "reconcile_fake_moto",
       targetType: "system",
       targetId: "matching",
-      details: `Inserite moto per ${reconciledCount} fake biker, ${clubJoins} iscrizioni brand club`,
+      details: `Moto: ${reconciledCount} nuove, Club: ${clubJoins} iscrizioni brand (${allFakeBikers.length} fake)`,
     });
 
     return res.json({
       reconciled: reconciledCount,
       clubJoins,
-      message: `Inserite moto per ${reconciledCount} fake biker, ${clubJoins} iscrizioni brand club`,
+      fakeBikersProcessed: allFakeBikers.length,
+      message: `Moto inserite per ${reconciledCount} fake biker, ${clubJoins} iscrizioni brand club (${allFakeBikers.length} fake processati)`,
     });
   } catch (error) {
     console.error("Reconcile fake moto error:", error);

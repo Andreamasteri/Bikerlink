@@ -610,7 +610,7 @@ export default function AdminSettings() {
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    onSuccess: (data: { invitesCreated: number; motorsChecked: number; message: string }) => {
+    onSuccess: (data: { motorsChecked: number; pendingInvites: number; message: string }) => {
       setClubInviteFeedback(data.message);
       queryClient.invalidateQueries({
         predicate: (query) => {
