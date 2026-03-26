@@ -1904,27 +1904,16 @@ router.post("/motoclubs/requests/:id/approve", async (req: Request, res: Respons
 
     if (request.requestedBy) {
       try {
-        const [dmConv] = await db.insert(conversations).values({
-          conversationType: "private",
-          title: null,
-        }).returning();
-        await db.insert(conversationParticipants).values([
-          { conversationId: dmConv.id, userId: adminId },
-          { conversationId: dmConv.id, userId: request.requestedBy },
-        ]);
-        await storage.createMessage({
-          conversationId: dmConv.id,
-          senderId: adminId,
-          messageType: "text",
-          content: `Il tuo motoclub "${request.name}" è stato approvato e creato! Puoi trovarlo nella sezione Motoclub.`,
-          imageUrl: null,
-          latitude: null,
-          longitude: null,
-          isFiltered: false,
+        await storage.createNotification({
+          userId: request.requestedBy,
+          title: "Motoclub approvato!",
+          body: `Il tuo motoclub "${request.name}" è stato approvato e creato! Puoi trovarlo nella sezione Motoclub.`,
+          notificationType: "motoclub_invite",
+          referenceType: "motoclub",
+          referenceId: newClub.id,
         });
-        await storage.updateConversationTimestamp(dmConv.id);
       } catch (e) {
-        console.error("[approve motoclub] DM error:", e);
+        console.error("[approve motoclub] notification error:", e);
       }
 
       await db.update(feedbackTickets)
@@ -1965,28 +1954,17 @@ router.post("/motoclubs/requests/:id/reject", async (req: Request, res: Response
 
     if (request?.requestedBy) {
       try {
-        const [dmConv] = await db.insert(conversations).values({
-          conversationType: "private",
-          title: null,
-        }).returning();
-        await db.insert(conversationParticipants).values([
-          { conversationId: dmConv.id, userId: adminId },
-          { conversationId: dmConv.id, userId: request.requestedBy },
-        ]);
         const noteText = note ? ` Motivazione: ${note}` : "";
-        await storage.createMessage({
-          conversationId: dmConv.id,
-          senderId: adminId,
-          messageType: "text",
-          content: `La richiesta di creazione del motoclub "${request.name}" non è stata approvata.${noteText}`,
-          imageUrl: null,
-          latitude: null,
-          longitude: null,
-          isFiltered: false,
+        await storage.createNotification({
+          userId: request.requestedBy,
+          title: "Richiesta motoclub non approvata",
+          body: `La richiesta di creazione del motoclub "${request.name}" non è stata approvata.${noteText}`,
+          notificationType: "system",
+          referenceType: "motoclub_request",
+          referenceId: requestId,
         });
-        await storage.updateConversationTimestamp(dmConv.id);
       } catch (e) {
-        console.error("[reject motoclub] DM error:", e);
+        console.error("[reject motoclub] notification error:", e);
       }
     }
 
