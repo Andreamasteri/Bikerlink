@@ -166,6 +166,7 @@ export interface IStorage {
   findExistingMatch(proposalId1: string, proposalId2: string): Promise<ProposalMatch | undefined>;
   deleteProposalMatch(id: string, userId: string): Promise<boolean>;
   deleteRejectedProposalMatches(userId: string): Promise<number>;
+  deletePendingProposalMatches(userId: string): Promise<number>;
   expireOldProposals(): Promise<number>;
   deleteExpiredProposals(): Promise<number>;
 
@@ -307,6 +308,7 @@ export interface IStorage {
   deleteGarageMatch(id: string, userId: string): Promise<boolean>;
   resetGarageMatchToNew(id: string, userId: string): Promise<boolean>;
   deleteRejectedGarageMatches(userId: string): Promise<number>;
+  deleteNewGarageMatches(userId: string): Promise<number>;
   getAllWishlistMotosWithUsers(countries?: string[]): Promise<{ wishlistMoto: any; userId: string }[]>;
   getAllBikerMotorcyclesWithUsers(countries?: string[]): Promise<{ motorcycle: any; userId: string }[]>;
   findExistingBikerZavarrinaMatch(bikerId: string, zavarrinaId: string, bikerMotorcycleId: string, wishlistMotoId: string): Promise<BikerZavarrinaMatch | undefined>;
@@ -319,6 +321,7 @@ export interface IStorage {
   updateBikerBikerMatch(id: string, data: Partial<InsertBikerBikerMatch>): Promise<BikerBikerMatch | undefined>;
   resetBikerBikerMatchToNew(id: string, userId: string): Promise<boolean>;
   deleteRejectedBikerBikerMatches(userId: string): Promise<number>;
+  deleteNewBikerBikerMatches(userId: string): Promise<number>;
 
   createEmailVerificationToken(userId: string, token: string, expiresAt: Date): Promise<void>;
   getEmailVerificationToken(token: string): Promise<EmailVerificationToken | undefined>;
@@ -545,6 +548,23 @@ export class DatabaseStorage implements IStorage {
       )
     );
     return rejected.length;
+  }
+
+  async deletePendingProposalMatches(userId: string): Promise<number> {
+    const pending = await db.select().from(proposalMatches).where(
+      and(
+        or(eq(proposalMatches.userId1, userId), eq(proposalMatches.userId2, userId)),
+        eq(proposalMatches.status, "pending")
+      )
+    );
+    if (pending.length === 0) return 0;
+    await db.delete(proposalMatches).where(
+      and(
+        or(eq(proposalMatches.userId1, userId), eq(proposalMatches.userId2, userId)),
+        eq(proposalMatches.status, "pending")
+      )
+    );
+    return pending.length;
   }
 
   async findExistingMatch(proposalId1: string, proposalId2: string): Promise<ProposalMatch | undefined> {
@@ -1287,6 +1307,23 @@ export class DatabaseStorage implements IStorage {
     return rejected.length;
   }
 
+  async deleteNewGarageMatches(userId: string): Promise<number> {
+    const newMatches = await db.select().from(bikerZavarrinaMatches).where(
+      and(
+        or(eq(bikerZavarrinaMatches.bikerId, userId), eq(bikerZavarrinaMatches.zavarrinaId, userId)),
+        eq(bikerZavarrinaMatches.status, "new")
+      )
+    );
+    if (newMatches.length === 0) return 0;
+    await db.delete(bikerZavarrinaMatches).where(
+      and(
+        or(eq(bikerZavarrinaMatches.bikerId, userId), eq(bikerZavarrinaMatches.zavarrinaId, userId)),
+        eq(bikerZavarrinaMatches.status, "new")
+      )
+    );
+    return newMatches.length;
+  }
+
   async getAllWishlistMotosWithUsers(countries?: string[]): Promise<{ wishlistMoto: any; userId: string }[]> {
     let query = db.select({
       wishlistMoto: zavarrinaWishlistMotos,
@@ -1779,6 +1816,23 @@ export class DatabaseStorage implements IStorage {
       )
     );
     return rejected.length;
+  }
+
+  async deleteNewBikerBikerMatches(userId: string): Promise<number> {
+    const newMatches = await db.select().from(bikerBikerMatches).where(
+      and(
+        or(eq(bikerBikerMatches.biker1Id, userId), eq(bikerBikerMatches.biker2Id, userId)),
+        eq(bikerBikerMatches.status, "new")
+      )
+    );
+    if (newMatches.length === 0) return 0;
+    await db.delete(bikerBikerMatches).where(
+      and(
+        or(eq(bikerBikerMatches.biker1Id, userId), eq(bikerBikerMatches.biker2Id, userId)),
+        eq(bikerBikerMatches.status, "new")
+      )
+    );
+    return newMatches.length;
   }
 
   async blockUser(blockerId: string, blockedId: string): Promise<UserBlock> {

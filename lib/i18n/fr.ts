@@ -335,6 +335,10 @@ const fr: Record<string, string> = {
   "match.distanceKmPlaceholder": "km",
   "match.positionUnavailable": "Position non disponible — définissez votre position dans le profil.",
   "match.applyFilter": "OK",
+  "match.rematchTitle": "Relancer le matching",
+  "match.rematchConfirm": "Voulez-vous supprimer tous les matches en attente et relancer le matching à zéro ?",
+  "match.rematchDone": "Matching terminé",
+  "match.rematchResult": "{count} nouveaux matches trouvés !",
 
   "proposals.detail.notFound": "Proposition introuvable",
   "proposals.detail.description": "Description",

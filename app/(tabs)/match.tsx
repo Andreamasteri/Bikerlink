@@ -700,6 +700,44 @@ export default function MatchScreen() {
     onError: (err: Error) => Alert.alert(t("match.error"), err.message),
   });
 
+  const [isRematching, setIsRematching] = useState(false);
+
+  const resetAndRematchMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/proposals/reset-and-rematch");
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/biker-matches"] });
+      setIsRematching(false);
+      const created = data?.created?.total ?? 0;
+      Alert.alert(t("match.rematchDone"), t("match.rematchResult").replace("{count}", String(created)));
+    },
+    onError: (err: Error) => {
+      setIsRematching(false);
+      Alert.alert(t("match.error"), err.message);
+    },
+  });
+
+  const handleResetAndRematch = useCallback(() => {
+    const doRematch = () => {
+      setIsRematching(true);
+      resetAndRematchMutation.mutate();
+    };
+    if (Platform.OS === "web") {
+      if (window.confirm(t("match.rematchConfirm"))) {
+        doRematch();
+      }
+    } else {
+      Alert.alert(t("match.rematchTitle"), t("match.rematchConfirm"), [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("common.confirm"), onPress: doRematch },
+      ]);
+    }
+  }, [resetAndRematchMutation, t]);
+
   const handleResetRejected = useCallback(() => {
     if (Platform.OS === "web") {
       if (window.confirm(t("match.resetRejectedConfirm"))) {
@@ -913,18 +951,18 @@ export default function MatchScreen() {
               maxLength={4}
             />
             <TouchableOpacity
-              style={[styles.distanceKmApplyBtn, (garageRefetching || bikerRefetching || proposalRefetching) && { opacity: 0.6 }]}
-              disabled={garageRefetching || bikerRefetching || proposalRefetching}
+              style={[styles.distanceKmApplyBtn, (isRematching || garageRefetching || bikerRefetching || proposalRefetching) && { opacity: 0.6 }]}
+              disabled={isRematching || garageRefetching || bikerRefetching || proposalRefetching}
               onPress={() => {
                 const val = pendingKm.trim();
                 if (val) {
                   setDistanceKm(val);
                   AsyncStorage.multiSet([["match_distance_mode", "km"], ["match_distance_km", val]]).catch(() => {});
-                  Promise.all([garageRefetch(), bikerRefetch(), proposalRefetch()]).catch(() => {});
                 }
+                handleResetAndRematch();
               }}
             >
-              {(garageRefetching || bikerRefetching || proposalRefetching) ? (
+              {isRematching ? (
                 <ActivityIndicator size="small" color={Colors.background} />
               ) : (
                 <MaterialCommunityIcons name="magnify" size={18} color={Colors.background} />

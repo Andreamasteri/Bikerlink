@@ -3,6 +3,7 @@ import { storage } from "../storage";
 import { db } from "../db";
 import { motoClubMembers } from "@shared/schema";
 import { and, eq } from "drizzle-orm";
+import { runMatchingForUser } from "../matching-engine";
 
 const router = Router();
 
@@ -409,6 +410,28 @@ router.delete("/biker-matches/:matchId", requireAuth, async (req: Request, res: 
     return res.json({ reset: true });
   } catch (error) {
     console.error("Reset biker-biker match error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/reset-and-rematch", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const [deletedGarage, deletedBiker] = await Promise.all([
+      storage.deleteNewGarageMatches(userId),
+      storage.deleteNewBikerBikerMatches(userId),
+    ]);
+    const totalDeleted = deletedGarage + deletedBiker;
+    console.log(`[ResetAndRematch] user=${userId} deleted: garage=${deletedGarage} biker=${deletedBiker}`);
+    const result = await runMatchingForUser(userId);
+    const totalCreated = result.bikerBiker + result.zavarrina;
+    console.log(`[ResetAndRematch] user=${userId} created: bikerBiker=${result.bikerBiker} zavarrina=${result.zavarrina}`);
+    return res.json({
+      deleted: { garage: deletedGarage, biker: deletedBiker, total: totalDeleted },
+      created: { bikerBiker: result.bikerBiker, zavarrina: result.zavarrina, total: totalCreated },
+    });
+  } catch (error) {
+    console.error("Reset and rematch error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
