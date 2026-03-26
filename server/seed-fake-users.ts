@@ -230,6 +230,8 @@ async function seedFakeUsers() {
       const email = `fake_${coppia.nickname.toLowerCase().replace("&", "_")}@fakeuser.bikerlink.it`;
       const coords = regionCoords[coppia.region];
 
+      const coppiaLat = coords.lat + randOffset();
+      const coppiaLng = coords.lng + randOffset();
       const [user] = await db
         .insert(users)
         .values({
@@ -246,14 +248,16 @@ async function seedFakeUsers() {
           eulaAccepted: true,
           isFake: true,
           lastLoginAt: new Date(),
+          firstLoginLat: coppiaLat,
+          firstLoginLng: coppiaLng,
         })
         .returning();
 
       await db.insert(userProfiles).values({
         userId: user.id,
         isAvailable: true,
-        latitude: coords.lat + randOffset(),
-        longitude: coords.lng + randOffset(),
+        latitude: coppiaLat,
+        longitude: coppiaLng,
         bio: coppia.bio,
       });
 
