@@ -116,6 +116,8 @@ async function seedFakeUsers() {
       const email = `fake_${biker.nickname.toLowerCase()}@fakeuser.bikerlink.it`;
       const coords = regionCoords[biker.region];
 
+      const bikerLat = coords.lat + randOffset();
+      const bikerLng = coords.lng + randOffset();
       const [user] = await db
         .insert(users)
         .values({
@@ -132,14 +134,16 @@ async function seedFakeUsers() {
           eulaAccepted: true,
           isFake: true,
           lastLoginAt: new Date(),
+          firstLoginLat: bikerLat,
+          firstLoginLng: bikerLng,
         })
         .returning();
 
       await db.insert(userProfiles).values({
         userId: user.id,
         isAvailable: true,
-        latitude: coords.lat + randOffset(),
-        longitude: coords.lng + randOffset(),
+        latitude: bikerLat,
+        longitude: bikerLng,
         bio: biker.bio,
       });
 
@@ -165,6 +169,8 @@ async function seedFakeUsers() {
       const email = `fake_${zav.nickname.toLowerCase()}@fakeuser.bikerlink.it`;
       const coords = regionCoords[zav.region];
 
+      const zavLat = coords.lat + randOffset();
+      const zavLng = coords.lng + randOffset();
       const [user] = await db
         .insert(users)
         .values({
@@ -181,14 +187,16 @@ async function seedFakeUsers() {
           eulaAccepted: true,
           isFake: true,
           lastLoginAt: new Date(),
+          firstLoginLat: zavLat,
+          firstLoginLng: zavLng,
         })
         .returning();
 
       await db.insert(userProfiles).values({
         userId: user.id,
         isAvailable: zav.isAvailable,
-        latitude: coords.lat + randOffset(),
-        longitude: coords.lng + randOffset(),
+        latitude: zavLat,
+        longitude: zavLng,
         bio: zav.bio,
       });
 

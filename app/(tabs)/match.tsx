@@ -515,7 +515,7 @@ export default function MatchScreen() {
     if (!Number.isFinite(myLat) || !Number.isFinite(myLng)) return true;
     const lat2 = parseFloat(String(otherLat));
     const lng2 = parseFloat(String(otherLng));
-    if (!Number.isFinite(lat2) || !Number.isFinite(lng2)) return true;
+    if (!Number.isFinite(lat2) || !Number.isFinite(lng2)) return false;
     return haversineKm(myLat!, myLng!, lat2, lng2) <= kmLimit;
   };
 

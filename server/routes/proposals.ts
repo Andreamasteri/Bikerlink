@@ -143,6 +143,14 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
           return null;
         }
 
+        let otherLat = otherUser?.firstLoginLat ?? null;
+        let otherLng = otherUser?.firstLoginLng ?? null;
+        if ((otherLat == null || otherLng == null) && otherUser?.id) {
+          const profile = await storage.getUserProfile(otherUser.id);
+          otherLat = profile?.latitude ?? null;
+          otherLng = profile?.longitude ?? null;
+        }
+
         return {
           ...match,
           isSupermatch: match.isSupermatch ?? false,
@@ -152,8 +160,8 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
           zavarrinaType: zavorrina?.userType,
           bikerMoto: bikerMoto ? { brand: bikerMoto.brand, model: bikerMoto.model, motorcycleType: bikerMoto.motorcycleType } : null,
           wishlistMoto: wishlistMoto ? { brand: wishlistMoto.brand, model: wishlistMoto.model, motorcycleType: wishlistMoto.motorcycleType } : null,
-          otherLat: otherUser?.firstLoginLat ?? null,
-          otherLng: otherUser?.firstLoginLng ?? null,
+          otherLat,
+          otherLng,
         };
       })
     );
@@ -337,13 +345,21 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
           return null;
         }
 
+        let otherLat = otherBiker?.firstLoginLat ?? null;
+        let otherLng = otherBiker?.firstLoginLng ?? null;
+        if ((otherLat == null || otherLng == null) && otherBiker?.id) {
+          const profile = await storage.getUserProfile(otherBiker.id);
+          otherLat = profile?.latitude ?? null;
+          otherLng = profile?.longitude ?? null;
+        }
+
         return {
           ...match,
           isSupermatch: match.isSupermatch ?? false,
           biker1Nickname: biker1?.nickname,
           biker2Nickname: biker2?.nickname,
-          otherLat: otherBiker?.firstLoginLat ?? null,
-          otherLng: otherBiker?.firstLoginLng ?? null,
+          otherLat,
+          otherLng,
         };
       })
     );

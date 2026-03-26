@@ -72,6 +72,8 @@ interface UserRow {
   spokenLanguages: string[];
   lastLoginAt: Date;
   invitationCode: string;
+  firstLoginLat: number;
+  firstLoginLng: number;
 }
 
 interface ProfileRow {
@@ -486,6 +488,8 @@ export async function massSeedFakeUsers(): Promise<void> {
           spokenLanguages: spec.spokenLanguages,
           lastLoginAt: new Date(),
           invitationCode: SEED_TAG,
+          firstLoginLat: spec.lat + randOffset(),
+          firstLoginLng: spec.lng + randOffset(),
         });
         specMeta.push({ nickname, email, spec });
       }

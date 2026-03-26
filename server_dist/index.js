@@ -3235,7 +3235,9 @@ async function massSeedFakeUsers() {
           country: spec.country,
           spokenLanguages: spec.spokenLanguages,
           lastLoginAt: /* @__PURE__ */ new Date(),
-          invitationCode: SEED_TAG
+          invitationCode: SEED_TAG,
+          firstLoginLat: spec.lat + randOffset(),
+          firstLoginLng: spec.lng + randOffset()
         });
         specMeta.push({ nickname, email, spec });
       }
@@ -6650,6 +6652,13 @@ router5.get("/garage-matches", requireAuth4, async (req, res) => {
         if (allowedCountries.length > 0 && (!otherUser?.country || !allowedCountries.includes(otherUser.country))) {
           return null;
         }
+        let otherLat = otherUser?.firstLoginLat ?? null;
+        let otherLng = otherUser?.firstLoginLng ?? null;
+        if ((otherLat == null || otherLng == null) && otherUser?.id) {
+          const profile = await storage.getUserProfile(otherUser.id);
+          otherLat = profile?.latitude ?? null;
+          otherLng = profile?.longitude ?? null;
+        }
         return {
           ...match,
           isSupermatch: match.isSupermatch ?? false,
@@ -6659,8 +6668,8 @@ router5.get("/garage-matches", requireAuth4, async (req, res) => {
           zavarrinaType: zavorrina?.userType,
           bikerMoto: bikerMoto ? { brand: bikerMoto.brand, model: bikerMoto.model, motorcycleType: bikerMoto.motorcycleType } : null,
           wishlistMoto: wishlistMoto ? { brand: wishlistMoto.brand, model: wishlistMoto.model, motorcycleType: wishlistMoto.motorcycleType } : null,
-          otherLat: otherUser?.firstLoginLat ?? null,
-          otherLng: otherUser?.firstLoginLng ?? null
+          otherLat,
+          otherLng
         };
       })
     );
@@ -6823,13 +6832,20 @@ router5.get("/biker-matches", requireAuth4, async (req, res) => {
         if (allowedCountries.length > 0 && (!otherBiker?.country || !allowedCountries.includes(otherBiker.country))) {
           return null;
         }
+        let otherLat = otherBiker?.firstLoginLat ?? null;
+        let otherLng = otherBiker?.firstLoginLng ?? null;
+        if ((otherLat == null || otherLng == null) && otherBiker?.id) {
+          const profile = await storage.getUserProfile(otherBiker.id);
+          otherLat = profile?.latitude ?? null;
+          otherLng = profile?.longitude ?? null;
+        }
         return {
           ...match,
           isSupermatch: match.isSupermatch ?? false,
           biker1Nickname: biker1?.nickname,
           biker2Nickname: biker2?.nickname,
-          otherLat: otherBiker?.firstLoginLat ?? null,
-          otherLng: otherBiker?.firstLoginLng ?? null
+          otherLat,
+          otherLng
         };
       })
     );
@@ -13009,6 +13025,8 @@ async function autoSeedFakeUsers() {
       try {
         const email = `fake_${biker.nickname.toLowerCase()}@fakeuser.bikerlink.it`;
         const coords = regionCoords[biker.region];
+        const bikerLat = coords.lat + randOffset2();
+        const bikerLng = coords.lng + randOffset2();
         const [user] = await db.insert(users).values({
           nickname: biker.nickname,
           email,
@@ -13022,13 +13040,15 @@ async function autoSeedFakeUsers() {
           emailVerified: true,
           eulaAccepted: true,
           isFake: true,
-          lastLoginAt: /* @__PURE__ */ new Date()
+          lastLoginAt: /* @__PURE__ */ new Date(),
+          firstLoginLat: bikerLat,
+          firstLoginLng: bikerLng
         }).returning();
         await db.insert(userProfiles).values({
           userId: user.id,
           isAvailable: true,
-          latitude: coords.lat + randOffset2(),
-          longitude: coords.lng + randOffset2(),
+          latitude: bikerLat,
+          longitude: bikerLng,
           bio: biker.bio
         });
         await db.insert(userMotorcycles).values({
@@ -13048,6 +13068,8 @@ async function autoSeedFakeUsers() {
       try {
         const email = `fake_${zav.nickname.toLowerCase()}@fakeuser.bikerlink.it`;
         const coords = regionCoords[zav.region];
+        const zavLat = coords.lat + randOffset2();
+        const zavLng = coords.lng + randOffset2();
         const [user] = await db.insert(users).values({
           nickname: zav.nickname,
           email,
@@ -13061,13 +13083,15 @@ async function autoSeedFakeUsers() {
           emailVerified: true,
           eulaAccepted: true,
           isFake: true,
-          lastLoginAt: /* @__PURE__ */ new Date()
+          lastLoginAt: /* @__PURE__ */ new Date(),
+          firstLoginLat: zavLat,
+          firstLoginLng: zavLng
         }).returning();
         await db.insert(userProfiles).values({
           userId: user.id,
           isAvailable: zav.isAvailable,
-          latitude: coords.lat + randOffset2(),
-          longitude: coords.lng + randOffset2(),
+          latitude: zavLat,
+          longitude: zavLng,
           bio: zav.bio
         });
         const [wishlist] = await db.insert(zavarrinaWishlists).values({
@@ -13091,6 +13115,8 @@ async function autoSeedFakeUsers() {
       try {
         const email = `fake_${coppia.nickname.toLowerCase().replace("&", "_")}@fakeuser.bikerlink.it`;
         const coords = regionCoords[coppia.region];
+        const coppiaLat = coords.lat + randOffset2();
+        const coppiaLng = coords.lng + randOffset2();
         const [user] = await db.insert(users).values({
           nickname: coppia.nickname,
           email,
@@ -13104,13 +13130,15 @@ async function autoSeedFakeUsers() {
           emailVerified: true,
           eulaAccepted: true,
           isFake: true,
-          lastLoginAt: /* @__PURE__ */ new Date()
+          lastLoginAt: /* @__PURE__ */ new Date(),
+          firstLoginLat: coppiaLat,
+          firstLoginLng: coppiaLng
         }).returning();
         await db.insert(userProfiles).values({
           userId: user.id,
           isAvailable: true,
-          latitude: coords.lat + randOffset2(),
-          longitude: coords.lng + randOffset2(),
+          latitude: coppiaLat,
+          longitude: coppiaLng,
           bio: coppia.bio
         });
         await db.insert(userMotorcycles).values({
