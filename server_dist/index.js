@@ -4748,6 +4748,12 @@ router2.post("/register", registerLimiter, async (req, res) => {
       await storage.markUserEmailVerified(user.id);
     }
     req.session.userId = user.id;
+    await new Promise((resolve2, reject) => {
+      req.session.save((err) => {
+        if (err) reject(err);
+        else resolve2();
+      });
+    });
     const { password: _, ...safeUser } = user;
     return res.status(201).json({ ...safeUser, giftMessage: invitationGiftMessage });
   } catch (error) {
@@ -4799,6 +4805,12 @@ router2.post("/login", loginLimiter, async (req, res) => {
       });
     }
     req.session.userId = user.id;
+    await new Promise((resolve2, reject) => {
+      req.session.save((err) => {
+        if (err) reject(err);
+        else resolve2();
+      });
+    });
     const { password: _, ...safeUser } = userRecord ?? user;
     return res.json(safeUser);
   } catch (error) {
@@ -4906,6 +4918,12 @@ router2.post("/verify-email", async (req, res) => {
     await storage.markUserEmailVerified(user.id);
     await storage.deleteEmailVerificationTokens(user.id);
     req.session.userId = user.id;
+    await new Promise((resolve2, reject) => {
+      req.session.save((err) => {
+        if (err) reject(err);
+        else resolve2();
+      });
+    });
     const { password: _, ...safeUser } = user;
     return res.json({ ...safeUser, emailVerified: true });
   } catch (error) {

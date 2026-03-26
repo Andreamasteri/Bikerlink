@@ -166,6 +166,9 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     }
 
     req.session.userId = user.id;
+    await new Promise<void>((resolve, reject) => {
+      req.session.save((err) => { if (err) reject(err); else resolve(); });
+    });
 
     const { password: _, ...safeUser } = user;
     return res.status(201).json({ ...safeUser, giftMessage: invitationGiftMessage });
@@ -227,6 +230,9 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     }
 
     req.session.userId = user.id;
+    await new Promise<void>((resolve, reject) => {
+      req.session.save((err) => { if (err) reject(err); else resolve(); });
+    });
 
     const { password: _, ...safeUser } = userRecord ?? user;
     return res.json(safeUser);
@@ -357,6 +363,9 @@ router.post("/verify-email", async (req: Request, res: Response) => {
     await storage.deleteEmailVerificationTokens(user.id);
 
     req.session.userId = user.id;
+    await new Promise<void>((resolve, reject) => {
+      req.session.save((err) => { if (err) reject(err); else resolve(); });
+    });
     const { password: _, ...safeUser } = user;
     return res.json({ ...safeUser, emailVerified: true });
   } catch (error) {
