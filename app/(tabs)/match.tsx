@@ -470,17 +470,23 @@ export default function MatchScreen() {
 
   const { data: proposalMatches, isLoading: proposalLoading, refetch: proposalRefetch, isRefetching: proposalRefetching } = useQuery<any[]>({
     queryKey: ["/api/proposals/matches"],
+    enabled: !!user,
     refetchInterval: 30000,
+    refetchOnMount: true,
   });
 
   const { data: garageMatches, isLoading: garageLoading, refetch: garageRefetch, isRefetching: garageRefetching } = useQuery<any[]>({
     queryKey: ["/api/proposals/garage-matches"],
+    enabled: !!user,
     refetchInterval: 30000,
+    refetchOnMount: true,
   });
 
   const { data: bikerMatches, isLoading: bikerLoading, refetch: bikerRefetch, isRefetching: bikerRefetching } = useQuery<any[]>({
     queryKey: ["/api/proposals/biker-matches"],
+    enabled: !!user,
     refetchInterval: 30000,
+    refetchOnMount: true,
   });
 
   const prevMatchCountRef = useRef<number | null>(null);

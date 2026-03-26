@@ -56,6 +56,8 @@ function WishlistScreen() {
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["/api/wishlist"],
+    enabled: !!user,
+    refetchOnMount: true,
   });
 
   const wishlist = (data as any)?.wishlist;
@@ -393,6 +395,8 @@ function GarageContent() {
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["/api/motorcycles"],
+    enabled: !!user,
+    refetchOnMount: true,
   });
 
   const motorcycles = Array.isArray(data) ? data : [];
