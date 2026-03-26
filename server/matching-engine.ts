@@ -411,7 +411,7 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
             wish.ridingStyle && bike.ridingStyle && wish.ridingStyle.toLowerCase() === bike.ridingStyle.toLowerCase()
           );
 
-          await storage.createMatch({
+          const inserted = await storage.createMatch({
             bikerId: userId,
             zavarrinaId: wm.userId,
             bikerMotorcycleId: bike.id,
@@ -419,8 +419,8 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
             status: "new",
             isSupermatch,
           });
-          existingKeys.add(key);
-          zavarrinaCount++;
+          if (inserted) { existingKeys.add(key); zavarrinaCount++; }
+          else existingKeys.add(key);
         }
       }
     }
@@ -457,7 +457,7 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
               wish.ridingStyle && bike.ridingStyle && wish.ridingStyle.toLowerCase() === bike.ridingStyle.toLowerCase()
             );
 
-            await storage.createMatch({
+            const inserted2 = await storage.createMatch({
               bikerId: bm.userId,
               zavarrinaId: userId,
               bikerMotorcycleId: bike.id,
@@ -465,8 +465,8 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
               status: "new",
               isSupermatch,
             });
-            existingKeys.add(key);
-            zavarrinaCount++;
+            if (inserted2) { existingKeys.add(key); zavarrinaCount++; }
+            else existingKeys.add(key);
           }
         }
       }

@@ -8759,7 +8759,7 @@ async function runMatchingForUser(userId) {
           const key = `${userId}:${wm.userId}:${bike.id}:${wish.id}`;
           if (existingKeys.has(key)) continue;
           const isSupermatch = !!(wish.brand && bike.brand && wish.brand.toLowerCase() === bike.brand.toLowerCase() && wish.model && bike.model && wish.model.toLowerCase() === bike.model.toLowerCase() && wish.motorcycleType && bike.motorcycleType && wish.motorcycleType.toLowerCase() === bike.motorcycleType.toLowerCase() && wish.ridingStyle && bike.ridingStyle && wish.ridingStyle.toLowerCase() === bike.ridingStyle.toLowerCase());
-          await storage.createMatch({
+          const inserted = await storage.createMatch({
             bikerId: userId,
             zavarrinaId: wm.userId,
             bikerMotorcycleId: bike.id,
@@ -8767,8 +8767,10 @@ async function runMatchingForUser(userId) {
             status: "new",
             isSupermatch
           });
-          existingKeys.add(key);
-          zavarrinaCount++;
+          if (inserted) {
+            existingKeys.add(key);
+            zavarrinaCount++;
+          } else existingKeys.add(key);
         }
       }
     }
@@ -8792,7 +8794,7 @@ async function runMatchingForUser(userId) {
             const key = `${bm.userId}:${userId}:${bike.id}:${wish.id}`;
             if (existingKeys.has(key)) continue;
             const isSupermatch = !!(wish.brand && bike.brand && wish.brand.toLowerCase() === bike.brand.toLowerCase() && wish.model && bike.model && wish.model.toLowerCase() === bike.model.toLowerCase() && wish.motorcycleType && bike.motorcycleType && wish.motorcycleType.toLowerCase() === bike.motorcycleType.toLowerCase() && wish.ridingStyle && bike.ridingStyle && wish.ridingStyle.toLowerCase() === bike.ridingStyle.toLowerCase());
-            await storage.createMatch({
+            const inserted2 = await storage.createMatch({
               bikerId: bm.userId,
               zavarrinaId: userId,
               bikerMotorcycleId: bike.id,
@@ -8800,8 +8802,10 @@ async function runMatchingForUser(userId) {
               status: "new",
               isSupermatch
             });
-            existingKeys.add(key);
-            zavarrinaCount++;
+            if (inserted2) {
+              existingKeys.add(key);
+              zavarrinaCount++;
+            } else existingKeys.add(key);
           }
         }
       }

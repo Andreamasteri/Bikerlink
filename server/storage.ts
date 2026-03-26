@@ -300,7 +300,7 @@ export interface IStorage {
   getWishlistMotoCount(wishlistId: string): Promise<number>;
   findMatchingWishlistMotos(brand: string, model: string, ridingStyle: string, motorcycleType: string): Promise<Array<ZavarrinaWishlistMoto & { userId: string }>>;
   findMatchingBikerMotos(brand: string, model: string, ridingStyle: string, motorcycleType: string): Promise<UserMotorcycle[]>;
-  createMatch(data: InsertBikerZavarrinaMatch): Promise<BikerZavarrinaMatch>;
+  createMatch(data: InsertBikerZavarrinaMatch): Promise<BikerZavarrinaMatch | null>;
   getMatchesForUser(userId: string): Promise<BikerZavarrinaMatch[]>;
   getGarageMatch(id: string): Promise<BikerZavarrinaMatch | undefined>;
   updateGarageMatch(id: string, data: Partial<InsertBikerZavarrinaMatch>): Promise<BikerZavarrinaMatch | undefined>;
