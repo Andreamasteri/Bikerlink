@@ -707,10 +707,12 @@ export default function MatchScreen() {
       const res = await apiRequest("POST", "/api/proposals/reset-and-rematch");
       return res.json();
     },
-    onSuccess: (data: { created?: { total?: number } }) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/proposals/biker-matches"] });
+    onSuccess: async (data: { created?: { total?: number } }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/proposals/biker-matches"] }),
+      ]);
       setIsRematching(false);
       const created = data?.created?.total ?? 0;
       Alert.alert(t("match.rematchDone"), t("match.rematchResult").replace("{count}", String(created)));
@@ -723,6 +725,11 @@ export default function MatchScreen() {
 
   const handleResetAndRematch = useCallback(() => {
     const doRematch = () => {
+      const val = pendingKm.trim();
+      if (val) {
+        setDistanceKm(val);
+        AsyncStorage.multiSet([["match_distance_mode", "km"], ["match_distance_km", val]]).catch(() => {});
+      }
       setIsRematching(true);
       resetAndRematchMutation.mutate();
     };
@@ -736,7 +743,7 @@ export default function MatchScreen() {
         { text: t("common.confirm"), onPress: doRematch },
       ]);
     }
-  }, [resetAndRematchMutation, t]);
+  }, [resetAndRematchMutation, pendingKm, t]);
 
   const handleResetRejected = useCallback(() => {
     if (Platform.OS === "web") {
@@ -954,11 +961,6 @@ export default function MatchScreen() {
               style={[styles.distanceKmApplyBtn, (isRematching || garageRefetching || bikerRefetching || proposalRefetching) && { opacity: 0.6 }]}
               disabled={isRematching || garageRefetching || bikerRefetching || proposalRefetching}
               onPress={() => {
-                const val = pendingKm.trim();
-                if (val) {
-                  setDistanceKm(val);
-                  AsyncStorage.multiSet([["match_distance_mode", "km"], ["match_distance_km", val]]).catch(() => {});
-                }
                 handleResetAndRematch();
               }}
             >
