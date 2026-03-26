@@ -707,7 +707,7 @@ export default function MatchScreen() {
       const res = await apiRequest("POST", "/api/proposals/reset-and-rematch");
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: { created?: { total?: number } }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/biker-matches"] });
