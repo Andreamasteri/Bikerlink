@@ -1771,8 +1771,8 @@ export class DatabaseStorage implements IStorage {
       or(eq(bikerBikerMatches.biker1Id, userId), eq(bikerBikerMatches.biker2Id, userId))
     ).orderBy(
       sql`CASE WHEN ${bikerBikerMatches.status} = 'accepted' THEN 0 WHEN ${bikerBikerMatches.status} = 'new' THEN 1 ELSE 2 END`,
-      desc(bikerBikerMatches.createdAt)
-    ).limit(200);
+      asc(bikerBikerMatches.id)
+    ).limit(2000);
   }
 
   async createBikerBikerMatch(data: InsertBikerBikerMatch): Promise<BikerBikerMatch | undefined> {

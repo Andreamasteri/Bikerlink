@@ -1885,8 +1885,8 @@ var init_storage = __esm({
           (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(bikerBikerMatches.biker1Id, userId), (0, import_drizzle_orm2.eq)(bikerBikerMatches.biker2Id, userId))
         ).orderBy(
           import_drizzle_orm2.sql`CASE WHEN ${bikerBikerMatches.status} = 'accepted' THEN 0 WHEN ${bikerBikerMatches.status} = 'new' THEN 1 ELSE 2 END`,
-          (0, import_drizzle_orm2.desc)(bikerBikerMatches.createdAt)
-        ).limit(200);
+          (0, import_drizzle_orm2.asc)(bikerBikerMatches.id)
+        ).limit(2e3);
       }
       async createBikerBikerMatch(data) {
         const [match] = await db.insert(bikerBikerMatches).values(data).onConflictDoNothing().returning();
