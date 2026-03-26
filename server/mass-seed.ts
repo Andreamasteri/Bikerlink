@@ -107,6 +107,8 @@ interface SpecMeta {
   nickname: string;
   email: string;
   spec: UserSpec;
+  lat: number;
+  lng: number;
 }
 
 const seedErrors: string[] = [];
@@ -470,6 +472,8 @@ export async function massSeedFakeUsers(): Promise<void> {
       for (const spec of batch) {
         const nickname = generateUniqueNickname(spec.sex, usedNicknames);
         const email = generateUniqueEmail(nickname, usedEmails);
+        const userLat = spec.lat + randOffset();
+        const userLng = spec.lng + randOffset();
         userRows.push({
           nickname,
           email,
@@ -488,10 +492,10 @@ export async function massSeedFakeUsers(): Promise<void> {
           spokenLanguages: spec.spokenLanguages,
           lastLoginAt: new Date(),
           invitationCode: SEED_TAG,
-          firstLoginLat: spec.lat + randOffset(),
-          firstLoginLng: spec.lng + randOffset(),
+          firstLoginLat: userLat,
+          firstLoginLng: userLng,
         });
-        specMeta.push({ nickname, email, spec });
+        specMeta.push({ nickname, email, spec, lat: userLat, lng: userLng });
       }
 
       let insertedUsers: User[];
@@ -518,13 +522,13 @@ export async function massSeedFakeUsers(): Promise<void> {
       for (const newUser of insertedUsers) {
         const meta = specMeta.find(m => m.nickname === newUser.nickname);
         const spec = meta?.spec;
-        if (!spec) continue;
+        if (!spec || !meta) continue;
 
         profileRows.push({
           userId: newUser.id,
           isAvailable: Math.random() > 0.3,
-          latitude: spec.lat + randOffset(),
-          longitude: spec.lng + randOffset(),
+          latitude: meta.lat,
+          longitude: meta.lng,
           maxPickupDistance: 20 + Math.floor(Math.random() * 80),
           bio: getBio(spec.userType, spec.sex),
         });
