@@ -4253,7 +4253,11 @@ router.get("/", requireAuth, async (req, res) => {
     const clubs = await db.select({
       club: motoClubs,
       memberCount: import_drizzle_orm3.sql`(select count(*) from moto_club_members m where m.club_id = moto_clubs.id and m.status = 'active')::int`
-    }).from(motoClubs).where((0, import_drizzle_orm3.and)(...conditions)).orderBy((0, import_drizzle_orm3.desc)(motoClubs.activityScore), motoClubs.name);
+    }).from(motoClubs).where((0, import_drizzle_orm3.and)(...conditions)).orderBy(
+      import_drizzle_orm3.sql`CASE ${motoClubs.clubType} WHEN 'brand' THEN 1 WHEN 'model' THEN 2 WHEN 'custom' THEN 3 WHEN 'region' THEN 4 ELSE 5 END`,
+      (0, import_drizzle_orm3.desc)(motoClubs.activityScore),
+      motoClubs.name
+    );
     let result = clubs.map((r) => ({ ...r.club, memberCount: r.memberCount }));
     if (country || region || language) {
       const memberCountsByClub = {};

@@ -303,7 +303,11 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     })
       .from(motoClubs)
       .where(and(...conditions))
-      .orderBy(desc(motoClubs.activityScore), motoClubs.name);
+      .orderBy(
+        sql`CASE ${motoClubs.clubType} WHEN 'brand' THEN 1 WHEN 'model' THEN 2 WHEN 'custom' THEN 3 WHEN 'region' THEN 4 ELSE 5 END`,
+        desc(motoClubs.activityScore),
+        motoClubs.name
+      );
 
     let result = clubs.map(r => ({ ...r.club, memberCount: r.memberCount }));
 
