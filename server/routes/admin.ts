@@ -7,7 +7,7 @@ import { storage } from "../storage";
 import { db } from "../db";
 import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches } from "@shared/schema";
 import { createClubInvitesForMoto } from "./motoclubs";
-import { eq, and, ne, desc, sql, count, notExists, inArray, lte, isNull, or } from "drizzle-orm";
+import { eq, and, ne, desc, sql, count, notExists, inArray, lte, isNull, or, ilike } from "drizzle-orm";
 import { sendEmail } from "../email";
 import { MOTORCYCLES, pickRandomN, getMotoYear } from "../mass-seed-data";
 import { getLastMatchingCycleMeta, runBikerBikerMatching, runWishlistMatching, runMatchingForUser } from "../matching-engine";
@@ -2643,6 +2643,80 @@ router.put("/backup/schedule", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/reconcile-club-invites", async (req: Request, res: Response) => {
+  try {
+    const userId = req.body.userId || req.session.userId!;
+    const userMotos = await db.select().from(userMotorcycles).where(eq(userMotorcycles.userId, userId));
+
+    if (userMotos.length === 0) {
+      return res.json({ invitesCreated: 0, message: "Nessuna moto nel garage" });
+    }
+
+    let invitesCreated = 0;
+    for (const moto of userMotos) {
+      const brandClubs = await db.select()
+        .from(motoClubs)
+        .where(
+          and(
+            eq(motoClubs.isApproved, true),
+            eq(motoClubs.clubType, "brand"),
+            ilike(motoClubs.brandName!, moto.brand)
+          )
+        );
+
+      for (const club of brandClubs) {
+        const isMember = await db.select()
+          .from(motoClubMembers)
+          .where(and(eq(motoClubMembers.clubId, club.id), eq(motoClubMembers.userId, userId)))
+          .limit(1);
+        if (isMember.length > 0) continue;
+
+        const hasInvite = await db.select()
+          .from(motoClubInvites)
+          .where(and(eq(motoClubInvites.clubId, club.id), eq(motoClubInvites.userId, userId)))
+          .limit(1);
+        if (hasInvite.length > 0) continue;
+
+        await db.insert(motoClubInvites).values({
+          clubId: club.id,
+          userId,
+          status: "pending",
+        });
+
+        await storage.createNotification({
+          userId,
+          title: "Ehi! Motoclub",
+          body: `Ci sono altre persone con una ${moto.brand}! Entra nel club "${club.name}"`,
+          notificationType: "motoclub_invite",
+          referenceType: "motoclub",
+          referenceId: club.id,
+        });
+
+        invitesCreated++;
+      }
+    }
+
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "reconcile_club_invites",
+      targetType: "user",
+      targetId: userId,
+      details: `Creati ${invitesCreated} inviti club per ${userMotos.length} moto`,
+    });
+
+    return res.json({
+      invitesCreated,
+      motorsChecked: userMotos.length,
+      message: invitesCreated > 0
+        ? `Creati ${invitesCreated} inviti club dal garage`
+        : "Tutti gli inviti club già presenti",
+    });
+  } catch (error) {
+    console.error("Reconcile club invites error:", error);
+    return res.status(500).json({ message: "Errore durante la riconciliazione inviti" });
+  }
+});
+
 router.post("/reconcile-fake-moto", async (req: Request, res: Response) => {
   try {
     const fakeUsersWithoutMoto = await db.select({ id: users.id })
@@ -2701,17 +2775,52 @@ router.post("/reconcile-fake-moto", async (req: Request, res: Response) => {
 
     console.log(`[ReconcileFakeMoto] Riconciliati ${reconciledCount} utenti fake senza moto`);
 
+    let clubJoins = 0;
+    const brandClubsCache = new Map<string, { id: string; name: string }[]>();
+
+    for (let i = 0; i < fakeUsersWithoutMoto.length; i += BATCH_SIZE) {
+      const batch = fakeUsersWithoutMoto.slice(i, i + BATCH_SIZE);
+      for (const u of batch) {
+        const userMotos = await db.select().from(userMotorcycles).where(eq(userMotorcycles.userId, u.id));
+        const seenClubIds = new Set<string>();
+        for (const moto of userMotos) {
+          const brandKey = moto.brand.toLowerCase();
+          if (!brandClubsCache.has(brandKey)) {
+            const clubs = await db.select({ id: motoClubs.id, name: motoClubs.name })
+              .from(motoClubs)
+              .where(and(eq(motoClubs.isApproved, true), eq(motoClubs.clubType, "brand"), ilike(motoClubs.brandName!, moto.brand)));
+            brandClubsCache.set(brandKey, clubs);
+          }
+          const clubs = brandClubsCache.get(brandKey) || [];
+          for (const club of clubs) {
+            if (seenClubIds.has(club.id)) continue;
+            seenClubIds.add(club.id);
+            const result = await db.insert(motoClubMembers).values({
+              clubId: club.id,
+              userId: u.id,
+              role: "member",
+              status: "active",
+            }).onConflictDoNothing().returning({ id: motoClubMembers.id });
+            if (result.length > 0) clubJoins++;
+          }
+        }
+      }
+    }
+
+    console.log(`[ReconcileFakeMoto] Auto-join brand clubs: ${clubJoins}`);
+
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
       action: "reconcile_fake_moto",
       targetType: "system",
       targetId: "matching",
-      details: `Inserite moto per ${reconciledCount} fake biker senza garage`,
+      details: `Inserite moto per ${reconciledCount} fake biker, ${clubJoins} iscrizioni brand club`,
     });
 
     return res.json({
       reconciled: reconciledCount,
-      message: `Inserite moto per ${reconciledCount} fake biker che non avevano moto nel garage`,
+      clubJoins,
+      message: `Inserite moto per ${reconciledCount} fake biker, ${clubJoins} iscrizioni brand club`,
     });
   } catch (error) {
     console.error("Reconcile fake moto error:", error);

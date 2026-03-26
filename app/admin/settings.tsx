@@ -288,6 +288,7 @@ export default function AdminSettings() {
   const [protectedPassword, setProtectedPassword] = useState("");
   const [matchingCountries, setMatchingCountries] = useState<string[]>([]);
   const [matchingTriggerFeedback, setMatchingTriggerFeedback] = useState<string | null>(null);
+  const [clubInviteFeedback, setClubInviteFeedback] = useState<string | null>(null);
 
   const { data: settings = [], isLoading } = useQuery<AppSetting[]>({
     queryKey: ["/api/admin/settings"],
@@ -593,6 +594,33 @@ export default function AdminSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/matching_countries"] });
+    },
+  });
+
+  const reconcileClubInvitesMutation = useMutation({
+    mutationFn: async () => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/reconcile-club-invites", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: (data: { invitesCreated: number; motorsChecked: number; message: string }) => {
+      setClubInviteFeedback(data.message);
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === "string" && key.startsWith("/api/motoclubs");
+        },
+      });
+    },
+    onError: (error: Error) => {
+      setClubInviteFeedback(`Errore: ${error.message}`);
     },
   });
 
@@ -1193,6 +1221,32 @@ export default function AdminSettings() {
         >
           <Text style={styles.saveBtnText}>Salva Paesi</Text>
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="bicycle" size={20} color={Colors.warning} />
+            <Text style={styles.synecoLabel}>Inviti Club dal Garage</Text>
+          </View>
+          {reconcileClubInvitesMutation.isPending && <ActivityIndicator size="small" color={Colors.warning} />}
+        </View>
+        <Text style={styles.synecoDesc}>
+          Ricrea inviti ai brand club per le moto nel tuo garage che non hanno ancora un invito o iscrizione.
+        </Text>
+        <TouchableOpacity
+          style={[styles.saveBtn, { alignSelf: "flex-start", marginTop: 10 }]}
+          onPress={() => {
+            setClubInviteFeedback(null);
+            reconcileClubInvitesMutation.mutate();
+          }}
+          disabled={reconcileClubInvitesMutation.isPending}
+        >
+          <Text style={styles.saveBtnText}>Ricrea inviti club</Text>
+        </TouchableOpacity>
+        {clubInviteFeedback && (
+          <Text style={[styles.synecoDesc, { color: Colors.warning, marginTop: 6 }]}>{clubInviteFeedback}</Text>
+        )}
       </View>
 
       <View style={styles.paidCard}>
