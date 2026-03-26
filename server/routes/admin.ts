@@ -1908,7 +1908,7 @@ router.post("/motoclubs/requests/:id/approve", async (req: Request, res: Respons
           userId: request.requestedBy,
           title: "Motoclub approvato!",
           body: `Il tuo motoclub "${request.name}" è stato approvato e creato! Puoi trovarlo nella sezione Motoclub.`,
-          notificationType: "motoclub_invite",
+          notificationType: "system",
           referenceType: "motoclub",
           referenceId: newClub.id,
         });
