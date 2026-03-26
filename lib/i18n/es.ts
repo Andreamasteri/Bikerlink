@@ -328,8 +328,8 @@ const es: Record<string, string> = {
   "match.sameMoto": "Misma moto",
   "match.superMatch": "¡Supermatch!!",
   "match.distanceFilter": "Filtro distancia",
-  "match.distanceFilterAll": "Todos",
-  "match.distanceFilterKm": "Radio",
+  "match.distanceFilterAll": "Todos los estados",
+  "match.distanceFilterKm": "Radio km",
   "match.distanceKmPlaceholder": "km",
 
   "proposals.detail.notFound": "Propuesta no encontrada",

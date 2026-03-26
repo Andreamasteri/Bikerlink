@@ -500,16 +500,17 @@ export default function MatchScreen() {
 
   const myLat = user?.firstLoginLat != null ? parseFloat(String(user.firstLoginLat)) : null;
   const myLng = user?.firstLoginLng != null ? parseFloat(String(user.firstLoginLng)) : null;
-  const kmLimit = parseFloat(distanceKm) || 50;
+  const parsedKm = parseFloat(distanceKm);
+  const kmLimit = Number.isFinite(parsedKm) && parsedKm > 0 ? parsedKm : 50;
 
   const passesDistanceFilter = (otherLat: any, otherLng: any, status: string): boolean => {
     if (status !== "new") return true;
     if (distanceMode !== "km") return true;
-    if (myLat === null || myLng === null || isNaN(myLat) || isNaN(myLng)) return true;
+    if (!Number.isFinite(myLat) || !Number.isFinite(myLng)) return true;
     const lat2 = parseFloat(String(otherLat));
     const lng2 = parseFloat(String(otherLng));
-    if (!lat2 || !lng2 || isNaN(lat2) || isNaN(lng2)) return true;
-    return haversineKm(myLat, myLng, lat2, lng2) <= kmLimit;
+    if (!Number.isFinite(lat2) || !Number.isFinite(lng2)) return true;
+    return haversineKm(myLat!, myLng!, lat2, lng2) <= kmLimit;
   };
 
   const visibleGarageMatches = allGarageMatches
