@@ -1451,8 +1451,8 @@ var init_storage = __esm({
         return [];
       }
       async createMatch(data) {
-        const [match] = await db.insert(bikerZavarrinaMatches).values(data).returning();
-        return match;
+        const [match] = await db.insert(bikerZavarrinaMatches).values(data).onConflictDoNothing().returning();
+        return match ?? null;
       }
       async getMatchesForUser(userId) {
         return db.select().from(bikerZavarrinaMatches).where(
@@ -8650,32 +8650,38 @@ async function runBikerBikerMatching() {
     }
     let matchCount = 0;
     let skipCount = 0;
-    const MAX_MATCHES_PER_RUN = 1e3;
+    const MAX_MATCHES_PER_BUCKET = 100;
     const shuffledBuckets = [...buckets.values()].sort(() => Math.random() - 0.5);
     for (const members of shuffledBuckets) {
       if (members.length < 2) continue;
       const uniqueMembers = members.filter((m, idx) => members.findIndex((x) => x.userId === m.userId) === idx).sort(() => Math.random() - 0.5);
       if (uniqueMembers.length < 2) continue;
-      for (let i = 0; i < uniqueMembers.length && matchCount < MAX_MATCHES_PER_RUN; i++) {
-        for (let j = i + 1; j < uniqueMembers.length && matchCount < MAX_MATCHES_PER_RUN; j++) {
-          const m1 = uniqueMembers[i];
-          const m2 = uniqueMembers[j];
-          const idA = m1.userId < m2.userId ? m1.userId : m2.userId;
-          const idB = m1.userId < m2.userId ? m2.userId : m1.userId;
-          const isSupermatch = !!(m1.model && m2.model && m1.model.toLowerCase() === m2.model.toLowerCase() && m1.motorcycleType && m2.motorcycleType && m1.motorcycleType.toLowerCase() === m2.motorcycleType.toLowerCase() && m1.ridingStyle && m2.ridingStyle && m1.ridingStyle.toLowerCase() === m2.ridingStyle.toLowerCase());
-          const inserted = await storage.createBikerBikerMatch({
-            biker1Id: idA,
-            biker2Id: idB,
-            motorcycleBrand: m1.brand,
-            motorcycleModel: m1.model,
-            status: "new",
-            isSupermatch
-          });
-          if (inserted) matchCount++;
-          else skipCount++;
+      let bucketCount = 0;
+      const maxPairs = uniqueMembers.length * (uniqueMembers.length - 1) / 2;
+      const bucketCap = Math.min(MAX_MATCHES_PER_BUCKET, maxPairs);
+      outer:
+        for (let i = 0; i < uniqueMembers.length; i++) {
+          for (let j = i + 1; j < uniqueMembers.length; j++) {
+            if (bucketCount >= bucketCap) break outer;
+            const m1 = uniqueMembers[i];
+            const m2 = uniqueMembers[j];
+            const idA = m1.userId < m2.userId ? m1.userId : m2.userId;
+            const idB = m1.userId < m2.userId ? m2.userId : m1.userId;
+            const isSupermatch = !!(m1.model && m2.model && m1.model.toLowerCase() === m2.model.toLowerCase() && m1.motorcycleType && m2.motorcycleType && m1.motorcycleType.toLowerCase() === m2.motorcycleType.toLowerCase() && m1.ridingStyle && m2.ridingStyle && m1.ridingStyle.toLowerCase() === m2.ridingStyle.toLowerCase());
+            const inserted = await storage.createBikerBikerMatch({
+              biker1Id: idA,
+              biker2Id: idB,
+              motorcycleBrand: m1.brand,
+              motorcycleModel: m1.model,
+              status: "new",
+              isSupermatch
+            });
+            if (inserted) {
+              matchCount++;
+              bucketCount++;
+            } else skipCount++;
+          }
         }
-      }
-      if (matchCount >= MAX_MATCHES_PER_RUN) break;
     }
     console.log(`[BikerBikerMatching] nuovi match: ${matchCount}, saltati (gi\xE0 esistenti): ${skipCount}`);
     return matchCount;
@@ -8683,6 +8689,147 @@ async function runBikerBikerMatching() {
     console.error("Biker-biker matching error:", error);
     return 0;
   }
+}
+async function runMatchingForUser(userId) {
+  try {
+    const user = await storage.getUser(userId);
+    if (!user) return { bikerBiker: 0, zavarrina: 0 };
+    const countriesSetting = await storage.getAppSetting("matching_countries");
+    let matchingCountries;
+    if (countriesSetting?.value) {
+      try {
+        matchingCountries = JSON.parse(countriesSetting.value);
+      } catch {
+      }
+      if (!Array.isArray(matchingCountries) || matchingCountries.length === 0) matchingCountries = void 0;
+    }
+    const isBiker = ["biker", "coppia", "admin"].includes(user.userType || "");
+    const isZavarrina = user.userType === "zavorrina" || user.userType === "coppia";
+    let bikerBikerCount = 0;
+    let zavarrinaCount = 0;
+    const allBikerMotos = await storage.getAllBikerMotorcyclesWithUsers(matchingCountries);
+    const userMotos = allBikerMotos.filter((bm) => bm.userId === userId);
+    if (isBiker && userMotos.length > 0) {
+      const userBrands = new Set(
+        userMotos.map((bm) => bm.motorcycle.brand?.toLowerCase()).filter((b) => !!b)
+      );
+      for (const brand of userBrands) {
+        const seen = /* @__PURE__ */ new Set();
+        const compatibles = allBikerMotos.filter((bm) => {
+          if (bm.userId === userId) return false;
+          if (bm.motorcycle.brand?.toLowerCase() !== brand) return false;
+          if (seen.has(bm.userId)) return false;
+          seen.add(bm.userId);
+          return true;
+        });
+        const userMotoBrand = userMotos.find((bm) => bm.motorcycle.brand?.toLowerCase() === brand);
+        for (const other of compatibles) {
+          const idA = userId < other.userId ? userId : other.userId;
+          const idB = userId < other.userId ? other.userId : userId;
+          const isSupermatch = !!(userMotoBrand.motorcycle.model && other.motorcycle.model && userMotoBrand.motorcycle.model.toLowerCase() === other.motorcycle.model.toLowerCase() && userMotoBrand.motorcycle.motorcycleType && other.motorcycle.motorcycleType && userMotoBrand.motorcycle.motorcycleType.toLowerCase() === other.motorcycle.motorcycleType.toLowerCase() && userMotoBrand.motorcycle.ridingStyle && other.motorcycle.ridingStyle && userMotoBrand.motorcycle.ridingStyle.toLowerCase() === other.motorcycle.ridingStyle.toLowerCase());
+          const inserted = await storage.createBikerBikerMatch({
+            biker1Id: idA,
+            biker2Id: idB,
+            motorcycleBrand: userMotoBrand.motorcycle.brand,
+            motorcycleModel: userMotoBrand.motorcycle.model || "",
+            status: "new",
+            isSupermatch
+          });
+          if (inserted) bikerBikerCount++;
+        }
+      }
+      console.log(`[MatchingForUser] biker-biker per ${userId}: ${bikerBikerCount} nuovi match`);
+    }
+    if (isBiker && userMotos.length > 0) {
+      const allWishlist = await storage.getAllWishlistMotosWithUsers(matchingCountries);
+      const existingKeys = await storage.getAllExistingBikerZavarrinaMatchKeys();
+      for (const moto of userMotos) {
+        const bike = moto.motorcycle;
+        if (!bike.id) continue;
+        for (const wm of allWishlist) {
+          if (wm.userId === userId) continue;
+          const wish = wm.wishlistMoto;
+          let compatible = false;
+          if (wish.brand && bike.brand && wish.brand.toLowerCase() === bike.brand.toLowerCase()) {
+            compatible = true;
+          } else if (!wish.brand && wish.motorcycleType && bike.motorcycleType && wish.motorcycleType.toLowerCase() === bike.motorcycleType.toLowerCase()) {
+            compatible = true;
+          }
+          if (!compatible) continue;
+          const key = `${userId}:${wm.userId}:${bike.id}:${wish.id}`;
+          if (existingKeys.has(key)) continue;
+          const isSupermatch = !!(wish.brand && bike.brand && wish.brand.toLowerCase() === bike.brand.toLowerCase() && wish.model && bike.model && wish.model.toLowerCase() === bike.model.toLowerCase() && wish.motorcycleType && bike.motorcycleType && wish.motorcycleType.toLowerCase() === bike.motorcycleType.toLowerCase() && wish.ridingStyle && bike.ridingStyle && wish.ridingStyle.toLowerCase() === bike.ridingStyle.toLowerCase());
+          await storage.createMatch({
+            bikerId: userId,
+            zavarrinaId: wm.userId,
+            bikerMotorcycleId: bike.id,
+            wishlistMotoId: wish.id,
+            status: "new",
+            isSupermatch
+          });
+          existingKeys.add(key);
+          zavarrinaCount++;
+        }
+      }
+    }
+    if (isZavarrina) {
+      const allWishlist = await storage.getAllWishlistMotosWithUsers(matchingCountries);
+      const userWishes = allWishlist.filter((wm) => wm.userId === userId);
+      if (userWishes.length > 0) {
+        const existingKeys = await storage.getAllExistingBikerZavarrinaMatchKeys();
+        for (const wm of userWishes) {
+          const wish = wm.wishlistMoto;
+          for (const bm of allBikerMotos) {
+            if (bm.userId === userId) continue;
+            const bike = bm.motorcycle;
+            let compatible = false;
+            if (wish.brand && bike.brand && wish.brand.toLowerCase() === bike.brand.toLowerCase()) {
+              compatible = true;
+            } else if (!wish.brand && wish.motorcycleType && bike.motorcycleType && wish.motorcycleType.toLowerCase() === bike.motorcycleType.toLowerCase()) {
+              compatible = true;
+            }
+            if (!compatible) continue;
+            const key = `${bm.userId}:${userId}:${bike.id}:${wish.id}`;
+            if (existingKeys.has(key)) continue;
+            const isSupermatch = !!(wish.brand && bike.brand && wish.brand.toLowerCase() === bike.brand.toLowerCase() && wish.model && bike.model && wish.model.toLowerCase() === bike.model.toLowerCase() && wish.motorcycleType && bike.motorcycleType && wish.motorcycleType.toLowerCase() === bike.motorcycleType.toLowerCase() && wish.ridingStyle && bike.ridingStyle && wish.ridingStyle.toLowerCase() === bike.ridingStyle.toLowerCase());
+            await storage.createMatch({
+              bikerId: bm.userId,
+              zavarrinaId: userId,
+              bikerMotorcycleId: bike.id,
+              wishlistMotoId: wish.id,
+              status: "new",
+              isSupermatch
+            });
+            existingKeys.add(key);
+            zavarrinaCount++;
+          }
+        }
+      }
+    }
+    console.log(`[MatchingForUser] userId ${userId}: ${bikerBikerCount} bb + ${zavarrinaCount} zav nuovi match`);
+    return { bikerBiker: bikerBikerCount, zavarrina: zavarrinaCount };
+  } catch (error) {
+    console.error("[MatchingForUser] error:", error);
+    return { bikerBiker: 0, zavarrina: 0 };
+  }
+}
+var lastUserMatchingAt = /* @__PURE__ */ new Map();
+var USER_MATCH_DEBOUNCE_MS = 2 * 60 * 1e3;
+function triggerMatchingForUser(userId) {
+  const now = Date.now();
+  const last = lastUserMatchingAt.get(userId) ?? 0;
+  if (now - last < USER_MATCH_DEBOUNCE_MS) return;
+  lastUserMatchingAt.set(userId, now);
+  (async () => {
+    try {
+      const { bikerBiker, zavarrina } = await runMatchingForUser(userId);
+      if (bikerBiker > 0 || zavarrina > 0) {
+        console.log(`[MatchingForUser] completato per ${userId}: ${bikerBiker} bb + ${zavarrina} zav`);
+      }
+    } catch (err) {
+      console.error("[MatchingForUser] errore background:", err);
+    }
+  })();
 }
 async function runCleanup() {
   try {
@@ -10866,16 +11013,31 @@ router17.get("/mass-seed-status", async (_req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-router17.post("/force-matching", async (_req, res) => {
+router17.post("/force-matching", async (req, res) => {
   try {
+    const adminId = req.session.userId;
     console.log("[Admin] Avvio force-matching richiesto dall'admin");
-    const bikerBiker = await runBikerBikerMatching();
-    const zavarrina = await runWishlistMatching();
-    console.log(`[Admin] Force-matching completato: ${bikerBiker} biker-biker, ${zavarrina} zavarrina`);
+    const { bikerBiker: bbUser, zavarrina: zavUser } = await runMatchingForUser(adminId);
+    const bbBulk = await runBikerBikerMatching();
+    const zavBulk = await runWishlistMatching();
+    const bikerBiker = bbUser + bbBulk;
+    const zavarrina = zavUser + zavBulk;
+    console.log(`[Admin] Force-matching completato: ${bikerBiker} biker-biker (${bbUser} mirati + ${bbBulk} bulk), ${zavarrina} zavarrina`);
     return res.json({ bikerBiker, zavarrina });
   } catch (error) {
     console.error("Admin force-matching error:", error);
     return res.status(500).json({ message: "Errore durante il matching" });
+  }
+});
+router17.delete("/reset-matches", async (_req, res) => {
+  try {
+    const [bb] = await db.select({ count: (0, import_drizzle_orm9.count)() }).from(bikerBikerMatches);
+    await db.delete(bikerBikerMatches);
+    console.log(`[Admin] Reset biker-biker matches: eliminati ${bb?.count ?? 0} match`);
+    return res.json({ deleted: Number(bb?.count ?? 0) });
+  } catch (error) {
+    console.error("Admin reset-matches error:", error);
+    return res.status(500).json({ message: "Errore durante il reset" });
   }
 });
 router17.get("/invitation-codes/stats", async (_req, res) => {
@@ -12429,6 +12591,8 @@ async function registerRoutes(app2) {
     if (!req.session?.userId) {
       return res.status(401).json({ message: "Non autenticato" });
     }
+    const userId = req.session.userId;
+    triggerMatchingForUser(userId);
     const result = triggerMatchingRun();
     res.json({ ok: true, ...result });
   });

@@ -1230,9 +1230,9 @@ export class DatabaseStorage implements IStorage {
     return [];
   }
 
-  async createMatch(data: InsertBikerZavarrinaMatch): Promise<BikerZavarrinaMatch> {
-    const [match] = await db.insert(bikerZavarrinaMatches).values(data).returning();
-    return match;
+  async createMatch(data: InsertBikerZavarrinaMatch): Promise<BikerZavarrinaMatch | null> {
+    const [match] = await db.insert(bikerZavarrinaMatches).values(data).onConflictDoNothing().returning();
+    return match ?? null;
   }
 
   async getMatchesForUser(userId: string): Promise<BikerZavarrinaMatch[]> {

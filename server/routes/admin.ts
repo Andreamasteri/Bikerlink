@@ -10,7 +10,7 @@ import { createClubInvitesForMoto } from "./motoclubs";
 import { eq, and, ne, desc, sql, count, notExists, inArray, lte, isNull, or } from "drizzle-orm";
 import { sendEmail } from "../email";
 import { MOTORCYCLES, pickRandomN, getMotoYear } from "../mass-seed-data";
-import { getLastMatchingCycleMeta, runBikerBikerMatching, runWishlistMatching } from "../matching-engine";
+import { getLastMatchingCycleMeta, runBikerBikerMatching, runWishlistMatching, runMatchingForUser } from "../matching-engine";
 import { isProtectedUser } from "../constants";
 
 const router = Router();
@@ -2166,16 +2166,32 @@ router.get("/mass-seed-status", async (_req: Request, res: Response) => {
   }
 });
 
-router.post("/force-matching", async (_req: Request, res: Response) => {
+router.post("/force-matching", async (req: Request, res: Response) => {
   try {
+    const adminId = req.session.userId!;
     console.log("[Admin] Avvio force-matching richiesto dall'admin");
-    const bikerBiker = await runBikerBikerMatching();
-    const zavarrina = await runWishlistMatching();
-    console.log(`[Admin] Force-matching completato: ${bikerBiker} biker-biker, ${zavarrina} zavarrina`);
+    const { bikerBiker: bbUser, zavarrina: zavUser } = await runMatchingForUser(adminId);
+    const bbBulk = await runBikerBikerMatching();
+    const zavBulk = await runWishlistMatching();
+    const bikerBiker = bbUser + bbBulk;
+    const zavarrina = zavUser + zavBulk;
+    console.log(`[Admin] Force-matching completato: ${bikerBiker} biker-biker (${bbUser} mirati + ${bbBulk} bulk), ${zavarrina} zavarrina`);
     return res.json({ bikerBiker, zavarrina });
   } catch (error) {
     console.error("Admin force-matching error:", error);
     return res.status(500).json({ message: "Errore durante il matching" });
+  }
+});
+
+router.delete("/reset-matches", async (_req: Request, res: Response) => {
+  try {
+    const [bb] = await db.select({ count: count() }).from(bikerBikerMatches);
+    await db.delete(bikerBikerMatches);
+    console.log(`[Admin] Reset biker-biker matches: eliminati ${bb?.count ?? 0} match`);
+    return res.json({ deleted: Number(bb?.count ?? 0) });
+  } catch (error) {
+    console.error("Admin reset-matches error:", error);
+    return res.status(500).json({ message: "Errore durante il reset" });
   }
 });
 

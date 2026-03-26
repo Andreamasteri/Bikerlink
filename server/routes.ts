@@ -28,7 +28,7 @@ import moderatorRoutes from "./routes/moderator";
 import customRoutesRouter from "./routes/custom-routes";
 import sosRoutes from "./routes/sos";
 import motoclubsRoutes from "./routes/motoclubs";
-import { triggerMatchingRun } from "./matching-engine";
+import { triggerMatchingRun, triggerMatchingForUser } from "./matching-engine";
 import { db } from "./db";
 import { users } from "@shared/schema";
 import { ilike } from "drizzle-orm";
@@ -708,6 +708,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.session?.userId) {
       return res.status(401).json({ message: "Non autenticato" });
     }
+    const userId = req.session.userId;
+    triggerMatchingForUser(userId);
     const result = triggerMatchingRun();
     res.json({ ok: true, ...result });
   });

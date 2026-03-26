@@ -296,6 +296,16 @@ export default function FakeUsersAdmin() {
     onError: () => setForceMatchingResult({ type: "error", text: "Errore durante il matching" }),
   });
 
+  const [resetMatchesResult, setResetMatchesResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const resetMatchesMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", "/api/admin/reset-matches", {}),
+    onSuccess: (data: any) => {
+      const deleted = data?.deleted ?? 0;
+      setResetMatchesResult({ type: "success", text: `${deleted} match biker-biker eliminati` });
+    },
+    onError: () => setResetMatchesResult({ type: "error", text: "Errore durante il reset" }),
+  });
+
   const distributeMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/admin/fake-users/distribute-to-clubs", {}),
     onSuccess: (data: any) => {
@@ -847,6 +857,26 @@ export default function FakeUsersAdmin() {
                 <>
                   <Ionicons name="git-compare" size={18} color="#fff" />
                   <Text style={[styles.massSeedBtnText, { color: "#fff" }]}>⚡ Forza Matching</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            {!!resetMatchesResult && (
+              <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: resetMatchesResult.type === "success" ? Colors.success : Colors.error }}>
+                {resetMatchesResult.text}
+              </Text>
+            )}
+            <TouchableOpacity
+              style={[styles.massSeedBtn, { backgroundColor: "#B71C1C" }, resetMatchesMutation.isPending && styles.massSeedBtnDisabled]}
+              onPress={() => { setResetMatchesResult(null); resetMatchesMutation.mutate(); }}
+              disabled={resetMatchesMutation.isPending}
+              activeOpacity={0.7}
+            >
+              {resetMatchesMutation.isPending ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="trash" size={18} color="#fff" />
+                  <Text style={[styles.massSeedBtnText, { color: "#fff" }]}>🗑 Reset Match BB</Text>
                 </>
               )}
             </TouchableOpacity>
