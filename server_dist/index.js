@@ -5346,10 +5346,10 @@ router3.get("/online-list", requireAuth2, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq11, and: and9, lt, or: or3, isNull, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq11, and: and9, lt, or: or4, isNull: isNull2, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const offlineConds = [eq11(usersTable.status, "active"), or3(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt)), eq11(usersTable.ghostMode, false)];
+      const offlineConds = [eq11(usersTable.status, "active"), or4(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull2(usersTable.lastLoginAt)), eq11(usersTable.ghostMode, false)];
       if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
       const offlineResults = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(usersTable).leftJoin(profilesTable, eq11(profilesTable.userId, usersTable.id)).where(and9(...offlineConds)).orderBy(sqlTag`distance`);
       const offlineOnly = offlineResults.filter((r) => !onlineIdSet.has(r.user.id) && !blockedIds.has(r.user.id));
@@ -5462,10 +5462,10 @@ router3.get("/biker-available-list", requireAuth2, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq11, and: and9, or: or3, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq11, and: and9, or: or4, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const bikerConds = [eq11(usersTable.status, "active"), or3(eq11(usersTable.userType, "biker"), eq11(usersTable.userType, "coppia")), eq11(usersTable.ghostMode, false)];
+      const bikerConds = [eq11(usersTable.status, "active"), or4(eq11(usersTable.userType, "biker"), eq11(usersTable.userType, "coppia")), eq11(usersTable.ghostMode, false)];
       if (countriesParam && countriesParam.length > 0) bikerConds.push(inArr(usersTable.country, countriesParam));
       const allBikers = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq11(usersTable.id, profilesTable.userId)).where(and9(...bikerConds)).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));
@@ -11112,19 +11112,12 @@ router17.get("/db-stats", async (_req, res) => {
 router17.post("/fake-users/wake-all", async (_req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
+    const fakeUserIds = db.select({ id: users.id }).from(users).where((0, import_drizzle_orm9.eq)(users.isFake, true));
     await db.update(users).set({ lastLoginAt: now }).where((0, import_drizzle_orm9.eq)(users.isFake, true));
-    await db.update(users).set({ country: "IT" }).where((0, import_drizzle_orm9.and)((0, import_drizzle_orm9.eq)(users.isFake, true), import_drizzle_orm9.sql`(${users.country} IS NULL OR ${users.country} = '')`));
-    const fakeIds = await db.select({ id: users.id }).from(users).where((0, import_drizzle_orm9.eq)(users.isFake, true));
-    const count3 = fakeIds.length;
-    if (count3 > 0) {
-      const ids = fakeIds.map((u) => u.id);
-      const CHUNK = 500;
-      for (let i = 0; i < ids.length; i += CHUNK) {
-        await db.update(userProfiles).set({ isAvailable: true }).where((0, import_drizzle_orm9.inArray)(userProfiles.userId, ids.slice(i, i + CHUNK)));
-        await new Promise((r) => setTimeout(r, 0));
-      }
-    }
-    return res.json({ ok: true, count: count3 });
+    await db.update(users).set({ country: "IT" }).where((0, import_drizzle_orm9.and)((0, import_drizzle_orm9.eq)(users.isFake, true), (0, import_drizzle_orm9.or)((0, import_drizzle_orm9.isNull)(users.country), (0, import_drizzle_orm9.eq)(users.country, ""))));
+    await db.update(userProfiles).set({ isAvailable: true }).where((0, import_drizzle_orm9.inArray)(userProfiles.userId, fakeUserIds));
+    const [{ cnt }] = await db.select({ cnt: import_drizzle_orm9.sql`cast(count(*) as int)` }).from(users).where((0, import_drizzle_orm9.eq)(users.isFake, true));
+    return res.json({ ok: true, count: cnt });
   } catch (error) {
     console.error("Admin wake-all fake users error:", error);
     return res.status(500).json({ message: "Errore interno del server" });

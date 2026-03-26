@@ -7,7 +7,7 @@ import { storage } from "../storage";
 import { db } from "../db";
 import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches } from "@shared/schema";
 import { createClubInvitesForMoto } from "./motoclubs";
-import { eq, and, ne, desc, sql, count, notExists, inArray, lte } from "drizzle-orm";
+import { eq, and, ne, desc, sql, count, notExists, inArray, lte, isNull, or } from "drizzle-orm";
 import { sendEmail } from "../email";
 import { MOTORCYCLES, pickRandomN, getMotoYear } from "../mass-seed-data";
 import { getLastMatchingCycleMeta } from "../matching-engine";
@@ -2427,25 +2427,18 @@ router.get("/db-stats", async (_req: Request, res: Response) => {
 router.post("/fake-users/wake-all", async (_req: Request, res: Response) => {
   try {
     const now = new Date();
+    const fakeUserIds = db.select({ id: users.id }).from(users).where(eq(users.isFake, true));
     await db.update(users)
       .set({ lastLoginAt: now })
       .where(eq(users.isFake, true));
     await db.update(users)
-      .set({ country: "IT" } as any)
-      .where(and(eq(users.isFake, true), sql`(${users.country} IS NULL OR ${users.country} = '')`));
-    const fakeIds = await db.select({ id: users.id }).from(users).where(eq(users.isFake, true));
-    const count = fakeIds.length;
-    if (count > 0) {
-      const ids = fakeIds.map(u => u.id);
-      const CHUNK = 500;
-      for (let i = 0; i < ids.length; i += CHUNK) {
-        await db.update(userProfiles)
-          .set({ isAvailable: true })
-          .where(inArray(userProfiles.userId, ids.slice(i, i + CHUNK)));
-        await new Promise(r => setTimeout(r, 0));
-      }
-    }
-    return res.json({ ok: true, count });
+      .set({ country: "IT" })
+      .where(and(eq(users.isFake, true), or(isNull(users.country), eq(users.country, ""))));
+    await db.update(userProfiles)
+      .set({ isAvailable: true })
+      .where(inArray(userProfiles.userId, fakeUserIds));
+    const [{ cnt }] = await db.select({ cnt: sql<number>`cast(count(*) as int)` }).from(users).where(eq(users.isFake, true));
+    return res.json({ ok: true, count: cnt });
   } catch (error) {
     console.error("Admin wake-all fake users error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
