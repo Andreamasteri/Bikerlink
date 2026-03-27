@@ -249,7 +249,7 @@ export default function PublicProfileScreen() {
           </View>
         )}
 
-        {!isSelf && (
+        {!isSelf && !isBlocked && (
           <TouchableOpacity style={styles.chatButton} onPress={handleStartChat} activeOpacity={0.8}>
             <Ionicons name="chatbubbles" size={22} color={Colors.background} />
             <Text style={styles.chatButtonText}>Scrivi un messaggio</Text>
