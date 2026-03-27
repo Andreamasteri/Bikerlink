@@ -1096,7 +1096,7 @@ export default function MapScreen() {
 
       <Modal visible={!!selectedUser} transparent animationType="slide" onRequestClose={() => setSelectedUser(null)}>
         <Pressable style={styles.detailOverlay} onPress={() => setSelectedUser(null)}>
-          <Pressable style={styles.detailSheet} onPress={(e) => e.stopPropagation()}>
+          <Pressable style={[styles.detailSheet, { paddingBottom: (insets.bottom || 16) }]} onPress={(e) => e.stopPropagation()}>
             <View style={styles.detailHandle} />
             {detailLoading ? (
               <ActivityIndicator size="large" color={Colors.accent} style={{ marginVertical: 40 }} />
