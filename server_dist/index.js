@@ -3688,12 +3688,12 @@ async function backupDatabase() {
   try {
     const dbUrl = process.env.DATABASE_URL;
     await execAsync(`pg_dump "${dbUrl}" --clean --if-exists -f "${tmpSql}" --no-password`);
-    await new Promise((resolve2, reject) => {
+    await new Promise((resolve3, reject) => {
       const inp = import_fs6.default.createReadStream(tmpSql);
       const out = import_fs6.default.createWriteStream(tmpGz);
       const gz = import_zlib.default.createGzip({ level: 9 });
       inp.pipe(gz).pipe(out);
-      out.on("finish", resolve2);
+      out.on("finish", resolve3);
       out.on("error", reject);
       inp.on("error", reject);
     });
@@ -3722,7 +3722,7 @@ async function backupMedia() {
   const tmpZip = import_path6.default.join(import_os.default.tmpdir(), `bikerlink_media_${ts}.zip`);
   try {
     const mediaDir = process.env.MEDIA_UPLOAD_DIR || process.env.UPLOAD_DIR || import_path6.default.join(process.cwd(), ".data", "uploads");
-    const zipBuffer = await new Promise((resolve2, reject) => {
+    const zipBuffer = await new Promise((resolve3, reject) => {
       const output = import_fs6.default.createWriteStream(tmpZip);
       const archive = (0, import_archiver.default)("zip", { zlib: { level: 6 } });
       archive.pipe(output);
@@ -3732,7 +3732,7 @@ async function backupMedia() {
         archive.append("(nessun file media)", { name: "README.txt" });
       }
       archive.finalize();
-      output.on("close", () => resolve2(import_fs6.default.readFileSync(tmpZip)));
+      output.on("close", () => resolve3(import_fs6.default.readFileSync(tmpZip)));
       archive.on("error", reject);
     });
     const fileName = `bikerlink_media_${ts}.zip`;
@@ -3756,12 +3756,12 @@ async function restoreDatabase(objectPath) {
   try {
     const buf = await downloadBuffer(objectPath);
     import_fs6.default.writeFileSync(tmpGz, buf);
-    await new Promise((resolve2, reject) => {
+    await new Promise((resolve3, reject) => {
       const inp = import_fs6.default.createReadStream(tmpGz);
       const out = import_fs6.default.createWriteStream(tmpSql);
       const gz = import_zlib.default.createGunzip();
       inp.pipe(gz).pipe(out);
-      out.on("finish", resolve2);
+      out.on("finish", resolve3);
       out.on("error", reject);
       inp.on("error", reject);
     });
@@ -3842,6 +3842,88 @@ var init_backup_service = __esm({
     isRestoringDb = false;
     INTERVAL_DB_MS = 24 * 60 * 60 * 1e3;
     INTERVAL_MEDIA_MS = 7 * 24 * 60 * 60 * 1e3;
+  }
+});
+
+// server/uptime.ts
+var uptime_exports = {};
+__export(uptime_exports, {
+  SERVER_START_TIME: () => SERVER_START_TIME,
+  appendUptimeLog: () => appendUptimeLog,
+  startMetroMonitor: () => startMetroMonitor,
+  uptimeState: () => uptimeState
+});
+function ensureLogsDir() {
+  const logsDir = path8.dirname(UPTIME_LOG);
+  if (!fs8.existsSync(logsDir)) fs8.mkdirSync(logsDir, { recursive: true });
+}
+function formatDuration(ms) {
+  const totalSec = Math.floor(ms / 1e3);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}m ${s}s`;
+}
+function appendUptimeLog(line) {
+  try {
+    ensureLogsDir();
+    const ts = (/* @__PURE__ */ new Date()).toISOString();
+    fs8.appendFileSync(UPTIME_LOG, `${ts} ${line}
+`, "utf-8");
+  } catch {
+  }
+}
+function startMetroMonitor() {
+  const METRO_PORT = 8081;
+  const INTERVAL_MS = 3e4;
+  const checkMetro = () => {
+    const req = http.get(
+      { hostname: "localhost", port: METRO_PORT, path: "/status", timeout: 5e3 },
+      (res) => {
+        let body = "";
+        res.on("data", (chunk) => {
+          body += chunk.toString();
+        });
+        res.on("end", () => {
+          const isRunning = body.includes("packager-status:running");
+          if (isRunning && !uptimeState.metroOnline) {
+            uptimeState.metroStartTime = Date.now();
+            uptimeState.metroOnline = true;
+            appendUptimeLog("METRO UP");
+          } else if (!isRunning && uptimeState.metroOnline) {
+            const uptime = uptimeState.metroStartTime > 0 ? formatDuration(Date.now() - uptimeState.metroStartTime) : "unknown";
+            uptimeState.metroOnline = false;
+            appendUptimeLog(`METRO DOWN \u2014 uptime: ${uptime}`);
+          }
+        });
+      }
+    );
+    req.on("error", () => {
+      if (uptimeState.metroOnline) {
+        const uptime = uptimeState.metroStartTime > 0 ? formatDuration(Date.now() - uptimeState.metroStartTime) : "unknown";
+        uptimeState.metroOnline = false;
+        appendUptimeLog(`METRO DOWN \u2014 uptime: ${uptime}`);
+      }
+    });
+    req.on("timeout", () => {
+      req.destroy();
+    });
+  };
+  setInterval(checkMetro, INTERVAL_MS);
+  setTimeout(checkMetro, 5e3);
+}
+var fs8, path8, http, SERVER_START_TIME, uptimeState, UPTIME_LOG;
+var init_uptime = __esm({
+  "server/uptime.ts"() {
+    "use strict";
+    fs8 = __toESM(require("fs"));
+    path8 = __toESM(require("path"));
+    http = __toESM(require("http"));
+    SERVER_START_TIME = Date.now();
+    uptimeState = {
+      metroStartTime: 0,
+      metroOnline: false
+    };
+    UPTIME_LOG = path8.resolve(process.cwd(), "logs", "uptime-resets.log");
   }
 });
 
@@ -4804,10 +4886,10 @@ router2.post("/register", registerLimiter, async (req, res) => {
       await storage.markUserEmailVerified(user.id);
     }
     req.session.userId = user.id;
-    await new Promise((resolve2, reject) => {
+    await new Promise((resolve3, reject) => {
       req.session.save((err) => {
         if (err) reject(err);
-        else resolve2();
+        else resolve3();
       });
     });
     const { password: _, ...safeUser } = user;
@@ -4861,10 +4943,10 @@ router2.post("/login", loginLimiter, async (req, res) => {
       });
     }
     req.session.userId = user.id;
-    await new Promise((resolve2, reject) => {
+    await new Promise((resolve3, reject) => {
       req.session.save((err) => {
         if (err) reject(err);
-        else resolve2();
+        else resolve3();
       });
     });
     const { password: _, ...safeUser } = userRecord ?? user;
@@ -4974,10 +5056,10 @@ router2.post("/verify-email", async (req, res) => {
     await storage.markUserEmailVerified(user.id);
     await storage.deleteEmailVerificationTokens(user.id);
     req.session.userId = user.id;
-    await new Promise((resolve2, reject) => {
+    await new Promise((resolve3, reject) => {
       req.session.save((err) => {
         if (err) reject(err);
-        else resolve2();
+        else resolve3();
       });
     });
     const { password: _, ...safeUser } = user;
@@ -12865,6 +12947,20 @@ async function registerRoutes(app2) {
   app2.get("/api/health", (_req, res) => {
     res.json({ status: "ok", initializing: initState.initializing });
   });
+  app2.get("/api/admin/uptime", async (req, res) => {
+    const session2 = req.session;
+    if (!session2?.userId) return res.status(401).json({ message: "Non autenticato" });
+    const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+    const user = await storage2.getUser(session2.userId);
+    if (!user || user.role !== "admin") return res.status(403).json({ message: "Accesso non autorizzato" });
+    const { SERVER_START_TIME: SERVER_START_TIME2, uptimeState: uptimeState2 } = await Promise.resolve().then(() => (init_uptime(), uptime_exports));
+    res.json({
+      backendStartedAt: SERVER_START_TIME2,
+      metroStartedAt: uptimeState2.metroStartTime,
+      metroOnline: uptimeState2.metroOnline,
+      serverNow: Date.now()
+    });
+  });
   const httpServer = (0, import_node_http.createServer)(app2);
   Promise.resolve().then(() => (init_backup_service(), backup_service_exports)).then(({ startScheduler: startScheduler2 }) => {
     startScheduler2().catch((err) => {
@@ -13166,8 +13262,9 @@ async function autoSeedFakeUsers() {
 init_db();
 var import_drizzle_orm12 = require("drizzle-orm");
 init_schema();
-var fs9 = __toESM(require("fs"));
-var path9 = __toESM(require("path"));
+var fs10 = __toESM(require("fs"));
+var path10 = __toESM(require("path"));
+init_uptime();
 var app = (0, import_express21.default)();
 var log = console.log;
 app.set("trust proxy", 1);
@@ -13213,7 +13310,7 @@ function setupBodyParsing(app2) {
 function setupRequestLogging(app2) {
   app2.use((req, res, next) => {
     const start = Date.now();
-    const path10 = req.path;
+    const path11 = req.path;
     let capturedJsonResponse = void 0;
     const originalResJson = res.json;
     res.json = function(bodyJson, ...args) {
@@ -13221,9 +13318,9 @@ function setupRequestLogging(app2) {
       return originalResJson.apply(res, [bodyJson, ...args]);
     };
     res.on("finish", () => {
-      if (!path10.startsWith("/api")) return;
+      if (!path11.startsWith("/api")) return;
       const duration = Date.now() - start;
-      let logLine = `${req.method} ${path10} ${res.statusCode} in ${duration}ms`;
+      let logLine = `${req.method} ${path11} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse && res.statusCode !== 304) {
         const jsonStr = JSON.stringify(capturedJsonResponse);
         logLine += ` :: ${jsonStr.length > 200 ? jsonStr.slice(0, 197) + "..." : jsonStr}`;
@@ -13238,8 +13335,8 @@ function setupRequestLogging(app2) {
 }
 function getAppName() {
   try {
-    const appJsonPath = path9.resolve(process.cwd(), "app.json");
-    const appJsonContent = fs9.readFileSync(appJsonPath, "utf-8");
+    const appJsonPath = path10.resolve(process.cwd(), "app.json");
+    const appJsonContent = fs10.readFileSync(appJsonPath, "utf-8");
     const appJson = JSON.parse(appJsonContent);
     return appJson.expo?.name || "App Landing Page";
   } catch {
@@ -13247,19 +13344,19 @@ function getAppName() {
   }
 }
 function serveExpoManifest(platform, res) {
-  const manifestPath = path9.resolve(
+  const manifestPath = path10.resolve(
     process.cwd(),
     "static-build",
     platform,
     "manifest.json"
   );
-  if (!fs9.existsSync(manifestPath)) {
+  if (!fs10.existsSync(manifestPath)) {
     return res.status(404).json({ error: `Manifest not found for platform: ${platform}` });
   }
   res.setHeader("expo-protocol-version", "1");
   res.setHeader("expo-sfv-version", "0");
   res.setHeader("content-type", "application/json");
-  const manifest = fs9.readFileSync(manifestPath, "utf-8");
+  const manifest = fs10.readFileSync(manifestPath, "utf-8");
   res.send(manifest);
 }
 function serveLandingPage({
@@ -13279,13 +13376,13 @@ function serveLandingPage({
   res.status(200).send(html);
 }
 function configureExpoAndLanding(app2) {
-  const templatePath = path9.resolve(
+  const templatePath = path10.resolve(
     process.cwd(),
     "server",
     "templates",
     "landing-page.html"
   );
-  const landingPageTemplate = fs9.readFileSync(templatePath, "utf-8");
+  const landingPageTemplate = fs10.readFileSync(templatePath, "utf-8");
   const appName = getAppName();
   log("Serving static Expo files with dynamic manifest routing");
   app2.use((req, res, next) => {
@@ -13309,10 +13406,10 @@ function configureExpoAndLanding(app2) {
     }
     next();
   });
-  app2.use("/assets", import_express21.default.static(path9.resolve(process.cwd(), "assets")));
-  app2.use("/uploads", import_express21.default.static(path9.resolve(process.cwd(), "uploads")));
-  app2.use(import_express21.default.static(path9.resolve(process.cwd(), "static-build")));
-  const webBuildDir = path9.resolve(process.cwd(), "static-build", "web");
+  app2.use("/assets", import_express21.default.static(path10.resolve(process.cwd(), "assets")));
+  app2.use("/uploads", import_express21.default.static(path10.resolve(process.cwd(), "uploads")));
+  app2.use(import_express21.default.static(path10.resolve(process.cwd(), "static-build")));
+  const webBuildDir = path10.resolve(process.cwd(), "static-build", "web");
   const noCacheHtml = (res, filePath) => {
     if (filePath.endsWith(".html")) {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
@@ -13323,8 +13420,8 @@ function configureExpoAndLanding(app2) {
   app2.use("/web", import_express21.default.static(webBuildDir, { setHeaders: noCacheHtml }));
   app2.use(import_express21.default.static(webBuildDir, { index: false, setHeaders: noCacheHtml }));
   app2.use("/web", (_req, res) => {
-    const indexPath = path9.join(webBuildDir, "index.html");
-    if (fs9.existsSync(indexPath)) {
+    const indexPath = path10.join(webBuildDir, "index.html");
+    if (fs10.existsSync(indexPath)) {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");
@@ -13394,13 +13491,13 @@ function setupErrorHandler(app2) {
   setupRequestLogging(app);
   configureExpoAndLanding(app);
   const server = await registerRoutes(app);
-  const webBuildIndex = path9.join(path9.resolve(process.cwd(), "static-build", "web"), "index.html");
+  const webBuildIndex = path10.join(path10.resolve(process.cwd(), "static-build", "web"), "index.html");
   app.use((req, res, next) => {
     if (req.method !== "GET" && req.method !== "HEAD") return next();
     if (req.path.startsWith("/api/")) return next();
     if (req.path === "/" || req.path === "/manifest" || req.path === "/healthz") return next();
     if (req.path.match(/\.\w+$/)) return next();
-    if (fs9.existsSync(webBuildIndex)) {
+    if (fs10.existsSync(webBuildIndex)) {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");
@@ -13418,6 +13515,8 @@ function setupErrorHandler(app2) {
     },
     () => {
       log(`express server serving on port ${port}`);
+      appendUptimeLog("BACKEND UP (cold start)");
+      startMetroMonitor();
       startMatchingEngine();
       (async () => {
         try {

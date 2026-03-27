@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
 import Colors from "@/constants/colors";
 import { getApiUrl, queryClient, apiRequest } from "@/lib/query-client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface AppSetting {
   id: string;
@@ -289,6 +290,18 @@ export default function AdminSettings() {
   const [matchingCountries, setMatchingCountries] = useState<string[]>([]);
   const [matchingTriggerFeedback, setMatchingTriggerFeedback] = useState<string | null>(null);
   const [clubInviteFeedback, setClubInviteFeedback] = useState<string | null>(null);
+  const [uptimeWidgetEnabled, setUptimeWidgetEnabled] = useState<boolean>(true);
+
+  useEffect(() => {
+    AsyncStorage.getItem("uptime_widget_enabled").then((val) => {
+      setUptimeWidgetEnabled(val === null ? true : val === "true");
+    });
+  }, []);
+
+  const handleUptimeToggle = (val: boolean) => {
+    setUptimeWidgetEnabled(val);
+    AsyncStorage.setItem("uptime_widget_enabled", val ? "true" : "false");
+  };
 
   const { data: settings = [], isLoading } = useQuery<AppSetting[]>({
     queryKey: ["/api/admin/settings"],
@@ -2018,6 +2031,31 @@ export default function AdminSettings() {
           {renderSettingCard(maxVotesSetting)}
         </>
       )}
+
+      <View style={styles.sectionHeaderRow}>
+        <Ionicons name="terminal" size={20} color="#00cc66" />
+        <Text style={[styles.sectionTitle, { color: "#00cc66" }]}>Sviluppo</Text>
+      </View>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="timer-outline" size={20} color="#00cc66" />
+            <Text style={styles.synecoLabel}>Uptime Counters</Text>
+          </View>
+          <Switch
+            value={uptimeWidgetEnabled}
+            onValueChange={handleUptimeToggle}
+            trackColor={{ false: Colors.border, true: "#00cc66" }}
+            thumbColor={uptimeWidgetEnabled ? Colors.text : Colors.textSecondary}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {uptimeWidgetEnabled
+            ? "Pannello fluttuante uptime attivo — visibile solo agli admin"
+            : "Pannello fluttuante uptime nascosto"}
+        </Text>
+      </View>
 
     </KeyboardAwareScrollViewCompat>
 

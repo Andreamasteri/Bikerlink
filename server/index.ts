@@ -10,6 +10,7 @@ import { motoClubs, motoClubMembers, conversations, conversationParticipants } f
 import { seedMotoclubs } from "./routes/motoclubs";
 import * as fs from "fs";
 import * as path from "path";
+import { appendUptimeLog, startMetroMonitor } from "./uptime";
 
 const app = express();
 const log = console.log;
@@ -358,6 +359,8 @@ function setupErrorHandler(app: express.Application) {
     },
     () => {
       log(`express server serving on port ${port}`);
+      appendUptimeLog("BACKEND UP (cold start)");
+      startMetroMonitor();
       startMatchingEngine();
 
       (async () => {

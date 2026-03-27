@@ -720,6 +720,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: "ok", initializing: initState.initializing });
   });
 
+  app.get("/api/admin/uptime", async (req, res) => {
+    const session = req.session as { userId?: string };
+    if (!session?.userId) return res.status(401).json({ message: "Non autenticato" });
+    const { storage } = await import("./storage");
+    const user = await storage.getUser(session.userId);
+    if (!user || user.role !== "admin") return res.status(403).json({ message: "Accesso non autorizzato" });
+    const { SERVER_START_TIME, uptimeState } = await import("./uptime");
+    res.json({
+      backendStartedAt: SERVER_START_TIME,
+      metroStartedAt: uptimeState.metroStartTime,
+      metroOnline: uptimeState.metroOnline,
+      serverNow: Date.now(),
+    });
+  });
+
   const httpServer = createServer(app);
 
   import("./backup-service").then(({ startScheduler }) => {

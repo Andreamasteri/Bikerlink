@@ -185,6 +185,20 @@ else
   ls /tmp/logs/ 2>/dev/null | sed 's/^/    /' || echo "    (directory vuota o inesistente)"
 fi
 
+# ── 6. Uptime reset log ───────────────────────────────────────────────────────
+section "6. UPTIME RESET LOG — ultimi 30 eventi (logs/uptime-resets.log)"
+
+UPTIME_LOG="$(pwd)/logs/uptime-resets.log"
+if [ -f "$UPTIME_LOG" ]; then
+  LINE_COUNT=$(wc -l < "$UPTIME_LOG" 2>/dev/null || echo 0)
+  info "File: $UPTIME_LOG ($LINE_COUNT righe totali)"
+  echo ""
+  tail -30 "$UPTIME_LOG" 2>/dev/null | sed 's/^/    /' || warn "Impossibile leggere $UPTIME_LOG"
+else
+  warn "Nessun evento registrato — il file non esiste ancora."
+  info "Il file verrà creato al prossimo avvio del backend."
+fi
+
 # ── Fine ──────────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════════╗${RESET}"

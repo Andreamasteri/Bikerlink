@@ -40,6 +40,8 @@ import { LocationProvider } from "@/lib/location-context";
 import { LanguageProvider, useLanguage } from "@/lib/language-context";
 import { MapSettingsProvider, useMapConfig } from "@/lib/map-context";
 import Colors from "@/constants/colors";
+import UptimeWidget from "@/components/UptimeWidget";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -111,6 +113,27 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
     );
   }
   return <>{children}</>;
+}
+
+function AdminUptimeOverlay() {
+  const { user } = useAuth();
+  const [enabled, setEnabled] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (user?.role !== "admin") return;
+    AsyncStorage.getItem("uptime_widget_enabled").then((val) => {
+      setEnabled(val === null ? true : val === "true");
+    });
+    const id = setInterval(() => {
+      AsyncStorage.getItem("uptime_widget_enabled").then((val) => {
+        setEnabled(val === null ? true : val === "true");
+      });
+    }, 2000);
+    return () => clearInterval(id);
+  }, [user]);
+
+  if (user?.role !== "admin" || !enabled) return null;
+  return <UptimeWidget />;
 }
 
 function LanguageKeyedRoot() {
@@ -198,6 +221,7 @@ export default function RootLayout() {
                 <StartupGate ready={ready}>
                   <MapReadyGate>
                     <AppStateHandler />
+                    <AdminUptimeOverlay />
                     <LanguageKeyedRoot />
                   </MapReadyGate>
                 </StartupGate>
