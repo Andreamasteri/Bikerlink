@@ -18,7 +18,14 @@ function handleUnauthorized() {
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    const contentType = res.headers.get("content-type") || "";
+    if (contentType.includes("text/html")) {
+      throw new Error("Server non disponibile. Riprova tra un momento.");
+    }
     const text = (await res.text()) || res.statusText;
+    if (text.trimStart().startsWith("<!DOCTYPE") || text.trimStart().startsWith("<html")) {
+      throw new Error("Server non disponibile. Riprova tra un momento.");
+    }
     throw new Error(`${res.status}: ${text}`);
   }
 }
