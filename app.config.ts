@@ -1,16 +1,14 @@
-import type { ExpoConfig } from "expo/config";
-import appJson from "./app.json";
+import type { ConfigContext, ExpoConfig } from "expo/config";
 
-const config: ExpoConfig = {
-  ...appJson.expo,
+export default ({ config }: ConfigContext): ExpoConfig => ({
+  ...config,
   android: {
-    ...appJson.expo.android,
+    ...config.android,
     config: {
+      ...config.android?.config,
       googleMaps: {
         apiKey: process.env.GOOGLE_MAPS_API_KEY || "",
       },
     },
   },
-};
-
-export default { expo: config };
+});
