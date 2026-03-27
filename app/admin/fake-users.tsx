@@ -1058,7 +1058,7 @@ export default function FakeUsersAdmin() {
               />
 
               <Text style={styles.fieldLabel}>Paese</Text>
-              <TouchableOpacity style={styles.input} onPress={() => { setShowCountryPicker(!showCountryPicker); setShowRegionPicker(false); }}>
+              <TouchableOpacity style={styles.input} onPress={() => { setShowCountryPicker(!showCountryPicker); setShowRegionPicker(false); setShowMotoBrandPicker(false); setShowDesiredBrandPicker(false); }}>
                 <Text style={styles.inputText}>{COUNTRIES_DATA.find(c => c.code === formCountry)?.name ?? formCountry}</Text>
               </TouchableOpacity>
               {!!showCountryPicker && (
@@ -1081,7 +1081,7 @@ export default function FakeUsersAdmin() {
               )}
 
               <Text style={styles.fieldLabel}>Regione</Text>
-              <TouchableOpacity style={styles.input} onPress={() => { setShowRegionPicker(!showRegionPicker); setShowCountryPicker(false); }}>
+              <TouchableOpacity style={styles.input} onPress={() => { setShowRegionPicker(!showRegionPicker); setShowCountryPicker(false); setShowMotoBrandPicker(false); setShowDesiredBrandPicker(false); }}>
                 <Text style={styles.inputText}>{formRegion || "— nessuna —"}</Text>
               </TouchableOpacity>
               {!!showRegionPicker && (
