@@ -3537,6 +3537,14 @@ var init_mass_seed = __esm({
 });
 
 // server/objectStorage.ts
+var objectStorage_exports = {};
+__export(objectStorage_exports, {
+  deleteObject: () => deleteObject,
+  downloadBuffer: () => downloadBuffer,
+  listObjects: () => listObjects,
+  objectExists: () => objectExists,
+  uploadBuffer: () => uploadBuffer
+});
 function getClient() {
   if (!_client) {
     _client = new import_object_storage.Client();
@@ -3566,6 +3574,11 @@ async function deleteObject(objectPath) {
   if (!result.ok) {
     throw new Error(`Eliminazione fallita per ${objectPath}: ${result.error?.message}`);
   }
+}
+async function objectExists(objectPath) {
+  const client = getClient();
+  const result = await client.exists(objectPath);
+  return result.ok && result.value === true;
 }
 async function listObjects(prefix) {
   const client = getClient();
@@ -12020,6 +12033,22 @@ router17.get("/matching-stats", async (_req, res) => {
     return res.status(500).json({ message: "Errore durante il recupero delle statistiche" });
   }
 });
+var otaBundleUpload = (0, import_multer3.default)({ storage: import_multer3.default.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+router17.post("/ota/upload", otaBundleUpload.single("bundle"), async (req, res) => {
+  try {
+    const version = (req.query.version || "").trim();
+    if (!version) return res.status(400).json({ message: "Parametro 'version' mancante" });
+    if (!req.file) return res.status(400).json({ message: "File bundle mancante" });
+    const objectPath = `public/ota/${version}/bundle.js`;
+    const { uploadBuffer: uploadBuffer2 } = await Promise.resolve().then(() => (init_objectStorage(), objectStorage_exports));
+    await uploadBuffer2(objectPath, req.file.buffer, "application/javascript");
+    const bundleUrl = `https://biker-link.replit.app/api/ota-bundle/${encodeURIComponent(version)}`;
+    return res.json({ url: bundleUrl, objectPath, version });
+  } catch (error) {
+    console.error("Admin OTA upload error:", error);
+    return res.status(500).json({ message: "Errore upload bundle OTA" });
+  }
+});
 router17.get("/ota", async (_req, res) => {
   try {
     const releases = await db.select().from(otaReleases).orderBy((0, import_drizzle_orm9.desc)(otaReleases.createdAt));
@@ -12657,6 +12686,18 @@ async function registerRoutes(app2) {
     } catch (error) {
       console.error("Updates check error:", error);
       return res.status(500).json({ message: "Errore verifica aggiornamenti" });
+    }
+  });
+  app2.get("/api/ota-bundle/:version", async (req, res) => {
+    try {
+      const version = req.params.version;
+      const { downloadBuffer: downloadBuffer2 } = await Promise.resolve().then(() => (init_objectStorage(), objectStorage_exports));
+      const buffer = await downloadBuffer2(`public/ota/${version}/bundle.js`);
+      res.setHeader("Content-Type", "application/javascript");
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      res.send(buffer);
+    } catch {
+      res.status(404).json({ message: "Bundle non trovato" });
     }
   });
   app2.get("/privacy-policy", (_req, res) => {

@@ -283,6 +283,17 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - `sendEmail()` funzione generica per usi futuri
 - Se email fallisce, notifica admin come backup (non crasha)
 
+## Script OTA Automatico (Task #225)
+
+- **`scripts/publish-ota.sh <version> "note"`** — pipeline completa 5 passi:
+  1. Login admin con `BIKERLINK_ADMIN_EMAIL` + `BIKERLINK_ADMIN_PASSWORD`
+  2. `expo export --platform android` → bundle JS in `dist-ota/`
+  3. Cerca bundle in `dist-ota/_expo/static/js/android/`
+  4. Upload su object storage → `public/ota/<version>/bundle.js` via `POST /api/admin/ota/upload`
+  5. Crea + pubblica release OTA via `POST /api/admin/ota`
+- **`POST /api/admin/ota/upload?version=<v>`** (richiede admin): riceve bundle multipart, salva su object storage
+- **`GET /api/ota-bundle/:version`** (pubblico): serve bundle scaricato dall'object storage (cache immutable 1 anno)
+
 ## Generazione APK Android
 
 ### Build locale con Android Studio

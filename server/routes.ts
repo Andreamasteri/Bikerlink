@@ -138,6 +138,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/ota-bundle/:version", async (req: Request, res: Response) => {
+    try {
+      const version = req.params.version;
+      const { downloadBuffer } = await import("./objectStorage");
+      const buffer = await downloadBuffer(`public/ota/${version}/bundle.js`);
+      res.setHeader("Content-Type", "application/javascript");
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      res.send(buffer);
+    } catch {
+      res.status(404).json({ message: "Bundle non trovato" });
+    }
+  });
+
   app.get("/privacy-policy", (_req, res) => {
     const templatePath = path.resolve(
       process.cwd(),

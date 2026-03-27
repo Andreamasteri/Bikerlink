@@ -2840,6 +2840,26 @@ router.get("/matching-stats", async (_req: Request, res: Response) => {
   }
 });
 
+const otaBundleUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+
+router.post("/ota/upload", otaBundleUpload.single("bundle"), async (req: Request, res: Response) => {
+  try {
+    const version = ((req.query.version as string) || "").trim();
+    if (!version) return res.status(400).json({ message: "Parametro 'version' mancante" });
+    if (!req.file) return res.status(400).json({ message: "File bundle mancante" });
+
+    const objectPath = `public/ota/${version}/bundle.js`;
+    const { uploadBuffer } = await import("../objectStorage");
+    await uploadBuffer(objectPath, req.file.buffer, "application/javascript");
+
+    const bundleUrl = `https://biker-link.replit.app/api/ota-bundle/${encodeURIComponent(version)}`;
+    return res.json({ url: bundleUrl, objectPath, version });
+  } catch (error) {
+    console.error("Admin OTA upload error:", error);
+    return res.status(500).json({ message: "Errore upload bundle OTA" });
+  }
+});
+
 router.get("/ota", async (_req: Request, res: Response) => {
   try {
     const releases = await db
