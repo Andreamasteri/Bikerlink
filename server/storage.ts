@@ -358,8 +358,12 @@ export interface IStorage {
   updateSosRequest(id: string, data: Partial<InsertSosRequest>): Promise<SosRequest | undefined>;
 
   blockUser(blockerId: string, blockedId: string): Promise<UserBlock>;
+  unblockUser(blockerId: string, blockedId: string): Promise<boolean>;
   isBlocked(userId1: string, userId2: string): Promise<boolean>;
+  hasBlockedUser(blockerId: string, blockedId: string): Promise<boolean>;
   getBlockedUserIds(userId: string): Promise<string[]>;
+  getAllBlockedPairs(): Promise<Array<{ blockerId: string; blockedId: string }>>;
+  deleteBikerBikerMatchesBetween(userId1: string, userId2: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1776,7 +1780,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createBikerBikerMatch(data: InsertBikerBikerMatch): Promise<BikerBikerMatch | undefined> {
-    const [match] = await db.insert(bikerBikerMatches).values(data)
+    const idA = data.biker1Id < data.biker2Id ? data.biker1Id : data.biker2Id;
+    const idB = data.biker1Id < data.biker2Id ? data.biker2Id : data.biker1Id;
+    const normalizedData = { ...data, biker1Id: idA, biker2Id: idB };
+
+    const [existing] = await db.select().from(bikerBikerMatches).where(
+      and(
+        eq(bikerBikerMatches.biker1Id, idA),
+        eq(bikerBikerMatches.biker2Id, idB),
+        eq(bikerBikerMatches.motorcycleBrand, data.motorcycleBrand),
+        eq(bikerBikerMatches.motorcycleModel, data.motorcycleModel),
+      )
+    ).limit(1);
+
+    if (existing) {
+      if (existing.status === "rejected") {
+        const [updated] = await db.update(bikerBikerMatches)
+          .set({ status: "new", isSupermatch: data.isSupermatch ?? false })
+          .where(eq(bikerBikerMatches.id, existing.id))
+          .returning();
+        return updated;
+      }
+      return undefined;
+    }
+
+    const [match] = await db.insert(bikerBikerMatches).values(normalizedData)
       .onConflictDoNothing()
       .returning();
     return match;
@@ -1840,12 +1868,26 @@ export class DatabaseStorage implements IStorage {
     return block;
   }
 
+  async unblockUser(blockerId: string, blockedId: string): Promise<boolean> {
+    const result = await db.delete(userBlocks).where(
+      and(eq(userBlocks.blockerId, blockerId), eq(userBlocks.blockedId, blockedId))
+    ).returning();
+    return result.length > 0;
+  }
+
   async isBlocked(userId1: string, userId2: string): Promise<boolean> {
     const [row] = await db.select().from(userBlocks).where(
       or(
         and(eq(userBlocks.blockerId, userId1), eq(userBlocks.blockedId, userId2)),
         and(eq(userBlocks.blockerId, userId2), eq(userBlocks.blockedId, userId1))
       )
+    ).limit(1);
+    return !!row;
+  }
+
+  async hasBlockedUser(blockerId: string, blockedId: string): Promise<boolean> {
+    const [row] = await db.select().from(userBlocks).where(
+      and(eq(userBlocks.blockerId, blockerId), eq(userBlocks.blockedId, blockedId))
     ).limit(1);
     return !!row;
   }
@@ -1858,6 +1900,21 @@ export class DatabaseStorage implements IStorage {
       )
     );
     return rows.map(r => r.blockerId === userId ? r.blockedId : r.blockerId);
+  }
+
+  async getAllBlockedPairs(): Promise<Array<{ blockerId: string; blockedId: string }>> {
+    const rows = await db.select({ blockerId: userBlocks.blockerId, blockedId: userBlocks.blockedId }).from(userBlocks);
+    return rows;
+  }
+
+  async deleteBikerBikerMatchesBetween(userId1: string, userId2: string): Promise<number> {
+    const result = await db.delete(bikerBikerMatches).where(
+      or(
+        and(eq(bikerBikerMatches.biker1Id, userId1), eq(bikerBikerMatches.biker2Id, userId2)),
+        and(eq(bikerBikerMatches.biker1Id, userId2), eq(bikerBikerMatches.biker2Id, userId1)),
+      )
+    ).returning();
+    return result.length;
   }
 }
 

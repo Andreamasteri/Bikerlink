@@ -357,6 +357,7 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
     const approvedPhotos = photos.filter((p) => p.isApproved);
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const isOnline = !targetUser.ghostMode && targetUser.lastLoginAt != null && new Date(targetUser.lastLoginAt) >= fifteenMinutesAgo;
+    const isBlockedByMe = await storage.hasBlockedUser(requesterId, userId);
     return res.json({
       id: targetUser.id,
       nickname: targetUser.nickname,
@@ -372,6 +373,7 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
       photos: approvedPhotos,
       isOnline,
       isAvailable: (profile?.isAvailable || false) && !targetUser.ghostMode,
+      isBlockedByMe,
     });
   } catch (error) {
     console.error("Get public user profile error:", error);
@@ -853,9 +855,31 @@ router.post("/:id/block", requireAuth, async (req: Request, res: Response) => {
     }
 
     await storage.blockUser(blockerId, blockedId);
+    await storage.deleteBikerBikerMatchesBetween(blockerId, blockedId);
     return res.json({ message: "Utente bloccato con successo" });
   } catch (error) {
     console.error("Block user error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/:id/block", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const blockerId = req.session.userId!;
+    const blockedId = req.params.id as string;
+
+    if (blockerId === blockedId) {
+      return res.status(400).json({ message: "Non puoi sbloccare te stesso" });
+    }
+
+    const success = await storage.unblockUser(blockerId, blockedId);
+    if (!success) {
+      return res.status(404).json({ message: "Blocco non trovato" });
+    }
+
+    return res.json({ message: "Utente sbloccato con successo" });
+  } catch (error) {
+    console.error("Unblock user error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

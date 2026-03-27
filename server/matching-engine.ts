@@ -257,6 +257,12 @@ export async function runBikerBikerMatching(): Promise<number> {
       }
     }
 
+    const allBlockedPairs = await storage.getAllBlockedPairs();
+    const blockedSet = new Set(
+      allBlockedPairs.flatMap(b => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`])
+    );
+    const isPairBlocked = (id1: string, id2: string) => blockedSet.has(`${id1}:${id2}`);
+
     let matchCount = 0;
     let skipCount = 0;
     const MAX_MATCHES_PER_BUCKET = 100;
@@ -282,6 +288,8 @@ export async function runBikerBikerMatching(): Promise<number> {
           const m2 = uniqueMembers[j];
           const idA = m1.userId < m2.userId ? m1.userId : m2.userId;
           const idB = m1.userId < m2.userId ? m2.userId : m1.userId;
+
+          if (isPairBlocked(m1.userId, m2.userId)) { skipCount++; continue; }
 
           const isSupermatch = !!(
             m1.model && m2.model &&
@@ -333,6 +341,8 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
     let bikerBikerCount = 0;
     let zavarrinaCount = 0;
 
+    const blockedUserIds = new Set(await storage.getBlockedUserIds(userId));
+
     const allBikerMotos = await storage.getAllBikerMotorcyclesWithUsers(matchingCountries);
     const userMotos = allBikerMotos.filter(bm => bm.userId === userId);
 
@@ -348,6 +358,7 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
           if (bm.userId === userId) return false;
           if (bm.motorcycle.brand?.toLowerCase() !== brand) return false;
           if (seen.has(bm.userId)) return false;
+          if (blockedUserIds.has(bm.userId)) return false;
           seen.add(bm.userId);
           return true;
         });

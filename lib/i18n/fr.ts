@@ -339,6 +339,12 @@ const fr: Record<string, string> = {
   "match.rematchConfirm": "Voulez-vous supprimer tous les matches en attente et relancer le matching à zéro ?",
   "match.rematchDone": "Matching terminé",
   "match.rematchResult": "{count} nouveaux matches trouvés !",
+  "match.blockUser": "Bloquer l'utilisateur",
+  "match.unblockUser": "Débloquer l'utilisateur",
+  "match.userBlocked": "Utilisateur bloqué",
+  "match.blockUserConfirmTitle": "Bloquer l'utilisateur",
+  "match.blockUserConfirmMsg": "Bloquer {nickname} ? Il disparaîtra des matches, du profil et du chat. Vous ne pourrez plus interagir.",
+  "match.bikerTabInfo": "Si vous refusez un match, le système le repropose au prochain reset. Si vous bloquez un utilisateur, il ne sera plus affiché.",
 
   "proposals.detail.notFound": "Proposition introuvable",
   "proposals.detail.description": "Description",

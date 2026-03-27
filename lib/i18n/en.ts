@@ -339,6 +339,12 @@ const en: Record<string, string> = {
   "match.rematchConfirm": "Do you want to clear all pending matches and re-run matching from scratch?",
   "match.rematchDone": "Matching complete",
   "match.rematchResult": "{count} new matches found!",
+  "match.blockUser": "Block User",
+  "match.unblockUser": "Unblock User",
+  "match.userBlocked": "User blocked",
+  "match.blockUserConfirmTitle": "Block user",
+  "match.blockUserConfirmMsg": "Block {nickname}? They will disappear from matches, profile and chat. You will no longer be able to interact.",
+  "match.bikerTabInfo": "If you reject a match, the system will re-propose it at the next reset. If you block a user, they won't be shown again and you won't be able to interact.",
 
   "proposals.detail.notFound": "Proposal not found",
   "proposals.detail.description": "Description",

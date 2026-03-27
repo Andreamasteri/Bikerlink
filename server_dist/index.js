@@ -1889,7 +1889,25 @@ var init_storage = __esm({
         ).limit(2e3);
       }
       async createBikerBikerMatch(data) {
-        const [match] = await db.insert(bikerBikerMatches).values(data).onConflictDoNothing().returning();
+        const idA = data.biker1Id < data.biker2Id ? data.biker1Id : data.biker2Id;
+        const idB = data.biker1Id < data.biker2Id ? data.biker2Id : data.biker1Id;
+        const normalizedData = { ...data, biker1Id: idA, biker2Id: idB };
+        const [existing] = await db.select().from(bikerBikerMatches).where(
+          (0, import_drizzle_orm2.and)(
+            (0, import_drizzle_orm2.eq)(bikerBikerMatches.biker1Id, idA),
+            (0, import_drizzle_orm2.eq)(bikerBikerMatches.biker2Id, idB),
+            (0, import_drizzle_orm2.eq)(bikerBikerMatches.motorcycleBrand, data.motorcycleBrand),
+            (0, import_drizzle_orm2.eq)(bikerBikerMatches.motorcycleModel, data.motorcycleModel)
+          )
+        ).limit(1);
+        if (existing) {
+          if (existing.status === "rejected") {
+            const [updated] = await db.update(bikerBikerMatches).set({ status: "new", isSupermatch: data.isSupermatch ?? false }).where((0, import_drizzle_orm2.eq)(bikerBikerMatches.id, existing.id)).returning();
+            return updated;
+          }
+          return void 0;
+        }
+        const [match] = await db.insert(bikerBikerMatches).values(normalizedData).onConflictDoNothing().returning();
         return match;
       }
       async getBikerBikerMatch(id) {
@@ -1944,12 +1962,24 @@ var init_storage = __esm({
         const [block] = await db.insert(userBlocks).values({ blockerId, blockedId }).returning();
         return block;
       }
+      async unblockUser(blockerId, blockedId) {
+        const result = await db.delete(userBlocks).where(
+          (0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(userBlocks.blockerId, blockerId), (0, import_drizzle_orm2.eq)(userBlocks.blockedId, blockedId))
+        ).returning();
+        return result.length > 0;
+      }
       async isBlocked(userId1, userId2) {
         const [row] = await db.select().from(userBlocks).where(
           (0, import_drizzle_orm2.or)(
             (0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(userBlocks.blockerId, userId1), (0, import_drizzle_orm2.eq)(userBlocks.blockedId, userId2)),
             (0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(userBlocks.blockerId, userId2), (0, import_drizzle_orm2.eq)(userBlocks.blockedId, userId1))
           )
+        ).limit(1);
+        return !!row;
+      }
+      async hasBlockedUser(blockerId, blockedId) {
+        const [row] = await db.select().from(userBlocks).where(
+          (0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(userBlocks.blockerId, blockerId), (0, import_drizzle_orm2.eq)(userBlocks.blockedId, blockedId))
         ).limit(1);
         return !!row;
       }
@@ -1961,6 +1991,19 @@ var init_storage = __esm({
           )
         );
         return rows.map((r) => r.blockerId === userId ? r.blockedId : r.blockerId);
+      }
+      async getAllBlockedPairs() {
+        const rows = await db.select({ blockerId: userBlocks.blockerId, blockedId: userBlocks.blockedId }).from(userBlocks);
+        return rows;
+      }
+      async deleteBikerBikerMatchesBetween(userId1, userId2) {
+        const result = await db.delete(bikerBikerMatches).where(
+          (0, import_drizzle_orm2.or)(
+            (0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(bikerBikerMatches.biker1Id, userId1), (0, import_drizzle_orm2.eq)(bikerBikerMatches.biker2Id, userId2)),
+            (0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(bikerBikerMatches.biker1Id, userId2), (0, import_drizzle_orm2.eq)(bikerBikerMatches.biker2Id, userId1))
+          )
+        ).returning();
+        return result.length;
       }
     };
     storage = new DatabaseStorage();
@@ -5486,6 +5529,7 @@ router3.get("/:id/public", requireAuth2, async (req, res) => {
     const approvedPhotos = photos.filter((p) => p.isApproved);
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
     const isOnline = !targetUser.ghostMode && targetUser.lastLoginAt != null && new Date(targetUser.lastLoginAt) >= fifteenMinutesAgo;
+    const isBlockedByMe = await storage.hasBlockedUser(requesterId, userId);
     return res.json({
       id: targetUser.id,
       nickname: targetUser.nickname,
@@ -5500,7 +5544,8 @@ router3.get("/:id/public", requireAuth2, async (req, res) => {
       motorcycles,
       photos: approvedPhotos,
       isOnline,
-      isAvailable: (profile?.isAvailable || false) && !targetUser.ghostMode
+      isAvailable: (profile?.isAvailable || false) && !targetUser.ghostMode,
+      isBlockedByMe
     });
   } catch (error) {
     console.error("Get public user profile error:", error);
@@ -5920,9 +5965,27 @@ router3.post("/:id/block", requireAuth2, async (req, res) => {
       return res.status(409).json({ message: "Utente gi\xE0 bloccato" });
     }
     await storage.blockUser(blockerId, blockedId);
+    await storage.deleteBikerBikerMatchesBetween(blockerId, blockedId);
     return res.json({ message: "Utente bloccato con successo" });
   } catch (error) {
     console.error("Block user error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router3.delete("/:id/block", requireAuth2, async (req, res) => {
+  try {
+    const blockerId = req.session.userId;
+    const blockedId = req.params.id;
+    if (blockerId === blockedId) {
+      return res.status(400).json({ message: "Non puoi sbloccare te stesso" });
+    }
+    const success = await storage.unblockUser(blockerId, blockedId);
+    if (!success) {
+      return res.status(404).json({ message: "Blocco non trovato" });
+    }
+    return res.json({ message: "Utente sbloccato con successo" });
+  } catch (error) {
+    console.error("Unblock user error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -6342,6 +6405,11 @@ async function runBikerBikerMatching() {
         console.log(`[BikerBikerMatching] bucket "${key}" \u2192 ${members.length} utenti`);
       }
     }
+    const allBlockedPairs = await storage.getAllBlockedPairs();
+    const blockedSet = new Set(
+      allBlockedPairs.flatMap((b) => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`])
+    );
+    const isPairBlocked = (id1, id2) => blockedSet.has(`${id1}:${id2}`);
     let matchCount = 0;
     let skipCount = 0;
     const MAX_MATCHES_PER_BUCKET = 100;
@@ -6361,6 +6429,10 @@ async function runBikerBikerMatching() {
             const m2 = uniqueMembers[j];
             const idA = m1.userId < m2.userId ? m1.userId : m2.userId;
             const idB = m1.userId < m2.userId ? m2.userId : m1.userId;
+            if (isPairBlocked(m1.userId, m2.userId)) {
+              skipCount++;
+              continue;
+            }
             const isSupermatch = !!(m1.model && m2.model && m1.model.toLowerCase() === m2.model.toLowerCase() && m1.motorcycleType && m2.motorcycleType && m1.motorcycleType.toLowerCase() === m2.motorcycleType.toLowerCase() && m1.ridingStyle && m2.ridingStyle && m1.ridingStyle.toLowerCase() === m2.ridingStyle.toLowerCase());
             const inserted = await storage.createBikerBikerMatch({
               biker1Id: idA,
@@ -6401,6 +6473,7 @@ async function runMatchingForUser(userId) {
     const isZavarrina = user.userType === "zavorrina" || user.userType === "coppia";
     let bikerBikerCount = 0;
     let zavarrinaCount = 0;
+    const blockedUserIds = new Set(await storage.getBlockedUserIds(userId));
     const allBikerMotos = await storage.getAllBikerMotorcyclesWithUsers(matchingCountries);
     const userMotos = allBikerMotos.filter((bm) => bm.userId === userId);
     if (isBiker && userMotos.length > 0) {
@@ -6413,6 +6486,7 @@ async function runMatchingForUser(userId) {
           if (bm.userId === userId) return false;
           if (bm.motorcycle.brand?.toLowerCase() !== brand) return false;
           if (seen.has(bm.userId)) return false;
+          if (blockedUserIds.has(bm.userId)) return false;
           seen.add(bm.userId);
           return true;
         });

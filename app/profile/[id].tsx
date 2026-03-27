@@ -54,7 +54,8 @@ export default function PublicProfileScreen() {
     return "Coppia";
   };
 
-  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockedOverride, setBlockedOverride] = useState<boolean | null>(null);
+  const isBlocked = blockedOverride !== null ? blockedOverride : (profile?.isBlockedByMe ?? false);
 
   const blockMutation = useMutation({
     mutationFn: async () => {
@@ -62,7 +63,7 @@ export default function PublicProfileScreen() {
       return res.json();
     },
     onSuccess: () => {
-      setIsBlocked(true);
+      setBlockedOverride(true);
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
@@ -78,16 +79,44 @@ export default function PublicProfileScreen() {
     },
   });
 
+  const unblockMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", `/api/users/${id}/block`);
+      return res.json();
+    },
+    onSuccess: () => {
+      setBlockedOverride(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/users", id, "public"] });
+    },
+    onError: (e: any) => {
+      Alert.alert("Errore", e.message || "Impossibile sbloccare l'utente");
+    },
+  });
+
   const handleBlockUser = () => {
     Alert.alert(
       "Blocca utente",
-      `Sei sicuro di voler bloccare ${profile?.nickname ?? "questo utente"}?\n\nQuesta azione è permanente e irreversibile. Né tu né ${profile?.nickname ?? "l'utente"} potrete più vedervi nella chat, nei profili e nei match.`,
+      `Sei sicuro di voler bloccare ${profile?.nickname ?? "questo utente"}?\n\nL'utente scomparirà dai match, dal profilo e dalla chat.`,
       [
         { text: "Annulla", style: "cancel" },
         {
           text: "Blocca",
           style: "destructive",
           onPress: () => blockMutation.mutate(),
+        },
+      ]
+    );
+  };
+
+  const handleUnblockUser = () => {
+    Alert.alert(
+      "Sblocca utente",
+      `Sbloccare ${profile?.nickname ?? "questo utente"}? Potrete tornare a vedervi nei match e nella chat.`,
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Sblocca",
+          onPress: () => unblockMutation.mutate(),
         },
       ]
     );
@@ -226,17 +255,38 @@ export default function PublicProfileScreen() {
             <Text style={styles.chatButtonText}>Scrivi un messaggio</Text>
           </TouchableOpacity>
         )}
-        {!isSelf && (
+        {!isSelf && isBlocked && (
+          <TouchableOpacity
+            style={[styles.blockButton, styles.unblockButton, unblockMutation.isPending && styles.blockButtonDisabled]}
+            onPress={handleUnblockUser}
+            activeOpacity={0.8}
+            disabled={unblockMutation.isPending}
+          >
+            {unblockMutation.isPending ? (
+              <ActivityIndicator size="small" color={Colors.textSecondary} />
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle-outline" size={20} color={Colors.textSecondary} />
+                <Text style={[styles.blockButtonText, { color: Colors.textSecondary }]}>Sblocca utente</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+        {!isSelf && !isBlocked && (
           <TouchableOpacity
             style={[styles.blockButton, blockMutation.isPending && styles.blockButtonDisabled]}
             onPress={handleBlockUser}
             activeOpacity={0.8}
-            disabled={blockMutation.isPending || isBlocked}
+            disabled={blockMutation.isPending}
           >
-            <Ionicons name="ban" size={20} color={Colors.error} />
-            <Text style={styles.blockButtonText}>
-              {isBlocked ? "Utente bloccato" : "Blocca utente"}
-            </Text>
+            {blockMutation.isPending ? (
+              <ActivityIndicator size="small" color={Colors.error} />
+            ) : (
+              <>
+                <Ionicons name="ban" size={20} color={Colors.error} />
+                <Text style={styles.blockButtonText}>Blocca utente</Text>
+              </>
+            )}
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -289,6 +339,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
     borderWidth: 1,
     borderColor: Colors.error,
+  },
+  unblockButton: {
+    borderColor: Colors.textSecondary,
   },
   blockButtonDisabled: {
     opacity: 0.5,
