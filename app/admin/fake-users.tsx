@@ -160,6 +160,7 @@ export default function FakeUsersAdmin() {
   const [formDesiredMotoType, setFormDesiredMotoType] = useState("");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [showRegionPicker, setShowRegionPicker] = useState(false);
+  const [showMotoBrandPicker, setShowMotoBrandPicker] = useState(false);
   const [showDesiredBrandPicker, setShowDesiredBrandPicker] = useState(false);
 
   const { data: chatbotData } = useQuery<{ enabled: boolean }>({
@@ -420,6 +421,7 @@ export default function FakeUsersAdmin() {
     setFormDesiredMotoType("");
     setShowCountryPicker(false);
     setShowRegionPicker(false);
+    setShowMotoBrandPicker(false);
     setShowDesiredBrandPicker(false);
   };
 
@@ -1121,9 +1123,33 @@ export default function FakeUsersAdmin() {
                 <>
                   <Text style={styles.sectionTitle}>Moto</Text>
                   <Text style={styles.fieldLabel}>Marca</Text>
-                  <TextInput style={styles.input} value={formMotoBrand} onChangeText={setFormMotoBrand} placeholder="Honda" placeholderTextColor="#666" />
+                  <TouchableOpacity
+                    style={styles.input}
+                    onPress={() => { setShowMotoBrandPicker(!showMotoBrandPicker); setShowCountryPicker(false); setShowRegionPicker(false); setShowDesiredBrandPicker(false); }}
+                  >
+                    <Text style={styles.inputText}>{formMotoBrand || "— seleziona marca —"}</Text>
+                  </TouchableOpacity>
+                  {!!showMotoBrandPicker && (
+                    <ScrollView style={styles.pickerList} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+                      <TouchableOpacity
+                        style={[styles.pickerItem, !formMotoBrand && styles.pickerItemActive]}
+                        onPress={() => { setFormMotoBrand(""); setFormMotoModel(""); setShowMotoBrandPicker(false); }}
+                      >
+                        <Text style={[styles.pickerItemText, !formMotoBrand && styles.pickerItemTextActive]}>— nessuna —</Text>
+                      </TouchableOpacity>
+                      {MOTORCYCLE_BRANDS.map((b) => (
+                        <TouchableOpacity
+                          key={b}
+                          style={[styles.pickerItem, formMotoBrand === b && styles.pickerItemActive]}
+                          onPress={() => { setFormMotoBrand(b); setFormMotoModel(""); setShowMotoBrandPicker(false); }}
+                        >
+                          <Text style={[styles.pickerItemText, formMotoBrand === b && styles.pickerItemTextActive]}>{b}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  )}
                   <Text style={styles.fieldLabel}>Modello</Text>
-                  <TextInput style={styles.input} value={formMotoModel} onChangeText={setFormMotoModel} placeholder="CBR 600" placeholderTextColor="#666" />
+                  <TextInput style={styles.input} value={formMotoModel} onChangeText={setFormMotoModel} placeholder="es. CBR 600" placeholderTextColor="#666" />
 
                   <Text style={styles.fieldLabel}>Tipo moto</Text>
                   <View style={styles.chipRow}>
