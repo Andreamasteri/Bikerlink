@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "node:http";
 import path from "node:path";
 import fs from "node:fs";
@@ -32,6 +32,19 @@ import { triggerMatchingRun, triggerMatchingForUser } from "./matching-engine";
 import { db } from "./db";
 import { users } from "@shared/schema";
 import { ilike } from "drizzle-orm";
+
+async function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  const session = (req as any).session as { userId?: string };
+  if (!session?.userId) {
+    return res.status(401).json({ message: "Non autenticato" });
+  }
+  const user = await storage.getUser(session.userId);
+  if (!user || user.role !== "admin") {
+    return res.status(403).json({ message: "Accesso non autorizzato" });
+  }
+  (req as any).adminUser = user;
+  next();
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const PgStore = connectPgSimple(session);
@@ -720,17 +733,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: "ok", initializing: initState.initializing });
   });
 
-  app.get("/api/admin/uptime", async (req, res) => {
-    const session = req.session as { userId?: string };
-    if (!session?.userId) return res.status(401).json({ message: "Non autenticato" });
-    const { storage } = await import("./storage");
-    const user = await storage.getUser(session.userId);
-    if (!user || user.role !== "admin") return res.status(403).json({ message: "Accesso non autorizzato" });
+  app.get("/api/admin/uptime", requireAdmin, async (_req, res) => {
     const { SERVER_START_TIME, uptimeState } = await import("./uptime");
     res.json({
       backendStartedAt: SERVER_START_TIME,
       metroStartedAt: uptimeState.metroStartTime,
+      metroLastSeenAt: uptimeState.metroLastSeenAt,
       metroOnline: uptimeState.metroOnline,
+      frontendStartTime: uptimeState.frontendStartTime,
       serverNow: Date.now(),
     });
   });

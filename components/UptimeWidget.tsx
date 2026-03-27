@@ -13,7 +13,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 interface UptimeData {
   backendStartedAt: number;
   metroStartedAt: number;
+  metroLastSeenAt: number;
   metroOnline: boolean;
+  frontendStartTime: number;
   serverNow: number;
 }
 
@@ -54,8 +56,9 @@ export default function UptimeWidget() {
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gs) =>
+        Math.abs(gs.dx) > 5 || Math.abs(gs.dy) > 5,
       onPanResponderGrant: () => {
         startPosRef.current = { ...posRef.current };
       },
@@ -89,6 +92,10 @@ export default function UptimeWidget() {
 
   const metroElapsed = data && data.metroOnline && data.metroStartedAt > 0
     ? (data.serverNow - data.metroStartedAt) + fetchAge
+    : -1;
+
+  const frontendElapsed = data && data.frontendStartTime > 0
+    ? (data.serverNow - data.frontendStartTime) + fetchAge
     : -1;
 
   const bottomBase = Platform.OS === "web"
@@ -130,8 +137,8 @@ export default function UptimeWidget() {
           />
           <Row
             label="Frontend"
-            value={metroElapsed >= 0 ? formatUptime(metroElapsed) : "OFFLINE"}
-            offline={metroElapsed < 0}
+            value={frontendElapsed >= 0 ? formatUptime(frontendElapsed) : "OFFLINE"}
+            offline={frontendElapsed < 0}
           />
         </View>
       )}

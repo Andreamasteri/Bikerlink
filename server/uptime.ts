@@ -6,7 +6,9 @@ export const SERVER_START_TIME = Date.now();
 
 export const uptimeState = {
   metroStartTime: 0,
+  metroLastSeenAt: 0,
   metroOnline: false,
+  frontendStartTime: 0,
 };
 
 const LOGS_DIR = path.resolve(process.cwd(), "logs");
@@ -79,9 +81,15 @@ export function startMetroMonitor() {
         res.on("data", (chunk: Buffer) => { body += chunk.toString(); });
         res.on("end", () => {
           const isRunning = body.includes("packager-status:running");
+          if (isRunning) {
+            uptimeState.metroLastSeenAt = Date.now();
+          }
           if (isRunning && !uptimeState.metroOnline) {
             uptimeState.metroStartTime = Date.now();
             uptimeState.metroOnline = true;
+            if (uptimeState.frontendStartTime === 0) {
+              uptimeState.frontendStartTime = uptimeState.metroStartTime;
+            }
             appendUptimeLog("METRO UP");
           } else if (!isRunning && uptimeState.metroOnline) {
             const uptime = uptimeState.metroStartTime > 0

@@ -3916,9 +3916,15 @@ function startMetroMonitor() {
         });
         res.on("end", () => {
           const isRunning = body.includes("packager-status:running");
+          if (isRunning) {
+            uptimeState.metroLastSeenAt = Date.now();
+          }
           if (isRunning && !uptimeState.metroOnline) {
             uptimeState.metroStartTime = Date.now();
             uptimeState.metroOnline = true;
+            if (uptimeState.frontendStartTime === 0) {
+              uptimeState.frontendStartTime = uptimeState.metroStartTime;
+            }
             appendUptimeLog("METRO UP");
           } else if (!isRunning && uptimeState.metroOnline) {
             const uptime = uptimeState.metroStartTime > 0 ? formatDuration(Date.now() - uptimeState.metroStartTime) : "unknown";
@@ -3952,7 +3958,9 @@ var init_uptime = __esm({
     SERVER_START_TIME = Date.now();
     uptimeState = {
       metroStartTime: 0,
-      metroOnline: false
+      metroLastSeenAt: 0,
+      metroOnline: false,
+      frontendStartTime: 0
     };
     LOGS_DIR = path8.resolve(process.cwd(), "logs");
     UPTIME_LOG = path8.join(LOGS_DIR, "uptime-resets.log");
@@ -12368,6 +12376,18 @@ var sos_default = router20;
 init_db();
 init_schema();
 var import_drizzle_orm10 = require("drizzle-orm");
+async function requireAdmin2(req, res, next) {
+  const session2 = req.session;
+  if (!session2?.userId) {
+    return res.status(401).json({ message: "Non autenticato" });
+  }
+  const user = await storage.getUser(session2.userId);
+  if (!user || user.role !== "admin") {
+    return res.status(403).json({ message: "Accesso non autorizzato" });
+  }
+  req.adminUser = user;
+  next();
+}
 async function registerRoutes(app2) {
   const PgStore = (0, import_connect_pg_simple.default)(import_express_session.default);
   app2.use(
@@ -12980,17 +13000,14 @@ async function registerRoutes(app2) {
   app2.get("/api/health", (_req, res) => {
     res.json({ status: "ok", initializing: initState.initializing });
   });
-  app2.get("/api/admin/uptime", async (req, res) => {
-    const session2 = req.session;
-    if (!session2?.userId) return res.status(401).json({ message: "Non autenticato" });
-    const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
-    const user = await storage2.getUser(session2.userId);
-    if (!user || user.role !== "admin") return res.status(403).json({ message: "Accesso non autorizzato" });
+  app2.get("/api/admin/uptime", requireAdmin2, async (_req, res) => {
     const { SERVER_START_TIME: SERVER_START_TIME2, uptimeState: uptimeState2 } = await Promise.resolve().then(() => (init_uptime(), uptime_exports));
     res.json({
       backendStartedAt: SERVER_START_TIME2,
       metroStartedAt: uptimeState2.metroStartTime,
+      metroLastSeenAt: uptimeState2.metroLastSeenAt,
       metroOnline: uptimeState2.metroOnline,
+      frontendStartTime: uptimeState2.frontendStartTime,
       serverNow: Date.now()
     });
   });
