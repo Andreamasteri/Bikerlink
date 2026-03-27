@@ -57,6 +57,7 @@ __export(schema_exports, {
   motoClubs: () => motoClubs,
   motorcyclePhotos: () => motorcyclePhotos,
   notifications: () => notifications,
+  otaReleases: () => otaReleases,
   passwordResetTokens: () => passwordResetTokens,
   phoneSharingTracker: () => phoneSharingTracker,
   photoContestEntries: () => photoContestEntries,
@@ -82,7 +83,7 @@ __export(schema_exports, {
   zavarrinaWishlistPhotos: () => zavarrinaWishlistPhotos,
   zavarrinaWishlists: () => zavarrinaWishlists
 });
-var import_drizzle_orm, import_pg_core, import_zod, users, userPhotos, userMotorcycles, userProfiles, proposals, proposalParticipants, proposalMatches, conversations, conversationParticipants, messages, routes, routePoints, customRoutes, customRouteWaypoints, photoContestEntries, photoVotes, dailyVoteCounts, photoWinners, workshops, workshopContacts, easterEggs, collectedEasterEggs, reports, moderatorLogs, adCampaigns, adClicks, notifications, invitationCodes, feedbackTickets, appSettings, verificationCodes, passwordResetTokens, motorcyclePhotos, zavarrinaWishlists, zavarrinaWishlistPhotos, zavarrinaWishlistMotos, bikerZavarrinaMatches, bikerBikerMatches, emailVerificationTokens, phoneSharingTracker, fakeUserInteractions, userBlocks, sosRequests, motoClubs, motoClubMembers, motoClubInvites, motoClubRequests, registerSchema, loginSchema;
+var import_drizzle_orm, import_pg_core, import_zod, users, userPhotos, userMotorcycles, userProfiles, proposals, proposalParticipants, proposalMatches, conversations, conversationParticipants, messages, routes, routePoints, customRoutes, customRouteWaypoints, photoContestEntries, photoVotes, dailyVoteCounts, photoWinners, workshops, workshopContacts, easterEggs, collectedEasterEggs, reports, moderatorLogs, adCampaigns, adClicks, notifications, invitationCodes, feedbackTickets, appSettings, verificationCodes, passwordResetTokens, motorcyclePhotos, zavarrinaWishlists, zavarrinaWishlistPhotos, zavarrinaWishlistMotos, bikerZavarrinaMatches, bikerBikerMatches, emailVerificationTokens, phoneSharingTracker, fakeUserInteractions, userBlocks, sosRequests, motoClubs, motoClubMembers, motoClubInvites, motoClubRequests, registerSchema, loginSchema, otaReleases;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -725,6 +726,20 @@ var init_schema = __esm({
       identifier: import_zod.z.string().min(1, "Inserisci email o nickname"),
       password: import_zod.z.string().min(1, "Inserisci la password")
     });
+    otaReleases = (0, import_pg_core.pgTable)("ota_releases", {
+      id: (0, import_pg_core.varchar)("id", { length: 36 }).primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      version: (0, import_pg_core.varchar)("version", { length: 50 }).notNull(),
+      bundlePath: (0, import_pg_core.text)("bundle_path"),
+      releaseNotes: (0, import_pg_core.text)("release_notes"),
+      scheduledAt: (0, import_pg_core.timestamp)("scheduled_at"),
+      publishedAt: (0, import_pg_core.timestamp)("published_at"),
+      status: (0, import_pg_core.varchar)("status", { length: 20 }).notNull().default("draft"),
+      createdBy: (0, import_pg_core.varchar)("created_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+      createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow(),
+      updatedAt: (0, import_pg_core.timestamp)("updated_at").notNull().defaultNow()
+    }, (table) => [
+      (0, import_pg_core.index)("ota_releases_status_idx").on(table.status)
+    ]);
   }
 });
 
@@ -5595,12 +5610,12 @@ router3.get("/online-list", requireAuth2, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq11, and: and9, lt, or: or4, isNull: isNull2, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq12, and: and9, lt, or: or4, isNull: isNull2, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const offlineConds = [eq11(usersTable.status, "active"), or4(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull2(usersTable.lastLoginAt)), eq11(usersTable.ghostMode, false)];
+      const offlineConds = [eq12(usersTable.status, "active"), or4(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull2(usersTable.lastLoginAt)), eq12(usersTable.ghostMode, false)];
       if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
-      const offlineResults = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(usersTable).leftJoin(profilesTable, eq11(profilesTable.userId, usersTable.id)).where(and9(...offlineConds)).orderBy(sqlTag`distance`);
+      const offlineResults = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(usersTable).leftJoin(profilesTable, eq12(profilesTable.userId, usersTable.id)).where(and9(...offlineConds)).orderBy(sqlTag`distance`);
       const offlineOnly = offlineResults.filter((r) => !onlineIdSet.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...allResults, ...offlineOnly];
     }
@@ -5711,12 +5726,12 @@ router3.get("/biker-available-list", requireAuth2, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq11, and: and9, or: or4, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq12, and: and9, or: or4, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const bikerConds = [eq11(usersTable.status, "active"), or4(eq11(usersTable.userType, "biker"), eq11(usersTable.userType, "coppia")), eq11(usersTable.ghostMode, false)];
+      const bikerConds = [eq12(usersTable.status, "active"), or4(eq12(usersTable.userType, "biker"), eq12(usersTable.userType, "coppia")), eq12(usersTable.ghostMode, false)];
       if (countriesParam && countriesParam.length > 0) bikerConds.push(inArr(usersTable.country, countriesParam));
-      const allBikers = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq11(usersTable.id, profilesTable.userId)).where(and9(...bikerConds)).orderBy(sqlTag`distance`);
+      const allBikers = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq12(usersTable.id, profilesTable.userId)).where(and9(...bikerConds)).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));
       const offlineOnly = allBikers.filter((r) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
@@ -5768,12 +5783,12 @@ router3.get("/zavorrine-available-list", requireAuth2, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq11, and: and9, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq12, and: and9, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const zavConds = [eq11(usersTable.status, "active"), eq11(usersTable.userType, "zavorrina"), eq11(usersTable.ghostMode, false)];
+      const zavConds = [eq12(usersTable.status, "active"), eq12(usersTable.userType, "zavorrina"), eq12(usersTable.ghostMode, false)];
       if (countriesParam && countriesParam.length > 0) zavConds.push(inArr(usersTable.country, countriesParam));
-      const allZav = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq11(usersTable.id, profilesTable.userId)).where(and9(...zavConds)).orderBy(sqlTag`distance`);
+      const allZav = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq12(usersTable.id, profilesTable.userId)).where(and9(...zavConds)).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));
       const offlineOnly = allZav.filter((r) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
@@ -9751,8 +9766,8 @@ router17.get("/easter-eggs/:id/stats", async (req, res) => {
     }
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { collectedEasterEggs: collectedEasterEggs2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq11, count: count3 } = await import("drizzle-orm");
-    const [result] = await db2.select({ count: count3() }).from(collectedEasterEggs2).where(eq11(collectedEasterEggs2.easterEggId, id));
+    const { eq: eq12, count: count3 } = await import("drizzle-orm");
+    const [result] = await db2.select({ count: count3() }).from(collectedEasterEggs2).where(eq12(collectedEasterEggs2.easterEggId, id));
     return res.json({ eggId: id, collectionsCount: result?.count || 0 });
   } catch (error) {
     console.error("Admin get easter egg stats error:", error);
@@ -10959,15 +10974,15 @@ router17.put("/fake-users/toggle-all", async (req, res) => {
     }
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { users: usersTable, userProfiles: userProfiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq11 } = await import("drizzle-orm");
+    const { eq: eq12 } = await import("drizzle-orm");
     await storage.upsertAppSetting("fake_users_enabled", enabled ? "true" : "false");
-    const fakeUsers = await db2.select().from(usersTable).where(eq11(usersTable.isFake, true));
+    const fakeUsers = await db2.select().from(usersTable).where(eq12(usersTable.isFake, true));
     const newLoginAt = enabled ? /* @__PURE__ */ new Date() : /* @__PURE__ */ new Date("2020-01-01");
     for (const fakeUser of fakeUsers) {
-      await db2.update(userProfiles2).set({ isAvailable: enabled }).where(eq11(userProfiles2.userId, fakeUser.id));
+      await db2.update(userProfiles2).set({ isAvailable: enabled }).where(eq12(userProfiles2.userId, fakeUser.id));
       const userUpdate = { lastLoginAt: newLoginAt };
       if (enabled && !fakeUser.country) userUpdate.country = "IT";
-      await db2.update(usersTable).set(userUpdate).where(eq11(usersTable.id, fakeUser.id));
+      await db2.update(usersTable).set(userUpdate).where(eq12(usersTable.id, fakeUser.id));
     }
     return res.json({ message: `Tutti gli utenti fake sono stati ${enabled ? "abilitati" : "disabilitati"}`, count: fakeUsers.length });
   } catch (error) {
@@ -12005,6 +12020,100 @@ router17.get("/matching-stats", async (_req, res) => {
     return res.status(500).json({ message: "Errore durante il recupero delle statistiche" });
   }
 });
+router17.get("/ota", async (_req, res) => {
+  try {
+    const releases = await db.select().from(otaReleases).orderBy((0, import_drizzle_orm9.desc)(otaReleases.createdAt));
+    return res.json(releases);
+  } catch (error) {
+    console.error("Admin get OTA releases error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router17.post("/ota", async (req, res) => {
+  try {
+    const { version, releaseNotes, bundlePath, scheduledAt, publishNow } = req.body;
+    if (!version || typeof version !== "string") {
+      return res.status(400).json({ message: "Versione mancante" });
+    }
+    const now = /* @__PURE__ */ new Date();
+    let status = "draft";
+    let publishedAt = null;
+    if (publishNow) {
+      await db.update(otaReleases).set({ status: "superseded", updatedAt: now }).where((0, import_drizzle_orm9.eq)(otaReleases.status, "active"));
+      status = "active";
+      publishedAt = now;
+    } else if (scheduledAt) {
+      status = "scheduled";
+    }
+    const [release] = await db.insert(otaReleases).values({
+      version,
+      bundlePath: bundlePath || null,
+      releaseNotes: releaseNotes || null,
+      scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+      publishedAt,
+      status,
+      createdBy: req.session.userId
+    }).returning();
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId,
+      action: "create_ota_release",
+      targetType: "ota_release",
+      targetId: release.id,
+      details: `OTA release creata: v${version} (${status})`
+    });
+    return res.status(201).json(release);
+  } catch (error) {
+    console.error("Admin create OTA release error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router17.post("/ota/:id/publish", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const [existing] = await db.select().from(otaReleases).where((0, import_drizzle_orm9.eq)(otaReleases.id, id)).limit(1);
+    if (!existing) {
+      return res.status(404).json({ message: "Release non trovata" });
+    }
+    const now = /* @__PURE__ */ new Date();
+    await db.update(otaReleases).set({ status: "superseded", updatedAt: now }).where((0, import_drizzle_orm9.eq)(otaReleases.status, "active"));
+    const [updated] = await db.update(otaReleases).set({ status: "active", publishedAt: now, updatedAt: now }).where((0, import_drizzle_orm9.eq)(otaReleases.id, id)).returning();
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId,
+      action: "publish_ota_release",
+      targetType: "ota_release",
+      targetId: id,
+      details: `OTA release pubblicata: v${updated.version}`
+    });
+    return res.json(updated);
+  } catch (error) {
+    console.error("Admin publish OTA release error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router17.delete("/ota/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const [existing] = await db.select().from(otaReleases).where((0, import_drizzle_orm9.eq)(otaReleases.id, id)).limit(1);
+    if (!existing) {
+      return res.status(404).json({ message: "Release non trovata" });
+    }
+    if (existing.status === "active") {
+      return res.status(400).json({ message: "Impossibile eliminare una release attiva" });
+    }
+    await db.delete(otaReleases).where((0, import_drizzle_orm9.eq)(otaReleases.id, id));
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId,
+      action: "delete_ota_release",
+      targetType: "ota_release",
+      targetId: id,
+      details: `OTA release eliminata: v${existing.version}`
+    });
+    return res.json({ message: "Release eliminata" });
+  } catch (error) {
+    console.error("Admin delete OTA release error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
 var admin_default = router17;
 
 // server/routes/moderator.ts
@@ -12526,6 +12635,30 @@ async function registerRoutes(app2) {
   app2.use("/api/moderator", moderator_default);
   app2.use("/api/sos", sos_default);
   app2.use("/api/motoclubs", motoclubs_default);
+  app2.get("/api/updates/check", async (req, res) => {
+    try {
+      const [activeRelease] = await db.select().from(otaReleases).where((0, import_drizzle_orm10.eq)(otaReleases.status, "active")).limit(1);
+      if (!activeRelease) {
+        return res.json({ hasUpdate: false, version: null, releaseNotes: null, manifestUrl: null });
+      }
+      const forwardedProto = req.header("x-forwarded-proto");
+      const protocol = forwardedProto || req.protocol || "https";
+      const forwardedHost = req.header("x-forwarded-host");
+      const host = forwardedHost || req.get("host");
+      const manifestUrl = `${protocol}://${host}/manifest`;
+      return res.json({
+        hasUpdate: true,
+        version: activeRelease.version,
+        releaseNotes: activeRelease.releaseNotes,
+        publishedAt: activeRelease.publishedAt,
+        bundlePath: activeRelease.bundlePath,
+        manifestUrl
+      });
+    } catch (error) {
+      console.error("Updates check error:", error);
+      return res.status(500).json({ message: "Errore verifica aggiornamenti" });
+    }
+  });
   app2.get("/privacy-policy", (_req, res) => {
     const templatePath = import_node_path.default.resolve(
       process.cwd(),
@@ -13474,7 +13607,7 @@ function getAppName() {
     return "App Landing Page";
   }
 }
-function serveExpoManifest(platform, res) {
+async function serveExpoManifest(platform, res) {
   const manifestPath = path10.resolve(
     process.cwd(),
     "static-build",
@@ -13487,8 +13620,25 @@ function serveExpoManifest(platform, res) {
   res.setHeader("expo-protocol-version", "1");
   res.setHeader("expo-sfv-version", "0");
   res.setHeader("content-type", "application/json");
-  const manifest = fs10.readFileSync(manifestPath, "utf-8");
-  res.send(manifest);
+  let manifest;
+  try {
+    manifest = JSON.parse(fs10.readFileSync(manifestPath, "utf-8"));
+  } catch {
+    return res.status(500).json({ error: "Manifest parse error" });
+  }
+  try {
+    const [activeRelease] = await db.select().from(otaReleases).where((0, import_drizzle_orm12.eq)(otaReleases.status, "active")).limit(1);
+    if (activeRelease?.bundlePath) {
+      const launchAsset = manifest.launchAsset;
+      if (launchAsset) {
+        launchAsset.url = activeRelease.bundlePath;
+        manifest.launchAsset = launchAsset;
+      }
+      manifest.otaVersion = activeRelease.version;
+    }
+  } catch {
+  }
+  res.send(JSON.stringify(manifest));
 }
 function serveLandingPage({
   req,
@@ -13525,7 +13675,10 @@ function configureExpoAndLanding(app2) {
     }
     const platform = req.header("expo-platform");
     if (platform && (platform === "ios" || platform === "android")) {
-      return serveExpoManifest(platform, res);
+      return void serveExpoManifest(platform, res).catch((err) => {
+        console.error("[manifest] error:", err);
+        if (!res.headersSent) res.status(500).json({ error: "Internal error" });
+      });
     }
     if (req.path === "/") {
       return serveLandingPage({
@@ -13562,6 +13715,26 @@ function configureExpoAndLanding(app2) {
     }
   });
   log("Expo routing: Checking expo-platform header on / and /manifest");
+}
+function startOtaCron() {
+  setInterval(async () => {
+    try {
+      const now = /* @__PURE__ */ new Date();
+      const scheduled = await db.select().from(otaReleases).where(
+        (0, import_drizzle_orm12.and)(
+          (0, import_drizzle_orm12.eq)(otaReleases.status, "scheduled"),
+          (0, import_drizzle_orm12.lte)(otaReleases.scheduledAt, now)
+        )
+      );
+      for (const release of scheduled) {
+        await db.update(otaReleases).set({ status: "superseded", updatedAt: now }).where((0, import_drizzle_orm12.eq)(otaReleases.status, "active"));
+        await db.update(otaReleases).set({ status: "active", publishedAt: now, updatedAt: now }).where((0, import_drizzle_orm12.eq)(otaReleases.id, release.id));
+        console.log(`[OTA] Published scheduled release v${release.version} (id: ${release.id})`);
+      }
+    } catch (e) {
+      console.warn("[OTA] Cron error:", e);
+    }
+  }, 60 * 1e3);
 }
 async function initMissingClubConversations() {
   try {
@@ -13649,6 +13822,7 @@ function setupErrorHandler(app2) {
       initUptimeTracking();
       startMetroMonitor();
       startMatchingEngine();
+      startOtaCron();
       (async () => {
         try {
           await db.execute(import_drizzle_orm12.sql`ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS image_url TEXT`);
@@ -13716,6 +13890,25 @@ function setupErrorHandler(app2) {
           await db.execute(import_drizzle_orm12.sql`CREATE INDEX IF NOT EXISTS user_blocks_blocked_idx ON user_blocks (blocked_id)`);
         } catch (e) {
           console.warn("[MIGRATION] user_blocks:", e);
+        }
+        try {
+          await db.execute(import_drizzle_orm12.sql`
+            CREATE TABLE IF NOT EXISTS ota_releases (
+              id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+              version VARCHAR(50) NOT NULL,
+              bundle_path TEXT,
+              release_notes TEXT,
+              scheduled_at TIMESTAMP,
+              published_at TIMESTAMP,
+              status VARCHAR(20) NOT NULL DEFAULT 'draft',
+              created_by VARCHAR(36) REFERENCES users(id) ON DELETE SET NULL,
+              created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+              updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+          `);
+          await db.execute(import_drizzle_orm12.sql`CREATE INDEX IF NOT EXISTS ota_releases_status_idx ON ota_releases (status)`);
+        } catch (e) {
+          console.warn("[MIGRATION] ota_releases:", e);
         }
         await autoSeedEssentialUsers();
         await autoSeedFakeUsers();

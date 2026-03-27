@@ -5,7 +5,7 @@ import path from "path";
 import bcrypt from "bcryptjs";
 import { storage } from "../storage";
 import { db } from "../db";
-import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches } from "@shared/schema";
+import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, otaReleases } from "@shared/schema";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { eq, and, ne, desc, sql, count, notExists, inArray, lte, isNull, or, ilike } from "drizzle-orm";
 import { sendEmail } from "../email";
@@ -2837,6 +2837,143 @@ router.get("/matching-stats", async (_req: Request, res: Response) => {
   } catch (error) {
     console.error("Matching stats error:", error);
     return res.status(500).json({ message: "Errore durante il recupero delle statistiche" });
+  }
+});
+
+router.get("/ota", async (_req: Request, res: Response) => {
+  try {
+    const releases = await db
+      .select()
+      .from(otaReleases)
+      .orderBy(desc(otaReleases.createdAt));
+    return res.json(releases);
+  } catch (error) {
+    console.error("Admin get OTA releases error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/ota", async (req: Request, res: Response) => {
+  try {
+    const { version, releaseNotes, bundlePath, scheduledAt, publishNow } = req.body;
+    if (!version || typeof version !== "string") {
+      return res.status(400).json({ message: "Versione mancante" });
+    }
+
+    const now = new Date();
+    let status = "draft";
+    let publishedAt: Date | null = null;
+
+    if (publishNow) {
+      await db
+        .update(otaReleases)
+        .set({ status: "superseded", updatedAt: now })
+        .where(eq(otaReleases.status, "active"));
+      status = "active";
+      publishedAt = now;
+    } else if (scheduledAt) {
+      status = "scheduled";
+    }
+
+    const [release] = await db
+      .insert(otaReleases)
+      .values({
+        version,
+        bundlePath: bundlePath || null,
+        releaseNotes: releaseNotes || null,
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+        publishedAt: publishedAt,
+        status,
+        createdBy: req.session.userId!,
+      })
+      .returning();
+
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "create_ota_release",
+      targetType: "ota_release",
+      targetId: release.id,
+      details: `OTA release creata: v${version} (${status})`,
+    });
+
+    return res.status(201).json(release);
+  } catch (error) {
+    console.error("Admin create OTA release error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/ota/:id/publish", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const [existing] = await db
+      .select()
+      .from(otaReleases)
+      .where(eq(otaReleases.id, id))
+      .limit(1);
+
+    if (!existing) {
+      return res.status(404).json({ message: "Release non trovata" });
+    }
+
+    const now = new Date();
+    await db
+      .update(otaReleases)
+      .set({ status: "superseded", updatedAt: now })
+      .where(eq(otaReleases.status, "active"));
+
+    const [updated] = await db
+      .update(otaReleases)
+      .set({ status: "active", publishedAt: now, updatedAt: now })
+      .where(eq(otaReleases.id, id))
+      .returning();
+
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "publish_ota_release",
+      targetType: "ota_release",
+      targetId: id,
+      details: `OTA release pubblicata: v${updated.version}`,
+    });
+
+    return res.json(updated);
+  } catch (error) {
+    console.error("Admin publish OTA release error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/ota/:id", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const [existing] = await db
+      .select()
+      .from(otaReleases)
+      .where(eq(otaReleases.id, id))
+      .limit(1);
+
+    if (!existing) {
+      return res.status(404).json({ message: "Release non trovata" });
+    }
+
+    if (existing.status === "active") {
+      return res.status(400).json({ message: "Impossibile eliminare una release attiva" });
+    }
+
+    await db.delete(otaReleases).where(eq(otaReleases.id, id));
+
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "delete_ota_release",
+      targetType: "ota_release",
+      targetId: id,
+      details: `OTA release eliminata: v${existing.version}`,
+    });
+
+    return res.json({ message: "Release eliminata" });
+  } catch (error) {
+    console.error("Admin delete OTA release error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
   }
 });
 

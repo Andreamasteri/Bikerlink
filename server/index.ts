@@ -5,8 +5,8 @@ import { initState } from "./init-state";
 import { startMatchingEngine } from "./matching-engine";
 import { autoSeedEssentialUsers, autoSeedFakeUsers } from "./auto-seed";
 import { db } from "./db";
-import { sql, eq, and } from "drizzle-orm";
-import { motoClubs, motoClubMembers, conversations, conversationParticipants } from "@shared/schema";
+import { sql, eq, and, lte } from "drizzle-orm";
+import { motoClubs, motoClubMembers, conversations, conversationParticipants, otaReleases } from "@shared/schema";
 import { seedMotoclubs } from "./routes/motoclubs";
 import * as fs from "fs";
 import * as path from "path";
@@ -120,7 +120,7 @@ function getAppName(): string {
   }
 }
 
-function serveExpoManifest(platform: string, res: Response) {
+async function serveExpoManifest(platform: string, res: Response) {
   const manifestPath = path.resolve(
     process.cwd(),
     "static-build",
@@ -138,8 +138,32 @@ function serveExpoManifest(platform: string, res: Response) {
   res.setHeader("expo-sfv-version", "0");
   res.setHeader("content-type", "application/json");
 
-  const manifest = fs.readFileSync(manifestPath, "utf-8");
-  res.send(manifest);
+  let manifest: Record<string, unknown>;
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+  } catch {
+    return res.status(500).json({ error: "Manifest parse error" });
+  }
+
+  try {
+    const [activeRelease] = await db
+      .select()
+      .from(otaReleases)
+      .where(eq(otaReleases.status, "active"))
+      .limit(1);
+
+    if (activeRelease?.bundlePath) {
+      const launchAsset = manifest.launchAsset as Record<string, unknown> | undefined;
+      if (launchAsset) {
+        launchAsset.url = activeRelease.bundlePath;
+        manifest.launchAsset = launchAsset;
+      }
+      manifest.otaVersion = activeRelease.version;
+    }
+  } catch {
+  }
+
+  res.send(JSON.stringify(manifest));
 }
 
 function serveLandingPage({
@@ -192,7 +216,10 @@ function configureExpoAndLanding(app: express.Application) {
 
     const platform = req.header("expo-platform");
     if (platform && (platform === "ios" || platform === "android")) {
-      return serveExpoManifest(platform, res);
+      return void serveExpoManifest(platform, res).catch((err) => {
+        console.error("[manifest] error:", err);
+        if (!res.headersSent) res.status(500).json({ error: "Internal error" });
+      });
     }
 
     if (req.path === "/") {
@@ -234,6 +261,39 @@ function configureExpoAndLanding(app: express.Application) {
   });
 
   log("Expo routing: Checking expo-platform header on / and /manifest");
+}
+
+function startOtaCron() {
+  setInterval(async () => {
+    try {
+      const now = new Date();
+      const scheduled = await db
+        .select()
+        .from(otaReleases)
+        .where(
+          and(
+            eq(otaReleases.status, "scheduled"),
+            lte(otaReleases.scheduledAt, now)
+          )
+        );
+
+      for (const release of scheduled) {
+        await db
+          .update(otaReleases)
+          .set({ status: "superseded", updatedAt: now })
+          .where(eq(otaReleases.status, "active"));
+
+        await db
+          .update(otaReleases)
+          .set({ status: "active", publishedAt: now, updatedAt: now })
+          .where(eq(otaReleases.id, release.id));
+
+        console.log(`[OTA] Published scheduled release v${release.version} (id: ${release.id})`);
+      }
+    } catch (e) {
+      console.warn("[OTA] Cron error:", e);
+    }
+  }, 60 * 1000);
 }
 
 async function initMissingClubConversations() {
@@ -362,6 +422,7 @@ function setupErrorHandler(app: express.Application) {
       initUptimeTracking();
       startMetroMonitor();
       startMatchingEngine();
+      startOtaCron();
 
       (async () => {
         try {
@@ -437,6 +498,26 @@ function setupErrorHandler(app: express.Application) {
           await db.execute(sql`CREATE INDEX IF NOT EXISTS user_blocks_blocked_idx ON user_blocks (blocked_id)`);
         } catch (e) {
           console.warn("[MIGRATION] user_blocks:", e);
+        }
+
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS ota_releases (
+              id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+              version VARCHAR(50) NOT NULL,
+              bundle_path TEXT,
+              release_notes TEXT,
+              scheduled_at TIMESTAMP,
+              published_at TIMESTAMP,
+              status VARCHAR(20) NOT NULL DEFAULT 'draft',
+              created_by VARCHAR(36) REFERENCES users(id) ON DELETE SET NULL,
+              created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+              updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+          `);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_releases_status_idx ON ota_releases (status)`);
+        } catch (e) {
+          console.warn("[MIGRATION] ota_releases:", e);
         }
 
         await autoSeedEssentialUsers();

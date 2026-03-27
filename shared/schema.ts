@@ -1020,3 +1020,24 @@ export type InsertUserBlock = typeof userBlocks.$inferInsert;
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+
+export const otaReleases = pgTable("ota_releases", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  version: varchar("version", { length: 50 }).notNull(),
+  bundlePath: text("bundle_path"),
+  releaseNotes: text("release_notes"),
+  scheduledAt: timestamp("scheduled_at"),
+  publishedAt: timestamp("published_at"),
+  status: varchar("status", { length: 20 }).notNull().default("draft"),
+  createdBy: varchar("created_by", { length: 36 })
+    .references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("ota_releases_status_idx").on(table.status),
+]);
+
+export type OtaRelease = typeof otaReleases.$inferSelect;
+export type InsertOtaRelease = typeof otaReleases.$inferInsert;

@@ -30,8 +30,8 @@ import sosRoutes from "./routes/sos";
 import motoclubsRoutes from "./routes/motoclubs";
 import { triggerMatchingRun, triggerMatchingForUser } from "./matching-engine";
 import { db } from "./db";
-import { users } from "@shared/schema";
-import { ilike } from "drizzle-orm";
+import { users, otaReleases } from "@shared/schema";
+import { ilike, eq } from "drizzle-orm";
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   const session = (req as any).session as { userId?: string };
@@ -105,6 +105,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/moderator", moderatorRoutes);
   app.use("/api/sos", sosRoutes);
   app.use("/api/motoclubs", motoclubsRoutes);
+
+  app.get("/api/updates/check", async (req: Request, res: Response) => {
+    try {
+      const [activeRelease] = await db
+        .select()
+        .from(otaReleases)
+        .where(eq(otaReleases.status, "active"))
+        .limit(1);
+
+      if (!activeRelease) {
+        return res.json({ hasUpdate: false, version: null, releaseNotes: null, manifestUrl: null });
+      }
+
+      const forwardedProto = req.header("x-forwarded-proto");
+      const protocol = forwardedProto || req.protocol || "https";
+      const forwardedHost = req.header("x-forwarded-host");
+      const host = forwardedHost || req.get("host");
+      const manifestUrl = `${protocol}://${host}/manifest`;
+
+      return res.json({
+        hasUpdate: true,
+        version: activeRelease.version,
+        releaseNotes: activeRelease.releaseNotes,
+        publishedAt: activeRelease.publishedAt,
+        bundlePath: activeRelease.bundlePath,
+        manifestUrl,
+      });
+    } catch (error) {
+      console.error("Updates check error:", error);
+      return res.status(500).json({ message: "Errore verifica aggiornamenti" });
+    }
+  });
 
   app.get("/privacy-policy", (_req, res) => {
     const templatePath = path.resolve(
