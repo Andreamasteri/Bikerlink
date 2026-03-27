@@ -1891,24 +1891,31 @@ var init_storage = __esm({
       async createBikerBikerMatch(data) {
         const idA = data.biker1Id < data.biker2Id ? data.biker1Id : data.biker2Id;
         const idB = data.biker1Id < data.biker2Id ? data.biker2Id : data.biker1Id;
-        const normalizedData = { ...data, biker1Id: idA, biker2Id: idB };
-        const [existing] = await db.select().from(bikerBikerMatches).where(
-          (0, import_drizzle_orm2.and)(
-            (0, import_drizzle_orm2.eq)(bikerBikerMatches.biker1Id, idA),
-            (0, import_drizzle_orm2.eq)(bikerBikerMatches.biker2Id, idB),
-            (0, import_drizzle_orm2.eq)(bikerBikerMatches.motorcycleBrand, data.motorcycleBrand),
-            (0, import_drizzle_orm2.eq)(bikerBikerMatches.motorcycleModel, data.motorcycleModel)
-          )
-        ).limit(1);
-        if (existing) {
-          if (existing.status === "rejected") {
-            const [updated] = await db.update(bikerBikerMatches).set({ status: "new", isSupermatch: data.isSupermatch ?? false }).where((0, import_drizzle_orm2.eq)(bikerBikerMatches.id, existing.id)).returning();
-            return updated;
-          }
-          return void 0;
-        }
-        const [match] = await db.insert(bikerBikerMatches).values(normalizedData).onConflictDoNothing().returning();
-        return match;
+        const isSupermatch = data.isSupermatch ?? false;
+        const status = data.status || "new";
+        const result = await pool.query(
+          `INSERT INTO biker_biker_matches (id, biker1_id, biker2_id, motorcycle_brand, motorcycle_model, status, is_supermatch)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6)
+       ON CONFLICT (LEAST(biker1_id, biker2_id), GREATEST(biker1_id, biker2_id), motorcycle_brand, motorcycle_model)
+       DO UPDATE SET
+         status = 'new',
+         is_supermatch = EXCLUDED.is_supermatch
+       WHERE biker_biker_matches.status = 'rejected'
+       RETURNING *`,
+          [idA, idB, data.motorcycleBrand, data.motorcycleModel, status, isSupermatch]
+        );
+        if (!result.rows || result.rows.length === 0) return void 0;
+        const row = result.rows[0];
+        return {
+          id: row.id,
+          biker1Id: row.biker1_id,
+          biker2Id: row.biker2_id,
+          motorcycleBrand: row.motorcycle_brand,
+          motorcycleModel: row.motorcycle_model,
+          status: row.status,
+          isSupermatch: row.is_supermatch,
+          createdAt: row.created_at
+        };
       }
       async getBikerBikerMatch(id) {
         const [match] = await db.select().from(bikerBikerMatches).where((0, import_drizzle_orm2.eq)(bikerBikerMatches.id, id));
@@ -5515,8 +5522,8 @@ router3.get("/:id/public", requireAuth2, async (req, res) => {
     if (!targetUser) {
       return res.status(404).json({ message: "Utente non trovato" });
     }
-    const isBlockedRelation = await storage.isBlocked(requesterId, userId);
-    if (isBlockedRelation && requesterId !== userId) {
+    const isBlockedByTarget = await storage.hasBlockedUser(userId, requesterId);
+    if (isBlockedByTarget && requesterId !== userId) {
       return res.status(403).json({ message: "Non puoi visualizzare questo profilo" });
     }
     if (targetUser.isFake && requesterId !== userId) {

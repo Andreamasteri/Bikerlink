@@ -343,8 +343,8 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Utente non trovato" });
     }
 
-    const isBlockedRelation = await storage.isBlocked(requesterId, userId);
-    if (isBlockedRelation && requesterId !== userId) {
+    const isBlockedByTarget = await storage.hasBlockedUser(userId, requesterId);
+    if (isBlockedByTarget && requesterId !== userId) {
       return res.status(403).json({ message: "Non puoi visualizzare questo profilo" });
     }
 

@@ -1,5 +1,5 @@
 import { eq, and, or, sql, desc, asc, gte, lte, inArray } from "drizzle-orm";
-import { db } from "./db";
+import { db, pool } from "./db";
 import {
   users,
   userPhotos,
@@ -1782,32 +1782,33 @@ export class DatabaseStorage implements IStorage {
   async createBikerBikerMatch(data: InsertBikerBikerMatch): Promise<BikerBikerMatch | undefined> {
     const idA = data.biker1Id < data.biker2Id ? data.biker1Id : data.biker2Id;
     const idB = data.biker1Id < data.biker2Id ? data.biker2Id : data.biker1Id;
-    const normalizedData = { ...data, biker1Id: idA, biker2Id: idB };
+    const isSupermatch = data.isSupermatch ?? false;
+    const status = data.status || "new";
 
-    const [existing] = await db.select().from(bikerBikerMatches).where(
-      and(
-        eq(bikerBikerMatches.biker1Id, idA),
-        eq(bikerBikerMatches.biker2Id, idB),
-        eq(bikerBikerMatches.motorcycleBrand, data.motorcycleBrand),
-        eq(bikerBikerMatches.motorcycleModel, data.motorcycleModel),
-      )
-    ).limit(1);
+    const result = await pool.query(
+      `INSERT INTO biker_biker_matches (id, biker1_id, biker2_id, motorcycle_brand, motorcycle_model, status, is_supermatch)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6)
+       ON CONFLICT (LEAST(biker1_id, biker2_id), GREATEST(biker1_id, biker2_id), motorcycle_brand, motorcycle_model)
+       DO UPDATE SET
+         status = 'new',
+         is_supermatch = EXCLUDED.is_supermatch
+       WHERE biker_biker_matches.status = 'rejected'
+       RETURNING *`,
+      [idA, idB, data.motorcycleBrand, data.motorcycleModel, status, isSupermatch]
+    );
 
-    if (existing) {
-      if (existing.status === "rejected") {
-        const [updated] = await db.update(bikerBikerMatches)
-          .set({ status: "new", isSupermatch: data.isSupermatch ?? false })
-          .where(eq(bikerBikerMatches.id, existing.id))
-          .returning();
-        return updated;
-      }
-      return undefined;
-    }
-
-    const [match] = await db.insert(bikerBikerMatches).values(normalizedData)
-      .onConflictDoNothing()
-      .returning();
-    return match;
+    if (!result.rows || result.rows.length === 0) return undefined;
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      biker1Id: row.biker1_id,
+      biker2Id: row.biker2_id,
+      motorcycleBrand: row.motorcycle_brand,
+      motorcycleModel: row.motorcycle_model,
+      status: row.status,
+      isSupermatch: row.is_supermatch,
+      createdAt: row.created_at,
+    } as BikerBikerMatch;
   }
 
   async getBikerBikerMatch(id: string): Promise<BikerBikerMatch | undefined> {
