@@ -546,9 +546,9 @@ export default function FakeUsersAdmin() {
       bio: formBio,
     };
     if (formType === "biker" || formType === "coppia") {
-      data.motorcycle = {
-        brand: formMotoBrand,
-        model: formMotoModel,
+      data.moto = {
+        brand: formMotoBrand || "Ducati",
+        model: formMotoModel || "Monster",
         motorcycleType: formMotoType,
         ridingStyle: formRidingStyle,
         displacement: parseInt(formDisplacement) || 0,
