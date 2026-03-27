@@ -13,10 +13,13 @@ if [ -z "$VERSION" ] || [ -z "$RELEASE_NOTES" ]; then
   echo "Variabili d'ambiente richieste:"
   echo "  BIKERLINK_ADMIN_EMAIL    — email dell'account admin"
   echo "  BIKERLINK_ADMIN_PASSWORD — password dell'account admin"
+  echo ""
+  echo "Variabili d'ambiente opzionali:"
+  echo "  BIKERLINK_BACKEND_URL    — URL backend (default: http://localhost:5000)"
   exit 1
 fi
 
-BACKEND_URL="http://localhost:5000"
+BACKEND_URL="${BIKERLINK_BACKEND_URL:-http://localhost:5000}"
 COOKIE_JAR="/tmp/ota-publish-cookies-$$.txt"
 DIST_DIR="dist-ota"
 
@@ -59,14 +62,30 @@ rm -rf "$DIST_DIR"
 EXPO_PUBLIC_DOMAIN=biker-link.replit.app npx expo export --platform android --output-dir "$DIST_DIR" 2>&1 | grep -E "(✓|✗|Bundle|Error)" | tail -5 || true
 echo "   Esportazione completata"
 
-# Step 3: Find bundle file
+# Step 3: Find bundle file — prefer entry (index) bundle, fallback to largest JS file
 echo "[3/6] Ricerca bundle principale..."
-BUNDLE_FILE=$(find "$DIST_DIR/_expo/static/js/android" -name "*.js" ! -name "*.map" 2>/dev/null | head -1)
-if [ -z "$BUNDLE_FILE" ]; then
-  echo "   ERRORE: bundle JS non trovato in $DIST_DIR/_expo/static/js/android/"
+ANDROID_DIR="$DIST_DIR/_expo/static/js/android"
+if [ ! -d "$ANDROID_DIR" ]; then
+  echo "   ERRORE: directory $ANDROID_DIR non trovata"
   find "$DIST_DIR" -type f 2>/dev/null | head -20
   exit 1
 fi
+
+# Prefer file with "index" in the name (Expo entry bundle naming convention)
+BUNDLE_FILE=$(find "$ANDROID_DIR" -name "index*.js" ! -name "*.map" 2>/dev/null | head -1)
+
+# Fallback: pick the largest JS file (entry bundle is typically the biggest)
+if [ -z "$BUNDLE_FILE" ]; then
+  BUNDLE_FILE=$(find "$ANDROID_DIR" -name "*.js" ! -name "*.map" 2>/dev/null \
+    -exec wc -c {} + 2>/dev/null | sort -n | tail -2 | head -1 | awk '{print $2}')
+fi
+
+if [ -z "$BUNDLE_FILE" ] || [ ! -f "$BUNDLE_FILE" ]; then
+  echo "   ERRORE: bundle JS non trovato in $ANDROID_DIR"
+  find "$DIST_DIR" -type f 2>/dev/null | head -20
+  exit 1
+fi
+
 BUNDLE_SIZE=$(wc -c < "$BUNDLE_FILE")
 BUNDLE_SIZE_HUMAN=$(node -e "const s=$BUNDLE_SIZE; process.stdout.write(s>1048576 ? (s/1048576).toFixed(1)+' MB' : Math.round(s/1024)+' KB')")
 echo "   Bundle trovato: $(basename "$BUNDLE_FILE") ($BUNDLE_SIZE_HUMAN)"
