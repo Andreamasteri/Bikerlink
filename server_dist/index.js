@@ -12042,7 +12042,8 @@ router17.post("/ota/upload", otaBundleUpload.single("bundle"), async (req, res) 
     const objectPath = `public/ota/${version}/bundle.js`;
     const { uploadBuffer: uploadBuffer2 } = await Promise.resolve().then(() => (init_objectStorage(), objectStorage_exports));
     await uploadBuffer2(objectPath, req.file.buffer, "application/javascript");
-    const bundleUrl = `https://biker-link.replit.app/api/ota-bundle/${encodeURIComponent(version)}`;
+    const publicDomain = process.env.BIKERLINK_PUBLIC_BASE_URL || "https://biker-link.replit.app";
+    const bundleUrl = `${publicDomain}/api/ota-bundle/${encodeURIComponent(version)}`;
     return res.json({ url: bundleUrl, objectPath, version });
   } catch (error) {
     console.error("Admin OTA upload error:", error);
