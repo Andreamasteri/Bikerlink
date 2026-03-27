@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
+import { MOTORCYCLE_BRANDS } from "@/lib/motorcycle-data";
 
 const COUNTRIES_DATA: { code: string; name: string; regions: string[] }[] = [
   { code: "IT", name: "🇮🇹 Italia", regions: ["Abruzzo","Basilicata","Calabria","Campania","Emilia-Romagna","Friuli Venezia Giulia","Lazio","Liguria","Lombardia","Marche","Molise","Piemonte","Puglia","Sardegna","Sicilia","Toscana","Trentino-Alto Adige","Umbria","Valle d'Aosta","Veneto"] },
@@ -156,8 +157,10 @@ export default function FakeUsersAdmin() {
   const [formWishlistDesc, setFormWishlistDesc] = useState("");
   const [formDesiredBrand, setFormDesiredBrand] = useState("");
   const [formDesiredModel, setFormDesiredModel] = useState("");
+  const [formDesiredMotoType, setFormDesiredMotoType] = useState("");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [showRegionPicker, setShowRegionPicker] = useState(false);
+  const [showDesiredBrandPicker, setShowDesiredBrandPicker] = useState(false);
 
   const { data: chatbotData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/chatbot-enabled"],
@@ -414,8 +417,10 @@ export default function FakeUsersAdmin() {
     setFormWishlistDesc("");
     setFormDesiredBrand("");
     setFormDesiredModel("");
+    setFormDesiredMotoType("");
     setShowCountryPicker(false);
     setShowRegionPicker(false);
+    setShowDesiredBrandPicker(false);
   };
 
   useEffect(() => {
@@ -549,11 +554,10 @@ export default function FakeUsersAdmin() {
       };
     }
     if (formType === "zavorrina") {
-      data.wishlist = {
-        description: formWishlistDesc,
-        desiredBrand: formDesiredBrand,
-        desiredModel: formDesiredModel,
-      };
+      data.wishlistDescription = formWishlistDesc || "La mia wishlist";
+      data.wishlistMotos = formDesiredBrand
+        ? [{ brand: formDesiredBrand, model: formDesiredModel || null, motorcycleType: formDesiredMotoType || null, ridingStyle: null }]
+        : [];
     }
     createMutation.mutate(data);
   };
@@ -1168,9 +1172,45 @@ export default function FakeUsersAdmin() {
                     numberOfLines={3}
                   />
                   <Text style={styles.fieldLabel}>Marca desiderata</Text>
-                  <TextInput style={styles.input} value={formDesiredBrand} onChangeText={setFormDesiredBrand} placeholder="Ducati" placeholderTextColor="#666" />
+                  <TouchableOpacity
+                    style={styles.input}
+                    onPress={() => { setShowDesiredBrandPicker(!showDesiredBrandPicker); setShowCountryPicker(false); setShowRegionPicker(false); }}
+                  >
+                    <Text style={styles.inputText}>{formDesiredBrand || "— seleziona marca —"}</Text>
+                  </TouchableOpacity>
+                  {!!showDesiredBrandPicker && (
+                    <ScrollView style={styles.pickerList} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+                      <TouchableOpacity
+                        style={[styles.pickerItem, !formDesiredBrand && styles.pickerItemActive]}
+                        onPress={() => { setFormDesiredBrand(""); setFormDesiredModel(""); setShowDesiredBrandPicker(false); }}
+                      >
+                        <Text style={[styles.pickerItemText, !formDesiredBrand && styles.pickerItemTextActive]}>— nessuna preferenza —</Text>
+                      </TouchableOpacity>
+                      {MOTORCYCLE_BRANDS.map((b) => (
+                        <TouchableOpacity
+                          key={b}
+                          style={[styles.pickerItem, formDesiredBrand === b && styles.pickerItemActive]}
+                          onPress={() => { setFormDesiredBrand(b); setFormDesiredModel(""); setShowDesiredBrandPicker(false); }}
+                        >
+                          <Text style={[styles.pickerItemText, formDesiredBrand === b && styles.pickerItemTextActive]}>{b}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  )}
                   <Text style={styles.fieldLabel}>Modello desiderato</Text>
-                  <TextInput style={styles.input} value={formDesiredModel} onChangeText={setFormDesiredModel} placeholder="Monster" placeholderTextColor="#666" />
+                  <TextInput style={styles.input} value={formDesiredModel} onChangeText={setFormDesiredModel} placeholder="es. Monster" placeholderTextColor="#666" />
+                  <Text style={styles.fieldLabel}>Tipo moto (opzionale)</Text>
+                  <View style={styles.chipRow}>
+                    {["", ...MOTORCYCLE_TYPES].map((t) => (
+                      <TouchableOpacity
+                        key={t || "__none__"}
+                        style={[styles.chip, formDesiredMotoType === t && styles.chipActive]}
+                        onPress={() => setFormDesiredMotoType(t)}
+                      >
+                        <Text style={[styles.chipText, formDesiredMotoType === t && styles.chipTextActive]}>{t || "Qualsiasi"}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </>
               )}
 

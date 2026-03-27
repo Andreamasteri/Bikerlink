@@ -277,8 +277,9 @@ export default function MapScreen() {
       return res.json();
     },
     retry: false,
-    staleTime: 300000,
-    refetchInterval: 300000,
+    staleTime: 30000,
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
     enabled: isAuthenticated && !!location && mapReady && countriesLoaded,
   });
 
