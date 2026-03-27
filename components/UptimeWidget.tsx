@@ -32,6 +32,8 @@ export default function UptimeWidget() {
   const [minimized, setMinimized] = useState(false);
   const [visible, setVisible] = useState(true);
   const [pos, setPos] = useState({ x: 0, y: 0 });
+  const posRef = useRef({ x: 0, y: 0 });
+  const startPosRef = useRef({ x: 0, y: 0 });
   const [tick, setTick] = useState(0);
   const fetchTimeRef = useRef<number>(Date.now());
 
@@ -54,11 +56,24 @@ export default function UptimeWidget() {
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        startPosRef.current = { ...posRef.current };
+      },
       onPanResponderMove: (_, gs) => {
-        setPos((prev) => ({ x: prev.x + gs.dx, y: prev.y + gs.dy }));
+        const newPos = {
+          x: startPosRef.current.x + gs.dx,
+          y: startPosRef.current.y + gs.dy,
+        };
+        posRef.current = newPos;
+        setPos(newPos);
       },
       onPanResponderRelease: (_, gs) => {
-        setPos((prev) => ({ x: prev.x, y: prev.y }));
+        const newPos = {
+          x: startPosRef.current.x + gs.dx,
+          y: startPosRef.current.y + gs.dy,
+        };
+        posRef.current = newPos;
+        setPos(newPos);
       },
     })
   ).current;
@@ -85,7 +100,7 @@ export default function UptimeWidget() {
       style={[
         styles.container,
         {
-          bottom: bottomBase + pos.y * -1,
+          bottom: bottomBase - pos.y,
           right: 16 - pos.x,
         },
       ]}

@@ -3850,17 +3850,19 @@ var uptime_exports = {};
 __export(uptime_exports, {
   SERVER_START_TIME: () => SERVER_START_TIME,
   appendUptimeLog: () => appendUptimeLog,
+  initUptimeTracking: () => initUptimeTracking,
   startMetroMonitor: () => startMetroMonitor,
   uptimeState: () => uptimeState
 });
 function ensureLogsDir() {
-  const logsDir = path8.dirname(UPTIME_LOG);
-  if (!fs8.existsSync(logsDir)) fs8.mkdirSync(logsDir, { recursive: true });
+  if (!fs8.existsSync(LOGS_DIR)) fs8.mkdirSync(LOGS_DIR, { recursive: true });
 }
 function formatDuration(ms) {
   const totalSec = Math.floor(ms / 1e3);
-  const m = Math.floor(totalSec / 60);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor(totalSec % 3600 / 60);
   const s = totalSec % 60;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
   return `${m}m ${s}s`;
 }
 function appendUptimeLog(line) {
@@ -3871,6 +3873,35 @@ function appendUptimeLog(line) {
 `, "utf-8");
   } catch {
   }
+}
+function readLastStartTime() {
+  try {
+    if (!fs8.existsSync(STATE_FILE)) return null;
+    const raw = fs8.readFileSync(STATE_FILE, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (typeof parsed.startedAt === "number") return parsed.startedAt;
+    return null;
+  } catch {
+    return null;
+  }
+}
+function writeStartTime(ts) {
+  try {
+    ensureLogsDir();
+    fs8.writeFileSync(STATE_FILE, JSON.stringify({ startedAt: ts }), "utf-8");
+  } catch {
+  }
+}
+function initUptimeTracking() {
+  const now = SERVER_START_TIME;
+  const lastStart = readLastStartTime();
+  if (lastStart !== null) {
+    const prevUptime = formatDuration(now - lastStart);
+    appendUptimeLog(`BACKEND RESTART \u2014 previous uptime: ${prevUptime}`);
+  } else {
+    appendUptimeLog("BACKEND UP (cold start)");
+  }
+  writeStartTime(now);
 }
 function startMetroMonitor() {
   const METRO_PORT = 8081;
@@ -3911,7 +3942,7 @@ function startMetroMonitor() {
   setInterval(checkMetro, INTERVAL_MS);
   setTimeout(checkMetro, 5e3);
 }
-var fs8, path8, http, SERVER_START_TIME, uptimeState, UPTIME_LOG;
+var fs8, path8, http, SERVER_START_TIME, uptimeState, LOGS_DIR, UPTIME_LOG, STATE_FILE;
 var init_uptime = __esm({
   "server/uptime.ts"() {
     "use strict";
@@ -3923,7 +3954,9 @@ var init_uptime = __esm({
       metroStartTime: 0,
       metroOnline: false
     };
-    UPTIME_LOG = path8.resolve(process.cwd(), "logs", "uptime-resets.log");
+    LOGS_DIR = path8.resolve(process.cwd(), "logs");
+    UPTIME_LOG = path8.join(LOGS_DIR, "uptime-resets.log");
+    STATE_FILE = path8.join(LOGS_DIR, "backend-uptime-state.json");
   }
 });
 
@@ -13515,7 +13548,7 @@ function setupErrorHandler(app2) {
     },
     () => {
       log(`express server serving on port ${port}`);
-      appendUptimeLog("BACKEND UP (cold start)");
+      initUptimeTracking();
       startMetroMonitor();
       startMatchingEngine();
       (async () => {
