@@ -110,17 +110,19 @@ echo "[6/6] Verifica stato OTA attivo..."
 CHECK_RESPONSE=$(curl -s "$BACKEND_URL/api/updates/check?appVersion=$VERSION")
 ACTIVE_VERSION=$(echo "$CHECK_RESPONSE" | jq -r '.version // "nessuno"' 2>/dev/null)
 ACTIVE_BUNDLE=$(echo "$CHECK_RESPONSE" | jq -r '.bundlePath // "N/A"' 2>/dev/null)
+MANIFEST_URL=$(echo "$CHECK_RESPONSE" | jq -r '.manifestUrl // "N/A"' 2>/dev/null)
 PUBLISHED_AT=$(echo "$CHECK_RESPONSE" | jq -r '.publishedAt // "N/A"' 2>/dev/null)
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════════╗"
 echo "║  ✅ Release OTA v${VERSION} pubblicata con successo!$(printf '%*s' $((17 - ${#VERSION})) '')║"
 echo "╠══════════════════════════════════════════════════════════════════╣"
-echo "║  Release ID    : $RELEASE_ID"
-echo "║  Bundle URL    : $BUNDLE_URL"
-echo "║  Versione att. : $ACTIVE_VERSION"
-echo "║  Bundle attivo : $ACTIVE_BUNDLE"
-echo "║  Pubblicato il : $PUBLISHED_AT"
+echo "║  Release ID     : $RELEASE_ID"
+echo "║  Bundle URL     : $BUNDLE_URL"
+echo "║  Manifest URL   : $MANIFEST_URL"
+echo "║  Versione att.  : $ACTIVE_VERSION"
+echo "║  Bundle attivo  : $ACTIVE_BUNDLE"
+echo "║  Pubblicato il  : $PUBLISHED_AT"
 echo "╚══════════════════════════════════════════════════════════════════╝"
 echo ""
 echo "   Tutti gli utenti riceveranno l'aggiornamento al prossimo avvio."
