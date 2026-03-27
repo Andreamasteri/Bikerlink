@@ -293,12 +293,16 @@ Gradle non trova i path di React Native e il build si blocca).
 
 ### EAS Build (cloud)
 
-### Ultimo APK stabile (Build #8 — preview build)
-- **Build #8** completato — 2026-03-20 — Profilo: preview (APK standalone)
+### Ultimo APK stabile (Build #9 — preview build)
+- **Build #9** completato — 2026-03-27 — Profilo: preview (APK standalone)
+- **APK download**: https://expo.dev/artifacts/eas/kvGWqiRDs7TEJEYzpsPZLx.apk
+- **ID build**: 9e036ed7-10de-43ef-a559-4233cfed1db3
+- **Commit**: dc8a292e7d8c615d7b94ed2ceb0f9818fbd390f4
+- **Expo page**: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/9e036ed7-10de-43ef-a559-4233cfed1db3
+
+### Build #8 (precedente — preview build)
 - **APK download**: https://expo.dev/artifacts/eas/7kvPoiveTzSQzJxg4kcUgL.apk
 - **ID build**: 335056c5-a45f-44af-8124-a5936f3c2eea
-- **Cache**: --clear-cache (tutti i moduli nativi freshly compilati)
-- **Log completo**: `eas-build-log.txt`
 
 ### Build #7 (precedente — development build)
 - **APK download**: https://expo.dev/artifacts/eas/uHdV4BHuYr2vMT8r7GbVNu.apk
