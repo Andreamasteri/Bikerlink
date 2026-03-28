@@ -309,7 +309,8 @@ Gradle non trova i path di React Native e il build si blocca).
 - **ID build**: de1d68e7-eacf-4f92-bb50-34dd27b1ef81
 - **Expo page**: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/de1d68e7-eacf-4f92-bb50-34dd27b1ef81
 - gradleCommand: assembleRelease — bundle JS embedded, installabile direttamente
-- Archivio: 53 MB — Flag: `--clear-cache EAS_SKIP_AUTO_FINGERPRINT=1 EAS_BUILD_NO_EXPO_GO_WARNING=1`
+- Archivio: 53 MB
+- Comando: `EAS_SKIP_AUTO_FINGERPRINT=1 EAS_BUILD_NO_EXPO_GO_WARNING=1 npx eas-cli@latest build --platform android --profile preview --non-interactive --clear-cache`
 
 ### Build #13 (preview APK — CANCELLATO dall'utente)
 - **ID build**: 472183bf-889e-4723-886e-16233c079bff
