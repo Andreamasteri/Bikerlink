@@ -13810,7 +13810,56 @@ function getAppName() {
     return "App Landing Page";
   }
 }
-async function serveExpoManifest(platform, res) {
+async function serveExpoManifest(platform, req, res) {
+  res.setHeader("expo-protocol-version", "1");
+  res.setHeader("expo-sfv-version", "0");
+  res.setHeader("content-type", "application/json");
+  try {
+    const http2 = await import("http");
+    const metroManifest = await new Promise((resolve3, reject) => {
+      const options = {
+        hostname: "localhost",
+        port: 8081,
+        path: "/",
+        method: "GET",
+        headers: {
+          "expo-platform": platform,
+          "Accept": "application/expo+json,application/json",
+          "Expo-Protocol-Version": "1",
+          "Expo-API-Version": "1"
+        },
+        timeout: 3e3
+      };
+      const metroReq = http2.default.request(options, (metroRes) => {
+        let data = "";
+        metroRes.on("data", (chunk) => {
+          data += chunk;
+        });
+        metroRes.on("end", () => resolve3(data));
+      });
+      metroReq.on("error", reject);
+      metroReq.on("timeout", () => {
+        metroReq.destroy();
+        reject(new Error("timeout"));
+      });
+      metroReq.end();
+    });
+    const manifest2 = JSON.parse(metroManifest);
+    try {
+      const [activeRelease] = await db.select().from(otaReleases).where((0, import_drizzle_orm12.eq)(otaReleases.status, "active")).limit(1);
+      if (activeRelease?.bundlePath) {
+        const launchAsset = manifest2.launchAsset;
+        if (launchAsset) {
+          launchAsset.url = activeRelease.bundlePath;
+          manifest2.launchAsset = launchAsset;
+        }
+        manifest2.otaVersion = activeRelease.version;
+      }
+    } catch {
+    }
+    return res.send(JSON.stringify(manifest2));
+  } catch {
+  }
   const manifestPath = path10.resolve(
     process.cwd(),
     "static-build",
@@ -13820,9 +13869,6 @@ async function serveExpoManifest(platform, res) {
   if (!fs10.existsSync(manifestPath)) {
     return res.status(404).json({ error: `Manifest not found for platform: ${platform}` });
   }
-  res.setHeader("expo-protocol-version", "1");
-  res.setHeader("expo-sfv-version", "0");
-  res.setHeader("content-type", "application/json");
   let manifest;
   try {
     manifest = JSON.parse(fs10.readFileSync(manifestPath, "utf-8"));
@@ -13878,7 +13924,7 @@ function configureExpoAndLanding(app2) {
     }
     const platform = req.header("expo-platform");
     if (platform && (platform === "ios" || platform === "android")) {
-      return void serveExpoManifest(platform, res).catch((err) => {
+      return void serveExpoManifest(platform, req, res).catch((err) => {
         console.error("[manifest] error:", err);
         if (!res.headersSent) res.status(500).json({ error: "Internal error" });
       });

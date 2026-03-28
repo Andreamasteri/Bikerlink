@@ -120,7 +120,62 @@ function getAppName(): string {
   }
 }
 
-async function serveExpoManifest(platform: string, res: Response) {
+async function serveExpoManifest(platform: string, req: Request, res: Response) {
+  res.setHeader("expo-protocol-version", "1");
+  res.setHeader("expo-sfv-version", "0");
+  res.setHeader("content-type", "application/json");
+
+  // Try to proxy manifest from live Metro first (always fresh, always current code)
+  try {
+    const http = await import("http");
+    const metroManifest = await new Promise<string>((resolve, reject) => {
+      const options = {
+        hostname: "localhost",
+        port: 8081,
+        path: "/",
+        method: "GET",
+        headers: {
+          "expo-platform": platform,
+          "Accept": "application/expo+json,application/json",
+          "Expo-Protocol-Version": "1",
+          "Expo-API-Version": "1",
+        },
+        timeout: 3000,
+      };
+      const metroReq = http.default.request(options, (metroRes) => {
+        let data = "";
+        metroRes.on("data", (chunk) => { data += chunk; });
+        metroRes.on("end", () => resolve(data));
+      });
+      metroReq.on("error", reject);
+      metroReq.on("timeout", () => { metroReq.destroy(); reject(new Error("timeout")); });
+      metroReq.end();
+    });
+
+    const manifest = JSON.parse(metroManifest) as Record<string, unknown>;
+
+    // Apply OTA override if active
+    try {
+      const [activeRelease] = await db
+        .select()
+        .from(otaReleases)
+        .where(eq(otaReleases.status, "active"))
+        .limit(1);
+      if (activeRelease?.bundlePath) {
+        const launchAsset = manifest.launchAsset as Record<string, unknown> | undefined;
+        if (launchAsset) {
+          launchAsset.url = activeRelease.bundlePath;
+          manifest.launchAsset = launchAsset;
+        }
+        manifest.otaVersion = activeRelease.version;
+      }
+    } catch { }
+
+    return res.send(JSON.stringify(manifest));
+  } catch {
+    // Metro not available — fall back to static manifest
+  }
+
   const manifestPath = path.resolve(
     process.cwd(),
     "static-build",
@@ -133,10 +188,6 @@ async function serveExpoManifest(platform: string, res: Response) {
       .status(404)
       .json({ error: `Manifest not found for platform: ${platform}` });
   }
-
-  res.setHeader("expo-protocol-version", "1");
-  res.setHeader("expo-sfv-version", "0");
-  res.setHeader("content-type", "application/json");
 
   let manifest: Record<string, unknown>;
   try {
@@ -160,8 +211,7 @@ async function serveExpoManifest(platform: string, res: Response) {
       }
       manifest.otaVersion = activeRelease.version;
     }
-  } catch {
-  }
+  } catch { }
 
   res.send(JSON.stringify(manifest));
 }
@@ -216,7 +266,7 @@ function configureExpoAndLanding(app: express.Application) {
 
     const platform = req.header("expo-platform");
     if (platform && (platform === "ios" || platform === "android")) {
-      return void serveExpoManifest(platform, res).catch((err) => {
+      return void serveExpoManifest(platform, req, res).catch((err) => {
         console.error("[manifest] error:", err);
         if (!res.headersSent) res.status(500).json({ error: "Internal error" });
       });
