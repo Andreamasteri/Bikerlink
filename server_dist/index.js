@@ -4058,6 +4058,7 @@ var init_backup_service = __esm({
 
 // server/index.ts
 var import_express21 = __toESM(require("express"));
+var http2 = __toESM(require("http"));
 
 // server/routes.ts
 var import_node_http = require("node:http");
@@ -4807,7 +4808,7 @@ router.post("/request", requireAuth, async (req, res) => {
     if (clubType === "model" && (!brandName || !modelName)) {
       return res.status(400).json({ message: "Marca e modello richiesti per club By Model" });
     }
-    const [request] = await db.insert(motoClubRequests).values({
+    const [request2] = await db.insert(motoClubRequests).values({
       name,
       clubType,
       brandName: brandName || null,
@@ -4815,7 +4816,7 @@ router.post("/request", requireAuth, async (req, res) => {
       requestedBy: userId,
       status: "pending"
     }).returning();
-    return res.status(201).json(request);
+    return res.status(201).json(request2);
   } catch (e) {
     return res.status(500).json({ message: "Errore interno" });
   }
@@ -4844,7 +4845,7 @@ router.post("/creation-request", requireAuth, async (req, res) => {
       return res.status(400).json({ message: "Nome obbligatorio (min 2 caratteri)" });
     }
     const user = await storage.getUser(userId);
-    const [request] = await db.insert(motoClubRequests).values({
+    const [request2] = await db.insert(motoClubRequests).values({
       name: name.trim(),
       clubType: "custom",
       requestedBy: userId,
@@ -4866,7 +4867,7 @@ router.post("/creation-request", requireAuth, async (req, res) => {
         latitude && longitude ? `Posizione: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}` : "Nessuna posizione",
         inviteRadiusKm ? `Raggio inviti: ${inviteRadiusKm} km` : "",
         inviteUserIds && inviteUserIds.length > 0 ? `Utenti invitati: ${inviteUserIds.length}` : "",
-        `Request ID: ${request.id}`
+        `Request ID: ${request2.id}`
       ].filter(Boolean).join("\n"),
       status: "open"
     });
@@ -4882,11 +4883,11 @@ router.post("/creation-request", requireAuth, async (req, res) => {
         ${latitude && longitude ? `<li><strong>Posizione:</strong> ${latitude.toFixed(4)}, ${longitude.toFixed(4)}</li>` : ""}
         ${inviteRadiusKm ? `<li><strong>Raggio inviti:</strong> ${inviteRadiusKm} km</li>` : ""}
         ${inviteUserIds && inviteUserIds.length > 0 ? `<li><strong>Inviti manuali:</strong> ${inviteUserIds.length} utenti</li>` : ""}
-        <li><strong>Request ID:</strong> ${request.id}</li>
+        <li><strong>Request ID:</strong> ${request2.id}</li>
       </ul>
       <p>Vai al pannello admin per approvare o rifiutare.</p>`
     ).catch((e) => console.error("[creation-request] email error:", e));
-    return res.status(201).json({ success: true, requestId: request.id });
+    return res.status(201).json({ success: true, requestId: request2.id });
   } catch (e) {
     console.error("[POST /creation-request]", e);
     return res.status(500).json({ message: "Errore interno" });
@@ -4895,13 +4896,13 @@ router.post("/creation-request", requireAuth, async (req, res) => {
 router.get("/creation-request/status", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId;
-    const [request] = await db.select().from(motoClubRequests).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubRequests.requestedBy, userId), (0, import_drizzle_orm3.eq)(motoClubRequests.clubType, "custom"))).orderBy((0, import_drizzle_orm3.desc)(motoClubRequests.createdAt)).limit(1);
-    if (!request) return res.json(null);
+    const [request2] = await db.select().from(motoClubRequests).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubRequests.requestedBy, userId), (0, import_drizzle_orm3.eq)(motoClubRequests.clubType, "custom"))).orderBy((0, import_drizzle_orm3.desc)(motoClubRequests.createdAt)).limit(1);
+    if (!request2) return res.json(null);
     return res.json({
-      status: request.status,
-      name: request.name,
-      createdAt: request.createdAt,
-      reviewNote: request.reviewNote
+      status: request2.status,
+      name: request2.name,
+      createdAt: request2.createdAt,
+      reviewNote: request2.reviewNote
     });
   } catch (e) {
     return res.status(500).json({ message: "Errore interno" });
@@ -11309,43 +11310,43 @@ router17.post("/motoclubs/requests/:id/approve", async (req, res) => {
   try {
     const adminId = req.session.userId;
     const requestId = req.params.id;
-    const [request] = await db.select().from(motoClubRequests).where((0, import_drizzle_orm9.eq)(motoClubRequests.id, requestId)).limit(1);
-    if (!request) return res.status(404).json({ message: "Richiesta non trovata" });
+    const [request2] = await db.select().from(motoClubRequests).where((0, import_drizzle_orm9.eq)(motoClubRequests.id, requestId)).limit(1);
+    if (!request2) return res.status(404).json({ message: "Richiesta non trovata" });
     await db.update(motoClubRequests).set({ status: "approved", reviewedBy: adminId, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm9.eq)(motoClubRequests.id, requestId));
     const [newClub] = await db.insert(motoClubs).values({
-      name: request.name,
-      clubType: request.clubType,
-      brandName: request.brandName,
-      modelName: request.modelName,
+      name: request2.name,
+      clubType: request2.clubType,
+      brandName: request2.brandName,
+      modelName: request2.modelName,
       isApproved: true,
-      createdBy: request.requestedBy ?? null,
-      parentClubId: request.parentClubId ?? null,
-      latitude: request.latitude ?? null,
-      longitude: request.longitude ?? null
+      createdBy: request2.requestedBy ?? null,
+      parentClubId: request2.parentClubId ?? null,
+      latitude: request2.latitude ?? null,
+      longitude: request2.longitude ?? null
     }).returning();
     const [conv] = await db.insert(conversations).values({
       conversationType: "motoclub",
-      title: `Club ${request.name}`
+      title: `Club ${request2.name}`
     }).returning();
     await db.update(motoClubs).set({ conversationId: conv.id }).where((0, import_drizzle_orm9.eq)(motoClubs.id, newClub.id));
-    const inviteRadiusKm = request.inviteRadiusKm;
-    const inviteUserIdsJson = request.inviteUserIds;
+    const inviteRadiusKm = request2.inviteRadiusKm;
+    const inviteUserIdsJson = request2.inviteUserIds;
     const invitedUserIds = /* @__PURE__ */ new Set();
-    if (inviteRadiusKm && request.latitude != null && request.longitude != null) {
-      const lat = request.latitude;
-      const lng = request.longitude;
+    if (inviteRadiusKm && request2.latitude != null && request2.longitude != null) {
+      const lat = request2.latitude;
+      const lng = request2.longitude;
       const nearbyUsers = await db.select({ userId: userProfiles.userId }).from(userProfiles).where(
         import_drizzle_orm9.sql`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude})))) <= ${inviteRadiusKm}`
       ).limit(200);
       nearbyUsers.forEach((r) => {
-        if (r.userId !== request.requestedBy) invitedUserIds.add(r.userId);
+        if (r.userId !== request2.requestedBy) invitedUserIds.add(r.userId);
       });
     }
     if (inviteUserIdsJson) {
       try {
         const ids = JSON.parse(inviteUserIdsJson);
         ids.forEach((id) => {
-          if (id !== request.requestedBy) invitedUserIds.add(id);
+          if (id !== request2.requestedBy) invitedUserIds.add(id);
         });
       } catch {
       }
@@ -11356,7 +11357,7 @@ router17.post("/motoclubs/requests/:id/approve", async (req, res) => {
         await storage.createNotification({
           userId: uid,
           title: "Sei stato invitato in un Motoclub!",
-          body: `Sei invitato a unirti al club "${request.name}"`,
+          body: `Sei invitato a unirti al club "${request2.name}"`,
           notificationType: "motoclub_invite",
           referenceType: "motoclub",
           referenceId: newClub.id
@@ -11365,12 +11366,12 @@ router17.post("/motoclubs/requests/:id/approve", async (req, res) => {
       } catch {
       }
     }
-    if (request.requestedBy) {
+    if (request2.requestedBy) {
       try {
         await storage.createNotification({
-          userId: request.requestedBy,
+          userId: request2.requestedBy,
           title: "Motoclub approvato!",
-          body: `Il tuo motoclub "${request.name}" \xE8 stato approvato e creato! Puoi trovarlo nella sezione Motoclub.`,
+          body: `Il tuo motoclub "${request2.name}" \xE8 stato approvato e creato! Puoi trovarlo nella sezione Motoclub.`,
           notificationType: "system",
           referenceType: "motoclub",
           referenceId: newClub.id
@@ -11379,7 +11380,7 @@ router17.post("/motoclubs/requests/:id/approve", async (req, res) => {
         console.error("[approve motoclub] notification error:", e);
       }
       await db.update(feedbackTickets).set({ status: "resolved", updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm9.and)(
-        (0, import_drizzle_orm9.eq)(feedbackTickets.userId, request.requestedBy),
+        (0, import_drizzle_orm9.eq)(feedbackTickets.userId, request2.requestedBy),
         (0, import_drizzle_orm9.eq)(feedbackTickets.status, "open"),
         import_drizzle_orm9.sql`${feedbackTickets.message} LIKE ${"%Request ID: " + requestId + "%"}`
       ));
@@ -11389,7 +11390,7 @@ router17.post("/motoclubs/requests/:id/approve", async (req, res) => {
       action: "approve_motoclub_request",
       targetType: "motoclub_request",
       targetId: requestId,
-      details: `Approvata richiesta: ${request.name} (${invitedUserIds.size} inviti inviati)`
+      details: `Approvata richiesta: ${request2.name} (${invitedUserIds.size} inviti inviati)`
     });
     return res.json({ message: "Richiesta approvata", club: newClub, invitesSent: invitedUserIds.size });
   } catch (e) {
@@ -11402,15 +11403,15 @@ router17.post("/motoclubs/requests/:id/reject", async (req, res) => {
     const adminId = req.session.userId;
     const requestId = req.params.id;
     const { note } = req.body;
-    const [request] = await db.select().from(motoClubRequests).where((0, import_drizzle_orm9.eq)(motoClubRequests.id, requestId)).limit(1);
+    const [request2] = await db.select().from(motoClubRequests).where((0, import_drizzle_orm9.eq)(motoClubRequests.id, requestId)).limit(1);
     await db.update(motoClubRequests).set({ status: "rejected", reviewedBy: adminId, reviewNote: note ?? null, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm9.eq)(motoClubRequests.id, requestId));
-    if (request?.requestedBy) {
+    if (request2?.requestedBy) {
       try {
         const noteText = note ? ` Motivazione: ${note}` : "";
         await storage.createNotification({
-          userId: request.requestedBy,
+          userId: request2.requestedBy,
           title: "Richiesta motoclub non approvata",
-          body: `La richiesta di creazione del motoclub "${request.name}" non \xE8 stata approvata.${noteText}`,
+          body: `La richiesta di creazione del motoclub "${request2.name}" non \xE8 stata approvata.${noteText}`,
           notificationType: "system",
           referenceType: "motoclub_request",
           referenceId: requestId
@@ -13869,7 +13870,7 @@ async function applyOtaOverride(manifest) {
   }
 }
 async function fetchMetroManifest(platform) {
-  const http2 = await import("http");
+  const http3 = await import("http");
   const data = await new Promise((resolve3, reject) => {
     const options = {
       hostname: "localhost",
@@ -13884,7 +13885,7 @@ async function fetchMetroManifest(platform) {
       },
       timeout: 1500
     };
-    const metroReq = http2.default.request(options, (metroRes) => {
+    const metroReq = http3.default.request(options, (metroRes) => {
       let body = "";
       metroRes.on("data", (chunk) => {
         body += chunk;
@@ -14018,6 +14019,10 @@ function configureExpoAndLanding(app2) {
     }
   });
   const spaFallbackIndex = path10.resolve(process.cwd(), "static-build", "index.html");
+  const devProxyActive = !fs10.existsSync(spaFallbackIndex);
+  if (devProxyActive) {
+    log("Dev proxy \u2192 Metro :8081 attivo (static-build non trovato)");
+  }
   app2.use((req, res, next) => {
     if (req.path.startsWith("/api")) return next();
     if (req.path.startsWith("/assets") || req.path.startsWith("/uploads")) return next();
@@ -14027,7 +14032,21 @@ function configureExpoAndLanding(app2) {
       res.setHeader("Expires", "0");
       return res.sendFile(spaFallbackIndex);
     }
-    next();
+    const proxyOptions = {
+      hostname: "127.0.0.1",
+      port: 8081,
+      path: req.url,
+      method: req.method,
+      headers: { ...req.headers, host: "localhost:8081" }
+    };
+    const proxyReq = http2.request(proxyOptions, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+      proxyRes.pipe(res, { end: true });
+    });
+    proxyReq.on("error", () => {
+      res.status(502).send("Metro non disponibile. Avvia il workflow 'Start Frontend'.");
+    });
+    req.pipe(proxyReq, { end: true });
   });
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }

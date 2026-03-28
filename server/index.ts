@@ -1,5 +1,6 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
+import * as http from "http";
 import { registerRoutes } from "./routes";
 import { initState } from "./init-state";
 import { startMatchingEngine, stopMatchingEngine } from "./matching-engine";
@@ -315,8 +316,13 @@ function configureExpoAndLanding(app: express.Application) {
   });
 
   // SPA fallback: serve index.html per rotte sconosciute quando static-build esiste
-  // Permette alle rotte Expo Router (es. /welcome, /(auth)/login) di funzionare in produzione
+  // In dev (no static-build): proxy a Metro :8081 — permette al canvas Replit di
+  // raggiungere le rotte Expo Router (es. /welcome, /(auth)/login) in sviluppo
   const spaFallbackIndex = path.resolve(process.cwd(), "static-build", "index.html");
+  const devProxyActive = !fs.existsSync(spaFallbackIndex);
+  if (devProxyActive) {
+    log("Dev proxy → Metro :8081 attivo (static-build non trovato)");
+  }
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.path.startsWith("/api")) return next();
     if (req.path.startsWith("/assets") || req.path.startsWith("/uploads")) return next();
@@ -326,7 +332,24 @@ function configureExpoAndLanding(app: express.Application) {
       res.setHeader("Expires", "0");
       return res.sendFile(spaFallbackIndex);
     }
-    next();
+    // Dev mode: proxy a Metro su porta 8081
+    const proxyOptions: http.RequestOptions = {
+      hostname: "127.0.0.1",
+      port: 8081,
+      path: req.url,
+      method: req.method,
+      headers: { ...req.headers, host: "localhost:8081" },
+    };
+    const proxyReq = http.request(proxyOptions, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+      proxyRes.pipe(res, { end: true });
+    });
+    proxyReq.on("error", () => {
+      res
+        .status(502)
+        .send("Metro non disponibile. Avvia il workflow 'Start Frontend'.");
+    });
+    req.pipe(proxyReq, { end: true });
   });
 
   log("Expo routing: Checking expo-platform header on / and /manifest");
