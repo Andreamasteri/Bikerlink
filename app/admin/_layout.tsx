@@ -26,6 +26,7 @@ export default function AdminLayout() {
       <Stack.Screen name="motoclubs" options={{ title: "Motoclub" }} />
       <Stack.Screen name="invite-codes" options={{ title: "Codici Invito" }} />
       <Stack.Screen name="backup" options={{ title: "Backup automatici" }} />
+      <Stack.Screen name="system" options={{ title: "Sistema" }} />
     </Stack>
   );
 }

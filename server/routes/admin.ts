@@ -12,6 +12,7 @@ import { sendEmail } from "../email";
 import { MOTORCYCLES, pickRandomN, getMotoYear } from "../mass-seed-data";
 import { getLastMatchingCycleMeta, runBikerBikerMatching, runWishlistMatching, runMatchingForUser } from "../matching-engine";
 import { isProtectedUser } from "../constants";
+import { SERVER_START_TIME, uptimeState } from "../uptime";
 
 const router = Router();
 
@@ -2994,6 +2995,49 @@ router.delete("/ota/:id", async (req: Request, res: Response) => {
     return res.json({ message: "Release eliminata" });
   } catch (error) {
     console.error("Admin delete OTA release error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/system-health", async (_req: Request, res: Response) => {
+  try {
+    const now = Date.now();
+    const backendUptimeSec = Math.floor((now - SERVER_START_TIME) / 1000);
+    const metroUptimeSec = uptimeState.metroOnline && uptimeState.metroStartTime > 0
+      ? Math.floor((now - uptimeState.metroStartTime) / 1000)
+      : 0;
+
+    const LOGS_DIR = path.resolve(process.cwd(), "logs");
+    const UPTIME_LOG = path.join(LOGS_DIR, "uptime-resets.log");
+
+    let events: { timestamp: string; message: string; type: string }[] = [];
+    if (fs.existsSync(UPTIME_LOG)) {
+      const raw = fs.readFileSync(UPTIME_LOG, "utf-8");
+      const lines = raw.split("\n").filter((l) => l.trim().length > 0);
+      const last50 = lines.slice(-50);
+      events = last50.reverse().map((line) => {
+        const spaceIdx = line.indexOf(" ");
+        const ts = spaceIdx !== -1 ? line.substring(0, spaceIdx) : "";
+        const msg = spaceIdx !== -1 ? line.substring(spaceIdx + 1) : line;
+        let type = "OTHER";
+        if (msg.includes("BACKEND RESTART")) type = "BACKEND_RESTART";
+        else if (msg.includes("BACKEND UP") && msg.includes("cold start")) type = "COLD_START";
+        else if (msg.includes("METRO UP")) type = "METRO_UP";
+        else if (msg.includes("METRO DOWN")) type = "METRO_DOWN";
+        return { timestamp: ts, message: msg, type };
+      });
+    }
+
+    return res.json({
+      backendStartedAt: SERVER_START_TIME,
+      backendUptimeSec,
+      metroOnline: uptimeState.metroOnline,
+      metroStartedAt: uptimeState.metroStartTime,
+      metroUptimeSec,
+      events,
+    });
+  } catch (error) {
+    console.error("Admin system-health error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

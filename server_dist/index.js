@@ -2973,6 +2973,129 @@ var init_mass_seed_data = __esm({
   }
 });
 
+// server/uptime.ts
+var uptime_exports = {};
+__export(uptime_exports, {
+  SERVER_START_TIME: () => SERVER_START_TIME,
+  appendUptimeLog: () => appendUptimeLog,
+  initUptimeTracking: () => initUptimeTracking,
+  startMetroMonitor: () => startMetroMonitor,
+  uptimeState: () => uptimeState
+});
+function ensureLogsDir() {
+  if (!fs6.existsSync(LOGS_DIR)) fs6.mkdirSync(LOGS_DIR, { recursive: true });
+}
+function formatDuration(ms) {
+  const totalSec = Math.floor(ms / 1e3);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor(totalSec % 3600 / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  return `${m}m ${s}s`;
+}
+function appendUptimeLog(line) {
+  try {
+    ensureLogsDir();
+    const ts = (/* @__PURE__ */ new Date()).toISOString();
+    fs6.appendFileSync(UPTIME_LOG, `${ts} ${line}
+`, "utf-8");
+  } catch {
+  }
+}
+function readLastStartTime() {
+  try {
+    if (!fs6.existsSync(STATE_FILE)) return null;
+    const raw = fs6.readFileSync(STATE_FILE, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (typeof parsed.startedAt === "number") return parsed.startedAt;
+    return null;
+  } catch {
+    return null;
+  }
+}
+function writeStartTime(ts) {
+  try {
+    ensureLogsDir();
+    fs6.writeFileSync(STATE_FILE, JSON.stringify({ startedAt: ts }), "utf-8");
+  } catch {
+  }
+}
+function initUptimeTracking() {
+  const now = SERVER_START_TIME;
+  const lastStart = readLastStartTime();
+  if (lastStart !== null) {
+    const prevUptime = formatDuration(now - lastStart);
+    appendUptimeLog(`BACKEND RESTART \u2014 previous uptime: ${prevUptime}`);
+  } else {
+    appendUptimeLog("BACKEND UP (cold start)");
+  }
+  writeStartTime(now);
+}
+function startMetroMonitor() {
+  const METRO_PORT = 8081;
+  const INTERVAL_MS = 3e4;
+  const checkMetro = () => {
+    const req = http.get(
+      { hostname: "localhost", port: METRO_PORT, path: "/status", timeout: 5e3 },
+      (res) => {
+        let body = "";
+        res.on("data", (chunk) => {
+          body += chunk.toString();
+        });
+        res.on("end", () => {
+          const isRunning = body.includes("packager-status:running");
+          if (isRunning) {
+            uptimeState.metroLastSeenAt = Date.now();
+          }
+          if (isRunning && !uptimeState.metroOnline) {
+            uptimeState.metroStartTime = Date.now();
+            uptimeState.metroOnline = true;
+            if (uptimeState.frontendStartTime === 0) {
+              uptimeState.frontendStartTime = uptimeState.metroStartTime;
+            }
+            appendUptimeLog("METRO UP");
+          } else if (!isRunning && uptimeState.metroOnline) {
+            const uptime = uptimeState.metroStartTime > 0 ? formatDuration(Date.now() - uptimeState.metroStartTime) : "unknown";
+            uptimeState.metroOnline = false;
+            appendUptimeLog(`METRO DOWN \u2014 uptime: ${uptime}`);
+          }
+        });
+      }
+    );
+    req.on("error", () => {
+      if (uptimeState.metroOnline) {
+        const uptime = uptimeState.metroStartTime > 0 ? formatDuration(Date.now() - uptimeState.metroStartTime) : "unknown";
+        uptimeState.metroOnline = false;
+        appendUptimeLog(`METRO DOWN \u2014 uptime: ${uptime}`);
+      }
+    });
+    req.on("timeout", () => {
+      req.destroy();
+    });
+  };
+  setInterval(checkMetro, INTERVAL_MS);
+  setTimeout(checkMetro, 5e3);
+}
+var fs6, path6, http, SERVER_START_TIME, uptimeState, LOGS_DIR, UPTIME_LOG, STATE_FILE;
+var init_uptime = __esm({
+  "server/uptime.ts"() {
+    "use strict";
+    fs6 = __toESM(require("fs"));
+    path6 = __toESM(require("path"));
+    http = __toESM(require("http"));
+    SERVER_START_TIME = Date.now();
+    uptimeState = {
+      metroStartTime: 0,
+      metroLastSeenAt: 0,
+      metroOnline: false,
+      frontendStartTime: 0
+    };
+    LOGS_DIR = path6.resolve(process.cwd(), "logs");
+    UPTIME_LOG = path6.join(LOGS_DIR, "uptime-resets.log");
+    STATE_FILE = path6.join(LOGS_DIR, "backend-uptime-state.json");
+  }
+});
+
 // server/mass-seed.ts
 var mass_seed_exports = {};
 __export(mass_seed_exports, {
@@ -3930,129 +4053,6 @@ var init_backup_service = __esm({
     isRestoringDb = false;
     INTERVAL_DB_MS = 24 * 60 * 60 * 1e3;
     INTERVAL_MEDIA_MS = 7 * 24 * 60 * 60 * 1e3;
-  }
-});
-
-// server/uptime.ts
-var uptime_exports = {};
-__export(uptime_exports, {
-  SERVER_START_TIME: () => SERVER_START_TIME,
-  appendUptimeLog: () => appendUptimeLog,
-  initUptimeTracking: () => initUptimeTracking,
-  startMetroMonitor: () => startMetroMonitor,
-  uptimeState: () => uptimeState
-});
-function ensureLogsDir() {
-  if (!fs8.existsSync(LOGS_DIR)) fs8.mkdirSync(LOGS_DIR, { recursive: true });
-}
-function formatDuration(ms) {
-  const totalSec = Math.floor(ms / 1e3);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor(totalSec % 3600 / 60);
-  const s = totalSec % 60;
-  if (h > 0) return `${h}h ${m}m ${s}s`;
-  return `${m}m ${s}s`;
-}
-function appendUptimeLog(line) {
-  try {
-    ensureLogsDir();
-    const ts = (/* @__PURE__ */ new Date()).toISOString();
-    fs8.appendFileSync(UPTIME_LOG, `${ts} ${line}
-`, "utf-8");
-  } catch {
-  }
-}
-function readLastStartTime() {
-  try {
-    if (!fs8.existsSync(STATE_FILE)) return null;
-    const raw = fs8.readFileSync(STATE_FILE, "utf-8");
-    const parsed = JSON.parse(raw);
-    if (typeof parsed.startedAt === "number") return parsed.startedAt;
-    return null;
-  } catch {
-    return null;
-  }
-}
-function writeStartTime(ts) {
-  try {
-    ensureLogsDir();
-    fs8.writeFileSync(STATE_FILE, JSON.stringify({ startedAt: ts }), "utf-8");
-  } catch {
-  }
-}
-function initUptimeTracking() {
-  const now = SERVER_START_TIME;
-  const lastStart = readLastStartTime();
-  if (lastStart !== null) {
-    const prevUptime = formatDuration(now - lastStart);
-    appendUptimeLog(`BACKEND RESTART \u2014 previous uptime: ${prevUptime}`);
-  } else {
-    appendUptimeLog("BACKEND UP (cold start)");
-  }
-  writeStartTime(now);
-}
-function startMetroMonitor() {
-  const METRO_PORT = 8081;
-  const INTERVAL_MS = 3e4;
-  const checkMetro = () => {
-    const req = http.get(
-      { hostname: "localhost", port: METRO_PORT, path: "/status", timeout: 5e3 },
-      (res) => {
-        let body = "";
-        res.on("data", (chunk) => {
-          body += chunk.toString();
-        });
-        res.on("end", () => {
-          const isRunning = body.includes("packager-status:running");
-          if (isRunning) {
-            uptimeState.metroLastSeenAt = Date.now();
-          }
-          if (isRunning && !uptimeState.metroOnline) {
-            uptimeState.metroStartTime = Date.now();
-            uptimeState.metroOnline = true;
-            if (uptimeState.frontendStartTime === 0) {
-              uptimeState.frontendStartTime = uptimeState.metroStartTime;
-            }
-            appendUptimeLog("METRO UP");
-          } else if (!isRunning && uptimeState.metroOnline) {
-            const uptime = uptimeState.metroStartTime > 0 ? formatDuration(Date.now() - uptimeState.metroStartTime) : "unknown";
-            uptimeState.metroOnline = false;
-            appendUptimeLog(`METRO DOWN \u2014 uptime: ${uptime}`);
-          }
-        });
-      }
-    );
-    req.on("error", () => {
-      if (uptimeState.metroOnline) {
-        const uptime = uptimeState.metroStartTime > 0 ? formatDuration(Date.now() - uptimeState.metroStartTime) : "unknown";
-        uptimeState.metroOnline = false;
-        appendUptimeLog(`METRO DOWN \u2014 uptime: ${uptime}`);
-      }
-    });
-    req.on("timeout", () => {
-      req.destroy();
-    });
-  };
-  setInterval(checkMetro, INTERVAL_MS);
-  setTimeout(checkMetro, 5e3);
-}
-var fs8, path8, http, SERVER_START_TIME, uptimeState, LOGS_DIR, UPTIME_LOG, STATE_FILE;
-var init_uptime = __esm({
-  "server/uptime.ts"() {
-    "use strict";
-    fs8 = __toESM(require("fs"));
-    path8 = __toESM(require("path"));
-    http = __toESM(require("http"));
-    SERVER_START_TIME = Date.now();
-    uptimeState = {
-      metroStartTime: 0,
-      metroLastSeenAt: 0,
-      metroOnline: false,
-      frontendStartTime: 0
-    };
-    LOGS_DIR = path8.resolve(process.cwd(), "logs");
-    UPTIME_LOG = path8.join(LOGS_DIR, "uptime-resets.log");
-    STATE_FILE = path8.join(LOGS_DIR, "backend-uptime-state.json");
   }
 });
 
@@ -9460,6 +9460,7 @@ init_db();
 init_schema();
 var import_drizzle_orm9 = require("drizzle-orm");
 init_mass_seed_data();
+init_uptime();
 var router17 = (0, import_express17.Router)();
 async function assignFakeUserToClubs(userId) {
   const stats = { assigned: 0, skipped: 0, failed: 0 };
@@ -12254,6 +12255,43 @@ router17.delete("/ota/:id", async (req, res) => {
     return res.json({ message: "Release eliminata" });
   } catch (error) {
     console.error("Admin delete OTA release error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router17.get("/system-health", async (_req, res) => {
+  try {
+    const now = Date.now();
+    const backendUptimeSec = Math.floor((now - SERVER_START_TIME) / 1e3);
+    const metroUptimeSec = uptimeState.metroOnline && uptimeState.metroStartTime > 0 ? Math.floor((now - uptimeState.metroStartTime) / 1e3) : 0;
+    const LOGS_DIR2 = import_path7.default.resolve(process.cwd(), "logs");
+    const UPTIME_LOG2 = import_path7.default.join(LOGS_DIR2, "uptime-resets.log");
+    let events = [];
+    if (import_fs7.default.existsSync(UPTIME_LOG2)) {
+      const raw = import_fs7.default.readFileSync(UPTIME_LOG2, "utf-8");
+      const lines = raw.split("\n").filter((l) => l.trim().length > 0);
+      const last50 = lines.slice(-50);
+      events = last50.reverse().map((line) => {
+        const spaceIdx = line.indexOf(" ");
+        const ts = spaceIdx !== -1 ? line.substring(0, spaceIdx) : "";
+        const msg = spaceIdx !== -1 ? line.substring(spaceIdx + 1) : line;
+        let type = "OTHER";
+        if (msg.includes("BACKEND RESTART")) type = "BACKEND_RESTART";
+        else if (msg.includes("BACKEND UP") && msg.includes("cold start")) type = "COLD_START";
+        else if (msg.includes("METRO UP")) type = "METRO_UP";
+        else if (msg.includes("METRO DOWN")) type = "METRO_DOWN";
+        return { timestamp: ts, message: msg, type };
+      });
+    }
+    return res.json({
+      backendStartedAt: SERVER_START_TIME,
+      backendUptimeSec,
+      metroOnline: uptimeState.metroOnline,
+      metroStartedAt: uptimeState.metroStartTime,
+      metroUptimeSec,
+      events
+    });
+  } catch (error) {
+    console.error("Admin system-health error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

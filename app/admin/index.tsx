@@ -72,6 +72,7 @@ const adminGroups: AdminGroup[] = [
       { key: "invite-codes", label: "Codici Invito", icon: "gift", iconSet: "Ionicons", route: "/admin/invite-codes" },
       { key: "backup", label: "Backup automatici", icon: "cloud-upload", iconSet: "MaterialCommunityIcons", route: "/admin/backup" },
       { key: "ota", label: "Aggiornamenti OTA", icon: "update", iconSet: "MaterialIcons", route: "/admin/ota", accentColor: "#22c55e" },
+      { key: "system", label: "Sistema", icon: "pulse-outline", iconSet: "Ionicons", route: "/admin/system", accentColor: "#FF4444" },
     ],
   },
 ];
