@@ -28,6 +28,7 @@ import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMapConfig } from "@/lib/map-context";
 import { MAP_PROVIDER_LABELS, MAP_PROVIDER_DESCRIPTIONS, type MapProvider } from "@/lib/map-tiles";
 
@@ -249,6 +250,31 @@ export default function ProfileScreen() {
   const doLogout = async () => {
     logoutMutation.mutate();
   };
+
+  const handleClearCache = useCallback(() => {
+    const doClear = async () => {
+      try {
+        await AsyncStorage.clear();
+        queryClient.clear();
+        Alert.alert("Cache pulita", "Tutti i dati locali sono stati cancellati. L'app si ricarica.");
+      } catch {
+        Alert.alert("Errore", "Impossibile pulire la cache.");
+      }
+    };
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined") {
+        try { window.localStorage.clear(); } catch {}
+        try { window.sessionStorage.clear(); } catch {}
+      }
+      queryClient.clear();
+      Alert.alert("Cache pulita", "Tutti i dati locali sono stati cancellati. Ricarica la pagina.");
+    } else {
+      Alert.alert("Pulisci cache", "Cancella tutti i dati locali salvati?", [
+        { text: "Annulla", style: "cancel" },
+        { text: "Pulisci", style: "destructive", onPress: doClear },
+      ]);
+    }
+  }, []);
 
   const handleRequestDeletion = useCallback(() => {
     requestDeletionMutation.mutate();
@@ -842,7 +868,11 @@ export default function ProfileScreen() {
         <MenuItem icon="trash-outline" label={t("profile.deleteAccount")} onPress={handleDeleteAccount} color={Colors.accentRed} />
       </View>
 
-      <View style={[styles.section, { marginTop: 8 }]}>
+      <View style={[styles.section, { marginTop: 8, gap: 10 }]}>
+        <Pressable style={styles.clearCacheBtn} onPress={handleClearCache}>
+          <Ionicons name="trash-bin-outline" size={20} color={Colors.textSecondary} />
+          <Text style={styles.clearCacheBtnText}>Cancella cache locale</Text>
+        </Pressable>
         <Pressable style={styles.logoutBtn} onPress={handleLogout}>
           <Ionicons name="log-out" size={22} color="#fff" />
           <Text style={styles.logoutBtnText}>{t("auth.logout")}</Text>
@@ -1473,6 +1503,22 @@ const styles = StyleSheet.create({
   langDropdownItemLabelActive: {
     color: Colors.accent,
     fontFamily: "Inter_600SemiBold",
+  },
+  clearCacheBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    paddingVertical: 13,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  clearCacheBtnText: {
+    fontSize: 15,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
   },
   logoutBtn: {
     flexDirection: "row",
