@@ -304,20 +304,20 @@ Gradle non trova i path di React Native e il build si blocca).
 
 ### EAS Build (cloud)
 
-### Ultimo APK stabile (Build #9 — preview build)
-- **Build #9** completato — 2026-03-27 — Profilo: preview (APK standalone)
+### Ultimo APK in build (Build #10 — preview standalone)
+- **Build #10** avviato — 2026-03-28 — Profilo: preview (APK standalone, SENZA expo-dev-client)
+- **ID build**: bd5840f4-c2c0-4446-8473-1b8d0cec4ff6
+- **Expo page**: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/bd5840f4-c2c0-4446-8473-1b8d0cec4ff6
+- **Commit**: 7d2c3ec
+
+### Build #9 (precedente — aveva expo-dev-client, NON FUNZIONANTE come standalone)
 - **APK download**: https://expo.dev/artifacts/eas/kvGWqiRDs7TEJEYzpsPZLx.apk
 - **ID build**: 9e036ed7-10de-43ef-a559-4233cfed1db3
-- **Commit**: dc8a292e7d8c615d7b94ed2ceb0f9818fbd390f4
-- **Expo page**: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/9e036ed7-10de-43ef-a559-4233cfed1db3
+- **Problema**: aveva expo-dev-client installato → APK cercava Metro all'avvio
 
 ### Build #8 (precedente — preview build)
 - **APK download**: https://expo.dev/artifacts/eas/7kvPoiveTzSQzJxg4kcUgL.apk
 - **ID build**: 335056c5-a45f-44af-8124-a5936f3c2eea
-
-### Build #7 (precedente — development build)
-- **APK download**: https://expo.dev/artifacts/eas/uHdV4BHuYr2vMT8r7GbVNu.apk
-- **ID build**: e881560b-f36c-4494-bd58-586b08078b8c
 
 ### Configurazione stabile (CRITICA — non modificare)
 - `newArchEnabled: false` — **OBBLIGATORIO**: `react-native-reanimated 3.x` richiede Old Architecture (4.x richiederebbe New Arch)
@@ -325,29 +325,29 @@ Gradle non trova i path di React Native e il build si blocca).
 - `react-native-worklets`: RIMOSSO (era peer dep di reanimated 4.x, non necessario con 3.x)
 - `react-native-maps: 1.18.0` — pinnato, in `expo.install.exclude`
 - `react-native-reanimated` — in `expo.install.exclude` (SDK 54 aspetta 4.x, usiamo 3.x intenzionalmente)
-- `expo-dev-client: ~6.0.20` — per development builds
-- `expo-doctor`: 17/17 checks passed
+- `expo-dev-client`: **RIMOSSO** (causava "Unable to load script" sugli APK preview)
+- `expo-doctor`: checks passed
 - **EXPO_PUBLIC_DOMAIN**: configurato in tutti i profili eas.json → `biker-link.replit.app`
 
 ### Come lanciare un nuovo build
 ```bash
-# Development build (con expo-dev-client, per debug)
-EXPO_TOKEN=$EXPO_TOKEN npx eas-cli@latest build --platform android --profile development --clear-cache --non-interactive
+# Preview build (APK standalone per distribuzione interna) — USARE QUESTO
+EXPO_TOKEN=$EXPO_TOKEN node_modules/.bin/eas build --platform android --profile preview --clear-cache --non-interactive
 
-# Preview build (APK normale per distribuzione interna)
-EXPO_TOKEN=$EXPO_TOKEN npx eas-cli@latest build --platform android --profile preview --non-interactive
+# Production build (AAB per Play Store)
+EXPO_TOKEN=$EXPO_TOKEN node_modules/.bin/eas build --platform android --profile production --non-interactive
 ```
-- **Non usare** `npm install -g eas-cli` — usare sempre `npx eas-cli@latest`
+- `eas-cli` installato in `node_modules/.bin/eas` (locale al progetto)
 - Il build richiede 20-40 min sul piano free tier
 
 ### Build AAB per Play Store (profilo `production`)
 ```bash
-EXPO_TOKEN=$EXPO_TOKEN npx eas-cli@latest build --platform android --profile production --non-interactive
+EXPO_TOKEN=$EXPO_TOKEN node_modules/.bin/eas build --platform android --profile production --non-interactive
 ```
 Produce un `.aab` ottimizzato per la distribuzione su Google Play.
 
 ### Configurazione (già pronta)
-- `eas.json`: profili `development`, `preview` (APK) e `production` (AAB) configurati
+- `eas.json`: profili `preview` (APK standalone) e `production` (AAB) — profilo `development` RIMOSSO
 - `app.json`: package `com.bikerlink.app`, version `1.0.0`, versionCode `1`
 - Keystore: Build Credentials NX-Is9EQ1Y (su EAS remote, account andreamasteri)
 - Icone adaptive Android presenti in `assets/images/`
