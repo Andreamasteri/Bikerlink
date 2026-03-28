@@ -332,17 +332,17 @@ Gradle non trova i path di React Native e il build si blocca).
 ### Come lanciare un nuovo build
 ```bash
 # Preview build (APK standalone per distribuzione interna) — USARE QUESTO
-EXPO_TOKEN=$EXPO_TOKEN node_modules/.bin/eas build --platform android --profile preview --clear-cache --non-interactive
+EXPO_TOKEN=$EXPO_TOKEN npx eas-cli@latest build --platform android --profile preview --clear-cache --non-interactive
 
 # Production build (AAB per Play Store)
-EXPO_TOKEN=$EXPO_TOKEN node_modules/.bin/eas build --platform android --profile production --non-interactive
+EXPO_TOKEN=$EXPO_TOKEN npx eas-cli@latest build --platform android --profile production --non-interactive
 ```
-- `eas-cli` installato in `node_modules/.bin/eas` (locale al progetto)
+- `eas-cli` NON deve essere nelle dipendenze del progetto — usare sempre `npx eas-cli@latest`
 - Il build richiede 20-40 min sul piano free tier
 
 ### Build AAB per Play Store (profilo `production`)
 ```bash
-EXPO_TOKEN=$EXPO_TOKEN node_modules/.bin/eas build --platform android --profile production --non-interactive
+EXPO_TOKEN=$EXPO_TOKEN npx eas-cli@latest build --platform android --profile production --non-interactive
 ```
 Produce un `.aab` ottimizzato per la distribuzione su Google Play.
 
