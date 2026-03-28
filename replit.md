@@ -229,8 +229,9 @@ Output atteso:
 - **Configurazione porte nel `.replit` NON va mai toccata.** Mapping corretto: `5000→5000`, `8081→80`, `8082→3000`.
 - Metro: `scripts/start-expo.sh` usa `flock` (lock atomico) + `curl` per port-check (nc NON è disponibile nel Nix env). `watchdog.sh` usa `flock` per impedire istanze parallele. Entrambi scrivono PID in `/tmp/start-expo.lock` / usano `/tmp/start-expo.flock` e `/tmp/watchdog.flock`. Root cause storico crash: `nc` inesistente → `port_is_open` sempre false → Metro mai rilevato → timeout 300s → retry esauriti.
 - react-native-maps: usare componenti con pattern `.web.tsx` per compatibilità web
-- KeyboardProvider: escluso su web (causa errore hooks)
 - react-native-maps pinnato a 1.18.0 per compatibilità Expo Go
+- **react-native-maps web shim**: `metro.config.js` ha un `resolver.resolveRequest` che su piattaforma web reindirizza `react-native-maps` a `mocks/react-native-maps.js` (esporta MapView/Marker/Polyline/Circle/UrlTile come View stub) e tutti i file interni del pacchetto a `mocks/empty.js`. MAI rimuovere questo shim — senza di esso il bundle web fallisce con HTTP 500 (native-only codegenNativeCommands).
+- KeyboardProvider: escluso su web (causa errore hooks)
 - Schema DB: non modificare tipi colonne ID (varchar UUID)
 - Filtro telefono chat: persistente su DB (tabella `phone_sharing_tracker`)
 - EULA: caricabile come file .txt dall'admin panel (sezione Impostazioni)
