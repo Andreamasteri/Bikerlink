@@ -332,7 +332,7 @@ Gradle non trova i path di React Native e il build si blocca).
 ### Come lanciare un nuovo build
 ```bash
 # Preview build (APK standalone per distribuzione interna) — USARE QUESTO
-EXPO_TOKEN=$EXPO_TOKEN npx eas-cli@latest build --platform android --profile preview --clear-cache --non-interactive
+EXPO_TOKEN=$EXPO_TOKEN npx eas-cli@latest build --platform android --profile preview --non-interactive
 
 # Production build (AAB per Play Store)
 EXPO_TOKEN=$EXPO_TOKEN npx eas-cli@latest build --platform android --profile production --non-interactive
