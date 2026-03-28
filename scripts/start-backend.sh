@@ -148,8 +148,8 @@ for retry in $(seq 1 $MAX_RETRIES); do
       UPTIME_SECS=$(( $(date +%s) - START_TIME ))
       log_crash "$SERVER_PID" "$REAL_EXIT" "$UPTIME_SECS"
 
-      if [ $REAL_EXIT -eq 143 ] || [ $REAL_EXIT -eq 0 ]; then
-        echo "Backend fermato normalmente (exit $REAL_EXIT), uscita pulita."
+      if [ $REAL_EXIT -eq 137 ] || [ $REAL_EXIT -eq 143 ] || [ $REAL_EXIT -eq 0 ]; then
+        echo "Backend fermato dal sistema (exit $REAL_EXIT), uscita pulita."
         exit 0
       fi
 
