@@ -154,17 +154,18 @@ check_android_bundle() {
 
 # ── Check 5: Backend /api/health ─────────────────────────────────────────────
 check_backend() {
-  local http_code body elapsed start_time end_time
+  local http_code start_time end_time elapsed
 
   start_time=$(date +%s%3N)
-  body=$(curl -s --max-time 5 --connect-timeout 3 \
+  # Singola chiamata: body su file, status code via -w
+  http_code=$(curl -s --max-time 5 --connect-timeout 3 \
+    -o /tmp/em_backend_health.txt -w "%{http_code}" \
     "http://localhost:$BACKEND_PORT/api/health" 2>/dev/null)
   end_time=$(date +%s%3N)
   elapsed=$((end_time - start_time))
 
-  http_code=$(curl -s --max-time 5 --connect-timeout 3 \
-    -o /dev/null -w "%{http_code}" \
-    "http://localhost:$BACKEND_PORT/api/health" 2>/dev/null)
+  local body
+  body=$(cat /tmp/em_backend_health.txt 2>/dev/null)
 
   if [ "$http_code" = "200" ]; then
     local initializing
