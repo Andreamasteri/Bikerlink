@@ -9,6 +9,10 @@ RESTART_COOLDOWN=60
 FRONTEND_RESTART_COOLDOWN=120
 LOG_MAX_BYTES=1048576
 
+MAX_CRASHES_IN_WINDOW=3
+CRASH_WINDOW_SECS=300
+BACKOFF_SECS=300
+
 mkdir -p "$(dirname "$LOG_FILE")"
 
 exec 9>>"/tmp/watchdog.flock"
@@ -57,6 +61,31 @@ metro_is_ready() {
   status=$(curl -s --max-time 5 --connect-timeout 3 \
     "http://localhost:$FRONTEND_PORT/status" 2>/dev/null)
   echo "$status" | grep -q "packager-status:running"
+}
+
+declare -a BACKEND_CRASH_TIMES=()
+BACKEND_BACKOFF_UNTIL=0
+
+record_backend_crash() {
+  local now=$1
+  local new_times=()
+  for t in "${BACKEND_CRASH_TIMES[@]}"; do
+    if [ $((now - t)) -lt $CRASH_WINDOW_SECS ]; then
+      new_times+=("$t")
+    fi
+  done
+  BACKEND_CRASH_TIMES=("${new_times[@]}" "$now")
+
+  local count=${#BACKEND_CRASH_TIMES[@]}
+  if [ "$count" -gt "$MAX_CRASHES_IN_WINDOW" ]; then
+    BACKEND_BACKOFF_UNTIL=$((now + BACKOFF_SECS))
+    local backoff_until_str
+    backoff_until_str=$(date -d "@$BACKEND_BACKOFF_UNTIL" '+%H:%M:%S' 2>/dev/null || echo "${BACKOFF_SECS}s da ora")
+    log "CRASH LOOP RILEVATO: $count crash negli ultimi ${CRASH_WINDOW_SECS}s — backoff ${BACKOFF_SECS}s fino alle $backoff_until_str"
+    BACKEND_CRASH_TIMES=()
+    return 1
+  fi
+  return 0
 }
 
 restart_backend() {
@@ -122,6 +151,7 @@ log "  Health check interval: ${HEALTH_CHECK_INTERVAL}s"
 log "  Check interval: ${CHECK_INTERVAL}s"
 log "  Restart cooldown backend: ${RESTART_COOLDOWN}s"
 log "  Restart cooldown frontend: ${FRONTEND_RESTART_COOLDOWN}s"
+log "  Crash loop: max ${MAX_CRASHES_IN_WINDOW} crash in ${CRASH_WINDOW_SECS}s → backoff ${BACKOFF_SECS}s"
 log "  Log max size: $((LOG_MAX_BYTES / 1024))KB (rotazione automatica)"
 log "========================================="
 
@@ -146,8 +176,15 @@ while [ "$RUNNING" -eq 1 ]; do
     fi
     time_since_last_restart=$((now - last_backend_restart))
     if [ "$time_since_last_restart" -ge "$RESTART_COOLDOWN" ]; then
-      restart_backend
-      last_backend_restart=$now
+      if [ "$BACKEND_BACKOFF_UNTIL" -gt "$now" ]; then
+        remaining=$((BACKEND_BACKOFF_UNTIL - now))
+        log "BACKEND GIU': crash loop backoff attivo — attendo ancora ${remaining}s"
+      else
+        if record_backend_crash "$now"; then
+          restart_backend
+        fi
+        last_backend_restart=$now
+      fi
     else
       log "BACKEND ANCORA GIU': prossimo tentativo di riavvio tra $((RESTART_COOLDOWN - time_since_last_restart))s"
     fi
@@ -159,16 +196,12 @@ while [ "$RUNNING" -eq 1 ]; do
       frontend_down_since=0
     fi
   else
-    # /status non risponde: Metro e' giù oppure ancora in inizializzazione.
-    # Segna sempre il timestamp di inizio problema (per timeout di stuck detection).
     if [ "$frontend_down_since" -eq 0 ]; then
       frontend_down_since=$now
     fi
     time_since_last_restart=$((now - last_frontend_restart))
     time_down=$((now - frontend_down_since))
     if is_port_open "$FRONTEND_PORT" && [ "$time_down" -lt 60 ]; then
-      # Porta TCP aperta e problema recente (<60s): Metro sta inizializzando.
-      # Non riavviare — dagli tempo di compilare il bundle.
       log "FRONTEND IN AVVIO: porta $FRONTEND_PORT aperta, attendo Metro (${time_down}s/60s)..."
     elif [ "$time_since_last_restart" -ge "$FRONTEND_RESTART_COOLDOWN" ]; then
       restart_frontend

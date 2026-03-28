@@ -1,8 +1,36 @@
 #!/bin/bash
 
 PORT=5000
-MAX_RETRIES=3
+MAX_RETRIES=10
 LOCK_FILE="/tmp/start-backend.lock"
+CRASH_LOG="logs/backend-crashes.log"
+SERVER_PID=0
+START_TIME=0
+
+mkdir -p logs
+
+log_crash() {
+  local pid=$1
+  local exit_code=$2
+  local uptime_secs=$3
+  local ts
+  ts=$(date '+%Y-%m-%dT%H:%M:%S')
+  local line="$ts EXIT_CODE=$exit_code PID=$pid UPTIME=${uptime_secs}s"
+  echo "$line"
+  echo "$line" >> "$CRASH_LOG"
+}
+
+sigterm_handler() {
+  local ts
+  ts=$(date '+%Y-%m-%dT%H:%M:%S')
+  echo "$ts [start-backend] SIGTERM ricevuto — propagazione a Node PID $SERVER_PID"
+  if [ "$SERVER_PID" -gt 0 ] && kill -0 "$SERVER_PID" 2>/dev/null; then
+    kill -TERM "$SERVER_PID"
+    wait "$SERVER_PID" 2>/dev/null
+  fi
+  exit 0
+}
+trap sigterm_handler SIGTERM
 
 cleanup() {
   rm -f "$LOCK_FILE"
@@ -50,8 +78,6 @@ needs_rebuild() {
   if [ ! -f "server_dist/index.js" ]; then
     return 0
   fi
-  local dist_mtime
-  dist_mtime=$(stat -c %Y server_dist/index.js 2>/dev/null || echo 0)
   local newest_src
   newest_src=$(find server/ shared/ -name '*.ts' -newer server_dist/index.js 2>/dev/null | head -1)
   if [ -n "$newest_src" ]; then
@@ -93,13 +119,18 @@ for retry in $(seq 1 $MAX_RETRIES); do
   sleep 3
 
   echo "Porta $PORT libera, avvio backend..."
-  NODE_ENV=production node --max-old-space-size=512 server_dist/index.js &
+  START_TIME=$(date +%s)
+  NODE_ENV=production node --max-old-space-size=1024 server_dist/index.js &
   SERVER_PID=$!
 
   sleep 8
 
   if ! kill -0 $SERVER_PID 2>/dev/null; then
-    echo "Backend crashato al tentativo $retry"
+    wait $SERVER_PID 2>/dev/null
+    REAL_EXIT=$?
+    UPTIME_SECS=$(( $(date +%s) - START_TIME ))
+    log_crash "$SERVER_PID" "$REAL_EXIT" "$UPTIME_SECS"
+    echo "Backend crashato subito al tentativo $retry (exit $REAL_EXIT)"
     if [ $retry -lt $MAX_RETRIES ]; then
       echo "Riprovo tra 8 secondi..."
       sleep 8
@@ -112,22 +143,24 @@ for retry in $(seq 1 $MAX_RETRIES); do
   while true; do
     sleep 10
     if ! kill -0 $SERVER_PID 2>/dev/null; then
-      EXIT_CODE=$?
-      echo "Backend terminato (PID: $SERVER_PID)"
       wait $SERVER_PID 2>/dev/null
-      REAL_EXIT=$(( $? ))
-      if [ $REAL_EXIT -eq 137 ] || [ $REAL_EXIT -eq 143 ] || [ $REAL_EXIT -eq 0 ]; then
-        echo "Backend fermato dal sistema (signal kill/term), uscita pulita."
+      REAL_EXIT=$?
+      UPTIME_SECS=$(( $(date +%s) - START_TIME ))
+      log_crash "$SERVER_PID" "$REAL_EXIT" "$UPTIME_SECS"
+
+      if [ $REAL_EXIT -eq 143 ] || [ $REAL_EXIT -eq 0 ]; then
+        echo "Backend fermato normalmente (exit $REAL_EXIT), uscita pulita."
         exit 0
       fi
-      echo "Backend crashato con codice: $REAL_EXIT"
+
+      echo "Backend terminato inaspettatamente (exit $REAL_EXIT, uptime: ${UPTIME_SECS}s) — tentativo $retry/$MAX_RETRIES"
       break
     fi
   done
 
   if [ $retry -lt $MAX_RETRIES ]; then
-    echo "Riavvio in corso..."
-    sleep 8
+    echo "Riavvio in corso (tentativo $((retry+1))/$MAX_RETRIES)..."
+    sleep 5
   fi
 done
 
