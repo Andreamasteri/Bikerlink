@@ -120,89 +120,13 @@ function getAppName(): string {
   }
 }
 
-async function serveExpoManifest(platform: string, req: Request, res: Response) {
-  res.setHeader("expo-protocol-version", "1");
-  res.setHeader("expo-sfv-version", "0");
-  res.setHeader("content-type", "application/json");
-
-  // Try to proxy manifest from live Metro first (always fresh, always current code)
-  try {
-    const http = await import("http");
-    const metroManifest = await new Promise<string>((resolve, reject) => {
-      const options = {
-        hostname: "localhost",
-        port: 8081,
-        path: "/",
-        method: "GET",
-        headers: {
-          "expo-platform": platform,
-          "Accept": "application/expo+json,application/json",
-          "Expo-Protocol-Version": "1",
-          "Expo-API-Version": "1",
-        },
-        timeout: 3000,
-      };
-      const metroReq = http.default.request(options, (metroRes) => {
-        let data = "";
-        metroRes.on("data", (chunk) => { data += chunk; });
-        metroRes.on("end", () => resolve(data));
-      });
-      metroReq.on("error", reject);
-      metroReq.on("timeout", () => { metroReq.destroy(); reject(new Error("timeout")); });
-      metroReq.end();
-    });
-
-    const manifest = JSON.parse(metroManifest) as Record<string, unknown>;
-
-    // Apply OTA override if active
-    try {
-      const [activeRelease] = await db
-        .select()
-        .from(otaReleases)
-        .where(eq(otaReleases.status, "active"))
-        .limit(1);
-      if (activeRelease?.bundlePath) {
-        const launchAsset = manifest.launchAsset as Record<string, unknown> | undefined;
-        if (launchAsset) {
-          launchAsset.url = activeRelease.bundlePath;
-          manifest.launchAsset = launchAsset;
-        }
-        manifest.otaVersion = activeRelease.version;
-      }
-    } catch { }
-
-    return res.send(JSON.stringify(manifest));
-  } catch {
-    // Metro not available — fall back to static manifest
-  }
-
-  const manifestPath = path.resolve(
-    process.cwd(),
-    "static-build",
-    platform,
-    "manifest.json",
-  );
-
-  if (!fs.existsSync(manifestPath)) {
-    return res
-      .status(404)
-      .json({ error: `Manifest not found for platform: ${platform}` });
-  }
-
-  let manifest: Record<string, unknown>;
-  try {
-    manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
-  } catch {
-    return res.status(500).json({ error: "Manifest parse error" });
-  }
-
+async function applyOtaOverride(manifest: Record<string, unknown>): Promise<void> {
   try {
     const [activeRelease] = await db
       .select()
       .from(otaReleases)
       .where(eq(otaReleases.status, "active"))
       .limit(1);
-
     if (activeRelease?.bundlePath) {
       const launchAsset = manifest.launchAsset as Record<string, unknown> | undefined;
       if (launchAsset) {
@@ -212,8 +136,88 @@ async function serveExpoManifest(platform: string, req: Request, res: Response) 
       manifest.otaVersion = activeRelease.version;
     }
   } catch { }
+}
 
-  res.send(JSON.stringify(manifest));
+async function fetchMetroManifest(platform: string): Promise<Record<string, unknown>> {
+  const http = await import("http");
+  const data = await new Promise<string>((resolve, reject) => {
+    const options = {
+      hostname: "localhost",
+      port: 8081,
+      path: "/",
+      method: "GET",
+      headers: {
+        "expo-platform": platform,
+        "Accept": "application/expo+json,application/json",
+        "Expo-Protocol-Version": "1",
+        "Expo-API-Version": "1",
+      },
+      timeout: 1500,
+    };
+    const metroReq = http.default.request(options, (metroRes) => {
+      let body = "";
+      metroRes.on("data", (chunk) => { body += chunk; });
+      metroRes.on("end", () => resolve(body));
+    });
+    metroReq.on("error", reject);
+    metroReq.on("timeout", () => { metroReq.destroy(); reject(new Error("timeout")); });
+    metroReq.end();
+  });
+  return JSON.parse(data) as Record<string, unknown>;
+}
+
+function staticBundleExists(platform: string): boolean {
+  const manifestPath = path.resolve(process.cwd(), "static-build", platform, "manifest.json");
+  if (!fs.existsSync(manifestPath)) return false;
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as Record<string, unknown>;
+    const launchAsset = manifest.launchAsset as Record<string, unknown> | undefined;
+    const bundleUrl = launchAsset?.url as string | undefined;
+    if (!bundleUrl) return false;
+    const urlPath = new URL(bundleUrl).pathname;
+    const localPath = path.resolve(process.cwd(), "static-build", urlPath.replace(/^\//, ""));
+    return fs.existsSync(localPath);
+  } catch {
+    return false;
+  }
+}
+
+function readStaticManifest(platform: string): Record<string, unknown> {
+  const manifestPath = path.resolve(process.cwd(), "static-build", platform, "manifest.json");
+  return JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as Record<string, unknown>;
+}
+
+async function serveExpoManifest(platform: string, req: Request, res: Response) {
+  res.setHeader("expo-protocol-version", "1");
+  res.setHeader("expo-sfv-version", "0");
+  res.setHeader("content-type", "application/json");
+
+  const forceLive = req.query["live"] === "true";
+
+  // Percorso primario: bundle statico locale (affidabile, sempre disponibile)
+  if (!forceLive && staticBundleExists(platform)) {
+    try {
+      const manifest = readStaticManifest(platform);
+      await applyOtaOverride(manifest);
+      log(`[manifest] Serving local static bundle for ${platform}`);
+      return res.send(JSON.stringify(manifest));
+    } catch (err) {
+      console.error("[manifest] static read error:", err);
+    }
+  }
+
+  // Percorso secondario: Metro live (dev / ?live=true / nessun bundle locale)
+  try {
+    const manifest = await fetchMetroManifest(platform);
+    await applyOtaOverride(manifest);
+    log(`[manifest] Serving live Metro manifest for ${platform}`);
+    return res.send(JSON.stringify(manifest));
+  } catch {
+    // Metro non disponibile
+  }
+
+  // Nessuna sorgente disponibile
+  return res.status(503).json({ error: `Bundle non disponibile per ${platform}. Riprova tra qualche secondo.` });
 }
 
 function serveLandingPage({
