@@ -119,8 +119,16 @@ constants/
 tail -50 logs/error-monitor.log   # ultimi 50 errori catturati
 grep "ERROR\|DOWN\|CRASH" logs/error-monitor.log | tail -20  # solo errori gravi
 ```
-Formato log: `[TIMESTAMP] TIPO: messaggio`
-Tipi: `METRO_OK`, `METRO_DOWN`, `METRO_WARN`, `BUNDLE_WEB_OK`, `BUNDLE_WEB_ERROR`, `BACKEND_OK`, `BACKEND_DOWN`, `BACKEND_ERROR`, `METRO_CYCLE_ERROR`, `BACKEND_CRASH`
+Formato log: `[YYYY-MM-DD HH:MM:SS] TIPO: messaggio`
+Tipi disponibili:
+- `METRO_DOWN` / `METRO_WARN` — Metro /status non risponde o packager non running
+- `SYMBOLICATE_OK` / `SYMBOLICATE_DOWN` / `SYMBOLICATE_ERROR` — Metro /symbolicate check
+- `BUNDLE_WEB_OK` / `BUNDLE_WEB_ERROR` / `BUNDLE_WEB_DOWN` — bundle platform=web
+- `BUNDLE_ANDROID_OK` / `BUNDLE_ANDROID_ERROR` / `BUNDLE_ANDROID_DOWN` — bundle platform=android (async, 90s timeout)
+- `BACKEND_OK` / `BACKEND_INIT` / `BACKEND_DOWN` / `BACKEND_ERROR` — /api/health con latenza
+- `METRO_CYCLE_ERROR` — errori nei log interni Metro (/tmp/metro-opt-cycle*.log)
+- `BACKEND_CRASH` — nuovi crash in logs/backend-crashes.log
+- `LOG_ROTATE` — troncamento automatico log (ogni ~10 min)
 
 ## Utenti Seed
 
