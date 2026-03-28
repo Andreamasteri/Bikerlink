@@ -111,6 +111,16 @@ constants/
 
 - `Start Backend` → `npm run server:dev` (porta 5000)
 - `Start Frontend` → `npm run expo:dev` (porta 8081)
+- `Watchdog` → `scripts/watchdog.sh` — riavvio automatico in caso di crash
+- `Error Monitor` → `scripts/error-monitor.sh` — cattura errori Metro/bundle/backend ogni 30s
+
+### Diagnosi rapida errori
+```bash
+tail -50 logs/error-monitor.log   # ultimi 50 errori catturati
+grep "ERROR\|DOWN\|CRASH" logs/error-monitor.log | tail -20  # solo errori gravi
+```
+Formato log: `[TIMESTAMP] TIPO: messaggio`
+Tipi: `METRO_OK`, `METRO_DOWN`, `METRO_WARN`, `BUNDLE_WEB_OK`, `BUNDLE_WEB_ERROR`, `BACKEND_OK`, `BACKEND_DOWN`, `BACKEND_ERROR`, `METRO_CYCLE_ERROR`, `BACKEND_CRASH`
 
 ## Utenti Seed
 
