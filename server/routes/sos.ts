@@ -44,10 +44,15 @@ router.post("/", async (req: Request, res: Response) => {
       status: "active",
     });
 
-    await Promise.all([
-      storage.updateUserProfile(userId, { isAvailable: true }),
-      storage.updateUser(userId, { ghostMode: false }),
-    ]);
+    try {
+      const currentUser = await storage.getUser(userId);
+      await Promise.all([
+        storage.updateUserProfile(userId, { isAvailable: true }),
+        ...(currentUser?.ghostMode ? [storage.updateUser(userId, { ghostMode: false })] : []),
+      ]);
+    } catch (updateErr) {
+      console.error("SOS availability update failed (non-fatal):", updateErr);
+    }
 
     return res.status(201).json(sosRequest);
   } catch (error) {
