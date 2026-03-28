@@ -4,7 +4,7 @@ import { registerRoutes } from "./routes";
 import { initState } from "./init-state";
 import { startMatchingEngine, stopMatchingEngine } from "./matching-engine";
 import { autoSeedEssentialUsers, autoSeedFakeUsers } from "./auto-seed";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { sql, eq, and, lte } from "drizzle-orm";
 import { motoClubs, motoClubMembers, conversations, conversationParticipants, otaReleases } from "@shared/schema";
 import { seedMotoclubs } from "./routes/motoclubs";
@@ -315,36 +315,42 @@ function configureExpoAndLanding(app: express.Application) {
 
 let _otaCronTimer: ReturnType<typeof setInterval> | null = null;
 
-function startOtaCron() {
-  _otaCronTimer = setInterval(async () => {
-    try {
-      const now = new Date();
-      const scheduled = await db
-        .select()
-        .from(otaReleases)
-        .where(
-          and(
-            eq(otaReleases.status, "scheduled"),
-            lte(otaReleases.scheduledAt, now)
-          )
-        );
+async function runOtaCheck() {
+  try {
+    const now = new Date();
+    const scheduled = await db
+      .select()
+      .from(otaReleases)
+      .where(
+        and(
+          eq(otaReleases.status, "scheduled"),
+          lte(otaReleases.scheduledAt, now)
+        )
+      );
 
-      for (const release of scheduled) {
-        await db
-          .update(otaReleases)
-          .set({ status: "superseded", updatedAt: now })
-          .where(eq(otaReleases.status, "active"));
+    for (const release of scheduled) {
+      await db
+        .update(otaReleases)
+        .set({ status: "superseded", updatedAt: now })
+        .where(eq(otaReleases.status, "active"));
 
-        await db
-          .update(otaReleases)
-          .set({ status: "active", publishedAt: now, updatedAt: now })
-          .where(eq(otaReleases.id, release.id));
+      await db
+        .update(otaReleases)
+        .set({ status: "active", publishedAt: now, updatedAt: now })
+        .where(eq(otaReleases.id, release.id));
 
-        console.log(`[OTA] Published scheduled release v${release.version} (id: ${release.id})`);
-      }
-    } catch (e) {
-      console.warn("[OTA] Cron error:", e);
+      console.log(`[OTA] Published scheduled release v${release.version} (id: ${release.id})`);
     }
+  } catch (e) {
+    console.warn("[OTA] Cron error:", e);
+  }
+}
+
+function startOtaCron() {
+  // Explicit 60s delay before first run, then every 60s
+  setTimeout(() => {
+    runOtaCheck();
+    _otaCronTimer = setInterval(runOtaCheck, 60 * 1000);
   }, 60 * 1000);
 }
 
@@ -473,7 +479,10 @@ function setupErrorHandler(app: express.Application) {
     if (_otaCronTimer) { clearInterval(_otaCronTimer); _otaCronTimer = null; }
     server.close(() => {
       console.log("[Shutdown] Server HTTP chiuso.");
-      process.exit(0);
+      pool.end().then(() => {
+        console.log("[Shutdown] Pool DB chiuso.");
+        process.exit(0);
+      }).catch(() => process.exit(0));
     });
     // Force exit after 5 seconds if server.close() stalls
     setTimeout(() => {
@@ -497,7 +506,8 @@ function setupErrorHandler(app: express.Application) {
 
       // Delay heavy startup to avoid OOM spike during initialization
       setTimeout(() => startMatchingEngine(), 5_000);
-      setTimeout(() => startOtaCron(), 15_000);
+      // OTA cron: first run at 60s from boot (explicit), then every 60s
+      startOtaCron();
 
       (async () => {
         try {
@@ -597,7 +607,12 @@ function setupErrorHandler(app: express.Application) {
 
         await autoSeedEssentialUsers();
         await autoSeedFakeUsers();
-        await initMissingClubConversations();
+        // Defer heavy club sync to reduce startup memory spike
+        setTimeout(() => {
+          initMissingClubConversations().catch((e) =>
+            console.warn("[INIT] initMissingClubConversations deferred error:", e)
+          );
+        }, 30_000);
 
         try {
           const { storage } = await import("./storage");
