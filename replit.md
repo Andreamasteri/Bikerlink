@@ -208,6 +208,21 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
 - Colonna `isFake` in `users`, `adminOverrideUntil` in `user_profiles`
 - Colonna `emailVerified` in `users`, `searchPreference` in `user_profiles`
 
+## Comandi Rapidi Utente
+
+| Comando | Azione |
+|---------|--------|
+| `dimensioni` | Mostra RAM live: Metro, Backend, Totale |
+
+### dimensioni
+```bash
+ps aux | grep "[n]ode" | awk '{rss=$6; printf "PID:%s CPU:%s%% MEM:%sMB %s %s\n", $2, $3, int(rss/1024), $11, $12}'
+```
+Output atteso:
+- **Metro** (expo): RSS in MB
+- **Backend** (--max-old-space-size): RSS in MB
+- **Totale**: somma
+
 ## Note Importanti
 
 - **MAI usare `configureWorkflow()`** per riavviare workflow — riscrive la sezione `[[ports]]` nel `.replit` e rompe il mapping delle porte. Usare SOLO `restart_workflow`.
