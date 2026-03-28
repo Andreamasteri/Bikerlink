@@ -1379,6 +1379,9 @@ var init_storage = __esm({
       async markPasswordResetTokenUsed(token) {
         await db.update(passwordResetTokens).set({ used: true }).where((0, import_drizzle_orm2.eq)(passwordResetTokens.token, token));
       }
+      async markPasswordResetTokenUsedById(id) {
+        await db.update(passwordResetTokens).set({ used: true }).where((0, import_drizzle_orm2.eq)(passwordResetTokens.id, id));
+      }
       async deletePasswordResetTokens(userId) {
         await db.delete(passwordResetTokens).where((0, import_drizzle_orm2.eq)(passwordResetTokens.userId, userId));
       }
@@ -5192,6 +5195,9 @@ router2.post("/reset-password", resetPasswordLimiter, async (req, res) => {
     if (!user) {
       return res.status(400).json({ message: "Codice non valido o scaduto" });
     }
+    if (user.status === "blocked" || user.status === "suspended") {
+      return res.status(403).json({ message: "Account sospeso o bloccato" });
+    }
     const resetToken = await storage.getPasswordResetTokenByCode(user.id, String(code).trim());
     if (!resetToken) {
       return res.status(400).json({ message: "Codice non valido o gi\xE0 utilizzato" });
@@ -5201,7 +5207,7 @@ router2.post("/reset-password", resetPasswordLimiter, async (req, res) => {
     }
     const hashedPassword = await import_bcryptjs.default.hash(password, 12);
     await storage.updateUser(user.id, { password: hashedPassword });
-    await storage.markPasswordResetTokenUsed(resetToken.token);
+    await storage.markPasswordResetTokenUsedById(resetToken.id);
     req.session.userId = user.id;
     await new Promise((resolve3, reject) => {
       req.session.save((err) => {

@@ -328,7 +328,8 @@ export interface IStorage {
   deleteEmailVerificationTokens(userId: string): Promise<void>;
   markUserEmailVerified(userId: string): Promise<void>;
 
-  getPasswordResetTokenByCode(userId: string, code: string): Promise<{ userId: string; expiresAt: Date; token: string } | undefined>;
+  getPasswordResetTokenByCode(userId: string, code: string): Promise<{ id: string; userId: string; expiresAt: Date; token: string } | undefined>;
+  markPasswordResetTokenUsedById(id: string): Promise<void>;
   deletePasswordResetTokens(userId: string): Promise<void>;
 
   requestUserDeletion(userId: string): Promise<void>;
@@ -1138,6 +1139,10 @@ export class DatabaseStorage implements IStorage {
 
   async markPasswordResetTokenUsed(token: string): Promise<void> {
     await db.update(passwordResetTokens).set({ used: true }).where(eq(passwordResetTokens.token, token));
+  }
+
+  async markPasswordResetTokenUsedById(id: string): Promise<void> {
+    await db.update(passwordResetTokens).set({ used: true }).where(eq(passwordResetTokens.id, id));
   }
 
   async deletePasswordResetTokens(userId: string): Promise<void> {

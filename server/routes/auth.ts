@@ -340,6 +340,10 @@ router.post("/reset-password", resetPasswordLimiter, async (req: Request, res: R
       return res.status(400).json({ message: "Codice non valido o scaduto" });
     }
 
+    if (user.status === "blocked" || user.status === "suspended") {
+      return res.status(403).json({ message: "Account sospeso o bloccato" });
+    }
+
     const resetToken = await storage.getPasswordResetTokenByCode(user.id, String(code).trim());
     if (!resetToken) {
       return res.status(400).json({ message: "Codice non valido o già utilizzato" });
@@ -351,7 +355,7 @@ router.post("/reset-password", resetPasswordLimiter, async (req: Request, res: R
 
     const hashedPassword = await bcrypt.hash(password, 12);
     await storage.updateUser(user.id, { password: hashedPassword } as any);
-    await storage.markPasswordResetTokenUsed(resetToken.token);
+    await storage.markPasswordResetTokenUsedById(resetToken.id);
 
     req.session.userId = user.id;
     await new Promise<void>((resolve, reject) => {
