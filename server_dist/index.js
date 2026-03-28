@@ -5166,10 +5166,18 @@ router2.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
     if (!user) {
       return res.json({ message: "Se l'email \xE8 registrata, riceverai un codice di recupero" });
     }
-    const code = String(import_crypto.default.randomInt(1e7, 1e8));
     const expiresAt = new Date(Date.now() + 60 * 60 * 1e3);
     await storage.deletePasswordResetTokens(user.id);
-    await storage.createPasswordResetToken(user.id, code, expiresAt);
+    let code = "";
+    for (let attempt = 0; attempt < 5; attempt++) {
+      code = String(import_crypto.default.randomInt(1e7, 1e8));
+      try {
+        await storage.createPasswordResetToken(user.id, code, expiresAt);
+        break;
+      } catch (e) {
+        if (attempt === 4) throw e;
+      }
+    }
     const emailSent = await sendPasswordResetEmail(user.email, user.nickname, code);
     if (emailSent) {
       console.log(`[PASSWORD RESET] Codice reset inviato a ${user.email}`);
@@ -5187,6 +5195,9 @@ router2.post("/reset-password", resetPasswordLimiter, async (req, res) => {
     const { email, code, password } = req.body;
     if (!email || !code || !password) {
       return res.status(400).json({ message: "Email, codice e password richiesti" });
+    }
+    if (!/^\d{8}$/.test(String(code).trim())) {
+      return res.status(400).json({ message: "Il codice deve essere composto da 8 cifre" });
     }
     if (password.length < 8) {
       return res.status(400).json({ message: "La password deve avere almeno 8 caratteri" });
@@ -5235,15 +5246,23 @@ router2.post("/resend-reset-code", resendResetLimiter, async (req, res) => {
     if (!user) {
       return res.json({ message: "Se l'email \xE8 registrata, riceverai un nuovo codice" });
     }
-    const code = String(import_crypto.default.randomInt(1e7, 1e8));
     const expiresAt = new Date(Date.now() + 60 * 60 * 1e3);
     await storage.deletePasswordResetTokens(user.id);
-    await storage.createPasswordResetToken(user.id, code, expiresAt);
+    let code = "";
+    for (let attempt = 0; attempt < 5; attempt++) {
+      code = String(import_crypto.default.randomInt(1e7, 1e8));
+      try {
+        await storage.createPasswordResetToken(user.id, code, expiresAt);
+        break;
+      } catch (e) {
+        if (attempt === 4) throw e;
+      }
+    }
     const emailSent = await sendPasswordResetEmail(user.email, user.nickname, code);
     if (!emailSent) {
       console.warn(`[PASSWORD RESET] Resend: email NON inviata a ${user.email}`);
     }
-    return res.json({ message: "Nuovo codice inviato" });
+    return res.json({ message: "Se l'email \xE8 registrata, riceverai un nuovo codice" });
   } catch (error) {
     console.error("Resend reset code error:", error);
     return res.status(500).json({ message: "Errore interno del server" });

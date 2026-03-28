@@ -304,11 +304,19 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res:
       return res.json({ message: "Se l'email è registrata, riceverai un codice di recupero" });
     }
 
-    const code = String(crypto.randomInt(10000000, 100000000));
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-
     await storage.deletePasswordResetTokens(user.id);
-    await storage.createPasswordResetToken(user.id, code, expiresAt);
+
+    let code = "";
+    for (let attempt = 0; attempt < 5; attempt++) {
+      code = String(crypto.randomInt(10000000, 100000000));
+      try {
+        await storage.createPasswordResetToken(user.id, code, expiresAt);
+        break;
+      } catch (e: any) {
+        if (attempt === 4) throw e;
+      }
+    }
 
     const emailSent = await sendPasswordResetEmail(user.email, user.nickname, code);
     if (emailSent) {
@@ -390,11 +398,19 @@ router.post("/resend-reset-code", resendResetLimiter, async (req: Request, res: 
       return res.json({ message: "Se l'email è registrata, riceverai un nuovo codice" });
     }
 
-    const code = String(crypto.randomInt(10000000, 100000000));
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-
     await storage.deletePasswordResetTokens(user.id);
-    await storage.createPasswordResetToken(user.id, code, expiresAt);
+
+    let code = "";
+    for (let attempt = 0; attempt < 5; attempt++) {
+      code = String(crypto.randomInt(10000000, 100000000));
+      try {
+        await storage.createPasswordResetToken(user.id, code, expiresAt);
+        break;
+      } catch (e: any) {
+        if (attempt === 4) throw e;
+      }
+    }
 
     const emailSent = await sendPasswordResetEmail(user.email, user.nickname, code);
     if (!emailSent) {
