@@ -52,3 +52,18 @@ server/public/
 
 # Script logs
 scripts/*.log
+
+# Metro cache (bundler cache, not needed for EAS)
+.metro-cache/
+
+# Attached assets (screenshots, design references)
+attached_assets/
+
+# Old web build output
+static-build/
+
+# User uploads (runtime files, not needed for build)
+uploads/
+
+# Compiled server (not needed for mobile build)
+server_dist/

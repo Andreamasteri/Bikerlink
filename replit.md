@@ -304,12 +304,16 @@ Gradle non trova i path di React Native e il build si blocca).
 
 ### EAS Build (cloud)
 
-### Build #12 in corso (preview — APK Standalone)
-- **Build #12** avviato — 2026-03-28 — Profilo: preview (APK standalone, senza Metro, senza expo-dev-client)
-- **ID build**: 6c7835e7-3b25-42d7-87c5-a33b6a115c58
-- **Expo page**: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/6c7835e7-3b25-42d7-87c5-a33b6a115c58
-- Icone BikerLink incluse (icon.png, adaptive foreground/background/monochrome)
+### Build #13 in corso (preview — APK Standalone)
+- **Build #13** avviato — 2026-03-28 — Profilo: preview (APK standalone, senza Metro, senza expo-dev-client)
+- **ID build**: 472183bf-889e-4723-886e-16233c079bff
+- **Expo page**: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/472183bf-889e-4723-886e-16233c079bff
 - gradleCommand: assembleRelease — bundle JS embedded, installabile direttamente
+- Archivio ridotto: 53 MB (era 156 MB) grazie a .easignore aggiornato
+
+### Build #12 (preview APK — CANCELLATO, .easignore non aggiornato)
+- **ID build**: 6c7835e7-3b25-42d7-87c5-a33b6a115c58
+- **Stato**: CANCELED (sostituito da Build #13 con .easignore ottimizzato)
 
 ### Build #11 (production — AAB Play Store)
 - **Build #11** avviato — 2026-03-28 — Profilo: production (AAB per Google Play Store)
