@@ -48,9 +48,11 @@ export default function RoutesListScreen() {
   const toggleVisibilityMutation = useMutation({
     mutationFn: async ({ id, isPublic }: { id: string; isPublic: boolean }) => {
       await apiRequest("PUT", `/api/custom-routes/${id}`, { isPublic });
+      return id;
     },
-    onSuccess: () => {
+    onSuccess: (id) => {
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-routes", id] });
     },
     onSettled: () => {
       setTogglingId(null);

@@ -100,11 +100,14 @@ export default function CreateRouteScreen() {
     try {
       await apiRequest("PUT", `/api/custom-routes/${createdRouteId}`, { isPublic: publish });
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
-    } catch (_) {
-    } finally {
-      setIsSettingVisibility(false);
       setShowPublishDialog(false);
       router.replace(`/routes/${createdRouteId}` as any);
+    } catch (e: any) {
+      Alert.alert("Errore", e.message || "Impossibile aggiornare la visibilità. Puoi cambiarla in seguito dal dettaglio percorso.");
+      setShowPublishDialog(false);
+      router.replace(`/routes/${createdRouteId}` as any);
+    } finally {
+      setIsSettingVisibility(false);
     }
   };
 
