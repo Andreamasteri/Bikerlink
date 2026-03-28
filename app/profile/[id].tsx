@@ -72,6 +72,9 @@ export default function PublicProfileScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/users/available-list"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-list"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-list"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/online-count"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-count"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-count"] });
       router.back();
     },
     onError: (e: any) => {
