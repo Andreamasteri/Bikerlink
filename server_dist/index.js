@@ -4929,6 +4929,20 @@ var forgotPasswordLimiter = (0, import_express_rate_limit.default)({
   standardHeaders: true,
   legacyHeaders: false
 });
+var resetPasswordLimiter = (0, import_express_rate_limit.default)({
+  windowMs: 15 * 60 * 1e3,
+  max: 10,
+  message: { message: "Troppi tentativi. Riprova pi\xF9 tardi." },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+var resendResetLimiter = (0, import_express_rate_limit.default)({
+  windowMs: 60 * 60 * 1e3,
+  max: 5,
+  message: { message: "Troppi tentativi. Riprova pi\xF9 tardi." },
+  standardHeaders: true,
+  legacyHeaders: false
+});
 router2.post("/register", registerLimiter, async (req, res) => {
   try {
     const parsed = registerSchema.safeParse(req.body);
@@ -5149,7 +5163,7 @@ router2.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
     if (!user) {
       return res.json({ message: "Se l'email \xE8 registrata, riceverai un codice di recupero" });
     }
-    const code = String(Math.floor(1e7 + Math.random() * 9e7));
+    const code = String(import_crypto.default.randomInt(1e7, 1e8));
     const expiresAt = new Date(Date.now() + 60 * 60 * 1e3);
     await storage.deletePasswordResetTokens(user.id);
     await storage.createPasswordResetToken(user.id, code, expiresAt);
@@ -5165,7 +5179,7 @@ router2.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-router2.post("/reset-password", async (req, res) => {
+router2.post("/reset-password", resetPasswordLimiter, async (req, res) => {
   try {
     const { email, code, password } = req.body;
     if (!email || !code || !password) {
@@ -5205,7 +5219,7 @@ router2.post("/reset-password", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-router2.post("/resend-reset-code", async (req, res) => {
+router2.post("/resend-reset-code", resendResetLimiter, async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) {
@@ -5215,7 +5229,7 @@ router2.post("/resend-reset-code", async (req, res) => {
     if (!user) {
       return res.json({ message: "Se l'email \xE8 registrata, riceverai un nuovo codice" });
     }
-    const code = String(Math.floor(1e7 + Math.random() * 9e7));
+    const code = String(import_crypto.default.randomInt(1e7, 1e8));
     const expiresAt = new Date(Date.now() + 60 * 60 * 1e3);
     await storage.deletePasswordResetTokens(user.id);
     await storage.createPasswordResetToken(user.id, code, expiresAt);

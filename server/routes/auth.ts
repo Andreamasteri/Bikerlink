@@ -39,6 +39,22 @@ const forgotPasswordLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const resetPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { message: "Troppi tentativi. Riprova più tardi." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const resendResetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { message: "Troppi tentativi. Riprova più tardi." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 router.post("/register", registerLimiter, async (req: Request, res: Response) => {
   try {
     const parsed = registerSchema.safeParse(req.body);
@@ -288,10 +304,10 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res:
       return res.json({ message: "Se l'email è registrata, riceverai un codice di recupero" });
     }
 
-    const code = String(Math.floor(10000000 + Math.random() * 90000000));
+    const code = String(crypto.randomInt(10000000, 100000000));
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-    await (storage as any).deletePasswordResetTokens(user.id);
+    await storage.deletePasswordResetTokens(user.id);
     await storage.createPasswordResetToken(user.id, code, expiresAt);
 
     const emailSent = await sendPasswordResetEmail(user.email, user.nickname, code);
@@ -308,7 +324,7 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res:
   }
 });
 
-router.post("/reset-password", async (req: Request, res: Response) => {
+router.post("/reset-password", resetPasswordLimiter, async (req: Request, res: Response) => {
   try {
     const { email, code, password } = req.body;
     if (!email || !code || !password) {
@@ -324,7 +340,7 @@ router.post("/reset-password", async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Codice non valido o scaduto" });
     }
 
-    const resetToken = await (storage as any).getPasswordResetTokenByCode(user.id, String(code).trim());
+    const resetToken = await storage.getPasswordResetTokenByCode(user.id, String(code).trim());
     if (!resetToken) {
       return res.status(400).json({ message: "Codice non valido o già utilizzato" });
     }
@@ -354,7 +370,7 @@ router.post("/reset-password", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/resend-reset-code", async (req: Request, res: Response) => {
+router.post("/resend-reset-code", resendResetLimiter, async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
     if (!email) {
@@ -366,10 +382,10 @@ router.post("/resend-reset-code", async (req: Request, res: Response) => {
       return res.json({ message: "Se l'email è registrata, riceverai un nuovo codice" });
     }
 
-    const code = String(Math.floor(10000000 + Math.random() * 90000000));
+    const code = String(crypto.randomInt(10000000, 100000000));
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-    await (storage as any).deletePasswordResetTokens(user.id);
+    await storage.deletePasswordResetTokens(user.id);
     await storage.createPasswordResetToken(user.id, code, expiresAt);
 
     const emailSent = await sendPasswordResetEmail(user.email, user.nickname, code);

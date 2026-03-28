@@ -328,6 +328,9 @@ export interface IStorage {
   deleteEmailVerificationTokens(userId: string): Promise<void>;
   markUserEmailVerified(userId: string): Promise<void>;
 
+  getPasswordResetTokenByCode(userId: string, code: string): Promise<{ userId: string; expiresAt: Date; token: string } | undefined>;
+  deletePasswordResetTokens(userId: string): Promise<void>;
+
   requestUserDeletion(userId: string): Promise<void>;
   cancelUserDeletion(userId: string): Promise<void>;
   deleteUser(userId: string): Promise<void>;
