@@ -180,7 +180,7 @@ export default function ChatConversationScreen() {
   const userId = user?.id || "";
   const [inputText, setInputText] = useState("");
   const flatListRef = useRef<FlatList>(null);
-  const textInputRef = useRef<any>(null);
+  const textInputRef = useRef<TextInput | null>(null);
 
   const [showHashtagPanel, setShowHashtagPanel] = useState(false);
   const [hashtagInput, setHashtagInput] = useState("");
