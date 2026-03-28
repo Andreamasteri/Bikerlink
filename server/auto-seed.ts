@@ -202,6 +202,7 @@ export async function autoSeedFakeUsers() {
 
     console.log("Auto-seeding fake users...");
     const hashedPassword = await bcrypt.hash("fakeuser2025!", 12);
+    let seedSuccessCount = 0;
 
     for (const biker of fakeBikers) {
       try {
@@ -248,6 +249,7 @@ export async function autoSeedFakeUsers() {
           motorcycleType: biker.motoType,
           ridingStyle: biker.ridingStyle,
         });
+        seedSuccessCount++;
       } catch (err: any) {
         console.error(`Failed to seed biker "${biker.nickname}":`, err.message);
       }
@@ -306,6 +308,7 @@ export async function autoSeedFakeUsers() {
             ridingStyle: moto.ridingStyle,
           });
         }
+        seedSuccessCount++;
       } catch (err: any) {
         console.error(`Failed to seed zavorrina "${zav.nickname}":`, err.message);
       }
@@ -356,17 +359,24 @@ export async function autoSeedFakeUsers() {
           motorcycleType: coppia.motoType,
           ridingStyle: coppia.ridingStyle,
         });
+        seedSuccessCount++;
       } catch (err: any) {
         console.error(`Failed to seed coppia "${coppia.nickname}":`, err.message);
       }
     }
 
-    await db
-      .insert(appSettings)
-      .values({ key: "fake_users_seeded", value: "true" })
-      .onConflictDoUpdate({ target: appSettings.key, set: { value: "true" } });
+    const totalExpected = fakeBikers.length + fakeZavorrine.length + fakeCoppie.length;
+    console.log(`Auto-seeded fake users complete: ${seedSuccessCount}/${totalExpected} riusciti`);
 
-    console.log("Auto-seeded fake users complete");
+    if (seedSuccessCount >= Math.floor(totalExpected / 2)) {
+      await db
+        .insert(appSettings)
+        .values({ key: "fake_users_seeded", value: "true" })
+        .onConflictDoUpdate({ target: appSettings.key, set: { value: "true" } });
+      console.log("fake_users_seeded flag scritto in app_settings");
+    } else {
+      console.warn(`Seed parziale (${seedSuccessCount}/${totalExpected}): flag NON scritto, sarà ritentato al prossimo riavvio`);
+    }
   } catch (err) {
     console.error("Auto-seed fake users failed:", err);
   }
