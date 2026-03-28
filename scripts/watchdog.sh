@@ -11,7 +11,7 @@ LOG_MAX_BYTES=1048576
 
 MAX_CRASHES_IN_WINDOW=3
 CRASH_WINDOW_SECS=300
-BACKOFF_SECS=300
+BACKOFF_STEPS=(300 600 1200)
 
 mkdir -p "$(dirname "$LOG_FILE")"
 
@@ -65,8 +65,10 @@ metro_is_ready() {
 
 declare -a BACKEND_CRASH_TIMES=()
 BACKEND_BACKOFF_UNTIL=0
+CONSECUTIVE_CRASH_SESSIONS=0
+backend_healthy_since=0
 
-record_backend_crash() {
+record_backend_crash_session() {
   local now=$1
   local new_times=()
   for t in "${BACKEND_CRASH_TIMES[@]}"; do
@@ -78,10 +80,15 @@ record_backend_crash() {
 
   local count=${#BACKEND_CRASH_TIMES[@]}
   if [ "$count" -gt "$MAX_CRASHES_IN_WINDOW" ]; then
-    BACKEND_BACKOFF_UNTIL=$((now + BACKOFF_SECS))
+    CONSECUTIVE_CRASH_SESSIONS=$((CONSECUTIVE_CRASH_SESSIONS + 1))
+    local step=$((CONSECUTIVE_CRASH_SESSIONS - 1))
+    local max_step=$(( ${#BACKOFF_STEPS[@]} - 1 ))
+    if [ "$step" -gt "$max_step" ]; then step=$max_step; fi
+    local backoff_secs=${BACKOFF_STEPS[$step]}
+    BACKEND_BACKOFF_UNTIL=$((now + backoff_secs))
     local backoff_until_str
-    backoff_until_str=$(date -d "@$BACKEND_BACKOFF_UNTIL" '+%H:%M:%S' 2>/dev/null || echo "${BACKOFF_SECS}s da ora")
-    log "CRASH LOOP RILEVATO: $count crash negli ultimi ${CRASH_WINDOW_SECS}s — backoff ${BACKOFF_SECS}s fino alle $backoff_until_str"
+    backoff_until_str=$(date -d "@$BACKEND_BACKOFF_UNTIL" '+%H:%M:%S' 2>/dev/null || echo "${backoff_secs}s da ora")
+    log "CRASH LOOP RILEVATO: $count crash negli ultimi ${CRASH_WINDOW_SECS}s (sessione #${CONSECUTIVE_CRASH_SESSIONS}) — backoff ${backoff_secs}s fino alle $backoff_until_str"
     BACKEND_CRASH_TIMES=()
     return 1
   fi
@@ -151,7 +158,7 @@ log "  Health check interval: ${HEALTH_CHECK_INTERVAL}s"
 log "  Check interval: ${CHECK_INTERVAL}s"
 log "  Restart cooldown backend: ${RESTART_COOLDOWN}s"
 log "  Restart cooldown frontend: ${FRONTEND_RESTART_COOLDOWN}s"
-log "  Crash loop: max ${MAX_CRASHES_IN_WINDOW} crash in ${CRASH_WINDOW_SECS}s → backoff ${BACKOFF_SECS}s"
+log "  Crash loop: max ${MAX_CRASHES_IN_WINDOW} crash in ${CRASH_WINDOW_SECS}s → backoff ${BACKOFF_STEPS[*]}s (esponenziale)"
 log "  Log max size: $((LOG_MAX_BYTES / 1024))KB (rotazione automatica)"
 log "========================================="
 
@@ -161,6 +168,7 @@ last_frontend_restart=0
 backend_down_since=0
 frontend_down_since=0
 check_count=0
+backend_crash_session_counted=0
 
 while [ "$RUNNING" -eq 1 ]; do
   now=$(date +%s)
@@ -169,10 +177,17 @@ while [ "$RUNNING" -eq 1 ]; do
     if [ "$backend_down_since" -gt 0 ]; then
       log "BACKEND RECUPERATO: porta $BACKEND_PORT risponde di nuovo"
       backend_down_since=0
+      backend_crash_session_counted=0
+      backend_healthy_since=$now
+    fi
+    if [ "$backend_healthy_since" -gt 0 ] && [ $((now - backend_healthy_since)) -ge 600 ] && [ "$CONSECUTIVE_CRASH_SESSIONS" -gt 0 ]; then
+      log "BACKEND STABILE: 10+ min uptime — reset contatore sessioni crash (era $CONSECUTIVE_CRASH_SESSIONS)"
+      CONSECUTIVE_CRASH_SESSIONS=0
     fi
   else
     if [ "$backend_down_since" -eq 0 ]; then
       backend_down_since=$now
+      backend_healthy_since=0
     fi
     time_since_last_restart=$((now - last_backend_restart))
     if [ "$time_since_last_restart" -ge "$RESTART_COOLDOWN" ]; then
@@ -180,9 +195,16 @@ while [ "$RUNNING" -eq 1 ]; do
         remaining=$((BACKEND_BACKOFF_UNTIL - now))
         log "BACKEND GIU': crash loop backoff attivo — attendo ancora ${remaining}s"
       else
-        if record_backend_crash "$now"; then
-          restart_backend
+        if [ "$backend_crash_session_counted" -eq 0 ]; then
+          backend_crash_session_counted=1
+          if ! record_backend_crash_session "$now"; then
+            log "BACKEND GIU': backoff appena attivato — skip restart questo ciclo"
+            last_backend_restart=$now
+            sleep "$CHECK_INTERVAL"
+            continue
+          fi
         fi
+        restart_backend
         last_backend_restart=$now
       fi
     else
