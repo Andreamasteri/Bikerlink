@@ -13985,6 +13985,8 @@ function configureExpoAndLanding(app2) {
       });
     }
     if (req.path === "/") {
+      const staticBuildIndex = path10.resolve(process.cwd(), "static-build", "index.html");
+      if (!fs10.existsSync(staticBuildIndex)) return next();
       return serveLandingPage({
         req,
         res,

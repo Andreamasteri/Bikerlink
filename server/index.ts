@@ -278,6 +278,9 @@ function configureExpoAndLanding(app: express.Application) {
     }
 
     if (req.path === "/") {
+      // In dev mode (nessun static-build), lascia che il proxy Metro serva l'app Expo
+      const staticBuildIndex = path.resolve(process.cwd(), "static-build", "index.html");
+      if (!fs.existsSync(staticBuildIndex)) return next();
       return serveLandingPage({
         req,
         res,
