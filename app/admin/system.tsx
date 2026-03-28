@@ -57,19 +57,19 @@ function eventIcon(type: string): { name: keyof typeof Ionicons.glyphMap; color:
     case "METRO_UP":
       return { name: "wifi", color: "#44AA44" };
     case "METRO_DOWN":
-      return { name: "wifi-outline", color: "#FF8800" };
+      return { name: "wifi-outline", color: "#FF4444" };
     default:
-      return { name: "ellipse-outline", color: Colors.textMuted ?? "#888" };
+      return { name: "ellipse-outline", color: "#888888" };
   }
 }
 
 function eventLabel(type: string): string {
   switch (type) {
-    case "BACKEND_RESTART": return "Backend Restart";
+    case "BACKEND_RESTART": return "Riavvio Backend";
     case "COLD_START": return "Avvio Freddo";
     case "METRO_UP": return "Metro Online";
     case "METRO_DOWN": return "Metro Offline";
-    default: return "Evento";
+    default: return "Evento generico";
   }
 }
 
