@@ -314,6 +314,21 @@ function configureExpoAndLanding(app: express.Application) {
     }
   });
 
+  // SPA fallback: serve index.html per rotte sconosciute quando static-build esiste
+  // Permette alle rotte Expo Router (es. /welcome, /(auth)/login) di funzionare in produzione
+  const spaFallbackIndex = path.resolve(process.cwd(), "static-build", "index.html");
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.path.startsWith("/api")) return next();
+    if (req.path.startsWith("/assets") || req.path.startsWith("/uploads")) return next();
+    if (fs.existsSync(spaFallbackIndex)) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+      return res.sendFile(spaFallbackIndex);
+    }
+    next();
+  });
+
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }
 

@@ -59,6 +59,57 @@ BikerLink utilizes a modern full-stack architecture.
 - Specific configurations for `react-native-reanimated` and `react-native-maps` are maintained for stability and Expo SDK compatibility.
 - OTA updates are managed via custom scripts for seamless deployment of new features.
 
+## Utenti Seed
+
+| Nickname | Email | Ruolo | Password |
+|----------|-------|-------|----------|
+| admin | admin@bikerlink.it | admin | admin2025! |
+| moderatore | mod@bikerlink.it | moderator | mod2025! |
+| user1 | user1@bikerlink.it | user | test |
+
+Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti)
+Tutti e tre presenti nel DB con `email_verified = true`.
+
+## Workflow e Diagnostica
+
+- `Start Backend` → Express porta 5000
+- `Start Frontend` → Metro/Expo porta 8081 (appare "failed" ma Metro gira — normale, cold-start supera 120s timeout)
+- `Watchdog` → `scripts/watchdog.sh` — riavvio automatico crash
+- `Error Monitor` → `scripts/error-monitor.sh` — cattura errori ogni 30s
+
+### Diagnosi rapida errori
+```bash
+tail -50 logs/error-monitor.log                              # ultimi errori
+grep "ERROR\|DOWN\|CRASH" logs/error-monitor.log | tail -20  # solo errori gravi
+ps aux | grep "[n]ode"                                        # RAM processi (comando: dimensioni)
+```
+Formato log Error Monitor: `[TIMESTAMP] TIPO: messaggio`
+Tipi: `METRO_DOWN/WARN`, `SYMBOLICATE_OK/DOWN`, `BUNDLE_WEB_OK/ERROR/DOWN`, `BUNDLE_ANDROID_OK/ERROR/DOWN`, `BACKEND_OK/INIT/DOWN/ERROR`, `METRO_CYCLE_ERROR`, `BACKEND_CRASH`
+
+## Configurazione Critica (NON MODIFICARE)
+
+- `newArchEnabled: false` in `app.json` — OBBLIGATORIO (react-native-reanimated 3.x richiede Old Arch)
+- `react-native-reanimated: ~3.19.5` — NON aggiornare a 4.x senza cambiare newArchEnabled
+- `react-native-maps: 1.18.0` — pinnato, in `expo.install.exclude`
+- `metro.config.js` shim per react-native-maps su web — MAI rimuovere (senza causa HTTP 500 bundle web)
+- `mocks/react-native-maps.js` + `mocks/empty.js` — stub web per native modules
+- `expo-dev-client` RIMOSSO — causava "Unable to load script" negli APK
+- `eas-cli` NON in dipendenze — usare sempre `npx eas-cli@latest`
+- Backend exit 137 nel `scripts/start-backend.sh` — MAI rimuovere (previene loop crash OOM)
+- `static-build/` in `.gitignore` — se esiste su disco il backend serve bundle stale
+
+## EAS Build (Android)
+
+```bash
+# Preview APK standalone (distribuzione interna)
+EXPO_TOKEN=$EXPO_TOKEN npx eas-cli@latest build --platform android --profile preview --non-interactive
+# Production AAB (Play Store)
+EXPO_TOKEN=$EXPO_TOKEN npx eas-cli@latest build --platform android --profile production --non-interactive
+```
+- EAS account: andreamasteri, progetto: @andreamasteri/bikerlink
+- `EXPO_PUBLIC_DOMAIN`: biker-link.replit.app (configurato in eas.json)
+- Build #14 ultima: de1d68e7-eacf-4f92-bb50-34dd27b1ef81
+
 ## External Dependencies
 - **Expo SDK 54**: Core framework for React Native development.
 - **React Native**: Frontend UI framework.

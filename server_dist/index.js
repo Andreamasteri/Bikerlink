@@ -14017,6 +14017,18 @@ function configureExpoAndLanding(app2) {
       res.status(404).send("Web build not available");
     }
   });
+  const spaFallbackIndex = path10.resolve(process.cwd(), "static-build", "index.html");
+  app2.use((req, res, next) => {
+    if (req.path.startsWith("/api")) return next();
+    if (req.path.startsWith("/assets") || req.path.startsWith("/uploads")) return next();
+    if (fs10.existsSync(spaFallbackIndex)) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+      return res.sendFile(spaFallbackIndex);
+    }
+    next();
+  });
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }
 var _otaCronTimer = null;
