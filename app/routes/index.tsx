@@ -54,6 +54,9 @@ export default function RoutesListScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes", id] });
     },
+    onError: (e: any) => {
+      Alert.alert("Errore", e.message || "Impossibile aggiornare la visibilità");
+    },
     onSettled: () => {
       setTogglingId(null);
     },
