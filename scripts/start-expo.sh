@@ -38,7 +38,7 @@ trap cleanup EXIT
 # ── Configurazione Node.js ─────────────────────────────────────────────────────
 # cgroup limit: 8192MB. maxWorkers=1 (metro.config.js) = 2 processi Node totali.
 # 2 x 1024MB = 2048MB per Metro + ~3GB backend+OS = ~5GB < 8GB limite cgroup.
-export NODE_OPTIONS="--max-old-space-size=1024"
+export NODE_OPTIONS="--max-old-space-size=896"
 
 # ── Funzioni di utilita' ────────────────────────────────────────────────────────
 

@@ -658,14 +658,16 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
   return { started: true };
 }
 
+const _engineTimers: ReturnType<typeof setInterval>[] = [];
+
 export function startMatchingEngine(): void {
   console.log("[Matching] Engine avviato — modalità on-demand (trigger da login utente)");
 
   runFakeZavorrineRotation();
-  setInterval(runFakeZavorrineRotation, 5 * 60 * 1000);
+  _engineTimers.push(setInterval(runFakeZavorrineRotation, 5 * 60 * 1000));
   console.log("[Matching] Fake zavorrine availability rotation started (5min interval)");
 
-  setInterval(async () => {
+  _engineTimers.push(setInterval(async () => {
     try {
       const expired = await runCleanup();
       if (expired > 0) console.log(`[Cleanup] Scadute ${expired} proposte`);
@@ -674,6 +676,12 @@ export function startMatchingEngine(): void {
     } catch (err) {
       console.error("[Cleanup] Errore pulizia oraria:", err);
     }
-  }, 60 * 60 * 1000);
+  }, 60 * 60 * 1000));
   console.log("[Matching] Cleanup orario proposte scadute avviato");
+}
+
+export function stopMatchingEngine(): void {
+  for (const t of _engineTimers) clearInterval(t);
+  _engineTimers.length = 0;
+  console.log("[Matching] Engine fermato (graceful shutdown)");
 }

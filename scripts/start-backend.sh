@@ -93,7 +93,7 @@ for retry in $(seq 1 $MAX_RETRIES); do
   sleep 3
 
   echo "Porta $PORT libera, avvio backend..."
-  NODE_ENV=production node server_dist/index.js &
+  NODE_ENV=production node --max-old-space-size=512 server_dist/index.js &
   SERVER_PID=$!
 
   sleep 8

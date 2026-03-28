@@ -2,7 +2,7 @@ import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { initState } from "./init-state";
-import { startMatchingEngine } from "./matching-engine";
+import { startMatchingEngine, stopMatchingEngine } from "./matching-engine";
 import { autoSeedEssentialUsers, autoSeedFakeUsers } from "./auto-seed";
 import { db } from "./db";
 import { sql, eq, and, lte } from "drizzle-orm";
@@ -313,8 +313,10 @@ function configureExpoAndLanding(app: express.Application) {
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }
 
+let _otaCronTimer: ReturnType<typeof setInterval> | null = null;
+
 function startOtaCron() {
-  setInterval(async () => {
+  _otaCronTimer = setInterval(async () => {
     try {
       const now = new Date();
       const scheduled = await db
@@ -461,6 +463,27 @@ function setupErrorHandler(app: express.Application) {
 
   const port = parseInt(process.env.PORT || "5000", 10);
 
+  // Graceful shutdown — free DB connections and stop timers before exit
+  let _shuttingDown = false;
+  const gracefulShutdown = (signal: string) => {
+    if (_shuttingDown) return;
+    _shuttingDown = true;
+    console.log(`[Shutdown] ${signal} ricevuto — chiusura pulita in corso...`);
+    stopMatchingEngine();
+    if (_otaCronTimer) { clearInterval(_otaCronTimer); _otaCronTimer = null; }
+    server.close(() => {
+      console.log("[Shutdown] Server HTTP chiuso.");
+      process.exit(0);
+    });
+    // Force exit after 5 seconds if server.close() stalls
+    setTimeout(() => {
+      console.log("[Shutdown] Timeout — uscita forzata.");
+      process.exit(1);
+    }, 5_000);
+  };
+  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
   server.listen(
     {
       port,
@@ -471,8 +494,10 @@ function setupErrorHandler(app: express.Application) {
       log(`express server serving on port ${port}`);
       initUptimeTracking();
       startMetroMonitor();
-      startMatchingEngine();
-      startOtaCron();
+
+      // Delay heavy startup to avoid OOM spike during initialization
+      setTimeout(() => startMatchingEngine(), 5_000);
+      setTimeout(() => startOtaCron(), 15_000);
 
       (async () => {
         try {

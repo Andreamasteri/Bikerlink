@@ -6863,12 +6863,13 @@ function triggerMatchingRun() {
   })();
   return { started: true };
 }
+var _engineTimers = [];
 function startMatchingEngine() {
   console.log("[Matching] Engine avviato \u2014 modalit\xE0 on-demand (trigger da login utente)");
   runFakeZavorrineRotation();
-  setInterval(runFakeZavorrineRotation, 5 * 60 * 1e3);
+  _engineTimers.push(setInterval(runFakeZavorrineRotation, 5 * 60 * 1e3));
   console.log("[Matching] Fake zavorrine availability rotation started (5min interval)");
-  setInterval(async () => {
+  _engineTimers.push(setInterval(async () => {
     try {
       const expired = await runCleanup();
       if (expired > 0) console.log(`[Cleanup] Scadute ${expired} proposte`);
@@ -6877,8 +6878,13 @@ function startMatchingEngine() {
     } catch (err) {
       console.error("[Cleanup] Errore pulizia oraria:", err);
     }
-  }, 60 * 60 * 1e3);
+  }, 60 * 60 * 1e3));
   console.log("[Matching] Cleanup orario proposte scadute avviato");
+}
+function stopMatchingEngine() {
+  for (const t of _engineTimers) clearInterval(t);
+  _engineTimers.length = 0;
+  console.log("[Matching] Engine fermato (graceful shutdown)");
 }
 
 // server/routes/proposals.ts
@@ -14003,8 +14009,9 @@ function configureExpoAndLanding(app2) {
   });
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }
+var _otaCronTimer = null;
 function startOtaCron() {
-  setInterval(async () => {
+  _otaCronTimer = setInterval(async () => {
     try {
       const now = /* @__PURE__ */ new Date();
       const scheduled = await db.select().from(otaReleases).where(
@@ -14098,6 +14105,27 @@ function setupErrorHandler(app2) {
   });
   setupErrorHandler(app);
   const port = parseInt(process.env.PORT || "5000", 10);
+  let _shuttingDown = false;
+  const gracefulShutdown = (signal) => {
+    if (_shuttingDown) return;
+    _shuttingDown = true;
+    console.log(`[Shutdown] ${signal} ricevuto \u2014 chiusura pulita in corso...`);
+    stopMatchingEngine();
+    if (_otaCronTimer) {
+      clearInterval(_otaCronTimer);
+      _otaCronTimer = null;
+    }
+    server.close(() => {
+      console.log("[Shutdown] Server HTTP chiuso.");
+      process.exit(0);
+    });
+    setTimeout(() => {
+      console.log("[Shutdown] Timeout \u2014 uscita forzata.");
+      process.exit(1);
+    }, 5e3);
+  };
+  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   server.listen(
     {
       port,
@@ -14108,8 +14136,8 @@ function setupErrorHandler(app2) {
       log(`express server serving on port ${port}`);
       initUptimeTracking();
       startMetroMonitor();
-      startMatchingEngine();
-      startOtaCron();
+      setTimeout(() => startMatchingEngine(), 5e3);
+      setTimeout(() => startOtaCron(), 15e3);
       (async () => {
         try {
           await db.execute(import_drizzle_orm12.sql`ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS image_url TEXT`);
