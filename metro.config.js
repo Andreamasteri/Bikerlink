@@ -55,9 +55,30 @@ config.resolver.blockList = [
 
 config.resolver.platforms = ["ios", "android", "web"];
 
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (platform === "web") {
+    if (moduleName === "react-native-maps") {
+      return {
+        filePath: path.join(__dirname, "mocks/react-native-maps.js"),
+        type: "sourceFile",
+      };
+    }
+    if (
+      context.originModulePath &&
+      context.originModulePath.includes("node_modules/react-native-maps")
+    ) {
+      return {
+        filePath: path.join(__dirname, "mocks/empty.js"),
+        type: "sourceFile",
+      };
+    }
+  }
+  return context.resolveRequest(context, moduleName, platform);
+};
+
 config.maxWorkers = 1;
 
-config.cacheVersion = "v5";
+config.cacheVersion = "v6";
 
 config.cacheStores = [
   new FileStore({ root: path.join(__dirname, ".metro-cache") }),
