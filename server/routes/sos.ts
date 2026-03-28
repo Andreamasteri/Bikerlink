@@ -44,6 +44,11 @@ router.post("/", async (req: Request, res: Response) => {
       status: "active",
     });
 
+    await Promise.all([
+      storage.updateUserProfile(userId, { isAvailable: true }),
+      storage.updateUser(userId, { ghostMode: false }),
+    ]);
+
     return res.status(201).json(sosRequest);
   } catch (error) {
     console.error("SOS create error:", error);

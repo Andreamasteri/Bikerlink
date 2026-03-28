@@ -1028,17 +1028,18 @@ export default function MapScreen() {
               </View>
             )}
           </Pressable>
-          {(activeSosQuery.data || []).length > 0 && (
-            <Pressable style={styles.sosOverlay} onPress={() => setShowSosDetail(true)}>
-              <View style={styles.sosWarningContainer}>
-                <View style={styles.sosTriangleBorder} />
-                <View style={styles.sosTriangleFill} />
-                <Text style={styles.sosExclamation}>!</Text>
-              </View>
-              <Text style={styles.sosOverlayLabel}>{t("home.sosActive")}</Text>
-            </Pressable>
-          )}
         </View>
+      )}
+
+      {(activeSosQuery.data || []).length > 0 && (
+        <Pressable style={styles.sosFloatingIndicator} onPress={() => setShowSosDetail(true)}>
+          <View style={styles.sosWarningContainer}>
+            <View style={styles.sosTriangleBorder} />
+            <View style={styles.sosTriangleFill} />
+            <Text style={styles.sosExclamation}>!</Text>
+          </View>
+          <Text style={styles.sosOverlayLabel}>{t("home.sosActive")}</Text>
+        </Pressable>
       )}
 
       <Modal visible={showSosDetail} transparent animationType="slide" onRequestClose={() => setShowSosDetail(false)}>
@@ -1702,6 +1703,19 @@ const styles = StyleSheet.create({
     justifyContent: "center" as const,
     gap: 10,
     zIndex: 10,
+  },
+  sosFloatingIndicator: {
+    position: "absolute" as const,
+    bottom: 16,
+    alignSelf: "center" as const,
+    backgroundColor: "rgba(0,0,0,0.72)",
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    alignItems: "center" as const,
+    flexDirection: "row" as const,
+    gap: 10,
+    zIndex: 20,
   },
   sosWarningContainer: {
     width: 100,

@@ -11,6 +11,7 @@ import {
   Alert,
   TextInput,
   Image,
+  KeyboardAvoidingView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -279,7 +280,11 @@ export default function ReadyToRideScreen() {
       </View>
 
       <Modal visible={showSosModal} transparent animationType="fade" onRequestClose={() => setShowSosModal(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setShowSosModal(false)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setShowSosModal(false)}>
           <Pressable style={styles.sosSheet} onPress={(e) => e.stopPropagation()}>
             <View style={styles.handle} />
             <View style={{ alignItems: "center", marginBottom: 16 }}>
@@ -361,7 +366,8 @@ export default function ReadyToRideScreen() {
               )}
             </Pressable>
           </Pressable>
-        </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
     </ScrollView>
@@ -492,7 +498,7 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "flex-end",
+    justifyContent: "flex-start",
   },
   handle: {
     width: 40,
@@ -504,10 +510,10 @@ const styles = StyleSheet.create({
   },
   sosSheet: {
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
     padding: 20,
-    paddingBottom: 32,
+    paddingBottom: 24,
   },
   sosSheetTitle: {
     fontSize: 20,

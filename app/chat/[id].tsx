@@ -180,6 +180,7 @@ export default function ChatConversationScreen() {
   const userId = user?.id || "";
   const [inputText, setInputText] = useState("");
   const flatListRef = useRef<FlatList>(null);
+  const textInputRef = useRef<any>(null);
 
   const [showHashtagPanel, setShowHashtagPanel] = useState(false);
   const [hashtagInput, setHashtagInput] = useState("");
@@ -277,16 +278,17 @@ export default function ChatConversationScreen() {
   }, []);
 
   const handleSendLocation = useCallback(async () => {
+    const insertCoords = (lat: number, lng: number) => {
+      const formatted = `📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      setInputText((prev) => (prev ? prev + " " + formatted : formatted));
+      setTimeout(() => textInputRef.current?.focus(), 100);
+    };
+
     if (Platform.OS === "web") {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
-            sendMutation.mutate({
-              messageType: "location",
-              content: "Posizione condivisa",
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-            });
+            insertCoords(position.coords.latitude, position.coords.longitude);
           },
           () => {}
         );
@@ -297,15 +299,10 @@ export default function ChatConversationScreen() {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") return;
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        sendMutation.mutate({
-          messageType: "location",
-          content: "Posizione condivisa",
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-        });
+        insertCoords(loc.coords.latitude, loc.coords.longitude);
       } catch {}
     }
-  }, [sendMutation]);
+  }, []);
 
   const getTitle = (): string => {
     if (conversation?.title) return conversation.title;
@@ -515,6 +512,7 @@ export default function ChatConversationScreen() {
         </TouchableOpacity>
         <View style={styles.inputWrapper}>
           <TextInput
+            ref={textInputRef}
             style={styles.textInput}
             value={inputText}
             onChangeText={setInputText}
