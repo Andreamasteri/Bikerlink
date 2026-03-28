@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -79,6 +79,8 @@ export default function CustomRouteDetailScreen() {
     queryFn: getQueryFn({ on401: "throw" }),
   });
 
+  const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
+
   const deleteMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("DELETE", `/api/custom-routes/${id}`);
@@ -88,6 +90,41 @@ export default function CustomRouteDetailScreen() {
       router.back();
     },
   });
+
+  const handleToggleVisibility = async () => {
+    if (!route) return;
+    const newState = !route.isPublic;
+    const message = newState
+      ? "Rendere pubblico questo percorso? Sarà visibile a tutti gli utenti."
+      : "Rendere privato questo percorso? Sarà visibile solo a te.";
+    const confirmText = newState ? "Pubblica" : "Rendi privato";
+
+    const doToggle = async () => {
+      setIsTogglingVisibility(true);
+      try {
+        await apiRequest("PUT", `/api/custom-routes/${id}`, { isPublic: newState });
+        queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/custom-routes", id] });
+      } catch (e: any) {
+        Alert.alert("Errore", e.message || "Impossibile aggiornare la visibilità");
+      } finally {
+        setIsTogglingVisibility(false);
+      }
+    };
+
+    if (Platform.OS === "web") {
+      if (confirm(message)) doToggle();
+    } else {
+      Alert.alert(
+        newState ? "Rendi pubblico" : "Rendi privato",
+        message,
+        [
+          { text: "Annulla", style: "cancel" },
+          { text: confirmText, onPress: doToggle },
+        ]
+      );
+    }
+  };
 
   const handleDelete = () => {
     if (Platform.OS === "web") {
@@ -209,6 +246,27 @@ export default function CustomRouteDetailScreen() {
 
       {route.isMine && (
         <View style={styles.ownerActions}>
+          <TouchableOpacity
+            style={[styles.visibilityButton, route.isPublic ? styles.visibilityPublicButton : styles.visibilityPrivateButton]}
+            onPress={handleToggleVisibility}
+            disabled={isTogglingVisibility}
+            activeOpacity={0.7}
+          >
+            {isTogglingVisibility ? (
+              <ActivityIndicator size="small" color={route.isPublic ? Colors.success : Colors.textSecondary} />
+            ) : (
+              <>
+                <MaterialCommunityIcons
+                  name={route.isPublic ? "earth" : "lock"}
+                  size={18}
+                  color={route.isPublic ? Colors.success : Colors.textSecondary}
+                />
+                <Text style={[styles.visibilityButtonText, route.isPublic ? styles.visibilityPublicText : styles.visibilityPrivateText]}>
+                  {route.isPublic ? "Pubblico" : "Privato"}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.editButton}
             onPress={() => router.push(`/routes/create?editId=${route.id}`)}
@@ -432,6 +490,35 @@ const styles = StyleSheet.create({
     color: Colors.accentRed,
     fontSize: 14,
     fontWeight: "600" as const,
+  },
+  visibilityButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: Colors.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    minWidth: 100,
+    justifyContent: "center",
+  },
+  visibilityPublicButton: {
+    borderColor: Colors.success,
+    backgroundColor: "rgba(76, 175, 80, 0.08)",
+  },
+  visibilityPrivateButton: {
+    borderColor: Colors.border,
+  },
+  visibilityButtonText: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+  },
+  visibilityPublicText: {
+    color: Colors.success,
+  },
+  visibilityPrivateText: {
+    color: Colors.textSecondary,
   },
   waypointsSection: {
     padding: 20,

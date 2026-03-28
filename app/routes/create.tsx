@@ -10,7 +10,6 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
-  Switch,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
@@ -51,7 +50,6 @@ export default function CreateRouteScreen() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [isPublic, setIsPublic] = useState(false);
   const [waypoints, setWaypoints] = useState<LocalWaypoint[]>([]);
   const [mapOpen, setMapOpen] = useState(false);
   const [pendingCoord, setPendingCoord] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -60,13 +58,16 @@ export default function CreateRouteScreen() {
   const [waypointDesc, setWaypointDesc] = useState("");
   const [waypointType, setWaypointType] = useState("stop");
   const [showWaypointForm, setShowWaypointForm] = useState(false);
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
+  const [createdRouteId, setCreatedRouteId] = useState<string | null>(null);
+  const [isSettingVisibility, setIsSettingVisibility] = useState(false);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       const routeRes = await apiRequest("POST", "/api/custom-routes", {
         title: title.trim(),
         description: description.trim() || null,
-        isPublic,
+        isPublic: false,
       });
       const route = await routeRes.json();
 
@@ -84,14 +85,28 @@ export default function CreateRouteScreen() {
 
       return route;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
-      router.back();
+    onSuccess: (route) => {
+      setCreatedRouteId(route.id);
+      setShowPublishDialog(true);
     },
     onError: (err: Error) => {
       Alert.alert("Errore", err.message);
     },
   });
+
+  const handlePublishChoice = async (publish: boolean) => {
+    if (!createdRouteId) return;
+    setIsSettingVisibility(true);
+    try {
+      await apiRequest("PUT", `/api/custom-routes/${createdRouteId}`, { isPublic: publish });
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
+    } catch (_) {
+    } finally {
+      setIsSettingVisibility(false);
+      setShowPublishDialog(false);
+      router.replace(`/routes/${createdRouteId}` as any);
+    }
+  };
 
   const openMapForNewWaypoint = useCallback(() => {
     setPendingCoord(null);
@@ -190,18 +205,6 @@ export default function CreateRouteScreen() {
           />
         </View>
 
-        <View style={styles.switchRow}>
-          <View style={styles.switchLabelWrap}>
-            <Ionicons name="globe-outline" size={20} color={Colors.accent} />
-            <Text style={styles.switchLabel}>Percorso pubblico</Text>
-          </View>
-          <Switch
-            value={isPublic}
-            onValueChange={setIsPublic}
-            trackColor={{ false: Colors.border, true: Colors.accent }}
-            thumbColor="#fff"
-          />
-        </View>
 
         <View style={styles.waypointHeader}>
           <Text style={styles.sectionTitle}>Tappe ({waypoints.length})</Text>
@@ -381,6 +384,41 @@ export default function CreateRouteScreen() {
                 <Text style={styles.modalSaveBtnText}>Aggiungi</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Publish dialog after save */}
+      <Modal visible={showPublishDialog} transparent animationType="fade">
+        <View style={styles.dialogOverlay}>
+          <View style={styles.dialogBox}>
+            <MaterialCommunityIcons name="earth" size={40} color={Colors.accent} style={{ marginBottom: 12 }} />
+            <Text style={styles.dialogTitle}>Vuoi pubblicare il tuo percorso?</Text>
+            <Text style={styles.dialogSubtitle}>
+              I percorsi pubblici sono visibili a tutti gli utenti. Puoi cambiare questa impostazione in qualsiasi momento.
+            </Text>
+            {isSettingVisibility ? (
+              <ActivityIndicator size="large" color={Colors.accent} style={{ marginTop: 20 }} />
+            ) : (
+              <View style={styles.dialogActions}>
+                <TouchableOpacity
+                  style={styles.dialogBtnSecondary}
+                  onPress={() => handlePublishChoice(false)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="lock-closed-outline" size={18} color={Colors.textSecondary} />
+                  <Text style={styles.dialogBtnSecondaryText}>No, tienilo privato</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.dialogBtnPrimary}
+                  onPress={() => handlePublishChoice(true)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="globe-outline" size={18} color="#fff" />
+                  <Text style={styles.dialogBtnPrimaryText}>Sì, pubblica</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -602,4 +640,68 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   modalSaveBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" as const },
+  dialogOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    padding: 24,
+  },
+  dialogBox: {
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    padding: 28,
+    width: "100%",
+    alignItems: "center" as const,
+  },
+  dialogTitle: {
+    color: Colors.text,
+    fontSize: 20,
+    fontWeight: "700" as const,
+    textAlign: "center" as const,
+    marginBottom: 10,
+  },
+  dialogSubtitle: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+    textAlign: "center" as const,
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  dialogActions: {
+    flexDirection: "column" as const,
+    gap: 12,
+    marginTop: 24,
+    width: "100%",
+  },
+  dialogBtnPrimary: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 8,
+    backgroundColor: Colors.accent,
+    borderRadius: 14,
+    paddingVertical: 14,
+  },
+  dialogBtnPrimaryText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700" as const,
+  },
+  dialogBtnSecondary: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 8,
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: 14,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  dialogBtnSecondaryText: {
+    color: Colors.textSecondary,
+    fontSize: 15,
+    fontWeight: "600" as const,
+  },
 });

@@ -203,4 +203,29 @@ router.delete("/api/custom-routes/:id/waypoints/:waypointId", async (req, res) =
   }
 });
 
+router.get("/api/users/:userId/custom-routes", async (req, res) => {
+  try {
+    const sessionUserId = (req.session as any)?.userId;
+    if (!sessionUserId) return res.status(401).json({ error: "Non autenticato" });
+
+    const { userId } = req.params;
+    const routesRaw = await storage.getCustomRoutes(userId);
+    const publicRoutes = routesRaw.filter((r) => r.isPublic);
+
+    const enriched = await Promise.all(
+      publicRoutes.map(async (route) => {
+        const waypoints = await storage.getCustomRouteWaypoints(route.id);
+        return {
+          ...route,
+          waypointCount: waypoints.length,
+        };
+      })
+    );
+
+    res.json({ routes: enriched });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -7,14 +7,17 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
+  Alert,
+  TouchableOpacity,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useSetting } from "@/lib/settings-context";
+import { apiRequest, queryClient } from "@/lib/query-client";
 
 interface CustomRoute {
   id: string;
@@ -33,6 +36,7 @@ export default function RoutesListScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const featureEnabled = useSetting("customRoutes");
 
@@ -40,6 +44,46 @@ export default function RoutesListScreen() {
     queryKey: ["/api/custom-routes"],
     enabled: featureEnabled,
   });
+
+  const toggleVisibilityMutation = useMutation({
+    mutationFn: async ({ id, isPublic }: { id: string; isPublic: boolean }) => {
+      await apiRequest("PUT", `/api/custom-routes/${id}`, { isPublic });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
+    },
+    onSettled: () => {
+      setTogglingId(null);
+    },
+  });
+
+  const handleToggleVisibility = (route: CustomRoute) => {
+    const newState = !route.isPublic;
+    const message = newState
+      ? `Rendere pubblico "${route.title}"? Sarà visibile a tutti.`
+      : `Rendere privato "${route.title}"? Sarà visibile solo a te.`;
+    if (Platform.OS === "web") {
+      if (confirm(message)) {
+        setTogglingId(route.id);
+        toggleVisibilityMutation.mutate({ id: route.id, isPublic: newState });
+      }
+    } else {
+      Alert.alert(
+        newState ? "Rendi pubblico" : "Rendi privato",
+        message,
+        [
+          { text: "Annulla", style: "cancel" },
+          {
+            text: newState ? "Pubblica" : "Rendi privato",
+            onPress: () => {
+              setTogglingId(route.id);
+              toggleVisibilityMutation.mutate({ id: route.id, isPublic: newState });
+            },
+          },
+        ]
+      );
+    }
+  };
 
   const isLoading = routesQuery.isLoading;
 
@@ -90,6 +134,7 @@ export default function RoutesListScreen() {
     const route = item.route;
     const waypointCount = route.waypointCount ?? 0;
     const distance = route.totalDistanceKm ? `${route.totalDistanceKm.toFixed(1)} km` : "N/D";
+    const isToggling = togglingId === route.id;
 
     return (
       <Pressable
@@ -138,7 +183,26 @@ export default function RoutesListScreen() {
             ) : null}
           </View>
         </View>
-        <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+        {item.isMine ? (
+          <TouchableOpacity
+            onPress={() => handleToggleVisibility(route)}
+            disabled={isToggling}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={styles.toggleBtn}
+          >
+            {isToggling ? (
+              <ActivityIndicator size="small" color={Colors.textSecondary} />
+            ) : (
+              <Ionicons
+                name={route.isPublic ? "globe-outline" : "lock-closed-outline"}
+                size={22}
+                color={route.isPublic ? Colors.success : Colors.textSecondary}
+              />
+            )}
+          </TouchableOpacity>
+        ) : (
+          <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+        )}
       </Pressable>
     );
   };
@@ -305,6 +369,11 @@ const styles = StyleSheet.create({
   metaText: {
     color: Colors.textSecondary,
     fontSize: 12,
+  },
+  toggleBtn: {
+    padding: 4,
+    justifyContent: "center",
+    alignItems: "center",
   },
   fab: {
     position: "absolute",

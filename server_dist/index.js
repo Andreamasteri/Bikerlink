@@ -12552,6 +12552,27 @@ router19.delete("/api/custom-routes/:id/waypoints/:waypointId", async (req, res)
     res.status(500).json({ error: error.message });
   }
 });
+router19.get("/api/users/:userId/custom-routes", async (req, res) => {
+  try {
+    const sessionUserId = req.session?.userId;
+    if (!sessionUserId) return res.status(401).json({ error: "Non autenticato" });
+    const { userId } = req.params;
+    const routesRaw = await storage.getCustomRoutes(userId);
+    const publicRoutes = routesRaw.filter((r) => r.isPublic);
+    const enriched = await Promise.all(
+      publicRoutes.map(async (route) => {
+        const waypoints = await storage.getCustomRouteWaypoints(route.id);
+        return {
+          ...route,
+          waypointCount: waypoints.length
+        };
+      })
+    );
+    res.json({ routes: enriched });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 var custom_routes_default = router19;
 
 // server/routes/sos.ts

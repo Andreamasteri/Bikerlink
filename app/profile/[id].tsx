@@ -30,6 +30,19 @@ export default function PublicProfileScreen() {
   });
   const marketplaceEnabled = marketplaceData?.enabled !== false;
 
+  const { data: routesData } = useQuery<{ routes: { id: string }[] }>({
+    queryKey: ["/api/users", id, "custom-routes"],
+    queryFn: async () => {
+      const res = await fetch(new URL(`/api/users/${id}/custom-routes`, baseUrl).toString(), {
+        credentials: "include",
+      });
+      if (!res.ok) return { routes: [] };
+      return res.json();
+    },
+    enabled: !!id,
+  });
+  const publicRoutesCount = routesData?.routes?.length ?? 0;
+
   const { data: profile, isLoading } = useQuery({
     queryKey: ["/api/users", id, "public"],
     queryFn: async () => {
@@ -252,6 +265,19 @@ export default function PublicProfileScreen() {
           </View>
         )}
 
+        {publicRoutesCount > 0 && (
+          <TouchableOpacity
+            style={styles.routesButton}
+            onPress={() => router.push(`/routes/user/${id}` as any)}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="map-marker-path" size={20} color={Colors.accent} />
+            <Text style={styles.routesButtonText}>
+              Visualizza percorsi ({publicRoutesCount})
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {!isSelf && !isBlocked && (
           <TouchableOpacity style={styles.chatButton} onPress={handleStartChat} activeOpacity={0.8}>
             <Ionicons name="chatbubbles" size={22} color={Colors.background} />
@@ -318,6 +344,20 @@ const styles = StyleSheet.create({
   motoInfo: { flex: 1 },
   motoName: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.text },
   motoDetail: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 },
+  routesButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginHorizontal: 20,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+  },
+  routesButtonText: { fontSize: 15, fontWeight: "600" as const, color: Colors.accent },
   chatButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -327,7 +367,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 16,
     marginHorizontal: 20,
-    marginTop: 24,
+    marginTop: 16,
   },
   chatButtonText: { fontSize: 16, fontWeight: "700" as const, color: Colors.background },
   blockButton: {
