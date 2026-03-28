@@ -8,10 +8,6 @@ FLOCK_FILE="/tmp/start-expo.flock"
 LOCK_FILE="/tmp/start-expo.lock"
 PID_FILE="/tmp/metro.pid"
 
-# PID globali per i curl di pre-warm (cleanup/retry)
-PREWARM_ANDROID_PID=0
-PREWARM_IOS_PID=0
-
 # ── Pulizia temp orfani da sessioni precedenti ────────────────────────────────
 find /tmp -maxdepth 1 -name "metro-opt-cycle*" -mmin +120 -delete 2>/dev/null || true
 
@@ -26,18 +22,10 @@ echo $$ > "$LOCK_FILE"
 
 cleanup() {
   rm -f "$LOCK_FILE"
-  if [ "$PREWARM_ANDROID_PID" -gt 0 ]; then
-    kill "$PREWARM_ANDROID_PID" 2>/dev/null || true
-  fi
-  if [ "$PREWARM_IOS_PID" -gt 0 ]; then
-    kill "$PREWARM_IOS_PID" 2>/dev/null || true
-  fi
 }
 trap cleanup EXIT
 
 # ── Configurazione Node.js ─────────────────────────────────────────────────────
-# cgroup limit: 8192MB. maxWorkers=1 (metro.config.js) = 2 processi Node totali.
-# 2 x 1024MB = 2048MB per Metro + ~3GB backend+OS = ~5GB < 8GB limite cgroup.
 export NODE_OPTIONS="--max-old-space-size=896"
 
 # ── Funzioni di utilita' ────────────────────────────────────────────────────────
@@ -54,12 +42,9 @@ port_is_alive() {
   curl -s --max-time 60 --connect-timeout 3 -o /dev/null "http://localhost:$1/" 2>/dev/null
 }
 
-# Usato nel monitoring loop dopo il pre-warm: controlla che Metro sia davvero
-# pronto a servire asset (non solo che la porta sia aperta).
+# Usato nel monitoring loop: controlla che Metro sia davvero pronto a servire
+# asset (non solo che la porta sia aperta).
 # /status risponde "packager-status:running" solo quando Metro e' inizializzato.
-# Timeout 10s: /status e' leggero e risponde rapidamente anche durante la
-# compilazione del secondo bundle in background. Connection refused istantaneo
-# se Metro e' morto.
 metro_is_alive() {
   local status
   status=$(curl -s --max-time 10 --connect-timeout 5 \
@@ -113,83 +98,6 @@ wait_for_backend() {
   echo "Attenzione: backend non risponde dopo ${BACKEND_WAIT_SECONDS}s, avvio Metro comunque."
 }
 
-# ── Pre-warm bundle Android + iOS (paralleli) ─────────────────────────────────
-# Lancia entrambe le richieste di bundle in background simultaneamente.
-# Attende che ALMENO UNA delle due si completi (o raggiunga il timeout globale
-# di 300s) prima di entrare nel monitoring loop.
-# Restituisce sempre 0: qualsiasi esito del pre-warm e' un fallback graceful,
-# il monitoring inizia comunque e l'avvio non viene bloccato.
-#
-# Perche' non usiamo HTTP check durante l'attesa:
-#   Durante la compilazione (~28-31s per 1635 moduli) Metro e' occupato e
-#   non risponde entro 2s → falso positivo. Polling sui PID dei curl evita
-#   questo problema senza dipendere dalla reattivita' HTTP di Metro.
-prewarm_bundles() {
-  local log_file="$1"
-  local BUNDLE_BASE="http://localhost:${PORT}/node_modules/expo-router/entry.bundle"
-  local BUNDLE_PARAMS="dev=true&hot=false&lazy=true&transform.engine=hermes&transform.bytecode=1&transform.routerRoot=app&unstable_transformProfile=hermes-stable"
-  local PW_TIMEOUT=300
-
-  # Avvia Android e iOS in parallelo
-  echo "Pre-warm bundle Android avviato (max ${PW_TIMEOUT}s)..." | tee -a "$log_file"
-  curl -s --max-time "$PW_TIMEOUT" --connect-timeout 10 \
-    -o /dev/null \
-    "${BUNDLE_BASE}?platform=android&${BUNDLE_PARAMS}" 2>/dev/null &
-  PREWARM_ANDROID_PID=$!
-
-  echo "Pre-warm bundle iOS avviato (max ${PW_TIMEOUT}s)..." | tee -a "$log_file"
-  curl -s --max-time "$PW_TIMEOUT" --connect-timeout 10 \
-    -o /dev/null \
-    "${BUNDLE_BASE}?platform=ios&${BUNDLE_PARAMS}" 2>/dev/null &
-  PREWARM_IOS_PID=$!
-
-  # Polling sui PID — attendi il primo completamento (no HTTP check)
-  local PW_START=$(date +%s)
-  local first_done=0
-
-  for i in $(seq 1 $((PW_TIMEOUT + 10))); do
-    local android_alive=0
-    local ios_alive=0
-    kill -0 "$PREWARM_ANDROID_PID" 2>/dev/null && android_alive=1
-    kill -0 "$PREWARM_IOS_PID" 2>/dev/null && ios_alive=1
-
-    if [ $android_alive -eq 0 ] || [ $ios_alive -eq 0 ]; then
-      first_done=1
-      break
-    fi
-
-    if [ $((i % 30)) -eq 0 ]; then
-      echo "  ...pre-warm in corso (${i}s / ${PW_TIMEOUT}s)..." | tee -a "$log_file"
-    fi
-    sleep 1
-  done
-
-  local PW_END=$(date +%s)
-  local PW_ELAPSED=$((PW_END - PW_START))
-
-  if [ "$first_done" -eq 1 ]; then
-    echo "Pre-warm bundle completato in ${PW_ELAPSED}s — Expo Go servira' dalla cache" | tee -a "$log_file"
-  else
-    echo "Pre-warm bundle completato (timeout ${PW_ELAPSED}s) — Expo Go servira' alla prima richiesta" | tee -a "$log_file"
-  fi
-
-  # I curl ancora in esecuzione restano attivi in background.
-  # Il monitoring loop li terminera' se Metro cade; cleanup li termina all'uscita.
-  return 0
-}
-
-# Ferma i curl di pre-warm se in esecuzione
-kill_prewarm() {
-  if [ "$PREWARM_ANDROID_PID" -gt 0 ]; then
-    kill "$PREWARM_ANDROID_PID" 2>/dev/null || true
-  fi
-  if [ "$PREWARM_IOS_PID" -gt 0 ]; then
-    kill "$PREWARM_IOS_PID" 2>/dev/null || true
-  fi
-  PREWARM_ANDROID_PID=0
-  PREWARM_IOS_PID=0
-}
-
 wait_for_backend
 
 SESSION_TS=$(date +%Y%m%d-%H%M%S)
@@ -200,9 +108,6 @@ for retry in $(seq 1 $MAX_RETRIES); do
   echo "Log ciclo: $LOG_FILE"
   echo "NODE_OPTIONS: $NODE_OPTIONS" | tee -a "$LOG_FILE"
   echo "Orario avvio: $(date)" | tee -a "$LOG_FILE"
-
-  # Ferma pre-warm dell'eventuale ciclo precedente (kill guard: solo se PID > 0)
-  kill_prewarm
 
   METRO_STARTED=0
   METRO_PID=0
@@ -226,17 +131,6 @@ for retry in $(seq 1 $MAX_RETRIES); do
     echo "Porta $PORT libera, avvio Metro..." | tee -a "$LOG_FILE"
     echo "EXPO_PACKAGER_PROXY_URL=https://$REPLIT_EXPO_DEV_DOMAIN EXPO_PUBLIC_DOMAIN=$REPLIT_DEV_DOMAIN" | tee -a "$LOG_FILE"
     START_TIME=$(date +%s)
-    # Nota: usiamo il comando diretto invece di `npm run expo:dev` perche' dobbiamo
-    # passare REPLIT_EXPO_DEV_DOMAIN (porta 8081, Metro) invece di REPLIT_DEV_DOMAIN
-    # (porta 5000, backend) per EXPO_PACKAGER_PROXY_URL e REACT_NATIVE_PACKAGER_HOSTNAME.
-    # Il comando e' identico allo script expo:dev (npx expo start --localhost),
-    # senza pre/post hook (solo postinstall esiste in package.json).
-    #
-    # NOTA CACHE: `expo start` NON supporta il flag --cache-dir (opzione non riconosciuta).
-    # La cache persistente e' configurata in metro.config.js tramite FileStore di metro-cache
-    # con root: path.join(__dirname, '.metro-cache'). Questo salva i moduli compilati in
-    # /home/runner/workspace/.metro-cache che sopravvive ai riavvii dell'ambiente Replit,
-    # riducendo i cold-start successivi da ~64s a pochi secondi.
     EXPO_PACKAGER_PROXY_URL="https://$REPLIT_EXPO_DEV_DOMAIN" \
     REACT_NATIVE_PACKAGER_HOSTNAME="$REPLIT_EXPO_DEV_DOMAIN" \
     EXPO_PUBLIC_DOMAIN="$REPLIT_DEV_DOMAIN" \
@@ -277,22 +171,11 @@ for retry in $(seq 1 $MAX_RETRIES); do
   fi
 
   if [ $METRO_STARTED -eq 1 ]; then
-    # ── Pre-warm Android+iOS in parallelo — attende il primo completamento ───
-    # prewarm_bundles() restituisce sempre 0: il monitoring inizia comunque
-    # qualunque sia l'esito del pre-warm (graceful fallback totale).
-    # Log garantito: "Pre-warm bundle completato in Xs" appare PRIMA di
-    # "Metro in esecuzione, monitoraggio".
-    prewarm_bundles "$LOG_FILE"
-
-    # ── Monitoring loop: usa metro_is_alive (/status) per verificare che     ─
-    # Metro sia davvero pronto a servire asset, non solo che la porta sia     ─
-    # aperta. /status risponde rapidamente anche durante compilazione bundle. ─
     echo "Metro in esecuzione, monitoraggio porta $PORT..." | tee -a "$LOG_FILE"
     while true; do
       sleep 15
       if ! metro_is_alive; then
         echo "Metro giu': /status non risponde — $(date)" | tee -a "$LOG_FILE"
-        kill_prewarm
         break
       fi
     done
