@@ -304,13 +304,16 @@ Gradle non trova i path di React Native e il build si blocca).
 
 ### EAS Build (cloud)
 
-### Build #13 in corso (preview — APK Standalone)
-- **Build #13** avviato — 2026-03-28 — Profilo: preview (APK standalone, senza Metro, senza expo-dev-client)
-- **ID build**: 472183bf-889e-4723-886e-16233c079bff
-- **Expo page**: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/472183bf-889e-4723-886e-16233c079bff
+### Build #14 in corso (preview — APK Standalone, cache pulita)
+- **Build #14** avviato — 2026-03-28 — Profilo: preview (APK standalone, senza Metro, senza expo-dev-client)
+- **ID build**: de1d68e7-eacf-4f92-bb50-34dd27b1ef81
+- **Expo page**: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/de1d68e7-eacf-4f92-bb50-34dd27b1ef81
 - gradleCommand: assembleRelease — bundle JS embedded, installabile direttamente
-- Archivio ridotto: 53 MB (era 156 MB) grazie a .easignore aggiornato
-- Flag usati: `EAS_SKIP_AUTO_FINGERPRINT=1 EAS_BUILD_NO_EXPO_GO_WARNING=1 --non-interactive`
+- Archivio: 53 MB — Flag: `--clear-cache EAS_SKIP_AUTO_FINGERPRINT=1 EAS_BUILD_NO_EXPO_GO_WARNING=1`
+
+### Build #13 (preview APK — CANCELLATO dall'utente)
+- **ID build**: 472183bf-889e-4723-886e-16233c079bff
+- **Stato**: CANCELED (sostituito da Build #14 con --clear-cache)
 
 ### Build #12 (preview APK — CANCELLATO, .easignore non aggiornato)
 - **ID build**: 6c7835e7-3b25-42d7-87c5-a33b6a115c58
