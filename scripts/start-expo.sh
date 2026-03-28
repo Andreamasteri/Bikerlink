@@ -26,7 +26,7 @@ cleanup() {
 trap cleanup EXIT
 
 # ── Configurazione Node.js ─────────────────────────────────────────────────────
-export NODE_OPTIONS="--max-old-space-size=896"
+export NODE_OPTIONS="--max-old-space-size=512"
 
 # ── Funzioni di utilita' ────────────────────────────────────────────────────────
 
