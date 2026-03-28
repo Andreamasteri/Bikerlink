@@ -59,6 +59,7 @@ async function seed() {
         userType: userData.userType,
         sex: userData.sex,
         eulaAccepted: true,
+        emailVerified: true,
       })
       .returning();
 
