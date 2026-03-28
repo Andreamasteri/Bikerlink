@@ -13409,6 +13409,11 @@ var fakeCoppie = [
 ];
 async function autoSeedFakeUsers() {
   try {
+    const seededFlag = await db.select().from(appSettings).where((0, import_drizzle_orm11.eq)(appSettings.key, "fake_users_seeded")).limit(1);
+    if (seededFlag.length > 0 && seededFlag[0].value === "true") {
+      console.log("Auto-seed fake users skipped (fake_users_seeded flag set)");
+      return;
+    }
     const skipSetting = await db.select().from(appSettings).where((0, import_drizzle_orm11.eq)(appSettings.key, "skip_fake_user_seed")).limit(1);
     if (skipSetting.length > 0 && skipSetting[0].value === "true") {
       console.log("Auto-seed fake users skipped (admin deleted all fake users)");
@@ -13417,10 +13422,12 @@ async function autoSeedFakeUsers() {
     const massSeedTagged = await db.select({ id: users.id }).from(users).where(import_drizzle_orm11.sql`${users.invitationCode} IN ('mass_seed_2420', 'mass_seed_eu_v1')`).limit(1);
     if (massSeedTagged.length > 0) {
       console.log("Auto-seed fake users skipped (mass-seeded population exists)");
+      await db.insert(appSettings).values({ key: "fake_users_seeded", value: "true" }).onConflictDoUpdate({ target: appSettings.key, set: { value: "true" } });
       return;
     }
     const existingFakes = await db.select().from(users).where((0, import_drizzle_orm11.eq)(users.isFake, true)).limit(11);
     if (existingFakes.length > 10) {
+      await db.insert(appSettings).values({ key: "fake_users_seeded", value: "true" }).onConflictDoUpdate({ target: appSettings.key, set: { value: "true" } });
       return;
     }
     console.log("Auto-seeding fake users...");
@@ -13558,6 +13565,7 @@ async function autoSeedFakeUsers() {
         console.error(`Failed to seed coppia "${coppia.nickname}":`, err.message);
       }
     }
+    await db.insert(appSettings).values({ key: "fake_users_seeded", value: "true" }).onConflictDoUpdate({ target: appSettings.key, set: { value: "true" } });
     console.log("Auto-seeded fake users complete");
   } catch (err) {
     console.error("Auto-seed fake users failed:", err);

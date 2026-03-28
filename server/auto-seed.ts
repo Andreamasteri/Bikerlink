@@ -149,6 +149,17 @@ const fakeCoppie = [
 
 export async function autoSeedFakeUsers() {
   try {
+    const seededFlag = await db
+      .select()
+      .from(appSettings)
+      .where(eq(appSettings.key, "fake_users_seeded"))
+      .limit(1);
+
+    if (seededFlag.length > 0 && seededFlag[0].value === "true") {
+      console.log("Auto-seed fake users skipped (fake_users_seeded flag set)");
+      return;
+    }
+
     const skipSetting = await db
       .select()
       .from(appSettings)
@@ -168,6 +179,10 @@ export async function autoSeedFakeUsers() {
 
     if (massSeedTagged.length > 0) {
       console.log("Auto-seed fake users skipped (mass-seeded population exists)");
+      await db
+        .insert(appSettings)
+        .values({ key: "fake_users_seeded", value: "true" })
+        .onConflictDoUpdate({ target: appSettings.key, set: { value: "true" } });
       return;
     }
 
@@ -178,6 +193,10 @@ export async function autoSeedFakeUsers() {
       .limit(11);
 
     if (existingFakes.length > 10) {
+      await db
+        .insert(appSettings)
+        .values({ key: "fake_users_seeded", value: "true" })
+        .onConflictDoUpdate({ target: appSettings.key, set: { value: "true" } });
       return;
     }
 
@@ -341,6 +360,11 @@ export async function autoSeedFakeUsers() {
         console.error(`Failed to seed coppia "${coppia.nickname}":`, err.message);
       }
     }
+
+    await db
+      .insert(appSettings)
+      .values({ key: "fake_users_seeded", value: "true" })
+      .onConflictDoUpdate({ target: appSettings.key, set: { value: "true" } });
 
     console.log("Auto-seeded fake users complete");
   } catch (err) {
