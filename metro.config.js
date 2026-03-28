@@ -78,7 +78,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
 
 config.maxWorkers = 1;
 
-config.cacheVersion = "v6";
+config.cacheVersion = "v7";
 
 config.cacheStores = [
   new FileStore({ root: path.join(__dirname, ".metro-cache") }),
@@ -86,10 +86,7 @@ config.cacheStores = [
 
 config.transformer = {
   ...config.transformer,
-  minifierConfig: {
-    keep_fnames: true,
-    mangle: { keep_fnames: true },
-  },
+  minifierConfig: {},
 };
 
 module.exports = config;
