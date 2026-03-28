@@ -160471,6 +160471,7 @@ function configureExpoAndLanding(app2) {
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }
 var _otaCronTimer = null;
+var _otaInitTimer = null;
 async function runOtaCheck() {
   try {
     const now = /* @__PURE__ */ new Date();
@@ -160490,7 +160491,8 @@ async function runOtaCheck() {
   }
 }
 function startOtaCron() {
-  setTimeout(() => {
+  _otaInitTimer = setTimeout(() => {
+    _otaInitTimer = null;
     runOtaCheck();
     _otaCronTimer = setInterval(runOtaCheck, 60 * 1e3);
   }, 60 * 1e3);
@@ -160576,6 +160578,10 @@ function setupErrorHandler(app2) {
     _shuttingDown = true;
     console.log(`[Shutdown] ${signal} ricevuto \u2014 chiusura pulita in corso...`);
     stopMatchingEngine();
+    if (_otaInitTimer) {
+      clearTimeout(_otaInitTimer);
+      _otaInitTimer = null;
+    }
     if (_otaCronTimer) {
       clearInterval(_otaCronTimer);
       _otaCronTimer = null;

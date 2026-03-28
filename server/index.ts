@@ -314,6 +314,7 @@ function configureExpoAndLanding(app: express.Application) {
 }
 
 let _otaCronTimer: ReturnType<typeof setInterval> | null = null;
+let _otaInitTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function runOtaCheck() {
   try {
@@ -348,7 +349,8 @@ async function runOtaCheck() {
 
 function startOtaCron() {
   // Explicit 60s delay before first run, then every 60s
-  setTimeout(() => {
+  _otaInitTimer = setTimeout(() => {
+    _otaInitTimer = null;
     runOtaCheck();
     _otaCronTimer = setInterval(runOtaCheck, 60 * 1000);
   }, 60 * 1000);
@@ -476,6 +478,7 @@ function setupErrorHandler(app: express.Application) {
     _shuttingDown = true;
     console.log(`[Shutdown] ${signal} ricevuto — chiusura pulita in corso...`);
     stopMatchingEngine();
+    if (_otaInitTimer) { clearTimeout(_otaInitTimer); _otaInitTimer = null; }
     if (_otaCronTimer) { clearInterval(_otaCronTimer); _otaCronTimer = null; }
     server.close(() => {
       console.log("[Shutdown] Server HTTP chiuso.");
