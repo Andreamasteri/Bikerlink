@@ -4,7 +4,7 @@ import crypto from "crypto";
 import rateLimit from "express-rate-limit";
 import { registerSchema, loginSchema } from "@shared/schema";
 import { storage } from "../storage";
-import { sendVerificationEmail, sendPasswordResetEmail, sendInvitationGiftEmail } from "../email";
+import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetConfirmationEmail, sendInvitationGiftEmail } from "../email";
 import { createClubInvitesForMoto, createRegionalClubInvite } from "./motoclubs";
 
 declare module "express-session" {
@@ -285,22 +285,23 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res:
 
     const user = await storage.getUserByEmail(email.trim().toLowerCase());
     if (!user) {
-      return res.json({ message: "Se l'email è registrata, riceverai un link di recupero" });
+      return res.json({ message: "Se l'email è registrata, riceverai un codice di recupero" });
     }
 
-    const token = crypto.randomBytes(32).toString("hex");
+    const code = String(Math.floor(10000000 + Math.random() * 90000000));
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-    await storage.createPasswordResetToken(user.id, token, expiresAt);
+    await (storage as any).deletePasswordResetTokens(user.id);
+    await storage.createPasswordResetToken(user.id, code, expiresAt);
 
-    const emailSent = await sendPasswordResetEmail(user.email, user.nickname, token);
+    const emailSent = await sendPasswordResetEmail(user.email, user.nickname, code);
     if (emailSent) {
-      console.log(`[PASSWORD RESET] Email di reset inviata a ${user.email}`);
+      console.log(`[PASSWORD RESET] Codice reset inviato a ${user.email}`);
     } else {
       console.warn(`[PASSWORD RESET] Email NON inviata a ${user.email}`);
     }
 
-    return res.json({ message: "Se l'email è registrata, riceverai un link di recupero" });
+    return res.json({ message: "Se l'email è registrata, riceverai un codice di recupero" });
   } catch (error) {
     console.error("Forgot password error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -309,31 +310,76 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res:
 
 router.post("/reset-password", async (req: Request, res: Response) => {
   try {
-    const { token, password } = req.body;
-    if (!token || !password) {
-      return res.status(400).json({ message: "Token e password richiesti" });
+    const { email, code, password } = req.body;
+    if (!email || !code || !password) {
+      return res.status(400).json({ message: "Email, codice e password richiesti" });
     }
 
     if (password.length < 8) {
       return res.status(400).json({ message: "La password deve avere almeno 8 caratteri" });
     }
 
-    const resetToken = await storage.getPasswordResetToken(token);
+    const user = await storage.getUserByEmail(email.trim().toLowerCase());
+    if (!user) {
+      return res.status(400).json({ message: "Codice non valido o scaduto" });
+    }
+
+    const resetToken = await (storage as any).getPasswordResetTokenByCode(user.id, String(code).trim());
     if (!resetToken) {
-      return res.status(400).json({ message: "Token non valido o già utilizzato" });
+      return res.status(400).json({ message: "Codice non valido o già utilizzato" });
     }
 
     if (new Date(resetToken.expiresAt) < new Date()) {
-      return res.status(400).json({ message: "Token scaduto" });
+      return res.status(400).json({ message: "Codice scaduto — richiedi un nuovo codice" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
-    await storage.updateUser(resetToken.userId, { password: hashedPassword } as any);
-    await storage.markPasswordResetTokenUsed(token);
+    await storage.updateUser(user.id, { password: hashedPassword } as any);
+    await storage.markPasswordResetTokenUsed(resetToken.token);
 
-    return res.json({ message: "Password aggiornata con successo" });
+    req.session.userId = user.id;
+    await new Promise<void>((resolve, reject) => {
+      req.session.save((err) => { if (err) reject(err); else resolve(); });
+    });
+
+    sendPasswordResetConfirmationEmail(user.email, user.nickname).catch((e) =>
+      console.warn("[PASSWORD RESET] Confirmation email failed:", e)
+    );
+
+    const { password: _, ...safeUser } = user;
+    return res.json({ ...safeUser, passwordReset: true });
   } catch (error) {
     console.error("Reset password error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/resend-reset-code", async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Email richiesta" });
+    }
+
+    const user = await storage.getUserByEmail(email.trim().toLowerCase());
+    if (!user) {
+      return res.json({ message: "Se l'email è registrata, riceverai un nuovo codice" });
+    }
+
+    const code = String(Math.floor(10000000 + Math.random() * 90000000));
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    await (storage as any).deletePasswordResetTokens(user.id);
+    await storage.createPasswordResetToken(user.id, code, expiresAt);
+
+    const emailSent = await sendPasswordResetEmail(user.email, user.nickname, code);
+    if (!emailSent) {
+      console.warn(`[PASSWORD RESET] Resend: email NON inviata a ${user.email}`);
+    }
+
+    return res.json({ message: "Nuovo codice inviato" });
+  } catch (error) {
+    console.error("Resend reset code error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

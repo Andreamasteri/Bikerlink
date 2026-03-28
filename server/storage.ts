@@ -1124,8 +1124,21 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
+  async getPasswordResetTokenByCode(userId: string, code: string) {
+    const [row] = await db
+      .select()
+      .from(passwordResetTokens)
+      .where(and(eq(passwordResetTokens.userId, userId), eq(passwordResetTokens.token, code), eq(passwordResetTokens.used, false)))
+      .limit(1);
+    return row;
+  }
+
   async markPasswordResetTokenUsed(token: string): Promise<void> {
     await db.update(passwordResetTokens).set({ used: true }).where(eq(passwordResetTokens.token, token));
+  }
+
+  async deletePasswordResetTokens(userId: string): Promise<void> {
+    await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId));
   }
 
   async getMotorcyclePhotos(motorcycleId: string): Promise<MotorcyclePhoto[]> {

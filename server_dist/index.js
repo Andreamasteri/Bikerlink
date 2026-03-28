@@ -1372,8 +1372,15 @@ var init_storage = __esm({
         const [row] = await db.select().from(passwordResetTokens).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(passwordResetTokens.token, token), (0, import_drizzle_orm2.eq)(passwordResetTokens.used, false))).limit(1);
         return row;
       }
+      async getPasswordResetTokenByCode(userId, code) {
+        const [row] = await db.select().from(passwordResetTokens).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(passwordResetTokens.userId, userId), (0, import_drizzle_orm2.eq)(passwordResetTokens.token, code), (0, import_drizzle_orm2.eq)(passwordResetTokens.used, false))).limit(1);
+        return row;
+      }
       async markPasswordResetTokenUsed(token) {
         await db.update(passwordResetTokens).set({ used: true }).where((0, import_drizzle_orm2.eq)(passwordResetTokens.token, token));
+      }
+      async deletePasswordResetTokens(userId) {
+        await db.delete(passwordResetTokens).where((0, import_drizzle_orm2.eq)(passwordResetTokens.userId, userId));
       }
       async getMotorcyclePhotos(motorcycleId) {
         return db.select().from(motorcyclePhotos).where((0, import_drizzle_orm2.eq)(motorcyclePhotos.motorcycleId, motorcycleId)).orderBy((0, import_drizzle_orm2.asc)(motorcyclePhotos.sortOrder));
@@ -4255,7 +4262,7 @@ async function sendInvitationGiftEmail(to, code, imageUrl, giftMessage, expiryDa
     return false;
   }
 }
-async function sendPasswordResetEmail(to, nickname, token) {
+async function sendPasswordResetEmail(to, nickname, code) {
   const subject = "BikerLink - Recupero password";
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
@@ -4267,16 +4274,43 @@ async function sendPasswordResetEmail(to, nickname, token) {
       <div style="background: #1a1a2e; border-radius: 12px; padding: 30px; color: #fff;">
         <h2 style="margin-top: 0; font-size: 20px;">Ciao ${nickname}!</h2>
         <p style="color: #ccc; line-height: 1.6;">
-          Hai richiesto il recupero della password del tuo account BikerLink. Usa il seguente codice per reimpostare la password nell'app:
+          Hai richiesto il recupero della password del tuo account BikerLink.<br/>
+          Inserisci il seguente codice nell'app per reimpostare la password:
         </p>
 
-        <div style="background: #FF6B35; border-radius: 8px; padding: 16px; text-align: center; margin: 24px 0;">
-          <span style="font-size: 14px; font-weight: bold; letter-spacing: 2px; color: #fff; word-break: break-all;">${token}</span>
+        <div style="background: #FF6B35; border-radius: 8px; padding: 20px; text-align: center; margin: 24px 0;">
+          <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #fff;">${code}</span>
         </div>
 
         <p style="color: #999; font-size: 13px; line-height: 1.5;">
           Il codice scade tra 1 ora.<br/>
           Se non hai richiesto il recupero password, ignora questa email. Il tuo account \xE8 al sicuro.
+        </p>
+      </div>
+
+      <p style="text-align: center; color: #666; font-size: 12px; margin-top: 20px;">
+        \xA9 ${(/* @__PURE__ */ new Date()).getFullYear()} BikerLink \u2014 Tutti i diritti riservati
+      </p>
+    </div>
+  `;
+  return sendEmail(to, subject, html);
+}
+async function sendPasswordResetConfirmationEmail(to, nickname) {
+  const subject = "BikerLink - Password aggiornata";
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
+      <div style="text-align: center; margin-bottom: 30px;">
+        <h1 style="color: #FF6B35; margin: 0; font-size: 28px;">\u{1F3CD}\uFE0F BikerLink</h1>
+        <p style="color: #888; font-size: 14px; margin-top: 4px;">U'll never ride alone</p>
+      </div>
+
+      <div style="background: #1a1a2e; border-radius: 12px; padding: 30px; color: #fff;">
+        <h2 style="margin-top: 0; font-size: 20px;">Ciao ${nickname}!</h2>
+        <p style="color: #ccc; line-height: 1.6;">
+          La tua password \xE8 stata aggiornata con successo. Ora sei di nuovo in pista! \u{1F3CD}\uFE0F
+        </p>
+        <p style="color: #999; font-size: 13px; line-height: 1.5;">
+          Se non hai effettuato questa modifica, contatta subito il supporto.
         </p>
       </div>
 
@@ -5113,18 +5147,19 @@ router2.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
     }
     const user = await storage.getUserByEmail(email.trim().toLowerCase());
     if (!user) {
-      return res.json({ message: "Se l'email \xE8 registrata, riceverai un link di recupero" });
+      return res.json({ message: "Se l'email \xE8 registrata, riceverai un codice di recupero" });
     }
-    const token = import_crypto.default.randomBytes(32).toString("hex");
+    const code = String(Math.floor(1e7 + Math.random() * 9e7));
     const expiresAt = new Date(Date.now() + 60 * 60 * 1e3);
-    await storage.createPasswordResetToken(user.id, token, expiresAt);
-    const emailSent = await sendPasswordResetEmail(user.email, user.nickname, token);
+    await storage.deletePasswordResetTokens(user.id);
+    await storage.createPasswordResetToken(user.id, code, expiresAt);
+    const emailSent = await sendPasswordResetEmail(user.email, user.nickname, code);
     if (emailSent) {
-      console.log(`[PASSWORD RESET] Email di reset inviata a ${user.email}`);
+      console.log(`[PASSWORD RESET] Codice reset inviato a ${user.email}`);
     } else {
       console.warn(`[PASSWORD RESET] Email NON inviata a ${user.email}`);
     }
-    return res.json({ message: "Se l'email \xE8 registrata, riceverai un link di recupero" });
+    return res.json({ message: "Se l'email \xE8 registrata, riceverai un codice di recupero" });
   } catch (error) {
     console.error("Forgot password error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -5132,26 +5167,65 @@ router2.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
 });
 router2.post("/reset-password", async (req, res) => {
   try {
-    const { token, password } = req.body;
-    if (!token || !password) {
-      return res.status(400).json({ message: "Token e password richiesti" });
+    const { email, code, password } = req.body;
+    if (!email || !code || !password) {
+      return res.status(400).json({ message: "Email, codice e password richiesti" });
     }
     if (password.length < 8) {
       return res.status(400).json({ message: "La password deve avere almeno 8 caratteri" });
     }
-    const resetToken = await storage.getPasswordResetToken(token);
+    const user = await storage.getUserByEmail(email.trim().toLowerCase());
+    if (!user) {
+      return res.status(400).json({ message: "Codice non valido o scaduto" });
+    }
+    const resetToken = await storage.getPasswordResetTokenByCode(user.id, String(code).trim());
     if (!resetToken) {
-      return res.status(400).json({ message: "Token non valido o gi\xE0 utilizzato" });
+      return res.status(400).json({ message: "Codice non valido o gi\xE0 utilizzato" });
     }
     if (new Date(resetToken.expiresAt) < /* @__PURE__ */ new Date()) {
-      return res.status(400).json({ message: "Token scaduto" });
+      return res.status(400).json({ message: "Codice scaduto \u2014 richiedi un nuovo codice" });
     }
     const hashedPassword = await import_bcryptjs.default.hash(password, 12);
-    await storage.updateUser(resetToken.userId, { password: hashedPassword });
-    await storage.markPasswordResetTokenUsed(token);
-    return res.json({ message: "Password aggiornata con successo" });
+    await storage.updateUser(user.id, { password: hashedPassword });
+    await storage.markPasswordResetTokenUsed(resetToken.token);
+    req.session.userId = user.id;
+    await new Promise((resolve3, reject) => {
+      req.session.save((err) => {
+        if (err) reject(err);
+        else resolve3();
+      });
+    });
+    sendPasswordResetConfirmationEmail(user.email, user.nickname).catch(
+      (e) => console.warn("[PASSWORD RESET] Confirmation email failed:", e)
+    );
+    const { password: _, ...safeUser } = user;
+    return res.json({ ...safeUser, passwordReset: true });
   } catch (error) {
     console.error("Reset password error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+router2.post("/resend-reset-code", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Email richiesta" });
+    }
+    const user = await storage.getUserByEmail(email.trim().toLowerCase());
+    if (!user) {
+      return res.json({ message: "Se l'email \xE8 registrata, riceverai un nuovo codice" });
+    }
+    const code = String(Math.floor(1e7 + Math.random() * 9e7));
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1e3);
+    await storage.deletePasswordResetTokens(user.id);
+    await storage.createPasswordResetToken(user.id, code, expiresAt);
+    const emailSent = await sendPasswordResetEmail(user.email, user.nickname, code);
+    if (!emailSent) {
+      console.warn(`[PASSWORD RESET] Resend: email NON inviata a ${user.email}`);
+    }
+    return res.json({ message: "Nuovo codice inviato" });
+  } catch (error) {
+    console.error("Resend reset code error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

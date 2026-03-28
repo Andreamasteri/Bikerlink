@@ -209,7 +209,7 @@ export async function sendInvitationGiftEmail(
   }
 }
 
-export async function sendPasswordResetEmail(to: string, nickname: string, token: string): Promise<boolean> {
+export async function sendPasswordResetEmail(to: string, nickname: string, code: string): Promise<boolean> {
   const subject = "BikerLink - Recupero password";
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
@@ -221,16 +221,45 @@ export async function sendPasswordResetEmail(to: string, nickname: string, token
       <div style="background: #1a1a2e; border-radius: 12px; padding: 30px; color: #fff;">
         <h2 style="margin-top: 0; font-size: 20px;">Ciao ${nickname}!</h2>
         <p style="color: #ccc; line-height: 1.6;">
-          Hai richiesto il recupero della password del tuo account BikerLink. Usa il seguente codice per reimpostare la password nell'app:
+          Hai richiesto il recupero della password del tuo account BikerLink.<br/>
+          Inserisci il seguente codice nell'app per reimpostare la password:
         </p>
 
-        <div style="background: #FF6B35; border-radius: 8px; padding: 16px; text-align: center; margin: 24px 0;">
-          <span style="font-size: 14px; font-weight: bold; letter-spacing: 2px; color: #fff; word-break: break-all;">${token}</span>
+        <div style="background: #FF6B35; border-radius: 8px; padding: 20px; text-align: center; margin: 24px 0;">
+          <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #fff;">${code}</span>
         </div>
 
         <p style="color: #999; font-size: 13px; line-height: 1.5;">
           Il codice scade tra 1 ora.<br/>
           Se non hai richiesto il recupero password, ignora questa email. Il tuo account è al sicuro.
+        </p>
+      </div>
+
+      <p style="text-align: center; color: #666; font-size: 12px; margin-top: 20px;">
+        © ${new Date().getFullYear()} BikerLink — Tutti i diritti riservati
+      </p>
+    </div>
+  `;
+
+  return sendEmail(to, subject, html);
+}
+
+export async function sendPasswordResetConfirmationEmail(to: string, nickname: string): Promise<boolean> {
+  const subject = "BikerLink - Password aggiornata";
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
+      <div style="text-align: center; margin-bottom: 30px;">
+        <h1 style="color: #FF6B35; margin: 0; font-size: 28px;">🏍️ BikerLink</h1>
+        <p style="color: #888; font-size: 14px; margin-top: 4px;">U'll never ride alone</p>
+      </div>
+
+      <div style="background: #1a1a2e; border-radius: 12px; padding: 30px; color: #fff;">
+        <h2 style="margin-top: 0; font-size: 20px;">Ciao ${nickname}!</h2>
+        <p style="color: #ccc; line-height: 1.6;">
+          La tua password è stata aggiornata con successo. Ora sei di nuovo in pista! 🏍️
+        </p>
+        <p style="color: #999; font-size: 13px; line-height: 1.5;">
+          Se non hai effettuato questa modifica, contatta subito il supporto.
         </p>
       </div>
 
