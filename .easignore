@@ -50,8 +50,8 @@ stress-test/
 server/templates/
 server/public/
 
-# Script logs
-scripts/*.log
+# Scripts directory (not needed for mobile build)
+scripts/
 
 # Metro cache (bundler cache, not needed for EAS)
 .metro-cache/
@@ -67,3 +67,11 @@ uploads/
 
 # Compiled server (not needed for mobile build)
 server_dist/
+
+# Documentation and manual files (not needed for mobile build)
+manuale-utente-bikerlink.md
+manuale-utente-bikerlink.docx
+BikerLink_Checklist.docx
+ANDROID_STUDIO.md
+replit.md
+eas-build-log.txt

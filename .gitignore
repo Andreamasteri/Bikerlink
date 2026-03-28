@@ -48,3 +48,6 @@ logs/
 
 # Static build (generated artifacts — non includere nel repo)
 static-build/
+
+# Compiled server
+server_dist/

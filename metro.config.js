@@ -46,6 +46,8 @@ config.resolver.blockList = [
   /\/scripts\//,
   /\/tmp\//,
   /\/migrations\//,
+  /\/static-build\//,
+  /\/attached_assets\//,
   /.*seed.*\.js$/,
   /.*seed.*\.ts$/,
   /.*\.sh$/,
