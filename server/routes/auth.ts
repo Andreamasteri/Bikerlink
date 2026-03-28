@@ -331,6 +331,10 @@ router.post("/reset-password", resetPasswordLimiter, async (req: Request, res: R
       return res.status(400).json({ message: "Email, codice e password richiesti" });
     }
 
+    if (!/^\d{8}$/.test(String(code).trim())) {
+      return res.status(400).json({ message: "Il codice deve essere composto da 8 cifre" });
+    }
+
     if (password.length < 8) {
       return res.status(400).json({ message: "La password deve avere almeno 8 caratteri" });
     }
@@ -397,7 +401,7 @@ router.post("/resend-reset-code", resendResetLimiter, async (req: Request, res: 
       console.warn(`[PASSWORD RESET] Resend: email NON inviata a ${user.email}`);
     }
 
-    return res.json({ message: "Nuovo codice inviato" });
+    return res.json({ message: "Se l'email è registrata, riceverai un nuovo codice" });
   } catch (error) {
     console.error("Resend reset code error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
