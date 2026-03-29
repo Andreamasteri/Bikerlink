@@ -96,7 +96,24 @@
     "iosUpdateId": null,
     "commitBase": "bcd0fa43aaad188a9d7f788ba88e47e9476f922f",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/57526da1-a906-4ba3-8286-34d955ce1512",
-    "status": "published",
+    "status": "superseded",
     "requiresBackendDeploy": true
+  },
+  {
+    "updateNumber": 7,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-7: check OTA pre-login con useUpdates() — aggiornamento silenzioso all'avvio",
+    "publishedAt": "2026-03-29",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Aggiunto OtaStartupChecker in _layout.tsx dentro StartupGate, prima di MapReadyGate. Usa useUpdates() di expo-updates: guarda isUpdatePending → chiama reloadAsync() in modo silenzioso. Nessun modal, nessun loop. Guard: __DEV__ e Platform.OS === 'web'. Bundle Hermes .hbc 3.65 MB.",
+    "updateGroupId": "06753f22-1e9c-4147-b165-e4a2d11678ed",
+    "androidUpdateId": "019d3912-8d1d-7f9c-8acd-738b935eacc9",
+    "iosUpdateId": null,
+    "commitBase": "a89c49f44961950f0f53d2e57204f8d9c1b709c3",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/06753f22-1e9c-4147-b165-e4a2d11678ed",
+    "status": "published"
   }
 ]

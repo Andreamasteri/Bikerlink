@@ -10,6 +10,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
 import { Platform, AppState, ActivityIndicator, View, StyleSheet } from "react-native";
+import { useUpdates } from "expo-updates";
 
 if (Platform.OS === "web" && typeof window !== "undefined") {
   const link = document.createElement("link");
@@ -113,6 +114,22 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
     );
   }
   return <>{children}</>;
+}
+
+function OtaStartupChecker() {
+  const { isUpdatePending } = useUpdates();
+  const reloadedRef = useRef(false);
+
+  useEffect(() => {
+    if (__DEV__ || Platform.OS === "web") return;
+    if (reloadedRef.current || !isUpdatePending) return;
+    reloadedRef.current = true;
+    import("expo-updates").then((Updates) => {
+      Updates.reloadAsync().catch(() => {});
+    });
+  }, [isUpdatePending]);
+
+  return null;
 }
 
 function AdminUptimeOverlay() {
@@ -219,6 +236,7 @@ export default function RootLayout() {
             <MapSettingsProvider>
               <LocationProvider>
                 <StartupGate ready={ready}>
+                  <OtaStartupChecker />
                   <MapReadyGate>
                     <AppStateHandler />
                     <AdminUptimeOverlay />
