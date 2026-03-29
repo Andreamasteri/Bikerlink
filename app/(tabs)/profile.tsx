@@ -874,7 +874,7 @@ export default function ProfileScreen() {
         <MenuItem icon="trash-outline" label={t("profile.deleteAccount")} onPress={handleDeleteAccount} color={Colors.accentRed} />
       </View>
 
-      <View style={[styles.section, { marginTop: 8, gap: 10 }]}>
+      <View style={[styles.section, { marginTop: 32, gap: 10 }]}>
         <Pressable style={styles.clearCacheBtn} onPress={handleClearCache}>
           <Ionicons name="trash-bin-outline" size={20} color={Colors.textSecondary} />
           <Text style={styles.clearCacheBtnText}>Cancella cache locale</Text>
@@ -920,7 +920,6 @@ export default function ProfileScreen() {
         </Pressable>
       </Modal>
 
-      <Text style={{ color: "#7B2FBE", fontSize: 18, fontFamily: "Inter_600SemiBold", textAlign: "center", paddingVertical: 24 }}>ciao ciao</Text>
       <View style={{ height: 40 }} />
     </ScrollView>
   );

@@ -165,6 +165,23 @@
     "iosUpdateId": null,
     "commitBase": "b3442b7",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/d67c9691-9176-4bc7-bf00-e493aa6e6db1",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 11,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-11: rimossa scritta ciao ciao, spaziatura bottoni cache/esci nel profilo",
+    "publishedAt": "2026-03-29",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Rimossa scritta 'ciao ciao' in viola dal fondo del tab Profilo. Aumentato marginTop da 8 a 32 tra la sezione 'Elimina account' e la sezione 'Cancella cache locale'/'Esci', per separazione visiva netta. Bundle Hermes .hbc 3.64 MB.",
+    "updateGroupId": "546ad8dc-d43b-44af-b0b2-f98e4edc5151",
+    "androidUpdateId": "019d3b12-dfbd-7dfe-8756-4d6d8807da4a",
+    "iosUpdateId": null,
+    "commitBase": "6677335087f06881e3d8b740e6ddc19f0ef396ba",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/546ad8dc-d43b-44af-b0b2-f98e4edc5151",
     "status": "published"
   }
 ]
