@@ -2986,7 +2986,7 @@ router.patch("/ota/:id/deactivate", async (req: Request, res: Response) => {
     const [updated] = await db
       .update(otaReleases)
       .set({ status: "superseded", updatedAt: now })
-      .where(eq(otaReleases.id, id))
+      .where(and(eq(otaReleases.id, id), eq(otaReleases.status, "active")))
       .returning();
 
     await storage.createModeratorLog({

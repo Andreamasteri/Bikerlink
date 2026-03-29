@@ -214,7 +214,7 @@ export default function OtaScreen() {
       `Disattivare la versione ${release.version}? Gli utenti non vedranno più il modal di aggiornamento finché non pubblichi una nuova release.`,
       [
         { text: "Annulla", style: "cancel" },
-        { text: "Disattiva", style: "destructive", onPress: () => deactivateMutation.mutate(release.id) },
+        { text: "Disattiva", style: "default", onPress: () => deactivateMutation.mutate(release.id) },
       ]
     );
   }

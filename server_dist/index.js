@@ -12252,7 +12252,7 @@ router17.patch("/ota/:id/deactivate", async (req, res) => {
       return res.status(400).json({ message: "Solo le release attive possono essere disattivate" });
     }
     const now = /* @__PURE__ */ new Date();
-    const [updated] = await db.update(otaReleases).set({ status: "superseded", updatedAt: now }).where((0, import_drizzle_orm9.eq)(otaReleases.id, id)).returning();
+    const [updated] = await db.update(otaReleases).set({ status: "superseded", updatedAt: now }).where((0, import_drizzle_orm9.and)((0, import_drizzle_orm9.eq)(otaReleases.id, id), (0, import_drizzle_orm9.eq)(otaReleases.status, "active"))).returning();
     await storage.createModeratorLog({
       moderatorId: req.session.userId,
       action: "deactivate_ota_release",
