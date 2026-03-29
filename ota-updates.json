@@ -233,6 +233,23 @@
     "iosUpdateId": null,
     "commitBase": "a6a5770",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/3e1e6ca3-c90f-4324-bf57-aed47dfc5c45",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 16,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-16: match reset su cambio filtro km→stati + escludi accettati dalla lista",
+    "publishedAt": "2026-03-29",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "2 fix in app/(tabs)/match.tsx: (1) Quando si passa da 'Raggio km' a 'Stati selezionati', se distanceMode era 'km' viene chiamato automaticamente resetAndRematchMutation.mutate() per rigenerare i match; (2) Match con status 'accepted' esclusi da visibleGarageMatches, visibleBikerMatchesRaw e visibleProposalMatches — le coppie già accettate non appaiono più nella lista profili match, accessibili solo via chat.",
+    "updateGroupId": "b28705a7-2daa-40a6-85ef-5628e6e16c7f",
+    "androidUpdateId": "019d3bf1-fa46-7207-aa39-79a5f216eef0",
+    "iosUpdateId": null,
+    "commitBase": "7d2559a916ebaf776d0f1bc08975fcc1a3ad1fd8",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/b28705a7-2daa-40a6-85ef-5628e6e16c7f",
     "status": "published"
   }
 ]

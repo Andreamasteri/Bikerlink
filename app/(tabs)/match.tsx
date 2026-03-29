@@ -522,10 +522,10 @@ export default function MatchScreen() {
   };
 
   const visibleGarageMatches = allGarageMatches
-    .filter((m: any) => m.status !== "rejected" && passesDistanceFilter(m.otherLat, m.otherLng, m.status))
+    .filter((m: any) => m.status !== "rejected" && m.status !== "accepted" && passesDistanceFilter(m.otherLat, m.otherLng, m.status))
     .sort((a: any, b: any) => matchSortScore(b) - matchSortScore(a));
   const visibleBikerMatchesRaw = allBikerMatches
-    .filter((m: any) => m.status !== "rejected" && passesDistanceFilter(m.otherLat, m.otherLng, m.status))
+    .filter((m: any) => m.status !== "rejected" && m.status !== "accepted" && passesDistanceFilter(m.otherLat, m.otherLng, m.status))
     .sort((a: any, b: any) => {
       const scoreDiff = matchSortScore(b) - matchSortScore(a);
       if (scoreDiff !== 0) return scoreDiff;
@@ -541,7 +541,7 @@ export default function MatchScreen() {
       return xOther === otherUserId;
     }) === idx;
   });
-  const visibleProposalMatches = allProposalMatches.filter((m: any) => m.status !== "rejected" && m.status !== "expired");
+  const visibleProposalMatches = allProposalMatches.filter((m: any) => m.status !== "rejected" && m.status !== "expired" && m.status !== "accepted");
 
   const newGarageMatches = visibleGarageMatches.filter((m: any) => m.status === "new");
   const newBikerMatches = visibleBikerMatches.filter((m: any) => m.status === "new");
@@ -907,8 +907,10 @@ export default function MatchScreen() {
         <TouchableOpacity
           style={[styles.distanceModeBtn, distanceMode === "all" && styles.distanceModeBtnActive]}
           onPress={() => {
+            const wasKm = distanceMode === "km";
             setDistanceMode("all");
             AsyncStorage.multiSet([["match_distance_mode", "all"], ["match_distance_km", distanceKm]]).catch(() => {});
+            if (wasKm) resetAndRematchMutation.mutate();
           }}
         >
           <Text style={[styles.distanceModeBtnText, distanceMode === "all" && styles.distanceModeBtnTextActive]}>
