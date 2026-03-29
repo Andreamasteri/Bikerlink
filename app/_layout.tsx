@@ -117,17 +117,24 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
 }
 
 function OtaStartupChecker() {
-  const { isUpdatePending } = useUpdates();
   const reloadedRef = useRef(false);
+  let updates: ReturnType<typeof useUpdates> | null = null;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    updates = useUpdates();
+  } catch {
+    // expo-updates non disponibile (runtime non supportato)
+  }
 
   useEffect(() => {
     if (__DEV__ || Platform.OS === "web") return;
-    if (reloadedRef.current || !isUpdatePending) return;
+    if (!updates) return;
+    if (reloadedRef.current || !updates.isUpdatePending) return;
     reloadedRef.current = true;
     import("expo-updates").then((Updates) => {
       Updates.reloadAsync().catch(() => {});
     });
-  }, [isUpdatePending]);
+  }, [updates?.isUpdatePending]);
 
   return null;
 }
