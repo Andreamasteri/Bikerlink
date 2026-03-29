@@ -150,6 +150,7 @@ export interface IStorage {
   getUserProfile(userId: string): Promise<UserProfile | undefined>;
   createUserProfile(profile: InsertUserProfile): Promise<UserProfile>;
   updateUserProfile(userId: string, data: Partial<InsertUserProfile>): Promise<UserProfile | undefined>;
+  upsertUserProfile(userId: string, data: Partial<InsertUserProfile>): Promise<UserProfile>;
 
   getProposals(filters?: { status?: string }): Promise<Proposal[]>;
   getActiveProposalsWithLocation(): Promise<Proposal[]>;
@@ -460,6 +461,18 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserProfile(userId: string, data: Partial<InsertUserProfile>): Promise<UserProfile | undefined> {
     const [profile] = await db.update(userProfiles).set({ ...data, updatedAt: new Date() }).where(eq(userProfiles.userId, userId)).returning();
+    return profile;
+  }
+
+  async upsertUserProfile(userId: string, data: Partial<InsertUserProfile>): Promise<UserProfile> {
+    const [profile] = await db
+      .insert(userProfiles)
+      .values({ userId, ...data })
+      .onConflictDoUpdate({
+        target: userProfiles.userId,
+        set: { ...data, updatedAt: new Date() },
+      })
+      .returning();
     return profile;
   }
 
