@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
   availabilityContainer: {
     position: "absolute",
     bottom: Platform.OS === "web" ? 106 : 86,
-    left: 12,
+    left: 16,
     zIndex: 10,
   },
   locationButton: {
