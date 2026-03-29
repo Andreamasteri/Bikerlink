@@ -86,3 +86,7 @@ Il seed imposta `emailVerified: true` per tutti gli utenti creati.
 - **Nodemailer**: Module for sending emails.
 - **Gmail SMTP**: Email sending service.
 - **eas-cli**: Command-line interface for Expo Application Services builds.
+## Dev vs Production JS Engine (Android)
+- **Sviluppo (Expo Go)**: `app.json` → `expo.android.jsEngine: "jsc"` — Metro serve JS normale senza bytecode Hermes, evitando OOM durante la compilazione.
+- **Build EAS** (preview/production): `eas.json` → `android.jsEngine: "hermes"` — sovrascrive il valore di app.json; le APK/AAB di produzione usano Hermes come da progetto originale.
+- Non modificare questa configurazione per evitare crash Metro al 68% su Expo Go Android.
