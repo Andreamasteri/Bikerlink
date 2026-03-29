@@ -8,7 +8,6 @@
       "channel": "preview",
       "distribution": "internal",
       "android": {
-        "jsEngine": "hermes",
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease"
       },
@@ -20,7 +19,6 @@
       "channel": "production",
       "distribution": "store",
       "android": {
-        "jsEngine": "hermes",
         "buildType": "app-bundle",
         "gradleCommand": ":app:bundleRelease"
       },
