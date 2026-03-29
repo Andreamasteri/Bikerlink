@@ -524,7 +524,7 @@ export default function MatchScreen() {
   const visibleGarageMatches = allGarageMatches
     .filter((m: any) => m.status !== "rejected" && m.status !== "accepted" && passesDistanceFilter(m.otherLat, m.otherLng, m.status))
     .sort((a: any, b: any) => matchSortScore(b) - matchSortScore(a));
-  const visibleBikerMatchesRaw = allBikerMatches
+  const visibleBikerMatches = allBikerMatches
     .filter((m: any) => m.status !== "rejected" && m.status !== "accepted" && passesDistanceFilter(m.otherLat, m.otherLng, m.status))
     .sort((a: any, b: any) => {
       const scoreDiff = matchSortScore(b) - matchSortScore(a);
@@ -533,14 +533,6 @@ export default function MatchScreen() {
       const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
       return bTime - aTime;
     });
-  const visibleBikerMatches = visibleBikerMatchesRaw.filter((m: any, idx: number) => {
-    const isBiker1 = m.biker1Id === user?.id;
-    const otherUserId = isBiker1 ? m.biker2Id : m.biker1Id;
-    return visibleBikerMatchesRaw.findIndex((x: any) => {
-      const xOther = x.biker1Id === user?.id ? x.biker2Id : x.biker1Id;
-      return xOther === otherUserId;
-    }) === idx;
-  });
   const visibleProposalMatches = allProposalMatches.filter((m: any) => m.status !== "rejected" && m.status !== "expired" && m.status !== "accepted");
 
   const newGarageMatches = visibleGarageMatches.filter((m: any) => m.status === "new");

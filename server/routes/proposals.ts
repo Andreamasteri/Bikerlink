@@ -166,7 +166,29 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
       })
     );
 
-    return res.json(results.filter(Boolean));
+    const enriched = results.filter(Boolean) as NonNullable<(typeof results)[number]>[];
+
+    const bestByUser = new Map<string, typeof enriched[number]>();
+    for (const m of enriched) {
+      const isBiker = m.bikerId === userId;
+      const otherUserId = isBiker ? m.zavarrinaId : m.bikerId;
+      const existing = bestByUser.get(otherUserId);
+      if (!existing) {
+        bestByUser.set(otherUserId, m);
+      } else {
+        const mIsSuper = m.isSupermatch;
+        const exIsSuper = existing.isSupermatch;
+        if (mIsSuper && !exIsSuper) {
+          bestByUser.set(otherUserId, m);
+        } else if (mIsSuper === exIsSuper) {
+          const mTime = m.createdAt ? new Date(m.createdAt).getTime() : 0;
+          const exTime = existing.createdAt ? new Date(existing.createdAt).getTime() : 0;
+          if (mTime > exTime) bestByUser.set(otherUserId, m);
+        }
+      }
+    }
+
+    return res.json([...bestByUser.values()]);
   } catch (error) {
     console.error("Get garage matches error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -364,7 +386,29 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
       })
     );
 
-    return res.json(results.filter(Boolean));
+    const enriched = results.filter(Boolean) as NonNullable<(typeof results)[number]>[];
+
+    const bestByUser = new Map<string, typeof enriched[number]>();
+    for (const m of enriched) {
+      const isBiker1 = m.biker1Id === userId;
+      const otherUserId = isBiker1 ? m.biker2Id : m.biker1Id;
+      const existing = bestByUser.get(otherUserId);
+      if (!existing) {
+        bestByUser.set(otherUserId, m);
+      } else {
+        const mIsSuper = m.isSupermatch;
+        const exIsSuper = existing.isSupermatch;
+        if (mIsSuper && !exIsSuper) {
+          bestByUser.set(otherUserId, m);
+        } else if (mIsSuper === exIsSuper) {
+          const mTime = m.createdAt ? new Date(m.createdAt).getTime() : 0;
+          const exTime = existing.createdAt ? new Date(existing.createdAt).getTime() : 0;
+          if (mTime > exTime) bestByUser.set(otherUserId, m);
+        }
+      }
+    }
+
+    return res.json([...bestByUser.values()]);
   } catch (error) {
     console.error("Get biker-biker matches error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
