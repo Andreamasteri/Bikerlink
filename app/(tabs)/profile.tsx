@@ -31,6 +31,7 @@ import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMapConfig } from "@/lib/map-context";
 import { MAP_PROVIDER_LABELS, MAP_PROVIDER_DESCRIPTIONS, type MapProvider } from "@/lib/map-tiles";
+import * as ExpoUpdates from "expo-updates";
 
 interface ProfileData {
   id: string;

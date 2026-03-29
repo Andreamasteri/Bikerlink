@@ -118,6 +118,7 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
 
 function OtaStartupChecker() {
   const reloadedRef = useRef(false);
+  const fetchStartedRef = useRef(false);
   let updates: ReturnType<typeof useUpdates> | null = null;
   try {
     // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -126,15 +127,37 @@ function OtaStartupChecker() {
     // expo-updates non disponibile (runtime non supportato)
   }
 
+  // Applica aggiornamento se già scaricato (isUpdatePending = true)
   useEffect(() => {
     if (__DEV__ || Platform.OS === "web") return;
     if (!updates) return;
     if (reloadedRef.current || !updates.isUpdatePending) return;
     reloadedRef.current = true;
-    import("expo-updates").then((Updates) => {
-      Updates.reloadAsync().catch(() => {});
+    import("expo-updates").then((mod) => {
+      mod.reloadAsync().catch(() => {});
     });
   }, [updates?.isUpdatePending]);
+
+  // Check esplicito se il check automatico ON_LOAD non trova nulla entro 2s
+  useEffect(() => {
+    if (__DEV__ || Platform.OS === "web") return;
+    if (fetchStartedRef.current) return;
+    fetchStartedRef.current = true;
+    const timer = setTimeout(async () => {
+      if (reloadedRef.current) return;
+      try {
+        const mod = await import("expo-updates");
+        const result = await mod.checkForUpdateAsync();
+        if (result.isAvailable) {
+          await mod.fetchUpdateAsync();
+          // isUpdatePending diventerà true → il primo useEffect farà reloadAsync
+        }
+      } catch {
+        // silent fail — EAS non raggiungibile o runtime mismatch
+      }
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return null;
 }
