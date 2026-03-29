@@ -916,7 +916,7 @@ export default function ProfileScreen() {
 
       <View style={{ alignItems: "center", marginTop: 8, marginBottom: 4 }}>
         <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: Colors.textSecondary, opacity: 0.5 }}>
-          v1.0 · OTA-1
+          v1.0 · OTA-1 · 950f6fac
         </Text>
       </View>
 
