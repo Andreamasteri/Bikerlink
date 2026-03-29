@@ -503,6 +503,12 @@ export default function ProfileScreen() {
         <Text style={styles.userEmail}>
           {profile?.email ?? user?.email ?? ""}
         </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, marginBottom: 2, backgroundColor: Colors.accent + "18", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+          <Ionicons name="cloud-download-outline" size={12} color={Colors.accent} />
+          <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: Colors.accent }}>
+            v1.0 · Aggiornamento OTA attivo
+          </Text>
+        </View>
         {profile?.isPrimal === true && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
             <Ionicons name="star" size={14} color="#FFD700" />
@@ -913,12 +919,6 @@ export default function ProfileScreen() {
           </View>
         </Pressable>
       </Modal>
-
-      <View style={{ alignItems: "center", marginTop: 8, marginBottom: 4 }}>
-        <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: Colors.textSecondary, opacity: 0.5 }}>
-          v1.0 · OTA-1 · 950f6fac
-        </Text>
-      </View>
 
       <View style={{ height: 40 }} />
     </ScrollView>
