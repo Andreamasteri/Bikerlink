@@ -663,9 +663,21 @@ const _engineTimers: ReturnType<typeof setInterval>[] = [];
 export function startMatchingEngine(): void {
   console.log("[Matching] Engine avviato — modalità on-demand (trigger da login utente)");
 
-  runFakeZavorrineRotation();
-  _engineTimers.push(setInterval(runFakeZavorrineRotation, 5 * 60 * 1000));
-  console.log("[Matching] Fake zavorrine availability rotation started (5min interval)");
+  (async () => {
+    try {
+      const fakeUsersSetting = await storage.getAppSetting("fake_users_enabled");
+      const fakeUsersEnabled = fakeUsersSetting?.value === "true";
+      if (!fakeUsersEnabled) {
+        console.log("[Matching] Fake zavorrine rotation skipped (fake users disabled)");
+      } else {
+        runFakeZavorrineRotation();
+        _engineTimers.push(setInterval(runFakeZavorrineRotation, 5 * 60 * 1000));
+        console.log("[Matching] Fake zavorrine availability rotation started (5min interval)");
+      }
+    } catch (err) {
+      console.error("[Matching] Error checking fake_users_enabled for rotation — skipped (fake users disabled):", err);
+    }
+  })();
 
   _engineTimers.push(setInterval(async () => {
     try {

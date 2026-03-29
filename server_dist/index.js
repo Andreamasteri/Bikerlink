@@ -6867,9 +6867,21 @@ function triggerMatchingRun() {
 var _engineTimers = [];
 function startMatchingEngine() {
   console.log("[Matching] Engine avviato \u2014 modalit\xE0 on-demand (trigger da login utente)");
-  runFakeZavorrineRotation();
-  _engineTimers.push(setInterval(runFakeZavorrineRotation, 5 * 60 * 1e3));
-  console.log("[Matching] Fake zavorrine availability rotation started (5min interval)");
+  (async () => {
+    try {
+      const fakeUsersSetting = await storage.getAppSetting("fake_users_enabled");
+      const fakeUsersEnabled = fakeUsersSetting?.value === "true";
+      if (!fakeUsersEnabled) {
+        console.log("[Matching] Fake zavorrine rotation skipped (fake users disabled)");
+      } else {
+        runFakeZavorrineRotation();
+        _engineTimers.push(setInterval(runFakeZavorrineRotation, 5 * 60 * 1e3));
+        console.log("[Matching] Fake zavorrine availability rotation started (5min interval)");
+      }
+    } catch (err) {
+      console.error("[Matching] Error checking fake_users_enabled for rotation \u2014 skipped (fake users disabled):", err);
+    }
+  })();
   _engineTimers.push(setInterval(async () => {
     try {
       const expired = await runCleanup();
@@ -14312,11 +14324,18 @@ function setupErrorHandler(app2) {
         console.log("[INIT] Phase 4 motoclub seed done");
         await delay(2e3);
         try {
-          await autoSeedFakeUsers();
+          const { storage: stPhase5 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+          const fakeUsersSetting = await stPhase5.getAppSetting("fake_users_enabled");
+          const fakeUsersEnabled = fakeUsersSetting?.value === "true";
+          if (!fakeUsersEnabled) {
+            console.log("[INIT] Phase 5 fake user seed skipped (fake users disabled)");
+          } else {
+            await autoSeedFakeUsers();
+            console.log("[INIT] Phase 5 fake user seed done");
+          }
         } catch (e) {
           console.warn("[INIT] autoSeedFakeUsers error:", e);
         }
-        console.log("[INIT] Phase 5 fake user seed done");
         await delay(2e3);
         try {
           await initMissingClubConversations();

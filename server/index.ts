@@ -689,11 +689,18 @@ function setupErrorHandler(app: express.Application) {
         // Phase 5: fake user seed (very heavy — bcrypt hashing for many users)
         await delay(2_000);
         try {
-          await autoSeedFakeUsers();
+          const { storage: stPhase5 } = await import("./storage");
+          const fakeUsersSetting = await stPhase5.getAppSetting("fake_users_enabled");
+          const fakeUsersEnabled = fakeUsersSetting?.value === "true";
+          if (!fakeUsersEnabled) {
+            console.log("[INIT] Phase 5 fake user seed skipped (fake users disabled)");
+          } else {
+            await autoSeedFakeUsers();
+            console.log("[INIT] Phase 5 fake user seed done");
+          }
         } catch (e) {
           console.warn("[INIT] autoSeedFakeUsers error:", e);
         }
-        console.log("[INIT] Phase 5 fake user seed done");
 
         // Phase 6: club conversation sync
         await delay(2_000);
