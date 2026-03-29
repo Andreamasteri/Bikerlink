@@ -199,6 +199,23 @@
     "iosUpdateId": null,
     "commitBase": "3251395641da61b47c4d955d3f9c41c0931ea850",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/40c5bd8f-6223-4964-8d75-6896ec079f48",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 13,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-13: match dedup + Garage Match! + restyling + fix counter + OTA button sync + auto-disponibilita cold start",
+    "publishedAt": "2026-03-29",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "5 fix: (1) Dedup BikerBikerMatches frontend per userId (max 1 proposta per coppia); (2) Restyling card: rimosso riquadro nero moto, 'stessa moto'→'Garage Match!', padding ridotto, swap pulsanti [Rifiuta][Blocca]+[Accetta]; (3) Fix counter disponibili: rimosso filtro lastLoginAt>=15min da countAvailableBikers/countAvailableZavorrine — chi ha isAvailable=true conta sempre; (4) Fix pulsante OTA profilo: sempre visibile, disabled+opacity 0.35 se già aggiornato (sincrono con scritta verde/rossa); (5) Auto-disponibilità cold start: _layout.tsx imposta isAvailable=true al primo rilevamento utente (se !ghostMode, non web).",
+    "updateGroupId": "1c64d719-4868-48f3-af3f-1d99a76f558d",
+    "androidUpdateId": "019d3b4a-f904-7c14-8673-1c613f2fa243",
+    "iosUpdateId": null,
+    "commitBase": "af2fc07980243d633a4d3e7cbff473fcfa1129a5",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/1c64d719-4868-48f3-af3f-1d99a76f558d",
     "status": "published"
   }
 ]

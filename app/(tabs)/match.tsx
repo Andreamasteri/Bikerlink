@@ -201,7 +201,7 @@ function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, onBlock
 
   const SUPERMATCH_COLOR = "#FF8C00";
   const statusColor = isAccepted ? Colors.success : isRejected ? Colors.accentRed : (isSuperMatch && isNew) ? SUPERMATCH_COLOR : Colors.accent;
-  const statusLabel = isAccepted ? t("match.accepted") : isRejected ? t("match.rejected") : (isSuperMatch && isNew) ? t("match.superMatch") : t("match.sameMoto");
+  const statusLabel = isAccepted ? t("match.accepted") : isRejected ? t("match.rejected") : (isSuperMatch && isNew) ? t("match.superMatch") : "Garage Match!";
   const statusIcon: keyof typeof Ionicons.glyphMap = isAccepted ? "checkmark-circle" : isRejected ? "close-circle" : (isSuperMatch && isNew) ? "flash" : "bicycle";
 
   const createdDate = match.createdAt
@@ -217,7 +217,7 @@ function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, onBlock
       isAccepted && styles.matchCardAccepted,
       isRejected && styles.matchCardDimmed,
     ]}>
-      <View style={styles.matchStatusRow}>
+      <View style={[styles.matchStatusRow, { marginBottom: 6 }]}>
         <Ionicons name={statusIcon} size={16} color={statusColor} />
         <Text style={[styles.statusLabel, { color: statusColor }]}>{statusLabel}</Text>
         {createdDate && <Text style={styles.matchDate}>{createdDate}</Text>}
@@ -229,12 +229,12 @@ function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, onBlock
       </View>
 
       <TouchableOpacity
-        style={styles.matchUserRow}
+        style={{ marginBottom: 6 }}
         onPress={() => otherUserId && cardRouter.push(`/profile/${otherUserId}` as any)}
         activeOpacity={0.7}
       >
         <View style={styles.matchUserInfo}>
-          <Ionicons name="bicycle" size={28} color={Colors.maleIcon} />
+          <Ionicons name="bicycle" size={24} color={Colors.maleIcon} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.matchNickname, { color: Colors.maleIcon }]}>{otherNickname}</Text>
             <Text style={styles.matchUserType}>{t("userType.biker")}</Text>
@@ -242,15 +242,6 @@ function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, onBlock
           <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
         </View>
       </TouchableOpacity>
-
-      <View style={styles.matchProposals}>
-        <View style={[styles.proposalMini, { flex: 1 }]}>
-          <Text style={styles.proposalMiniLabel}>{t("match.sameMoto")}</Text>
-          <Text style={styles.proposalMiniTitle} numberOfLines={1}>
-            {`${match.motorcycleBrand || ""} ${match.motorcycleModel || ""}`.trim() || t("match.moto")}
-          </Text>
-        </View>
-      </View>
 
       {isAccepted && onChatPress && (
         <TouchableOpacity style={styles.chatBtn} onPress={onChatPress}>
@@ -260,7 +251,7 @@ function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, onBlock
       )}
 
       {isNew && (
-        <View style={{ marginTop: 10, gap: 6 }}>
+        <View style={{ marginTop: 6, gap: 5 }}>
           <View style={styles.matchActions}>
             <TouchableOpacity
               style={[styles.actionBtn, styles.rejectBtn]}
@@ -271,27 +262,27 @@ function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, onBlock
               <Text style={[styles.actionBtnText, { color: Colors.accentRed }]}>{t("match.reject")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.actionBtn, styles.acceptBtn]}
-              onPress={onAccept}
+              style={[styles.actionBtn, styles.blockBtn]}
+              onPress={onBlock}
               disabled={isPending}
             >
-              {isPending ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="checkmark" size={18} color="#fff" />
-                  <Text style={[styles.actionBtnText, { color: "#fff" }]}>{t("match.accept")}</Text>
-                </>
-              )}
+              <Ionicons name="ban" size={16} color={Colors.accentRed} />
+              <Text style={[styles.actionBtnText, { color: Colors.accentRed, fontSize: 13 }]}>{t("match.blockUser")}</Text>
             </TouchableOpacity>
           </View>
           <TouchableOpacity
-            style={[styles.actionBtn, styles.blockBtn]}
-            onPress={onBlock}
+            style={[styles.actionBtn, styles.acceptBtn]}
+            onPress={onAccept}
             disabled={isPending}
           >
-            <Ionicons name="ban" size={16} color={Colors.accentRed} />
-            <Text style={[styles.actionBtnText, { color: Colors.accentRed, fontSize: 13 }]}>{t("match.blockUser")}</Text>
+            {isPending ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="checkmark" size={18} color="#fff" />
+                <Text style={[styles.actionBtnText, { color: "#fff" }]}>{t("match.accept")}</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
       )}
@@ -533,9 +524,17 @@ export default function MatchScreen() {
   const visibleGarageMatches = allGarageMatches
     .filter((m: any) => m.status !== "rejected" && passesDistanceFilter(m.otherLat, m.otherLng, m.status))
     .sort((a: any, b: any) => matchSortScore(b) - matchSortScore(a));
-  const visibleBikerMatches = allBikerMatches
+  const visibleBikerMatchesRaw = allBikerMatches
     .filter((m: any) => m.status !== "rejected" && passesDistanceFilter(m.otherLat, m.otherLng, m.status))
     .sort((a: any, b: any) => matchSortScore(b) - matchSortScore(a));
+  const visibleBikerMatches = visibleBikerMatchesRaw.filter((m: any, idx: number) => {
+    const isBiker1 = m.biker1Id === user?.id;
+    const otherUserId = isBiker1 ? m.biker2Id : m.biker1Id;
+    return visibleBikerMatchesRaw.findIndex((x: any) => {
+      const xOther = x.biker1Id === user?.id ? x.biker2Id : x.biker1Id;
+      return xOther === otherUserId;
+    }) === idx;
+  });
   const visibleProposalMatches = allProposalMatches.filter((m: any) => m.status !== "rejected" && m.status !== "expired");
 
   const newGarageMatches = visibleGarageMatches.filter((m: any) => m.status === "new");
@@ -1191,9 +1190,9 @@ const styles = StyleSheet.create({
   },
   matchCard: {
     backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: Colors.accent + "30",
   },

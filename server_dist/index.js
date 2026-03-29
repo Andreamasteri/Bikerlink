@@ -1623,7 +1623,6 @@ var init_storage = __esm({
         const conditions = [
           (0, import_drizzle_orm2.eq)(users.status, "active"),
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
-          (0, import_drizzle_orm2.gte)(users.lastLoginAt, since),
           (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.userType, "biker"), (0, import_drizzle_orm2.eq)(users.userType, "coppia")),
           (0, import_drizzle_orm2.eq)(users.ghostMode, false)
         ];
@@ -1635,7 +1634,6 @@ var init_storage = __esm({
         const conditions = [
           (0, import_drizzle_orm2.eq)(users.status, "active"),
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
-          (0, import_drizzle_orm2.gte)(users.lastLoginAt, since),
           (0, import_drizzle_orm2.eq)(users.userType, "zavorrina"),
           (0, import_drizzle_orm2.eq)(users.ghostMode, false)
         ];

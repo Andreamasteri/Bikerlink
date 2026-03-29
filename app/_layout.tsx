@@ -61,6 +61,12 @@ function AppStateHandler() {
   const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    if (!user || user.ghostMode) return;
+    if (Platform.OS === "web") return;
+    apiRequest("PUT", "/api/users/me/availability", { isAvailable: true }).catch(() => {});
+  }, [user?.id]);
+
+  useEffect(() => {
     if (!user) return;
 
     sendHeartbeat();

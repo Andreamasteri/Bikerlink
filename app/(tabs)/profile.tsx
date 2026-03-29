@@ -566,11 +566,11 @@ export default function ProfileScreen() {
               {latestOta ? `OTA-${latestOta.updateNumber}` : "OTA"}
             </Text>
           </View>
-          {!isOtaUpToDate && !__DEV__ && Platform.OS !== "web" && (
+          {!__DEV__ && Platform.OS !== "web" && (
             <TouchableOpacity
               onPress={handleForceOtaCheck}
-              disabled={isCheckingOta}
-              style={{ backgroundColor: "#22C55E", borderRadius: 12, padding: 6, alignItems: "center", justifyContent: "center" }}
+              disabled={isOtaUpToDate || isCheckingOta}
+              style={{ backgroundColor: "#22C55E", borderRadius: 12, padding: 6, alignItems: "center", justifyContent: "center", opacity: isOtaUpToDate ? 0.35 : 1 }}
             >
               {isCheckingOta
                 ? <ActivityIndicator size="small" color="#fff" />
