@@ -13,7 +13,26 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useNavigation } from "expo-router";
-import otaUpdates from "@/ota-updates.json";
+import otaUpdatesRaw from "@/ota-updates.json";
+
+interface OtaUpdateEntry {
+  updateNumber: number;
+  channel: string;
+  message: string;
+  publishedAt: string;
+  runtimeVersion: string;
+  platforms: string[];
+  jsEngine: string;
+  note?: string;
+  updateGroupId: string;
+  androidUpdateId: string | null;
+  iosUpdateId: string | null;
+  commitBase: string;
+  easDashboard: string;
+  status: string;
+}
+
+const otaUpdates: OtaUpdateEntry[] = otaUpdatesRaw as OtaUpdateEntry[];
 
 interface SystemEvent {
   timestamp: string;
@@ -90,9 +109,9 @@ export default function SystemScreen() {
 
   const mergedEvents = useMemo<SystemEvent[]>(() => {
     const backendEvents: SystemEvent[] = data?.events ?? [];
-    const otaEvents: SystemEvent[] = (otaUpdates as any[]).map((entry) => ({
+    const otaEvents: SystemEvent[] = otaUpdates.map((entry) => ({
       timestamp: new Date(entry.publishedAt).toISOString(),
-      message: entry.message ?? `OTA-${entry.updateNumber}`,
+      message: `OTA-${entry.updateNumber}: ${entry.message}`,
       type: "OTA_PUBLISHED",
     }));
     return [...backendEvents, ...otaEvents].sort(

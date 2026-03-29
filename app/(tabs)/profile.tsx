@@ -33,7 +33,19 @@ import { useMapConfig } from "@/lib/map-context";
 import { MAP_PROVIDER_LABELS, MAP_PROVIDER_DESCRIPTIONS, type MapProvider } from "@/lib/map-tiles";
 import Constants from "expo-constants";
 import * as Updates from "expo-updates";
-import otaUpdates from "@/ota-updates.json";
+import otaUpdatesRaw from "@/ota-updates.json";
+
+interface OtaUpdateEntry {
+  updateNumber: number;
+  channel: string;
+  message: string;
+  publishedAt: string;
+  androidUpdateId: string | null;
+  iosUpdateId: string | null;
+  status: string;
+}
+
+const otaUpdates: OtaUpdateEntry[] = otaUpdatesRaw as OtaUpdateEntry[];
 
 interface ProfileData {
   id: string;
@@ -122,7 +134,7 @@ export default function ProfileScreen() {
   const [isCheckingOta, setIsCheckingOta] = useState(false);
 
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
-  const latestOta = (otaUpdates as any[]).reduce<any>((best, entry) => {
+  const latestOta = otaUpdates.reduce<OtaUpdateEntry | null>((best, entry) => {
     if (!best || entry.updateNumber > best.updateNumber) return entry;
     return best;
   }, null);

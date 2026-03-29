@@ -194,11 +194,11 @@
     "platforms": ["android"],
     "jsEngine": "hermes",
     "note": "7 fix frontend: (1) counter online/disponibili invalidati al foreground in _layout.tsx; (2) SOS spostato subito dopo toggle disponibilità in ready.tsx; (3) Admin Sistema ora mostra eventi OTA da ota-updates.json; (4) fix bottom insets mappa fullscreen (insets.bottom+16); (5) badge versione app (verde, costante); (6) pill OTA verde/rosso basato su Updates.updateId; (7) pulsante refresh OTA condizionale (solo se pill rossa). Bundle Hermes .hbc 3.64 MB.",
-    "updateGroupId": "a5c7db0a-3c55-43d9-95f1-1abb1edd7cd8",
-    "androidUpdateId": "019d3b18-cad9-7f0d-9fd7-97934f0d67d4",
+    "updateGroupId": "40c5bd8f-6223-4964-8d75-6896ec079f48",
+    "androidUpdateId": "019d3b1d-57ab-754c-8add-5b4e186026da",
     "iosUpdateId": null,
-    "commitBase": "b29bca0333b334ec74b51343155594e797747247",
-    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/a5c7db0a-3c55-43d9-95f1-1abb1edd7cd8",
+    "commitBase": "3251395641da61b47c4d955d3f9c41c0931ea850",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/40c5bd8f-6223-4964-8d75-6896ec079f48",
     "status": "published"
   }
 ]
