@@ -851,6 +851,13 @@ var init_storage = __esm({
         const [profile] = await db.update(userProfiles).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm2.eq)(userProfiles.userId, userId)).returning();
         return profile;
       }
+      async upsertUserProfile(userId, data) {
+        const [profile] = await db.insert(userProfiles).values({ userId, ...data }).onConflictDoUpdate({
+          target: userProfiles.userId,
+          set: { ...data, updatedAt: /* @__PURE__ */ new Date() }
+        }).returning();
+        return profile;
+      }
       async getProposals(filters) {
         if (filters?.status) {
           return db.select().from(proposals).where((0, import_drizzle_orm2.eq)(proposals.status, filters.status)).orderBy((0, import_drizzle_orm2.desc)(proposals.createdAt));
@@ -5097,14 +5104,8 @@ router2.post("/login", loginLimiter, async (req, res) => {
     if (!userRecord?.ghostMode) {
       const availSetting = await storage.getAppSetting("user_available_on_login").catch(() => null);
       const availableOnLogin = availSetting?.value !== "false";
-      const existingProfile = await storage.getUserProfile(user.id).catch(() => null);
-      if (!existingProfile) {
-        await storage.createUserProfile({ userId: user.id }).catch((e) => {
-          console.warn("[login] createUserProfile failed:", e?.message);
-        });
-      }
-      await storage.updateUserProfile(user.id, { isAvailable: availableOnLogin }).catch((e) => {
-        console.warn("[login] updateUserProfile failed:", e?.message);
+      await storage.upsertUserProfile(user.id, { isAvailable: availableOnLogin }).catch((e) => {
+        console.warn("[login] upsertUserProfile failed:", e?.message);
       });
     }
     req.session.userId = user.id;
