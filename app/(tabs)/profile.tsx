@@ -31,6 +31,9 @@ import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMapConfig } from "@/lib/map-context";
 import { MAP_PROVIDER_LABELS, MAP_PROVIDER_DESCRIPTIONS, type MapProvider } from "@/lib/map-tiles";
+import Constants from "expo-constants";
+import * as Updates from "expo-updates";
+import otaUpdates from "@/ota-updates.json";
 
 interface ProfileData {
   id: string;
@@ -116,6 +119,41 @@ export default function ProfileScreen() {
   const [isDownloadingEula, setIsDownloadingEula] = useState(false);
   const [isDownloadingPrivacy, setIsDownloadingPrivacy] = useState(false);
   const [isExportingData, setIsExportingData] = useState(false);
+  const [isCheckingOta, setIsCheckingOta] = useState(false);
+
+  const appVersion = Constants.expoConfig?.version ?? "1.0.0";
+  const latestOta = (otaUpdates as any[]).reduce<any>((best, entry) => {
+    if (!best || entry.updateNumber > best.updateNumber) return entry;
+    return best;
+  }, null);
+  const currentUpdateId = Updates.updateId ?? null;
+  const isOtaUpToDate =
+    __DEV__ || Platform.OS === "web"
+      ? true
+      : latestOta
+      ? currentUpdateId === latestOta.androidUpdateId
+      : true;
+
+  const handleForceOtaCheck = async () => {
+    if (__DEV__ || Platform.OS === "web") {
+      Alert.alert("Info", "Aggiornamenti OTA non disponibili in modalità sviluppo.");
+      return;
+    }
+    try {
+      setIsCheckingOta(true);
+      const check = await Updates.checkForUpdateAsync();
+      if (check.isAvailable) {
+        await Updates.fetchUpdateAsync();
+        await Updates.reloadAsync();
+      } else {
+        Alert.alert("✓ Aggiornato", "Stai già usando l'ultima versione disponibile.");
+      }
+    } catch {
+      Alert.alert("Errore", "Impossibile controllare gli aggiornamenti. Controlla la connessione.");
+    } finally {
+      setIsCheckingOta(false);
+    }
+  };
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -503,11 +541,30 @@ export default function ProfileScreen() {
         <Text style={styles.userEmail}>
           {profile?.email ?? user?.email ?? ""}
         </Text>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, marginBottom: 2, backgroundColor: Colors.accent + "18", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
-          <Ionicons name="cloud-download-outline" size={12} color={Colors.accent} />
-          <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: Colors.accent }}>
-            v1.0 · OTA-8 · d3aa6178
-          </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, marginBottom: 2 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#22C55E18", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+            <Ionicons name="phone-portrait-outline" size={11} color="#22C55E" />
+            <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: "#22C55E" }}>
+              v{appVersion}
+            </Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: (isOtaUpToDate ? "#22C55E" : "#EF4444") + "18", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+            <Ionicons name="cloud-download-outline" size={11} color={isOtaUpToDate ? "#22C55E" : "#EF4444"} />
+            <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: isOtaUpToDate ? "#22C55E" : "#EF4444" }}>
+              {latestOta ? `OTA-${latestOta.updateNumber}` : "OTA"}
+            </Text>
+          </View>
+          {!isOtaUpToDate && !__DEV__ && Platform.OS !== "web" && (
+            <TouchableOpacity
+              onPress={handleForceOtaCheck}
+              disabled={isCheckingOta}
+              style={{ backgroundColor: "#22C55E", borderRadius: 12, padding: 6, alignItems: "center", justifyContent: "center" }}
+            >
+              {isCheckingOta
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Ionicons name="refresh" size={13} color="#fff" />}
+            </TouchableOpacity>
+          )}
         </View>
         {profile?.isPrimal === true && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>

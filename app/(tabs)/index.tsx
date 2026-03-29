@@ -761,7 +761,7 @@ export default function MapScreen() {
             <Ionicons name="close" size={28} color="#fff" />
           </Pressable>
           <Pressable
-            style={[styles.defineAreaBtn, { bottom: Platform.OS === "web" ? 44 : 24 }]}
+            style={[styles.defineAreaBtn, { bottom: Platform.OS === "web" ? 44 : insets.bottom + 16 }]}
             onPress={() => setShowAreaModal(true)}
           >
             <Ionicons name="globe-outline" size={16} color={Colors.text} />
@@ -771,7 +771,7 @@ export default function MapScreen() {
                 : `${selectedCountries.length} ${t("home.defineAreaCountries")}`}
             </Text>
           </Pressable>
-          <View style={[styles.fullscreenBottomStats, { bottom: Platform.OS === "web" ? 44 : 24 }]}>
+          <View style={[styles.fullscreenBottomStats, { bottom: Platform.OS === "web" ? 44 : insets.bottom + 16 }]}>
             <View style={styles.statsChip}>
               <MaterialCommunityIcons name="motorbike" size={14} color={Colors.maleIcon} />
               <Text style={styles.statsChipText}>{bikerCount}</Text>

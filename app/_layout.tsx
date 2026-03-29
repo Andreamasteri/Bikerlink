@@ -85,6 +85,11 @@ function AppStateHandler() {
           wasAvailableRef.current = null;
         }
         queryClient.invalidateQueries({ queryKey: ["/api/users/profile"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/users/online-count"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-count"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-count"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-list"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-list"] });
       }
       appStateRef.current = nextAppState;
     });

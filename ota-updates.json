@@ -182,6 +182,23 @@
     "iosUpdateId": null,
     "commitBase": "6677335087f06881e3d8b740e6ddc19f0ef396ba",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/546ad8dc-d43b-44af-b0b2-f98e4edc5151",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 12,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-12: fix counter, SOS su, OTA in Sistema, mappa insets, badge versione, forza OTA",
+    "publishedAt": "2026-03-29",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "7 fix frontend: (1) counter online/disponibili invalidati al foreground in _layout.tsx; (2) SOS spostato subito dopo toggle disponibilità in ready.tsx; (3) Admin Sistema ora mostra eventi OTA da ota-updates.json; (4) fix bottom insets mappa fullscreen (insets.bottom+16); (5) badge versione app (verde, costante); (6) pill OTA verde/rosso basato su Updates.updateId; (7) pulsante refresh OTA condizionale (solo se pill rossa). Bundle Hermes .hbc 3.64 MB.",
+    "updateGroupId": "a5c7db0a-3c55-43d9-95f1-1abb1edd7cd8",
+    "androidUpdateId": "019d3b18-cad9-7f0d-9fd7-97934f0d67d4",
+    "iosUpdateId": null,
+    "commitBase": "b29bca0333b334ec74b51343155594e797747247",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/a5c7db0a-3c55-43d9-95f1-1abb1edd7cd8",
     "status": "published"
   }
 ]

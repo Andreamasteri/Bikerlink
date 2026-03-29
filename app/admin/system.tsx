@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useNavigation } from "expo-router";
+import otaUpdates from "@/ota-updates.json";
 
 interface SystemEvent {
   timestamp: string;
@@ -58,6 +59,8 @@ function eventIcon(type: string): { name: keyof typeof Ionicons.glyphMap; color:
       return { name: "wifi", color: "#44AA44" };
     case "METRO_DOWN":
       return { name: "wifi-outline", color: "#FF4444" };
+    case "OTA_PUBLISHED":
+      return { name: "cloud-download-outline", color: Colors.accent };
     default:
       return { name: "ellipse-outline", color: "#888888" };
   }
@@ -69,6 +72,7 @@ function eventLabel(type: string): string {
     case "COLD_START": return "Avvio Freddo";
     case "METRO_UP": return "Metro Online";
     case "METRO_DOWN": return "Metro Offline";
+    case "OTA_PUBLISHED": return "Aggiornamento OTA";
     default: return "Evento generico";
   }
 }
@@ -83,6 +87,18 @@ export default function SystemScreen() {
     queryKey: ["/api/admin/system-health"],
     refetchInterval: 30000,
   });
+
+  const mergedEvents = useMemo<SystemEvent[]>(() => {
+    const backendEvents: SystemEvent[] = data?.events ?? [];
+    const otaEvents: SystemEvent[] = (otaUpdates as any[]).map((entry) => ({
+      timestamp: new Date(entry.publishedAt).toISOString(),
+      message: entry.message ?? `OTA-${entry.updateNumber}`,
+      type: "OTA_PUBLISHED",
+    }));
+    return [...backendEvents, ...otaEvents].sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  }, [data?.events]);
 
   useEffect(() => {
     if (data) {
@@ -143,7 +159,7 @@ export default function SystemScreen() {
 
   return (
     <FlatList
-      data={data.events}
+      data={mergedEvents}
       keyExtractor={(item, index) => `${item.timestamp}-${index}`}
       contentContainerStyle={[
         styles.listContent,
@@ -194,7 +210,7 @@ export default function SystemScreen() {
             )}
           </View>
 
-          <Text style={styles.sectionTitle}>Ultimi eventi ({data.events.length})</Text>
+          <Text style={styles.sectionTitle}>Ultimi eventi ({mergedEvents.length})</Text>
         </>
       }
       renderItem={({ item }) => {
