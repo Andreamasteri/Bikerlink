@@ -39,13 +39,31 @@
     "runtimeVersion": "1.0.0",
     "platforms": ["android", "ios"],
     "jsEngine": "hermes",
-    "note": "Fix bug: handleReload() ora chiama reloadAsync() sempre, indipendentemente da isNew. checkAutomatically=ON_LOAD scaricava il bundle prima che l'utente aprisse il modal → isNew sempre false → nessun riavvio. Ora sempre riavvia.",
+    "note": "Fix bug: handleReload() ora chiama reloadAsync() sempre, indipendentemente da isNew.",
     "updateGroupId": "c6352f85-0955-4601-b1d2-e407ead37b46",
     "androidUpdateId": "019d38a8-1911-71f5-8b8a-f96afcab5e6c",
     "iosUpdateId": "019d38a8-1911-786f-8a17-34c56c95099a",
     "commitBase": "bed43f0f63aa24919eb4d06e8ddac2f74d32ffee",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/c6352f85-0955-4601-b1d2-e407ead37b46",
-    "status": "published",
+    "status": "superseded",
     "visibleChange": "app/(tabs)/profile.tsx — badge 'v1.0 · OTA-3 · c6352f85'; app/_layout.tsx — fix handleReload()"
+  },
+  {
+    "updateNumber": 4,
+    "channel": "preview",
+    "platform": "android",
+    "message": "Redesign pannello OTA admin",
+    "publishedAt": "2026-03-29",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Redesign completo pannello admin OTA: device status card, banner EAS check, Forza aggiornamento, storico release, FAB creazione semplificata. Bundle .hbc Hermes confermato.",
+    "updateGroupId": "acc17d9e-3ffb-4c98-9935-f3c287f94137",
+    "androidUpdateId": "019d38d9-e4f1-7bfc-9978-84fb3cc66f6e",
+    "iosUpdateId": null,
+    "commitBase": "018b787d5591667444bdaf3ead67a8c5fc6dbb05",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/acc17d9e-3ffb-4c98-9935-f3c287f94137",
+    "status": "published",
+    "visibleChange": "app/admin/ota.tsx — redesign completo; app/(tabs)/profile.tsx — badge 'v1.0 · OTA-4 · acc17d9e'"
   }
 ]
