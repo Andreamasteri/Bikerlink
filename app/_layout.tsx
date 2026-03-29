@@ -178,14 +178,11 @@ function OtaUpdateChecker() {
     setApplying(true);
     try {
       const Updates = await import("expo-updates");
-      const result = await Updates.fetchUpdateAsync();
-      if (result.isNew) {
-        await AsyncStorage.setItem(OTA_ACTIVE_VERSION_KEY, updateInfo!.version).catch(() => {});
-        await Updates.reloadAsync();
-      } else {
-        await AsyncStorage.setItem(OTA_ACTIVE_VERSION_KEY, updateInfo!.version).catch(() => {});
-        setDismissed(true);
-      }
+      try {
+        await Updates.fetchUpdateAsync();
+      } catch {}
+      await AsyncStorage.setItem(OTA_ACTIVE_VERSION_KEY, updateInfo!.version).catch(() => {});
+      await Updates.reloadAsync();
     } catch {
       setApplying(false);
       setDismissed(true);

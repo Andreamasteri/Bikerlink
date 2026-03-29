@@ -23,13 +23,29 @@
     "runtimeVersion": "1.0.0",
     "platforms": ["android", "ios"],
     "jsEngine": "hermes",
-    "note": "Bundle Android compilato con EAS_BUILD=1 → Hermes (.hbc). Compatibile con APK EAS Build.",
+    "note": "Bundle Hermes ma handleReload() aveva bug isNew=false. Superseded da OTA-3.",
     "updateGroupId": "fabe5d21-aad7-4d13-8c63-6091f787a456",
     "androidUpdateId": "019d3896-bf8e-70a6-8eeb-ad9bc9445c0b",
     "iosUpdateId": "019d3896-bf8e-7482-862c-529d6d79eb8b",
     "commitBase": "1050bb94c3e6772a604b12391fd55224263af1d8",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/fabe5d21-aad7-4d13-8c63-6091f787a456",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 3,
+    "channel": "preview",
+    "message": "Fix OTA: applica sempre reloadAsync anche se isNew=false",
+    "publishedAt": "2026-03-29",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android", "ios"],
+    "jsEngine": "hermes",
+    "note": "Fix bug: handleReload() ora chiama reloadAsync() sempre, indipendentemente da isNew. checkAutomatically=ON_LOAD scaricava il bundle prima che l'utente aprisse il modal → isNew sempre false → nessun riavvio. Ora sempre riavvia.",
+    "updateGroupId": "c6352f85-0955-4601-b1d2-e407ead37b46",
+    "androidUpdateId": "019d38a8-1911-71f5-8b8a-f96afcab5e6c",
+    "iosUpdateId": "019d38a8-1911-786f-8a17-34c56c95099a",
+    "commitBase": "bed43f0f63aa24919eb4d06e8ddac2f74d32ffee",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/c6352f85-0955-4601-b1d2-e407ead37b46",
     "status": "published",
-    "visibleChange": "app/(tabs)/profile.tsx — badge 'v1.0 · OTA-2 · fabe5d21' aggiornato con nuovo ID"
+    "visibleChange": "app/(tabs)/profile.tsx — badge 'v1.0 · OTA-3 · c6352f85'; app/_layout.tsx — fix handleReload()"
   }
 ]
