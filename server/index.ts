@@ -634,79 +634,79 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] ota_releases:", e);
         }
 
-        console.log("[INIT] Phase 1 migrations done — scheduling heavy tasks with staggered delays");
+        console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
+
+        const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+        // Phase 2: start matching engine
+        await delay(2_000);
+        startMatchingEngine();
+        console.log("[INIT] Phase 2 matching engine started");
+
+        // Phase 3: seed essential users + splash settings
+        await delay(2_000);
+        try {
+          await autoSeedEssentialUsers();
+        } catch (e) {
+          console.warn("[INIT] autoSeedEssentialUsers error:", e);
+        }
+        try {
+          const { storage } = await import("./storage");
+          const modeSetting = await storage.getAppSetting("splash_message_mode");
+          if (!modeSetting) await storage.upsertAppSetting("splash_message_mode", "single");
+          const listSetting = await storage.getAppSetting("splash_messages_list");
+          if (!listSetting) await storage.upsertAppSetting("splash_messages_list", "[]");
+          const motoclubZavSetting = await storage.getAppSetting("motoclub_include_zav");
+          if (!motoclubZavSetting) await storage.upsertAppSetting("motoclub_include_zav", "true");
+          const mapsUserChoiceSetting = await storage.getAppSetting("maps_user_choice_enabled");
+          if (!mapsUserChoiceSetting) await storage.upsertAppSetting("maps_user_choice_enabled", "true");
+        } catch (e) {
+          console.warn("[SEED] splash settings:", e);
+        }
+        console.log("[INIT] Phase 3 essential seed + settings done");
+
+        // Phase 4: motoclub migration + reseed (heavy — many DB inserts)
+        await delay(2_000);
+        try {
+          const { storage: st } = await import("./storage");
+          const alreadyReset = await st.getAppSetting("motoclub_brand_region_v2").catch(() => null);
+          if (!alreadyReset) {
+            console.log("[MIGRATION] Pulizia completa motoclub in corso...");
+            await db.execute(sql`DELETE FROM moto_club_invites`);
+            await db.execute(sql`DELETE FROM moto_club_requests`);
+            await db.execute(sql`DELETE FROM moto_club_members`);
+            await db.execute(sql`DELETE FROM moto_clubs`);
+            await st.upsertAppSetting("motoclub_brand_region_v2", "true");
+            console.log("[MIGRATION] Motoclub svuotati — riseed brand+region avviato...");
+          }
+          await seedMotoclubs();
+        } catch (e) {
+          console.warn("[MIGRATION] cleanup/reseed motoclub:", e);
+        }
+        console.log("[INIT] Phase 4 motoclub seed done");
+
+        // Phase 5: fake user seed (very heavy — bcrypt hashing for many users)
+        await delay(2_000);
+        try {
+          await autoSeedFakeUsers();
+        } catch (e) {
+          console.warn("[INIT] autoSeedFakeUsers error:", e);
+        }
+        console.log("[INIT] Phase 5 fake user seed done");
+
+        // Phase 6: club conversation sync
+        await delay(2_000);
+        try {
+          await initMissingClubConversations();
+        } catch (e) {
+          console.warn("[INIT] initMissingClubConversations deferred error:", e);
+        }
+        console.log("[INIT] Phase 6 club conversation sync done");
       })().catch((err) => {
-        console.error("[INIT] Phase 1 migration error:", err);
+        console.error("[INIT] Startup phase chain error:", err);
         initState.initializing = false;
       });
-
-      // Phase 2 (5s): start matching engine
-      setTimeout(() => {
-        startMatchingEngine();
-      }, 5_000);
-
-      // Phase 3 (10s): seed essential users + splash settings
-      setTimeout(() => {
-        (async () => {
-          try {
-            await autoSeedEssentialUsers();
-          } catch (e) {
-            console.warn("[INIT] autoSeedEssentialUsers error:", e);
-          }
-
-          try {
-            const { storage } = await import("./storage");
-            const modeSetting = await storage.getAppSetting("splash_message_mode");
-            if (!modeSetting) await storage.upsertAppSetting("splash_message_mode", "single");
-            const listSetting = await storage.getAppSetting("splash_messages_list");
-            if (!listSetting) await storage.upsertAppSetting("splash_messages_list", "[]");
-            const motoclubZavSetting = await storage.getAppSetting("motoclub_include_zav");
-            if (!motoclubZavSetting) await storage.upsertAppSetting("motoclub_include_zav", "true");
-            const mapsUserChoiceSetting = await storage.getAppSetting("maps_user_choice_enabled");
-            if (!mapsUserChoiceSetting) await storage.upsertAppSetting("maps_user_choice_enabled", "true");
-          } catch (e) {
-            console.warn("[SEED] splash settings:", e);
-          }
-
-          console.log("[INIT] Phase 3 essential seed + settings done");
-        })().catch((e) => console.warn("[INIT] Phase 3 error:", e));
-      }, 10_000);
-
-      // Phase 4 (25s): motoclub migration + reseed (heavy — many DB inserts)
-      setTimeout(() => {
-        (async () => {
-          try {
-            const { storage: st } = await import("./storage");
-            const alreadyReset = await st.getAppSetting("motoclub_brand_region_v2").catch(() => null);
-            if (!alreadyReset) {
-              console.log("[MIGRATION] Pulizia completa motoclub in corso...");
-              await db.execute(sql`DELETE FROM moto_club_invites`);
-              await db.execute(sql`DELETE FROM moto_club_requests`);
-              await db.execute(sql`DELETE FROM moto_club_members`);
-              await db.execute(sql`DELETE FROM moto_clubs`);
-              await st.upsertAppSetting("motoclub_brand_region_v2", "true");
-              console.log("[MIGRATION] Motoclub svuotati — riseed brand+region avviato...");
-            }
-            await seedMotoclubs();
-          } catch (e) {
-            console.warn("[MIGRATION] cleanup/reseed motoclub:", e);
-          }
-          console.log("[INIT] Phase 4 motoclub seed done");
-        })().catch((e) => console.warn("[INIT] Phase 4 error:", e));
-      }, 25_000);
-
-      // Phase 5 (45s): fake user seed (very heavy — bcrypt hashing for many users)
-      setTimeout(() => {
-        autoSeedFakeUsers().catch((e) => console.warn("[INIT] autoSeedFakeUsers error:", e));
-      }, 45_000);
-
-      // Phase 6 (60s): club conversation sync
-      setTimeout(() => {
-        initMissingClubConversations().catch((e) =>
-          console.warn("[INIT] initMissingClubConversations deferred error:", e)
-        );
-      }, 60_000);
     },
   );
 })();
