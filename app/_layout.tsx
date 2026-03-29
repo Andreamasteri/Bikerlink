@@ -184,6 +184,7 @@ function OtaUpdateChecker() {
       await AsyncStorage.setItem(OTA_ACTIVE_VERSION_KEY, updateInfo!.version).catch(() => {});
       await Updates.reloadAsync();
     } catch {
+      await AsyncStorage.removeItem(OTA_ACTIVE_VERSION_KEY).catch(() => {});
       setApplying(false);
       setDismissed(true);
     }
