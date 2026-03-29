@@ -1465,7 +1465,6 @@ export class DatabaseStorage implements IStorage {
     const conditions: any[] = [
       eq(users.status, "active"),
       eq(userProfiles.isAvailable, true),
-      gte(users.lastLoginAt, since),
       or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
       eq(users.ghostMode, false),
     ];
@@ -1487,7 +1486,6 @@ export class DatabaseStorage implements IStorage {
     const conditions: any[] = [
       eq(users.status, "active"),
       eq(userProfiles.isAvailable, true),
-      gte(users.lastLoginAt, since),
       eq(users.userType, "zavorrina"),
       eq(users.ghostMode, false),
     ];
