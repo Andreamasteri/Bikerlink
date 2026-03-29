@@ -5097,7 +5097,14 @@ router2.post("/login", loginLimiter, async (req, res) => {
     if (!userRecord?.ghostMode) {
       const availSetting = await storage.getAppSetting("user_available_on_login").catch(() => null);
       const availableOnLogin = availSetting?.value !== "false";
-      await storage.updateUserProfile(user.id, { isAvailable: availableOnLogin }).catch(() => {
+      const existingProfile = await storage.getUserProfile(user.id).catch(() => null);
+      if (!existingProfile) {
+        await storage.createUserProfile({ userId: user.id }).catch((e) => {
+          console.warn("[login] createUserProfile failed:", e?.message);
+        });
+      }
+      await storage.updateUserProfile(user.id, { isAvailable: availableOnLogin }).catch((e) => {
+        console.warn("[login] updateUserProfile failed:", e?.message);
       });
     }
     req.session.userId = user.id;
