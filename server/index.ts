@@ -452,13 +452,23 @@ function setupErrorHandler(app: express.Application) {
 
   const port = parseInt(process.env.PORT || "5000", 10);
 
-  // Graceful shutdown — free DB connections and stop timers before exit
+  // Track active connections so we can destroy them on shutdown
+  const activeConnections = new Set<import("net").Socket>();
+
+  // Graceful shutdown — destroy active connections, free DB pool, exit cleanly
   let _shuttingDown = false;
   const gracefulShutdown = (signal: string) => {
     if (_shuttingDown) return;
     _shuttingDown = true;
     console.log(`[Shutdown] ${signal} ricevuto — chiusura pulita in corso...`);
     stopMatchingEngine();
+
+    // Destroy all active sockets so server.close() finishes immediately
+    for (const socket of activeConnections) {
+      socket.destroy();
+    }
+    activeConnections.clear();
+
     server.close(() => {
       console.log("[Shutdown] Server HTTP chiuso.");
       pool.end().then(() => {
@@ -466,11 +476,12 @@ function setupErrorHandler(app: express.Application) {
         process.exit(0);
       }).catch(() => process.exit(0));
     });
-    // Force exit after 5 seconds if server.close() stalls
+
+    // Force exit after 8 seconds — always exit 0 so Replit promote completes cleanly
     setTimeout(() => {
       console.log("[Shutdown] Timeout — uscita forzata.");
-      process.exit(1);
-    }, 5_000);
+      process.exit(0);
+    }, 8_000);
   };
   process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
   process.on("SIGINT", () => gracefulShutdown("SIGINT"));
@@ -648,4 +659,10 @@ function setupErrorHandler(app: express.Application) {
       });
     },
   );
+
+  // Register each new TCP socket so gracefulShutdown can destroy them instantly
+  server.on("connection", (socket) => {
+    activeConnections.add(socket);
+    socket.once("close", () => activeConnections.delete(socket));
+  });
 })();

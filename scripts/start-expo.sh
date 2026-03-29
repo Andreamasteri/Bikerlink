@@ -2,7 +2,7 @@
 
 PORT=8081
 BACKEND_PORT=5000
-MAX_RETRIES=3
+MAX_RETRIES=10
 BACKEND_WAIT_SECONDS=120
 FLOCK_FILE="/tmp/start-expo.flock"
 LOCK_FILE="/tmp/start-expo.lock"
@@ -26,7 +26,7 @@ cleanup() {
 trap cleanup EXIT
 
 # ── Configurazione Node.js ─────────────────────────────────────────────────────
-export NODE_OPTIONS="--max-old-space-size=768"
+export NODE_OPTIONS="--max-old-space-size=512"
 
 # ── Funzioni di utilita' ────────────────────────────────────────────────────────
 
@@ -45,9 +45,11 @@ port_is_alive() {
 # Usato nel monitoring loop: controlla che Metro sia davvero pronto a servire
 # asset (non solo che la porta sia aperta).
 # /status risponde "packager-status:running" solo quando Metro e' inizializzato.
+# Timeout esteso a 30s: durante il bundle del primo avvio (1528 moduli, ~45s)
+# Metro puo' essere temporaneamente lento a rispondere ma non e' morto.
 metro_is_alive() {
   local status
-  status=$(curl -s --max-time 10 --connect-timeout 5 \
+  status=$(curl -s --max-time 30 --connect-timeout 5 \
     "http://localhost:$PORT/status" 2>/dev/null)
   echo "$status" | grep -q "packager-status:running"
 }
@@ -171,9 +173,11 @@ for retry in $(seq 1 $MAX_RETRIES); do
   fi
 
   if [ $METRO_STARTED -eq 1 ]; then
-    echo "Metro in esecuzione, monitoraggio porta $PORT..." | tee -a "$LOG_FILE"
+    echo "Metro in esecuzione, warmup 90s prima del monitoraggio (primo bundle ~45s)..." | tee -a "$LOG_FILE"
+    sleep 90
+    echo "Warmup terminato — inizio monitoraggio porta $PORT..." | tee -a "$LOG_FILE"
     while true; do
-      sleep 15
+      sleep 30
       if ! metro_is_alive; then
         echo "Metro giu': /status non risponde — $(date)" | tee -a "$LOG_FILE"
         break
