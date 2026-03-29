@@ -13825,7 +13825,8 @@ function configureExpoAndLanding(app2) {
     }
     if (req.path === "/") {
       const staticBuildIndex = path10.resolve(process.cwd(), "static-build", "index.html");
-      if (!fs10.existsSync(staticBuildIndex)) return next();
+      const isProduction = process.env.NODE_ENV === "production" || !!process.env.REPLIT_INTERNAL_APP_DOMAIN;
+      if (!isProduction && !fs10.existsSync(staticBuildIndex)) return next();
       return serveLandingPage({
         req,
         res,
@@ -13860,8 +13861,11 @@ function configureExpoAndLanding(app2) {
     }
   });
   const spaFallbackIndex = path10.resolve(process.cwd(), "static-build", "index.html");
-  const devProxyActive = !fs10.existsSync(spaFallbackIndex);
-  if (devProxyActive) {
+  const isProductionMode = process.env.NODE_ENV === "production" || !!process.env.REPLIT_INTERNAL_APP_DOMAIN;
+  const devProxyActive = !isProductionMode && !fs10.existsSync(spaFallbackIndex);
+  if (isProductionMode) {
+    log("Production mode \u2014 Metro proxy disabilitato");
+  } else if (devProxyActive) {
     log("Dev proxy \u2192 Metro :8081 attivo (static-build non trovato)");
   }
   const metroProxy = devProxyActive ? (0, import_http_proxy_middleware.createProxyMiddleware)({
