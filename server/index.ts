@@ -343,7 +343,7 @@ function configureExpoAndLanding(app: express.Application) {
     : null;
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.path.startsWith("/api")) return next();
-    if (req.path.startsWith("/assets") || req.path.startsWith("/uploads")) return next();
+    if (req.path.startsWith("/uploads")) return next();
     if (fs.existsSync(spaFallbackIndex)) {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       res.setHeader("Pragma", "no-cache");

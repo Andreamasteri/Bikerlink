@@ -14038,7 +14038,7 @@ function configureExpoAndLanding(app2) {
   }) : null;
   app2.use((req, res, next) => {
     if (req.path.startsWith("/api")) return next();
-    if (req.path.startsWith("/assets") || req.path.startsWith("/uploads")) return next();
+    if (req.path.startsWith("/uploads")) return next();
     if (fs10.existsSync(spaFallbackIndex)) {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       res.setHeader("Pragma", "no-cache");
