@@ -12241,6 +12241,31 @@ router17.post("/ota/:id/publish", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
+router17.patch("/ota/:id/deactivate", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const [existing] = await db.select().from(otaReleases).where((0, import_drizzle_orm9.eq)(otaReleases.id, id)).limit(1);
+    if (!existing) {
+      return res.status(404).json({ message: "Release non trovata" });
+    }
+    if (existing.status !== "active") {
+      return res.status(400).json({ message: "Solo le release attive possono essere disattivate" });
+    }
+    const now = /* @__PURE__ */ new Date();
+    const [updated] = await db.update(otaReleases).set({ status: "superseded", updatedAt: now }).where((0, import_drizzle_orm9.eq)(otaReleases.id, id)).returning();
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId,
+      action: "deactivate_ota_release",
+      targetType: "ota_release",
+      targetId: id,
+      details: `OTA release disattivata: v${existing.version}`
+    });
+    return res.json(updated);
+  } catch (error) {
+    console.error("Admin deactivate OTA release error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
 router17.delete("/ota/:id", async (req, res) => {
   try {
     const id = req.params.id;

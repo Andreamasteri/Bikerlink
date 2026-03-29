@@ -139,6 +139,20 @@ export default function OtaScreen() {
     },
   });
 
+  const deactivateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("PATCH", `/api/admin/ota/${id}/deactivate`, undefined);
+      if (!res.ok) throw await parseApiError(res, "Errore disattivazione");
+      return res.json() as Promise<OtaRelease>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/ota"] });
+    },
+    onError: (err: Error) => {
+      Alert.alert("Errore", err.message);
+    },
+  });
+
   function resetForm() {
     setVersion("");
     setBundlePath("");
@@ -194,6 +208,17 @@ export default function OtaScreen() {
     );
   }
 
+  function confirmDeactivate(release: OtaRelease) {
+    Alert.alert(
+      "Disattiva release",
+      `Disattivare la versione ${release.version}? Gli utenti non vedranno più il modal di aggiornamento finché non pubblichi una nuova release.`,
+      [
+        { text: "Annulla", style: "cancel" },
+        { text: "Disattiva", style: "destructive", onPress: () => deactivateMutation.mutate(release.id) },
+      ]
+    );
+  }
+
   const activeRelease = releases.find((r) => r.status === "active");
 
   return (
@@ -211,6 +236,18 @@ export default function OtaScreen() {
               <View style={styles.activeCardHeader}>
                 <MaterialCommunityIcons name="check-circle" size={20} color="#22c55e" />
                 <Text style={styles.activeCardTitle}>Versione attiva</Text>
+                <TouchableOpacity
+                  style={styles.deactivateBtn}
+                  onPress={() => confirmDeactivate(activeRelease)}
+                  disabled={deactivateMutation.isPending}
+                >
+                  {deactivateMutation.isPending ? (
+                    <ActivityIndicator size="small" color="#f97316" />
+                  ) : (
+                    <Ionicons name="pause-circle-outline" size={20} color="#f97316" />
+                  )}
+                  <Text style={styles.deactivateBtnText}>Disattiva</Text>
+                </TouchableOpacity>
               </View>
               <Text style={styles.activeVersion}>{activeRelease.version}</Text>
               <Text style={styles.activeDate}>
@@ -463,6 +500,23 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
     color: "#166534",
+    flex: 1,
+  },
+  deactivateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#f97316",
+    backgroundColor: "#fff7ed",
+  },
+  deactivateBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: "#f97316",
   },
   activeVersion: {
     fontFamily: "Inter_700Bold",
