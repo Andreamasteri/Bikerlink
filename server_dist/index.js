@@ -13964,12 +13964,17 @@ function setupErrorHandler(app2) {
   });
   setupErrorHandler(app);
   const port = parseInt(process.env.PORT || "5000", 10);
+  const activeConnections = /* @__PURE__ */ new Set();
   let _shuttingDown = false;
   const gracefulShutdown = (signal) => {
     if (_shuttingDown) return;
     _shuttingDown = true;
     console.log(`[Shutdown] ${signal} ricevuto \u2014 chiusura pulita in corso...`);
     stopMatchingEngine();
+    for (const socket of activeConnections) {
+      socket.destroy();
+    }
+    activeConnections.clear();
     server.close(() => {
       console.log("[Shutdown] Server HTTP chiuso.");
       pool.end().then(() => {
@@ -13979,8 +13984,8 @@ function setupErrorHandler(app2) {
     });
     setTimeout(() => {
       console.log("[Shutdown] Timeout \u2014 uscita forzata.");
-      process.exit(1);
-    }, 5e3);
+      process.exit(0);
+    }, 8e3);
   };
   process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
   process.on("SIGINT", () => gracefulShutdown("SIGINT"));
@@ -14136,4 +14141,8 @@ function setupErrorHandler(app2) {
       });
     }
   );
+  server.on("connection", (socket) => {
+    activeConnections.add(socket);
+    socket.once("close", () => activeConnections.delete(socket));
+  });
 })();
