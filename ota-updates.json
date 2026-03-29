@@ -148,6 +148,23 @@
     "iosUpdateId": null,
     "commitBase": "2d2a2789fc7a5de0747db801bc28d8a79aaa20c3",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/fe29bf38-582d-45e4-acde-cefa27f228e7",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 10,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-10: Storico OTA spostato vicino a Monitoraggio nel pannello admin",
+    "publishedAt": "2026-03-29",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Spostato OtaHistoryWidget dal top della pagina admin alla posizione subito dopo il gruppo Monitoraggio, usando React.Fragment nel map. Stile otaWidget adeguato: marginTop -8 per avvicinarlo visivamente, marginBottom 24 per coerenza con gli altri gruppi. Bundle Hermes .hbc 3.64 MB.",
+    "updateGroupId": "d67c9691-9176-4bc7-bf00-e493aa6e6db1",
+    "androidUpdateId": "019d3b00-0149-7764-941e-67a57d2d5708",
+    "iosUpdateId": null,
+    "commitBase": "b3442b7",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/d67c9691-9176-4bc7-bf00-e493aa6e6db1",
     "status": "published"
   }
 ]

@@ -178,35 +178,36 @@ export default function AdminDashboard() {
     >
       <Text style={styles.subtitle}>Gestisci tutti gli aspetti dell'app</Text>
 
-      <OtaHistoryWidget />
-
       {adminGroups.map((group) => (
-        <View key={group.title} style={styles.groupContainer}>
-          <View style={styles.groupHeader}>
-            {renderGroupHeaderIcon(group)}
-            <Text style={styles.groupTitle}>{group.title}</Text>
+        <React.Fragment key={group.title}>
+          <View style={styles.groupContainer}>
+            <View style={styles.groupHeader}>
+              {renderGroupHeaderIcon(group)}
+              <Text style={styles.groupTitle}>{group.title}</Text>
+            </View>
+            <View style={styles.grid}>
+              {group.items.map((section) => {
+                const iconColor = section.accentColor || Colors.accent;
+                return (
+                  <TouchableOpacity
+                    key={section.key}
+                    style={styles.card}
+                    onPress={() => handleItemPress(section)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.cardIcon}>
+                      {renderIcon(section, 28, iconColor)}
+                    </View>
+                    <Text style={styles.cardLabel}>
+                      {section.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
-          <View style={styles.grid}>
-            {group.items.map((section) => {
-              const iconColor = section.accentColor || Colors.accent;
-              return (
-                <TouchableOpacity
-                  key={section.key}
-                  style={styles.card}
-                  onPress={() => handleItemPress(section)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.cardIcon}>
-                    {renderIcon(section, 28, iconColor)}
-                  </View>
-                  <Text style={styles.cardLabel}>
-                    {section.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
+          {group.title === "Monitoraggio" && <OtaHistoryWidget />}
+        </React.Fragment>
       ))}
     </ScrollView>
   );
@@ -276,7 +277,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.border,
-    marginBottom: 20,
+    marginTop: -8,
+    marginBottom: 24,
     overflow: "hidden",
   },
   otaWidgetHeader: {
