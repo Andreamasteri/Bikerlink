@@ -3670,14 +3670,6 @@ var init_mass_seed = __esm({
 });
 
 // server/objectStorage.ts
-var objectStorage_exports = {};
-__export(objectStorage_exports, {
-  deleteObject: () => deleteObject,
-  downloadBuffer: () => downloadBuffer,
-  listObjects: () => listObjects,
-  objectExists: () => objectExists,
-  uploadBuffer: () => uploadBuffer
-});
 function getClient() {
   if (!_client) {
     _client = new import_object_storage.Client();
@@ -3707,11 +3699,6 @@ async function deleteObject(objectPath) {
   if (!result.ok) {
     throw new Error(`Eliminazione fallita per ${objectPath}: ${result.error?.message}`);
   }
-}
-async function objectExists(objectPath) {
-  const client = getClient();
-  const result = await client.exists(objectPath);
-  return result.ok && result.value === true;
 }
 async function listObjects(prefix) {
   const client = getClient();
@@ -5737,12 +5724,12 @@ router3.get("/online-list", requireAuth2, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq12, and: and9, lt, or: or4, isNull: isNull2, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq11, and: and9, lt, or: or4, isNull: isNull2, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const offlineConds = [eq12(usersTable.status, "active"), or4(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull2(usersTable.lastLoginAt)), eq12(usersTable.ghostMode, false)];
+      const offlineConds = [eq11(usersTable.status, "active"), or4(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull2(usersTable.lastLoginAt)), eq11(usersTable.ghostMode, false)];
       if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
-      const offlineResults = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(usersTable).leftJoin(profilesTable, eq12(profilesTable.userId, usersTable.id)).where(and9(...offlineConds)).orderBy(sqlTag`distance`);
+      const offlineResults = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(usersTable).leftJoin(profilesTable, eq11(profilesTable.userId, usersTable.id)).where(and9(...offlineConds)).orderBy(sqlTag`distance`);
       const offlineOnly = offlineResults.filter((r) => !onlineIdSet.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...allResults, ...offlineOnly];
     }
@@ -5853,12 +5840,12 @@ router3.get("/biker-available-list", requireAuth2, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq12, and: and9, or: or4, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq11, and: and9, or: or4, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const bikerConds = [eq12(usersTable.status, "active"), or4(eq12(usersTable.userType, "biker"), eq12(usersTable.userType, "coppia")), eq12(usersTable.ghostMode, false)];
+      const bikerConds = [eq11(usersTable.status, "active"), or4(eq11(usersTable.userType, "biker"), eq11(usersTable.userType, "coppia")), eq11(usersTable.ghostMode, false)];
       if (countriesParam && countriesParam.length > 0) bikerConds.push(inArr(usersTable.country, countriesParam));
-      const allBikers = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq12(usersTable.id, profilesTable.userId)).where(and9(...bikerConds)).orderBy(sqlTag`distance`);
+      const allBikers = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq11(usersTable.id, profilesTable.userId)).where(and9(...bikerConds)).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));
       const offlineOnly = allBikers.filter((r) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
@@ -5910,12 +5897,12 @@ router3.get("/zavorrine-available-list", requireAuth2, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq12, and: and9, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq11, and: and9, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const zavConds = [eq12(usersTable.status, "active"), eq12(usersTable.userType, "zavorrina"), eq12(usersTable.ghostMode, false)];
+      const zavConds = [eq11(usersTable.status, "active"), eq11(usersTable.userType, "zavorrina"), eq11(usersTable.ghostMode, false)];
       if (countriesParam && countriesParam.length > 0) zavConds.push(inArr(usersTable.country, countriesParam));
-      const allZav = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq12(usersTable.id, profilesTable.userId)).where(and9(...zavConds)).orderBy(sqlTag`distance`);
+      const allZav = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq11(usersTable.id, profilesTable.userId)).where(and9(...zavConds)).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));
       const offlineOnly = allZav.filter((r) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
@@ -9912,8 +9899,8 @@ router17.get("/easter-eggs/:id/stats", async (req, res) => {
     }
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { collectedEasterEggs: collectedEasterEggs2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq12, count: count3 } = await import("drizzle-orm");
-    const [result] = await db2.select({ count: count3() }).from(collectedEasterEggs2).where(eq12(collectedEasterEggs2.easterEggId, id));
+    const { eq: eq11, count: count3 } = await import("drizzle-orm");
+    const [result] = await db2.select({ count: count3() }).from(collectedEasterEggs2).where(eq11(collectedEasterEggs2.easterEggId, id));
     return res.json({ eggId: id, collectionsCount: result?.count || 0 });
   } catch (error) {
     console.error("Admin get easter egg stats error:", error);
@@ -11120,15 +11107,15 @@ router17.put("/fake-users/toggle-all", async (req, res) => {
     }
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { users: usersTable, userProfiles: userProfiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq12 } = await import("drizzle-orm");
+    const { eq: eq11 } = await import("drizzle-orm");
     await storage.upsertAppSetting("fake_users_enabled", enabled ? "true" : "false");
-    const fakeUsers = await db2.select().from(usersTable).where(eq12(usersTable.isFake, true));
+    const fakeUsers = await db2.select().from(usersTable).where(eq11(usersTable.isFake, true));
     const newLoginAt = enabled ? /* @__PURE__ */ new Date() : /* @__PURE__ */ new Date("2020-01-01");
     for (const fakeUser of fakeUsers) {
-      await db2.update(userProfiles2).set({ isAvailable: enabled }).where(eq12(userProfiles2.userId, fakeUser.id));
+      await db2.update(userProfiles2).set({ isAvailable: enabled }).where(eq11(userProfiles2.userId, fakeUser.id));
       const userUpdate = { lastLoginAt: newLoginAt };
       if (enabled && !fakeUser.country) userUpdate.country = "IT";
-      await db2.update(usersTable).set(userUpdate).where(eq12(usersTable.id, fakeUser.id));
+      await db2.update(usersTable).set(userUpdate).where(eq11(usersTable.id, fakeUser.id));
     }
     return res.json({ message: `Tutti gli utenti fake sono stati ${enabled ? "abilitati" : "disabilitati"}`, count: fakeUsers.length });
   } catch (error) {
@@ -12166,142 +12153,6 @@ router17.get("/matching-stats", async (_req, res) => {
     return res.status(500).json({ message: "Errore durante il recupero delle statistiche" });
   }
 });
-var otaBundleUpload = (0, import_multer3.default)({ storage: import_multer3.default.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
-router17.post("/ota/upload", otaBundleUpload.single("bundle"), async (req, res) => {
-  try {
-    const version = (req.query.version || "").trim();
-    if (!version) return res.status(400).json({ message: "Parametro 'version' mancante" });
-    if (!req.file) return res.status(400).json({ message: "File bundle mancante" });
-    const objectPath = `public/ota/${version}/bundle.js`;
-    const { uploadBuffer: uploadBuffer2 } = await Promise.resolve().then(() => (init_objectStorage(), objectStorage_exports));
-    await uploadBuffer2(objectPath, req.file.buffer, "application/javascript");
-    const publicDomain = process.env.BIKERLINK_PUBLIC_BASE_URL || "https://biker-link.replit.app";
-    const bundleUrl = `${publicDomain}/api/ota-bundle/${encodeURIComponent(version)}`;
-    return res.json({ url: bundleUrl, objectPath, version });
-  } catch (error) {
-    console.error("Admin OTA upload error:", error);
-    return res.status(500).json({ message: "Errore upload bundle OTA" });
-  }
-});
-router17.get("/ota", async (_req, res) => {
-  try {
-    const releases = await db.select().from(otaReleases).orderBy((0, import_drizzle_orm9.desc)(otaReleases.createdAt));
-    return res.json(releases);
-  } catch (error) {
-    console.error("Admin get OTA releases error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router17.post("/ota", async (req, res) => {
-  try {
-    const { version, releaseNotes, bundlePath, scheduledAt, publishNow } = req.body;
-    if (!version || typeof version !== "string") {
-      return res.status(400).json({ message: "Versione mancante" });
-    }
-    const now = /* @__PURE__ */ new Date();
-    let status = "draft";
-    let publishedAt = null;
-    if (publishNow) {
-      await db.update(otaReleases).set({ status: "superseded", updatedAt: now }).where((0, import_drizzle_orm9.eq)(otaReleases.status, "active"));
-      status = "active";
-      publishedAt = now;
-    } else if (scheduledAt) {
-      status = "scheduled";
-    }
-    const [release] = await db.insert(otaReleases).values({
-      version,
-      bundlePath: bundlePath || null,
-      releaseNotes: releaseNotes || null,
-      scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
-      publishedAt,
-      status,
-      createdBy: req.session.userId
-    }).returning();
-    await storage.createModeratorLog({
-      moderatorId: req.session.userId,
-      action: "create_ota_release",
-      targetType: "ota_release",
-      targetId: release.id,
-      details: `OTA release creata: v${version} (${status})`
-    });
-    return res.status(201).json(release);
-  } catch (error) {
-    console.error("Admin create OTA release error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router17.post("/ota/:id/publish", async (req, res) => {
-  try {
-    const id = req.params.id;
-    const [existing] = await db.select().from(otaReleases).where((0, import_drizzle_orm9.eq)(otaReleases.id, id)).limit(1);
-    if (!existing) {
-      return res.status(404).json({ message: "Release non trovata" });
-    }
-    const now = /* @__PURE__ */ new Date();
-    await db.update(otaReleases).set({ status: "superseded", updatedAt: now }).where((0, import_drizzle_orm9.eq)(otaReleases.status, "active"));
-    const [updated] = await db.update(otaReleases).set({ status: "active", publishedAt: now, updatedAt: now }).where((0, import_drizzle_orm9.eq)(otaReleases.id, id)).returning();
-    await storage.createModeratorLog({
-      moderatorId: req.session.userId,
-      action: "publish_ota_release",
-      targetType: "ota_release",
-      targetId: id,
-      details: `OTA release pubblicata: v${updated.version}`
-    });
-    return res.json(updated);
-  } catch (error) {
-    console.error("Admin publish OTA release error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router17.patch("/ota/:id/deactivate", async (req, res) => {
-  try {
-    const id = req.params.id;
-    const [existing] = await db.select().from(otaReleases).where((0, import_drizzle_orm9.eq)(otaReleases.id, id)).limit(1);
-    if (!existing) {
-      return res.status(404).json({ message: "Release non trovata" });
-    }
-    if (existing.status !== "active") {
-      return res.status(400).json({ message: "Solo le release attive possono essere disattivate" });
-    }
-    const now = /* @__PURE__ */ new Date();
-    const [updated] = await db.update(otaReleases).set({ status: "superseded", updatedAt: now }).where((0, import_drizzle_orm9.and)((0, import_drizzle_orm9.eq)(otaReleases.id, id), (0, import_drizzle_orm9.eq)(otaReleases.status, "active"))).returning();
-    await storage.createModeratorLog({
-      moderatorId: req.session.userId,
-      action: "deactivate_ota_release",
-      targetType: "ota_release",
-      targetId: id,
-      details: `OTA release disattivata: v${existing.version}`
-    });
-    return res.json(updated);
-  } catch (error) {
-    console.error("Admin deactivate OTA release error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-router17.delete("/ota/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-    const [existing] = await db.select().from(otaReleases).where((0, import_drizzle_orm9.eq)(otaReleases.id, id)).limit(1);
-    if (!existing) {
-      return res.status(404).json({ message: "Release non trovata" });
-    }
-    if (existing.status === "active") {
-      return res.status(400).json({ message: "Impossibile eliminare una release attiva" });
-    }
-    await db.delete(otaReleases).where((0, import_drizzle_orm9.eq)(otaReleases.id, id));
-    await storage.createModeratorLog({
-      moderatorId: req.session.userId,
-      action: "delete_ota_release",
-      targetType: "ota_release",
-      targetId: id,
-      details: `OTA release eliminata: v${existing.version}`
-    });
-    return res.json({ message: "Release eliminata" });
-  } catch (error) {
-    console.error("Admin delete OTA release error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
 router17.get("/system-health", async (_req, res) => {
   try {
     const now = Date.now();
@@ -12892,18 +12743,6 @@ async function registerRoutes(app2) {
   app2.use("/api/motoclubs", motoclubs_default);
   app2.get("/api/updates/check", async (_req, res) => {
     return res.json({ hasUpdate: false, version: null, releaseNotes: null, manifestUrl: null });
-  });
-  app2.get("/api/ota-bundle/:version", async (req, res) => {
-    try {
-      const version = req.params.version;
-      const { downloadBuffer: downloadBuffer2 } = await Promise.resolve().then(() => (init_objectStorage(), objectStorage_exports));
-      const buffer = await downloadBuffer2(`public/ota/${version}/bundle.js`);
-      res.setHeader("Content-Type", "application/javascript");
-      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-      res.send(buffer);
-    } catch {
-      res.status(404).json({ message: "Bundle non trovato" });
-    }
   });
   app2.get("/privacy-policy", (_req, res) => {
     const templatePath = import_node_path.default.resolve(
@@ -13871,20 +13710,6 @@ function getAppName() {
     return "App Landing Page";
   }
 }
-async function applyOtaOverride(manifest) {
-  try {
-    const [activeRelease] = await db.select().from(otaReleases).where((0, import_drizzle_orm12.eq)(otaReleases.status, "active")).limit(1);
-    if (activeRelease?.bundlePath) {
-      const launchAsset = manifest.launchAsset;
-      if (launchAsset) {
-        launchAsset.url = activeRelease.bundlePath;
-        manifest.launchAsset = launchAsset;
-      }
-      manifest.otaVersion = activeRelease.version;
-    }
-  } catch {
-  }
-}
 async function fetchMetroManifest(platform) {
   const http2 = await import("http");
   const data = await new Promise((resolve3, reject) => {
@@ -13944,7 +13769,6 @@ async function serveExpoManifest(platform, req, res) {
   if (!forceLive && staticBundleExists(platform)) {
     try {
       const manifest = readStaticManifest(platform);
-      await applyOtaOverride(manifest);
       log(`[manifest] Serving local static bundle for ${platform}`);
       return res.send(JSON.stringify(manifest));
     } catch (err) {
@@ -13953,7 +13777,6 @@ async function serveExpoManifest(platform, req, res) {
   }
   try {
     const manifest = await fetchMetroManifest(platform);
-    await applyOtaOverride(manifest);
     log(`[manifest] Serving live Metro manifest for ${platform}`);
     return res.send(JSON.stringify(manifest));
   } catch {
@@ -14066,33 +13889,6 @@ function configureExpoAndLanding(app2) {
   });
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }
-var _otaCronTimer = null;
-var _otaInitTimer = null;
-async function runOtaCheck() {
-  try {
-    const now = /* @__PURE__ */ new Date();
-    const scheduled = await db.select().from(otaReleases).where(
-      (0, import_drizzle_orm12.and)(
-        (0, import_drizzle_orm12.eq)(otaReleases.status, "scheduled"),
-        (0, import_drizzle_orm12.lte)(otaReleases.scheduledAt, now)
-      )
-    );
-    for (const release of scheduled) {
-      await db.update(otaReleases).set({ status: "superseded", updatedAt: now }).where((0, import_drizzle_orm12.eq)(otaReleases.status, "active"));
-      await db.update(otaReleases).set({ status: "active", publishedAt: now, updatedAt: now }).where((0, import_drizzle_orm12.eq)(otaReleases.id, release.id));
-      console.log(`[OTA] Published scheduled release v${release.version} (id: ${release.id})`);
-    }
-  } catch (e) {
-    console.warn("[OTA] Cron error:", e);
-  }
-}
-function startOtaCron() {
-  _otaInitTimer = setTimeout(() => {
-    _otaInitTimer = null;
-    runOtaCheck();
-    _otaCronTimer = setInterval(runOtaCheck, 60 * 1e3);
-  }, 60 * 1e3);
-}
 async function initMissingClubConversations() {
   try {
     const clubs = await db.select({ id: motoClubs.id, name: motoClubs.name, conversationId: motoClubs.conversationId }).from(motoClubs).where((0, import_drizzle_orm12.eq)(motoClubs.isApproved, true));
@@ -14174,14 +13970,6 @@ function setupErrorHandler(app2) {
     _shuttingDown = true;
     console.log(`[Shutdown] ${signal} ricevuto \u2014 chiusura pulita in corso...`);
     stopMatchingEngine();
-    if (_otaInitTimer) {
-      clearTimeout(_otaInitTimer);
-      _otaInitTimer = null;
-    }
-    if (_otaCronTimer) {
-      clearInterval(_otaCronTimer);
-      _otaCronTimer = null;
-    }
     server.close(() => {
       console.log("[Shutdown] Server HTTP chiuso.");
       pool.end().then(() => {
@@ -14206,7 +13994,6 @@ function setupErrorHandler(app2) {
       log(`express server serving on port ${port}`);
       initUptimeTracking();
       startMetroMonitor();
-      startOtaCron();
       (async () => {
         try {
           await db.execute(import_drizzle_orm12.sql`ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS image_url TEXT`);

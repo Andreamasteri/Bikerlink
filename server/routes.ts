@@ -30,8 +30,8 @@ import sosRoutes from "./routes/sos";
 import motoclubsRoutes from "./routes/motoclubs";
 import { triggerMatchingRun, triggerMatchingForUser } from "./matching-engine";
 import { db } from "./db";
-import { users, otaReleases } from "@shared/schema";
-import { ilike, eq } from "drizzle-orm";
+import { users } from "@shared/schema";
+import { ilike } from "drizzle-orm";
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   const session = (req as any).session as { userId?: string };
@@ -108,19 +108,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/updates/check", async (_req: Request, res: Response) => {
     return res.json({ hasUpdate: false, version: null, releaseNotes: null, manifestUrl: null });
-  });
-
-  app.get("/api/ota-bundle/:version", async (req: Request, res: Response) => {
-    try {
-      const version = req.params.version;
-      const { downloadBuffer } = await import("./objectStorage");
-      const buffer = await downloadBuffer(`public/ota/${version}/bundle.js`);
-      res.setHeader("Content-Type", "application/javascript");
-      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-      res.send(buffer);
-    } catch {
-      res.status(404).json({ message: "Bundle non trovato" });
-    }
   });
 
   app.get("/privacy-policy", (_req, res) => {

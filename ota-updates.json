@@ -115,5 +115,18 @@
     "commitBase": "a89c49f44961950f0f53d2e57204f8d9c1b709c3",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/06753f22-1e9c-4147-b165-e4a2d11678ed",
     "status": "published"
+  },
+  {
+    "updateNumber": 8,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-8: rimozione pannello admin OTA, storico widget in sola lettura",
+    "publishedAt": "2026-03-29",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "taskCount": 1,
+    "note": "Rimosso app/admin/ota.tsx e pannello gestione OTA. Aggiunto widget storico OTA in app/admin/index.tsx che legge ota-updates.json. Rimossi endpoint backend OTA custom e cron runOtaCheck.",
+    "status": "pending"
   }
 ]

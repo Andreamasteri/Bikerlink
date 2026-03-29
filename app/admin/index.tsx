@@ -1,10 +1,11 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import type { Href } from "expo-router";
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import otaUpdates from "@/ota-updates.json";
 
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
 type MaterialCommunityIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -71,7 +72,6 @@ const adminGroups: AdminGroup[] = [
       { key: "settings", label: "Impostazioni", icon: "settings", iconSet: "MaterialIcons", route: "/admin/settings" },
       { key: "invite-codes", label: "Codici Invito", icon: "gift", iconSet: "Ionicons", route: "/admin/invite-codes" },
       { key: "backup", label: "Backup automatici", icon: "cloud-upload", iconSet: "MaterialCommunityIcons", route: "/admin/backup" },
-      { key: "ota", label: "Aggiornamenti OTA", icon: "update", iconSet: "MaterialIcons", route: "/admin/ota", accentColor: "#22c55e" },
       { key: "system", label: "Sistema", icon: "pulse-outline", iconSet: "Ionicons", route: "/admin/system", accentColor: "#FF4444" },
     ],
   },
@@ -99,6 +99,65 @@ function renderGroupHeaderIcon(group: AdminGroup) {
   }
 }
 
+interface OtaUpdate {
+  updateNumber: number;
+  publishedAt?: string;
+  message?: string;
+  taskCount?: number;
+  status?: string;
+  [key: string]: unknown;
+}
+
+function formatOtaDate(dateStr?: string): string {
+  if (!dateStr) return "—";
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" });
+  } catch {
+    return dateStr;
+  }
+}
+
+function OtaHistoryWidget() {
+  const [collapsed, setCollapsed] = useState(false);
+  const updates = (otaUpdates as OtaUpdate[]).slice().reverse();
+
+  return (
+    <View style={styles.otaWidget}>
+      <TouchableOpacity style={styles.otaWidgetHeader} onPress={() => setCollapsed(!collapsed)} activeOpacity={0.8}>
+        <View style={styles.otaWidgetHeaderLeft}>
+          <MaterialCommunityIcons name="update" size={18} color={Colors.accent} />
+          <Text style={styles.otaWidgetTitle}>Storico OTA</Text>
+          <View style={styles.otaBadge}>
+            <Text style={styles.otaBadgeText}>{updates.length}</Text>
+          </View>
+        </View>
+        <Ionicons name={collapsed ? "chevron-down" : "chevron-up"} size={18} color={Colors.textSecondary} />
+      </TouchableOpacity>
+      {!collapsed && (
+        <View style={styles.otaList}>
+          {updates.map((u) => (
+            <View key={u.updateNumber} style={styles.otaRow}>
+              <View style={styles.otaRowLeft}>
+                <Text style={styles.otaNumber}>OTA-{u.updateNumber}</Text>
+                <Text style={styles.otaDate}>{formatOtaDate(u.publishedAt)}</Text>
+              </View>
+              <View style={styles.otaRowRight}>
+                <Text style={styles.otaMessage} numberOfLines={2}>{u.message || "—"}</Text>
+                {u.taskCount !== undefined ? (
+                  <Text style={styles.otaTaskCount}>{u.taskCount} task</Text>
+                ) : (
+                  <Text style={styles.otaTaskCount}>—</Text>
+                )}
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -114,10 +173,12 @@ export default function AdminDashboard() {
       style={styles.container}
       contentContainerStyle={[
         styles.content,
-        { paddingBottom: insets.bottom + 20 },
+        { paddingBottom: insets.bottom + 20, paddingTop: Platform.OS === "web" ? 67 : 0 },
       ]}
     >
       <Text style={styles.subtitle}>Gestisci tutti gli aspetti dell'app</Text>
+
+      <OtaHistoryWidget />
 
       {adminGroups.map((group) => (
         <View key={group.title} style={styles.groupContainer}>
@@ -209,5 +270,81 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.text,
     textAlign: "center",
+  },
+  otaWidget: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 20,
+    overflow: "hidden",
+  },
+  otaWidgetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 14,
+  },
+  otaWidgetHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  otaWidgetTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    color: Colors.text,
+  },
+  otaBadge: {
+    backgroundColor: Colors.accent,
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  otaBadgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    color: "#fff",
+  },
+  otaList: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  otaRow: {
+    flexDirection: "row",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    gap: 10,
+  },
+  otaRowLeft: {
+    minWidth: 72,
+  },
+  otaNumber: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    color: Colors.accent,
+  },
+  otaDate: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  otaRowRight: {
+    flex: 1,
+  },
+  otaMessage: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.text,
+    lineHeight: 18,
+  },
+  otaTaskCount: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
 });

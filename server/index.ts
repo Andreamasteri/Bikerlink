@@ -6,8 +6,8 @@ import { initState } from "./init-state";
 import { startMatchingEngine, stopMatchingEngine } from "./matching-engine";
 import { autoSeedEssentialUsers, autoSeedFakeUsers } from "./auto-seed";
 import { db, pool } from "./db";
-import { sql, eq, and, lte } from "drizzle-orm";
-import { motoClubs, motoClubMembers, conversations, conversationParticipants, otaReleases } from "@shared/schema";
+import { sql, eq, and } from "drizzle-orm";
+import { motoClubs, motoClubMembers, conversations, conversationParticipants } from "@shared/schema";
 import { seedMotoclubs } from "./routes/motoclubs";
 import * as fs from "fs";
 import * as path from "path";
@@ -121,24 +121,6 @@ function getAppName(): string {
   }
 }
 
-async function applyOtaOverride(manifest: Record<string, unknown>): Promise<void> {
-  try {
-    const [activeRelease] = await db
-      .select()
-      .from(otaReleases)
-      .where(eq(otaReleases.status, "active"))
-      .limit(1);
-    if (activeRelease?.bundlePath) {
-      const launchAsset = manifest.launchAsset as Record<string, unknown> | undefined;
-      if (launchAsset) {
-        launchAsset.url = activeRelease.bundlePath;
-        manifest.launchAsset = launchAsset;
-      }
-      manifest.otaVersion = activeRelease.version;
-    }
-  } catch { }
-}
-
 async function fetchMetroManifest(platform: string): Promise<Record<string, unknown>> {
   const http = await import("http");
   const data = await new Promise<string>((resolve, reject) => {
@@ -199,7 +181,6 @@ async function serveExpoManifest(platform: string, req: Request, res: Response) 
   if (!forceLive && staticBundleExists(platform)) {
     try {
       const manifest = readStaticManifest(platform);
-      await applyOtaOverride(manifest);
       log(`[manifest] Serving local static bundle for ${platform}`);
       return res.send(JSON.stringify(manifest));
     } catch (err) {
@@ -210,7 +191,6 @@ async function serveExpoManifest(platform: string, req: Request, res: Response) 
   // Percorso secondario: Metro live (dev / ?live=true / nessun bundle locale)
   try {
     const manifest = await fetchMetroManifest(platform);
-    await applyOtaOverride(manifest);
     log(`[manifest] Serving live Metro manifest for ${platform}`);
     return res.send(JSON.stringify(manifest));
   } catch {
@@ -357,49 +337,6 @@ function configureExpoAndLanding(app: express.Application) {
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }
 
-let _otaCronTimer: ReturnType<typeof setInterval> | null = null;
-let _otaInitTimer: ReturnType<typeof setTimeout> | null = null;
-
-async function runOtaCheck() {
-  try {
-    const now = new Date();
-    const scheduled = await db
-      .select()
-      .from(otaReleases)
-      .where(
-        and(
-          eq(otaReleases.status, "scheduled"),
-          lte(otaReleases.scheduledAt, now)
-        )
-      );
-
-    for (const release of scheduled) {
-      await db
-        .update(otaReleases)
-        .set({ status: "superseded", updatedAt: now })
-        .where(eq(otaReleases.status, "active"));
-
-      await db
-        .update(otaReleases)
-        .set({ status: "active", publishedAt: now, updatedAt: now })
-        .where(eq(otaReleases.id, release.id));
-
-      console.log(`[OTA] Published scheduled release v${release.version} (id: ${release.id})`);
-    }
-  } catch (e) {
-    console.warn("[OTA] Cron error:", e);
-  }
-}
-
-function startOtaCron() {
-  // Explicit 60s delay before first run, then every 60s
-  _otaInitTimer = setTimeout(() => {
-    _otaInitTimer = null;
-    runOtaCheck();
-    _otaCronTimer = setInterval(runOtaCheck, 60 * 1000);
-  }, 60 * 1000);
-}
-
 async function initMissingClubConversations() {
   try {
     const clubs = await db
@@ -522,8 +459,6 @@ function setupErrorHandler(app: express.Application) {
     _shuttingDown = true;
     console.log(`[Shutdown] ${signal} ricevuto — chiusura pulita in corso...`);
     stopMatchingEngine();
-    if (_otaInitTimer) { clearTimeout(_otaInitTimer); _otaInitTimer = null; }
-    if (_otaCronTimer) { clearInterval(_otaCronTimer); _otaCronTimer = null; }
     server.close(() => {
       console.log("[Shutdown] Server HTTP chiuso.");
       pool.end().then(() => {
@@ -550,9 +485,6 @@ function setupErrorHandler(app: express.Application) {
       log(`express server serving on port ${port}`);
       initUptimeTracking();
       startMetroMonitor();
-
-      // OTA cron: first run at 60s from boot (explicit), then every 60s
-      startOtaCron();
 
       // Phase 1 (immediate): run cheap DB migrations only — no heavy work at boot
       (async () => {
