@@ -10304,6 +10304,26 @@ router17.put("/settings/motoclub_include_zav", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
+router17.put("/settings/show_search_preference", async (req, res) => {
+  try {
+    const { value } = req.body;
+    if (value !== "true" && value !== "false") {
+      return res.status(400).json({ message: "Valore non valido: usare 'true' o 'false'" });
+    }
+    const setting = await storage.upsertAppSetting("show_search_preference", value);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId,
+      action: "update_setting",
+      targetType: "app_setting",
+      targetId: "show_search_preference",
+      details: `show_search_preference = ${value}`
+    });
+    return res.json(setting);
+  } catch (error) {
+    console.error("Admin show_search_preference error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
 router17.put("/settings/maps_enabled", async (req, res) => {
   try {
     const { value } = req.body;
@@ -12897,6 +12917,14 @@ async function registerRoutes(app2) {
       res.json({ enabled: false });
     }
   });
+  app2.get("/api/settings/show-search-preference", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("show_search_preference");
+      res.json({ enabled: setting?.value === "true" });
+    } catch {
+      res.json({ enabled: false });
+    }
+  });
   app2.get("/api/users/search", async (req, res) => {
     if (!req.session?.userId) return res.status(401).json({ message: "Non autenticato" });
     try {
@@ -14098,6 +14126,8 @@ function setupErrorHandler(app2) {
           if (!listSetting) await storage2.upsertAppSetting("splash_messages_list", "[]");
           const motoclubZavSetting = await storage2.getAppSetting("motoclub_include_zav");
           if (!motoclubZavSetting) await storage2.upsertAppSetting("motoclub_include_zav", "true");
+          const showSearchPrefSetting = await storage2.getAppSetting("show_search_preference");
+          if (!showSearchPrefSetting) await storage2.upsertAppSetting("show_search_preference", "false");
           const mapsUserChoiceSetting = await storage2.getAppSetting("maps_user_choice_enabled");
           if (!mapsUserChoiceSetting) await storage2.upsertAppSetting("maps_user_choice_enabled", "true");
         } catch (e) {

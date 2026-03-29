@@ -220,6 +220,11 @@ export default function ProfileScreen() {
     },
   });
 
+  const { data: showSearchPrefData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/show-search-preference"],
+  });
+  const showSearchPref = showSearchPrefData?.enabled === true;
+
   const { data: donationData } = useQuery<{ enabled: boolean; text: string; paypalEmail: string }>({
     queryKey: ["/api/settings/donation"],
   });
@@ -742,7 +747,7 @@ export default function ProfileScreen() {
         </Pressable>
       </View>
 
-      {currentUserType === "biker" && (
+      {currentUserType === "biker" && showSearchPref && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Ricerca Match con ...</Text>
           <View style={styles.searchPrefRow}>

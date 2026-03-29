@@ -924,6 +924,27 @@ router.put("/settings/motoclub_include_zav", async (req: Request, res: Response)
   }
 });
 
+router.put("/settings/show_search_preference", async (req: Request, res: Response) => {
+  try {
+    const { value } = req.body as { value: string };
+    if (value !== "true" && value !== "false") {
+      return res.status(400).json({ message: "Valore non valido: usare 'true' o 'false'" });
+    }
+    const setting = await storage.upsertAppSetting("show_search_preference", value);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_setting",
+      targetType: "app_setting",
+      targetId: "show_search_preference",
+      details: `show_search_preference = ${value}`,
+    });
+    return res.json(setting);
+  } catch (error) {
+    console.error("Admin show_search_preference error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/settings/maps_enabled", async (req: Request, res: Response) => {
   try {
     const { value } = req.body as { value: string };

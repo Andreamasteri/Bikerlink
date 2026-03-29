@@ -610,6 +610,8 @@ function setupErrorHandler(app: express.Application) {
           if (!listSetting) await storage.upsertAppSetting("splash_messages_list", "[]");
           const motoclubZavSetting = await storage.getAppSetting("motoclub_include_zav");
           if (!motoclubZavSetting) await storage.upsertAppSetting("motoclub_include_zav", "true");
+          const showSearchPrefSetting = await storage.getAppSetting("show_search_preference");
+          if (!showSearchPrefSetting) await storage.upsertAppSetting("show_search_preference", "false");
           const mapsUserChoiceSetting = await storage.getAppSetting("maps_user_choice_enabled");
           if (!mapsUserChoiceSetting) await storage.upsertAppSetting("maps_user_choice_enabled", "true");
         } catch (e) {

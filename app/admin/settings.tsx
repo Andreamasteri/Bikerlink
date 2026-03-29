@@ -361,6 +361,11 @@ export default function AdminSettings() {
   });
   const userAvailableOnLogin = userAvailableData?.enabled !== false;
 
+  const { data: showSearchPrefData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/show-search-preference"],
+  });
+  const showSearchPrefEnabled = showSearchPrefData?.enabled === true;
+
   const protectedToggleMutation = useMutation({
     mutationFn: async ({ key, value, adminPassword }: { key: string; value: string; adminPassword: string }) => {
       const baseUrl = getApiUrl();
@@ -520,6 +525,25 @@ export default function AdminSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/auto-matching"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const showSearchPrefMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/show_search_preference", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/show-search-preference"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
   });
@@ -1043,6 +1067,25 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {autoMatchEnabled ? "Il motore di matching automatico è attivo" : "Il matching automatico è disattivato"}
+        </Text>
+      </View>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="search" size={20} color={Colors.warning} />
+            <Text style={styles.synecoLabel}>Mostra "Ricerca Match con..."</Text>
+          </View>
+          <Switch
+            value={showSearchPrefEnabled}
+            onValueChange={(val) => showSearchPrefMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: Colors.warning }}
+            thumbColor={showSearchPrefEnabled ? Colors.text : Colors.textSecondary}
+            disabled={showSearchPrefMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {showSearchPrefEnabled ? "La sezione 'Ricerca Match con...' è visibile nel profilo utente" : "La sezione 'Ricerca Match con...' è nascosta dal profilo utente"}
         </Text>
       </View>
 

@@ -276,6 +276,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/show-search-preference", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("show_search_preference");
+      res.json({ enabled: setting?.value === "true" });
+    } catch {
+      res.json({ enabled: false });
+    }
+  });
+
   app.get("/api/users/search", async (req, res) => {
     if (!req.session?.userId) return res.status(401).json({ message: "Non autenticato" });
     try {
