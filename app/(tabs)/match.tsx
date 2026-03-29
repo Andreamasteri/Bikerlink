@@ -526,7 +526,13 @@ export default function MatchScreen() {
     .sort((a: any, b: any) => matchSortScore(b) - matchSortScore(a));
   const visibleBikerMatchesRaw = allBikerMatches
     .filter((m: any) => m.status !== "rejected" && passesDistanceFilter(m.otherLat, m.otherLng, m.status))
-    .sort((a: any, b: any) => matchSortScore(b) - matchSortScore(a));
+    .sort((a: any, b: any) => {
+      const scoreDiff = matchSortScore(b) - matchSortScore(a);
+      if (scoreDiff !== 0) return scoreDiff;
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bTime - aTime;
+    });
   const visibleBikerMatches = visibleBikerMatchesRaw.filter((m: any, idx: number) => {
     const isBiker1 = m.biker1Id === user?.id;
     const otherUserId = isBiker1 ? m.biker2Id : m.biker1Id;
