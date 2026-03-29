@@ -56,7 +56,7 @@ function getRunningOtaLabel(): string {
   try {
     if (__DEV__) return "Modalità sviluppo";
     const uid = Updates.updateId;
-    if (!uid) return "Bundle originale";
+    if (!uid) return "Bundle originale (nessun OTA)";
     return uid.substring(0, 8);
   } catch {
     return "—";
@@ -75,6 +75,7 @@ export default function OtaScreen() {
 
   const [checkLoading, setCheckLoading] = useState(true);
   const [otaAvailable, setOtaAvailable] = useState<boolean | null>(null);
+  const [otaCheckError, setOtaCheckError] = useState(false);
   const [isForcing, setIsForcing] = useState(false);
 
   useEffect(() => {
@@ -88,7 +89,8 @@ export default function OtaScreen() {
         const result = await Updates.checkForUpdateAsync();
         setOtaAvailable(result.isAvailable);
       } catch {
-        setOtaAvailable(false);
+        setOtaCheckError(true);
+        setOtaAvailable(null);
       } finally {
         setCheckLoading(false);
       }
@@ -242,6 +244,11 @@ export default function OtaScreen() {
             <View style={styles.updateBannerLoading}>
               <ActivityIndicator size="small" color={Colors.textSecondary} />
               <Text style={styles.updateBannerLoadingText}>Controllo aggiornamenti EAS...</Text>
+            </View>
+          ) : otaCheckError ? (
+            <View style={styles.updateBannerError}>
+              <Ionicons name="warning-outline" size={16} color={Colors.textSecondary} />
+              <Text style={styles.updateBannerErrorText}>Stato aggiornamenti non disponibile</Text>
             </View>
           ) : otaAvailable ? (
             <View style={styles.updateBannerAvailable}>
@@ -600,6 +607,25 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
     color: "#fff",
+  },
+  updateBannerError: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignSelf: "flex-start",
+  },
+  updateBannerErrorText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontStyle: "italic",
   },
   updateBannerOk: {
     flexDirection: "row",
