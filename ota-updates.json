@@ -12,6 +12,6 @@
     "commitBase": "d3eac0cdba8e73f5ed83626b8f372d79e58d1840",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/950f6fac-763b-473d-afce-dca04202c396",
     "status": "published",
-    "visibleChange": "app/(tabs)/profile.tsx — aggiunto indicatore 'v1.0 · OTA-1 · 950f6fac' in fondo alla schermata Profilo"
+    "visibleChange": "app/(tabs)/profile.tsx — badge 'v1.0 · Aggiornamento OTA attivo' con icona cloud-download-outline, posizionato sotto l'email nell'header del profilo (visibile senza scrollare)"
   }
 ]
