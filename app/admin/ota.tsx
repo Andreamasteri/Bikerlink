@@ -315,16 +315,20 @@ export default function OtaScreen() {
               <Text style={styles.modalCancel}>Annulla</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Nuova Release OTA</Text>
-            <TouchableOpacity onPress={handleCreate} disabled={createMutation.isPending}>
+            <TouchableOpacity
+              style={styles.modalSaveBtn}
+              onPress={handleCreate}
+              disabled={createMutation.isPending}
+            >
               {createMutation.isPending ? (
-                <ActivityIndicator size="small" color={Colors.primary} />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <Text style={styles.modalSave}>Crea</Text>
               )}
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalBody}>
+          <ScrollView style={styles.modalBody} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
             <Text style={styles.fieldLabel}>Versione *</Text>
             <TextInput
               style={styles.input}
@@ -408,6 +412,19 @@ export default function OtaScreen() {
                 </Text>
               </View>
             )}
+
+            <TouchableOpacity
+              style={[styles.createBtn, createMutation.isPending && { opacity: 0.6 }]}
+              onPress={handleCreate}
+              disabled={createMutation.isPending}
+              activeOpacity={0.8}
+            >
+              {createMutation.isPending ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.createBtnText}>Crea release</Text>
+              )}
+            </TouchableOpacity>
           </ScrollView>
         </View>
       </Modal>
@@ -611,10 +628,32 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: Colors.text,
   },
+  modalSaveBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    minWidth: 52,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   modalSave: {
     fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: "#fff",
+  },
+  createBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingVertical: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 24,
+  },
+  createBtnText: {
+    fontFamily: "Inter_600SemiBold",
     fontSize: 16,
-    color: Colors.primary,
+    color: "#fff",
   },
   modalBody: {
     padding: 16,
