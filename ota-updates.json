@@ -39,14 +39,13 @@
     "runtimeVersion": "1.0.0",
     "platforms": ["android", "ios"],
     "jsEngine": "hermes",
-    "note": "Fix bug: handleReload() ora chiama reloadAsync() sempre, indipendentemente da isNew.",
+    "note": "Fix bug: handleReload() ora chiama reloadAsync() sempre. Superseded da OTA-4.",
     "updateGroupId": "c6352f85-0955-4601-b1d2-e407ead37b46",
     "androidUpdateId": "019d38a8-1911-71f5-8b8a-f96afcab5e6c",
     "iosUpdateId": "019d38a8-1911-786f-8a17-34c56c95099a",
     "commitBase": "bed43f0f63aa24919eb4d06e8ddac2f74d32ffee",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/c6352f85-0955-4601-b1d2-e407ead37b46",
-    "status": "superseded",
-    "visibleChange": "app/(tabs)/profile.tsx — badge 'v1.0 · OTA-3 · c6352f85'; app/_layout.tsx — fix handleReload()"
+    "status": "superseded"
   },
   {
     "updateNumber": 4,
@@ -63,8 +62,7 @@
     "iosUpdateId": null,
     "commitBase": "018b787d5591667444bdaf3ead67a8c5fc6dbb05",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/acc17d9e-3ffb-4c98-9935-f3c287f94137",
-    "status": "superseded",
-    "visibleChange": "app/admin/ota.tsx — redesign completo; app/(tabs)/profile.tsx — badge 'v1.0 · OTA-4 · acc17d9e'"
+    "status": "superseded"
   },
   {
     "updateNumber": 5,
@@ -75,13 +73,30 @@
     "runtimeVersion": "1.0.0",
     "platforms": ["android"],
     "jsEngine": "hermes",
-    "note": "Rimosso completamente OtaUpdateChecker da _layout.tsx. expo-updates gestisce gli aggiornamenti in automatico (checkAutomatically: ON_LOAD) senza conflitti. Bundle Hermes .hbc confermato (3.65 MB).",
+    "note": "Rimosso OtaUpdateChecker da _layout.tsx. Loop continuava perché il backend produceva hasUpdate: true con sentinel. Superseded da OTA-6.",
     "updateGroupId": "0f8de9df-a9b8-4be5-a167-1766aebbcbaa",
     "androidUpdateId": "019d38f3-ac6d-7772-ba23-8ad08a25fba8",
     "iosUpdateId": null,
     "commitBase": "230f79d43b187afa1eb0090da9f10514ba1df218",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/0f8de9df-a9b8-4be5-a167-1766aebbcbaa",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 6,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-6: endpoint check disabilitato — aggiornamenti solo via EAS nativo",
+    "publishedAt": "2026-03-29",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "server/routes.ts: /api/updates/check ora ritorna sempre hasUpdate: false. Questo ferma definitivamente il loop del vecchio codice APK. expo-updates gestisce tutto via EAS CDN nativo. Bundle Hermes .hbc 3.65 MB confermato. RICHIEDE: deploy backend in produzione per avere effetto.",
+    "updateGroupId": "57526da1-a906-4ba3-8286-34d955ce1512",
+    "androidUpdateId": "019d38fe-9815-7bc2-966b-fff17712b80d",
+    "iosUpdateId": null,
+    "commitBase": "bcd0fa43aaad188a9d7f788ba88e47e9476f922f",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/57526da1-a906-4ba3-8286-34d955ce1512",
     "status": "published",
-    "visibleChange": "app/_layout.tsx — rimosso OtaUpdateChecker + modal + stili OTA; app/(tabs)/profile.tsx — badge 'v1.0 · OTA-5 · 0f8de9df'"
+    "requiresBackendDeploy": true
   }
 ]

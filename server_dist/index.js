@@ -12878,29 +12878,8 @@ async function registerRoutes(app2) {
   app2.use("/api/moderator", moderator_default);
   app2.use("/api/sos", sos_default);
   app2.use("/api/motoclubs", motoclubs_default);
-  app2.get("/api/updates/check", async (req, res) => {
-    try {
-      const [activeRelease] = await db.select().from(otaReleases).where((0, import_drizzle_orm10.eq)(otaReleases.status, "active")).limit(1);
-      if (!activeRelease) {
-        return res.json({ hasUpdate: false, version: null, releaseNotes: null, manifestUrl: null });
-      }
-      const forwardedProto = req.header("x-forwarded-proto");
-      const protocol = forwardedProto || req.protocol || "https";
-      const forwardedHost = req.header("x-forwarded-host");
-      const host = forwardedHost || req.get("host");
-      const manifestUrl = `${protocol}://${host}/manifest`;
-      return res.json({
-        hasUpdate: true,
-        version: activeRelease.version,
-        releaseNotes: activeRelease.releaseNotes,
-        publishedAt: activeRelease.publishedAt,
-        bundlePath: activeRelease.bundlePath,
-        manifestUrl
-      });
-    } catch (error) {
-      console.error("Updates check error:", error);
-      return res.status(500).json({ message: "Errore verifica aggiornamenti" });
-    }
+  app2.get("/api/updates/check", async (_req, res) => {
+    return res.json({ hasUpdate: false, version: null, releaseNotes: null, manifestUrl: null });
   });
   app2.get("/api/ota-bundle/:version", async (req, res) => {
     try {

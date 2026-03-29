@@ -506,7 +506,7 @@ export default function ProfileScreen() {
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, marginBottom: 2, backgroundColor: Colors.accent + "18", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
           <Ionicons name="cloud-download-outline" size={12} color={Colors.accent} />
           <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: Colors.accent }}>
-            v1.0 · OTA-5 · 0f8de9df
+            v1.0 · OTA-6 · 57526da1
           </Text>
         </View>
         {profile?.isPrimal === true && (
