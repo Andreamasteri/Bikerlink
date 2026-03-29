@@ -914,6 +914,12 @@ export default function ProfileScreen() {
         </Pressable>
       </Modal>
 
+      <View style={{ alignItems: "center", marginTop: 8, marginBottom: 4 }}>
+        <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: Colors.textSecondary, opacity: 0.5 }}>
+          v1.0 · OTA-1
+        </Text>
+      </View>
+
       <View style={{ height: 40 }} />
     </ScrollView>
   );
