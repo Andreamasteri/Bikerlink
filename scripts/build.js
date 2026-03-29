@@ -560,6 +560,27 @@ async function main() {
     console.error("Web export failed (non-fatal):", err.message);
   }
 
+  // Crea static-build/index.html come marker di production e SPA fallback.
+  // Il server controlla questo file per sapere se è in production mode e
+  // per servire il SPA fallback su rotte sconosciute.
+  const webIndexSrc = path.join("static-build", "web", "index.html");
+  const staticIndexDest = path.join("static-build", "index.html");
+  try {
+    if (fs.existsSync(webIndexSrc)) {
+      fs.copyFileSync(webIndexSrc, staticIndexDest);
+      console.log("static-build/index.html creato (da web export)");
+    } else {
+      // Fallback: minimal marker file (il server genera comunque la landing page dinamicamente)
+      fs.writeFileSync(
+        staticIndexDest,
+        "<!DOCTYPE html><html lang=\"it\"><head><meta charset=\"utf-8\"><title>BikerLink</title><meta http-equiv=\"refresh\" content=\"0;url=/\"></head><body></body></html>"
+      );
+      console.log("static-build/index.html creato (marker fallback)");
+    }
+  } catch (err) {
+    console.error("Errore creazione static-build/index.html (non-fatal):", err.message);
+  }
+
   console.log("Full build complete!");
   process.exit(0);
 }

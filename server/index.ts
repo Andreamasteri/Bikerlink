@@ -258,9 +258,12 @@ function configureExpoAndLanding(app: express.Application) {
     }
 
     if (req.path === "/") {
-      // In dev mode (nessun static-build), lascia che il proxy Metro serva l'app Expo
+      // In dev mode (nessun static-build e non siamo in production), lascia che il proxy Metro serva l'app Expo.
+      // isProduction = true se NODE_ENV="production" oppure se REPLIT_INTERNAL_APP_DOMAIN è impostato
+      // (Replit lo setta solo nel container di produzione, non in sviluppo).
       const staticBuildIndex = path.resolve(process.cwd(), "static-build", "index.html");
-      if (!fs.existsSync(staticBuildIndex)) return next();
+      const isProduction = process.env.NODE_ENV === "production" || !!process.env.REPLIT_INTERNAL_APP_DOMAIN;
+      if (!isProduction && !fs.existsSync(staticBuildIndex)) return next();
       return serveLandingPage({
         req,
         res,
@@ -302,8 +305,13 @@ function configureExpoAndLanding(app: express.Application) {
   // In dev (no static-build): proxy a Metro :8081 tramite createProxyMiddleware —
   // permette al canvas Replit di raggiungere le rotte Expo Router (/welcome, ecc.).
   const spaFallbackIndex = path.resolve(process.cwd(), "static-build", "index.html");
-  const devProxyActive = !fs.existsSync(spaFallbackIndex);
-  if (devProxyActive) {
+  // isProductionMode = true se NODE_ENV="production" oppure se Replit ha impostato REPLIT_INTERNAL_APP_DOMAIN
+  // (presente solo nel container di produzione, non in sviluppo).
+  const isProductionMode = process.env.NODE_ENV === "production" || !!process.env.REPLIT_INTERNAL_APP_DOMAIN;
+  const devProxyActive = !isProductionMode && !fs.existsSync(spaFallbackIndex);
+  if (isProductionMode) {
+    log("Production mode — Metro proxy disabilitato");
+  } else if (devProxyActive) {
     log("Dev proxy → Metro :8081 attivo (static-build non trovato)");
   }
   const metroProxy = devProxyActive
