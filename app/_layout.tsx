@@ -9,7 +9,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
-import { Platform, AppState, ActivityIndicator, View, StyleSheet, Modal, Text, TouchableOpacity } from "react-native";
+import { Platform, AppState, ActivityIndicator, View, StyleSheet } from "react-native";
 
 if (Platform.OS === "web" && typeof window !== "undefined") {
   const link = document.createElement("link");
@@ -113,121 +113,6 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
     );
   }
   return <>{children}</>;
-}
-
-const OTA_ACTIVE_VERSION_KEY = "ota_active_version";
-
-interface OtaCheckResponse {
-  hasUpdate: boolean;
-  version: string | null;
-  releaseNotes: string | null;
-  publishedAt: string | null;
-  bundlePath: string | null;
-  manifestUrl: string | null;
-}
-
-function OtaUpdateChecker() {
-  const { user } = useAuth();
-  const [updateInfo, setUpdateInfo] = useState<{
-    version: string;
-    releaseNotes: string | null;
-  } | null>(null);
-  const [dismissed, setDismissed] = useState(false);
-  const [applying, setApplying] = useState(false);
-  const checkedRef = useRef(false);
-
-  useEffect(() => {
-    if (!user || checkedRef.current || Platform.OS === "web") return;
-    checkedRef.current = true;
-
-    (async () => {
-      try {
-        const res = await apiRequest("GET", "/api/updates/check");
-        if (!res.ok) return;
-        const data = (await res.json()) as OtaCheckResponse;
-        if (!data.hasUpdate || !data.version) return;
-
-        const storedVersion = await AsyncStorage.getItem(OTA_ACTIVE_VERSION_KEY);
-        if (storedVersion === data.version) return;
-
-        let localVersion: string | null = null;
-        try {
-          const Updates = await import("expo-updates");
-          if (Updates.updateId) {
-            const manifest = Updates.manifest;
-            if (manifest && "metadata" in manifest) {
-              const meta = manifest.metadata as Record<string, unknown> | undefined;
-              localVersion = (meta?.otaVersion as string) ?? null;
-            }
-          }
-        } catch {}
-
-        if (localVersion && localVersion === data.version) {
-          await AsyncStorage.setItem(OTA_ACTIVE_VERSION_KEY, data.version).catch(() => {});
-          return;
-        }
-
-        setUpdateInfo({ version: data.version, releaseNotes: data.releaseNotes ?? null });
-      } catch {}
-    })();
-  }, [user]);
-
-  if (!updateInfo || dismissed) return null;
-
-  async function handleReload() {
-    setApplying(true);
-    try {
-      const Updates = await import("expo-updates");
-      try {
-        await Updates.fetchUpdateAsync();
-      } catch {}
-      await AsyncStorage.setItem(OTA_ACTIVE_VERSION_KEY, updateInfo!.version).catch(() => {});
-      await Updates.reloadAsync();
-    } catch {
-      await AsyncStorage.removeItem(OTA_ACTIVE_VERSION_KEY).catch(() => {});
-      setApplying(false);
-      setDismissed(true);
-    }
-  }
-
-  function handleDismiss() {
-    setDismissed(true);
-  }
-
-  return (
-    <Modal
-      visible={true}
-      transparent
-      animationType="fade"
-      onRequestClose={handleDismiss}
-    >
-      <View style={otaStyles.overlay}>
-        <View style={otaStyles.card}>
-          <Text style={otaStyles.title}>Aggiornamento disponibile</Text>
-          <Text style={otaStyles.version}>Versione {updateInfo.version}</Text>
-          {updateInfo.releaseNotes ? (
-            <Text style={otaStyles.notes}>{updateInfo.releaseNotes}</Text>
-          ) : null}
-          <TouchableOpacity
-            style={otaStyles.primaryBtn}
-            onPress={handleReload}
-            disabled={applying}
-          >
-            {applying ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={otaStyles.primaryBtnText}>Aggiorna ora</Text>
-            )}
-          </TouchableOpacity>
-          {!applying && (
-            <TouchableOpacity style={otaStyles.secondaryBtn} onPress={handleDismiss}>
-              <Text style={otaStyles.secondaryBtnText}>Più tardi</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    </Modal>
-  );
 }
 
 function AdminUptimeOverlay() {
@@ -337,7 +222,6 @@ export default function RootLayout() {
                   <MapReadyGate>
                     <AppStateHandler />
                     <AdminUptimeOverlay />
-                    <OtaUpdateChecker />
                     <LanguageKeyedRoot />
                   </MapReadyGate>
                 </StartupGate>
@@ -356,73 +240,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: Colors.background,
-  },
-});
-
-const otaStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-  },
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 24,
-    width: "100%",
-    maxWidth: 380,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  title: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 20,
-    color: Colors.text,
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  version: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 16,
-    color: Colors.primary,
-    marginBottom: 12,
-  },
-  notes: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  primaryBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    width: "100%",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  primaryBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 16,
-    color: "#fff",
-  },
-  secondaryBtn: {
-    paddingVertical: 10,
-    width: "100%",
-    alignItems: "center",
-  },
-  secondaryBtnText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 15,
-    color: Colors.textSecondary,
   },
 });

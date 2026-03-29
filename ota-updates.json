@@ -57,13 +57,31 @@
     "runtimeVersion": "1.0.0",
     "platforms": ["android"],
     "jsEngine": "hermes",
-    "note": "Redesign completo pannello admin OTA: device status card, banner EAS check, Forza aggiornamento, storico release, FAB creazione semplificata. Bundle .hbc Hermes confermato.",
+    "note": "Redesign completo pannello admin OTA. Superseded da OTA-5.",
     "updateGroupId": "acc17d9e-3ffb-4c98-9935-f3c287f94137",
     "androidUpdateId": "019d38d9-e4f1-7bfc-9978-84fb3cc66f6e",
     "iosUpdateId": null,
     "commitBase": "018b787d5591667444bdaf3ead67a8c5fc6dbb05",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/acc17d9e-3ffb-4c98-9935-f3c287f94137",
-    "status": "published",
+    "status": "superseded",
     "visibleChange": "app/admin/ota.tsx — redesign completo; app/(tabs)/profile.tsx — badge 'v1.0 · OTA-4 · acc17d9e'"
+  },
+  {
+    "updateNumber": 5,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-5: rimozione modal OTA — aggiornamenti automatici nativi",
+    "publishedAt": "2026-03-29",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Rimosso completamente OtaUpdateChecker da _layout.tsx. expo-updates gestisce gli aggiornamenti in automatico (checkAutomatically: ON_LOAD) senza conflitti. Bundle Hermes .hbc confermato (3.65 MB).",
+    "updateGroupId": "0f8de9df-a9b8-4be5-a167-1766aebbcbaa",
+    "androidUpdateId": "019d38f3-ac6d-7772-ba23-8ad08a25fba8",
+    "iosUpdateId": null,
+    "commitBase": "230f79d43b187afa1eb0090da9f10514ba1df218",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/0f8de9df-a9b8-4be5-a167-1766aebbcbaa",
+    "status": "published",
+    "visibleChange": "app/_layout.tsx — rimosso OtaUpdateChecker + modal + stili OTA; app/(tabs)/profile.tsx — badge 'v1.0 · OTA-5 · 0f8de9df'"
   }
 ]
