@@ -114,19 +114,23 @@
     "iosUpdateId": null,
     "commitBase": "a89c49f44961950f0f53d2e57204f8d9c1b709c3",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/06753f22-1e9c-4147-b165-e4a2d11678ed",
-    "status": "published"
+    "status": "superseded"
   },
   {
     "updateNumber": 8,
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-8: rimozione pannello admin OTA, storico widget in sola lettura",
+    "message": "OTA-8: rimozione sezione duplicata EULA/Privacy admin",
     "publishedAt": "2026-03-29",
     "runtimeVersion": "1.0.0",
     "platforms": ["android"],
     "jsEngine": "hermes",
-    "taskCount": 1,
-    "note": "Rimosso app/admin/ota.tsx e pannello gestione OTA. Aggiunto widget storico OTA in app/admin/index.tsx che legge ota-updates.json. Rimossi endpoint backend OTA custom e cron runOtaCheck.",
-    "status": "pending"
+    "note": "Rimossa sezione 'Documenti Legali' duplicata da app/admin/settings.tsx (text editor EULA + Privacy Policy). Mantenuta sezione 'Documenti PDF' con PdfDocumentAdminSection. Rimosse state variables privacyPolicyText/isUploadingPrivacy/isSavingPrivacy, useQuery privacy-policy, funzioni handleSavePrivacyPolicy/handleUploadPrivacyPolicy, variabile eulaSettingDef, entry eula_text da defaultSettings, stili privacyCard/privacyHeader. Bundle Hermes .hbc 3.64 MB.",
+    "updateGroupId": "d3aa6178-c3da-47e0-b4a1-c3c9755244c8",
+    "androidUpdateId": "019d3940-920b-72fc-9454-fbe1b2f8fc45",
+    "iosUpdateId": null,
+    "commitBase": "ba06745bf7961e33fd0bf9b6210e9f6a37aa0340",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/d3aa6178-c3da-47e0-b4a1-c3c9755244c8",
+    "status": "published"
   }
 ]

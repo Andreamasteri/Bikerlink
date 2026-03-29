@@ -18,7 +18,6 @@ interface AppSetting {
 }
 
 const defaultSettings = [
-  { key: "eula_text", label: "Testo EULA", placeholder: "Inserisci il testo EULA..." },
   { key: "splash_message", label: "Messaggio Splash", placeholder: "Messaggio da mostrare nello splash..." },
   { key: "maintenance_mode", label: "Modalita manutenzione", placeholder: "true / false" },
   { key: "min_app_version", label: "Versione minima app", placeholder: "1.0.0" },
@@ -725,10 +724,6 @@ export default function AdminSettings() {
 
   const [isUploadingEula, setIsUploadingEula] = useState(false);
 
-  const [privacyPolicyText, setPrivacyPolicyText] = useState("");
-  const [isUploadingPrivacy, setIsUploadingPrivacy] = useState(false);
-  const [isSavingPrivacy, setIsSavingPrivacy] = useState(false);
-
   const [paypalEmail, setPaypalEmail] = useState("");
   const [isSavingPaypal, setIsSavingPaypal] = useState(false);
 
@@ -821,16 +816,6 @@ export default function AdminSettings() {
       setIsSavingPaypal(false);
     }
   }
-
-  const { data: privacyData } = useQuery<{ text: string }>({
-    queryKey: ["/api/settings/privacy-policy"],
-  });
-
-  React.useEffect(() => {
-    if (privacyData?.text !== undefined) {
-      setPrivacyPolicyText(privacyData.text);
-    }
-  }, [privacyData?.text]);
 
   const [splashMode, setSplashMode] = useState<"single" | "cycle">("single");
   const [splashMessagesList, setSplashMessagesList] = useState<string[]>([]);
@@ -943,72 +928,6 @@ export default function AdminSettings() {
     }
   }
 
-  async function handleSavePrivacyPolicy() {
-    try {
-      setIsSavingPrivacy(true);
-      await apiRequest("PUT", "/api/admin/settings/privacy_policy_text", { value: privacyPolicyText });
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/privacy-policy"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      Alert.alert("Successo", "Privacy Policy salvata con successo");
-    } catch (error: any) {
-      Alert.alert("Errore", error.message || "Errore durante il salvataggio");
-    } finally {
-      setIsSavingPrivacy(false);
-    }
-  }
-
-  async function handleUploadPrivacyPolicy() {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: "text/plain",
-        copyToCacheDirectory: true,
-      });
-
-      if (result.canceled || !result.assets || result.assets.length === 0) {
-        return;
-      }
-
-      const asset = result.assets[0];
-      setIsUploadingPrivacy(true);
-
-      const formData = new FormData();
-      formData.append("file", {
-        uri: asset.uri,
-        name: asset.name || "privacy-policy.txt",
-        type: "text/plain",
-      } as any);
-
-      const baseUrl = getApiUrl();
-      const url = new URL("/api/admin/settings/privacy-policy/upload", baseUrl);
-
-      const res = await fetch(url.toString(), {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ message: "Errore durante l'upload" }));
-        Alert.alert("Errore", errorData.message || "Errore durante l'upload");
-        return;
-      }
-
-      const data = await res.json();
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/privacy-policy"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-
-      if (data.value) {
-        setPrivacyPolicyText(data.value);
-      }
-
-      Alert.alert("Successo", "Privacy Policy caricata con successo");
-    } catch (error: any) {
-      Alert.alert("Errore", error.message || "Errore durante l'upload del file");
-    } finally {
-      setIsUploadingPrivacy(false);
-    }
-  }
-
   function getSettingValue(key: string): string {
     const setting = (settings || []).find((s) => s.key === key);
     return setting?.value ?? "";
@@ -1089,7 +1008,6 @@ export default function AdminSettings() {
     return itEntry ? [itEntry, ...rest] : rest;
   }, []);
 
-  const eulaSettingDef = defaultSettings.find(s => s.key === "eula_text")!;
   const splashSetting = defaultSettings.find(s => s.key === "splash_message")!;
   const maintenanceSetting = defaultSettings.find(s => s.key === "maintenance_mode")!;
   const minAppVersionSetting = defaultSettings.find(s => s.key === "min_app_version")!;
@@ -1882,57 +1800,6 @@ export default function AdminSettings() {
       )}
 
       <View style={styles.sectionHeaderRow}>
-        <Ionicons name="document-text" size={20} color={Colors.accent} />
-        <Text style={styles.sectionTitle}>Documenti Legali</Text>
-      </View>
-
-      {isLoading ? (
-        <Text style={styles.loadingText}>Caricamento...</Text>
-      ) : (
-        renderSettingCard(eulaSettingDef)
-      )}
-
-      <View style={styles.privacyCard}>
-        <View style={styles.privacyHeader}>
-          <View style={styles.synecoInfo}>
-            <Ionicons name="document-text-outline" size={20} color={Colors.accent} />
-            <Text style={styles.synecoLabel}>Privacy Policy</Text>
-          </View>
-          <View style={styles.settingActions}>
-            <TouchableOpacity
-              style={styles.uploadBtn}
-              onPress={handleUploadPrivacyPolicy}
-              disabled={isUploadingPrivacy}
-            >
-              {isUploadingPrivacy ? (
-                <ActivityIndicator size="small" color={Colors.accent} />
-              ) : (
-                <Ionicons name="cloud-upload" size={20} color={Colors.accent} />
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-        <TextInput
-          style={[styles.input, { marginTop: 12, minHeight: 120 }]}
-          placeholder="Inserisci il testo della Privacy Policy..."
-          placeholderTextColor={Colors.textSecondary}
-          value={privacyPolicyText}
-          onChangeText={setPrivacyPolicyText}
-          multiline
-          numberOfLines={6}
-        />
-        <View style={styles.editActions}>
-          <TouchableOpacity
-            style={styles.saveBtn}
-            onPress={handleSavePrivacyPolicy}
-            disabled={isSavingPrivacy}
-          >
-            <Text style={styles.saveBtnText}>{isSavingPrivacy ? "..." : "Salva"}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.sectionHeaderRow}>
         <Ionicons name="options" size={20} color={Colors.accent} />
         <Text style={styles.sectionTitle}>Parametri</Text>
       </View>
@@ -2264,11 +2131,6 @@ const styles = StyleSheet.create({
   },
   dropdownMenuItemActive: { backgroundColor: Colors.surfaceLight },
   dropdownMenuItemText: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.text },
-  privacyCard: {
-    backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginTop: 16,
-    borderWidth: 1, borderColor: Colors.accent,
-  },
-  privacyHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   paypalCard: {
     backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginTop: 16,
     borderWidth: 1, borderColor: "#003087",
