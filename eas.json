@@ -6,6 +6,7 @@
   "build": {
     "preview": {
       "distribution": "internal",
+      "jsEngine": "hermes",
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease"
@@ -16,6 +17,7 @@
     },
     "production": {
       "distribution": "store",
+      "jsEngine": "hermes",
       "android": {
         "buildType": "app-bundle",
         "gradleCommand": ":app:bundleRelease"

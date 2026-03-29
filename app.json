@@ -23,6 +23,7 @@
       }
     },
     "android": {
+      "jsEngine": "jsc",
       "package": "com.bikerlink.app",
       "versionCode": 1,
       "permissions": [
