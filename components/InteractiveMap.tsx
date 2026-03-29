@@ -363,6 +363,14 @@ export default function InteractiveMap({
       </View>
 
       <View style={styles.controlsContainer}>
+        <TouchableOpacity
+          style={styles.locationButton}
+          onPress={centerOnUser}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="crosshairs-gps" size={22} color={Colors.accent} />
+        </TouchableOpacity>
+
         {showDayNightButton && (
           <TouchableOpacity
             style={styles.locationButton}
@@ -377,15 +385,9 @@ export default function InteractiveMap({
             />
           </TouchableOpacity>
         )}
+      </View>
 
-        <TouchableOpacity
-          style={styles.locationButton}
-          onPress={centerOnUser}
-          activeOpacity={0.7}
-        >
-          <MaterialCommunityIcons name="crosshairs-gps" size={22} color={Colors.accent} />
-        </TouchableOpacity>
-
+      <View style={styles.availabilityContainer}>
         <View style={styles.availabilityIndicator}>
           <View style={styles.indicatorRow}>
             <View style={[styles.statusDot, { backgroundColor: isAvailable ? Colors.success : Colors.accentRed }]} />
@@ -454,6 +456,12 @@ const styles = StyleSheet.create({
     right: 12,
     gap: 10,
     alignItems: "flex-end",
+  },
+  availabilityContainer: {
+    position: "absolute",
+    bottom: Platform.OS === "web" ? 106 : 86,
+    left: 12,
+    zIndex: 10,
   },
   locationButton: {
     backgroundColor: Colors.surface,

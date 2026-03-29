@@ -761,7 +761,7 @@ export default function MapScreen() {
             <Ionicons name="close" size={28} color="#fff" />
           </Pressable>
           <Pressable
-            style={[styles.defineAreaBtn, { bottom: Platform.OS === "web" ? 44 : insets.bottom + 16 }]}
+            style={[styles.defineAreaBtn, { bottom: Platform.OS === "web" ? 39 : insets.bottom + 11 }]}
             onPress={() => setShowAreaModal(true)}
           >
             <Ionicons name="globe-outline" size={16} color={Colors.text} />

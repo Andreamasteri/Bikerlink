@@ -216,6 +216,23 @@
     "iosUpdateId": null,
     "commitBase": "af2fc07980243d633a4d3e7cbff473fcfa1129a5",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/1c64d719-4868-48f3-af3f-1d99a76f558d",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 15,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-15: UI mappa — paese -5px, disponibile +6px sx, light/dark sotto centraggio",
+    "publishedAt": "2026-03-29",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "3 UI tweak mappa fullscreen: (1) defineAreaBtn (selezione paese) abbassato di 5px (bottom: insets.bottom+11 da +16); (2) pannello online/disponibile (availabilityIndicator) spostato fuori dal controlsContainer, posizionato in basso-sinistra a left:12/bottom:86 (+6px rispetto al precedente 80), centrato sopra i 3 counter chips; (3) icona light/dark spostata sotto l'icona centraggio mappa (swap ordine JSX in controlsContainer). Bundle Hermes .hbc 3.64 MB.",
+    "updateGroupId": "8a1f1467-ab8d-4729-988e-5128b1f032d4",
+    "androidUpdateId": "019d3bd3-61d3-76e8-afa1-600a0276ad25",
+    "iosUpdateId": null,
+    "commitBase": "b40eeafbb1274a257aefad6c3db54ce2cef25be2",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/8a1f1467-ab8d-4729-988e-5128b1f032d4",
     "status": "published"
   }
 ]
