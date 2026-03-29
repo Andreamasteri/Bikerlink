@@ -1,39 +1,56 @@
 OTA PUBLICATION LOG — BikerLink
 ================================
+
+--- UPDATE #1 (DEPRECATO — jsEngine mismatch) ---
 Data: 2026-03-29
 Comando: CI=1 npx eas-cli@latest update --channel preview --message "Test OTA #1 - indicatore versione"
+Problema: bundle Android compilato con JSC (.js), APK usa Hermes → isNew: false
+
+Branch             preview
+Runtime version    1.0.0
+Platform           android, ios
+Android bundle     _expo/static/js/android/entry-64bdd1a88113d5d5c73485882db02aea.js (JSC — ERRATO)
+iOS bundle         _expo/static/js/ios/entry-893ed0bbba4f9d37ee3a2325830aa286.hbc (Hermes)
+Update group ID    950f6fac-763b-473d-afce-dca04202c396
+Android update ID  019d387d-6302-76a5-9ec9-e52417d83670
+iOS update ID      019d387d-6302-7791-90a4-180571b5fb09
+Status             superseded
+
+--- UPDATE #2 (ATTIVO — Hermes corretto) ---
+Data: 2026-03-29
+Comando: EAS_BUILD=1 CI=1 npx eas-cli@latest update --channel preview --message "Fix jsEngine: bundle Hermes per APK EAS Build"
+Fix: aggiunta variabile EAS_BUILD=1 → app.config.ts usa jsEngine: "hermes"
 
 OUTPUT EAS CLI:
---------------
 ✔ Exported bundle(s)
 ✔ Uploaded assetmap.json
 ✔ Uploaded 2 app bundles
-✔ Uploaded 4 assets (reused 70 assets)
+✔ Uploading assets skipped - no new assets found
 ✔ Computed project fingerprints
 ✔ Published!
 
 Branch             preview
 Runtime version    1.0.0
 Platform           android, ios
-Update group ID    950f6fac-763b-473d-afce-dca04202c396
-Android update ID  019d387d-6302-76a5-9ec9-e52417d83670
-iOS update ID      019d387d-6302-7791-90a4-180571b5fb09
-Message            Test OTA #1 - indicatore versione
-Commit             d3eac0cdba8e73f5ed83626b8f372d79e58d1840*
-EAS Dashboard      https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/950f6fac-763b-473d-afce-dca04202c396
+Android bundle     _expo/static/js/android/entry-de4ef7efe7d1502fd8928c78795924b2.hbc (HERMES — CORRETTO)
+iOS bundle         _expo/static/js/ios/entry-3d341d8fd8ea501d21e7c5521bb42ea1.hbc (Hermes)
+Update group ID    fabe5d21-aad7-4d13-8c63-6091f787a456
+Android update ID  019d3896-bf8e-70a6-8eeb-ad9bc9445c0b
+iOS update ID      019d3896-bf8e-7482-862c-529d6d79eb8b
+Message            Fix jsEngine: bundle Hermes per APK EAS Build
+Commit             1050bb94c3e6772a604b12391fd55224263af1d8
+EAS Dashboard      https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/fabe5d21-aad7-4d13-8c63-6091f787a456
+Status             published (attivo sul canale preview)
 
-MODIFICA VISIBILE:
------------------
+MODIFICA VISIBILE (OTA-2):
+--------------------------
 File: app/(tabs)/profile.tsx
 Posizione: sotto email nell'header del profilo (visibile senza scrollare)
-Testo: "v1.0 · Aggiornamento OTA attivo"
+Testo: "v1.0 · OTA-2 · fabe5d21"
 Icona: cloud-download-outline (Ionicons)
-Stile: badge tondeggiante con colore accent, fontSize 12
 
 NOTE:
------
-- Bundle Android: _expo/static/js/android/entry-64bdd1a88113d5d5c73485882db02aea.js (4.06 MB)
-- Bundle iOS: _expo/static/js/ios/entry-893ed0bbba4f9d37ee3a2325830aa286.hbc (3.65 MB)
-- Bundle Web: _expo/static/js/web/entry-e404f4a3adf42bcc6b8ad0d926eafe41.js (3.37 MB)
 - 68 asset iOS, 68 asset Android (limite: 2000 totali per update)
-- L'update viene scaricato automaticamente alla prossima apertura dell'APK con connessione attiva
+- Entrambi i bundle ora in formato .hbc (Hermes Bytecode)
+- L'update viene scaricato automaticamente alla prossima apertura dell'APK
+- Per futuri eas update, usare SEMPRE: EAS_BUILD=1 CI=1 npx eas-cli@latest update ...

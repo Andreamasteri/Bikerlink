@@ -6,12 +6,30 @@
     "publishedAt": "2026-03-29",
     "runtimeVersion": "1.0.0",
     "platforms": ["android", "ios"],
+    "jsEngine": "jsc",
+    "note": "DEPRECATO — bundle Android compilato con JSC, incompatibile con APK Hermes",
     "updateGroupId": "950f6fac-763b-473d-afce-dca04202c396",
     "androidUpdateId": "019d387d-6302-76a5-9ec9-e52417d83670",
     "iosUpdateId": "019d387d-6302-7791-90a4-180571b5fb09",
     "commitBase": "d3eac0cdba8e73f5ed83626b8f372d79e58d1840",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/950f6fac-763b-473d-afce-dca04202c396",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 2,
+    "channel": "preview",
+    "message": "Fix jsEngine: bundle Hermes per APK EAS Build",
+    "publishedAt": "2026-03-29",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android", "ios"],
+    "jsEngine": "hermes",
+    "note": "Bundle Android compilato con EAS_BUILD=1 → Hermes (.hbc). Compatibile con APK EAS Build.",
+    "updateGroupId": "fabe5d21-aad7-4d13-8c63-6091f787a456",
+    "androidUpdateId": "019d3896-bf8e-70a6-8eeb-ad9bc9445c0b",
+    "iosUpdateId": "019d3896-bf8e-7482-862c-529d6d79eb8b",
+    "commitBase": "1050bb94c3e6772a604b12391fd55224263af1d8",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/fabe5d21-aad7-4d13-8c63-6091f787a456",
     "status": "published",
-    "visibleChange": "app/(tabs)/profile.tsx — badge 'v1.0 · Aggiornamento OTA attivo' con icona cloud-download-outline, posizionato sotto l'email nell'header del profilo (visibile senza scrollare)"
+    "visibleChange": "app/(tabs)/profile.tsx — badge 'v1.0 · OTA-2 · fabe5d21' aggiornato con nuovo ID"
   }
 ]
