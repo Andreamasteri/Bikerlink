@@ -452,15 +452,15 @@ const styles = StyleSheet.create({
   },
   controlsContainer: {
     position: "absolute",
-    bottom: Platform.OS === "web" ? 100 : 80,
+    bottom: Platform.OS === "web" ? 103 : 83,
     right: 12,
     gap: 10,
     alignItems: "flex-end",
   },
   availabilityContainer: {
     position: "absolute",
-    bottom: Platform.OS === "web" ? 106 : 86,
-    left: 16,
+    bottom: Platform.OS === "web" ? 109 : 89,
+    left: 12,
     zIndex: 10,
   },
   locationButton: {
