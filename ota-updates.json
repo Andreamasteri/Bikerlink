@@ -131,6 +131,23 @@
     "iosUpdateId": null,
     "commitBase": "ba06745bf7961e33fd0bf9b6210e9f6a37aa0340",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/d3aa6178-c3da-47e0-b4a1-c3c9755244c8",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 9,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-9: test ciao ciao in viola in fondo al profilo",
+    "publishedAt": "2026-03-29",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Aggiunta scritta 'ciao ciao' in viola (#7B2FBE) in fondo al tab Profilo utente, subito prima del spacer finale. OTA minuscola per verificare il meccanismo di aggiornamento sull'APK v2. Bundle Hermes .hbc 3.64 MB.",
+    "updateGroupId": "fe29bf38-582d-45e4-acde-cefa27f228e7",
+    "androidUpdateId": "019d3afb-6fe1-7051-b245-7ea384b3d783",
+    "iosUpdateId": null,
+    "commitBase": "2d2a2789fc7a5de0747db801bc28d8a79aaa20c3",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/fe29bf38-582d-45e4-acde-cefa27f228e7",
     "status": "published"
   }
 ]

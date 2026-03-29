@@ -920,6 +920,7 @@ export default function ProfileScreen() {
         </Pressable>
       </Modal>
 
+      <Text style={{ color: "#7B2FBE", fontSize: 18, fontFamily: "Inter_600SemiBold", textAlign: "center", paddingVertical: 24 }}>ciao ciao</Text>
       <View style={{ height: 40 }} />
     </ScrollView>
   );
