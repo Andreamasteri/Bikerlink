@@ -1624,7 +1624,8 @@ var init_storage = __esm({
           (0, import_drizzle_orm2.eq)(users.status, "active"),
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.userType, "biker"), (0, import_drizzle_orm2.eq)(users.userType, "coppia")),
-          (0, import_drizzle_orm2.eq)(users.ghostMode, false)
+          (0, import_drizzle_orm2.eq)(users.ghostMode, false),
+          (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)
         ];
         if (countries && countries.length > 0) conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
         const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)(...conditions));
@@ -1635,7 +1636,8 @@ var init_storage = __esm({
           (0, import_drizzle_orm2.eq)(users.status, "active"),
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           (0, import_drizzle_orm2.eq)(users.userType, "zavorrina"),
-          (0, import_drizzle_orm2.eq)(users.ghostMode, false)
+          (0, import_drizzle_orm2.eq)(users.ghostMode, false),
+          (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)
         ];
         if (countries && countries.length > 0) conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
         const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)(...conditions));
@@ -1647,7 +1649,8 @@ var init_storage = __esm({
           (0, import_drizzle_orm2.eq)(users.status, "active"),
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.userType, "biker"), (0, import_drizzle_orm2.eq)(users.userType, "coppia")),
-          (0, import_drizzle_orm2.eq)(users.ghostMode, false)
+          (0, import_drizzle_orm2.eq)(users.ghostMode, false),
+          (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)
         ];
         if (countries && countries.length > 0) {
           conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
@@ -1660,7 +1663,8 @@ var init_storage = __esm({
           (0, import_drizzle_orm2.eq)(users.status, "active"),
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           (0, import_drizzle_orm2.eq)(users.userType, "zavorrina"),
-          (0, import_drizzle_orm2.eq)(users.ghostMode, false)
+          (0, import_drizzle_orm2.eq)(users.ghostMode, false),
+          (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)
         ];
         if (countries && countries.length > 0) {
           conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));

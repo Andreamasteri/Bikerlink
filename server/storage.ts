@@ -1434,6 +1434,7 @@ export class DatabaseStorage implements IStorage {
       eq(userProfiles.isAvailable, true),
       or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
       eq(users.ghostMode, false),
+      gte(users.lastLoginAt, since),
     ];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const result = await db.select({ count: sql<number>`count(*)::int` })
@@ -1449,6 +1450,7 @@ export class DatabaseStorage implements IStorage {
       eq(userProfiles.isAvailable, true),
       eq(users.userType, "zavorrina"),
       eq(users.ghostMode, false),
+      gte(users.lastLoginAt, since),
     ];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const result = await db.select({ count: sql<number>`count(*)::int` })
@@ -1467,6 +1469,7 @@ export class DatabaseStorage implements IStorage {
       eq(userProfiles.isAvailable, true),
       or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
       eq(users.ghostMode, false),
+      gte(users.lastLoginAt, since),
     ];
     if (countries && countries.length > 0) {
       conditions.push(inArray(users.country, countries));
@@ -1488,6 +1491,7 @@ export class DatabaseStorage implements IStorage {
       eq(userProfiles.isAvailable, true),
       eq(users.userType, "zavorrina"),
       eq(users.ghostMode, false),
+      gte(users.lastLoginAt, since),
     ];
     if (countries && countries.length > 0) {
       conditions.push(inArray(users.country, countries));
