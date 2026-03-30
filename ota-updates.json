@@ -387,6 +387,23 @@
     "iosUpdateId": null,
     "commitBase": "09b6848dbdf4d62993dc493b1a2ca38ab6ba6d88",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/904dd4f4-ea7f-4268-a73f-3bbde325a313",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 25,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-25: UX proposta — partenza opzionale, ??? / pollice, pulsanti +25%, tappe hint",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #315 — app/proposals/create.tsx: (1) label 'Descrizione' → 'Descrizione del punto di partenza'; (2) campo partenza reso opzionale: rimosso blocco submit, fallback 'da qui....' nel payload; (3) indicatore ??? (arancio) / pollice verde (MaterialCommunityIcons thumb-up) sopra i pulsanti GPS/mappa; (4) marginTop gpsRow 8→13px (+5px); (5) icone pulsanti GPS/mappa 18→23px (+28%), paddingVertical 8→10, paddingHorizontal 14→18, fontSize 13→16; (6) label tappe hint aggiornata.",
+    "updateGroupId": "64b613fc-7b1b-4043-bd82-cd139b5f5a36",
+    "androidUpdateId": "019d40a7-4bf3-7501-8a74-922ab63d5644",
+    "iosUpdateId": null,
+    "commitBase": "95b8833ee01fc81bfb2986bed7a2816dc6a7ecf8",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/64b613fc-7b1b-4043-bd82-cd139b5f5a36",
     "status": "published"
   }
 ]

@@ -208,10 +208,6 @@ export default function CreateProposalScreen() {
       Alert.alert(t("common.error"), t("proposals.create.enterTitle"));
       return;
     }
-    if (!departureAddress.trim()) {
-      Alert.alert(t("common.error"), t("proposals.create.enterDeparture"));
-      return;
-    }
     if (!dateStr || !timeFrom) {
       Alert.alert(t("common.error"), t("proposals.create.enterDateTime"));
       return;
@@ -312,7 +308,7 @@ export default function CreateProposalScreen() {
       title: title.trim(),
       description: description.trim() || null,
       searchRadius: parseInt(searchRadius) || 30,
-      departureAddress: departureAddress.trim(),
+      departureAddress: departureAddress.trim() || "da qui....",
       departureLatitude: finalLat,
       departureLongitude: finalLng,
       scheduledAt: departureTimeFrom.toISOString(),
@@ -495,15 +491,23 @@ export default function CreateProposalScreen() {
               </>
             )}
 
-            <Text style={styles.sectionTitle}>Punto di partenza *</Text>
-            <Text style={styles.fieldHint}>Descrizione</Text>
+            <Text style={styles.sectionTitle}>Punto di partenza</Text>
+            <Text style={styles.fieldHint}>Descrizione del punto di partenza</Text>
             <TextInput
               style={styles.input}
               value={departureAddress}
               onChangeText={setDepartureAddress}
-              placeholder="Es: Piazza del Duomo, Firenze"
+              placeholder="Es: Piazza del Duomo, Firenze (opzionale)"
               placeholderTextColor={Colors.textSecondary}
             />
+
+            <View style={styles.gpsStatusIndicator}>
+              {!gpsSource ? (
+                <Text style={styles.gpsStatusQuestion}>???</Text>
+              ) : (
+                <MaterialCommunityIcons name="thumb-up" size={20} color={Colors.success} />
+              )}
+            </View>
 
             <View style={styles.gpsRow}>
               <TouchableOpacity
@@ -522,7 +526,7 @@ export default function CreateProposalScreen() {
                 {gpsLoading ? (
                   <ActivityIndicator size="small" color="#000" />
                 ) : (
-                  <Ionicons name={gpsSource === "live" ? "checkmark-circle" : "navigate"} size={18} color={gpsSource === "live" ? Colors.success : "#000"} />
+                  <Ionicons name={gpsSource === "live" ? "checkmark-circle" : "navigate"} size={23} color={gpsSource === "live" ? Colors.success : "#000"} />
                 )}
                 <Text style={styles.gpsButtonText}>
                   {gpsLoading ? "Rilevamento..." : gpsSource === "live" ? "GPS attivo" : "Posizione attuale"}
@@ -535,32 +539,12 @@ export default function CreateProposalScreen() {
                   setShowMapPicker(true);
                 }}
               >
-                <Ionicons name={gpsSource === "map" ? "checkmark-circle" : "map"} size={18} color={gpsSource === "map" ? Colors.success : "#000"} />
+                <Ionicons name={gpsSource === "map" ? "checkmark-circle" : "map"} size={23} color={gpsSource === "map" ? Colors.success : "#000"} />
                 <Text style={styles.gpsButtonText}>
                   {gpsSource === "map" ? "Mappa" : "Scegli sulla mappa"}
                 </Text>
               </TouchableOpacity>
             </View>
-            {!!gpsSource && (
-              <View style={styles.gpsStatus}>
-                <Ionicons
-                  name={gpsSource === "live" ? "location" : gpsSource === "map" ? "pin" : "location-outline"}
-                  size={16}
-                  color={Colors.success}
-                />
-                <Text style={styles.gpsStatusText}>
-                  {gpsSource === "live" ? "Posizione GPS attuale" : gpsSource === "map" ? "Punto selezionato sulla mappa" : "Posizione profilo"}
-                </Text>
-              </View>
-            )}
-            {!gpsSource && (
-              <View style={styles.gpsStatus}>
-                <Ionicons name="warning" size={16} color={Colors.accentRed} />
-                <Text style={[styles.gpsStatusText, { color: Colors.accentRed }]}>
-                  Posizione richiesta
-                </Text>
-              </View>
-            )}
 
             {needsDestination && (
               <>
@@ -634,7 +618,7 @@ export default function CreateProposalScreen() {
             {!needsDestination && (
               <>
                 <Text style={styles.sectionTitle}>Tappe di ritrovo</Text>
-                <Text style={styles.fieldHint}>Descrizione</Text>
+                <Text style={styles.fieldHint}>qualche tappa per ritrovarsi lungo il tragitto... eg il bar di Mario</Text>
                 {stops.map((s, i) => (
                   <View key={i} style={styles.stopRow}>
                     <Ionicons name="flag" size={16} color={Colors.accent} />
@@ -886,11 +870,23 @@ const styles = StyleSheet.create({
   },
   submitButtonDisabled: { opacity: 0.5 },
   submitText: { color: "#000", fontSize: 16, fontWeight: "700" as const },
+  gpsStatusIndicator: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  gpsStatusQuestion: {
+    fontSize: 18,
+    fontWeight: "700" as const,
+    color: Colors.warning,
+    letterSpacing: 2,
+  },
   gpsRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: 12,
-    marginTop: 8,
+    marginTop: 13,
     marginBottom: 4,
   },
   gpsButton: {
@@ -898,23 +894,14 @@ const styles = StyleSheet.create({
     alignItems: "center" as const,
     backgroundColor: Colors.accent,
     borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
     gap: 6,
   },
   gpsButtonText: {
     color: "#000",
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "600" as const,
-  },
-  gpsStatus: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 4,
-  },
-  gpsStatusText: {
-    color: Colors.success,
-    fontSize: 12,
   },
   clubSelectorRow: {
     flexDirection: "row" as const,
