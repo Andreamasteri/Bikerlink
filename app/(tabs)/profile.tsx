@@ -731,9 +731,9 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Pressable style={styles.garageCard} onPress={() => router.push("/garage" as any)}>
           {isBikerOrCoppia ? (
-            <MaterialCommunityIcons name="motorbike" size={38} color={Colors.accent} />
+            <MaterialCommunityIcons name="motorbike" size={76} color={Colors.accent} />
           ) : (
-            <Ionicons name="heart" size={38} color={Colors.accent} />
+            <Ionicons name="heart" size={76} color={Colors.accent} />
           )}
           <Text style={styles.garageCardLabel}>
             {isBikerOrCoppia ? "Il Mio Garage" : "La Mia Wishlist"}
