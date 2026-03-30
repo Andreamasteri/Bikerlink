@@ -318,6 +318,23 @@
     "iosUpdateId": null,
     "commitBase": "14f8239b7c535a7a9c45f83bd2d1408fce2885e4",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/a48a2649-b0d2-4d63-817d-c405d5883535",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 21,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-21: auto-reset disponibilità su background app, toast feedback toggle",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "3 cambiamenti: (1) AppStateHandler (_layout.tsx): quando app va in background (active→inactive/background), chiama PUT /api/users/profile/dynamic {isAvailable:false} e aggiorna la cache locale — la disponibilità si azzera automaticamente uscendo dall'app; (2) Toggle (ready.tsx): aggiunto toast inline di 2.5s dopo il toggle ('Sei disponibile! Appari sulla mappa' / 'Non sei più disponibile') e Alert.alert su errore di rete — l'utente sa sempre se il salvataggio è andato a buon fine; (3) Login (auth.ts): rimosso auto-set isAvailable=true al login — ora il login imposta sempre isAvailable=false, l'utente deve attivarsi manualmente dal tab Ready.",
+    "updateGroupId": "f721201a-d466-48e3-9458-4922c38b15bd",
+    "androidUpdateId": "019d3f1e-ab6d-7797-afc5-c1ad64efd197",
+    "iosUpdateId": null,
+    "commitBase": "8771e42eb46b0c1450475c4004ac25c4afb53add",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/f721201a-d466-48e3-9458-4922c38b15bd",
     "status": "published"
   }
 ]

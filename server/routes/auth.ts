@@ -240,9 +240,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
 
     const userRecord = await storage.getUser(user.id);
     if (!userRecord?.ghostMode) {
-      const availSetting = await storage.getAppSetting("user_available_on_login").catch(() => null);
-      const availableOnLogin = availSetting?.value !== "false";
-      await storage.upsertUserProfile(user.id, { isAvailable: availableOnLogin }).catch((e: Error) => {
+      await storage.upsertUserProfile(user.id, { isAvailable: false }).catch((e: Error) => {
         console.warn("[login] upsertUserProfile failed:", e?.message);
       });
     }

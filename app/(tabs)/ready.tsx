@@ -38,6 +38,8 @@ export default function ReadyToRideScreen() {
   const [sosRadiusKm, setSosRadiusKm] = useState(10);
   const [customRadius, setCustomRadius] = useState("");
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,13 +93,26 @@ export default function ReadyToRideScreen() {
     queryClient.invalidateQueries({ queryKey: ["/api/users/nearby"] });
   };
 
+  const showToast = (msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToastMsg(msg);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 2500);
+  };
+
   const toggleMutation = useMutation({
     mutationFn: async (newVal: boolean) => {
       await apiRequest("PUT", "/api/users/profile/dynamic", {
         isAvailable: newVal,
       });
+      return newVal;
     },
-    onSuccess: invalidateOnlineQueries,
+    onSuccess: (_data: boolean, variables: boolean) => {
+      invalidateOnlineQueries();
+      showToast(variables ? "Sei disponibile! Appari sulla mappa" : "Non sei più disponibile");
+    },
+    onError: () => {
+      Alert.alert("Errore", "Impossibile aggiornare la disponibilità. Verifica la connessione.");
+    },
   });
 
   const ghostMutation = useMutation({
@@ -208,6 +223,12 @@ export default function ReadyToRideScreen() {
             />
           )}
         </Pressable>
+
+        {toastMsg !== null && (
+          <View style={styles.toastContainer}>
+            <Text style={styles.toastText}>{toastMsg}</Text>
+          </View>
+        )}
 
         {ghostModeFeatureEnabled && (
           <View style={styles.ghostBlock}>
@@ -436,6 +457,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#222222",
     borderWidth: 1.5,
     borderColor: "#888",
+  },
+  toastContainer: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  toastText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+    textAlign: "center" as const,
   },
   ghostBtnText: {
     fontSize: 14,

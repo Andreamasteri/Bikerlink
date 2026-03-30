@@ -66,7 +66,9 @@ function AppStateHandler() {
     heartbeatTimerRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
 
     const subscription = AppState.addEventListener("change", (nextAppState) => {
-      if (appStateRef.current.match(/inactive|background/) && nextAppState === "active") {
+      const prev = appStateRef.current;
+
+      if (prev.match(/inactive|background/) && nextAppState === "active") {
         sendHeartbeat();
         queryClient.invalidateQueries({ queryKey: ["/api/users/profile"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users/online-count"] });
@@ -75,6 +77,15 @@ function AppStateHandler() {
         queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-list"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-list"] });
       }
+
+      if (prev === "active" && nextAppState.match(/inactive|background/)) {
+        apiRequest("PUT", "/api/users/profile/dynamic", { isAvailable: false }).catch(() => {});
+        queryClient.setQueryData(["/api/users/profile"], (old: unknown) => {
+          if (!old || typeof old !== "object") return old;
+          return { ...(old as Record<string, unknown>), isAvailable: false };
+        });
+      }
+
       appStateRef.current = nextAppState;
     });
 
