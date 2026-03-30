@@ -23,6 +23,7 @@ export default function AdminLayout() {
       <Stack.Screen name="performance" options={{ title: "Record Performance" }} />
       <Stack.Screen name="fake-users" options={{ title: "Utenti Fake" }} />
       <Stack.Screen name="db-debug" options={{ title: "DB Debug" }} />
+      <Stack.Screen name="ota-history" options={{ title: "Storico OTA" }} />
       <Stack.Screen name="motoclubs" options={{ title: "Motoclub" }} />
       <Stack.Screen name="invite-codes" options={{ title: "Codici Invito" }} />
       <Stack.Screen name="backup" options={{ title: "Backup automatici" }} />

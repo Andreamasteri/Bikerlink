@@ -261,12 +261,12 @@
     "runtimeVersion": "1.0.0",
     "platforms": ["android"],
     "jsEngine": "hermes",
-    "note": "Rimosso OtaHistoryWidget inline dal pannello admin (era tra il gruppo Monitoraggio e Sistema). Creata nuova schermata app/admin/ota-history.tsx con la lista completa degli OTA in card stile admin. Aggiunta card 'Storico OTA' (icona update, MaterialCommunityIcons) nel gruppo Monitoraggio, dopo DB Debug. Rimossi tutti gli stili otaXxx, formatOtaDate, interface OtaUpdate, import otaUpdates da admin/index.tsx.",
-    "updateGroupId": "38779451-b606-41c5-b28d-845b70dc049d",
-    "androidUpdateId": "019d3dcb-5f15-787c-98ae-c70cf8085ec0",
+    "note": "Rimosso OtaHistoryWidget inline dal pannello admin (era tra il gruppo Monitoraggio e Sistema). Creata nuova schermata app/admin/ota-history.tsx con la lista completa degli OTA in card stile admin. Aggiunta card 'Storico OTA' (icona update, MaterialCommunityIcons) nel gruppo Monitoraggio, dopo DB Debug. Aggiunto Stack.Screen name='ota-history' title='Storico OTA' in app/admin/_layout.tsx. Rimossi tutti gli stili otaXxx, formatOtaDate, interface OtaUpdate, import otaUpdates da admin/index.tsx.",
+    "updateGroupId": "883ea5cd-6360-47c2-a7e2-977bea2f490a",
+    "androidUpdateId": "019d3dcd-fa68-700e-a372-a1d9f693bb50",
     "iosUpdateId": null,
-    "commitBase": "d846281720ba59fc426c5e15d99d5787852597be",
-    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/38779451-b606-41c5-b28d-845b70dc049d",
+    "commitBase": "5aba3b8819813960a5252b72d063756447509573",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/883ea5cd-6360-47c2-a7e2-977bea2f490a",
     "status": "published"
   }
 ]
