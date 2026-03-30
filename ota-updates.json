@@ -421,6 +421,23 @@
     "iosUpdateId": null,
     "commitBase": "6774b77603cbcd8dbae345da445fa5f7d64f11d0",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/64355f53-c327-4993-b563-f588615c9485",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 27,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-27: rimuovi tab Garage dalla navbar, aggiorna testo banner GPS",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #317 — app/(tabs)/_layout.tsx: (1) Tabs.Screen 'garage': href fisso a null (rimossa condizione isGpsGateActive), rimosso headerLeft personalizzato; (2) banner GPS: 'Senza GPS puoi accedere solo a Profilo e Garage' → 'Senza GPS puoi accedere solo al Profilo'. Garage rimane navigabile dal profilo.",
+    "updateGroupId": "3024f56c-68d6-4b3c-9021-a039a07e5570",
+    "androidUpdateId": "019d40b0-d87f-7d55-b6fe-f853a68e8fd3",
+    "iosUpdateId": null,
+    "commitBase": "dc9391ca13e74ce88dbdbf1ee0571182fec26baf",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/3024f56c-68d6-4b3c-9021-a039a07e5570",
     "status": "published"
   }
 ]

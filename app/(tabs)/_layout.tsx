@@ -70,7 +70,7 @@ export default function TabLayout() {
           <Text style={gpsBannerStyles.title}>GPS non attivo</Text>
           <Text style={gpsBannerStyles.text}>
             BikerLink ha bisogno della posizione per funzionare.{"\n"}
-            Senza GPS puoi accedere solo a Profilo e Garage.
+            Senza GPS puoi accedere solo al Profilo.
           </Text>
           <Pressable
             style={gpsBannerStyles.btn}
@@ -190,12 +190,7 @@ export default function TabLayout() {
               <Ionicons name={isBikerOrCoppia ? "build" : "heart"} size={size} color={color} />
             ),
             headerTitle: isBikerOrCoppia ? "Il Mio Garage" : "La Mia Wishlist",
-            href: isGpsGateActive ? null : undefined,
-            headerLeft: isGpsGateActive ? undefined : () => (
-              <Pressable onPress={() => router.back()} style={{ marginLeft: 8 }}>
-                <Ionicons name="arrow-back" size={24} color={Colors.text} />
-              </Pressable>
-            ),
+            href: null,
           }}
         />
         <Tabs.Screen
