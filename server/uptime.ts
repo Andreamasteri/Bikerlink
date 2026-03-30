@@ -1,6 +1,8 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as http from "http";
+import { db } from "./db";
+import { serverRestarts } from "@shared/schema";
 
 export const SERVER_START_TIME = Date.now();
 
@@ -59,14 +61,21 @@ export function initUptimeTracking() {
   const now = SERVER_START_TIME;
   const lastStart = readLastStartTime();
 
+  let reason: "cold_start" | "restart";
   if (lastStart !== null) {
     const prevUptime = formatDuration(now - lastStart);
     appendUptimeLog(`BACKEND RESTART — previous uptime: ${prevUptime}`);
+    reason = "restart";
   } else {
     appendUptimeLog("BACKEND UP (cold start)");
+    reason = "cold_start";
   }
 
   writeStartTime(now);
+
+  db.insert(serverRestarts).values({ startedAt: new Date(now), reason }).catch((err) => {
+    console.warn("[uptime] Could not record server restart:", err);
+  });
 }
 
 export function startMetroMonitor() {

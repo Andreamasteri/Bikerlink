@@ -1021,6 +1021,17 @@ export type InsertUserBlock = typeof userBlocks.$inferInsert;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 
+export const serverRestarts = pgTable("server_restarts", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  reason: varchar("reason", { length: 50 }).notNull().default("restart"),
+});
+
+export type ServerRestart = typeof serverRestarts.$inferSelect;
+export type InsertServerRestart = typeof serverRestarts.$inferInsert;
+
 export const otaReleases = pgTable("ota_releases", {
   id: varchar("id", { length: 36 })
     .primaryKey()

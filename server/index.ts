@@ -502,11 +502,26 @@ function setupErrorHandler(app: express.Application) {
     },
     () => {
       log(`express server serving on port ${port}`);
-      initUptimeTracking();
       startMetroMonitor();
 
       // Phase 1 (immediate): run cheap DB migrations only — no heavy work at boot
       (async () => {
+        // Ensure server_restarts table exists before recording uptime (must run first)
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS server_restarts (
+              id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+              started_at TIMESTAMP NOT NULL DEFAULT NOW(),
+              reason VARCHAR(50) NOT NULL DEFAULT 'restart'
+            )
+          `);
+        } catch (e) {
+          console.warn("[MIGRATION] server_restarts (pre-uptime):", e);
+        }
+
+        // Now it is safe to record this boot
+        initUptimeTracking();
+
         try {
           await db.execute(sql`ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS image_url TEXT`);
         } catch (e) {

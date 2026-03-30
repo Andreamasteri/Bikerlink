@@ -5,7 +5,7 @@ import path from "path";
 import bcrypt from "bcryptjs";
 import { storage } from "../storage";
 import { db } from "../db";
-import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches } from "@shared/schema";
+import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts } from "@shared/schema";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { eq, and, ne, desc, sql, count, notExists, inArray, lte, isNull, or, ilike } from "drizzle-orm";
 import { sendEmail } from "../email";
@@ -2859,6 +2859,19 @@ router.get("/matching-stats", async (_req: Request, res: Response) => {
   } catch (error) {
     console.error("Matching stats error:", error);
     return res.status(500).json({ message: "Errore durante il recupero delle statistiche" });
+  }
+});
+
+router.get("/restart-history", async (_req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select()
+      .from(serverRestarts)
+      .orderBy(desc(serverRestarts.startedAt));
+    return res.json({ total: rows.length, restarts: rows });
+  } catch (error) {
+    console.error("Admin restart-history error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
   }
 });
 

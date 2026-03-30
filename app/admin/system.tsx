@@ -49,6 +49,17 @@ interface SystemHealth {
   events: SystemEvent[];
 }
 
+interface ServerRestart {
+  id: string;
+  startedAt: string;
+  reason: string;
+}
+
+interface RestartHistory {
+  total: number;
+  restarts: ServerRestart[];
+}
+
 function formatDuration(totalSec: number): string {
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
@@ -57,11 +68,13 @@ function formatDuration(totalSec: number): string {
   return `${m}m ${s}s`;
 }
 
+const ROME_TZ = "Europe/Rome";
+
 function formatTimestamp(iso: string): string {
   try {
     const d = new Date(iso);
-    const date = d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
-    const time = d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const date = d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", timeZone: ROME_TZ });
+    const time = d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: ROME_TZ });
     return `${date} ${time}`;
   } catch {
     return iso;
@@ -105,6 +118,11 @@ export default function SystemScreen() {
   const { data, isLoading, isError, refetch, isFetching } = useQuery<SystemHealth>({
     queryKey: ["/api/admin/system-health"],
     refetchInterval: 30000,
+  });
+
+  const { data: restartHistory } = useQuery<RestartHistory>({
+    queryKey: ["/api/admin/restart-history"],
+    refetchInterval: 60000,
   });
 
   const mergedEvents = useMemo<SystemEvent[]>(() => {
@@ -228,6 +246,33 @@ export default function SystemScreen() {
               <Text style={styles.offlineText}>Metro non raggiungibile</Text>
             )}
           </View>
+
+          {restartHistory && (
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Ionicons name="refresh-circle-outline" size={18} color={Colors.accent} />
+                <Text style={styles.cardTitle}>Storico Riavvii</Text>
+                <View style={[styles.badge, { backgroundColor: Colors.accent }]}>
+                  <Text style={styles.badgeText}>{restartHistory.total}</Text>
+                </View>
+              </View>
+              {restartHistory.restarts.slice(0, 10).map((r) => (
+                <View key={r.id} style={styles.restartRow}>
+                  <Ionicons
+                    name={r.reason === "cold_start" ? "power-outline" : "refresh-outline"}
+                    size={14}
+                    color={r.reason === "cold_start" ? "#44AA44" : "#FF8C00"}
+                  />
+                  <Text style={styles.restartReason}>
+                    {r.reason === "cold_start" ? "Avvio freddo" : "Riavvio"}
+                  </Text>
+                  <Text style={styles.restartTime}>
+                    {formatTimestamp(r.startedAt)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           <Text style={styles.sectionTitle}>Ultimi eventi ({mergedEvents.length})</Text>
         </>
@@ -397,5 +442,24 @@ const styles = StyleSheet.create({
     color: Colors.textMuted ?? "#888",
     fontFamily: "Inter_400Regular",
     fontSize: 14,
+  },
+  restartRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 5,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border ?? "#333",
+  },
+  restartReason: {
+    color: Colors.text,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    flex: 1,
+  },
+  restartTime: {
+    color: Colors.textMuted ?? "#888",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
   },
 });

@@ -70,6 +70,7 @@ __export(schema_exports, {
   reports: () => reports,
   routePoints: () => routePoints,
   routes: () => routes,
+  serverRestarts: () => serverRestarts,
   sosRequests: () => sosRequests,
   userBlocks: () => userBlocks,
   userMotorcycles: () => userMotorcycles,
@@ -83,7 +84,7 @@ __export(schema_exports, {
   zavarrinaWishlistPhotos: () => zavarrinaWishlistPhotos,
   zavarrinaWishlists: () => zavarrinaWishlists
 });
-var import_drizzle_orm, import_pg_core, import_zod, users, userPhotos, userMotorcycles, userProfiles, proposals, proposalParticipants, proposalMatches, conversations, conversationParticipants, messages, routes, routePoints, customRoutes, customRouteWaypoints, photoContestEntries, photoVotes, dailyVoteCounts, photoWinners, workshops, workshopContacts, easterEggs, collectedEasterEggs, reports, moderatorLogs, adCampaigns, adClicks, notifications, invitationCodes, feedbackTickets, appSettings, verificationCodes, passwordResetTokens, motorcyclePhotos, zavarrinaWishlists, zavarrinaWishlistPhotos, zavarrinaWishlistMotos, bikerZavarrinaMatches, bikerBikerMatches, emailVerificationTokens, phoneSharingTracker, fakeUserInteractions, userBlocks, sosRequests, motoClubs, motoClubMembers, motoClubInvites, motoClubRequests, registerSchema, loginSchema, otaReleases;
+var import_drizzle_orm, import_pg_core, import_zod, users, userPhotos, userMotorcycles, userProfiles, proposals, proposalParticipants, proposalMatches, conversations, conversationParticipants, messages, routes, routePoints, customRoutes, customRouteWaypoints, photoContestEntries, photoVotes, dailyVoteCounts, photoWinners, workshops, workshopContacts, easterEggs, collectedEasterEggs, reports, moderatorLogs, adCampaigns, adClicks, notifications, invitationCodes, feedbackTickets, appSettings, verificationCodes, passwordResetTokens, motorcyclePhotos, zavarrinaWishlists, zavarrinaWishlistPhotos, zavarrinaWishlistMotos, bikerZavarrinaMatches, bikerBikerMatches, emailVerificationTokens, phoneSharingTracker, fakeUserInteractions, userBlocks, sosRequests, motoClubs, motoClubMembers, motoClubInvites, motoClubRequests, registerSchema, loginSchema, serverRestarts, otaReleases;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -725,6 +726,11 @@ var init_schema = __esm({
     loginSchema = import_zod.z.object({
       identifier: import_zod.z.string().min(1, "Inserisci email o nickname"),
       password: import_zod.z.string().min(1, "Inserisci la password")
+    });
+    serverRestarts = (0, import_pg_core.pgTable)("server_restarts", {
+      id: (0, import_pg_core.varchar)("id", { length: 36 }).primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      startedAt: (0, import_pg_core.timestamp)("started_at").notNull().defaultNow(),
+      reason: (0, import_pg_core.varchar)("reason", { length: 50 }).notNull().default("restart")
     });
     otaReleases = (0, import_pg_core.pgTable)("ota_releases", {
       id: (0, import_pg_core.varchar)("id", { length: 36 }).primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
@@ -3030,13 +3036,19 @@ function writeStartTime(ts) {
 function initUptimeTracking() {
   const now = SERVER_START_TIME;
   const lastStart = readLastStartTime();
+  let reason;
   if (lastStart !== null) {
     const prevUptime = formatDuration(now - lastStart);
     appendUptimeLog(`BACKEND RESTART \u2014 previous uptime: ${prevUptime}`);
+    reason = "restart";
   } else {
     appendUptimeLog("BACKEND UP (cold start)");
+    reason = "cold_start";
   }
   writeStartTime(now);
+  db.insert(serverRestarts).values({ startedAt: new Date(now), reason }).catch((err) => {
+    console.warn("[uptime] Could not record server restart:", err);
+  });
 }
 function startMetroMonitor() {
   const METRO_PORT = 8081;
@@ -3090,6 +3102,8 @@ var init_uptime = __esm({
     fs6 = __toESM(require("fs"));
     path6 = __toESM(require("path"));
     http = __toESM(require("http"));
+    init_db();
+    init_schema();
     SERVER_START_TIME = Date.now();
     uptimeState = {
       metroStartTime: 0,
@@ -12221,6 +12235,15 @@ router17.get("/matching-stats", async (_req, res) => {
     return res.status(500).json({ message: "Errore durante il recupero delle statistiche" });
   }
 });
+router17.get("/restart-history", async (_req, res) => {
+  try {
+    const rows = await db.select().from(serverRestarts).orderBy((0, import_drizzle_orm9.desc)(serverRestarts.startedAt));
+    return res.json({ total: rows.length, restarts: rows });
+  } catch (error) {
+    console.error("Admin restart-history error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
 router17.get("/system-health", async (_req, res) => {
   try {
     const now = Date.now();
@@ -14077,9 +14100,20 @@ function setupErrorHandler(app2) {
     },
     () => {
       log(`express server serving on port ${port}`);
-      initUptimeTracking();
       startMetroMonitor();
       (async () => {
+        try {
+          await db.execute(import_drizzle_orm12.sql`
+            CREATE TABLE IF NOT EXISTS server_restarts (
+              id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+              started_at TIMESTAMP NOT NULL DEFAULT NOW(),
+              reason VARCHAR(50) NOT NULL DEFAULT 'restart'
+            )
+          `);
+        } catch (e) {
+          console.warn("[MIGRATION] server_restarts (pre-uptime):", e);
+        }
+        initUptimeTracking();
         try {
           await db.execute(import_drizzle_orm12.sql`ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS image_url TEXT`);
         } catch (e) {
