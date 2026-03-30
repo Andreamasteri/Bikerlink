@@ -523,6 +523,23 @@
     "iosUpdateId": null,
     "commitBase": "dd16c1897e96b0ab6565bfd1cb8f1919b3196eeb",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/ae3e26e5-93e7-4c81-af11-b08f3e71bcc1",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 32,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-32: icona garage/wishlist da 28 a 38px (+35%) nel profilo",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #322 — app/(tabs)/profile.tsx garageCard: MaterialCommunityIcons 'motorbike' e Ionicons 'heart' size 28→38 (+35%). Nessun altro elemento modificato (padding, bordi, testo, layout). Solo le due icone del tasto 'Il Mio Garage' / 'La Mia Wishlist'.",
+    "updateGroupId": "270be822-9f2c-48bf-9f97-9637ef759d8d",
+    "androidUpdateId": "019d40f9-9a97-7f81-9332-a5e8335b6873",
+    "iosUpdateId": null,
+    "commitBase": "2195cd6d301658002e24ca7fe9f2775684fda7c2",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/270be822-9f2c-48bf-9f97-9637ef759d8d",
     "status": "published"
   }
 ]
