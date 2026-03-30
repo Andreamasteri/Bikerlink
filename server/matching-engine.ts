@@ -335,7 +335,7 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
       if (!Array.isArray(matchingCountries) || matchingCountries.length === 0) matchingCountries = undefined;
     }
 
-    const isBiker = ["biker", "coppia", "admin"].includes(user.userType || "");
+    const isBiker = ["biker", "coppia"].includes(user.userType || "");
     const isZavarrina = user.userType === "zavorrina" || user.userType === "coppia";
 
     let bikerBikerCount = 0;
@@ -348,6 +348,8 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
 
     // 1. BIKER-BIKER: match this user with ALL brand-compatible bikers
     if (isBiker && userMotos.length > 0) {
+      const acceptedBikerPairs = await storage.getAcceptedBikerBikerPairKeys(userId);
+
       const userBrands = new Set(
         userMotos.map(bm => bm.motorcycle.brand?.toLowerCase()).filter((b): b is string => !!b)
       );
@@ -368,6 +370,7 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
         for (const other of compatibles) {
           const idA = userId < other.userId ? userId : other.userId;
           const idB = userId < other.userId ? other.userId : userId;
+          if (acceptedBikerPairs.has(`${idA}:${idB}`)) continue;
           const isSupermatch = !!(
             userMotoBrand.motorcycle.model && other.motorcycle.model &&
             userMotoBrand.motorcycle.model.toLowerCase() === other.motorcycle.model.toLowerCase() &&

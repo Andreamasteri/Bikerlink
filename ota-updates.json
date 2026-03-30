@@ -369,7 +369,24 @@
     "iosUpdateId": null,
     "commitBase": "8ce02d1429d84df816a06297ed51ec96edd502ec",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/1ea0281a-ac96-4ffe-b06e-327bc9dc8351",
-    "status": "published",
+    "status": "superseded",
     "requiresBackendDeploy": true
+  },
+  {
+    "updateNumber": 24,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-24: fix match admin escluso, re-proposta accepted, bottone mappa +3px",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "3 fix task #314: (1) BACKEND matching-engine.ts: rimosso 'admin' dall'array isBiker — admin non entra più nella pool di matching biker-biker; (2) BACKEND storage.ts: rimosso eq(users.userType,'admin') da getAllBikerMotorcyclesWithUsers — admin escluso anche dalla lista moto per matching; (3) BACKEND matching-engine.ts + storage.ts: aggiunto getAcceptedBikerBikerPairKeys() — le coppie già accettate sono caricate all'inizio e saltate nel loop biker-biker (non vengono più ri-proposte dopo reset-and-rematch); (4) FRONTEND InteractiveMap.tsx: controlsContainer bottom web 111→114, native 91→94 (+3px) — bottone light/dark mappa spostato 3px verso l'alto.",
+    "updateGroupId": "904dd4f4-ea7f-4268-a73f-3bbde325a313",
+    "androidUpdateId": "019d40a2-8893-7c99-b0d0-34d727306f1b",
+    "iosUpdateId": null,
+    "commitBase": "09b6848dbdf4d62993dc493b1a2ca38ab6ba6d88",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/904dd4f4-ea7f-4268-a73f-3bbde325a313",
+    "status": "published"
   }
 ]

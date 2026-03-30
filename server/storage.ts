@@ -323,6 +323,7 @@ export interface IStorage {
   resetBikerBikerMatchToNew(id: string, userId: string): Promise<boolean>;
   deleteRejectedBikerBikerMatches(userId: string): Promise<number>;
   deleteNewBikerBikerMatches(userId: string): Promise<number>;
+  getAcceptedBikerBikerPairKeys(userId: string): Promise<Set<string>>;
 
   createEmailVerificationToken(userId: string, token: string, expiresAt: Date): Promise<void>;
   getEmailVerificationToken(token: string): Promise<EmailVerificationToken | undefined>;
@@ -1376,7 +1377,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllBikerMotorcyclesWithUsers(countries?: string[]): Promise<{ motorcycle: any; userId: string }[]> {
-    const baseCondition = or(eq(users.userType, "biker"), eq(users.userType, "coppia"), eq(users.userType, "admin"))!;
+    const baseCondition = or(eq(users.userType, "biker"), eq(users.userType, "coppia"))!;
     const condition = countries && countries.length > 0
       ? and(baseCondition, inArray(users.country, countries))
       : baseCondition;
@@ -1896,6 +1897,25 @@ export class DatabaseStorage implements IStorage {
       )
     );
     return newMatches.length;
+  }
+
+  async getAcceptedBikerBikerPairKeys(userId: string): Promise<Set<string>> {
+    const rows = await db.select({
+      biker1Id: bikerBikerMatches.biker1Id,
+      biker2Id: bikerBikerMatches.biker2Id,
+    }).from(bikerBikerMatches).where(
+      and(
+        or(eq(bikerBikerMatches.biker1Id, userId), eq(bikerBikerMatches.biker2Id, userId)),
+        eq(bikerBikerMatches.status, "accepted")
+      )
+    );
+    const keys = new Set<string>();
+    for (const r of rows) {
+      const idA = r.biker1Id < r.biker2Id ? r.biker1Id : r.biker2Id;
+      const idB = r.biker1Id < r.biker2Id ? r.biker2Id : r.biker1Id;
+      keys.add(`${idA}:${idB}`);
+    }
+    return keys;
   }
 
   async blockUser(blockerId: string, blockedId: string): Promise<UserBlock> {

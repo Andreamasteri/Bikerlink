@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
   },
   controlsContainer: {
     position: "absolute",
-    bottom: Platform.OS === "web" ? 111 : 91,
+    bottom: Platform.OS === "web" ? 114 : 94,
     right: 12,
     gap: 10,
     alignItems: "flex-end",

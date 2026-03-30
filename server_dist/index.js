@@ -1581,7 +1581,7 @@ var init_storage = __esm({
         return query;
       }
       async getAllBikerMotorcyclesWithUsers(countries) {
-        const baseCondition = (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.userType, "biker"), (0, import_drizzle_orm2.eq)(users.userType, "coppia"), (0, import_drizzle_orm2.eq)(users.userType, "admin"));
+        const baseCondition = (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.userType, "biker"), (0, import_drizzle_orm2.eq)(users.userType, "coppia"));
         const condition = countries && countries.length > 0 ? (0, import_drizzle_orm2.and)(baseCondition, (0, import_drizzle_orm2.inArray)(users.country, countries)) : baseCondition;
         const results = await db.select({
           motorcycle: userMotorcycles,
@@ -2002,6 +2002,24 @@ var init_storage = __esm({
           )
         );
         return newMatches.length;
+      }
+      async getAcceptedBikerBikerPairKeys(userId) {
+        const rows = await db.select({
+          biker1Id: bikerBikerMatches.biker1Id,
+          biker2Id: bikerBikerMatches.biker2Id
+        }).from(bikerBikerMatches).where(
+          (0, import_drizzle_orm2.and)(
+            (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(bikerBikerMatches.biker1Id, userId), (0, import_drizzle_orm2.eq)(bikerBikerMatches.biker2Id, userId)),
+            (0, import_drizzle_orm2.eq)(bikerBikerMatches.status, "accepted")
+          )
+        );
+        const keys = /* @__PURE__ */ new Set();
+        for (const r of rows) {
+          const idA = r.biker1Id < r.biker2Id ? r.biker1Id : r.biker2Id;
+          const idB = r.biker1Id < r.biker2Id ? r.biker2Id : r.biker1Id;
+          keys.add(`${idA}:${idB}`);
+        }
+        return keys;
       }
       async blockUser(blockerId, blockedId) {
         const [block] = await db.insert(userBlocks).values({ blockerId, blockedId }).returning();
@@ -6625,7 +6643,7 @@ async function runMatchingForUser(userId) {
       }
       if (!Array.isArray(matchingCountries) || matchingCountries.length === 0) matchingCountries = void 0;
     }
-    const isBiker = ["biker", "coppia", "admin"].includes(user.userType || "");
+    const isBiker = ["biker", "coppia"].includes(user.userType || "");
     const isZavarrina = user.userType === "zavorrina" || user.userType === "coppia";
     let bikerBikerCount = 0;
     let zavarrinaCount = 0;
@@ -6633,6 +6651,7 @@ async function runMatchingForUser(userId) {
     const allBikerMotos = await storage.getAllBikerMotorcyclesWithUsers(matchingCountries);
     const userMotos = allBikerMotos.filter((bm) => bm.userId === userId);
     if (isBiker && userMotos.length > 0) {
+      const acceptedBikerPairs = await storage.getAcceptedBikerBikerPairKeys(userId);
       const userBrands = new Set(
         userMotos.map((bm) => bm.motorcycle.brand?.toLowerCase()).filter((b) => !!b)
       );
@@ -6650,6 +6669,7 @@ async function runMatchingForUser(userId) {
         for (const other of compatibles) {
           const idA = userId < other.userId ? userId : other.userId;
           const idB = userId < other.userId ? other.userId : userId;
+          if (acceptedBikerPairs.has(`${idA}:${idB}`)) continue;
           const isSupermatch = !!(userMotoBrand.motorcycle.model && other.motorcycle.model && userMotoBrand.motorcycle.model.toLowerCase() === other.motorcycle.model.toLowerCase() && userMotoBrand.motorcycle.motorcycleType && other.motorcycle.motorcycleType && userMotoBrand.motorcycle.motorcycleType.toLowerCase() === other.motorcycle.motorcycleType.toLowerCase() && userMotoBrand.motorcycle.ridingStyle && other.motorcycle.ridingStyle && userMotoBrand.motorcycle.ridingStyle.toLowerCase() === other.motorcycle.ridingStyle.toLowerCase());
           const inserted = await storage.createBikerBikerMatch({
             biker1Id: idA,
