@@ -438,6 +438,23 @@
     "iosUpdateId": null,
     "commitBase": "dc9391ca13e74ce88dbdbf1ee0571182fec26baf",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/3024f56c-68d6-4b3c-9021-a039a07e5570",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 28,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-28: popup promemoria garage/wishlist ogni 15 minuti",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #318 — app/(tabs)/_layout.tsx: aggiunto popup Modal promemoria garage/wishlist. Query /api/motorcycles (biker/coppia) e /api/wishlist (zavorrina) abilitate post-login. setInterval 900000ms (15 min) avviato solo se garageIsEmpty===true. Modal con testo specifico per tipo utente, pulsante Ok chiude popup e naviga a /garage. Stile coerente con Colors.surface/accent. Admin e moderatori esclusi.",
+    "updateGroupId": "d546a05a-23ab-4fda-9c37-ae3d3d32022f",
+    "androidUpdateId": "019d40b4-ddb2-7fed-ac84-07b557be13f3",
+    "iosUpdateId": null,
+    "commitBase": "b59f81efbec7936c29a0a3d1763965585271c6b9",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/d546a05a-23ab-4fda-9c37-ae3d3d32022f",
     "status": "published"
   }
 ]

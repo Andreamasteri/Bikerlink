@@ -1,8 +1,8 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { Tabs, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { Platform, View, Pressable, Text, StyleSheet, Linking } from "react-native";
+import { Platform, View, Pressable, Text, StyleSheet, Linking, Modal } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/lib/auth-context";
 import { useLocationGate } from "@/lib/location-context";
@@ -22,11 +22,52 @@ export default function TabLayout() {
   }, [user, isLoading]);
 
   const isBikerOrCoppia = user?.userType === "biker" || user?.userType === "coppia";
+  const isZavorrina = user?.userType === "zavorrina";
+  const needsGarageReminder = isBikerOrCoppia || isZavorrina;
+
+  const [showGarageReminder, setShowGarageReminder] = useState(false);
+  const reminderIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { data: profileData } = useQuery({
     queryKey: ["/api/users/profile"],
     enabled: !!user,
   });
+
+  const { data: motorcyclesData } = useQuery({
+    queryKey: ["/api/motorcycles"],
+    enabled: !!user && isBikerOrCoppia,
+  });
+
+  const { data: wishlistData } = useQuery({
+    queryKey: ["/api/wishlist"],
+    enabled: !!user && isZavorrina,
+  });
+
+  const garageIsEmpty: boolean | undefined = isBikerOrCoppia
+    ? (motorcyclesData === undefined ? undefined : Array.isArray(motorcyclesData) ? motorcyclesData.length === 0 : false)
+    : isZavorrina
+    ? (wishlistData === undefined ? undefined : ((wishlistData as any)?.motos?.length ?? 0) === 0)
+    : false;
+
+  useEffect(() => {
+    if (!needsGarageReminder || garageIsEmpty !== true) {
+      if (reminderIntervalRef.current) {
+        clearInterval(reminderIntervalRef.current);
+        reminderIntervalRef.current = null;
+      }
+      return;
+    }
+    if (reminderIntervalRef.current) return;
+    reminderIntervalRef.current = setInterval(() => {
+      setShowGarageReminder(true);
+    }, 900000);
+    return () => {
+      if (reminderIntervalRef.current) {
+        clearInterval(reminderIntervalRef.current);
+        reminderIntervalRef.current = null;
+      }
+    };
+  }, [needsGarageReminder, garageIsEmpty]);
 
   const { data: unreadData } = useQuery<{ count: number }>({
     queryKey: ["/api/chat/unread-total"],
@@ -241,6 +282,38 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
+
+      <Modal
+        visible={showGarageReminder}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowGarageReminder(false)}
+      >
+        <View style={reminderStyles.overlay}>
+          <View style={reminderStyles.card}>
+            <Ionicons
+              name={isBikerOrCoppia ? "build" : "heart"}
+              size={36}
+              color={Colors.accent}
+              style={{ marginBottom: 12 }}
+            />
+            <Text style={reminderStyles.text}>
+              {isBikerOrCoppia
+                ? "Ehi, ricordati di parcheggiare le tue moto nel garage!! Lo trovi sotto Profilo Utente, in fondo a destra"
+                : "Ehi, ricordati di condividere la tua lista dei desideri motociclistica! La trovi sotto Profilo Utente, in fondo a destra"}
+            </Text>
+            <Pressable
+              style={reminderStyles.btn}
+              onPress={() => {
+                setShowGarageReminder(false);
+                router.push("/garage" as any);
+              }}
+            >
+              <Text style={reminderStyles.btnText}>Ok</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -279,5 +352,47 @@ const gpsBannerStyles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
     color: "#fff",
+  },
+});
+
+const reminderStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 28,
+    alignItems: "center",
+    width: "100%",
+    maxWidth: 340,
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  text: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+    color: Colors.text,
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  btn: {
+    backgroundColor: Colors.accent,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 40,
+  },
+  btnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: "#000",
   },
 });
