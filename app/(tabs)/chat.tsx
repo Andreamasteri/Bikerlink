@@ -271,7 +271,7 @@ export default function ChatScreen() {
       <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 16 : insets.top + 12 }]}>
         <View style={styles.emailNotifRow}>
           <Ionicons name="mail-outline" size={15} color={Colors.textSecondary} style={{ marginRight: 6 }} />
-          <Text style={styles.emailNotifLabel}>Avvisami via email se sei offline</Text>
+          <Text style={styles.emailNotifLabel}>Inviami i messaggi della chat in email se sono offline</Text>
           <Switch
             value={emailNotifEnabled}
             onValueChange={(val) => toggleEmailNotifMutation.mutate(val)}

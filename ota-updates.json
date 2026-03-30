@@ -574,6 +574,24 @@
     "iosUpdateId": null,
     "commitBase": "83aa67b92b6371835298222f8857dba9cf1f3862",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/5b315b89-64c4-4b60-91e5-c074cfdd300f",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 35,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-35: rename toggle email chat + fix logging invio email",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #326 — (1) FRONTEND app/(tabs)/chat.tsx riga 277: label toggle 'Avvisami via email se sei offline' → 'Inviami i messaggi della chat in email se sono offline'; (2) BACKEND server/routes/chat.ts riga 851: sendEmail().catch(() => {}) → .catch((err) => console.error('[EMAIL] Invio notifica chat fallito:', err)) per rendere visibili gli errori nel monitor; (3) DB dev già aveva email_chat_notifications (ALTER TABLE precedente) — confermato via query; (4) NOTA: DB produzione richiede redeploy backend Autoscale per applicare la colonna — senza di esso il toggle non persiste sull'APK.",
+    "updateGroupId": "5986f2d0-f3db-43f1-b205-8784fa6ab068",
+    "androidUpdateId": "019d410a-7be0-7bbd-9df8-dc631c5f9a8a",
+    "iosUpdateId": null,
+    "commitBase": "7b00fe2e04848fa1468a23adf8fc8ed200708ba0",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/5986f2d0-f3db-43f1-b205-8784fa6ab068",
+    "requiresBackendDeploy": true,
     "status": "published"
   }
 ]

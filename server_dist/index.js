@@ -9203,8 +9203,7 @@ router12.post("/conversations/:id/messages", async (req, res) => {
                   </p>
                 </div>
               `;
-              sendEmail(targetUser.email, "Nuovo messaggio su BikerLink", html).catch(() => {
-              });
+              sendEmail(targetUser.email, "Nuovo messaggio su BikerLink", html).catch((err) => console.error("[EMAIL] Invio notifica chat fallito:", err));
             }
           }
         }
