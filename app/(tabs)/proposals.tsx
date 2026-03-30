@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 16, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
   fab: {
     position: "absolute",
-    bottom: Platform.OS === "web" ? 50 : 16,
+    bottom: Platform.OS === "web" ? 94 : 16,
     right: 20,
     width: 56,
     height: 56,

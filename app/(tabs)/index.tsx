@@ -275,8 +275,7 @@ export default function MapScreen() {
       url.searchParams.set("lat", String(location.latitude));
       url.searchParams.set("lng", String(location.longitude));
       if (countriesQueryParam) url.searchParams.set("countries", countriesQueryParam);
-      const res = await fetch(url.toString(), { credentials: "include" });
-      if (!res.ok) return [];
+      const res = await apiRequest("GET", url.pathname + url.search);
       return res.json();
     },
     retry: false,
@@ -291,7 +290,7 @@ export default function MapScreen() {
   // --- LIVELLO 2: contatori (dopo mappa pronta, refresh 30s) ---
   const onlineCountQuery = useQuery<{ count: number }>({
     queryKey: ["/api/users/online-count", countriesQueryParam],
-    queryFn: () => fetch(new URL(`/api/users/online-count${countriesQueryParam ? `?countries=${countriesQueryParam}` : ""}`, getApiUrl()).toString(), { credentials: "include" }).then(r => r.json()),
+    queryFn: () => apiRequest("GET", `/api/users/online-count${countriesQueryParam ? `?countries=${countriesQueryParam}` : ""}`).then(r => r.json()),
     staleTime: 30000,
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
@@ -300,7 +299,7 @@ export default function MapScreen() {
 
   const bikerCountQuery = useQuery<{ count: number }>({
     queryKey: ["/api/users/biker-available-count", countriesQueryParam],
-    queryFn: () => fetch(new URL(`/api/users/biker-available-count${countriesQueryParam ? `?countries=${countriesQueryParam}` : ""}`, getApiUrl()).toString(), { credentials: "include" }).then(r => r.json()),
+    queryFn: () => apiRequest("GET", `/api/users/biker-available-count${countriesQueryParam ? `?countries=${countriesQueryParam}` : ""}`).then(r => r.json()),
     staleTime: 30000,
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
@@ -309,7 +308,7 @@ export default function MapScreen() {
 
   const zavCountQuery = useQuery<{ count: number }>({
     queryKey: ["/api/users/zavorrine-available-count", countriesQueryParam],
-    queryFn: () => fetch(new URL(`/api/users/zavorrine-available-count${countriesQueryParam ? `?countries=${countriesQueryParam}` : ""}`, getApiUrl()).toString(), { credentials: "include" }).then(r => r.json()),
+    queryFn: () => apiRequest("GET", `/api/users/zavorrine-available-count${countriesQueryParam ? `?countries=${countriesQueryParam}` : ""}`).then(r => r.json()),
     staleTime: 30000,
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
@@ -328,11 +327,7 @@ export default function MapScreen() {
     queryKey: ["/api/easter-eggs/nearby", location?.latitude, location?.longitude],
     queryFn: async () => {
       if (!location) return [];
-      const url = new URL("/api/easter-eggs/nearby", getApiUrl());
-      url.searchParams.set("lat", String(location.latitude));
-      url.searchParams.set("lng", String(location.longitude));
-      const res = await fetch(url.toString(), { credentials: "include" });
-      if (!res.ok) return [];
+      const res = await apiRequest("GET", `/api/easter-eggs/nearby?lat=${location.latitude}&lng=${location.longitude}`);
       return res.json();
     },
     retry: false,
@@ -371,15 +366,15 @@ export default function MapScreen() {
   const onlineListQuery = useQuery<any[]>({
     queryKey: ["/api/users/online-list", location?.latitude, location?.longitude, showOfflineOnline, countriesQueryParam],
     queryFn: async () => {
-      const url = new URL("/api/users/online-list", getApiUrl());
+      const params = new URLSearchParams();
       if (location) {
-        url.searchParams.set("lat", String(location.latitude));
-        url.searchParams.set("lng", String(location.longitude));
+        params.set("lat", String(location.latitude));
+        params.set("lng", String(location.longitude));
       }
-      if (showOfflineOnline) url.searchParams.set("includeOffline", "true");
-      if (countriesQueryParam) url.searchParams.set("countries", countriesQueryParam);
-      const res = await fetch(url.toString(), { credentials: "include" });
-      if (!res.ok) return [];
+      if (showOfflineOnline) params.set("includeOffline", "true");
+      if (countriesQueryParam) params.set("countries", countriesQueryParam);
+      const qs = params.toString();
+      const res = await apiRequest("GET", `/api/users/online-list${qs ? `?${qs}` : ""}`);
       return res.json();
     },
     staleTime: 15000,
@@ -389,14 +384,14 @@ export default function MapScreen() {
   const bikerListQuery = useQuery<any[]>({
     queryKey: ["/api/users/biker-available-list", location?.latitude, location?.longitude, countriesQueryParam],
     queryFn: async () => {
-      const url = new URL("/api/users/biker-available-list", getApiUrl());
+      const params = new URLSearchParams();
       if (location) {
-        url.searchParams.set("lat", String(location.latitude));
-        url.searchParams.set("lng", String(location.longitude));
+        params.set("lat", String(location.latitude));
+        params.set("lng", String(location.longitude));
       }
-      if (countriesQueryParam) url.searchParams.set("countries", countriesQueryParam);
-      const res = await fetch(url.toString(), { credentials: "include" });
-      if (!res.ok) return [];
+      if (countriesQueryParam) params.set("countries", countriesQueryParam);
+      const qs = params.toString();
+      const res = await apiRequest("GET", `/api/users/biker-available-list${qs ? `?${qs}` : ""}`);
       return res.json();
     },
     staleTime: 15000,
@@ -406,14 +401,14 @@ export default function MapScreen() {
   const zavListQuery = useQuery<any[]>({
     queryKey: ["/api/users/zavorrine-available-list", location?.latitude, location?.longitude, countriesQueryParam],
     queryFn: async () => {
-      const url = new URL("/api/users/zavorrine-available-list", getApiUrl());
+      const params = new URLSearchParams();
       if (location) {
-        url.searchParams.set("lat", String(location.latitude));
-        url.searchParams.set("lng", String(location.longitude));
+        params.set("lat", String(location.latitude));
+        params.set("lng", String(location.longitude));
       }
-      if (countriesQueryParam) url.searchParams.set("countries", countriesQueryParam);
-      const res = await fetch(url.toString(), { credentials: "include" });
-      if (!res.ok) return [];
+      if (countriesQueryParam) params.set("countries", countriesQueryParam);
+      const qs = params.toString();
+      const res = await apiRequest("GET", `/api/users/zavorrine-available-list${qs ? `?${qs}` : ""}`);
       return res.json();
     },
     staleTime: 15000,
@@ -509,19 +504,15 @@ export default function MapScreen() {
     setSelectedUserProposals([]);
     try {
       const [detailRes, proposalsRes] = await Promise.all([
-        fetch(new URL(`/api/users/${mapUser.id}/public`, baseUrl).toString(), { credentials: "include" }),
-        fetch(new URL("/api/proposals", baseUrl).toString(), { credentials: "include" }),
+        apiRequest("GET", `/api/users/${mapUser.id}/public`),
+        apiRequest("GET", "/api/proposals"),
       ]);
-      if (detailRes.ok) {
-        setSelectedUserDetail(await detailRes.json());
-      }
-      if (proposalsRes.ok) {
-        const allProposals = await proposalsRes.json();
-        const userProposals = (Array.isArray(allProposals) ? allProposals : []).filter(
-          (p: any) => p.userId === mapUser.id && p.status === "active"
-        );
-        setSelectedUserProposals(userProposals);
-      }
+      setSelectedUserDetail(await detailRes.json());
+      const allProposals = await proposalsRes.json();
+      const userProposals = (Array.isArray(allProposals) ? allProposals : []).filter(
+        (p: any) => p.userId === mapUser.id && p.status === "active"
+      );
+      setSelectedUserProposals(userProposals);
     } catch (e) {}
     setDetailLoading(false);
   }, []);
@@ -576,16 +567,12 @@ export default function MapScreen() {
     setSearchLoading(true);
     setShowSearchResults(true);
     try {
-      const url = new URL("/api/users/search", baseUrl);
-      url.searchParams.set("q", text.trim());
-      const res = await fetch(url.toString(), { credentials: "include" });
-      if (res.ok) {
-        const data = await res.json();
-        setSearchResults(data.filter((u: any) => u.id !== user?.id));
-      }
+      const res = await apiRequest("GET", `/api/users/search?q=${encodeURIComponent(text.trim())}`);
+      const data = await res.json();
+      setSearchResults(data.filter((u: any) => u.id !== user?.id));
     } catch { }
     setSearchLoading(false);
-  }, [baseUrl, user?.id]);
+  }, [user?.id]);
 
   const handleSearchResultPress = useCallback((u: any) => {
     setShowSearchResults(false);

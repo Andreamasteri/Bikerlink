@@ -586,7 +586,7 @@ function GarageContent() {
         />
       )}
 
-      <Pressable style={[styles.fab, { bottom: Platform.OS === "web" ? 50 : 16 }]} onPress={openAdd}>
+      <Pressable style={[styles.fab, { bottom: Platform.OS === "web" ? 94 : 16 }]} onPress={openAdd}>
         <Ionicons name="add" size={28} color={Colors.background} />
       </Pressable>
 

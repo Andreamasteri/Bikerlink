@@ -411,7 +411,7 @@ export default function ContestScreen() {
       />
 
         <Pressable
-          style={[styles.fab, { bottom: Platform.OS === "web" ? 50 : 16 }]}
+          style={[styles.fab, { bottom: Platform.OS === "web" ? 94 : 16 }]}
           onPress={handlePickImage}
         >
           <Ionicons name="camera" size={28} color={Colors.background} />

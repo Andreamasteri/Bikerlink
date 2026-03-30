@@ -190,7 +190,7 @@ export default function TabLayout() {
               <Ionicons name={isBikerOrCoppia ? "build" : "heart"} size={size} color={color} />
             ),
             headerTitle: isBikerOrCoppia ? "Il Mio Garage" : "La Mia Wishlist",
-            href: isGpsGateActive ? undefined : null,
+            href: isGpsGateActive ? null : undefined,
             headerLeft: isGpsGateActive ? undefined : () => (
               <Pressable onPress={() => router.back()} style={{ marginLeft: 8 }}>
                 <Ionicons name="arrow-back" size={24} color={Colors.text} />

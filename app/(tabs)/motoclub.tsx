@@ -15,7 +15,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { apiRequest } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { getCurrentLocale } from "@/lib/i18n";
 
@@ -318,11 +318,9 @@ export default function MotoclubScreen() {
       await Promise.all(
         myClubs.map(async (club) => {
           try {
-            const res = await fetch(new URL(`/api/motoclubs/${club.id}/marketplace`, getApiUrl()).toString(), { credentials: "include" });
-            if (res.ok) {
-              const data = await res.json();
-              if (data.length > 0) results[club.id] = data;
-            }
+            const res = await apiRequest("GET", `/api/motoclubs/${club.id}/marketplace`);
+            const data = await res.json();
+            if (data.length > 0) results[club.id] = data;
           } catch {}
         })
       );
