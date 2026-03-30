@@ -250,6 +250,23 @@
     "iosUpdateId": null,
     "commitBase": "7d2559a916ebaf776d0f1bc08975fcc1a3ad1fd8",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/b28705a7-2daa-40a6-85ef-5628e6e16c7f",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 17,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-17: admin — Storico OTA come card dedicata, rimosso widget inline",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Rimosso OtaHistoryWidget inline dal pannello admin (era tra il gruppo Monitoraggio e Sistema). Creata nuova schermata app/admin/ota-history.tsx con la lista completa degli OTA in card stile admin. Aggiunta card 'Storico OTA' (icona update, MaterialCommunityIcons) nel gruppo Monitoraggio, dopo DB Debug. Rimossi tutti gli stili otaXxx, formatOtaDate, interface OtaUpdate, import otaUpdates da admin/index.tsx.",
+    "updateGroupId": "38779451-b606-41c5-b28d-845b70dc049d",
+    "androidUpdateId": "019d3dcb-5f15-787c-98ae-c70cf8085ec0",
+    "iosUpdateId": null,
+    "commitBase": "d846281720ba59fc426c5e15d99d5787852597be",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/38779451-b606-41c5-b28d-845b70dc049d",
     "status": "published"
   }
 ]
