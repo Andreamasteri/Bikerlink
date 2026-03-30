@@ -560,7 +560,7 @@ export default function CreateProposalScreen() {
             )}
 
             <View style={styles.dateLabelRow}>
-              <Text style={[styles.sectionTitle, { marginTop: 8, marginBottom: 0, flex: 1 }]}>Data *</Text>
+              <Text style={[styles.sectionTitle, { marginTop: 8, marginBottom: 0, flex: 1 }]}>Data e Ora di Partenza *</Text>
               <TouchableOpacity
                 style={styles.dateShortcutBtn}
                 onPress={() => setDateStr(formatDateDDMMYYYY(new Date()))}
@@ -602,7 +602,7 @@ export default function CreateProposalScreen() {
                 />
               </View>
               <View style={styles.timeCol}>
-                <Text style={styles.sectionTitle}>Alle (limite)</Text>
+                <Text style={styles.sectionTitle}>Alle (Orario limite partenza)</Text>
                 <TextInput
                   style={styles.input}
                   value={timeTo}

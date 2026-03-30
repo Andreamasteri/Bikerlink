@@ -557,6 +557,23 @@
     "iosUpdateId": null,
     "commitBase": "384e4c04fc2bd761d01f069d8add3d286869b7e5",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/5a4a9bb4-500d-418d-80ef-d723f9442227",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 34,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-34: label form proposta — 'Data e Ora di Partenza *' e 'Alle (Orario limite partenza)'",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #324 — app/proposals/create.tsx: (1) riga 566: label 'Data *' → 'Data e Ora di Partenza *' (nel dateLabelRow, sectionTitle con marginTop:8/marginBottom:0/flex:1); (2) riga 608: label 'Alle (limite)' → 'Alle (Orario limite partenza)' (nel timeCol destro del timeRow). Nessun'altra modifica — layout, logica, validazione, backend invariati.",
+    "updateGroupId": "5b315b89-64c4-4b60-91e5-c074cfdd300f",
+    "androidUpdateId": "019d40fe-8b88-72d2-a188-51cbf550dc0f",
+    "iosUpdateId": null,
+    "commitBase": "83aa67b92b6371835298222f8857dba9cf1f3862",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/5b315b89-64c4-4b60-91e5-c074cfdd300f",
     "status": "published"
   }
 ]
