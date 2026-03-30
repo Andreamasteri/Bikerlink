@@ -791,7 +791,7 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Stile Mappa</Text>
           <View style={styles.mapStyleCard}>
             {(["esri_gray", "carto_light"] as MapProvider[]).map((p) => {
-              const currentStyle = (profile?.profile?.preferredMapStyle || null) as MapProvider | null;
+              const currentStyle = (profile?.profile?.preferredMapStyle || "carto_light") as MapProvider;
               const isSelected = currentStyle === p;
               return (
                 <Pressable

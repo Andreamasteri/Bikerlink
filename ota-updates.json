@@ -404,6 +404,23 @@
     "iosUpdateId": null,
     "commitBase": "dfd7292b42976904de3284f6b640abe526c69228",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/0ab8224b-f800-4013-8cc9-a0affca2591c",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 26,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-26: default stile mappa = carto_light nel profilo",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #316 — app/(tabs)/profile.tsx:797: currentStyle fallback null → 'carto_light'. Utenti senza preferenza salvata vedono 'Mappa dettagliata' (carto_light) selezionata con spunta nel pannello profilo.",
+    "updateGroupId": "64355f53-c327-4993-b563-f588615c9485",
+    "androidUpdateId": "019d40ad-41be-72f5-8714-1eb618bd2045",
+    "iosUpdateId": null,
+    "commitBase": "6774b77603cbcd8dbae345da445fa5f7d64f11d0",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/64355f53-c327-4993-b563-f588615c9485",
     "status": "published"
   }
 ]
