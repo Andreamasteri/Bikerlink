@@ -267,6 +267,23 @@
     "iosUpdateId": null,
     "commitBase": "5aba3b8819813960a5252b72d063756447509573",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/883ea5cd-6360-47c2-a7e2-977bea2f490a",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 18,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-18: pannelletto disponibilità alzato di 4px",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "controlsContainer bottom: web 103→107, native 83→87. Il pannelletto 'Sono disponibile / Online' sulla mappa è ora 4px più in alto. Bundle Hermes .hbc.",
+    "updateGroupId": "04c3410d-96db-452d-b7e2-9507dd60ae07",
+    "androidUpdateId": "019d3dd8-2403-719e-a910-d0d8221b6977",
+    "iosUpdateId": null,
+    "commitBase": "f992bd9f532a457ad0f33bcaaa9e7a4e125285f7",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/04c3410d-96db-452d-b7e2-9507dd60ae07",
     "status": "published"
   }
 ]
