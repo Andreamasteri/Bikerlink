@@ -347,11 +347,11 @@
     "platforms": ["android"],
     "jsEngine": "hermes",
     "note": "Fix loop infinito introdotto da OTA-20: OtaStartupChecker ora usa AsyncStorage (chiave 'ota_last_applied_id') invece di reloadedRef in-memoria. Prima di ogni reloadAsync() viene salvato l'updateId; al riavvio, se l'ID corrisponde a quello già salvato, il reload viene saltato — nessun loop. Fix applicato sia al path isUpdatePending che al path checkForUpdateAsync(). Se l'ID update non è disponibile (null), il reload viene saltato in modo sicuro senza persistere sentinel.",
-    "updateGroupId": null,
-    "androidUpdateId": null,
+    "updateGroupId": "fe7dafac-355c-46f0-b9ba-3c1bad291cb8",
+    "androidUpdateId": "019d3f62-ebde-7f1c-b8e5-ff3d9c528cf1",
     "iosUpdateId": null,
-    "commitBase": null,
-    "easDashboard": null,
-    "status": "pending-publish"
+    "commitBase": "10f729efe620d9680b6116ae870ac8a31d14401c",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/fe7dafac-355c-46f0-b9ba-3c1bad291cb8",
+    "status": "published"
   }
 ]
