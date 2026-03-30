@@ -609,6 +609,23 @@
     "iosUpdateId": null,
     "commitBase": "4b39d7209b462ac93f885af506452687628a70b5",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/24c935a3-02b6-4992-ad51-44ce0852845a",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 37,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-37: fix badge OTA — pill verde quando siamo ahead of bundled list",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #328 — app/(tabs)/profile.tsx: (1) aggiunta currentOtaEntry = otaUpdates.find(e => e.androidUpdateId === currentUpdateId); (2) isOtaUpToDate ora include il caso !currentOtaEntry (updateId non presente nella lista bundled = bundle più recente del JSON = aggiornato); (3) label badge: mostra 'OTA-N' se trovato in lista, 'OTA-N+' (ultimo noto + segno) se non trovato. Risolve il bug strutturale per cui ogni bundle è 'one behind': il bundle OTA-36 conteneva ota-updates.json fino a OTA-35, quindi la pill mostrava rosso e 'OTA-35' anche quando l'app girava su OTA-36.",
+    "updateGroupId": "0bc0b7dc-94bc-46d8-8b33-b799f6284e68",
+    "androidUpdateId": "019d4123-1872-7dfc-ac02-b6a9e6af6818",
+    "iosUpdateId": null,
+    "commitBase": "86d7185f13ab973b31b4ea8483ab5632b9671594",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/0bc0b7dc-94bc-46d8-8b33-b799f6284e68",
     "status": "published"
   }
 ]

@@ -138,12 +138,14 @@ export default function ProfileScreen() {
     return best;
   }, null);
   const currentUpdateId = Updates.updateId ?? null;
+  const currentOtaEntry = otaUpdates.find(e => e.androidUpdateId === currentUpdateId) ?? null;
   const isOtaUpToDate =
     __DEV__ || Platform.OS === "web"
       ? true
-      : latestOta
-      ? currentUpdateId === latestOta.androidUpdateId
-      : true;
+      : currentUpdateId === null
+      ? false
+      : currentUpdateId === latestOta?.androidUpdateId  // match esatto con il latest noto
+        || !currentOtaEntry;  // non in lista = bundle più recente del JSON bundled → aggiornato
 
   const handleForceOtaCheck = async () => {
     if (__DEV__ || Platform.OS === "web") {
@@ -562,7 +564,11 @@ export default function ProfileScreen() {
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: (isOtaUpToDate || confirmedUpToDate ? "#22C55E" : "#EF4444") + "18", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
             <Ionicons name="cloud-download-outline" size={11} color={isOtaUpToDate || confirmedUpToDate ? "#22C55E" : "#EF4444"} />
             <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: isOtaUpToDate || confirmedUpToDate ? "#22C55E" : "#EF4444" }}>
-              {latestOta ? `OTA-${latestOta.updateNumber}` : "OTA"}
+              {currentOtaEntry
+                ? `OTA-${currentOtaEntry.updateNumber}`
+                : latestOta
+                ? `OTA-${latestOta.updateNumber}+`
+                : "OTA"}
             </Text>
           </View>
           {!__DEV__ && Platform.OS !== "web" && (
