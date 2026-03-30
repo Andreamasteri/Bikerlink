@@ -312,7 +312,7 @@
     "runtimeVersion": "1.0.0",
     "platforms": ["android"],
     "jsEngine": "hermes",
-    "note": "3 fix: (1) BACKEND: rimosso filtro gte(lastLoginAt, fifteenMinutesAgo) da countAvailableBikers, countAvailableZavorrine, getAvailableBikersList, getAvailableZavorrinaList in server/storage.ts — 'disponibile' ora conta chiunque abbia isAvailable=true indipendentemente dall'ultimo login; (2) MAPPA: availabilityContainer bottom web 109→118 / native 89→98 (+9px); controlsContainer bottom web 107→111 / native 87→91 (+4px); (3) OtaStartupChecker in _layout.tsx: dopo fetchUpdateAsync() ora chiama reloadAsync() direttamente invece di aspettare isUpdatePending via useEffect — elimina race condition che impediva l'applicazione dell'OTA.",
+    "note": "3 fix: (1) BACKEND: rimosso filtro gte(lastLoginAt, fifteenMinutesAgo) da countAvailableBikers, countAvailableZavorrine, getAvailableBikersList, getAvailableZavorrinaList in server/storage.ts — 'disponibile' ora conta chiunque abbia isAvailable=true indipendentemente dall'ultimo login; (2) MAPPA: availabilityContainer bottom web 109→118 / native 89→98 (+9px); controlsContainer bottom web 107→111 / native 87→91 (+4px); (3) OtaStartupChecker in _layout.tsx: dopo fetchUpdateAsync() ora chiama reloadAsync() direttamente invece di aspettare isUpdatePending via useEffect — elimina race condition che impediva l'applicazione dell'OTA. PROBLEMA: reloadedRef in-memoria si azzera ad ogni reloadAsync() → loop infinito.",
     "updateGroupId": "a48a2649-b0d2-4d63-817d-c405d5883535",
     "androidUpdateId": "019d3e02-e77c-76dc-8b62-2f50a81e66b5",
     "iosUpdateId": null,
@@ -335,6 +335,23 @@
     "iosUpdateId": null,
     "commitBase": "8771e42eb46b0c1450475c4004ac25c4afb53add",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/f721201a-d466-48e3-9458-4922c38b15bd",
-    "status": "published"
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 22,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-22: fix loop OTA — AsyncStorage persistente invece di ref in-memoria",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Fix loop infinito introdotto da OTA-20: OtaStartupChecker ora usa AsyncStorage (chiave 'ota_last_applied_id') invece di reloadedRef in-memoria. Prima di ogni reloadAsync() viene salvato l'updateId; al riavvio, se l'ID corrisponde a quello già salvato, il reload viene saltato — nessun loop. Fix applicato sia al path isUpdatePending che al path checkForUpdateAsync(). Se l'ID update non è disponibile (null), il reload viene saltato in modo sicuro senza persistere sentinel.",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": null,
+    "easDashboard": null,
+    "status": "pending-publish"
   }
 ]

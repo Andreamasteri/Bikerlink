@@ -116,8 +116,31 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+const OTA_APPLIED_KEY = "ota_last_applied_id";
+
+/**
+ * Esegue reloadAsync() solo se l'aggiornamento con targetUpdateId non è già
+ * stato applicato nell'ultimo riavvio. Confronta con il valore persistito in
+ * AsyncStorage per evitare loop infiniti dopo reloadAsync().
+ * Se targetUpdateId è null (ID non disponibile) la funzione esce senza fare nulla.
+ */
+async function safeReloadAsync(targetUpdateId: string | null): Promise<void> {
+  if (!targetUpdateId) return;
+  try {
+    const alreadyApplied = await AsyncStorage.getItem(OTA_APPLIED_KEY);
+    if (alreadyApplied === targetUpdateId) {
+      // Questo update è già stato applicato nell'ultimo ciclo — evita loop
+      return;
+    }
+    await AsyncStorage.setItem(OTA_APPLIED_KEY, targetUpdateId);
+    const mod = await import("expo-updates");
+    await mod.reloadAsync();
+  } catch {
+    // silent fail
+  }
+}
+
 function OtaStartupChecker() {
-  const reloadedRef = useRef(false);
   const fetchStartedRef = useRef(false);
   let updates: ReturnType<typeof useUpdates> | null = null;
   try {
@@ -131,12 +154,11 @@ function OtaStartupChecker() {
   useEffect(() => {
     if (__DEV__ || Platform.OS === "web") return;
     if (!updates) return;
-    if (reloadedRef.current || !updates.isUpdatePending) return;
-    reloadedRef.current = true;
-    import("expo-updates").then((mod) => {
-      mod.reloadAsync().catch(() => {});
-    });
-  }, [updates?.isUpdatePending]);
+    if (!updates.isUpdatePending) return;
+    // Usa updateId dell'update disponibile — se assente non rilanciare
+    const targetId = updates.availableUpdate?.updateId ?? null;
+    safeReloadAsync(targetId);
+  }, [updates?.isUpdatePending]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check esplicito se il check automatico ON_LOAD non trova nulla entro 2s
   useEffect(() => {
@@ -144,16 +166,19 @@ function OtaStartupChecker() {
     if (fetchStartedRef.current) return;
     fetchStartedRef.current = true;
     const timer = setTimeout(async () => {
-      if (reloadedRef.current) return;
       try {
         const mod = await import("expo-updates");
         const result = await mod.checkForUpdateAsync();
         if (result.isAvailable) {
+          const manifest = result.manifest as { id?: string } | undefined;
+          const targetId = manifest?.id ?? null;
+          // Se non riusciamo a leggere un ID stabile, non procediamo
+          if (!targetId) return;
+          const alreadyApplied = await AsyncStorage.getItem(OTA_APPLIED_KEY);
+          if (alreadyApplied === targetId) return;
           await mod.fetchUpdateAsync();
-          if (!reloadedRef.current) {
-            reloadedRef.current = true;
-            await mod.reloadAsync();
-          }
+          await AsyncStorage.setItem(OTA_APPLIED_KEY, targetId);
+          await mod.reloadAsync();
         }
       } catch {
         // silent fail — EAS non raggiungibile o runtime mismatch
