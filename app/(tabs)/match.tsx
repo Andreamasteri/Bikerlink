@@ -132,6 +132,10 @@ function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress
         </TouchableOpacity>
       )}
 
+      {isAccepted && (
+        <Text style={{ fontSize: 40, textAlign: "center", marginVertical: 6 }}>❤️</Text>
+      )}
+
       <View style={styles.matchProposals}>
         <View style={[styles.proposalMini, { flex: 1 }]}>
           <Text style={styles.proposalMiniLabel}>{t("match.moto")}</Text>
@@ -248,6 +252,10 @@ function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, onBlock
           <Ionicons name="chatbubble" size={18} color={Colors.background} />
           <Text style={styles.chatBtnText}>{t("match.sendMessage")}</Text>
         </TouchableOpacity>
+      )}
+
+      {isAccepted && (
+        <Text style={{ fontSize: 40, textAlign: "center", marginVertical: 6 }}>✌️</Text>
       )}
 
       {isNew && (

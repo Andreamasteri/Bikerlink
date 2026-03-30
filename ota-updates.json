@@ -540,6 +540,23 @@
     "iosUpdateId": null,
     "commitBase": "2195cd6d301658002e24ca7fe9f2775684fda7c2",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/270be822-9f2c-48bf-9f97-9637ef759d8d",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 33,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-33: emoji ✌️ match biker-biker accettato, ❤️ match biker-zavorrina accettato",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #323 — app/(tabs)/match.tsx: (1) GarageMatchCard (biker-zavorrina): quando isAccepted === true, aggiunta riga <Text fontSize=40 textAlign=center marginVertical=6>❤️</Text> dopo il pulsante chat e prima di matchProposals; (2) BikerMatchCard (biker-biker): quando isAccepted === true, aggiunta riga <Text fontSize=40 textAlign=center marginVertical=6>✌️</Text> dopo il pulsante chat e prima del blocco isNew. Match non accettati: nessuna emoji. Solo frontend, nessun cambio backend/DB.",
+    "updateGroupId": "5a4a9bb4-500d-418d-80ef-d723f9442227",
+    "androidUpdateId": "019d40fc-2baf-7024-8e4e-7012d73a9c8b",
+    "iosUpdateId": null,
+    "commitBase": "384e4c04fc2bd761d01f069d8add3d286869b7e5",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/5a4a9bb4-500d-418d-80ef-d723f9442227",
     "status": "published"
   }
 ]
