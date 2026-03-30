@@ -56,15 +56,8 @@ async function sendHeartbeat() {
 
 function AppStateHandler() {
   const { user } = useAuth();
-  const wasAvailableRef = useRef<boolean | null>(null);
   const appStateRef = useRef(AppState.currentState);
   const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    if (!user || user.ghostMode) return;
-    if (Platform.OS === "web") return;
-    apiRequest("PUT", "/api/users/me/availability", { isAvailable: true }).catch(() => {});
-  }, [user?.id]);
 
   useEffect(() => {
     if (!user) return;
@@ -72,24 +65,9 @@ function AppStateHandler() {
     sendHeartbeat();
     heartbeatTimerRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
 
-    const subscription = AppState.addEventListener("change", async (nextAppState) => {
-      if (appStateRef.current.match(/active/) && nextAppState.match(/inactive|background/)) {
-        try {
-          const profileRes = await apiRequest("GET", "/api/users/profile");
-          const profile = await profileRes.json();
-          wasAvailableRef.current = profile?.isAvailable ?? false;
-          if (wasAvailableRef.current) {
-            await apiRequest("PUT", "/api/users/me/availability", { isAvailable: false });
-          }
-        } catch {}
-      } else if (appStateRef.current.match(/inactive|background/) && nextAppState === "active") {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (appStateRef.current.match(/inactive|background/) && nextAppState === "active") {
         sendHeartbeat();
-        if (wasAvailableRef.current === true) {
-          try {
-            await apiRequest("PUT", "/api/users/me/availability", { isAvailable: true });
-          } catch {}
-          wasAvailableRef.current = null;
-        }
         queryClient.invalidateQueries({ queryKey: ["/api/users/profile"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users/online-count"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-count"] });
