@@ -489,6 +489,23 @@
     "iosUpdateId": null,
     "commitBase": "1acaf21df55f1fc1fc8b3a2a3020e4b295c7d443",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/e856c2b6-c821-4f84-b0c4-0c0181fec0af",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": "30b",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-30b: fix HTML injection in email notifiche chat (escapeHtml)",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #320 fix sicurezza — aggiunto escapeHtml() in server/routes/chat.ts; senderNick e preview (testo messaggio) ora escapati prima di essere inseriti nell'HTML email. &copy; e &mdash; al posto di caratteri letterali.",
+    "updateGroupId": "2af94f11-58f9-45f1-bfee-64586865b77d",
+    "androidUpdateId": "019d40c5-85df-7201-8291-5ebb5f1761a3",
+    "iosUpdateId": null,
+    "commitBase": "c63221425adca27b1e355b8ee86ed5da23da7002",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/2af94f11-58f9-45f1-bfee-64586865b77d",
     "status": "published"
   }
 ]

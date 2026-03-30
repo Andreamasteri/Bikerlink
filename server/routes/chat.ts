@@ -5,6 +5,15 @@ import { motoClubs, motoClubMembers, users } from "@shared/schema";
 import { eq, and, ne } from "drizzle-orm";
 import { sendEmail } from "../email";
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
 const router = Router();
 
 const fakeBotMessageCounts = new Map<string, number>();
@@ -807,14 +816,16 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
             const lastLogin = targetUser.lastLoginAt ? new Date(targetUser.lastLoginAt) : null;
             const isOffline = !lastLogin || (Date.now() - lastLogin.getTime() > 15 * 60 * 1000);
             if (isOffline) {
-              const senderNick = senderUser?.nickname ?? "Un utente";
+              const senderNick = escapeHtml(senderUser?.nickname ?? "Un utente");
               let preview: string;
               if (messageType === "image") {
                 preview = "📸 ha inviato una foto";
               } else if (messageType === "location") {
                 preview = "📍 ha condiviso una posizione";
               } else {
-                preview = finalContent ? (finalContent.length > 120 ? finalContent.substring(0, 120) + "…" : finalContent) : "";
+                const rawText = finalContent ?? "";
+                const truncated = rawText.length > 120 ? rawText.substring(0, 120) + "…" : rawText;
+                preview = escapeHtml(truncated);
               }
               const html = `
                 <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:480px;margin:0 auto;padding:20px;">
@@ -830,7 +841,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
                     </p>
                   </div>
                   <p style="text-align:center;color:#666;font-size:12px;margin-top:20px;">
-                    © ${new Date().getFullYear()} BikerLink — Puoi disattivare questa notifica dal tab Chat dell'app.
+                    &copy; ${new Date().getFullYear()} BikerLink &mdash; Puoi disattivare questa notifica dal tab Chat dell'app.
                   </p>
                 </div>
               `;
