@@ -288,12 +288,12 @@ export default function MapScreen() {
 
   const nearbyLoaded = nearbyUsersQuery.isFetched || nearbyUsersQuery.isError;
 
-  // --- LIVELLO 2: contatori (dopo mappa pronta, refresh 5 minuti) ---
+  // --- LIVELLO 2: contatori (dopo mappa pronta, refresh 30s) ---
   const onlineCountQuery = useQuery<{ count: number }>({
     queryKey: ["/api/users/online-count", countriesQueryParam],
     queryFn: () => fetch(new URL(`/api/users/online-count${countriesQueryParam ? `?countries=${countriesQueryParam}` : ""}`, getApiUrl()).toString(), { credentials: "include" }).then(r => r.json()),
-    staleTime: 60000,
-    refetchInterval: 60000,
+    staleTime: 30000,
+    refetchInterval: 30000,
     refetchOnWindowFocus: true,
     enabled: isAuthenticated && mapReady && countriesLoaded,
   });
@@ -301,8 +301,8 @@ export default function MapScreen() {
   const bikerCountQuery = useQuery<{ count: number }>({
     queryKey: ["/api/users/biker-available-count", countriesQueryParam],
     queryFn: () => fetch(new URL(`/api/users/biker-available-count${countriesQueryParam ? `?countries=${countriesQueryParam}` : ""}`, getApiUrl()).toString(), { credentials: "include" }).then(r => r.json()),
-    staleTime: 60000,
-    refetchInterval: 60000,
+    staleTime: 30000,
+    refetchInterval: 30000,
     refetchOnWindowFocus: true,
     enabled: isAuthenticated && mapReady && countriesLoaded,
   });
@@ -310,8 +310,8 @@ export default function MapScreen() {
   const zavCountQuery = useQuery<{ count: number }>({
     queryKey: ["/api/users/zavorrine-available-count", countriesQueryParam],
     queryFn: () => fetch(new URL(`/api/users/zavorrine-available-count${countriesQueryParam ? `?countries=${countriesQueryParam}` : ""}`, getApiUrl()).toString(), { credentials: "include" }).then(r => r.json()),
-    staleTime: 60000,
-    refetchInterval: 60000,
+    staleTime: 30000,
+    refetchInterval: 30000,
     refetchOnWindowFocus: true,
     enabled: isAuthenticated && mapReady && countriesLoaded,
   });
