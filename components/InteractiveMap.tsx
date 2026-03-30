@@ -452,14 +452,14 @@ const styles = StyleSheet.create({
   },
   controlsContainer: {
     position: "absolute",
-    bottom: Platform.OS === "web" ? 107 : 87,
+    bottom: Platform.OS === "web" ? 111 : 91,
     right: 12,
     gap: 10,
     alignItems: "flex-end",
   },
   availabilityContainer: {
     position: "absolute",
-    bottom: Platform.OS === "web" ? 109 : 89,
+    bottom: Platform.OS === "web" ? 118 : 98,
     left: 12,
     zIndex: 10,
   },

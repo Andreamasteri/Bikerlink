@@ -301,6 +301,23 @@
     "iosUpdateId": null,
     "commitBase": "fd6ceb32f6c2d9dce291aacb922dc96920f08ef3",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/02f944d8-b325-4ace-8eca-9b8e36270834",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 20,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-20: pannelletto +9px, controlsContainer +4px, fix OTA checker robusto",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "3 fix: (1) BACKEND: rimosso filtro gte(lastLoginAt, fifteenMinutesAgo) da countAvailableBikers, countAvailableZavorrine, getAvailableBikersList, getAvailableZavorrinaList in server/storage.ts — 'disponibile' ora conta chiunque abbia isAvailable=true indipendentemente dall'ultimo login; (2) MAPPA: availabilityContainer bottom web 109→118 / native 89→98 (+9px); controlsContainer bottom web 107→111 / native 87→91 (+4px); (3) OtaStartupChecker in _layout.tsx: dopo fetchUpdateAsync() ora chiama reloadAsync() direttamente invece di aspettare isUpdatePending via useEffect — elimina race condition che impediva l'applicazione dell'OTA.",
+    "updateGroupId": "a48a2649-b0d2-4d63-817d-c405d5883535",
+    "androidUpdateId": "019d3e02-e77c-76dc-8b62-2f50a81e66b5",
+    "iosUpdateId": null,
+    "commitBase": "14f8239b7c535a7a9c45f83bd2d1408fce2885e4",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/a48a2649-b0d2-4d63-817d-c405d5883535",
     "status": "published"
   }
 ]

@@ -139,7 +139,10 @@ function OtaStartupChecker() {
         const result = await mod.checkForUpdateAsync();
         if (result.isAvailable) {
           await mod.fetchUpdateAsync();
-          // isUpdatePending diventerà true → il primo useEffect farà reloadAsync
+          if (!reloadedRef.current) {
+            reloadedRef.current = true;
+            await mod.reloadAsync();
+          }
         }
       } catch {
         // silent fail — EAS non raggiungibile o runtime mismatch

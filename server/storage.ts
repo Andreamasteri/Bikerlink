@@ -1428,13 +1428,12 @@ export class DatabaseStorage implements IStorage {
     return keys;
   }
 
-  async countAvailableBikers(since: Date, countries?: string[]): Promise<number> {
+  async countAvailableBikers(_since: Date, countries?: string[]): Promise<number> {
     const conditions: any[] = [
       eq(users.status, "active"),
       eq(userProfiles.isAvailable, true),
       or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
       eq(users.ghostMode, false),
-      gte(users.lastLoginAt, since),
     ];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const result = await db.select({ count: sql<number>`count(*)::int` })
@@ -1444,13 +1443,12 @@ export class DatabaseStorage implements IStorage {
     return result[0]?.count ?? 0;
   }
 
-  async countAvailableZavorrine(since: Date, countries?: string[]): Promise<number> {
+  async countAvailableZavorrine(_since: Date, countries?: string[]): Promise<number> {
     const conditions: any[] = [
       eq(users.status, "active"),
       eq(userProfiles.isAvailable, true),
       eq(users.userType, "zavorrina"),
       eq(users.ghostMode, false),
-      gte(users.lastLoginAt, since),
     ];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const result = await db.select({ count: sql<number>`count(*)::int` })
@@ -1460,7 +1458,7 @@ export class DatabaseStorage implements IStorage {
     return result[0]?.count ?? 0;
   }
 
-  async getAvailableBikersList(since: Date, lat?: number, lng?: number, countries?: string[]): Promise<any[]> {
+  async getAvailableBikersList(_since: Date, lat?: number, lng?: number, countries?: string[]): Promise<any[]> {
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
@@ -1469,7 +1467,6 @@ export class DatabaseStorage implements IStorage {
       eq(userProfiles.isAvailable, true),
       or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
       eq(users.ghostMode, false),
-      gte(users.lastLoginAt, since),
     ];
     if (countries && countries.length > 0) {
       conditions.push(inArray(users.country, countries));
@@ -1482,7 +1479,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(sql`distance`);
   }
 
-  async getAvailableZavorrinaList(since: Date, lat?: number, lng?: number, countries?: string[]): Promise<any[]> {
+  async getAvailableZavorrinaList(_since: Date, lat?: number, lng?: number, countries?: string[]): Promise<any[]> {
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
@@ -1491,7 +1488,6 @@ export class DatabaseStorage implements IStorage {
       eq(userProfiles.isAvailable, true),
       eq(users.userType, "zavorrina"),
       eq(users.ghostMode, false),
-      gte(users.lastLoginAt, since),
     ];
     if (countries && countries.length > 0) {
       conditions.push(inArray(users.country, countries));
