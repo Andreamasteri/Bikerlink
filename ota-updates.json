@@ -455,6 +455,23 @@
     "iosUpdateId": null,
     "commitBase": "c101724fecb5a4aab4e0fde602dbf89324870001",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/a9fa394b-2d04-4a1a-87d2-8c18d25fb239",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 29,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-29: rimuovi badge versione nativa dal profilo, lascia solo OTA",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #319 — app/(tabs)/profile.tsx: rimosso badge 'v{appVersion}' (icona phone-portrait-outline, sfondo verde); rimossa variabile appVersion; rimosso import Constants da expo-constants (non più usato). Rimane solo il badge OTA con colore rosso/verde e pulsante refresh.",
+    "updateGroupId": "00841ab0-679d-4e58-bec7-fcaa6876474e",
+    "androidUpdateId": "019d40bb-96d2-7807-9c38-ed3a3c5d7e8a",
+    "iosUpdateId": null,
+    "commitBase": "617021b3769ef0a1b322a133ee1c6c9248c17596",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/00841ab0-679d-4e58-bec7-fcaa6876474e",
     "status": "published"
   }
 ]

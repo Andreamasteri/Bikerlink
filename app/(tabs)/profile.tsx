@@ -31,7 +31,6 @@ import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMapConfig } from "@/lib/map-context";
 import { MAP_PROVIDER_LABELS, MAP_PROVIDER_DESCRIPTIONS, type MapProvider } from "@/lib/map-tiles";
-import Constants from "expo-constants";
 import * as Updates from "expo-updates";
 import otaUpdatesRaw from "@/ota-updates.json";
 
@@ -133,7 +132,6 @@ export default function ProfileScreen() {
   const [isExportingData, setIsExportingData] = useState(false);
   const [isCheckingOta, setIsCheckingOta] = useState(false);
 
-  const appVersion = Constants.expoConfig?.version ?? "1.0.0";
   const latestOta = otaUpdates.reduce<OtaUpdateEntry | null>((best, entry) => {
     if (!best || entry.updateNumber > best.updateNumber) return entry;
     return best;
@@ -559,12 +557,6 @@ export default function ProfileScreen() {
           {profile?.email ?? user?.email ?? ""}
         </Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, marginBottom: 2 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#22C55E18", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-            <Ionicons name="phone-portrait-outline" size={11} color="#22C55E" />
-            <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: "#22C55E" }}>
-              v{appVersion}
-            </Text>
-          </View>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: (isOtaUpToDate ? "#22C55E" : "#EF4444") + "18", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
             <Ionicons name="cloud-download-outline" size={11} color={isOtaUpToDate ? "#22C55E" : "#EF4444"} />
             <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: isOtaUpToDate ? "#22C55E" : "#EF4444" }}>
