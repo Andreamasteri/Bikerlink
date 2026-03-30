@@ -592,6 +592,23 @@
     "commitBase": "7b00fe2e04848fa1468a23adf8fc8ed200708ba0",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/5986f2d0-f3db-43f1-b205-8784fa6ab068",
     "requiresBackendDeploy": true,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 36,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-36: spaziatura verticale pulsante Garage/Wishlist ridotta (paddingVertical 18→8, gap 8→4)",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #327 — app/(tabs)/profile.tsx: stile garageCard: paddingVertical 18→8 e gap 8→4. Il pulsante 'Il Mio Garage' / 'La Mia Wishlist' risulta visibilmente più compatto verticalmente. Icona (76px) e testo restano centrati. Solo frontend, nessun cambio backend/DB.",
+    "updateGroupId": "24c935a3-02b6-4992-ad51-44ce0852845a",
+    "androidUpdateId": "019d411a-b61a-7f46-96c5-f0ccde8bf527",
+    "iosUpdateId": null,
+    "commitBase": "4b39d7209b462ac93f885af506452687628a70b5",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/24c935a3-02b6-4992-ad51-44ce0852845a",
     "status": "published"
   }
 ]
