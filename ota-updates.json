@@ -626,6 +626,23 @@
     "iosUpdateId": null,
     "commitBase": "86d7185f13ab973b31b4ea8483ab5632b9671594",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/0bc0b7dc-94bc-46d8-8b33-b799f6284e68",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 38,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-38: rimozione pulsante verde refresh OTA dal profilo",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #329 — app/(tabs)/profile.tsx: rimosso pulsante verde (icona refresh) accanto alla pill OTA. L'aggiornamento OTA avviene automaticamente all'avvio via OtaStartupChecker in _layout.tsx, il pulsante manuale era ridondante. Rimossi anche: stato isCheckingOta, stato confirmedUpToDate, handler handleForceOtaCheck. Pill OTA ora usa solo isOtaUpToDate (calcolato) per il colore rosso/verde. Rimossi riferimenti a confirmedUpToDate dalla pill.",
+    "updateGroupId": "TBD",
+    "androidUpdateId": "TBD",
+    "iosUpdateId": null,
+    "commitBase": "TBD",
+    "easDashboard": "TBD",
     "status": "published"
   }
 ]

@@ -130,9 +130,6 @@ export default function ProfileScreen() {
   const [isDownloadingEula, setIsDownloadingEula] = useState(false);
   const [isDownloadingPrivacy, setIsDownloadingPrivacy] = useState(false);
   const [isExportingData, setIsExportingData] = useState(false);
-  const [isCheckingOta, setIsCheckingOta] = useState(false);
-  const [confirmedUpToDate, setConfirmedUpToDate] = useState(false);
-
   const latestOta = otaUpdates.reduce<OtaUpdateEntry | null>((best, entry) => {
     if (!best || entry.updateNumber > best.updateNumber) return entry;
     return best;
@@ -146,28 +143,6 @@ export default function ProfileScreen() {
       ? false
       : currentUpdateId === latestOta?.androidUpdateId  // match esatto con il latest noto
         || !currentOtaEntry;  // non in lista = bundle più recente del JSON bundled → aggiornato
-
-  const handleForceOtaCheck = async () => {
-    if (__DEV__ || Platform.OS === "web") {
-      Alert.alert("Info", "Aggiornamenti OTA non disponibili in modalità sviluppo.");
-      return;
-    }
-    try {
-      setIsCheckingOta(true);
-      const check = await Updates.checkForUpdateAsync();
-      if (check.isAvailable) {
-        await Updates.fetchUpdateAsync();
-        await Updates.reloadAsync();
-      } else {
-        setConfirmedUpToDate(true);
-        Alert.alert("✓ Aggiornato", "Stai già usando l'ultima versione disponibile.");
-      }
-    } catch {
-      Alert.alert("Errore", "Impossibile controllare gli aggiornamenti. Controlla la connessione.");
-    } finally {
-      setIsCheckingOta(false);
-    }
-  };
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -561,9 +536,9 @@ export default function ProfileScreen() {
           {profile?.email ?? user?.email ?? ""}
         </Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, marginBottom: 2 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: (isOtaUpToDate || confirmedUpToDate ? "#22C55E" : "#EF4444") + "18", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-            <Ionicons name="cloud-download-outline" size={11} color={isOtaUpToDate || confirmedUpToDate ? "#22C55E" : "#EF4444"} />
-            <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: isOtaUpToDate || confirmedUpToDate ? "#22C55E" : "#EF4444" }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: (isOtaUpToDate ? "#22C55E" : "#EF4444") + "18", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+            <Ionicons name="cloud-download-outline" size={11} color={isOtaUpToDate ? "#22C55E" : "#EF4444"} />
+            <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: isOtaUpToDate ? "#22C55E" : "#EF4444" }}>
               {currentOtaEntry
                 ? `OTA-${currentOtaEntry.updateNumber}`
                 : latestOta
@@ -571,17 +546,6 @@ export default function ProfileScreen() {
                 : "OTA"}
             </Text>
           </View>
-          {!__DEV__ && Platform.OS !== "web" && (
-            <TouchableOpacity
-              onPress={handleForceOtaCheck}
-              disabled={isOtaUpToDate || confirmedUpToDate || isCheckingOta}
-              style={{ backgroundColor: "#22C55E", borderRadius: 12, padding: 6, alignItems: "center", justifyContent: "center", opacity: isOtaUpToDate || confirmedUpToDate ? 0.35 : 1 }}
-            >
-              {isCheckingOta
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Ionicons name="refresh" size={13} color="#fff" />}
-            </TouchableOpacity>
-          )}
         </View>
         {profile?.isPrimal === true && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
