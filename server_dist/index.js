@@ -166,6 +166,7 @@ var init_schema = __esm({
       easterEggsCollected: (0, import_pg_core.integer)("easter_eggs_collected").notNull().default(0),
       searchPreference: (0, import_pg_core.varchar)("search_preference", { length: 20 }).notNull().default("both"),
       preferredMapStyle: (0, import_pg_core.varchar)("preferred_map_style", { length: 20 }),
+      emailChatNotifications: (0, import_pg_core.boolean)("email_chat_notifications").notNull().default(false),
       adminOverrideUntil: (0, import_pg_core.timestamp)("admin_override_until"),
       updatedAt: (0, import_pg_core.timestamp)("updated_at").notNull().defaultNow()
     }, (table) => [
@@ -5582,7 +5583,7 @@ router3.get("/profile", requireAuth2, async (req, res) => {
 router3.put("/profile/dynamic", requireAuth2, async (req, res) => {
   try {
     const userId = req.session.userId;
-    const { isAvailable, latitude, longitude, searchPreference, preferredMapStyle } = req.body;
+    const { isAvailable, latitude, longitude, searchPreference, preferredMapStyle, emailChatNotifications } = req.body;
     const existingProfile = await storage.getUserProfile(userId);
     const updateData = {};
     if (typeof isAvailable === "boolean") updateData.isAvailable = isAvailable;
@@ -5596,6 +5597,7 @@ router3.put("/profile/dynamic", requireAuth2, async (req, res) => {
       }
       updateData.preferredMapStyle = preferredMapStyle;
     }
+    if (typeof emailChatNotifications === "boolean") updateData.emailChatNotifications = emailChatNotifications;
     if (isAvailable === true) {
       await storage.updateUser(userId, { ghostMode: false });
       await captureFirstAvailabilityLocation(userId, latitude, longitude, existingProfile?.latitude, existingProfile?.longitude);
@@ -9116,6 +9118,7 @@ router12.post("/conversations/:id/messages", async (req, res) => {
       isFiltered
     });
     await storage.updateConversationTimestamp(id);
+    const senderUser = await storage.getUser(userId);
     for (const p of participants) {
       if (p.userId !== userId) {
         const targetUser = await storage.getUser(p.userId);
@@ -9132,7 +9135,6 @@ router12.post("/conversations/:id/messages", async (req, res) => {
           const fakeProfile = await storage.getUserProfile(fakeUserId);
           const fakeMotoList = await storage.getUserMotorcycles(fakeUserId);
           const firstMoto = fakeMotoList[0];
-          const senderUser = await storage.getUser(userId);
           const fakeCtx = {
             nickname: targetUser.nickname,
             region: targetUser.region || void 0,
@@ -9163,6 +9165,43 @@ router12.post("/conversations/:id/messages", async (req, res) => {
               console.error("Fake bot reply error:", err);
             }
           }, delay);
+        } else if (targetUser && !senderUser?.isFake) {
+          const targetProfile = await storage.getUserProfile(p.userId);
+          if (targetProfile?.emailChatNotifications && targetUser.email) {
+            const lastLogin = targetUser.lastLoginAt ? new Date(targetUser.lastLoginAt) : null;
+            const isOffline = !lastLogin || Date.now() - lastLogin.getTime() > 15 * 60 * 1e3;
+            if (isOffline) {
+              const senderNick = senderUser?.nickname ?? "Un utente";
+              let preview;
+              if (messageType === "image") {
+                preview = "\u{1F4F8} ha inviato una foto";
+              } else if (messageType === "location") {
+                preview = "\u{1F4CD} ha condiviso una posizione";
+              } else {
+                preview = finalContent ? finalContent.length > 120 ? finalContent.substring(0, 120) + "\u2026" : finalContent : "";
+              }
+              const html = `
+                <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:480px;margin:0 auto;padding:20px;">
+                  <div style="text-align:center;margin-bottom:24px;">
+                    <h1 style="color:#FF6B35;margin:0;font-size:26px;">\u{1F3CD}\uFE0F BikerLink</h1>
+                    <p style="color:#888;font-size:13px;margin-top:4px;">U'll never ride alone</p>
+                  </div>
+                  <div style="background:#1a1a2e;border-radius:12px;padding:24px;color:#fff;">
+                    <h2 style="margin-top:0;font-size:18px;">Nuovo messaggio da ${senderNick}</h2>
+                    ${preview ? `<div style="background:#22222e;border-radius:8px;padding:14px;margin:16px 0;color:#ddd;font-size:15px;line-height:1.5;">${preview}</div>` : ""}
+                    <p style="color:#999;font-size:13px;line-height:1.5;margin-bottom:0;">
+                      Apri BikerLink per rispondere.
+                    </p>
+                  </div>
+                  <p style="text-align:center;color:#666;font-size:12px;margin-top:20px;">
+                    \xA9 ${(/* @__PURE__ */ new Date()).getFullYear()} BikerLink \u2014 Puoi disattivare questa notifica dal tab Chat dell'app.
+                  </p>
+                </div>
+              `;
+              sendEmail(targetUser.email, "Nuovo messaggio su BikerLink", html).catch(() => {
+              });
+            }
+          }
         }
       }
     }

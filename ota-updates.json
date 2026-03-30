@@ -472,6 +472,23 @@
     "iosUpdateId": null,
     "commitBase": "617021b3769ef0a1b322a133ee1c6c9248c17596",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/00841ab0-679d-4e58-bec7-fcaa6876474e",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 30,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-30: toggle notifiche email chat quando offline",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #320 — Notifiche email messaggi chat quando offline. Schema: colonna email_chat_notifications (boolean, default false) su user_profiles aggiunta via ALTER TABLE. Backend: import sendEmail in chat.ts; logica email per utenti reali offline (lastLoginAt>15min) con emailChatNotifications=true; email non inviata se sender è fake. Endpoint /api/users/profile/dynamic ora gestisce emailChatNotifications. Frontend: Switch in header chat.tsx con query /api/users/profile e PUT /api/users/profile/dynamic.",
+    "updateGroupId": "e856c2b6-c821-4f84-b0c4-0c0181fec0af",
+    "androidUpdateId": "019d40c2-94e7-7b79-915a-3f18ac3bbc62",
+    "iosUpdateId": null,
+    "commitBase": "1acaf21df55f1fc1fc8b3a2a3020e4b295c7d443",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/e856c2b6-c821-4f84-b0c4-0c0181fec0af",
     "status": "published"
   }
 ]

@@ -3,6 +3,7 @@ import { storage } from "../storage";
 import { db } from "../db";
 import { motoClubs, motoClubMembers, users } from "@shared/schema";
 import { eq, and, ne } from "drizzle-orm";
+import { sendEmail } from "../email";
 
 const router = Router();
 
@@ -748,6 +749,8 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
 
     await storage.updateConversationTimestamp(id);
 
+    const senderUser = await storage.getUser(userId);
+
     for (const p of participants) {
       if (p.userId !== userId) {
         const targetUser = await storage.getUser(p.userId);
@@ -766,7 +769,6 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
           const fakeProfile = await storage.getUserProfile(fakeUserId);
           const fakeMotoList = await storage.getUserMotorcycles(fakeUserId);
           const firstMoto = fakeMotoList[0];
-          const senderUser = await storage.getUser(userId);
           const fakeCtx: FakeUserContext = {
             nickname: targetUser.nickname,
             region: targetUser.region || undefined,
@@ -798,6 +800,43 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
               console.error("Fake bot reply error:", err);
             }
           }, delay);
+        } else if (targetUser && !senderUser?.isFake) {
+          // Notifica email se utente reale offline con preferenza attiva
+          const targetProfile = await storage.getUserProfile(p.userId);
+          if (targetProfile?.emailChatNotifications && targetUser.email) {
+            const lastLogin = targetUser.lastLoginAt ? new Date(targetUser.lastLoginAt) : null;
+            const isOffline = !lastLogin || (Date.now() - lastLogin.getTime() > 15 * 60 * 1000);
+            if (isOffline) {
+              const senderNick = senderUser?.nickname ?? "Un utente";
+              let preview: string;
+              if (messageType === "image") {
+                preview = "📸 ha inviato una foto";
+              } else if (messageType === "location") {
+                preview = "📍 ha condiviso una posizione";
+              } else {
+                preview = finalContent ? (finalContent.length > 120 ? finalContent.substring(0, 120) + "…" : finalContent) : "";
+              }
+              const html = `
+                <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:480px;margin:0 auto;padding:20px;">
+                  <div style="text-align:center;margin-bottom:24px;">
+                    <h1 style="color:#FF6B35;margin:0;font-size:26px;">🏍️ BikerLink</h1>
+                    <p style="color:#888;font-size:13px;margin-top:4px;">U'll never ride alone</p>
+                  </div>
+                  <div style="background:#1a1a2e;border-radius:12px;padding:24px;color:#fff;">
+                    <h2 style="margin-top:0;font-size:18px;">Nuovo messaggio da ${senderNick}</h2>
+                    ${preview ? `<div style="background:#22222e;border-radius:8px;padding:14px;margin:16px 0;color:#ddd;font-size:15px;line-height:1.5;">${preview}</div>` : ""}
+                    <p style="color:#999;font-size:13px;line-height:1.5;margin-bottom:0;">
+                      Apri BikerLink per rispondere.
+                    </p>
+                  </div>
+                  <p style="text-align:center;color:#666;font-size:12px;margin-top:20px;">
+                    © ${new Date().getFullYear()} BikerLink — Puoi disattivare questa notifica dal tab Chat dell'app.
+                  </p>
+                </div>
+              `;
+              sendEmail(targetUser.email, "Nuovo messaggio su BikerLink", html).catch(() => {});
+            }
+          }
         }
       }
     }

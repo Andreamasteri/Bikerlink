@@ -10,6 +10,7 @@ import {
   Modal,
   TextInput,
   Alert,
+  Switch,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native";
 import { useRouter } from "expo-router";
@@ -182,6 +183,21 @@ export default function ChatScreen() {
     enabled: showNewChat,
   });
 
+  const { data: myProfile } = useQuery<{ emailChatNotifications?: boolean }>({
+    queryKey: ["/api/users/profile"],
+  });
+
+  const emailNotifEnabled = myProfile?.emailChatNotifications ?? false;
+
+  const toggleEmailNotifMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      await apiRequest("PUT", "/api/users/profile/dynamic", { emailChatNotifications: enabled });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/profile"] });
+    },
+  });
+
   const createConversationMutation = useMutation({
     mutationFn: async (data: { conversationType: string; participantIds: string[] }) => {
       const res = await apiRequest("POST", "/api/chat/conversations", data);
@@ -253,6 +269,17 @@ export default function ChatScreen() {
   return (
     <View style={[styles.container, { paddingTop: webTopInset }]}>
       <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 16 : insets.top + 12 }]}>
+        <View style={styles.emailNotifRow}>
+          <Ionicons name="mail-outline" size={15} color={Colors.textSecondary} style={{ marginRight: 6 }} />
+          <Text style={styles.emailNotifLabel}>Avvisami via email se sei offline</Text>
+          <Switch
+            value={emailNotifEnabled}
+            onValueChange={(val) => toggleEmailNotifMutation.mutate(val)}
+            trackColor={{ false: Colors.surfaceLight, true: Colors.accent + "88" }}
+            thumbColor={emailNotifEnabled ? Colors.accent : Colors.textSecondary}
+            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+          />
+        </View>
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>{t("chat.title")}</Text>
           <TouchableOpacity onPress={() => setShowNewChat(true)} style={styles.newChatButton}>
@@ -383,6 +410,17 @@ const styles = StyleSheet.create({
   },
   newChatButton: {
     padding: 4,
+  },
+  emailNotifRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  emailNotifLabel: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
   },
   centerContent: {
     flex: 1,
