@@ -506,6 +506,23 @@
     "iosUpdateId": null,
     "commitBase": "c63221425adca27b1e355b8ee86ed5da23da7002",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/2af94f11-58f9-45f1-bfee-64586865b77d",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 31,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-31: fix badge OTA rosso/verde (confirmedUpToDate state)",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #321 — Fix colore badge OTA nel profilo. Aggiunto stato confirmedUpToDate (default false). Quando handleForceOtaCheck risponde check.isAvailable===false, setConfirmedUpToDate(true). Badge e pulsante refresh usano isOtaUpToDate||confirmedUpToDate per colore verde/rosso e stato disabilitato.",
+    "updateGroupId": "ae3e26e5-93e7-4c81-af11-b08f3e71bcc1",
+    "androidUpdateId": "019d40ee-0338-734a-9d51-21d2960b07f3",
+    "iosUpdateId": null,
+    "commitBase": "dd16c1897e96b0ab6565bfd1cb8f1919b3196eeb",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/ae3e26e5-93e7-4c81-af11-b08f3e71bcc1",
     "status": "published"
   }
 ]

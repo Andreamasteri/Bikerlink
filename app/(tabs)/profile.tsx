@@ -131,6 +131,7 @@ export default function ProfileScreen() {
   const [isDownloadingPrivacy, setIsDownloadingPrivacy] = useState(false);
   const [isExportingData, setIsExportingData] = useState(false);
   const [isCheckingOta, setIsCheckingOta] = useState(false);
+  const [confirmedUpToDate, setConfirmedUpToDate] = useState(false);
 
   const latestOta = otaUpdates.reduce<OtaUpdateEntry | null>((best, entry) => {
     if (!best || entry.updateNumber > best.updateNumber) return entry;
@@ -156,6 +157,7 @@ export default function ProfileScreen() {
         await Updates.fetchUpdateAsync();
         await Updates.reloadAsync();
       } else {
+        setConfirmedUpToDate(true);
         Alert.alert("✓ Aggiornato", "Stai già usando l'ultima versione disponibile.");
       }
     } catch {
@@ -557,17 +559,17 @@ export default function ProfileScreen() {
           {profile?.email ?? user?.email ?? ""}
         </Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, marginBottom: 2 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: (isOtaUpToDate ? "#22C55E" : "#EF4444") + "18", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-            <Ionicons name="cloud-download-outline" size={11} color={isOtaUpToDate ? "#22C55E" : "#EF4444"} />
-            <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: isOtaUpToDate ? "#22C55E" : "#EF4444" }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: (isOtaUpToDate || confirmedUpToDate ? "#22C55E" : "#EF4444") + "18", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+            <Ionicons name="cloud-download-outline" size={11} color={isOtaUpToDate || confirmedUpToDate ? "#22C55E" : "#EF4444"} />
+            <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: isOtaUpToDate || confirmedUpToDate ? "#22C55E" : "#EF4444" }}>
               {latestOta ? `OTA-${latestOta.updateNumber}` : "OTA"}
             </Text>
           </View>
           {!__DEV__ && Platform.OS !== "web" && (
             <TouchableOpacity
               onPress={handleForceOtaCheck}
-              disabled={isOtaUpToDate || isCheckingOta}
-              style={{ backgroundColor: "#22C55E", borderRadius: 12, padding: 6, alignItems: "center", justifyContent: "center", opacity: isOtaUpToDate ? 0.35 : 1 }}
+              disabled={isOtaUpToDate || confirmedUpToDate || isCheckingOta}
+              style={{ backgroundColor: "#22C55E", borderRadius: 12, padding: 6, alignItems: "center", justifyContent: "center", opacity: isOtaUpToDate || confirmedUpToDate ? 0.35 : 1 }}
             >
               {isCheckingOta
                 ? <ActivityIndicator size="small" color="#fff" />
