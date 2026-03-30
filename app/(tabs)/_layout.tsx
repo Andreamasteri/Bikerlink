@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Tabs, useRouter } from "expo-router";
+import { Tabs, useRouter, type Href } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { Platform, View, Pressable, Text, StyleSheet, Linking, Modal } from "react-native";
@@ -38,7 +38,12 @@ export default function TabLayout() {
     enabled: !!user && isBikerOrCoppia,
   });
 
-  const { data: wishlistData } = useQuery({
+  interface WishlistResponse {
+    wishlist?: { description?: string };
+    motos?: { id: number }[];
+  }
+
+  const { data: wishlistData } = useQuery<WishlistResponse>({
     queryKey: ["/api/wishlist"],
     enabled: !!user && isZavorrina,
   });
@@ -46,7 +51,7 @@ export default function TabLayout() {
   const garageIsEmpty: boolean | undefined = isBikerOrCoppia
     ? (motorcyclesData === undefined ? undefined : Array.isArray(motorcyclesData) ? motorcyclesData.length === 0 : false)
     : isZavorrina
-    ? (wishlistData === undefined ? undefined : ((wishlistData as any)?.motos?.length ?? 0) === 0)
+    ? (wishlistData === undefined ? undefined : (wishlistData.motos?.length ?? 0) === 0)
     : false;
 
   useEffect(() => {
@@ -306,7 +311,7 @@ export default function TabLayout() {
               style={reminderStyles.btn}
               onPress={() => {
                 setShowGarageReminder(false);
-                router.push("/garage" as any);
+                router.push("/garage" as Href);
               }}
             >
               <Text style={reminderStyles.btnText}>Ok</Text>

@@ -449,12 +449,12 @@
     "runtimeVersion": "1.0.0",
     "platforms": ["android"],
     "jsEngine": "hermes",
-    "note": "Task #318 — app/(tabs)/_layout.tsx: aggiunto popup Modal promemoria garage/wishlist. Query /api/motorcycles (biker/coppia) e /api/wishlist (zavorrina) abilitate post-login. setInterval 900000ms (15 min) avviato solo se garageIsEmpty===true. Modal con testo specifico per tipo utente, pulsante Ok chiude popup e naviga a /garage. Stile coerente con Colors.surface/accent. Admin e moderatori esclusi.",
-    "updateGroupId": "d546a05a-23ab-4fda-9c37-ae3d3d32022f",
-    "androidUpdateId": "019d40b4-ddb2-7fed-ac84-07b557be13f3",
+    "note": "Task #318 — app/(tabs)/_layout.tsx: aggiunto popup Modal promemoria garage/wishlist. Query /api/motorcycles (biker/coppia) e /api/wishlist (zavorrina) abilitate post-login. setInterval 900000ms (15 min) avviato solo se garageIsEmpty===true. Modal con testo specifico per tipo utente, pulsante Ok chiude popup e naviga a /garage. Stile coerente con Colors.surface/accent. Admin e moderatori esclusi. v28b: introdotto WishlistResponse interface (elimina cast any), router.push usa Href type.",
+    "updateGroupId": "a9fa394b-2d04-4a1a-87d2-8c18d25fb239",
+    "androidUpdateId": "019d40b8-776a-7baf-b553-1f921c3d1747",
     "iosUpdateId": null,
-    "commitBase": "b59f81efbec7936c29a0a3d1763965585271c6b9",
-    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/d546a05a-23ab-4fda-9c37-ae3d3d32022f",
+    "commitBase": "c101724fecb5a4aab4e0fde602dbf89324870001",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/a9fa394b-2d04-4a1a-87d2-8c18d25fb239",
     "status": "published"
   }
 ]
