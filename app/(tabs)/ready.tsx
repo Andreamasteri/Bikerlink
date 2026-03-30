@@ -42,6 +42,12 @@ export default function ReadyToRideScreen() {
   const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     async function initLocation() {
       try {
