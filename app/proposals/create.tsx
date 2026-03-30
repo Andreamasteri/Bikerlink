@@ -497,15 +497,15 @@ export default function CreateProposalScreen() {
               style={styles.input}
               value={departureAddress}
               onChangeText={setDepartureAddress}
-              placeholder="Es: Piazza del Duomo, Firenze (opzionale)"
+              placeholder="da qui...."
               placeholderTextColor={Colors.textSecondary}
             />
 
             <View style={styles.gpsStatusIndicator}>
-              {!gpsSource ? (
-                <Text style={styles.gpsStatusQuestion}>???</Text>
-              ) : (
+              {gpsSource === "live" || gpsSource === "map" ? (
                 <MaterialCommunityIcons name="thumb-up" size={20} color={Colors.success} />
+              ) : (
+                <Text style={styles.gpsStatusQuestion}>???</Text>
               )}
             </View>
 

@@ -398,12 +398,12 @@
     "runtimeVersion": "1.0.0",
     "platforms": ["android"],
     "jsEngine": "hermes",
-    "note": "Task #315 — app/proposals/create.tsx: (1) label 'Descrizione' → 'Descrizione del punto di partenza'; (2) campo partenza reso opzionale: rimosso blocco submit, fallback 'da qui....' nel payload; (3) indicatore ??? (arancio) / pollice verde (MaterialCommunityIcons thumb-up) sopra i pulsanti GPS/mappa; (4) marginTop gpsRow 8→13px (+5px); (5) icone pulsanti GPS/mappa 18→23px (+28%), paddingVertical 8→10, paddingHorizontal 14→18, fontSize 13→16; (6) label tappe hint aggiornata.",
-    "updateGroupId": "64b613fc-7b1b-4043-bd82-cd139b5f5a36",
-    "androidUpdateId": "019d40a7-4bf3-7501-8a74-922ab63d5644",
+    "note": "Task #315 — app/proposals/create.tsx: (1) label 'Descrizione' → 'Descrizione del punto di partenza'; (2) campo partenza reso opzionale: rimosso blocco submit, fallback 'da qui....' nel payload, placeholder TextInput = 'da qui....'; (3) indicatore ??? (arancio) se gpsSource !== 'live' && !== 'map'; pollice verde MaterialCommunityIcons se live|map; (4) marginTop gpsRow 8→13px (+5px); (5) icone 18→23px, paddingVertical 8→10, paddingHorizontal 14→18, fontSize 13→16; (6) label tappe hint aggiornata. v25b fix: placeholder corretto + condizione indicatore corretta.",
+    "updateGroupId": "0ab8224b-f800-4013-8cc9-a0affca2591c",
+    "androidUpdateId": "019d40a9-ec09-76dc-9c52-01805998fc6d",
     "iosUpdateId": null,
-    "commitBase": "95b8833ee01fc81bfb2986bed7a2816dc6a7ecf8",
-    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/64b613fc-7b1b-4043-bd82-cd139b5f5a36",
+    "commitBase": "dfd7292b42976904de3284f6b640abe526c69228",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/0ab8224b-f800-4013-8cc9-a0affca2591c",
     "status": "published"
   }
 ]
