@@ -1625,48 +1625,52 @@ var init_storage = __esm({
         }
         return keys;
       }
-      async countAvailableBikers(_since, countries) {
+      async countAvailableBikers(since, countries) {
         const conditions = [
           (0, import_drizzle_orm2.eq)(users.status, "active"),
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.userType, "biker"), (0, import_drizzle_orm2.eq)(users.userType, "coppia")),
-          (0, import_drizzle_orm2.eq)(users.ghostMode, false)
+          (0, import_drizzle_orm2.eq)(users.ghostMode, false),
+          (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)
         ];
         if (countries && countries.length > 0) conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
         const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)(...conditions));
         return result[0]?.count ?? 0;
       }
-      async countAvailableZavorrine(_since, countries) {
+      async countAvailableZavorrine(since, countries) {
         const conditions = [
           (0, import_drizzle_orm2.eq)(users.status, "active"),
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           (0, import_drizzle_orm2.eq)(users.userType, "zavorrina"),
-          (0, import_drizzle_orm2.eq)(users.ghostMode, false)
+          (0, import_drizzle_orm2.eq)(users.ghostMode, false),
+          (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)
         ];
         if (countries && countries.length > 0) conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
         const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)(...conditions));
         return result[0]?.count ?? 0;
       }
-      async getAvailableBikersList(_since, lat, lng, countries) {
+      async getAvailableBikersList(since, lat, lng, countries) {
         const distanceExpr = lat != null && lng != null ? import_drizzle_orm2.sql`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance") : import_drizzle_orm2.sql`0`.as("distance");
         const conditions = [
           (0, import_drizzle_orm2.eq)(users.status, "active"),
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.userType, "biker"), (0, import_drizzle_orm2.eq)(users.userType, "coppia")),
-          (0, import_drizzle_orm2.eq)(users.ghostMode, false)
+          (0, import_drizzle_orm2.eq)(users.ghostMode, false),
+          (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)
         ];
         if (countries && countries.length > 0) {
           conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
         }
         return db.select({ user: users, profile: userProfiles, distance: distanceExpr }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)(...conditions)).orderBy(import_drizzle_orm2.sql`distance`);
       }
-      async getAvailableZavorrinaList(_since, lat, lng, countries) {
+      async getAvailableZavorrinaList(since, lat, lng, countries) {
         const distanceExpr = lat != null && lng != null ? import_drizzle_orm2.sql`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance") : import_drizzle_orm2.sql`0`.as("distance");
         const conditions = [
           (0, import_drizzle_orm2.eq)(users.status, "active"),
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           (0, import_drizzle_orm2.eq)(users.userType, "zavorrina"),
-          (0, import_drizzle_orm2.eq)(users.ghostMode, false)
+          (0, import_drizzle_orm2.eq)(users.ghostMode, false),
+          (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)
         ];
         if (countries && countries.length > 0) {
           conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
