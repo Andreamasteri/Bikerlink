@@ -209,34 +209,6 @@ export default function ReadyToRideScreen() {
           )}
         </Pressable>
 
-        {sosEnabled && (
-          <View style={styles.sosRow}>
-            <Pressable
-              style={[styles.sosBtn, mySosQuery.data ? styles.sosBtnActive : null]}
-              onPress={() => {
-                if (mySosQuery.data) {
-                  Alert.alert(
-                    "Annulla SOS",
-                    "Vuoi annullare la tua richiesta SOS?",
-                    [
-                      { text: "No", style: "cancel" },
-                      { text: "Sì, annulla", style: "destructive", onPress: () => cancelSosMutation.mutate(mySosQuery.data.id) },
-                    ]
-                  );
-                } else {
-                  setShowSosModal(true);
-                }
-              }}
-            >
-              <Image source={sosLaunchIcon} style={[styles.sosIconLeft, mySosQuery.data ? styles.sosIconLeftActive : null]} resizeMode="contain" />
-              <Text style={[styles.sosLabelLeft, mySosQuery.data ? styles.sosLabelLeftActive : null]}>
-                {mySosQuery.data ? "SOS ATTIVO" : "LANCIA SOS"}
-              </Text>
-            </Pressable>
-
-          </View>
-        )}
-
         {ghostModeFeatureEnabled && (
           <View style={styles.ghostBlock}>
             <Pressable
@@ -277,6 +249,34 @@ export default function ReadyToRideScreen() {
           <Ionicons name="map" size={20} color={Colors.accent} />
           <Text style={styles.cronoBtnText}>I Miei Percorsi</Text>
         </Pressable>
+
+        {sosEnabled && (
+          <View style={styles.sosRow}>
+            <Pressable
+              style={[styles.sosBtn, mySosQuery.data ? styles.sosBtnActive : null]}
+              onPress={() => {
+                if (mySosQuery.data) {
+                  Alert.alert(
+                    "Annulla SOS",
+                    "Vuoi annullare la tua richiesta SOS?",
+                    [
+                      { text: "No", style: "cancel" },
+                      { text: "Sì, annulla", style: "destructive", onPress: () => cancelSosMutation.mutate(mySosQuery.data.id) },
+                    ]
+                  );
+                } else {
+                  setShowSosModal(true);
+                }
+              }}
+            >
+              <Image source={sosLaunchIcon} style={[styles.sosIconLeft, mySosQuery.data ? styles.sosIconLeftActive : null]} resizeMode="contain" />
+              <Text style={[styles.sosLabelLeft, mySosQuery.data ? styles.sosLabelLeftActive : null]}>
+                {mySosQuery.data ? "SOS ATTIVO" : "LANCIA SOS"}
+              </Text>
+            </Pressable>
+
+          </View>
+        )}
 
       </View>
 
