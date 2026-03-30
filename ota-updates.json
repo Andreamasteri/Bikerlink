@@ -352,6 +352,24 @@
     "iosUpdateId": null,
     "commitBase": "10f729efe620d9680b6116ae870ac8a31d14401c",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/fe7dafac-355c-46f0-b9ba-3c1bad291cb8",
-    "status": "published"
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 23,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-23: fix disponibile auto-login, rimuovi reset background",
+    "publishedAt": "2026-03-30",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "2 cambiamenti che invertono OTA-21: (1) BACKEND auth.ts: login imposta isAvailable=true (non più false) — l'utente è disponibile appena finisce il login, senza premere nessun tasto; (2) FRONTEND _layout.tsx: rimosso il blocco AppStateHandler che inviava PUT /api/users/profile/dynamic {isAvailable:false} quando l'app andava in background. Ora lo stato disponibile/non disponibile è mantenuto anche durante background, powersave, perdita temporanea dati/GPS. Il meccanismo heartbeat (15 min) gestisce il 'scompare se offline' in modo automatico. L'utente diventa non disponibile solo: (a) chiude app e dopo 15 min senza heartbeat, (b) ghost mode, (c) toggle manuale. Richiede anche redeploy backend Autoscale per produzione.",
+    "updateGroupId": "1ea0281a-ac96-4ffe-b06e-327bc9dc8351",
+    "androidUpdateId": "019d4062-c82a-7ce7-a8ab-da16d2ea3745",
+    "iosUpdateId": null,
+    "commitBase": "8ce02d1429d84df816a06297ed51ec96edd502ec",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/1ea0281a-ac96-4ffe-b06e-327bc9dc8351",
+    "status": "published",
+    "requiresBackendDeploy": true
   }
 ]

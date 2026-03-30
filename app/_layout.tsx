@@ -78,14 +78,6 @@ function AppStateHandler() {
         queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-list"] });
       }
 
-      if (prev === "active" && nextAppState.match(/inactive|background/)) {
-        apiRequest("PUT", "/api/users/profile/dynamic", { isAvailable: false }).catch(() => {});
-        queryClient.setQueryData(["/api/users/profile"], (old: unknown) => {
-          if (!old || typeof old !== "object") return old;
-          return { ...(old as Record<string, unknown>), isAvailable: false };
-        });
-      }
-
       appStateRef.current = nextAppState;
     });
 

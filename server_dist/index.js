@@ -5116,7 +5116,7 @@ router2.post("/login", loginLimiter, async (req, res) => {
     }
     const userRecord = await storage.getUser(user.id);
     if (!userRecord?.ghostMode) {
-      await storage.upsertUserProfile(user.id, { isAvailable: false }).catch((e) => {
+      await storage.upsertUserProfile(user.id, { isAvailable: true }).catch((e) => {
         console.warn("[login] upsertUserProfile failed:", e?.message);
       });
     }
