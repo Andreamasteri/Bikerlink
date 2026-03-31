@@ -301,26 +301,28 @@ export default function CreateRouteScreen() {
         </TouchableOpacity>
       </View>
 
-      <Modal visible={mapOpen} animationType="slide" presentationStyle="fullScreen">
-        <MapPickerContent
-          coord={pendingCoord}
-          onCoordChange={setPendingCoord}
-          onConfirm={handleMapConfirm}
-          onClose={() => setMapOpen(false)}
-          initialRegion={waypoints.length > 0 ? {
-            latitude: waypoints[waypoints.length - 1].latitude,
-            longitude: waypoints[waypoints.length - 1].longitude,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          } : undefined}
-          existingWaypoints={waypoints.map((wp) => ({
-            latitude: wp.latitude,
-            longitude: wp.longitude,
-            name: wp.name,
-            waypointType: wp.waypointType,
-          }))}
-        />
-      </Modal>
+      {mapOpen && (
+        <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, elevation: 9999 }}>
+          <MapPickerContent
+            coord={pendingCoord}
+            onCoordChange={setPendingCoord}
+            onConfirm={handleMapConfirm}
+            onClose={() => setMapOpen(false)}
+            initialRegion={waypoints.length > 0 ? {
+              latitude: waypoints[waypoints.length - 1].latitude,
+              longitude: waypoints[waypoints.length - 1].longitude,
+              latitudeDelta: 0.05,
+              longitudeDelta: 0.05,
+            } : undefined}
+            existingWaypoints={waypoints.map((wp) => ({
+              latitude: wp.latitude,
+              longitude: wp.longitude,
+              name: wp.name,
+              waypointType: wp.waypointType,
+            }))}
+          />
+        </View>
+      )}
 
       <Modal visible={showWaypointForm} transparent animationType="fade">
         <View style={styles.modalOverlay}>

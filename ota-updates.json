@@ -694,6 +694,23 @@
     "iosUpdateId": null,
     "commitBase": "1e884bf9a7c599d8ee8e06ec81a882d098080a5b",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/12095c42-2cf7-43f3-bea6-bae0eef1076a",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 42,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-42: fix mappa picker — View assoluta invece di Modal (touch funziona su Android)",
+    "publishedAt": "2026-03-31",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #334 — Su Android, MapView dentro Modal non riceve eventi touch onPress. Fix: in app/proposals/create.tsx e app/routes/create.tsx, il Modal che wrappava MapPickerContent è stato sostituito con un View a posizionamento assoluto (position absolute, top/left/right/bottom 0, zIndex 9999, elevation 9999) con visibilità condizionale (showMapPicker / mapOpen). MapPickerContent rimane invariato, gestisce i propri safe area insets via useSafeAreaInsets(). Rimosso Modal dagli import di proposals/create.tsx (era l'unico uso). routes/create.tsx mantiene Modal per il form tappa (showWaypointForm) e il dialogo pubblicazione (showPublishDialog).",
+    "updateGroupId": "304ff81d-6879-429d-a43e-c8b7c5bba60b",
+    "androidUpdateId": "019d454c-22e6-7f3c-8528-40c0cded5107",
+    "iosUpdateId": null,
+    "commitBase": "b28efc8f33e8bee545613a9375e10a33e27649a7",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/304ff81d-6879-429d-a43e-c8b7c5bba60b",
     "status": "published"
   }
 ]

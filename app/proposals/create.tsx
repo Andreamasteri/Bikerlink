@@ -9,7 +9,6 @@ import {
   Alert,
   ActivityIndicator,
   Switch,
-  Modal,
 } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useRouter, Stack } from "expo-router";
@@ -755,21 +754,23 @@ export default function CreateProposalScreen() {
         <View style={{ height: Platform.OS === "web" ? 34 : 40 }} />
       </KeyboardAwareScrollViewCompat>
 
-      <Modal visible={showMapPicker} animationType="slide" onRequestClose={() => setShowMapPicker(false)}>
-        <MapPickerContent
-          coord={mapPickerCoord}
-          onCoordChange={setMapPickerCoord}
-          onConfirm={() => {
-            if (mapPickerCoord) {
-              setDepartureLat(mapPickerCoord.latitude);
-              setDepartureLng(mapPickerCoord.longitude);
-              setGpsSource("map");
-            }
-            setShowMapPicker(false);
-          }}
-          onClose={() => setShowMapPicker(false)}
-        />
-      </Modal>
+      {showMapPicker && (
+        <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, elevation: 9999 }}>
+          <MapPickerContent
+            coord={mapPickerCoord}
+            onCoordChange={setMapPickerCoord}
+            onConfirm={() => {
+              if (mapPickerCoord) {
+                setDepartureLat(mapPickerCoord.latitude);
+                setDepartureLng(mapPickerCoord.longitude);
+                setGpsSource("map");
+              }
+              setShowMapPicker(false);
+            }}
+            onClose={() => setShowMapPicker(false)}
+          />
+        </View>
+      )}
     </>
   );
 }
