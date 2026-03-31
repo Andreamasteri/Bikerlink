@@ -956,7 +956,9 @@ export default function MatchScreen() {
         )}
       </View>
       {distanceMode === "km" && (myLat == null || myLng == null) && (
-        <Text style={styles.distanceWarning}>{t("match.positionUnavailable")}</Text>
+        <View style={styles.distanceWarningRow}>
+          <Text style={styles.distanceWarning}>{t("match.positionUnavailable")}</Text>
+        </View>
       )}
 
       <View style={[styles.tabRow, styles.tabRowSpaced]}>
@@ -1160,12 +1162,15 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     color: "#fff",
   },
+  distanceWarningRow: {
+    paddingHorizontal: 12,
+    paddingBottom: 4,
+  },
   distanceWarning: {
     fontSize: 11,
     fontFamily: "Inter_400Regular",
     fontStyle: "italic" as const,
     color: Colors.textSecondary,
-    marginTop: 4,
   },
   bikerInfoBanner: {
     flexDirection: "row" as const,

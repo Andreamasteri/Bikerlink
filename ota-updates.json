@@ -745,6 +745,23 @@
     "iosUpdateId": null,
     "commitBase": "6eb9fe8d24d9dd531bfc9ea9c297e51cf926d7d0",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/251d894b-5459-4844-be05-380b985376b2",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 45,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-45: polish warning km — View wrapper con paddingHorizontal allineato a distanceFilterRow",
+    "publishedAt": "2026-03-31",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Post code-review OTA-44: il reviewer ha suggerito di avvolgere il distanceWarning in una View separata per allineamento/padding coerenti con distanceFilterRow. Aggiunto stile distanceWarningRow (paddingHorizontal:12, paddingBottom:4) che replica il padding orizzontale di distanceFilterRow. Rimosso marginTop:4 da distanceWarning (ora gestito dal paddingBottom del container). Il Text mantiene lo stesso aspetto visivo ma è ora correttamente allineato con i controlli sopra.",
+    "updateGroupId": "628b6f92-12c4-43b0-b89b-04a66d8522a0",
+    "androidUpdateId": "019d4555-494a-7a08-bec9-6e3222df7b18",
+    "iosUpdateId": null,
+    "commitBase": "34ae166461b891c66eb25e3d52caede625d0ccff",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/628b6f92-12c4-43b0-b89b-04a66d8522a0",
     "status": "published"
   }
 ]
