@@ -4460,15 +4460,17 @@ async function createRegionalClubInvite(userId, region) {
     const isMember = await db.select().from(motoClubMembers).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubMembers.clubId, regionalClub.id), (0, import_drizzle_orm3.eq)(motoClubMembers.userId, userId))).limit(1);
     if (isMember.length > 0) return;
     if (user.autoJoinClubs === false) {
-      await db.insert(motoClubInvites).values({ clubId: regionalClub.id, userId, status: "pending" }).onConflictDoNothing();
-      await storage.createNotification({
-        userId,
-        title: "Invito al club regionale",
-        body: `Sei stato invitato nel club "${regionalClub.name}"`,
-        notificationType: "motoclub_invite",
-        referenceType: "motoclub",
-        referenceId: regionalClub.id
-      });
+      const inserted = await db.insert(motoClubInvites).values({ clubId: regionalClub.id, userId, status: "pending" }).onConflictDoNothing().returning({ id: motoClubInvites.id });
+      if (inserted.length > 0) {
+        await storage.createNotification({
+          userId,
+          title: "Invito al club regionale",
+          body: `Sei stato invitato nel club "${regionalClub.name}"`,
+          notificationType: "motoclub_invite",
+          referenceType: "motoclub",
+          referenceId: regionalClub.id
+        });
+      }
       return;
     }
     await db.insert(motoClubMembers).values({ clubId: regionalClub.id, userId, status: "active" });
@@ -4503,15 +4505,17 @@ async function createClubInvitesForMoto(userId, brand, model) {
       const isMember = await db.select().from(motoClubMembers).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubMembers.clubId, club.id), (0, import_drizzle_orm3.eq)(motoClubMembers.userId, userId))).limit(1);
       if (isMember.length > 0) continue;
       if (user.autoJoinClubs === false) {
-        await db.insert(motoClubInvites).values({ clubId: club.id, userId, status: "pending" }).onConflictDoNothing();
-        await storage.createNotification({
-          userId,
-          title: "Invito al club",
-          body: `Sei stato invitato nel club "${club.name}"`,
-          notificationType: "motoclub_invite",
-          referenceType: "motoclub",
-          referenceId: club.id
-        });
+        const inserted = await db.insert(motoClubInvites).values({ clubId: club.id, userId, status: "pending" }).onConflictDoNothing().returning({ id: motoClubInvites.id });
+        if (inserted.length > 0) {
+          await storage.createNotification({
+            userId,
+            title: "Invito al club",
+            body: `Sei stato invitato nel club "${club.name}"`,
+            notificationType: "motoclub_invite",
+            referenceType: "motoclub",
+            referenceId: club.id
+          });
+        }
         continue;
       }
       await db.insert(motoClubMembers).values({ clubId: club.id, userId, status: "active" });

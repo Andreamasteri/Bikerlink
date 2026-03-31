@@ -145,18 +145,21 @@ export async function createRegionalClubInvite(userId: string, region: string): 
     if (isMember.length > 0) return;
 
     if (user.autoJoinClubs === false) {
-      // Comportamento legacy: invito pending
-      await db.insert(motoClubInvites)
+      // Comportamento legacy: invito pending (notifica solo se riga creata)
+      const inserted = await db.insert(motoClubInvites)
         .values({ clubId: regionalClub.id, userId, status: "pending" })
-        .onConflictDoNothing();
-      await storage.createNotification({
-        userId,
-        title: "Invito al club regionale",
-        body: `Sei stato invitato nel club "${regionalClub.name}"`,
-        notificationType: "motoclub_invite",
-        referenceType: "motoclub",
-        referenceId: regionalClub.id,
-      });
+        .onConflictDoNothing()
+        .returning({ id: motoClubInvites.id });
+      if (inserted.length > 0) {
+        await storage.createNotification({
+          userId,
+          title: "Invito al club regionale",
+          body: `Sei stato invitato nel club "${regionalClub.name}"`,
+          notificationType: "motoclub_invite",
+          referenceType: "motoclub",
+          referenceId: regionalClub.id,
+        });
+      }
       return;
     }
 
@@ -207,18 +210,21 @@ export async function createClubInvitesForMoto(userId: string, brand: string, mo
       if (isMember.length > 0) continue;
 
       if (user.autoJoinClubs === false) {
-        // Comportamento legacy: invito pending
-        await db.insert(motoClubInvites)
+        // Comportamento legacy: invito pending (notifica solo se riga creata)
+        const inserted = await db.insert(motoClubInvites)
           .values({ clubId: club.id, userId, status: "pending" })
-          .onConflictDoNothing();
-        await storage.createNotification({
-          userId,
-          title: "Invito al club",
-          body: `Sei stato invitato nel club "${club.name}"`,
-          notificationType: "motoclub_invite",
-          referenceType: "motoclub",
-          referenceId: club.id,
-        });
+          .onConflictDoNothing()
+          .returning({ id: motoClubInvites.id });
+        if (inserted.length > 0) {
+          await storage.createNotification({
+            userId,
+            title: "Invito al club",
+            body: `Sei stato invitato nel club "${club.name}"`,
+            notificationType: "motoclub_invite",
+            referenceType: "motoclub",
+            referenceId: club.id,
+          });
+        }
         continue;
       }
 
