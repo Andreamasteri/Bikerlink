@@ -476,11 +476,11 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
 router.get("/available-list", requireAuth, async (req: Request, res: Response) => {
   try {
     const requesterId = req.session.userId!;
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
-    const allItems = await storage.getAvailableUsersList(fifteenMinutesAgo, lat, lng);
+    const allItems = await storage.getAvailableUsersList(threeMinutesAgo, lat, lng);
     const results = allItems.filter((r: any) => !blockedIds.has(r.user.id));
     const motorcyclesMap: Record<string, any[]> = {};
     for (const item of results) {
@@ -516,9 +516,9 @@ router.get("/available-list", requireAuth, async (req: Request, res: Response) =
 
 router.get("/biker-available-count", requireAuth, async (req: Request, res: Response) => {
   try {
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
-    const count = await storage.countAvailableBikers(fifteenMinutesAgo, countriesParam);
+    const count = await storage.countAvailableBikers(threeMinutesAgo, countriesParam);
     return res.json({ count });
   } catch (error) {
     console.error("Biker available count error:", error);
@@ -528,9 +528,9 @@ router.get("/biker-available-count", requireAuth, async (req: Request, res: Resp
 
 router.get("/zavorrine-available-count", requireAuth, async (req: Request, res: Response) => {
   try {
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
-    const count = await storage.countAvailableZavorrine(fifteenMinutesAgo, countriesParam);
+    const count = await storage.countAvailableZavorrine(threeMinutesAgo, countriesParam);
     return res.json({ count });
   } catch (error) {
     console.error("Zavorrine available count error:", error);
@@ -541,13 +541,13 @@ router.get("/zavorrine-available-count", requireAuth, async (req: Request, res: 
 router.get("/biker-available-list", requireAuth, async (req: Request, res: Response) => {
   try {
     const requesterId = req.session.userId!;
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
     const includeOffline = req.query.includeOffline === "true";
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
-    const onlineResultsRaw = await storage.getAvailableBikersList(fifteenMinutesAgo, lat, lng, countriesParam);
+    const onlineResultsRaw = await storage.getAvailableBikersList(threeMinutesAgo, lat, lng, countriesParam);
     const onlineResults = onlineResultsRaw.filter((r: any) => !blockedIds.has(r.user.id));
     let allResults = onlineResults;
     if (includeOffline) {
@@ -606,13 +606,13 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
 router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: Response) => {
   try {
     const requesterId = req.session.userId!;
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
     const includeOffline = req.query.includeOffline === "true";
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
-    const onlineResultsRaw = await storage.getAvailableZavorrinaList(fifteenMinutesAgo, lat, lng, countriesParam);
+    const onlineResultsRaw = await storage.getAvailableZavorrinaList(threeMinutesAgo, lat, lng, countriesParam);
     const onlineResults = onlineResultsRaw.filter((r: any) => !blockedIds.has(r.user.id));
     let allResults = onlineResults;
     if (includeOffline) {

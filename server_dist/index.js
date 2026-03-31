@@ -5875,11 +5875,11 @@ router3.get("/online-list", requireAuth2, async (req, res) => {
 router3.get("/available-list", requireAuth2, async (req, res) => {
   try {
     const requesterId = req.session.userId;
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
+    const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1e3);
     const lat = req.query.lat ? parseFloat(req.query.lat) : void 0;
     const lng = req.query.lng ? parseFloat(req.query.lng) : void 0;
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
-    const allItems = await storage.getAvailableUsersList(fifteenMinutesAgo, lat, lng);
+    const allItems = await storage.getAvailableUsersList(threeMinutesAgo, lat, lng);
     const results = allItems.filter((r) => !blockedIds.has(r.user.id));
     const motorcyclesMap = {};
     for (const item of results) {
@@ -5913,9 +5913,9 @@ router3.get("/available-list", requireAuth2, async (req, res) => {
 });
 router3.get("/biker-available-count", requireAuth2, async (req, res) => {
   try {
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
+    const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1e3);
     const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
-    const count3 = await storage.countAvailableBikers(fifteenMinutesAgo, countriesParam);
+    const count3 = await storage.countAvailableBikers(threeMinutesAgo, countriesParam);
     return res.json({ count: count3 });
   } catch (error) {
     console.error("Biker available count error:", error);
@@ -5924,9 +5924,9 @@ router3.get("/biker-available-count", requireAuth2, async (req, res) => {
 });
 router3.get("/zavorrine-available-count", requireAuth2, async (req, res) => {
   try {
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
+    const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1e3);
     const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
-    const count3 = await storage.countAvailableZavorrine(fifteenMinutesAgo, countriesParam);
+    const count3 = await storage.countAvailableZavorrine(threeMinutesAgo, countriesParam);
     return res.json({ count: count3 });
   } catch (error) {
     console.error("Zavorrine available count error:", error);
@@ -5936,13 +5936,13 @@ router3.get("/zavorrine-available-count", requireAuth2, async (req, res) => {
 router3.get("/biker-available-list", requireAuth2, async (req, res) => {
   try {
     const requesterId = req.session.userId;
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
+    const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1e3);
     const lat = req.query.lat ? parseFloat(req.query.lat) : void 0;
     const lng = req.query.lng ? parseFloat(req.query.lng) : void 0;
     const includeOffline = req.query.includeOffline === "true";
     const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
-    const onlineResultsRaw = await storage.getAvailableBikersList(fifteenMinutesAgo, lat, lng, countriesParam);
+    const onlineResultsRaw = await storage.getAvailableBikersList(threeMinutesAgo, lat, lng, countriesParam);
     const onlineResults = onlineResultsRaw.filter((r) => !blockedIds.has(r.user.id));
     let allResults = onlineResults;
     if (includeOffline) {
@@ -5993,13 +5993,13 @@ router3.get("/biker-available-list", requireAuth2, async (req, res) => {
 router3.get("/zavorrine-available-list", requireAuth2, async (req, res) => {
   try {
     const requesterId = req.session.userId;
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1e3);
+    const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1e3);
     const lat = req.query.lat ? parseFloat(req.query.lat) : void 0;
     const lng = req.query.lng ? parseFloat(req.query.lng) : void 0;
     const includeOffline = req.query.includeOffline === "true";
     const countriesParam = req.query.countries ? req.query.countries.split(",").filter(Boolean) : void 0;
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
-    const onlineResultsRaw = await storage.getAvailableZavorrinaList(fifteenMinutesAgo, lat, lng, countriesParam);
+    const onlineResultsRaw = await storage.getAvailableZavorrinaList(threeMinutesAgo, lat, lng, countriesParam);
     const onlineResults = onlineResultsRaw.filter((r) => !blockedIds.has(r.user.id));
     let allResults = onlineResults;
     if (includeOffline) {
