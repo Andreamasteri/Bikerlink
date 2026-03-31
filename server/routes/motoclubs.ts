@@ -96,6 +96,28 @@ async function seedMotoclubs() {
         });
       }
       console.log("[Motoclub] Seed brand:", SEED_BRANDS.length, "club");
+    } else {
+      // Repair: insert individual brand clubs that may be missing (e.g. BMW was absent while Ducati existed)
+      let repaired = 0;
+      for (const b of SEED_BRANDS) {
+        const existing = await db.select({ id: motoClubs.id })
+          .from(motoClubs)
+          .where(and(eq(motoClubs.clubType, "brand"), ilike(motoClubs.brandName!, b.brandName)))
+          .limit(1);
+        if (existing.length === 0) {
+          await db.insert(motoClubs).values({
+            name: b.name,
+            clubType: "brand",
+            brandName: b.brandName,
+            logoUrl: b.logoUrl ?? null,
+            isApproved: true,
+            activityScore: 0,
+          });
+          repaired++;
+          console.log("[Motoclub] Repair: aggiunto club brand mancante:", b.name);
+        }
+      }
+      if (repaired > 0) console.log("[Motoclub] Repair brand completato:", repaired, "club aggiunti");
     }
 
     if (Number(regionCount) === 0) {
@@ -111,6 +133,29 @@ async function seedMotoclubs() {
         });
       }
       console.log("[Motoclub] Seed regionali:", SEED_REGIONS.length, "club");
+    } else {
+      // Repair: insert individual region clubs that may be missing
+      let repaired = 0;
+      for (const r of SEED_REGIONS) {
+        const existing = await db.select({ id: motoClubs.id })
+          .from(motoClubs)
+          .where(and(eq(motoClubs.clubType, "region"), ilike(motoClubs.region!, r.region)))
+          .limit(1);
+        if (existing.length === 0) {
+          await db.insert(motoClubs).values({
+            name: `Motoclub ${r.region}`,
+            clubType: "region",
+            region: r.region,
+            country: "IT",
+            logoUrl: r.logoUrl,
+            isApproved: true,
+            activityScore: 0,
+          });
+          repaired++;
+          console.log("[Motoclub] Repair: aggiunto club regionale mancante:", r.region);
+        }
+      }
+      if (repaired > 0) console.log("[Motoclub] Repair regionali completato:", repaired, "club aggiunti");
     }
   } catch (e) {
     console.error("[Motoclub seed error]", e);
