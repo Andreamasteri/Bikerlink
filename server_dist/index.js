@@ -793,11 +793,11 @@ var init_storage = __esm({
         return user;
       }
       async getUserByNickname(nickname) {
-        const [user] = await db.select().from(users).where((0, import_drizzle_orm2.eq)(users.nickname, nickname)).limit(1);
+        const [user] = await db.select().from(users).where(import_drizzle_orm2.sql`LOWER(${users.nickname}) = LOWER(${nickname})`).limit(1);
         return user;
       }
       async getUserByEmail(email) {
-        const [user] = await db.select().from(users).where((0, import_drizzle_orm2.eq)(users.email, email)).limit(1);
+        const [user] = await db.select().from(users).where(import_drizzle_orm2.sql`LOWER(${users.email}) = LOWER(${email})`).limit(1);
         return user;
       }
       async createUser(data) {
@@ -4988,6 +4988,7 @@ router2.post("/register", registerLimiter, async (req, res) => {
         return res.status(400).json({ message: "Devi avere almeno 18 anni per registrarti" });
       }
     }
+    data.email = data.email.trim().toLowerCase();
     const existingEmail = await storage.getUserByEmail(data.email);
     if (existingEmail) {
       return res.status(409).json({ message: "Email gi\xE0 registrata" });
@@ -5103,7 +5104,8 @@ router2.post("/login", loginLimiter, async (req, res) => {
     if (!parsed.success) {
       return res.status(400).json({ message: parsed.error.errors[0].message });
     }
-    const { identifier, password } = parsed.data;
+    const { identifier: rawIdentifier, password } = parsed.data;
+    const identifier = rawIdentifier.trim();
     let user = await storage.getUserByEmail(identifier);
     if (!user) {
       user = await storage.getUserByNickname(identifier);

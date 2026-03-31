@@ -72,6 +72,8 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       }
     }
 
+    data.email = data.email.trim().toLowerCase();
+
     const existingEmail = await storage.getUserByEmail(data.email);
     if (existingEmail) {
       return res.status(409).json({ message: "Email già registrata" });
@@ -201,7 +203,8 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       return res.status(400).json({ message: parsed.error.errors[0].message });
     }
 
-    const { identifier, password } = parsed.data;
+    const { identifier: rawIdentifier, password } = parsed.data;
+    const identifier = rawIdentifier.trim();
 
     let user = await storage.getUserByEmail(identifier);
     if (!user) {
