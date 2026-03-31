@@ -38,12 +38,13 @@ interface Campaign {
   placement: string;
 }
 
-type TabKey = "biker" | "zavorrina" | "coppia";
+type TabKey = "biker" | "zavorrina" | "coppia" | "tutti";
 
 const TABS: { key: TabKey; label: string; icon: string; iconSet: "material" | "community" | "ionicons"; color: string }[] = [
   { key: "biker", label: "Biker", icon: "motorcycle", iconSet: "material", color: Colors.accent },
   { key: "zavorrina", label: "Zavorrine", icon: "seat-passenger", iconSet: "community", color: Colors.femaleIcon },
   { key: "coppia", label: "Coppie", icon: "people", iconSet: "material", color: Colors.coupleIcon },
+  { key: "tutti", label: "Tutti", icon: "people-outline", iconSet: "ionicons", color: Colors.textSecondary },
 ];
 
 

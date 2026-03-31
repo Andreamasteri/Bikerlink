@@ -876,7 +876,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveAdsByUserType(userType: string): Promise<AdCampaign[]> {
-    return db.select().from(adCampaigns).where(and(eq(adCampaigns.isActive, true), eq(adCampaigns.targetUserType, userType))).orderBy(asc(adCampaigns.sortOrder));
+    return db.select().from(adCampaigns).where(and(eq(adCampaigns.isActive, true), or(eq(adCampaigns.targetUserType, userType), eq(adCampaigns.targetUserType, "tutti")))).orderBy(asc(adCampaigns.sortOrder));
   }
 
   async createAdCampaign(data: InsertAdCampaign): Promise<AdCampaign> {

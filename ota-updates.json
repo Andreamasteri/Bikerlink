@@ -779,6 +779,23 @@
     "iosUpdateId": null,
     "commitBase": "d65a9654b09175b9bf7e49a1f87851c853f48fe9",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/829b69bd-5afa-4c65-b09f-162133389eb6",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 47,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-47: Fix campagne ads - aggiungi tipo Tutti (OR condition + tab admin)",
+    "publishedAt": "2026-03-31",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #341 — 2 fix: (1) BACKEND server/storage.ts getActiveAdsByUserType: la query ora usa OR(eq(targetUserType, userType), eq(targetUserType, 'tutti')) — le campagne con target 'tutti' appaiono per biker, zavorrine e coppie (in precedenza era solo eq esatto); (2) FRONTEND app/admin/ads.tsx: aggiunto quarto tab 'Tutti' (icon: people-outline ionicons, color: textSecondary) alla costante TABS e al tipo TabKey. L'admin può ora creare campagne visibili a tutti gli utenti indipendentemente dal tipo. Nessuna migrazione DB — 'tutti' è un varchar libero. Backend ricompilato e riavviato.",
+    "updateGroupId": "49efe48f-71bd-4701-af0f-942e0c030f52",
+    "androidUpdateId": "019d45cf-7607-7032-918a-26d43c0c2050",
+    "iosUpdateId": null,
+    "commitBase": "397b3a71e4e225f766b2db074ddf4e9498648fab",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/49efe48f-71bd-4701-af0f-942e0c030f52",
     "status": "published"
   }
 ]

@@ -1186,7 +1186,7 @@ var init_storage = __esm({
         return db.select().from(adCampaigns).where((0, import_drizzle_orm2.eq)(adCampaigns.isActive, true));
       }
       async getActiveAdsByUserType(userType) {
-        return db.select().from(adCampaigns).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(adCampaigns.isActive, true), (0, import_drizzle_orm2.eq)(adCampaigns.targetUserType, userType))).orderBy((0, import_drizzle_orm2.asc)(adCampaigns.sortOrder));
+        return db.select().from(adCampaigns).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(adCampaigns.isActive, true), (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(adCampaigns.targetUserType, userType), (0, import_drizzle_orm2.eq)(adCampaigns.targetUserType, "tutti")))).orderBy((0, import_drizzle_orm2.asc)(adCampaigns.sortOrder));
       }
       async createAdCampaign(data) {
         const [campaign] = await db.insert(adCampaigns).values(data).returning();
