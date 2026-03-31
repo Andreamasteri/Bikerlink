@@ -122,7 +122,7 @@ export { seedMotoclubs };
 export async function createRegionalClubInvite(userId: string, region: string): Promise<void> {
   try {
     const user = await storage.getUser(userId);
-    if (!user || user.autoJoinClubs === false) return;
+    if (!user) return;
 
     const [regionalClub] = await db.select()
       .from(motoClubs)
@@ -137,14 +137,30 @@ export async function createRegionalClubInvite(userId: string, region: string): 
 
     if (!regionalClub) return;
 
+    // Evita duplicati sia in members che in invites
     const isMember = await db.select()
       .from(motoClubMembers)
       .where(and(eq(motoClubMembers.clubId, regionalClub.id), eq(motoClubMembers.userId, userId)))
       .limit(1);
-
     if (isMember.length > 0) return;
 
-    // Auto-join diretto — nessun invito pending
+    if (user.autoJoinClubs === false) {
+      // Comportamento legacy: invito pending
+      await db.insert(motoClubInvites)
+        .values({ clubId: regionalClub.id, userId, status: "pending" })
+        .onConflictDoNothing();
+      await storage.createNotification({
+        userId,
+        title: "Invito al club regionale",
+        body: `Sei stato invitato nel club "${regionalClub.name}"`,
+        notificationType: "motoclub_invite",
+        referenceType: "motoclub",
+        referenceId: regionalClub.id,
+      });
+      return;
+    }
+
+    // Auto-join diretto
     await db.insert(motoClubMembers).values({ clubId: regionalClub.id, userId, status: "active" });
 
     let convId = regionalClub.conversationId;
@@ -171,7 +187,7 @@ export async function createRegionalClubInvite(userId: string, region: string): 
 export async function createClubInvitesForMoto(userId: string, brand: string, model: string) {
   try {
     const user = await storage.getUser(userId);
-    if (!user || user.autoJoinClubs === false) return;
+    if (!user) return;
 
     const matchingClubs = await db.select()
       .from(motoClubs)
@@ -188,10 +204,25 @@ export async function createClubInvitesForMoto(userId: string, brand: string, mo
         .from(motoClubMembers)
         .where(and(eq(motoClubMembers.clubId, club.id), eq(motoClubMembers.userId, userId)))
         .limit(1);
-
       if (isMember.length > 0) continue;
 
-      // Auto-join diretto — nessun invito pending
+      if (user.autoJoinClubs === false) {
+        // Comportamento legacy: invito pending
+        await db.insert(motoClubInvites)
+          .values({ clubId: club.id, userId, status: "pending" })
+          .onConflictDoNothing();
+        await storage.createNotification({
+          userId,
+          title: "Invito al club",
+          body: `Sei stato invitato nel club "${club.name}"`,
+          notificationType: "motoclub_invite",
+          referenceType: "motoclub",
+          referenceId: club.id,
+        });
+        continue;
+      }
+
+      // Auto-join diretto
       await db.insert(motoClubMembers).values({ clubId: club.id, userId, status: "active" });
 
       let convId = club.conversationId;
@@ -823,19 +854,34 @@ router.get("/creation-request/status", requireAuth, async (req: Request, res: Re
 router.post("/sync-garage", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
+    const user = await storage.getUser(userId);
+    if (!user) return res.status(404).json({ message: "Utente non trovato" });
 
     const before = await db.select({ c: count() })
       .from(motoClubMembers)
       .where(and(eq(motoClubMembers.userId, userId), eq(motoClubMembers.status, "active")));
     const countBefore = Number(before[0]?.c ?? 0);
 
-    const motos = await storage.getUserMotorcycles(userId);
-    for (const moto of motos) {
-      await createClubInvitesForMoto(userId, moto.brand, moto.model ?? "");
+    if (user.userType === "zavorrina") {
+      // Zavorrina: usa le moto della wishlist
+      const wishlist = await storage.getWishlist(userId);
+      if (wishlist) {
+        const wishlistMotos = await storage.getWishlistMotos(wishlist.id);
+        for (const moto of wishlistMotos) {
+          if (moto.brand) {
+            await createClubInvitesForMoto(userId, moto.brand, moto.model ?? "");
+          }
+        }
+      }
+    } else {
+      // Biker / coppia: usa le moto del garage
+      const motos = await storage.getUserMotorcycles(userId);
+      for (const moto of motos) {
+        await createClubInvitesForMoto(userId, moto.brand, moto.model ?? "");
+      }
     }
 
-    const user = await storage.getUser(userId);
-    if (user?.region) {
+    if (user.region) {
       await createRegionalClubInvite(userId, user.region);
     }
 

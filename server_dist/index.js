@@ -4448,7 +4448,7 @@ async function seedMotoclubs() {
 async function createRegionalClubInvite(userId, region) {
   try {
     const user = await storage.getUser(userId);
-    if (!user || user.autoJoinClubs === false) return;
+    if (!user) return;
     const [regionalClub] = await db.select().from(motoClubs).where(
       (0, import_drizzle_orm3.and)(
         (0, import_drizzle_orm3.eq)(motoClubs.isApproved, true),
@@ -4459,6 +4459,18 @@ async function createRegionalClubInvite(userId, region) {
     if (!regionalClub) return;
     const isMember = await db.select().from(motoClubMembers).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubMembers.clubId, regionalClub.id), (0, import_drizzle_orm3.eq)(motoClubMembers.userId, userId))).limit(1);
     if (isMember.length > 0) return;
+    if (user.autoJoinClubs === false) {
+      await db.insert(motoClubInvites).values({ clubId: regionalClub.id, userId, status: "pending" }).onConflictDoNothing();
+      await storage.createNotification({
+        userId,
+        title: "Invito al club regionale",
+        body: `Sei stato invitato nel club "${regionalClub.name}"`,
+        notificationType: "motoclub_invite",
+        referenceType: "motoclub",
+        referenceId: regionalClub.id
+      });
+      return;
+    }
     await db.insert(motoClubMembers).values({ clubId: regionalClub.id, userId, status: "active" });
     let convId = regionalClub.conversationId;
     if (!convId) convId = await createClubConversation(regionalClub.id, regionalClub.name);
@@ -4479,7 +4491,7 @@ async function createRegionalClubInvite(userId, region) {
 async function createClubInvitesForMoto(userId, brand, model) {
   try {
     const user = await storage.getUser(userId);
-    if (!user || user.autoJoinClubs === false) return;
+    if (!user) return;
     const matchingClubs = await db.select().from(motoClubs).where(
       (0, import_drizzle_orm3.and)(
         (0, import_drizzle_orm3.eq)(motoClubs.isApproved, true),
@@ -4490,6 +4502,18 @@ async function createClubInvitesForMoto(userId, brand, model) {
     for (const club of matchingClubs) {
       const isMember = await db.select().from(motoClubMembers).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubMembers.clubId, club.id), (0, import_drizzle_orm3.eq)(motoClubMembers.userId, userId))).limit(1);
       if (isMember.length > 0) continue;
+      if (user.autoJoinClubs === false) {
+        await db.insert(motoClubInvites).values({ clubId: club.id, userId, status: "pending" }).onConflictDoNothing();
+        await storage.createNotification({
+          userId,
+          title: "Invito al club",
+          body: `Sei stato invitato nel club "${club.name}"`,
+          notificationType: "motoclub_invite",
+          referenceType: "motoclub",
+          referenceId: club.id
+        });
+        continue;
+      }
       await db.insert(motoClubMembers).values({ clubId: club.id, userId, status: "active" });
       let convId = club.conversationId;
       if (!convId) convId = await createClubConversation(club.id, club.name);
@@ -4934,14 +4958,27 @@ router.get("/creation-request/status", requireAuth, async (req, res) => {
 router.post("/sync-garage", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId;
+    const user = await storage.getUser(userId);
+    if (!user) return res.status(404).json({ message: "Utente non trovato" });
     const before = await db.select({ c: (0, import_drizzle_orm3.count)() }).from(motoClubMembers).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubMembers.userId, userId), (0, import_drizzle_orm3.eq)(motoClubMembers.status, "active")));
     const countBefore = Number(before[0]?.c ?? 0);
-    const motos = await storage.getUserMotorcycles(userId);
-    for (const moto of motos) {
-      await createClubInvitesForMoto(userId, moto.brand, moto.model ?? "");
+    if (user.userType === "zavorrina") {
+      const wishlist = await storage.getWishlist(userId);
+      if (wishlist) {
+        const wishlistMotos = await storage.getWishlistMotos(wishlist.id);
+        for (const moto of wishlistMotos) {
+          if (moto.brand) {
+            await createClubInvitesForMoto(userId, moto.brand, moto.model ?? "");
+          }
+        }
+      }
+    } else {
+      const motos = await storage.getUserMotorcycles(userId);
+      for (const moto of motos) {
+        await createClubInvitesForMoto(userId, moto.brand, moto.model ?? "");
+      }
     }
-    const user = await storage.getUser(userId);
-    if (user?.region) {
+    if (user.region) {
       await createRegionalClubInvite(userId, user.region);
     }
     const after = await db.select({ c: (0, import_drizzle_orm3.count)() }).from(motoClubMembers).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubMembers.userId, userId), (0, import_drizzle_orm3.eq)(motoClubMembers.status, "active")));
