@@ -299,6 +299,8 @@ export default function AdminAds() {
             >
               {tab.iconSet === "community" ? (
                 <MaterialCommunityIcons name={tab.icon as any} size={22} color={isActive ? tab.color : Colors.textSecondary} />
+              ) : tab.iconSet === "ionicons" ? (
+                <Ionicons name={tab.icon as any} size={22} color={isActive ? tab.color : Colors.textSecondary} />
               ) : (
                 <MaterialIcons name={tab.icon as any} size={22} color={isActive ? tab.color : Colors.textSecondary} />
               )}
