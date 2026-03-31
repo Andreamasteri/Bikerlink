@@ -830,6 +830,23 @@
     "iosUpdateId": null,
     "commitBase": "54af095a2adff3f373dc552ea04baeade5e7873f",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/8557d5ff-1bee-4554-a0d3-8c5eba48cec3",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 50,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-50: Refactor modifica profilo — titolo Dettagli profilo & Foto, rimosso telefono, lista moto, sezione foto per tutti",
+    "publishedAt": "2026-03-31",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #347 — 5 fix: (1) i18n: profile.edit cambiato da 'Modifica profilo' a 'Dettagli profilo & Foto'; (2) Rimosso campo telefono da edit.tsx (stato phone, setPhone, useEffect, handleSave, interfaccia ProfileData); (3) Sezione Moto: ora mostra lista moto esistenti come card (brand + model + anno) con icona motorbike, poi pulsante testuale 'Aggiungi moto' sotto la lista; (4) Aggiunta sezione Foto per TUTTI i tipi utente (biker, coppia, zavorrina): 3 slot 100x100, slot pieno con swap/delete, slot vuoto con icona camera e 'Aggiungi foto', badge 'In attesa' se isApproved=false; (5) BACKEND: limite 3 foto esteso da solo zavorrine a tutti i tipi utente. Backend riavviato.",
+    "updateGroupId": "885a0b30-6932-4167-99d9-cd4b5c2df35b",
+    "androidUpdateId": "019d463e-e423-7fcd-aeab-bb6616893e69",
+    "iosUpdateId": null,
+    "commitBase": "c88f1958c1d1a0ba4d490d5cedefdf0a9b6650e4",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/885a0b30-6932-4167-99d9-cd4b5c2df35b",
     "status": "published"
   }
 ]

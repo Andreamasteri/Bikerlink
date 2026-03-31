@@ -75,7 +75,7 @@ const it: Record<string, string> = {
   "contest.thisWeek": "Questa settimana",
 
   "profile.title": "Profilo",
-  "profile.edit": "Modifica profilo",
+  "profile.edit": "Dettagli profilo & Foto",
   "profile.photos": "Foto",
   "profile.motorcycles": "Moto",
   "profile.stats": "Statistiche",

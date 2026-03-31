@@ -754,14 +754,12 @@ router.post("/me/photos", requireAuth, upload.single("photo"), async (req: Reque
       return res.status(404).json({ message: "Utente non trovato" });
     }
 
-    if (user.userType === "zavorrina") {
-      const count = await storage.getUserPhotoCount(userId);
-      if (count >= 3) {
-        if (req.file) {
-          fs.unlinkSync(req.file.path);
-        }
-        return res.status(400).json({ message: "Massimo 3 foto consentite per le zavorrine" });
+    const count = await storage.getUserPhotoCount(userId);
+    if (count >= 3) {
+      if (req.file) {
+        fs.unlinkSync(req.file.path);
       }
+      return res.status(400).json({ message: "Massimo 3 foto consentite" });
     }
 
     if (!req.file) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -18,14 +19,14 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
-import { apiRequest, queryClient } from "@/lib/query-client";
+import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import { EUROPEAN_COUNTRIES, getRegionsForCountry, findCountryByRegion } from "@/lib/countries-regions";
+import { showImagePickerMenu } from "@/lib/image-picker-utils";
 
 interface ProfileData {
   id: string;
   nickname: string;
   email: string;
-  phone?: string;
   userType: string;
   sex?: string;
   coupleSexConfig?: string;
@@ -37,6 +38,12 @@ interface ProfileData {
     bio?: string;
     maxPickupDistance?: number;
   };
+  photos?: Array<{
+    id: string;
+    photoUrl: string;
+    sortOrder: number;
+    isApproved: boolean;
+  }>;
   motorcycles?: Array<{
     id: string;
     brand: string;
@@ -71,7 +78,6 @@ export default function EditProfileScreen() {
   const profile = profileQuery.data;
 
   const [nickname, setNickname] = useState("");
-  const [phone, setPhone] = useState("");
   const [country, setCountry] = useState("");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [region, setRegion] = useState("");
@@ -88,10 +94,11 @@ export default function EditProfileScreen() {
   const [motoType, setMotoType] = useState("");
   const [ridingStyle, setRidingStyle] = useState("");
 
+  const [replacingSlot, setReplacingSlot] = useState<string | null>(null);
+
   useEffect(() => {
     if (profile) {
       setNickname(profile.nickname ?? "");
-      setPhone(profile.phone ?? "");
       if (profile.country) {
         setCountry(profile.country);
       } else if (profile.region) {
@@ -146,10 +153,82 @@ export default function EditProfileScreen() {
     },
   });
 
+  const uploadPhotoMutation = useMutation({
+    mutationFn: async (uri: string) => {
+      const formData = new FormData();
+      const filename = uri.split("/").pop() || "photo.jpg";
+      const ext = /\.(\w+)$/.exec(filename);
+      const mimeType = ext ? `image/${ext[1]}` : "image/jpeg";
+
+      if (Platform.OS === "web") {
+        const response = await globalThis.fetch(uri);
+        const blob = await response.blob();
+        formData.append("photo", blob, filename);
+      } else {
+        formData.append("photo", { uri, name: filename, type: mimeType } as any);
+      }
+
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/users/me/photos", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text);
+      }
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+    },
+    onError: (error: Error) => {
+      Alert.alert(t("common.error"), error.message);
+    },
+  });
+
+  const deletePhotoMutation = useMutation({
+    mutationFn: async (photoId: string) => {
+      await apiRequest("DELETE", `/api/users/me/photos/${photoId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+    },
+  });
+
+  const pickImageForSlot = useCallback((existingPhotoId?: string) => {
+    showImagePickerMenu(
+      async (uri) => {
+        if (existingPhotoId) {
+          setReplacingSlot(existingPhotoId);
+          try {
+            await apiRequest("DELETE", `/api/users/me/photos/${existingPhotoId}`);
+          } catch {}
+        }
+        uploadPhotoMutation.mutate(uri, {
+          onSettled: () => setReplacingSlot(null),
+        });
+      },
+      { aspect: [1, 1], quality: 0.8 }
+    );
+  }, []);
+
+  const handleDeletePhoto = useCallback((photoId: string) => {
+    Alert.alert(t("profile.deletePhoto"), t("profile.deletePhotoConfirm"), [
+      { text: t("common.cancel"), style: "cancel" },
+      {
+        text: t("common.delete"),
+        style: "destructive",
+        onPress: () => deletePhotoMutation.mutate(photoId),
+      },
+    ]);
+  }, []);
+
   const handleSave = () => {
     const data: Record<string, unknown> = {};
     if (nickname && nickname !== profile?.nickname) data.nickname = nickname;
-    if (phone !== (profile?.phone ?? "")) data.phone = phone || null;
     if (country !== (profile?.country ?? "")) data.country = country || null;
     if (region !== (profile?.region ?? "")) data.region = region || null;
     if (birthYear !== String(profile?.birthYear ?? "")) {
@@ -187,6 +266,8 @@ export default function EditProfileScreen() {
   const isBikerOrCoppia =
     (profile?.userType ?? user?.userType) === "biker" ||
     (profile?.userType ?? user?.userType) === "coppia";
+
+  const photos = profile?.photos ?? [];
 
   return (
     <KeyboardAvoidingView
@@ -236,19 +317,6 @@ export default function EditProfileScreen() {
               onChangeText={setNickname}
               placeholderTextColor={Colors.textSecondary}
               maxLength={50}
-            />
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>{t("auth.phone")}</Text>
-            <TextInput
-              style={styles.input}
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="+39..."
-              placeholderTextColor={Colors.textSecondary}
-              keyboardType="phone-pad"
-              maxLength={30}
             />
           </View>
 
@@ -394,20 +462,97 @@ export default function EditProfileScreen() {
           <Text style={styles.charCount}>{bio.length}/500</Text>
         </View>
 
+        <View style={styles.fieldGroup}>
+          <Text style={styles.groupTitle}>{t("profile.photos")}</Text>
+          <View style={styles.photoGrid}>
+            {[0, 1, 2].map((slotIndex) => {
+              const photo = photos[slotIndex];
+              const isUploading = uploadPhotoMutation.isPending && !photo;
+              const isReplacing = photo && replacingSlot === photo.id;
+              if (photo) {
+                const photoUri = photo.photoUrl.startsWith("http")
+                  ? photo.photoUrl
+                  : `${getApiUrl()}${photo.photoUrl}`;
+                return (
+                  <View key={photo.id} style={styles.photoItem}>
+                    <Image source={{ uri: photoUri }} style={styles.photoImage} />
+                    {isReplacing && (
+                      <View style={styles.photoOverlay}>
+                        <ActivityIndicator color="#FFFFFF" />
+                      </View>
+                    )}
+                    <View style={styles.photoActions}>
+                      <TouchableOpacity
+                        style={styles.photoActionBtn}
+                        onPress={() => pickImageForSlot(photo.id)}
+                      >
+                        <Ionicons name="swap-horizontal" size={14} color="#FFFFFF" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.photoActionBtn, { backgroundColor: "rgba(220,50,50,0.8)" }]}
+                        onPress={() => handleDeletePhoto(photo.id)}
+                      >
+                        <Ionicons name="trash" size={14} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                    {!photo.isApproved && (
+                      <View style={styles.pendingBadge}>
+                        <Text style={styles.pendingText}>In attesa</Text>
+                      </View>
+                    )}
+                    <View style={styles.slotLabel}>
+                      <Text style={styles.slotLabelText}>Foto {slotIndex + 1}</Text>
+                    </View>
+                  </View>
+                );
+              }
+              return (
+                <TouchableOpacity
+                  key={`empty-${slotIndex}`}
+                  style={styles.addPhotoSlot}
+                  onPress={() => pickImageForSlot()}
+                  activeOpacity={0.7}
+                  disabled={isUploading}
+                >
+                  {isUploading ? (
+                    <ActivityIndicator color={Colors.accent} />
+                  ) : (
+                    <>
+                      <Ionicons name="camera-outline" size={24} color={Colors.textSecondary} />
+                      <Text style={styles.addPhotoText}>Aggiungi foto</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
         {isBikerOrCoppia && (
           <View style={styles.fieldGroup}>
-            <View style={styles.groupHeader}>
-              <Text style={styles.groupTitle}>{t("profile.motorcycles")}</Text>
-              {!showAddMoto && (
-                <TouchableOpacity onPress={() => setShowAddMoto(true)}>
-                  <Ionicons
-                    name="add-circle-outline"
-                    size={24}
-                    color={Colors.accent}
-                  />
-                </TouchableOpacity>
-              )}
-            </View>
+            <Text style={styles.groupTitle}>{t("profile.motorcycles")}</Text>
+
+            {(profile?.motorcycles ?? []).length > 0 && (
+              <View style={styles.motoList}>
+                {(profile?.motorcycles ?? []).map((moto) => (
+                  <View key={moto.id} style={styles.motoCard}>
+                    <MaterialCommunityIcons
+                      name="motorbike"
+                      size={20}
+                      color={Colors.accent}
+                    />
+                    <View style={styles.motoCardInfo}>
+                      <Text style={styles.motoCardTitle}>
+                        {moto.brand} {moto.model}
+                      </Text>
+                      {moto.year && (
+                        <Text style={styles.motoCardSub}>{moto.year}</Text>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
 
             {showAddMoto && (
               <View style={styles.addMotoForm}>
@@ -540,6 +685,17 @@ export default function EditProfileScreen() {
                 </View>
               </View>
             )}
+
+            {!showAddMoto && (
+              <TouchableOpacity
+                style={styles.addMotoBtn}
+                onPress={() => setShowAddMoto(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add-circle-outline" size={18} color={Colors.accent} />
+                <Text style={styles.addMotoBtnText}>Aggiungi moto</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -548,6 +704,8 @@ export default function EditProfileScreen() {
     </KeyboardAvoidingView>
   );
 }
+
+const photoSize = 100;
 
 const styles = StyleSheet.create({
   container: {
@@ -580,12 +738,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700" as const,
     color: Colors.text,
-    marginBottom: 14,
-  },
-  groupHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     marginBottom: 14,
   },
   field: {
@@ -657,10 +809,129 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     fontWeight: "600" as const,
   },
+  photoGrid: {
+    flexDirection: "row",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  photoItem: {
+    width: photoSize,
+    height: photoSize,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  photoImage: {
+    width: "100%",
+    height: "100%",
+  },
+  photoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoActions: {
+    position: "absolute",
+    top: 5,
+    right: 5,
+    flexDirection: "row",
+    gap: 5,
+  },
+  photoActionBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  slotLabel: {
+    position: "absolute",
+    top: 5,
+    left: 5,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  slotLabelText: {
+    fontSize: 10,
+    color: "#FFFFFF",
+  },
+  pendingBadge: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    paddingVertical: 4,
+    alignItems: "center",
+  },
+  pendingText: {
+    fontSize: 10,
+    color: Colors.warning,
+    fontWeight: "600" as const,
+  },
+  addPhotoSlot: {
+    width: photoSize,
+    height: photoSize,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  addPhotoText: {
+    fontSize: 10,
+    color: Colors.textSecondary,
+  },
+  motoList: {
+    gap: 8,
+    marginBottom: 12,
+  },
+  motoCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  motoCardInfo: {
+    flex: 1,
+  },
+  motoCardTitle: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: Colors.text,
+  },
+  motoCardSub: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  addMotoBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  addMotoBtnText: {
+    fontSize: 15,
+    color: Colors.accent,
+    fontWeight: "600" as const,
+  },
   addMotoForm: {
     backgroundColor: Colors.surface,
     borderRadius: 14,
     padding: 14,
+    marginBottom: 12,
   },
   motoRow: {
     flexDirection: "row",
