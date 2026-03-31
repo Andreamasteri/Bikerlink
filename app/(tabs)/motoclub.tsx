@@ -363,6 +363,23 @@ export default function MotoclubScreen() {
     onSuccess: invalidateClubLists,
   });
 
+  const syncGarageMut = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/motoclubs/sync-garage");
+      return res.json() as Promise<{ joined: number; message: string }>;
+    },
+    onSuccess: (data) => {
+      invalidateClubLists();
+      Alert.alert(
+        data.joined > 0 ? "Club trovati!" : "Nessun club",
+        data.message
+      );
+    },
+    onError: () => {
+      Alert.alert("Errore", "Impossibile sincronizzare il garage. Riprova.");
+    },
+  });
+
   const handleJoin = useCallback(
     (clubId: string) => {
       joinMut.mutate(clubId);
@@ -564,6 +581,21 @@ export default function MotoclubScreen() {
                 count={pendingInvites.length}
                 onPress={() => setShowInvites(true)}
               />
+              {tab === "mine" && myClubs.length === 0 && (
+                <TouchableOpacity
+                  style={styles.syncBanner}
+                  onPress={() => syncGarageMut.mutate()}
+                  disabled={syncGarageMut.isPending}
+                  activeOpacity={0.8}
+                >
+                  {syncGarageMut.isPending
+                    ? <ActivityIndicator size="small" color={Colors.accent} />
+                    : <Ionicons name="sync-outline" size={18} color={Colors.accent} />}
+                  <Text style={styles.syncBannerText}>
+                    {syncGarageMut.isPending ? "Sincronizzazione..." : "Sincronizza il tuo garage con i club"}
+                  </Text>
+                </TouchableOpacity>
+              )}
               {tab === "all" && featured && !search && !filterType && !filterCountry && (
                 <FeaturedBanner
                   club={featured}
@@ -849,6 +881,19 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent + "44",
   },
   invitesText: { flex: 1, fontSize: 14, color: Colors.accent, fontFamily: "Inter_600SemiBold" },
+  syncBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: Colors.accent + "12",
+    borderRadius: 12,
+    marginHorizontal: 12,
+    marginTop: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: Colors.accent + "30",
+  },
+  syncBannerText: { flex: 1, fontSize: 13, color: Colors.accent, fontFamily: "Inter_500Medium" },
   empty: { alignItems: "center", justifyContent: "center", paddingVertical: 60, gap: 12 },
   emptyText: {
     fontSize: 14,

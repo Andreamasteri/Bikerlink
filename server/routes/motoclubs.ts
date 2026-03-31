@@ -144,23 +144,21 @@ export async function createRegionalClubInvite(userId: string, region: string): 
 
     if (isMember.length > 0) return;
 
-    const hasInvite = await db.select()
-      .from(motoClubInvites)
-      .where(and(eq(motoClubInvites.clubId, regionalClub.id), eq(motoClubInvites.userId, userId)))
-      .limit(1);
+    // Auto-join diretto — nessun invito pending
+    await db.insert(motoClubMembers).values({ clubId: regionalClub.id, userId, status: "active" });
 
-    if (hasInvite.length > 0) return;
+    let convId = regionalClub.conversationId;
+    if (!convId) convId = await createClubConversation(regionalClub.id, regionalClub.name);
+    if (convId) await addMemberToConversation(convId, userId);
 
-    await db.insert(motoClubInvites).values({
-      clubId: regionalClub.id,
-      userId,
-      status: "pending",
-    });
+    await db.update(motoClubs)
+      .set({ activityScore: sql`activity_score + 2`, updatedAt: new Date() })
+      .where(eq(motoClubs.id, regionalClub.id));
 
     await storage.createNotification({
       userId,
-      title: "Motoclub Regionale",
-      body: `Sei di ${region}? Unisciti al club "${regionalClub.name}"!`,
+      title: "Sei entrato nel club!",
+      body: `Benvenuto nel club regionale "${regionalClub.name}" 🏍️`,
       notificationType: "motoclub_invite",
       referenceType: "motoclub",
       referenceId: regionalClub.id,
@@ -186,13 +184,6 @@ export async function createClubInvitesForMoto(userId: string, brand: string, mo
       );
 
     for (const club of matchingClubs) {
-      const existing = await db.select()
-        .from(motoClubInvites)
-        .where(and(eq(motoClubInvites.clubId, club.id), eq(motoClubInvites.userId, userId)))
-        .limit(1);
-
-      if (existing.length > 0) continue;
-
       const isMember = await db.select()
         .from(motoClubMembers)
         .where(and(eq(motoClubMembers.clubId, club.id), eq(motoClubMembers.userId, userId)))
@@ -200,16 +191,21 @@ export async function createClubInvitesForMoto(userId: string, brand: string, mo
 
       if (isMember.length > 0) continue;
 
-      await db.insert(motoClubInvites).values({
-        clubId: club.id,
-        userId,
-        status: "pending",
-      });
+      // Auto-join diretto — nessun invito pending
+      await db.insert(motoClubMembers).values({ clubId: club.id, userId, status: "active" });
+
+      let convId = club.conversationId;
+      if (!convId) convId = await createClubConversation(club.id, club.name);
+      if (convId) await addMemberToConversation(convId, userId);
+
+      await db.update(motoClubs)
+        .set({ activityScore: sql`activity_score + 2`, updatedAt: new Date() })
+        .where(eq(motoClubs.id, club.id));
 
       await storage.createNotification({
         userId,
-        title: "Ehi! Motoclub",
-        body: `Ci sono altre persone con una ${brand}! Entra nel club "${club.name}"`,
+        title: "Sei entrato nel club!",
+        body: `Benvenuto nel club "${club.name}" — hai una ${brand} 🏍️`,
         notificationType: "motoclub_invite",
         referenceType: "motoclub",
         referenceId: club.id,
@@ -820,6 +816,41 @@ router.get("/creation-request/status", requireAuth, async (req: Request, res: Re
       reviewNote: request.reviewNote,
     });
   } catch (e) {
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+router.post("/sync-garage", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+
+    const before = await db.select({ c: count() })
+      .from(motoClubMembers)
+      .where(and(eq(motoClubMembers.userId, userId), eq(motoClubMembers.status, "active")));
+    const countBefore = Number(before[0]?.c ?? 0);
+
+    const motos = await storage.getUserMotorcycles(userId);
+    for (const moto of motos) {
+      await createClubInvitesForMoto(userId, moto.brand, moto.model ?? "");
+    }
+
+    const user = await storage.getUser(userId);
+    if (user?.region) {
+      await createRegionalClubInvite(userId, user.region);
+    }
+
+    const after = await db.select({ c: count() })
+      .from(motoClubMembers)
+      .where(and(eq(motoClubMembers.userId, userId), eq(motoClubMembers.status, "active")));
+    const countAfter = Number(after[0]?.c ?? 0);
+
+    const joined = countAfter - countBefore;
+    return res.json({
+      joined,
+      message: joined > 0 ? `Iscritto a ${joined} club!` : "Nessun nuovo club trovato",
+    });
+  } catch (e) {
+    console.error("[POST /sync-garage]", e);
     return res.status(500).json({ message: "Errore interno" });
   }
 });
