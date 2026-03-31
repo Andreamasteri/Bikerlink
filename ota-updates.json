@@ -728,6 +728,23 @@
     "iosUpdateId": null,
     "commitBase": "71924086952e22ad2cc1417b30970173f2a64287",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/8e2a855c-62f5-4265-98f5-5ba543b5ca97",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 44,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-44: fix campo km match — warning posizione su riga separata, minWidth/maxWidth input",
+    "publishedAt": "2026-03-31",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #338 — In match.tsx, il testo distanceWarning era dentro la View flexDirection:'row' (distanceFilterRow) insieme al TextInput e al pulsante applica. Quando myLat/myLng è null (primo login), il warning occupa spazio nella riga riducendo il TextInput (flex:1 senza vincolo di larghezza minima). Fix: estratto il distanceWarning dal Fragment dentro distanceFilterRow e spostato in un elemento autonomo subito dopo la chiusura di distanceFilterRow, con condizione {distanceMode==='km' && (myLat==null||myLng==null)}. Aggiunto minWidth:48 e maxWidth:80 a distanceKmInput come protezione aggiuntiva contro future squeeze layout.",
+    "updateGroupId": "251d894b-5459-4844-be05-380b985376b2",
+    "androidUpdateId": "019d4552-c8b0-75bb-9af5-03cb89579088",
+    "iosUpdateId": null,
+    "commitBase": "6eb9fe8d24d9dd531bfc9ea9c297e51cf926d7d0",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/251d894b-5459-4844-be05-380b985376b2",
     "status": "published"
   }
 ]

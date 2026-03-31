@@ -952,12 +952,12 @@ export default function MatchScreen() {
                 <MaterialCommunityIcons name="magnify" size={18} color={Colors.background} />
               )}
             </TouchableOpacity>
-            {(myLat == null || myLng == null) && (
-              <Text style={styles.distanceWarning}>{t("match.positionUnavailable")}</Text>
-            )}
           </>
         )}
       </View>
+      {distanceMode === "km" && (myLat == null || myLng == null) && (
+        <Text style={styles.distanceWarning}>{t("match.positionUnavailable")}</Text>
+      )}
 
       <View style={[styles.tabRow, styles.tabRowSpaced]}>
         {tabs.map((tab) => (
@@ -1134,6 +1134,8 @@ const styles = StyleSheet.create({
   },
   distanceKmInput: {
     flex: 1,
+    minWidth: 48,
+    maxWidth: 80,
     height: 34,
     backgroundColor: Colors.surface,
     borderRadius: 8,
