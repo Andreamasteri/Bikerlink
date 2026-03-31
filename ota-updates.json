@@ -813,6 +813,23 @@
     "iosUpdateId": null,
     "commitBase": "0f536cdbadcacf7b43f5982f10f4b4034550182f",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/93e808d5-f940-4d14-8800-4591963e2721",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 49,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-49: Fix sync motoclub — inviti duplicati, BMW brand matching, back button Android, plurale invito/inviti",
+    "publishedAt": "2026-03-31",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #348 — 4 fix: (1) BACKEND createRegionalClubInvite: aggiunto check su motoClubInvites prima di inserire un invito regionale — evita duplicati quando l'utente modifica il profilo più volte; (2) BACKEND createClubInvitesForMoto: stesso check anti-duplicato su motoClubInvites, più brand matching bidirezionale OR(ilike esatto, brand ilike '%name%', name ilike '%brand%') per coprire 'BMW Motorrad' vs club con brandName='BMW'; (3) FRONTEND motoclub.tsx: BackHandler Android intercetta il tasto fisico indietro quando showInvites===true e torna alla lista club invece di uscire dall'app; (4) FRONTEND motoclub.tsx: pluralizzazione corretta del banner inviti: 'Hai 1 invito in attesa' / 'Hai N inviti in attesa'. Backend riavviato.",
+    "updateGroupId": "8557d5ff-1bee-4554-a0d3-8c5eba48cec3",
+    "androidUpdateId": "019d462d-0aa3-7103-992d-77a02a204209",
+    "iosUpdateId": null,
+    "commitBase": "54af095a2adff3f373dc552ea04baeade5e7873f",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/8557d5ff-1bee-4554-a0d3-8c5eba48cec3",
     "status": "published"
   }
 ]

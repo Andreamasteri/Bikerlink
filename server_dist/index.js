@@ -4460,6 +4460,8 @@ async function createRegionalClubInvite(userId, region) {
     if (!regionalClub) return;
     const isMember = await db.select().from(motoClubMembers).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubMembers.clubId, regionalClub.id), (0, import_drizzle_orm3.eq)(motoClubMembers.userId, userId))).limit(1);
     if (isMember.length > 0) return;
+    const existingInvite = await db.select().from(motoClubInvites).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubInvites.clubId, regionalClub.id), (0, import_drizzle_orm3.eq)(motoClubInvites.userId, userId))).limit(1);
+    if (existingInvite.length > 0) return;
     if (user.autoJoinClubs === false) {
       const inserted = await db.insert(motoClubInvites).values({ clubId: regionalClub.id, userId, status: "pending" }).onConflictDoNothing().returning({ id: motoClubInvites.id });
       if (inserted.length > 0) {
@@ -4474,7 +4476,7 @@ async function createRegionalClubInvite(userId, region) {
       }
       return;
     }
-    await db.insert(motoClubMembers).values({ clubId: regionalClub.id, userId, status: "active" });
+    await db.insert(motoClubMembers).values({ clubId: regionalClub.id, userId, status: "active" }).onConflictDoNothing();
     let convId = regionalClub.conversationId;
     if (!convId) convId = await createClubConversation(regionalClub.id, regionalClub.name);
     if (convId) await addMemberToConversation(convId, userId);
@@ -4499,12 +4501,18 @@ async function createClubInvitesForMoto(userId, brand, model) {
       (0, import_drizzle_orm3.and)(
         (0, import_drizzle_orm3.eq)(motoClubs.isApproved, true),
         (0, import_drizzle_orm3.eq)(motoClubs.clubType, "brand"),
-        (0, import_drizzle_orm3.ilike)(motoClubs.brandName, brand)
+        (0, import_drizzle_orm3.or)(
+          (0, import_drizzle_orm3.ilike)(motoClubs.brandName, brand),
+          import_drizzle_orm3.sql`${motoClubs.brandName} ilike ${"%" + brand + "%"}`,
+          import_drizzle_orm3.sql`${brand} ilike '%' || ${motoClubs.brandName} || '%'`
+        )
       )
     );
     for (const club of matchingClubs) {
       const isMember = await db.select().from(motoClubMembers).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubMembers.clubId, club.id), (0, import_drizzle_orm3.eq)(motoClubMembers.userId, userId))).limit(1);
       if (isMember.length > 0) continue;
+      const existingInvite = await db.select().from(motoClubInvites).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubInvites.clubId, club.id), (0, import_drizzle_orm3.eq)(motoClubInvites.userId, userId))).limit(1);
+      if (existingInvite.length > 0) continue;
       if (user.autoJoinClubs === false) {
         const inserted = await db.insert(motoClubInvites).values({ clubId: club.id, userId, status: "pending" }).onConflictDoNothing().returning({ id: motoClubInvites.id });
         if (inserted.length > 0) {
@@ -4519,7 +4527,7 @@ async function createClubInvitesForMoto(userId, brand, model) {
         }
         continue;
       }
-      await db.insert(motoClubMembers).values({ clubId: club.id, userId, status: "active" });
+      await db.insert(motoClubMembers).values({ clubId: club.id, userId, status: "active" }).onConflictDoNothing();
       let convId = club.conversationId;
       if (!convId) convId = await createClubConversation(club.id, club.name);
       if (convId) await addMemberToConversation(convId, userId);

@@ -144,6 +144,13 @@ export async function createRegionalClubInvite(userId: string, region: string): 
       .limit(1);
     if (isMember.length > 0) return;
 
+    // Evita di ricreare inviti già esistenti (pending o declined)
+    const existingInvite = await db.select()
+      .from(motoClubInvites)
+      .where(and(eq(motoClubInvites.clubId, regionalClub.id), eq(motoClubInvites.userId, userId)))
+      .limit(1);
+    if (existingInvite.length > 0) return;
+
     if (user.autoJoinClubs === false) {
       // Comportamento legacy: invito pending (notifica solo se riga creata)
       const inserted = await db.insert(motoClubInvites)
@@ -164,7 +171,9 @@ export async function createRegionalClubInvite(userId: string, region: string): 
     }
 
     // Auto-join diretto
-    await db.insert(motoClubMembers).values({ clubId: regionalClub.id, userId, status: "active" });
+    await db.insert(motoClubMembers)
+      .values({ clubId: regionalClub.id, userId, status: "active" })
+      .onConflictDoNothing();
 
     let convId = regionalClub.conversationId;
     if (!convId) convId = await createClubConversation(regionalClub.id, regionalClub.name);
@@ -198,7 +207,11 @@ export async function createClubInvitesForMoto(userId: string, brand: string, mo
         and(
           eq(motoClubs.isApproved, true),
           eq(motoClubs.clubType, "brand"),
-          ilike(motoClubs.brandName!, brand)
+          or(
+            ilike(motoClubs.brandName!, brand),
+            sql`${motoClubs.brandName} ilike ${'%' + brand + '%'}`,
+            sql`${brand} ilike '%' || ${motoClubs.brandName} || '%'`
+          )
         )
       );
 
@@ -208,6 +221,13 @@ export async function createClubInvitesForMoto(userId: string, brand: string, mo
         .where(and(eq(motoClubMembers.clubId, club.id), eq(motoClubMembers.userId, userId)))
         .limit(1);
       if (isMember.length > 0) continue;
+
+      // Evita di ricreare inviti già esistenti (pending o declined)
+      const existingInvite = await db.select()
+        .from(motoClubInvites)
+        .where(and(eq(motoClubInvites.clubId, club.id), eq(motoClubInvites.userId, userId)))
+        .limit(1);
+      if (existingInvite.length > 0) continue;
 
       if (user.autoJoinClubs === false) {
         // Comportamento legacy: invito pending (notifica solo se riga creata)
@@ -229,7 +249,9 @@ export async function createClubInvitesForMoto(userId: string, brand: string, mo
       }
 
       // Auto-join diretto
-      await db.insert(motoClubMembers).values({ clubId: club.id, userId, status: "active" });
+      await db.insert(motoClubMembers)
+        .values({ clubId: club.id, userId, status: "active" })
+        .onConflictDoNothing();
 
       let convId = club.conversationId;
       if (!convId) convId = await createClubConversation(club.id, club.name);

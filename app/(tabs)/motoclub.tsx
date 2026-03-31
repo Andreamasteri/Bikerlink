@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Platform,
   Alert,
+  BackHandler,
 } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -226,7 +227,7 @@ function InvitesBanner({
     <TouchableOpacity style={styles.invitesBanner} onPress={onPress} activeOpacity={0.85}>
       <Ionicons name="mail" size={18} color={Colors.accent} />
       <Text style={styles.invitesText}>
-        Hai {count} invito{count > 1 ? " in attesa" : ""}
+        Hai {count} {count === 1 ? "invito" : "inviti"} in attesa
       </Text>
       <Ionicons name="chevron-forward" size={16} color={Colors.accent} />
     </TouchableOpacity>
@@ -268,6 +269,15 @@ export default function MotoclubScreen() {
   const [filterCountry, setFilterCountry] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [showInvites, setShowInvites] = useState(false);
+
+  useEffect(() => {
+    if (!showInvites) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      setShowInvites(false);
+      return true;
+    });
+    return () => sub.remove();
+  }, [showInvites]);
 
   const clubsUrl = React.useMemo(() => {
     const p = new URLSearchParams();
