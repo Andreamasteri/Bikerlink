@@ -124,6 +124,7 @@ export default function VerifyEmailScreen() {
 
         <Text style={styles.subtitle}>Abbiamo inviato un codice di verifica a</Text>
         <Text style={styles.emailText}>{email}</Text>
+        <Text style={styles.emailWarning}>Attenzione, se non ti è arrivato il messaggio, controlla che l'email inserita sia corretta</Text>
         <Text style={styles.spamHint}>Controlla anche la cartella spam.</Text>
 
         {error ? (
@@ -204,7 +205,8 @@ const styles = StyleSheet.create({
   },
   warnText: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 13, color: "#F59E0B", lineHeight: 18 },
   subtitle: { fontFamily: "Inter_400Regular", fontSize: 15, color: Colors.textSecondary, textAlign: "center" },
-  emailText: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: Colors.accent, textAlign: "center", marginBottom: 4 },
+  emailText: { fontFamily: "Inter_700Bold", fontSize: 30, color: Colors.text, textAlign: "center", marginBottom: 8 },
+  emailWarning: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, textAlign: "center", textDecorationLine: "underline", marginBottom: 4 },
   spamHint: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, textAlign: "center", marginBottom: 24 },
   errorBanner: {
     flexDirection: "row", alignItems: "center", gap: 8,

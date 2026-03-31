@@ -1058,7 +1058,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceLight,
   },
   typeLabel: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
     color: Colors.textSecondary,
   },
@@ -1113,7 +1113,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     paddingHorizontal: 14,
-    height: 52,
+    height: 58,
   },
   inputIcon: {
     marginRight: 10,
@@ -1121,7 +1121,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     color: Colors.text,
-    fontSize: 15,
+    fontSize: 17,
     fontFamily: "Inter_400Regular",
     height: "100%",
   },
@@ -1148,8 +1148,8 @@ const styles = StyleSheet.create({
   privacyNoticeText: {
     flex: 1,
     color: Colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 14,
+    lineHeight: 20,
   },
   phoneRow: {
     flexDirection: "row",
@@ -1163,7 +1163,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     paddingHorizontal: 12,
-    height: 52,
+    height: 58,
     gap: 4,
   },
   prefixText: {
@@ -1180,12 +1180,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     paddingHorizontal: 14,
-    height: 52,
+    height: 58,
   },
   phoneInput: {
     flex: 1,
     color: Colors.text,
-    fontSize: 15,
+    fontSize: 17,
     fontFamily: "Inter_400Regular",
     height: "100%",
   },
@@ -1324,7 +1324,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: Colors.error,
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: "Inter_400Regular",
     flex: 1,
   },
@@ -1410,7 +1410,7 @@ const styles = StyleSheet.create({
   },
   inviteBannerMessage: {
     color: Colors.text,
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: "Inter_400Regular",
     lineHeight: 18,
   },
