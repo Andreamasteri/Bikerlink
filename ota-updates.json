@@ -677,6 +677,23 @@
     "iosUpdateId": null,
     "commitBase": "4e641ed5ecd91c9da044e16e2476bc739c75dad4",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/591a62b9-1f71-4e96-ae6a-da99e6b47fab",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 41,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-41: fix pallino selezione mappa nel profilo (carto_dark→carto_light)",
+    "publishedAt": "2026-03-31",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #336 — profile.tsx: calcolo currentStyle nella sezione 'Stile Mappa' ora normalizza carto_dark → carto_light. Il toggle light/dark sulla mappa salva 'carto_dark' nel DB, ma le opzioni mostrate nel profilo sono solo [esri_gray, carto_light]; prima del fix nessuna opzione mostrava il pallino arancione. Fix: rawStyle = preferredMapStyle; currentStyle = (!rawStyle || rawStyle === 'carto_dark') ? 'carto_light' : rawStyle. Copre anche il caso null/undefined (nuovi utenti).",
+    "updateGroupId": "12095c42-2cf7-43f3-bea6-bae0eef1076a",
+    "androidUpdateId": "019d4543-1a77-74cc-bc74-1528409cc44e",
+    "iosUpdateId": null,
+    "commitBase": "1e884bf9a7c599d8ee8e06ec81a882d098080a5b",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/12095c42-2cf7-43f3-bea6-bae0eef1076a",
     "status": "published"
   }
 ]
