@@ -424,12 +424,12 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
     if (includeOffline) {
       const { db } = await import("../db");
       const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
-      const { eq, and, lt, or, isNull, inArray: inArr } = await import("drizzle-orm");
+      const { eq, and, lt, or, isNull, inArray: inArr, notInArray: notInArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null
         ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
         : sqlTag<number>`0`.as("distance");
-      const offlineConds: any[] = [eq(usersTable.status, "active"), or(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt)), eq(usersTable.ghostMode, false)];
+      const offlineConds: any[] = [eq(usersTable.status, "active"), or(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt)), eq(usersTable.ghostMode, false), notInArr(usersTable.role, ["admin", "moderatore"])];
       if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
       const offlineResults = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
