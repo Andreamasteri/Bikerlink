@@ -1272,7 +1272,7 @@ var init_storage = __esm({
         const conditions = [
           (0, import_drizzle_orm2.eq)(users.status, "active"),
           (0, import_drizzle_orm2.eq)(users.ghostMode, false),
-          (0, import_drizzle_orm2.notInArray)(users.role, ["admin", "moderator"]),
+          (0, import_drizzle_orm2.notInArray)(users.role, ["admin", "moderator", "moderatore"]),
           import_drizzle_orm2.sql`${userProfiles.latitude} IS NOT NULL`,
           import_drizzle_orm2.sql`${userProfiles.longitude} IS NOT NULL`
         ];
@@ -1340,7 +1340,7 @@ var init_storage = __esm({
       }
       async getOnlineUsersList(since, lat, lng, countries) {
         const distanceExpr = lat != null && lng != null ? import_drizzle_orm2.sql`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance") : import_drizzle_orm2.sql`0`.as("distance");
-        const conditions = [(0, import_drizzle_orm2.eq)(users.status, "active"), (0, import_drizzle_orm2.gte)(users.lastLoginAt, since), (0, import_drizzle_orm2.eq)(users.ghostMode, false), (0, import_drizzle_orm2.notInArray)(users.role, ["admin", "moderator"])];
+        const conditions = [(0, import_drizzle_orm2.eq)(users.status, "active"), (0, import_drizzle_orm2.gte)(users.lastLoginAt, since), (0, import_drizzle_orm2.eq)(users.ghostMode, false), (0, import_drizzle_orm2.notInArray)(users.role, ["admin", "moderator", "moderatore"])];
         if (countries && countries.length > 0) {
           conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
         }
@@ -5835,7 +5835,7 @@ router3.get("/online-list", requireAuth2, async (req, res) => {
       const { eq: eq11, and: and9, lt, or: or4, isNull: isNull2, inArray: inArr, notInArray: notInArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const offlineConds = [eq11(usersTable.status, "active"), or4(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull2(usersTable.lastLoginAt)), eq11(usersTable.ghostMode, false), notInArr(usersTable.role, ["admin", "moderator"])];
+      const offlineConds = [eq11(usersTable.status, "active"), or4(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull2(usersTable.lastLoginAt)), eq11(usersTable.ghostMode, false), notInArr(usersTable.role, ["admin", "moderator", "moderatore"])];
       if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
       const offlineResults = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(usersTable).leftJoin(profilesTable, eq11(profilesTable.userId, usersTable.id)).where(and9(...offlineConds)).orderBy(sqlTag`distance`);
       const offlineOnly = offlineResults.filter((r) => !onlineIdSet.has(r.user.id) && !blockedIds.has(r.user.id));

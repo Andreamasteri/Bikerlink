@@ -984,7 +984,7 @@ export class DatabaseStorage implements IStorage {
     const conditions = [
       eq(users.status, "active"),
       eq(users.ghostMode, false),
-      notInArray(users.role, ["admin", "moderator"]),
+      notInArray(users.role, ["admin", "moderator", "moderatore"]),
       sql`${userProfiles.latitude} IS NOT NULL`,
       sql`${userProfiles.longitude} IS NOT NULL`,
     ];
@@ -1074,7 +1074,7 @@ export class DatabaseStorage implements IStorage {
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
-    const conditions: any[] = [eq(users.status, "active"), gte(users.lastLoginAt, since), eq(users.ghostMode, false), notInArray(users.role, ["admin", "moderator"])];
+    const conditions: any[] = [eq(users.status, "active"), gte(users.lastLoginAt, since), eq(users.ghostMode, false), notInArray(users.role, ["admin", "moderator", "moderatore"])];
     if (countries && countries.length > 0) {
       conditions.push(inArray(users.country, countries));
     }
