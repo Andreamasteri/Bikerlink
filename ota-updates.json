@@ -762,6 +762,23 @@
     "iosUpdateId": null,
     "commitBase": "34ae166461b891c66eb25e3d52caede625d0ccff",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/628b6f92-12c4-43b0-b89b-04a66d8522a0",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 46,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-46: migliora leggibilità form registrazione e verifica email (Task #339)",
+    "publishedAt": "2026-03-31",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #339 — register.tsx: inputWrapper height 52→58, input/phoneInput fontSize 15→17, prefixButton/phoneInputWrapper height 52→58, errorText/typeLabel/privacyNoticeText/inviteBannerMessage fontSize 13→14, privacyNoticeText lineHeight 19→20. verify-email.tsx: emailText fontFamily Inter_600SemiBold→Inter_700Bold, fontSize 15→30, color accent→text, marginBottom 4→8; aggiunto emailWarning style (fontSize 13, textSecondary, underline) e testo di avviso sotto l'email per suggerire di controllare la casella se il messaggio non arriva.",
+    "updateGroupId": "829b69bd-5afa-4c65-b09f-162133389eb6",
+    "androidUpdateId": "019d457a-a8ab-78df-8d8f-bf9e23841479",
+    "iosUpdateId": null,
+    "commitBase": "d65a9654b09175b9bf7e49a1f87851c853f48fe9",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/829b69bd-5afa-4c65-b09f-162133389eb6",
     "status": "published"
   }
 ]
