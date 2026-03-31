@@ -13,6 +13,7 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQueryClient } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 
@@ -21,6 +22,7 @@ const RESEND_COOLDOWN = 60;
 export default function VerifyEmailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const { email } = useLocalSearchParams<{ email: string }>();
 
   const [token, setToken] = useState("");
@@ -61,7 +63,9 @@ export default function VerifyEmailScreen() {
     setError("");
     setIsVerifying(true);
     try {
-      await apiRequest("POST", "/api/auth/verify-email", { email, token: token.trim() });
+      const res = await apiRequest("POST", "/api/auth/verify-email", { email, token: token.trim() });
+      const userData = await res.json();
+      queryClient.setQueryData(["/api/auth/me"], userData);
       router.replace("/(tabs)");
     } catch (err: any) {
       const msg = err?.message || "Errore durante la verifica";
