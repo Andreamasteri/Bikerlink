@@ -660,6 +660,23 @@
     "iosUpdateId": null,
     "commitBase": "d6be0c4f6dedfb122113fab96f754599ee21b622",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/0a3e14f9-a0d4-4b00-80d5-2748d8f849c0",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 40,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-40: icona garage bicicletta → moto (motorbike)",
+    "publishedAt": "2026-03-31",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #333 — garage.tsx: importato MaterialCommunityIcons; sostituiti tutti i riferimenti a Ionicons bicycle/bicycle-outline con MaterialCommunityIcons motorbike (size 14 nel chip tipo moto, size 28 nel card lista moto, size 64 nello stato vuoto garage).",
+    "updateGroupId": "591a62b9-1f71-4e96-ae6a-da99e6b47fab",
+    "androidUpdateId": "019d4532-5b2a-7cd6-93f5-1736920fc081",
+    "iosUpdateId": null,
+    "commitBase": "4e641ed5ecd91c9da044e16e2476bc739c75dad4",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/591a62b9-1f71-4e96-ae6a-da99e6b47fab",
     "status": "published"
   }
 ]

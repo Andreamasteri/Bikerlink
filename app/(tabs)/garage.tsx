@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
@@ -250,7 +250,7 @@ function WishlistScreen() {
                   <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
                     {moto.motorcycleType && (
                       <View style={styles.detailChip}>
-                        <Ionicons name="bicycle-outline" size={14} color={Colors.textSecondary} />
+                        <MaterialCommunityIcons name="motorbike" size={14} color={Colors.textSecondary} />
                         <Text style={styles.detailText}>{getMotoTypeLabel(moto.motorcycleType)}</Text>
                       </View>
                     )}
@@ -512,7 +512,7 @@ function GarageContent() {
     return (
       <Pressable style={styles.card} onPress={() => openEdit(item)}>
         <View style={styles.cardHeader}>
-          <Ionicons name="bicycle" size={28} color={Colors.accent} />
+          <MaterialCommunityIcons name="motorbike" size={28} color={Colors.accent} />
           <View style={styles.cardInfo}>
             <Text style={styles.motoName}>{displayName}</Text>
             <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
@@ -577,7 +577,7 @@ function GarageContent() {
           refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} tintColor={Colors.accent} />}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="bicycle" size={64} color={Colors.textSecondary} />
+              <MaterialCommunityIcons name="motorbike" size={64} color={Colors.textSecondary} />
               <Text style={styles.emptyText}>{t("garage.noMotoInGarage")}</Text>
               <Text style={styles.emptySubtext}>{t("garage.addFirstMoto")}</Text>
             </View>
