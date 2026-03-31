@@ -139,6 +139,7 @@ export default function SynecoAd({ displayMode = "banner", queryKey = "/api/ads/
   const { data: campaigns } = useQuery<AdCampaign[]>({
     queryKey: [queryKey],
     staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
     retry: 1,
   });
 

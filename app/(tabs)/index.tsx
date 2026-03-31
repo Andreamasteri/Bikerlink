@@ -346,6 +346,7 @@ export default function MapScreen() {
   const myAdsQuery = useQuery<any[]>({
     queryKey: ["/api/ads/my-ads"],
     staleTime: 60000,
+    refetchInterval: 5 * 60 * 1000,
     enabled: isAuthenticated && adsGloballyEnabled && nearbyLoaded,
   });
 

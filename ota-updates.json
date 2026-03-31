@@ -796,6 +796,23 @@
     "iosUpdateId": null,
     "commitBase": "397b3a71e4e225f766b2db074ddf4e9498648fab",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/49efe48f-71bd-4701-af0f-942e0c030f52",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 48,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-48: Auto-refresh campagne ads ogni 5 min (refetchInterval)",
+    "publishedAt": "2026-03-31",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #342 — Le campagne ads ora si aggiornano automaticamente ogni 5 minuti senza riavviare l'app. Fix in 2 punti: (1) app/(tabs)/index.tsx: aggiunto refetchInterval: 5*60*1000 alla myAdsQuery (che aveva staleTime: 60000 ma nessun refetchInterval); (2) components/SynecoAd.tsx: aggiunto refetchInterval: 5*60*1000 alla query del componente (che aveva staleTime: 5*60*1000 ma nessun refetchInterval). Entrambe le query ora ricaricano le campagne in background ogni 5 minuti silenziosamente. Nessun cambio backend, nessuna migrazione.",
+    "updateGroupId": "93e808d5-f940-4d14-8800-4591963e2721",
+    "androidUpdateId": "019d45de-bdc5-7a28-8c01-2558775b4b50",
+    "iosUpdateId": null,
+    "commitBase": "0f536cdbadcacf7b43f5982f10f4b4034550182f",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/93e808d5-f940-4d14-8800-4591963e2721",
     "status": "published"
   }
 ]
