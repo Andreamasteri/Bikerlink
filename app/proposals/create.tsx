@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Switch,
+  BackHandler,
 } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useRouter, Stack } from "expo-router";
@@ -94,6 +95,15 @@ export default function CreateProposalScreen() {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
   const [mapPickerCoord, setMapPickerCoord] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  useEffect(() => {
+    if (!showMapPicker) return;
+    const handler = BackHandler.addEventListener("hardwareBackPress", () => {
+      setShowMapPicker(false);
+      return true;
+    });
+    return () => handler.remove();
+  }, [showMapPicker]);
 
   useEffect(() => {
     const profileLat = (user as any)?.profileLatitude;

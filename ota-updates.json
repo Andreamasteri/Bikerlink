@@ -711,6 +711,23 @@
     "iosUpdateId": null,
     "commitBase": "b28efc8f33e8bee545613a9375e10a33e27649a7",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/304ff81d-6879-429d-a43e-c8b7c5bba60b",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 43,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-43: fix back button su mappa picker — BackHandler chiude overlay invece di navigare",
+    "publishedAt": "2026-03-31",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Fix post code-review di OTA-42: il Modal originale aveva onRequestClose che gestiva il tasto hardware back di Android. Sostituendo con View assoluta, questo comportamento andava replicato manualmente. Aggiunto useEffect con BackHandler.addEventListener('hardwareBackPress') in proposals/create.tsx (chiude showMapPicker) e routes/create.tsx (chiude mapOpen). Il BackHandler è attivo solo quando l'overlay è aperto (early return se !showMapPicker / !mapOpen), si auto-rimuove al chiudersi. Aggiunti import BackHandler (in entrambi) e useEffect (routes/create.tsx che non lo aveva). Retrocompatibile: BackHandler è no-op su iOS e web.",
+    "updateGroupId": "8e2a855c-62f5-4265-98f5-5ba543b5ca97",
+    "androidUpdateId": "019d454f-eb4d-7610-ae0c-174f4c117c85",
+    "iosUpdateId": null,
+    "commitBase": "71924086952e22ad2cc1417b30970173f2a64287",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/8e2a855c-62f5-4265-98f5-5ba543b5ca97",
     "status": "published"
   }
 ]

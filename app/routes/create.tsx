@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  BackHandler,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
@@ -54,6 +55,16 @@ export default function CreateRouteScreen() {
   const [mapOpen, setMapOpen] = useState(false);
   const [pendingCoord, setPendingCoord] = useState<{ latitude: number; longitude: number } | null>(null);
   const [editingWaypointIndex, setEditingWaypointIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!mapOpen) return;
+    const handler = BackHandler.addEventListener("hardwareBackPress", () => {
+      setMapOpen(false);
+      return true;
+    });
+    return () => handler.remove();
+  }, [mapOpen]);
+
   const [waypointName, setWaypointName] = useState("");
   const [waypointDesc, setWaypointDesc] = useState("");
   const [waypointType, setWaypointType] = useState("stop");
