@@ -5591,6 +5591,9 @@ router3.put("/me", requireAuth2, async (req, res) => {
         }
       }
       await storage.updateUser(userId, userUpdate);
+      if (req.body.region !== void 0 && typeof userUpdate.region === "string" && userUpdate.region.trim()) {
+        createRegionalClubInvite(userId, userUpdate.region).catch((e) => console.error("[auto-join region error]", e));
+      }
     }
     const allowedProfileFields = ["bio", "maxPickupDistance", "latitude", "longitude"];
     const profileUpdate = {};
@@ -6329,8 +6332,7 @@ router4.post("/", requireAuth3, async (req, res) => {
       }
     }
     if (brand) {
-      createClubInvitesForMoto(userId, brand, model || "").catch(() => {
-      });
+      createClubInvitesForMoto(userId, brand, model || "").catch((e) => console.error("[auto-join brand error]", e));
     }
     return res.status(201).json({ motorcycle, matches });
   } catch (error) {

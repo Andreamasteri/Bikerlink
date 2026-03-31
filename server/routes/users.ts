@@ -161,6 +161,10 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
         }
       }
       await storage.updateUser(userId, userUpdate as any);
+
+      if (req.body.region !== undefined && typeof userUpdate.region === "string" && userUpdate.region.trim()) {
+        createRegionalClubInvite(userId, userUpdate.region).catch((e) => console.error("[auto-join region error]", e));
+      }
     }
 
     const allowedProfileFields = ["bio", "maxPickupDistance", "latitude", "longitude"];

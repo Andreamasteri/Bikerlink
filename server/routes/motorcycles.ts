@@ -113,7 +113,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     }
 
     if (brand) {
-      createClubInvitesForMoto(userId, brand, model || "").catch(() => {});
+      createClubInvitesForMoto(userId, brand, model || "").catch((e) => console.error("[auto-join brand error]", e));
     }
 
     return res.status(201).json({ motorcycle, matches });
