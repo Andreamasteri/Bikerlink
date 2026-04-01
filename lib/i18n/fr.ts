@@ -320,7 +320,7 @@ const fr: Record<string, string> = {
   "match.tabBiker": "Bikers",
   "match.tabProposals": "Propositions",
   "match.tabAccepted": "Acceptés",
-  "match.tabBlacklist": "Blacklist",
+  "match.tabBlacklist": "Bloqués",
   "match.emptyAcceptedTitle": "Aucun match accepté",
   "match.emptyAcceptedDesc": "Vous trouverez ici tous les matches que vous avez acceptés. Acceptez un match pour le voir ici !",
   "match.emptyBlacklistTitle": "Aucun utilisateur bloqué",

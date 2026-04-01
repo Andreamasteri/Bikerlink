@@ -1272,7 +1272,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent + "40",
   },
   tabText: {
-    fontSize: 11,
+    fontSize: 22,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
   },

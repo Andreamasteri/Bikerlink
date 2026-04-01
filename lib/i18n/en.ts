@@ -317,7 +317,7 @@ const en: Record<string, string> = {
   "match.tabBiker": "Bikers",
   "match.tabProposals": "Proposals",
   "match.tabAccepted": "Accepted",
-  "match.tabBlacklist": "Blacklist",
+  "match.tabBlacklist": "Blocked",
   "match.emptyAcceptedTitle": "No accepted matches",
   "match.emptyAcceptedDesc": "Here you will find all matches you have accepted. Accept a match to see it here!",
   "match.emptyBlacklistTitle": "No blocked users",

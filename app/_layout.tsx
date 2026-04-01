@@ -108,24 +108,16 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-const OTA_APPLIED_KEY = "ota_last_applied_id";
-
 /**
- * Esegue reloadAsync() solo se l'aggiornamento con targetUpdateId non è già
- * stato applicato nell'ultimo riavvio. Confronta con il valore persistito in
- * AsyncStorage per evitare loop infiniti dopo reloadAsync().
- * Se targetUpdateId è null (ID non disponibile) la funzione esce senza fare nulla.
+ * Esegue reloadAsync() solo se targetUpdateId non è già l'update in esecuzione.
+ * Usa mod.updateId (stato live) come guard anti-loop — non può bloccarsi se
+ * reloadAsync() viene interrotto, perché non scrive nulla su AsyncStorage.
  */
 async function safeReloadAsync(targetUpdateId: string | null): Promise<void> {
   if (!targetUpdateId) return;
   try {
-    const alreadyApplied = await AsyncStorage.getItem(OTA_APPLIED_KEY);
-    if (alreadyApplied === targetUpdateId) {
-      // Questo update è già stato applicato nell'ultimo ciclo — evita loop
-      return;
-    }
-    await AsyncStorage.setItem(OTA_APPLIED_KEY, targetUpdateId);
     const mod = await import("expo-updates");
+    if (mod.updateId === targetUpdateId) return;
     await mod.reloadAsync();
   } catch {
     // silent fail
@@ -164,12 +156,10 @@ function OtaStartupChecker() {
         if (result.isAvailable) {
           const manifest = result.manifest as { id?: string } | undefined;
           const targetId = manifest?.id ?? null;
-          // Se non riusciamo a leggere un ID stabile, non procediamo
           if (!targetId) return;
-          const alreadyApplied = await AsyncStorage.getItem(OTA_APPLIED_KEY);
-          if (alreadyApplied === targetId) return;
+          // Guard anti-loop: skip se è già l'update in esecuzione
+          if (mod.updateId === targetId) return;
           await mod.fetchUpdateAsync();
-          await AsyncStorage.setItem(OTA_APPLIED_KEY, targetId);
           await mod.reloadAsync();
         }
       } catch {

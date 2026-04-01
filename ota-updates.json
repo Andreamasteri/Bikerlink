@@ -1035,6 +1035,23 @@
     "iosUpdateId": null,
     "commitBase": "ec10b7dc7e7ca8b980a9f04ea11241841985ac4e",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/807a706a-5dc7-43c9-85ae-2f75e305b5f4",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 61,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-61: Fix checker OTA bloccato + font tab match x2 + Bloccati",
+    "publishedAt": "2026-04-01",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #365 — 3 fix: (1) safeReloadAsync in _layout.tsx: rimosso meccanismo AsyncStorage come guard anti-loop OTA (salvava ID PRIMA di reloadAsync → se interrotto bloccava tutte le OTA successive). Sostituito con confronto diretto su mod.updateId (update in esecuzione) — se uguale al targetUpdateId skip, altrimenti reload. Fix applicato su entrambi i path (isUpdatePending e checkForUpdateAsync). (2) tabText.fontSize 11→22 in app/(tabs)/match.tsx (tabText + tabTextActive). (3) match.tabBlacklist → 'Bloccati' (it), 'Blocked' (en), 'Bloqués' (fr), 'Bloqueados' (es), 'Gesperrt' (de) in tutti i file i18n.",
+    "updateGroupId": "40f8d369-1629-4e68-bbec-412a8dc22074",
+    "androidUpdateId": "019d4a51-9218-7790-84c0-5d7cbc9cf5ff",
+    "iosUpdateId": null,
+    "commitBase": "2d03162fc27d02ace1c36b4b9f7c94da6be25a03",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/40f8d369-1629-4e68-bbec-412a8dc22074",
     "status": "published"
   }
 ]
