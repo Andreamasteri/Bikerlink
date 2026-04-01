@@ -556,7 +556,7 @@ export default function ProfileScreen() {
               {currentOtaEntry
                 ? `OTA-${currentOtaEntry.updateNumber}${currentRv ? ` · v${currentRv}` : ""}`
                 : latestOta
-                ? `OTA-${latestOta.updateNumber}+${currentRv ? ` · v${currentRv}` : ""}`
+                ? `OTA-${latestOta.updateNumber}${currentRv ? ` · v${currentRv}` : ""}`
                 : `OTA${currentRv ? ` · v${currentRv}` : ""}`}
             </Text>
           </View>
