@@ -6104,7 +6104,7 @@ router3.get("/nearby", requireAuth2, async (req, res) => {
     }
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
     const nearbyUsers = await storage.getNearbyUsers(lat, lng, radius, countriesParam);
-    const results = nearbyUsers.filter((item) => !blockedIds.has(item.user.id)).map((item) => {
+    const results = nearbyUsers.filter((item) => !blockedIds.has(item.user.id) && item.user.id !== requesterId).map((item) => {
       return {
         id: item.user.id,
         nickname: item.user.nickname,

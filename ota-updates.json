@@ -847,6 +847,23 @@
     "iosUpdateId": null,
     "commitBase": "c88f1958c1d1a0ba4d490d5cedefdf0a9b6650e4",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/885a0b30-6932-4167-99d9-cd4b5c2df35b",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 51,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-51: Fix GPS self-marker, avatar reale nel profilo, foto tappabili + fullscreen modal",
+    "publishedAt": "2026-04-01",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #346 — 3 fix: (1) BACKEND server/routes/users.ts: endpoint /nearby aggiunto filtro item.user.id !== requesterId — l'utente loggato non vede più se stesso sulla mappa; (2) FRONTEND app/profile/[id].tsx: avatar reale (Image se avatarUrl presente, altrimenti icona fallback), sezione 'Foto' con ScrollView orizzontale e thumbnail 80x80 tappabili, modal fullscreen (sfondo nero 92%) per vedere ogni foto a schermo intero; (3) FRONTEND app/(tabs)/index.tsx: foto nel popup mappa avvolte in TouchableOpacity, modal fullscreen identico per le foto nel popup utente della mappa. Backend riavviato.",
+    "updateGroupId": "f9c7fea9-a9e9-4db5-9723-39a968af5c4c",
+    "androidUpdateId": "019d465c-0174-729d-b149-9b01a91b9187",
+    "iosUpdateId": null,
+    "commitBase": "38a407de97aadae4dde1741f562f2182afb909c3",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/f9c7fea9-a9e9-4db5-9723-39a968af5c4c",
     "status": "published"
   }
 ]

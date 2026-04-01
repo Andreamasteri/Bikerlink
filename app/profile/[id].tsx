@@ -8,6 +8,9 @@ import {
   ActivityIndicator,
   Platform,
   Alert,
+  Image,
+  Modal,
+  Pressable,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -68,6 +71,7 @@ export default function PublicProfileScreen() {
   };
 
   const [blockedOverride, setBlockedOverride] = useState<boolean | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const isBlocked = blockedOverride !== null ? blockedOverride : (profile?.isBlockedByMe ?? false);
 
   const blockMutation = useMutation({
@@ -195,11 +199,18 @@ export default function PublicProfileScreen() {
       >
         <View style={styles.avatarSection}>
           <View style={[styles.avatar, { backgroundColor: color + "33" }]}>
-            <Ionicons
-              name={profile.userType === "coppia" ? "people" : profile.userType === "zavorrina" ? "person" : "bicycle"}
-              size={48}
-              color={color}
-            />
+            {profile.avatarUrl ? (
+              <Image
+                source={{ uri: profile.avatarUrl.startsWith("http") ? profile.avatarUrl : `${baseUrl}${profile.avatarUrl}` }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <Ionicons
+                name={profile.userType === "coppia" ? "people" : profile.userType === "zavorrina" ? "person" : "bicycle"}
+                size={48}
+                color={color}
+              />
+            )}
           </View>
           <Text style={[styles.nickname, { color }]}>{profile.nickname}</Text>
           <View style={styles.statusRow}>
@@ -265,6 +276,22 @@ export default function PublicProfileScreen() {
           </View>
         )}
 
+        {profile.photos && profile.photos.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Foto</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
+              {profile.photos.map((p: any) => {
+                const uri = p.photoUrl?.startsWith("http") ? p.photoUrl : `${baseUrl}${p.photoUrl}`;
+                return (
+                  <TouchableOpacity key={p.id} onPress={() => setSelectedPhoto(uri)} activeOpacity={0.8}>
+                    <Image source={{ uri }} style={styles.photoThumb} />
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         {publicRoutesCount > 0 && (
           <TouchableOpacity
             style={styles.routesButton}
@@ -319,6 +346,17 @@ export default function PublicProfileScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
+
+      <Modal visible={!!selectedPhoto} transparent animationType="fade" onRequestClose={() => setSelectedPhoto(null)}>
+        <Pressable style={styles.photoModal} onPress={() => setSelectedPhoto(null)}>
+          {selectedPhoto && (
+            <Image source={{ uri: selectedPhoto }} style={styles.photoModalImage} resizeMode="contain" />
+          )}
+          <TouchableOpacity style={styles.photoModalClose} onPress={() => setSelectedPhoto(null)}>
+            <Ionicons name="close" size={28} color="#FFFFFF" />
+          </TouchableOpacity>
+        </Pressable>
+      </Modal>
     </>
   );
 }
@@ -390,4 +428,21 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   blockButtonText: { fontSize: 15, fontWeight: "600" as const, color: Colors.error },
+  avatarImage: { width: 96, height: 96, borderRadius: 48 },
+  photoThumb: { width: 80, height: 80, borderRadius: 10, marginRight: 8 },
+  photoModal: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.92)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoModalImage: { width: "100%", height: "80%" },
+  photoModalClose: {
+    position: "absolute",
+    top: 48,
+    right: 20,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 20,
+    padding: 6,
+  },
 });

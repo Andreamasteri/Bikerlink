@@ -54,6 +54,7 @@ export default function MapScreen() {
   const [filterCoppia, setFilterCoppia] = useState(true);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [selectedUserDetail, setSelectedUserDetail] = useState<any>(null);
+  const [selectedMapPhoto, setSelectedMapPhoto] = useState<string | null>(null);
   const [searchText, setSearchText] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -1136,7 +1137,9 @@ export default function MapScreen() {
                       {selectedUserDetail.photos.map((p: any) => {
                         const pUri = p.photoUrl?.startsWith("http") ? p.photoUrl : `${baseUrl}${p.photoUrl}`;
                         return (
-                          <Image key={p.id} source={{ uri: pUri }} style={{ width: 80, height: 80, borderRadius: 10, marginRight: 8 }} />
+                          <TouchableOpacity key={p.id} onPress={() => setSelectedMapPhoto(pUri)} activeOpacity={0.8}>
+                            <Image source={{ uri: pUri }} style={{ width: 80, height: 80, borderRadius: 10, marginRight: 8 }} />
+                          </TouchableOpacity>
                         );
                       })}
                     </ScrollView>
@@ -1306,6 +1309,23 @@ export default function MapScreen() {
               </Pressable>
             )}
           </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={!!selectedMapPhoto} transparent animationType="fade" onRequestClose={() => setSelectedMapPhoto(null)}>
+        <Pressable
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center" }}
+          onPress={() => setSelectedMapPhoto(null)}
+        >
+          {selectedMapPhoto && (
+            <Image source={{ uri: selectedMapPhoto }} style={{ width: "100%", height: "80%" }} resizeMode="contain" />
+          )}
+          <TouchableOpacity
+            style={{ position: "absolute", top: 48, right: 20, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 20, padding: 6 }}
+            onPress={() => setSelectedMapPhoto(null)}
+          >
+            <Ionicons name="close" size={28} color="#FFFFFF" />
+          </TouchableOpacity>
         </Pressable>
       </Modal>
     </ScrollView>
