@@ -121,6 +121,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.sendFile(templatePath);
   });
 
+  app.get("/apple-review", (_req, res) => {
+    const templatePath = path.resolve(
+      process.cwd(),
+      "server",
+      "templates",
+      "apple-review.html",
+    );
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.sendFile(templatePath);
+  });
+
   app.get("/api/settings/privacy-policy", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("privacy_policy_text");

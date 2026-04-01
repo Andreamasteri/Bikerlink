@@ -933,6 +933,23 @@
     "iosUpdateId": null,
     "commitBase": "93fa27c30bd7169cc27f9638dc4c61f76e5d401c",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/0b265d6e-c31f-4a49-919a-77d99f8b0bc9",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 55,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-55: PayPal nascosto su iOS (Platform.OS !== ios)",
+    "publishedAt": "2026-04-01",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #351 — Fix Apple iOS compliance: (1) Sezione donazione PayPal wrappata con Platform.OS !== 'ios' in app/(tabs)/profile.tsx — il pulsante 'Dona con PayPal' non appare su dispositivi iOS durante la review Apple (regola 3.1.1 external payment); (2) app.json: aggiunto buildNumber: '1' sotto ios (richiesto da EAS per submission App Store); (3) backend: nuovo endpoint GET /apple-review accessibile senza autenticazione — serve pagina HTML con credenziali demo Apple Reviewer; (4) account demo AppleReviewer creato nel DB (email: applereview@bikerlink.it, pass: AppleReview2026!, moto Ducati Monster 937 a Firenze, is_fake=true); (5) invite code APPLE-REVIEW-2026 creato con max_uses illimitati.",
+    "updateGroupId": "269c091a-afac-4cef-97a6-5fecd0e73675",
+    "androidUpdateId": "019d4871-e3a8-7376-80de-91d745fc352d",
+    "iosUpdateId": null,
+    "commitBase": "52cab5ad7dab03b5793f471430c03b6c239ea9af",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/269c091a-afac-4cef-97a6-5fecd0e73675",
     "status": "published"
   }
 ]

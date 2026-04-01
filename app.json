@@ -14,6 +14,7 @@
     },
     "ios": {
       "supportsTablet": false,
+      "buildNumber": "1",
       "bundleIdentifier": "com.bikerlink.app",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "BikerLink usa la tua posizione per mostrare i motociclisti vicini e registrare i tuoi giri.",

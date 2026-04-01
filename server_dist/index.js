@@ -13065,6 +13065,16 @@ async function registerRoutes(app2) {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.sendFile(templatePath);
   });
+  app2.get("/apple-review", (_req, res) => {
+    const templatePath = import_node_path.default.resolve(
+      process.cwd(),
+      "server",
+      "templates",
+      "apple-review.html"
+    );
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.sendFile(templatePath);
+  });
   app2.get("/api/settings/privacy-policy", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("privacy_policy_text");

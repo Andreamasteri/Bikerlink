@@ -788,7 +788,7 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      {donationData?.enabled !== false && (
+      {donationData?.enabled !== false && Platform.OS !== 'ios' && (
         <View style={styles.donationSection}>
           <View style={styles.donationIconRow}>
             <Ionicons name="heart" size={28} color={Colors.accentRed} />
