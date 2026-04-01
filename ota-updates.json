@@ -1069,6 +1069,31 @@
     "iosUpdateId": null,
     "commitBase": "b75f97ecf41cde24b8e187b18ad3ac559ad8a182",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/a3c9edb8-efdf-44a4-ba9f-9ae39d0978b0",
+    "status": "superseded"
+  },
+
+  {
+    "_comment": "=== CICLO APK v2 — runtimeVersion 2.0.0 | EAS Build 1c56b89d | versionCode 3 | Hermes ==="
+  },
+
+  {
+    "updateNumber": 1,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-01 (v2.0.0): prima OTA ciclo 2.x — fix safeReloadAsync, Bloccati i18n, font tab match, sicurezza dipendenze",
+    "publishedAt": "2026-04-01",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Prima OTA del ciclo runtimeVersion 2.0.0. APK base: EAS Build 1c56b89d-31b5-457a-b6dc-eaf04b2259c5 (versionCode 3, hermes). Contiene: (1) safeReloadAsync usa mod.updateId come guard anti-loop (no AsyncStorage); (2) 'Blacklist'→'Bloccati'/'Blocked'/'Bloqués'/'Bloqueados'/'Gesperrt' in tutte le lingue; (3) font tab match 11→22; (4) dipendenze sicurezza: @xmldom/xmldom 0.8.12, path-to-regexp 8.4.0, picomatch 3.0.2 transitive. Bundle Hermes .hbc 3.68 MB.",
+    "updateGroupId": "d3b6a684-2c11-4def-b0f9-6133da9ec503",
+    "androidUpdateId": "019d4a9d-aaea-7164-82e7-bf0aacd4d96a",
+    "iosUpdateId": null,
+    "commitBase": "74f1e030d28f03369a708298deed33ebf75cd0b8",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/d3b6a684-2c11-4def-b0f9-6133da9ec503",
+    "apkBuildId": "1c56b89d-31b5-457a-b6dc-eaf04b2259c5",
+    "apkUrl": "https://expo.dev/artifacts/eas/4uXX2pRPGhYQTf4shL8U3H.apk",
     "status": "published"
   }
 ]
