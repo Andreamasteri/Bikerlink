@@ -4499,9 +4499,17 @@ async function createRegionalClubInvite(userId, region) {
       )
     ).limit(1);
     if (!regionalClub) return;
-    const isMember = await db.select().from(motoClubMembers).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubMembers.clubId, regionalClub.id), (0, import_drizzle_orm3.eq)(motoClubMembers.userId, userId))).limit(1);
+    const isMember = await db.select().from(motoClubMembers).where((0, import_drizzle_orm3.and)(
+      (0, import_drizzle_orm3.eq)(motoClubMembers.clubId, regionalClub.id),
+      (0, import_drizzle_orm3.eq)(motoClubMembers.userId, userId),
+      (0, import_drizzle_orm3.eq)(motoClubMembers.status, "active")
+    )).limit(1);
     if (isMember.length > 0) return;
-    const existingInvite = await db.select().from(motoClubInvites).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubInvites.clubId, regionalClub.id), (0, import_drizzle_orm3.eq)(motoClubInvites.userId, userId))).limit(1);
+    const existingInvite = await db.select().from(motoClubInvites).where((0, import_drizzle_orm3.and)(
+      (0, import_drizzle_orm3.eq)(motoClubInvites.clubId, regionalClub.id),
+      (0, import_drizzle_orm3.eq)(motoClubInvites.userId, userId),
+      (0, import_drizzle_orm3.eq)(motoClubInvites.status, "pending")
+    )).limit(1);
     if (existingInvite.length > 0) return;
     if (user.autoJoinClubs === false) {
       const inserted = await db.insert(motoClubInvites).values({ clubId: regionalClub.id, userId, status: "pending" }).onConflictDoNothing().returning({ id: motoClubInvites.id });
@@ -4550,9 +4558,17 @@ async function createClubInvitesForMoto(userId, brand, model) {
       )
     );
     for (const club of matchingClubs) {
-      const isMember = await db.select().from(motoClubMembers).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubMembers.clubId, club.id), (0, import_drizzle_orm3.eq)(motoClubMembers.userId, userId))).limit(1);
+      const isMember = await db.select().from(motoClubMembers).where((0, import_drizzle_orm3.and)(
+        (0, import_drizzle_orm3.eq)(motoClubMembers.clubId, club.id),
+        (0, import_drizzle_orm3.eq)(motoClubMembers.userId, userId),
+        (0, import_drizzle_orm3.eq)(motoClubMembers.status, "active")
+      )).limit(1);
       if (isMember.length > 0) continue;
-      const existingInvite = await db.select().from(motoClubInvites).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(motoClubInvites.clubId, club.id), (0, import_drizzle_orm3.eq)(motoClubInvites.userId, userId))).limit(1);
+      const existingInvite = await db.select().from(motoClubInvites).where((0, import_drizzle_orm3.and)(
+        (0, import_drizzle_orm3.eq)(motoClubInvites.clubId, club.id),
+        (0, import_drizzle_orm3.eq)(motoClubInvites.userId, userId),
+        (0, import_drizzle_orm3.eq)(motoClubInvites.status, "pending")
+      )).limit(1);
       if (existingInvite.length > 0) continue;
       if (user.autoJoinClubs === false) {
         const inserted = await db.insert(motoClubInvites).values({ clubId: club.id, userId, status: "pending" }).onConflictDoNothing().returning({ id: motoClubInvites.id });

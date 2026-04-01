@@ -182,17 +182,25 @@ export async function createRegionalClubInvite(userId: string, region: string): 
 
     if (!regionalClub) return;
 
-    // Evita duplicati sia in members che in invites
+    // Blocca solo se è ancora membro ATTIVO (non se ha lasciato il club)
     const isMember = await db.select()
       .from(motoClubMembers)
-      .where(and(eq(motoClubMembers.clubId, regionalClub.id), eq(motoClubMembers.userId, userId)))
+      .where(and(
+        eq(motoClubMembers.clubId, regionalClub.id),
+        eq(motoClubMembers.userId, userId),
+        eq(motoClubMembers.status, "active")
+      ))
       .limit(1);
     if (isMember.length > 0) return;
 
-    // Evita di ricreare inviti già esistenti (pending o declined)
+    // Blocca solo se c'è già un invito PENDING (non se è stato declined)
     const existingInvite = await db.select()
       .from(motoClubInvites)
-      .where(and(eq(motoClubInvites.clubId, regionalClub.id), eq(motoClubInvites.userId, userId)))
+      .where(and(
+        eq(motoClubInvites.clubId, regionalClub.id),
+        eq(motoClubInvites.userId, userId),
+        eq(motoClubInvites.status, "pending")
+      ))
       .limit(1);
     if (existingInvite.length > 0) return;
 
@@ -261,16 +269,25 @@ export async function createClubInvitesForMoto(userId: string, brand: string, mo
       );
 
     for (const club of matchingClubs) {
+      // Blocca solo se è ancora membro ATTIVO (non se ha lasciato il club)
       const isMember = await db.select()
         .from(motoClubMembers)
-        .where(and(eq(motoClubMembers.clubId, club.id), eq(motoClubMembers.userId, userId)))
+        .where(and(
+          eq(motoClubMembers.clubId, club.id),
+          eq(motoClubMembers.userId, userId),
+          eq(motoClubMembers.status, "active")
+        ))
         .limit(1);
       if (isMember.length > 0) continue;
 
-      // Evita di ricreare inviti già esistenti (pending o declined)
+      // Blocca solo se c'è già un invito PENDING (non se è stato declined)
       const existingInvite = await db.select()
         .from(motoClubInvites)
-        .where(and(eq(motoClubInvites.clubId, club.id), eq(motoClubInvites.userId, userId)))
+        .where(and(
+          eq(motoClubInvites.clubId, club.id),
+          eq(motoClubInvites.userId, userId),
+          eq(motoClubInvites.status, "pending")
+        ))
         .limit(1);
       if (existingInvite.length > 0) continue;
 
