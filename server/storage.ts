@@ -514,14 +514,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveProposalsWithLocation(): Promise<Proposal[]> {
-    return db.select().from(proposals).where(
-      and(
-        eq(proposals.status, "active"),
-        sql`${proposals.departureLatitude} IS NOT NULL`,
-        sql`${proposals.departureLongitude} IS NOT NULL`,
-        sql`${proposals.searchType} IS NOT NULL`
-      )
-    );
+    const results = await db.select({ proposal: proposals, role: users.role })
+      .from(proposals)
+      .innerJoin(users, eq(users.id, proposals.userId))
+      .where(
+        and(
+          eq(proposals.status, "active"),
+          sql`${proposals.departureLatitude} IS NOT NULL`,
+          sql`${proposals.departureLongitude} IS NOT NULL`,
+          sql`${proposals.searchType} IS NOT NULL`,
+          notInArray(users.role, ["admin", "moderator", "moderatore"])
+        )
+      );
+    return results.map(r => r.proposal);
   }
 
   async getProposalMatches(userId: string): Promise<ProposalMatch[]> {
@@ -1366,20 +1371,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllWishlistMotosWithUsers(countries?: string[]): Promise<{ wishlistMoto: any; userId: string }[]> {
-    let query = db.select({
+    const baseCondition = notInArray(users.role, ["admin", "moderator", "moderatore"]);
+    const condition = countries && countries.length > 0
+      ? and(baseCondition, inArray(users.country, countries))
+      : baseCondition;
+    return db.select({
       wishlistMoto: zavarrinaWishlistMotos,
       userId: zavarrinaWishlists.userId,
     }).from(zavarrinaWishlistMotos)
       .innerJoin(zavarrinaWishlists, eq(zavarrinaWishlists.id, zavarrinaWishlistMotos.wishlistId))
-      .innerJoin(users, eq(users.id, zavarrinaWishlists.userId));
-    if (countries && countries.length > 0) {
-      return query.where(inArray(users.country, countries));
-    }
-    return query;
+      .innerJoin(users, eq(users.id, zavarrinaWishlists.userId))
+      .where(condition);
   }
 
   async getAllBikerMotorcyclesWithUsers(countries?: string[]): Promise<{ motorcycle: any; userId: string }[]> {
-    const baseCondition = or(eq(users.userType, "biker"), eq(users.userType, "coppia"))!;
+    const baseCondition = and(
+      or(eq(users.userType, "biker"), eq(users.userType, "coppia"))!,
+      notInArray(users.role, ["admin", "moderator", "moderatore"])
+    )!;
     const condition = countries && countries.length > 0
       ? and(baseCondition, inArray(users.country, countries))
       : baseCondition;
@@ -1990,6 +1999,43 @@ export class DatabaseStorage implements IStorage {
       )
     ).returning();
     return result.length;
+  }
+
+  async cleanupAdminMatches(): Promise<{ bikerZavarrina: number; bikerBiker: number }> {
+    const adminUsers = await db.select({ id: users.id })
+      .from(users)
+      .where(inArray(users.role, ["admin", "moderator", "moderatore"]));
+
+    if (adminUsers.length === 0) {
+      return { bikerZavarrina: 0, bikerBiker: 0 };
+    }
+
+    const adminIds = adminUsers.map(u => u.id);
+    console.log(`[AdminCleanup] Trovati ${adminIds.length} utenti admin/moderator da escludere dai match`);
+
+    let bzDeleted = 0;
+    let bbDeleted = 0;
+
+    for (const adminId of adminIds) {
+      const bzResult = await db.delete(bikerZavarrinaMatches).where(
+        or(
+          eq(bikerZavarrinaMatches.bikerId, adminId),
+          eq(bikerZavarrinaMatches.zavarrinaId, adminId)
+        )
+      ).returning();
+      bzDeleted += bzResult.length;
+
+      const bbResult = await db.delete(bikerBikerMatches).where(
+        or(
+          eq(bikerBikerMatches.biker1Id, adminId),
+          eq(bikerBikerMatches.biker2Id, adminId)
+        )
+      ).returning();
+      bbDeleted += bbResult.length;
+    }
+
+    console.log(`[AdminCleanup] Rimossi ${bzDeleted} match biker-zavorrina e ${bbDeleted} match biker-biker con admin/moderator`);
+    return { bikerZavarrina: bzDeleted, bikerBiker: bbDeleted };
   }
 }
 

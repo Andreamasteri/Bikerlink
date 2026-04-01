@@ -51,3 +51,4 @@ static-build/
 
 # Compiled server
 server_dist/
+server_dist/index.js

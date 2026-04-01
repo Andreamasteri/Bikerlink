@@ -605,6 +605,15 @@ function setupErrorHandler(app: express.Application) {
 
         const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+        // Phase 1.5: cleanup admin matches
+        try {
+          const { storage: stCleanup } = await import("./storage");
+          const cleaned = await stCleanup.cleanupAdminMatches();
+          console.log(`[INIT] Phase 1.5 admin cleanup done — biker-zavarrina: ${cleaned.bikerZavarrina}, biker-biker: ${cleaned.bikerBiker}`);
+        } catch (e) {
+          console.warn("[INIT] admin cleanup error:", e);
+        }
+
         // Phase 2: start matching engine
         await delay(2_000);
         startMatchingEngine();
