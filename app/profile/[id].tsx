@@ -22,19 +22,16 @@ import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 
-const DAYS_IT = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
-const MONTHS_IT = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
-
 function formatLastSeen(dateStr: string | null): string {
   if (!dateStr) return "";
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return "";
-  const day = DAYS_IT[d.getDay()];
-  const date = d.getDate();
-  const month = MONTHS_IT[d.getMonth()];
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const yy = String(d.getFullYear()).slice(-2);
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${day} ${date} ${month} · ${hh}:${mm}`;
+  return `${dd}/${mo}/'${yy} - ${hh}.${mm}`;
 }
 
 const REPORT_REASONS = [
