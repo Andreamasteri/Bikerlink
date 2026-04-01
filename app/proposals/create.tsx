@@ -348,7 +348,7 @@ export default function CreateProposalScreen() {
     }
     if (returnDeadline) data.returnDeadline = returnDeadline.toISOString();
     if (selectedClubId) data.clubId = selectedClubId;
-    if (canExtendToDestination && extendToDestination && destinationExtLat && destinationExtLng) {
+    if (canExtendToDestination && extendToDestination && destinationExtLat != null && destinationExtLng != null) {
       data.extendToDestination = true;
       data.destinationLatitude = destinationExtLat;
       data.destinationLongitude = destinationExtLng;
@@ -640,14 +640,14 @@ export default function CreateProposalScreen() {
 
                     <TouchableOpacity
                       style={[styles.gpsButton, { marginTop: 10, alignSelf: "flex-start" },
-                        destinationExtLat && destinationExtLng ? { backgroundColor: Colors.accent + "30", borderColor: Colors.accent, borderWidth: 1 } : {}
+                        destinationExtLat != null && destinationExtLng != null ? { backgroundColor: Colors.accent + "30", borderColor: Colors.accent, borderWidth: 1 } : {}
                       ]}
                       onPress={() => {
                         setMapPickerMode("destination");
                         setMapPickerCoord(
-                          destinationExtLat && destinationExtLng
+                          destinationExtLat != null && destinationExtLng != null
                             ? { latitude: destinationExtLat, longitude: destinationExtLng }
-                            : departureLat && departureLng
+                            : departureLat != null && departureLng != null
                               ? { latitude: departureLat, longitude: departureLng }
                               : null
                         );
@@ -655,12 +655,12 @@ export default function CreateProposalScreen() {
                       }}
                     >
                       <Ionicons
-                        name={destinationExtLat && destinationExtLng ? "checkmark-circle" : "map"}
+                        name={destinationExtLat != null && destinationExtLng != null ? "checkmark-circle" : "map"}
                         size={23}
-                        color={destinationExtLat && destinationExtLng ? Colors.success : "#000"}
+                        color={destinationExtLat != null && destinationExtLng != null ? Colors.success : "#000"}
                       />
                       <Text style={styles.gpsButtonText}>
-                        {destinationExtLat && destinationExtLng ? "Destinazione impostata" : "Scegli sulla mappa"}
+                        {destinationExtLat != null && destinationExtLng != null ? "Destinazione impostata" : "Scegli sulla mappa"}
                       </Text>
                     </TouchableOpacity>
 

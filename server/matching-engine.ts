@@ -59,7 +59,7 @@ function areCompatible(p1: Proposal, p2: Proposal): boolean {
 
   if (!timeRangesOverlap(p1.departureTimeFrom, p1.departureTimeTo, p2.departureTimeFrom, p2.departureTimeTo)) return false;
 
-  if (p1.departureLatitude && p1.departureLongitude && p2.departureLatitude && p2.departureLongitude) {
+  if (p1.departureLatitude != null && p1.departureLongitude != null && p2.departureLatitude != null && p2.departureLongitude != null) {
     const distance = haversineDistance(
       p1.departureLatitude, p1.departureLongitude,
       p2.departureLatitude, p2.departureLongitude
@@ -69,13 +69,13 @@ function areCompatible(p1: Proposal, p2: Proposal): boolean {
     if (distance <= Math.min(radius1, radius2)) return true;
   }
 
-  if (p1.extendToDestination && p1.destinationLatitude && p1.destinationLongitude && p2.departureLatitude && p2.departureLongitude) {
+  if (p1.extendToDestination && p1.destinationLatitude != null && p1.destinationLongitude != null && p2.departureLatitude != null && p2.departureLongitude != null) {
     const destRadius1 = p1.destinationSearchRadius || 30;
     const distDest1 = haversineDistance(p1.destinationLatitude, p1.destinationLongitude, p2.departureLatitude, p2.departureLongitude);
     if (distDest1 <= destRadius1) return true;
   }
 
-  if (p2.extendToDestination && p2.destinationLatitude && p2.destinationLongitude && p1.departureLatitude && p1.departureLongitude) {
+  if (p2.extendToDestination && p2.destinationLatitude != null && p2.destinationLongitude != null && p1.departureLatitude != null && p1.departureLongitude != null) {
     const destRadius2 = p2.destinationSearchRadius || 30;
     const distDest2 = haversineDistance(p2.destinationLatitude, p2.destinationLongitude, p1.departureLatitude, p1.departureLongitude);
     if (distDest2 <= destRadius2) return true;

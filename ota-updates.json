@@ -916,6 +916,23 @@
     "iosUpdateId": null,
     "commitBase": "4cfd4e46ec215d71e1d60edc21ea020251fed654",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/502cda77-c787-4e12-9b71-513a0a3d5ca4",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": "54b",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-54b: Fix null-check coordinate destinazione e matching engine",
+    "publishedAt": "2026-04-01",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Fix code-review su OTA-54: tutti i controlli truthy su coordinate (destinationExtLat && destinationExtLng) sostituiti con !=(null) sia in app/proposals/create.tsx (payload + 4 guard UI) sia in server/matching-engine.ts (3 guard: departure e 2 destination). Anche departureLat/Lng nel modal-picker ora usano != null. Backend ricompilato.",
+    "updateGroupId": "0b265d6e-c31f-4a49-919a-77d99f8b0bc9",
+    "androidUpdateId": "019d484a-85f4-74fd-8788-4254f7d99967",
+    "iosUpdateId": null,
+    "commitBase": "93fa27c30bd7169cc27f9638dc4c61f76e5d401c",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/0b265d6e-c31f-4a49-919a-77d99f8b0bc9",
     "status": "published"
   }
 ]
