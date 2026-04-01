@@ -566,15 +566,14 @@ export default function ProfileScreen() {
                 if (isCheckingOta) return;
                 setIsCheckingOta(true);
                 try {
-                  const mod = await import("expo-updates");
-                  const result = await mod.checkForUpdateAsync();
+                  const result = await Updates.checkForUpdateAsync();
                   if (!result.isAvailable) {
                     Alert.alert("Aggiornato", "Nessun aggiornamento disponibile.");
                     setIsCheckingOta(false);
                     return;
                   }
-                  await mod.fetchUpdateAsync();
-                  await mod.reloadAsync();
+                  await Updates.fetchUpdateAsync();
+                  await Updates.reloadAsync();
                 } catch {
                   Alert.alert("Errore", "Impossibile scaricare l'aggiornamento.");
                   setIsCheckingOta(false);
