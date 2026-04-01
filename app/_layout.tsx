@@ -158,9 +158,8 @@ function OtaStartupChecker() {
         if (result.isAvailable) {
           const manifest = result.manifest as { id?: string } | undefined;
           const targetId = manifest?.id ?? null;
-          if (!targetId) return;
-          // Guard anti-loop: skip se è già l'update in esecuzione
-          if (mod.updateId === targetId) return;
+          // Guard anti-loop solo se targetId è noto
+          if (targetId && mod.updateId === targetId) return;
           await mod.fetchUpdateAsync();
           await mod.reloadAsync();
         }

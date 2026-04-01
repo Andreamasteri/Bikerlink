@@ -42,9 +42,15 @@ interface OtaUpdateEntry {
   androidUpdateId: string | null;
   iosUpdateId: string | null;
   status: string;
+  runtimeVersion?: string;
+  cycle?: string;
 }
 
-const otaUpdates: OtaUpdateEntry[] = otaUpdatesRaw as OtaUpdateEntry[];
+const allOtaUpdates: OtaUpdateEntry[] = (otaUpdatesRaw as unknown[])
+  .filter((e): e is OtaUpdateEntry => {
+    const entry = e as Record<string, unknown>;
+    return !entry._comment && entry.androidUpdateId !== undefined;
+  });
 
 interface ProfileData {
   id: string;
@@ -130,18 +136,26 @@ export default function ProfileScreen() {
   const [isDownloadingEula, setIsDownloadingEula] = useState(false);
   const [isDownloadingPrivacy, setIsDownloadingPrivacy] = useState(false);
   const [isExportingData, setIsExportingData] = useState(false);
-  const latestOta = otaUpdates.reduce<OtaUpdateEntry | null>((best, entry) => {
+  const [isCheckingOta, setIsCheckingOta] = useState(false);
+
+  // Ciclo-aware: filtra le OTA per la runtimeVersion dell'APK corrente
+  const currentRv = Updates.runtimeVersion ?? null;
+  const cycleOtaUpdates = currentRv
+    ? allOtaUpdates.filter(e => e.runtimeVersion === currentRv)
+    : allOtaUpdates;
+
+  const latestOta = cycleOtaUpdates.reduce<OtaUpdateEntry | null>((best, entry) => {
     if (!best || entry.updateNumber > best.updateNumber) return entry;
     return best;
   }, null);
   const currentUpdateId = Updates.updateId ?? null;
-  const currentOtaEntry = otaUpdates.find(e => e.androidUpdateId === currentUpdateId) ?? null;
+  const currentOtaEntry = allOtaUpdates.find(e => e.androidUpdateId === currentUpdateId) ?? null;
   const isOtaUpToDate =
     __DEV__ || Platform.OS === "web"
       ? true
       : currentUpdateId === null
       ? false
-      : currentUpdateId === latestOta?.androidUpdateId  // match esatto con il latest noto
+      : currentUpdateId === latestOta?.androidUpdateId  // match esatto con il latest noto del ciclo
         || !currentOtaEntry;  // non in lista = bundle più recente del JSON bundled → aggiornato
 
   const profileQuery = useQuery<ProfileData>({
@@ -540,12 +554,41 @@ export default function ProfileScreen() {
             <Ionicons name="cloud-download-outline" size={11} color={isOtaUpToDate ? "#22C55E" : "#EF4444"} />
             <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: isOtaUpToDate ? "#22C55E" : "#EF4444" }}>
               {currentOtaEntry
-                ? `OTA-${currentOtaEntry.updateNumber}`
+                ? `OTA-${currentOtaEntry.updateNumber}${currentRv ? ` · v${currentRv}` : ""}`
                 : latestOta
-                ? `OTA-${latestOta.updateNumber}+`
-                : "OTA"}
+                ? `OTA-${latestOta.updateNumber}+${currentRv ? ` · v${currentRv}` : ""}`
+                : `OTA${currentRv ? ` · v${currentRv}` : ""}`}
             </Text>
           </View>
+          {!__DEV__ && Platform.OS !== "web" && (
+            <TouchableOpacity
+              onPress={async () => {
+                if (isCheckingOta) return;
+                setIsCheckingOta(true);
+                try {
+                  const mod = await import("expo-updates");
+                  const result = await mod.checkForUpdateAsync();
+                  if (!result.isAvailable) {
+                    Alert.alert("Aggiornato", "Nessun aggiornamento disponibile.");
+                    setIsCheckingOta(false);
+                    return;
+                  }
+                  await mod.fetchUpdateAsync();
+                  await mod.reloadAsync();
+                } catch {
+                  Alert.alert("Errore", "Impossibile scaricare l'aggiornamento.");
+                  setIsCheckingOta(false);
+                }
+              }}
+              disabled={isCheckingOta}
+              style={{ padding: 3 }}
+            >
+              {isCheckingOta
+                ? <ActivityIndicator size="small" color={isOtaUpToDate ? "#22C55E" : "#EF4444"} />
+                : <Ionicons name="refresh-outline" size={14} color={isOtaUpToDate ? "#22C55E" : "#EF4444"} />
+              }
+            </TouchableOpacity>
+          )}
         </View>
         {profile?.isPrimal === true && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
