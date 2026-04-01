@@ -102,7 +102,7 @@ async function runMatching(): Promise<number> {
 
         if (existingKeys.has(`${p1.id}:${p2.id}`)) continue;
 
-        await storage.createProposalMatch({
+        const newMatch = await storage.createProposalMatch({
           proposalId1: p1.id,
           proposalId2: p2.id,
           userId1: p1.userId,
@@ -115,6 +115,27 @@ async function runMatching(): Promise<number> {
         existingKeys.add(`${p1.id}:${p2.id}`);
         existingKeys.add(`${p2.id}:${p1.id}`);
         matchCount++;
+
+        try {
+          await storage.createNotification({
+            userId: p1.userId,
+            title: "New proposal match found!",
+            body: "A compatible proposal has been found for your trip.",
+            notificationType: "proposal_match",
+            referenceType: "proposal_match",
+            referenceId: newMatch.id,
+          });
+          await storage.createNotification({
+            userId: p2.userId,
+            title: "New proposal match found!",
+            body: "A compatible proposal has been found for your trip.",
+            notificationType: "proposal_match",
+            referenceType: "proposal_match",
+            referenceId: newMatch.id,
+          });
+        } catch (notifErr) {
+          console.error("[ProposalMatching] Error sending match notifications:", notifErr);
+        }
       }
     }
 
@@ -525,7 +546,7 @@ export async function runProposalMatchingForUser(userId: string): Promise<number
         const p1 = up.id < other.id ? up : other;
         const p2 = up.id < other.id ? other : up;
 
-        await storage.createProposalMatch({
+        const newMatch = await storage.createProposalMatch({
           proposalId1: p1.id,
           proposalId2: p2.id,
           userId1: p1.userId,
@@ -538,6 +559,27 @@ export async function runProposalMatchingForUser(userId: string): Promise<number
         existingKeys.add(`${p1Id}:${p2Id}`);
         existingKeys.add(`${p2Id}:${p1Id}`);
         matchCount++;
+
+        try {
+          await storage.createNotification({
+            userId: p1.userId,
+            title: "New proposal match found!",
+            body: "A compatible proposal has been found for your trip.",
+            notificationType: "proposal_match",
+            referenceType: "proposal_match",
+            referenceId: newMatch.id,
+          });
+          await storage.createNotification({
+            userId: p2.userId,
+            title: "New proposal match found!",
+            body: "A compatible proposal has been found for your trip.",
+            notificationType: "proposal_match",
+            referenceType: "proposal_match",
+            referenceId: newMatch.id,
+          });
+        } catch (notifErr) {
+          console.error("[ProposalMatchingForUser] Error sending match notifications:", notifErr);
+        }
       }
     }
 
