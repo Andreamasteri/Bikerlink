@@ -1094,6 +1094,27 @@
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/d3b6a684-2c11-4def-b0f9-6133da9ec503",
     "apkBuildId": "1c56b89d-31b5-457a-b6dc-eaf04b2259c5",
     "apkUrl": "https://expo.dev/artifacts/eas/4uXX2pRPGhYQTf4shL8U3H.apk",
+    "status": "superseded"
+  },
+
+  {
+    "updateNumber": 2,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-02 (v2.0.0): Fix OTA pill ciclo-aware + runtimeVersion + pulsante forza aggiornamento",
+    "publishedAt": "2026-04-01",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #371+#372 — Corretto bug logica OTA: latestOta ora filtra per runtimeVersion (ciclo-aware); pill mostra 'OTA-02 · v2.0.0'; aggiunto pulsante forza aggiornamento (refresh-outline) accanto al pill; fix _layout.tsx checker: rimosso guard 'if (!targetId) return' che bloccava fetchUpdateAsync quando manifest.id era null. Bundle Hermes .hbc 3.69 MB.",
+    "updateGroupId": "ca9f6229-c78a-44db-8512-bead33ae30f3",
+    "androidUpdateId": "019d4ada-792f-7505-8ba5-b146fe25b418",
+    "iosUpdateId": null,
+    "commitBase": "64ec9be8647d73f6ffb1a052b7e6624fb68f7838",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/ca9f6229-c78a-44db-8512-bead33ae30f3",
+    "apkBuildId": "1c56b89d-31b5-457a-b6dc-eaf04b2259c5",
+    "apkUrl": "https://expo.dev/artifacts/eas/4uXX2pRPGhYQTf4shL8U3H.apk",
     "status": "published"
   }
 ]
