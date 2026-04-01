@@ -13953,6 +13953,62 @@ async function autoSeedFakeUsers() {
     console.error("Auto-seed fake users failed:", err);
   }
 }
+var APPLE_REVIEWER_EMAIL = "applereview@bikerlink.it";
+var APPLE_REVIEWER_NICKNAME = "AppleReviewer";
+var APPLE_REVIEWER_PASSWORD = "AppleReview2026!";
+var APPLE_REVIEW_INVITE_CODE = "APPLE-REVIEW-2026";
+async function seedAppleReviewerAccount() {
+  try {
+    await db.insert(invitationCodes).values({
+      code: APPLE_REVIEW_INVITE_CODE,
+      label: "Apple Review",
+      maxUses: 100,
+      currentUses: 0,
+      isActive: true
+    }).onConflictDoNothing();
+    const existing = await db.select({ id: users.id }).from(users).where((0, import_drizzle_orm11.eq)(users.email, APPLE_REVIEWER_EMAIL)).limit(1);
+    if (existing.length > 0) {
+      return;
+    }
+    const hashedPassword = await import_bcryptjs4.default.hash(APPLE_REVIEWER_PASSWORD, 12);
+    const [user] = await db.insert(users).values({
+      nickname: APPLE_REVIEWER_NICKNAME,
+      email: APPLE_REVIEWER_EMAIL,
+      password: hashedPassword,
+      role: "user",
+      userType: "biker",
+      sex: "M",
+      birthYear: 1990,
+      region: "Toscana",
+      country: "IT",
+      emailVerified: true,
+      eulaAccepted: true,
+      privacyAccepted: true,
+      consentAcceptedAt: /* @__PURE__ */ new Date(),
+      isFake: true,
+      invitationCode: APPLE_REVIEW_INVITE_CODE
+    }).returning({ id: users.id });
+    if (!user) return;
+    await db.insert(userProfiles).values({
+      userId: user.id,
+      isAvailable: true,
+      latitude: 43.7696,
+      longitude: 11.2558,
+      bio: "Account di test per la review di Apple. Motociclista appassionato con anni di esperienza sulle strade toscane.",
+      searchPreference: "both"
+    }).onConflictDoNothing();
+    await db.insert(userMotorcycles).values({
+      userId: user.id,
+      brand: "Ducati",
+      model: "Monster 937",
+      year: 2022,
+      displacement: 937
+    });
+    console.log("[SEED] AppleReviewer account provisioned");
+  } catch (err) {
+    console.warn("[SEED] seedAppleReviewerAccount error:", err);
+  }
+}
 
 // server/index.ts
 init_db();
@@ -14425,6 +14481,11 @@ function setupErrorHandler(app2) {
           await autoSeedEssentialUsers();
         } catch (e) {
           console.warn("[INIT] autoSeedEssentialUsers error:", e);
+        }
+        try {
+          await seedAppleReviewerAccount();
+        } catch (e) {
+          console.warn("[INIT] seedAppleReviewerAccount error:", e);
         }
         try {
           const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));

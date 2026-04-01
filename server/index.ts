@@ -4,7 +4,7 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 import { registerRoutes } from "./routes";
 import { initState } from "./init-state";
 import { startMatchingEngine, stopMatchingEngine } from "./matching-engine";
-import { autoSeedEssentialUsers, autoSeedFakeUsers } from "./auto-seed";
+import { autoSeedEssentialUsers, autoSeedFakeUsers, seedAppleReviewerAccount } from "./auto-seed";
 import { db, pool } from "./db";
 import { sql, eq, and } from "drizzle-orm";
 import { motoClubs, motoClubMembers, conversations, conversationParticipants } from "@shared/schema";
@@ -616,6 +616,11 @@ function setupErrorHandler(app: express.Application) {
           await autoSeedEssentialUsers();
         } catch (e) {
           console.warn("[INIT] autoSeedEssentialUsers error:", e);
+        }
+        try {
+          await seedAppleReviewerAccount();
+        } catch (e) {
+          console.warn("[INIT] seedAppleReviewerAccount error:", e);
         }
         try {
           const { storage } = await import("./storage");
