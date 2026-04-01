@@ -881,7 +881,24 @@
     "iosUpdateId": null,
     "commitBase": "8512e5cb9fecafa1b7bad4b69147a751de9ab585",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/d6c24117-6fef-4c60-b711-0ee1800d3adc",
-    "status": "published",
+    "status": "superseded",
     "requiresBackendDeploy": true
+  },
+  {
+    "updateNumber": 53,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-53: Fix prompt salva password — textContentType e autoComplete su tutti i form auth",
+    "publishedAt": "2026-04-01",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #344 — 4 file modificati, 7 campi TextInput aggiornati: (1) login.tsx campo identifier: aggiunto textContentType='emailAddress' autoComplete='email'; (2) login.tsx campo password: aggiunto textContentType='password' autoComplete='password'; (3) register.tsx campo password: aggiunto textContentType='newPassword' autoComplete='new-password' passwordRules='minlength: 8;'; (4) register.tsx campo confirmPassword: aggiunto textContentType='newPassword' autoComplete='new-password'; (5) forgot-password.tsx campo newPassword: aggiunto textContentType='newPassword' autoComplete='new-password' passwordRules='minlength: 8;'; (6) forgot-password.tsx campo confirmPassword: aggiunto textContentType='newPassword' autoComplete='new-password'. Effetto: iOS riconosce il contesto, autofill silenzioso al login, nessun prompt ripetuto dopo OTA.",
+    "updateGroupId": "8121fbbf-54d5-46ea-a2f6-050279819069",
+    "androidUpdateId": "019d4664-67f3-73d7-9aa6-b41eceb7e4f9",
+    "iosUpdateId": null,
+    "commitBase": "0de4c94a1d1e9956148baf78e755158158b220d0",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/8121fbbf-54d5-46ea-a2f6-050279819069",
+    "status": "published"
   }
 ]

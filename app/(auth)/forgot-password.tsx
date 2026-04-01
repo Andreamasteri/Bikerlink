@@ -229,6 +229,9 @@ export default function ForgotPasswordScreen() {
                   onChangeText={setNewPassword}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
+                  textContentType="newPassword"
+                  autoComplete="new-password"
+                  passwordRules="minlength: 8;"
                   testID="forgot-new-password"
                 />
                 <TouchableOpacity
@@ -253,6 +256,8 @@ export default function ForgotPasswordScreen() {
                   onChangeText={setConfirmPassword}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
+                  textContentType="newPassword"
+                  autoComplete="new-password"
                   testID="forgot-confirm-password"
                 />
               </View>

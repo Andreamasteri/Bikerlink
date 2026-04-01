@@ -675,6 +675,9 @@ export default function RegisterScreen() {
           onChangeText={setPassword}
           secureTextEntry={!showPassword}
           autoCapitalize="none"
+          textContentType="newPassword"
+          autoComplete="new-password"
+          passwordRules="minlength: 8;"
           testID="reg-password"
         />
         <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
@@ -696,6 +699,8 @@ export default function RegisterScreen() {
           onChangeText={setConfirmPassword}
           secureTextEntry={!showConfirmPassword}
           autoCapitalize="none"
+          textContentType="newPassword"
+          autoComplete="new-password"
           testID="reg-confirm-password"
         />
         <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeButton}>

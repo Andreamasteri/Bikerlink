@@ -93,6 +93,8 @@ export default function LoginScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
+              textContentType="emailAddress"
+              autoComplete="email"
               testID="login-identifier"
             />
           </View>
@@ -107,6 +109,8 @@ export default function LoginScreen() {
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
+              textContentType="password"
+              autoComplete="password"
               testID="login-password"
             />
             <TouchableOpacity
