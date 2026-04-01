@@ -205,13 +205,23 @@ export async function createRegionalClubInvite(userId: string, region: string): 
     if (existingInvite.length > 0) return;
 
     if (user.autoJoinClubs === false) {
-      // Invito pending: upsert per riattivare anche i declined
-      await db.insert(motoClubInvites)
-        .values({ clubId: regionalClub.id, userId, status: "pending" })
-        .onConflictDoUpdate({
-          target: [motoClubInvites.clubId, motoClubInvites.userId],
-          set: { status: "pending" },
-        });
+      // Invito pending: riattiva declined esistente o crea nuovo
+      const declinedRegional = await db.select({ id: motoClubInvites.id })
+        .from(motoClubInvites)
+        .where(and(
+          eq(motoClubInvites.clubId, regionalClub.id),
+          eq(motoClubInvites.userId, userId),
+          eq(motoClubInvites.status, "declined")
+        ))
+        .limit(1);
+      if (declinedRegional.length > 0) {
+        await db.update(motoClubInvites)
+          .set({ status: "pending" })
+          .where(eq(motoClubInvites.id, declinedRegional[0].id));
+      } else {
+        await db.insert(motoClubInvites)
+          .values({ clubId: regionalClub.id, userId, status: "pending" });
+      }
       await storage.createNotification({
         userId,
         title: "Invito al club regionale",
@@ -295,13 +305,23 @@ export async function createClubInvitesForMoto(userId: string, brand: string, mo
       if (existingInvite.length > 0) continue;
 
       if (user.autoJoinClubs === false) {
-        // Invito pending: upsert per riattivare anche i declined
-        await db.insert(motoClubInvites)
-          .values({ clubId: club.id, userId, status: "pending" })
-          .onConflictDoUpdate({
-            target: [motoClubInvites.clubId, motoClubInvites.userId],
-            set: { status: "pending" },
-          });
+        // Invito pending: riattiva declined esistente o crea nuovo
+        const declinedBrand = await db.select({ id: motoClubInvites.id })
+          .from(motoClubInvites)
+          .where(and(
+            eq(motoClubInvites.clubId, club.id),
+            eq(motoClubInvites.userId, userId),
+            eq(motoClubInvites.status, "declined")
+          ))
+          .limit(1);
+        if (declinedBrand.length > 0) {
+          await db.update(motoClubInvites)
+            .set({ status: "pending" })
+            .where(eq(motoClubInvites.id, declinedBrand[0].id));
+        } else {
+          await db.insert(motoClubInvites)
+            .values({ clubId: club.id, userId, status: "pending" });
+        }
         await storage.createNotification({
           userId,
           title: "Invito al club",
