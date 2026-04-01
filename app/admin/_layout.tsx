@@ -21,7 +21,7 @@ export default function AdminLayout() {
       <Stack.Screen name="analytics" options={{ title: "Analytics" }} />
       <Stack.Screen name="settings" options={{ title: "Impostazioni" }} />
       <Stack.Screen name="performance" options={{ title: "Record Performance" }} />
-      <Stack.Screen name="fake-users" options={{ title: "Utenti Fake" }} />
+      <Stack.Screen name="stregatti" options={{ title: "Stregatti" }} />
       <Stack.Screen name="db-debug" options={{ title: "DB Debug" }} />
       <Stack.Screen name="ota-history" options={{ title: "Storico OTA" }} />
       <Stack.Screen name="motoclubs" options={{ title: "Motoclub" }} />

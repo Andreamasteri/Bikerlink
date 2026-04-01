@@ -194,7 +194,7 @@ export default function FakeUsersAdmin() {
   const toggleAllMutation = useMutation({
     mutationFn: async ({ enabled, adminPassword }: { enabled: boolean; adminPassword: string }) => {
       const baseUrl = getApiUrl();
-      const url = new URL("/api/admin/fake-users/toggle-all", baseUrl);
+      const url = new URL("/api/admin/stregatti/toggle-all", baseUrl);
       const res = await fetch(url.toString(), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -208,7 +208,7 @@ export default function FakeUsersAdmin() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/fake-users-enabled"] });
     },
   });
@@ -222,15 +222,15 @@ export default function FakeUsersAdmin() {
     fetchNextPage,
     error: usersError,
   } = useInfiniteQuery<FakeUsersPage>({
-    queryKey: ["/api/admin/fake-users", filter],
+    queryKey: ["/api/admin/stregatti", filter],
     queryFn: async ({ pageParam = 0 }) => {
-      const url = new URL("/api/admin/fake-users", getApiUrl());
+      const url = new URL("/api/admin/stregatti", getApiUrl());
       url.searchParams.set("limit", String(PAGE_SIZE));
       url.searchParams.set("offset", String((pageParam as number) * PAGE_SIZE));
       url.searchParams.set("type", filter);
       const res = await fetch(url.toString(), { credentials: "include" });
       if (res.status === 401) throw new Error("Sessione scaduta — effettua di nuovo il login come admin");
-      if (!res.ok) throw new Error("Errore caricamento utenti fake");
+      if (!res.ok) throw new Error("Errore caricamento stregatti");
       return res.json();
     },
     getNextPageParam: (lastPage, allPages) => lastPage.hasMore ? allPages.length : undefined,
@@ -243,29 +243,29 @@ export default function FakeUsersAdmin() {
   const pageStats = usersData?.pages[0]?.stats ?? { total: 0, biker: 0, zavorrina: 0, coppia: 0 };
 
   const toggleAvailableMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("PUT", `/api/admin/fake-users/${id}/toggle-available`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] }),
+    mutationFn: (id: string) => apiRequest("PUT", `/api/admin/stregatti/${id}/toggle-available`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] }),
   });
 
   const toggleOnlineMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("PUT", `/api/admin/fake-users/${id}/toggle-online`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] }),
+    mutationFn: (id: string) => apiRequest("PUT", `/api/admin/stregatti/${id}/toggle-online`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/fake-users/${id}`),
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/stregatti/${id}`),
     onSuccess: () => {
       setDeleteSingleTarget(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] });
     },
   });
 
   const deleteAllMutation = useMutation({
-    mutationFn: () => apiRequest("DELETE", "/api/admin/fake-users"),
+    mutationFn: () => apiRequest("DELETE", "/api/admin/stregatti"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/fake-users-enabled"] });
-      setDeleteAllResultMsg({ type: "success", text: "Tutti gli utenti fake eliminati." });
+      setDeleteAllResultMsg({ type: "success", text: "Tutti gli stregatti eliminati." });
     },
     onError: (error: Error) => {
       setDeleteAllResultMsg({ type: "error", text: error.message || "Errore durante l'eliminazione" });
@@ -280,10 +280,10 @@ export default function FakeUsersAdmin() {
 
   const [wakeAllResult, setWakeAllResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const wakeAllMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/admin/fake-users/wake-all", {}),
+    mutationFn: () => apiRequest("POST", "/api/admin/stregatti/wake-all", {}),
     onSuccess: (data: any) => {
-      setWakeAllResult({ type: "success", text: `${data?.count ?? "?"} utenti fake portati online` });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] });
+      setWakeAllResult({ type: "success", text: `${data?.count ?? "?"} stregatti portati online` });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] });
     },
     onError: () => setWakeAllResult({ type: "error", text: "Errore durante l'operazione" }),
   });
@@ -316,7 +316,7 @@ export default function FakeUsersAdmin() {
   });
 
   const distributeMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/admin/fake-users/distribute-to-clubs", {}),
+    mutationFn: () => apiRequest("POST", "/api/admin/stregatti/distribute-to-clubs", {}),
     onSuccess: (data: any) => {
       setDistributeResult({ type: "success", text: `${data?.usersProcessed ?? "?"} utenti distribuiti (${data?.assigned ?? 0} assegnazioni)` });
     },
@@ -343,7 +343,7 @@ export default function FakeUsersAdmin() {
       setMassSeedError(data.error);
       if (!data.running) {
         stopPolling();
-        queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] });
       }
     } catch {}
   };
@@ -393,9 +393,9 @@ export default function FakeUsersAdmin() {
   };
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/admin/fake-users", data),
+    mutationFn: (data: any) => apiRequest("POST", "/api/admin/stregatti", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/fake-users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] });
       setCreateModalVisible(false);
       resetForm();
     },
@@ -450,7 +450,7 @@ export default function FakeUsersAdmin() {
     setLoadingChat(true);
     setChatModalVisible(true);
     try {
-      const url = new URL(`/api/admin/fake-users/${userId}/conversations`, getApiUrl()).toString();
+      const url = new URL(`/api/admin/stregatti/${userId}/conversations`, getApiUrl()).toString();
       const res = await fetch(url, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
@@ -466,7 +466,7 @@ export default function FakeUsersAdmin() {
     setSelectedConvId(convId);
     setLoadingChat(true);
     try {
-      const url = new URL(`/api/admin/fake-users/conversations/${convId}/messages`, getApiUrl()).toString();
+      const url = new URL(`/api/admin/stregatti/conversations/${convId}/messages`, getApiUrl()).toString();
       const res = await fetch(url, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
@@ -481,7 +481,7 @@ export default function FakeUsersAdmin() {
   const handleDeleteAllFakeChats = async () => {
     Alert.alert(
       "Elimina tutte le chat fake",
-      "Eliminare TUTTE le conversazioni di TUTTI gli utenti fake? L'operazione non è reversibile.",
+      "Eliminare TUTTE le conversazioni di TUTTI gli stregatti? L'operazione non è reversibile.",
       [
         { text: "Annulla", style: "cancel" },
         {
@@ -491,7 +491,7 @@ export default function FakeUsersAdmin() {
             setDeletingAllChats(true);
             setDeleteAllChatsResult(null);
             try {
-              const url = new URL("/api/admin/fake-users/all-conversations", getApiUrl()).toString();
+              const url = new URL("/api/admin/stregatti/all-conversations", getApiUrl()).toString();
               const res = await fetch(url, { method: "DELETE", credentials: "include" });
               const data = await res.json();
               if (res.ok) {
@@ -522,7 +522,7 @@ export default function FakeUsersAdmin() {
           onPress: async () => {
             setDeletingChats(true);
             try {
-              const url = new URL(`/api/admin/fake-users/${selectedUserId}/conversations`, getApiUrl()).toString();
+              const url = new URL(`/api/admin/stregatti/${selectedUserId}/conversations`, getApiUrl()).toString();
               const res = await fetch(url, { method: "DELETE", credentials: "include" });
               if (res.ok) {
                 setConversations([]);
@@ -658,13 +658,13 @@ export default function FakeUsersAdmin() {
         }
         ListHeaderComponent={
           <View>
-            <Text style={styles.title}>Utenti Fake</Text>
+            <Text style={styles.title}>Stregatti</Text>
 
             <View style={styles.controlsCard}>
           <View style={styles.controlRow}>
             <View style={styles.controlInfo}>
               <Ionicons name="people" size={20} color={Colors.accent} />
-              <Text style={styles.controlLabel}>Abilita utenti fake</Text>
+              <Text style={styles.controlLabel}>Abilita stregatti</Text>
             </View>
             <Switch
               value={allEnabled}
@@ -679,7 +679,7 @@ export default function FakeUsersAdmin() {
             />
           </View>
           <Text style={styles.controlDesc}>
-            {allEnabled ? "Tutti gli utenti fake sono attivi e visibili" : "Gli utenti fake sono disattivati"}
+            {allEnabled ? "Tutti gli stregatti sono attivi e visibili" : "Gli stregatti sono disattivati"}
           </Text>
           {!!usersError && (
             <Text style={[styles.controlDesc, { color: Colors.error ?? "#e53935" }]}>
@@ -763,7 +763,7 @@ export default function FakeUsersAdmin() {
             <Text style={styles.massSeedTitle}>Generazione Massiva</Text>
           </View>
           <Text style={styles.massSeedDesc}>
-            Genera 5000 utenti fake (3000 biker M, 500 biker F, 500 coppie, 850 zav F, 150 zav M) distribuiti uniformemente in tutta Europa.
+            Genera 5000 stregatti (3000 biker M, 500 biker F, 500 coppie, 850 zav F, 150 zav M) distribuiti uniformemente in tutta Europa.
           </Text>
           {massSeedRunning && (
             <View style={styles.massSeedProgress}>
@@ -799,7 +799,7 @@ export default function FakeUsersAdmin() {
 
           <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 12, gap: 8 }}>
             <Text style={[styles.massSeedDesc, { marginBottom: 0 }]}>
-              Porta tutti gli utenti fake online aggiornando l'ultima sessione a adesso.
+              Porta tutti gli stregatti online aggiornando l'ultima sessione a adesso.
             </Text>
             {!!wakeAllResult && (
               <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: wakeAllResult.type === "success" ? Colors.success : Colors.error }}>
@@ -1261,7 +1261,7 @@ export default function FakeUsersAdmin() {
           <View style={styles.pwdModalContainer}>
             <Text style={styles.pwdModalTitle}>Generazione Massiva</Text>
             <Text style={styles.pwdModalDesc}>
-              Verranno generati 5000 utenti fake distribuiti uniformemente in tutta Europa (88 zone).{"\n\n"}Questo processo richiederà qualche minuto.
+              Verranno generati 5000 stregatti distribuiti uniformemente in tutta Europa (88 zone).{"\n\n"}Questo processo richiederà qualche minuto.
             </Text>
             <View style={styles.pwdModalButtons}>
               <TouchableOpacity
@@ -1285,7 +1285,7 @@ export default function FakeUsersAdmin() {
         <View style={styles.modalOverlay}>
           <View style={styles.pwdModalContainer}>
             <Text style={styles.pwdModalTitle}>
-              {pendingToggleVal ? "Abilita utenti fake" : "Disabilita utenti fake"}
+              {pendingToggleVal ? "Abilita stregatti" : "Disabilita stregatti"}
             </Text>
             <Text style={styles.pwdModalDesc}>
               Inserisci la password admin per confermare questa operazione.
@@ -1347,8 +1347,8 @@ export default function FakeUsersAdmin() {
         <View style={styles.modalOverlay}>
           <View style={styles.confirmBox}>
             <Ionicons name="warning" size={36} color={Colors.error} style={{ marginBottom: 12 }} />
-            <Text style={styles.confirmTitle}>Elimina tutti gli utenti fake?</Text>
-            <Text style={styles.confirmDesc}>Questa azione elimina permanentemente tutti i {totalCount} utenti fake e non può essere annullata.</Text>
+            <Text style={styles.confirmTitle}>Elimina tutti gli stregatti?</Text>
+            <Text style={styles.confirmDesc}>Questa azione elimina permanentemente tutti i {totalCount} stregatti e non può essere annullata.</Text>
             <View style={styles.confirmBtns}>
               <TouchableOpacity
                 style={[styles.confirmCancelBtn, deleteAllMutation.isPending && { opacity: 0.4 }]}

@@ -1313,7 +1313,7 @@ router.get("/logs", async (_req: Request, res: Response) => {
   }
 });
 
-router.get("/fake-users", async (req: Request, res: Response) => {
+router.get("/stregatti", async (req: Request, res: Response) => {
   try {
     const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10) || 50, 200);
     const offset = parseInt(String(req.query.offset ?? "0"), 10) || 0;
@@ -1326,7 +1326,7 @@ router.get("/fake-users", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/fake-users", async (req: Request, res: Response) => {
+router.post("/stregatti", async (req: Request, res: Response) => {
   try {
     const { nickname, userType, sex, coupleSexConfig, birthYear, region, bio, moto, wishlistDescription, wishlistMotos } = req.body;
     if (!nickname || !userType) {
@@ -1643,7 +1643,7 @@ router.get("/users/:id/stats", async (req: Request, res: Response) => {
   }
 });
 
-router.put("/fake-users/toggle-all", async (req: Request, res: Response) => {
+router.put("/stregatti/toggle-all", async (req: Request, res: Response) => {
   try {
     const { enabled, adminPassword } = req.body;
     if (typeof enabled !== "boolean") {
@@ -1679,7 +1679,7 @@ router.put("/fake-users/toggle-all", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/fake-users", async (req: Request, res: Response) => {
+router.delete("/stregatti", async (req: Request, res: Response) => {
   console.log("[Admin] DELETE /fake-users ricevuto");
   try {
     const count = await storage.deleteAllFakeUsers();
@@ -1699,7 +1699,7 @@ router.delete("/fake-users", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/fake-users/:id", async (req: Request, res: Response) => {
+router.delete("/stregatti/:id", async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     await storage.deleteFakeUser(id);
@@ -1710,7 +1710,7 @@ router.delete("/fake-users/:id", async (req: Request, res: Response) => {
   }
 });
 
-router.put("/fake-users/:id/toggle-available", async (req: Request, res: Response) => {
+router.put("/stregatti/:id/toggle-available", async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     const profile = await storage.getUserProfile(id);
@@ -1729,7 +1729,7 @@ router.put("/fake-users/:id/toggle-available", async (req: Request, res: Respons
   }
 });
 
-router.put("/fake-users/:id/toggle-online", async (req: Request, res: Response) => {
+router.put("/stregatti/:id/toggle-online", async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     const user = await storage.getUser(id);
@@ -1749,7 +1749,7 @@ router.put("/fake-users/:id/toggle-online", async (req: Request, res: Response) 
   }
 });
 
-router.get("/fake-users/:id/conversations", async (req: Request, res: Response) => {
+router.get("/stregatti/:id/conversations", async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     const convs = await storage.getFakeUserConversations(id);
@@ -1760,7 +1760,7 @@ router.get("/fake-users/:id/conversations", async (req: Request, res: Response) 
   }
 });
 
-router.delete("/fake-users/all-conversations", async (req: Request, res: Response) => {
+router.delete("/stregatti/all-conversations", async (req: Request, res: Response) => {
   try {
     const fakeUsers = await db.select({ id: users.id, nickname: users.nickname })
       .from(users)
@@ -1787,7 +1787,7 @@ router.delete("/fake-users/all-conversations", async (req: Request, res: Respons
   }
 });
 
-router.delete("/fake-users/:id/conversations", async (req: Request, res: Response) => {
+router.delete("/stregatti/:id/conversations", async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     const user = await storage.getUser(id);
@@ -1814,7 +1814,7 @@ router.delete("/fake-users/:id/conversations", async (req: Request, res: Respons
   }
 });
 
-router.get("/fake-users/conversations/:convId/messages", async (req: Request, res: Response) => {
+router.get("/stregatti/conversations/:convId/messages", async (req: Request, res: Response) => {
   try {
     const convId = req.params.convId;
     const msgs = await storage.getMessages(convId, 200, 0);
@@ -2478,7 +2478,7 @@ router.get("/db-stats", async (_req: Request, res: Response) => {
   }
 });
 
-router.post("/fake-users/wake-all", async (_req: Request, res: Response) => {
+router.post("/stregatti/wake-all", async (_req: Request, res: Response) => {
   try {
     const now = new Date();
     const fakeUserIds = db.select({ id: users.id }).from(users).where(eq(users.isFake, true));
@@ -2499,7 +2499,7 @@ router.post("/fake-users/wake-all", async (_req: Request, res: Response) => {
   }
 });
 
-router.post("/fake-users/distribute-to-clubs", async (_req: Request, res: Response) => {
+router.post("/stregatti/distribute-to-clubs", async (_req: Request, res: Response) => {
   try {
     const [fakeUsers, approvedClubs] = await Promise.all([
       db.select({ id: users.id }).from(users).where(eq(users.isFake, true)),

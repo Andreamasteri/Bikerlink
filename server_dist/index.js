@@ -10989,7 +10989,7 @@ router17.get("/logs", async (_req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-router17.get("/fake-users", async (req, res) => {
+router17.get("/stregatti", async (req, res) => {
   try {
     const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10) || 50, 200);
     const offset = parseInt(String(req.query.offset ?? "0"), 10) || 0;
@@ -11001,7 +11001,7 @@ router17.get("/fake-users", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-router17.post("/fake-users", async (req, res) => {
+router17.post("/stregatti", async (req, res) => {
   try {
     const { nickname, userType, sex, coupleSexConfig, birthYear, region, bio, moto, wishlistDescription, wishlistMotos } = req.body;
     if (!nickname || !userType) {
@@ -11430,7 +11430,7 @@ router17.get("/users/:id/stats", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-router17.put("/fake-users/toggle-all", async (req, res) => {
+router17.put("/stregatti/toggle-all", async (req, res) => {
   try {
     const { enabled, adminPassword } = req.body;
     if (typeof enabled !== "boolean") {
@@ -11465,7 +11465,7 @@ router17.put("/fake-users/toggle-all", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-router17.delete("/fake-users", async (req, res) => {
+router17.delete("/stregatti", async (req, res) => {
   console.log("[Admin] DELETE /fake-users ricevuto");
   try {
     const count3 = await storage.deleteAllFakeUsers();
@@ -11484,7 +11484,7 @@ router17.delete("/fake-users", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-router17.delete("/fake-users/:id", async (req, res) => {
+router17.delete("/stregatti/:id", async (req, res) => {
   try {
     const id = req.params.id;
     await storage.deleteFakeUser(id);
@@ -11494,7 +11494,7 @@ router17.delete("/fake-users/:id", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-router17.put("/fake-users/:id/toggle-available", async (req, res) => {
+router17.put("/stregatti/:id/toggle-available", async (req, res) => {
   try {
     const id = req.params.id;
     const profile = await storage.getUserProfile(id);
@@ -11512,7 +11512,7 @@ router17.put("/fake-users/:id/toggle-available", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-router17.put("/fake-users/:id/toggle-online", async (req, res) => {
+router17.put("/stregatti/:id/toggle-online", async (req, res) => {
   try {
     const id = req.params.id;
     const user = await storage.getUser(id);
@@ -11531,7 +11531,7 @@ router17.put("/fake-users/:id/toggle-online", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-router17.get("/fake-users/:id/conversations", async (req, res) => {
+router17.get("/stregatti/:id/conversations", async (req, res) => {
   try {
     const id = req.params.id;
     const convs = await storage.getFakeUserConversations(id);
@@ -11541,7 +11541,7 @@ router17.get("/fake-users/:id/conversations", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-router17.delete("/fake-users/all-conversations", async (req, res) => {
+router17.delete("/stregatti/all-conversations", async (req, res) => {
   try {
     const fakeUsers = await db.select({ id: users.id, nickname: users.nickname }).from(users).where((0, import_drizzle_orm9.and)((0, import_drizzle_orm9.eq)(users.isFake, true), (0, import_drizzle_orm9.ne)(users.nickname, "BikerLink_Official")));
     let deleted = 0;
@@ -11565,7 +11565,7 @@ router17.delete("/fake-users/all-conversations", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-router17.delete("/fake-users/:id/conversations", async (req, res) => {
+router17.delete("/stregatti/:id/conversations", async (req, res) => {
   try {
     const id = req.params.id;
     const user = await storage.getUser(id);
@@ -11591,7 +11591,7 @@ router17.delete("/fake-users/:id/conversations", async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-router17.get("/fake-users/conversations/:convId/messages", async (req, res) => {
+router17.get("/stregatti/conversations/:convId/messages", async (req, res) => {
   try {
     const convId = req.params.convId;
     const msgs = await storage.getMessages(convId, 200, 0);
@@ -12177,7 +12177,7 @@ router17.get("/db-stats", async (_req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-router17.post("/fake-users/wake-all", async (_req, res) => {
+router17.post("/stregatti/wake-all", async (_req, res) => {
   try {
     const now = /* @__PURE__ */ new Date();
     const fakeUserIds = db.select({ id: users.id }).from(users).where((0, import_drizzle_orm9.eq)(users.isFake, true));
@@ -12191,7 +12191,7 @@ router17.post("/fake-users/wake-all", async (_req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
-router17.post("/fake-users/distribute-to-clubs", async (_req, res) => {
+router17.post("/stregatti/distribute-to-clubs", async (_req, res) => {
   try {
     const [fakeUsers, approvedClubs] = await Promise.all([
       db.select({ id: users.id }).from(users).where((0, import_drizzle_orm9.eq)(users.isFake, true)),
