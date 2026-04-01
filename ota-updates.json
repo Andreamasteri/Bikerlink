@@ -1,1 +1,22 @@
-[]
+[
+  {
+    "updateNumber": 1,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-01: Test ciaociao — nuovo workflow",
+    "publishedAt": "2026-04-01",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #379 — Prima OTA del nuovo ciclo con APK versionCode 4. Nuovo workflow: entry pre-popolata prima della pubblicazione. Bundle Hermes .hbc 3.61 MB (1514 modules).",
+    "updateGroupId": "99d3613f-a7a8-494e-a8fc-7af955c39996",
+    "androidUpdateId": "019d4b67-1ebb-7b5f-842e-341f21a8c7bf",
+    "iosUpdateId": null,
+    "commitBase": "db556ad66390971443c365abbd5d3ed0bfdd3660",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/99d3613f-a7a8-494e-a8fc-7af955c39996",
+    "apkBuildId": "0160475b-70da-416b-b854-c5c0ed7338be",
+    "apkUrl": "https://expo.dev/artifacts/eas/aRCt9ihwPdLrnbUfkMU33.apk",
+    "status": "published"
+  }
+]
