@@ -2,7 +2,7 @@
   "expo": {
     "name": "BikerLink",
     "slug": "bikerlink",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "bikerlink",
@@ -24,9 +24,9 @@
       }
     },
     "android": {
-      "jsEngine": "jsc",
+      "jsEngine": "hermes",
       "package": "com.bikerlink.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -64,7 +64,7 @@
       "fallbackToCacheTimeout": 0,
       "checkAutomatically": "ON_LOAD"
     },
-    "runtimeVersion": "1.0.0",
+    "runtimeVersion": "2.0.0",
     "extra": {
       "router": {
         "origin": "https://replit.com/"
