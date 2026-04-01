@@ -4512,20 +4512,24 @@ async function createRegionalClubInvite(userId, region) {
     )).limit(1);
     if (existingInvite.length > 0) return;
     if (user.autoJoinClubs === false) {
-      const inserted = await db.insert(motoClubInvites).values({ clubId: regionalClub.id, userId, status: "pending" }).onConflictDoNothing().returning({ id: motoClubInvites.id });
-      if (inserted.length > 0) {
-        await storage.createNotification({
-          userId,
-          title: "Invito al club regionale",
-          body: `Sei stato invitato nel club "${regionalClub.name}"`,
-          notificationType: "motoclub_invite",
-          referenceType: "motoclub",
-          referenceId: regionalClub.id
-        });
-      }
+      await db.insert(motoClubInvites).values({ clubId: regionalClub.id, userId, status: "pending" }).onConflictDoUpdate({
+        target: [motoClubInvites.clubId, motoClubInvites.userId],
+        set: { status: "pending" }
+      });
+      await storage.createNotification({
+        userId,
+        title: "Invito al club regionale",
+        body: `Sei stato invitato nel club "${regionalClub.name}"`,
+        notificationType: "motoclub_invite",
+        referenceType: "motoclub",
+        referenceId: regionalClub.id
+      });
       return;
     }
-    await db.insert(motoClubMembers).values({ clubId: regionalClub.id, userId, status: "active" }).onConflictDoNothing();
+    await db.insert(motoClubMembers).values({ clubId: regionalClub.id, userId, status: "active" }).onConflictDoUpdate({
+      target: [motoClubMembers.clubId, motoClubMembers.userId],
+      set: { status: "active", joinedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }
+    });
     let convId = regionalClub.conversationId;
     if (!convId) convId = await createClubConversation(regionalClub.id, regionalClub.name);
     if (convId) await addMemberToConversation(convId, userId);
@@ -4571,20 +4575,24 @@ async function createClubInvitesForMoto(userId, brand, model) {
       )).limit(1);
       if (existingInvite.length > 0) continue;
       if (user.autoJoinClubs === false) {
-        const inserted = await db.insert(motoClubInvites).values({ clubId: club.id, userId, status: "pending" }).onConflictDoNothing().returning({ id: motoClubInvites.id });
-        if (inserted.length > 0) {
-          await storage.createNotification({
-            userId,
-            title: "Invito al club",
-            body: `Sei stato invitato nel club "${club.name}"`,
-            notificationType: "motoclub_invite",
-            referenceType: "motoclub",
-            referenceId: club.id
-          });
-        }
+        await db.insert(motoClubInvites).values({ clubId: club.id, userId, status: "pending" }).onConflictDoUpdate({
+          target: [motoClubInvites.clubId, motoClubInvites.userId],
+          set: { status: "pending" }
+        });
+        await storage.createNotification({
+          userId,
+          title: "Invito al club",
+          body: `Sei stato invitato nel club "${club.name}"`,
+          notificationType: "motoclub_invite",
+          referenceType: "motoclub",
+          referenceId: club.id
+        });
         continue;
       }
-      await db.insert(motoClubMembers).values({ clubId: club.id, userId, status: "active" }).onConflictDoNothing();
+      await db.insert(motoClubMembers).values({ clubId: club.id, userId, status: "active" }).onConflictDoUpdate({
+        target: [motoClubMembers.clubId, motoClubMembers.userId],
+        set: { status: "active", joinedAt: /* @__PURE__ */ new Date(), updatedAt: /* @__PURE__ */ new Date() }
+      });
       let convId = club.conversationId;
       if (!convId) convId = await createClubConversation(club.id, club.name);
       if (convId) await addMemberToConversation(convId, userId);

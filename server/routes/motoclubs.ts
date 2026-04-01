@@ -205,28 +205,31 @@ export async function createRegionalClubInvite(userId: string, region: string): 
     if (existingInvite.length > 0) return;
 
     if (user.autoJoinClubs === false) {
-      // Comportamento legacy: invito pending (notifica solo se riga creata)
-      const inserted = await db.insert(motoClubInvites)
+      // Invito pending: upsert per riattivare anche i declined
+      await db.insert(motoClubInvites)
         .values({ clubId: regionalClub.id, userId, status: "pending" })
-        .onConflictDoNothing()
-        .returning({ id: motoClubInvites.id });
-      if (inserted.length > 0) {
-        await storage.createNotification({
-          userId,
-          title: "Invito al club regionale",
-          body: `Sei stato invitato nel club "${regionalClub.name}"`,
-          notificationType: "motoclub_invite",
-          referenceType: "motoclub",
-          referenceId: regionalClub.id,
+        .onConflictDoUpdate({
+          target: [motoClubInvites.clubId, motoClubInvites.userId],
+          set: { status: "pending" },
         });
-      }
+      await storage.createNotification({
+        userId,
+        title: "Invito al club regionale",
+        body: `Sei stato invitato nel club "${regionalClub.name}"`,
+        notificationType: "motoclub_invite",
+        referenceType: "motoclub",
+        referenceId: regionalClub.id,
+      });
       return;
     }
 
-    // Auto-join diretto
+    // Auto-join diretto: upsert per riattivare anche i left
     await db.insert(motoClubMembers)
       .values({ clubId: regionalClub.id, userId, status: "active" })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: [motoClubMembers.clubId, motoClubMembers.userId],
+        set: { status: "active", joinedAt: new Date(), updatedAt: new Date() },
+      });
 
     let convId = regionalClub.conversationId;
     if (!convId) convId = await createClubConversation(regionalClub.id, regionalClub.name);
@@ -292,28 +295,31 @@ export async function createClubInvitesForMoto(userId: string, brand: string, mo
       if (existingInvite.length > 0) continue;
 
       if (user.autoJoinClubs === false) {
-        // Comportamento legacy: invito pending (notifica solo se riga creata)
-        const inserted = await db.insert(motoClubInvites)
+        // Invito pending: upsert per riattivare anche i declined
+        await db.insert(motoClubInvites)
           .values({ clubId: club.id, userId, status: "pending" })
-          .onConflictDoNothing()
-          .returning({ id: motoClubInvites.id });
-        if (inserted.length > 0) {
-          await storage.createNotification({
-            userId,
-            title: "Invito al club",
-            body: `Sei stato invitato nel club "${club.name}"`,
-            notificationType: "motoclub_invite",
-            referenceType: "motoclub",
-            referenceId: club.id,
+          .onConflictDoUpdate({
+            target: [motoClubInvites.clubId, motoClubInvites.userId],
+            set: { status: "pending" },
           });
-        }
+        await storage.createNotification({
+          userId,
+          title: "Invito al club",
+          body: `Sei stato invitato nel club "${club.name}"`,
+          notificationType: "motoclub_invite",
+          referenceType: "motoclub",
+          referenceId: club.id,
+        });
         continue;
       }
 
-      // Auto-join diretto
+      // Auto-join diretto: upsert per riattivare anche i left
       await db.insert(motoClubMembers)
         .values({ clubId: club.id, userId, status: "active" })
-        .onConflictDoNothing();
+        .onConflictDoUpdate({
+          target: [motoClubMembers.clubId, motoClubMembers.userId],
+          set: { status: "active", joinedAt: new Date(), updatedAt: new Date() },
+        });
 
       let convId = club.conversationId;
       if (!convId) convId = await createClubConversation(club.id, club.name);
