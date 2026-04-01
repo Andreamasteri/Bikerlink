@@ -1001,6 +1001,23 @@
     "iosUpdateId": null,
     "commitBase": "6e87b4746c7f87ebc7a0013251c4d9d13db8c9d3",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/102a71fb-4456-4cf8-9b6c-fbaa0ccbed17",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 59,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-59: Rebuild bundle - fix aggiornamento OTA-58 (Tab Accettati+Blacklist, match, supporto email)",
+    "publishedAt": "2026-04-01",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Ripubblicazione bundle fresco di OTA-58 per risolvere mancato aggiornamento su alcuni dispositivi. Stesso contenuto: Task #354 (Tab Accettati+Blacklist), Task #355 (escludi admin match), Task #356 (solo email supporto), Task #357 (tab match due righe).",
+    "updateGroupId": "36a447e6-453e-4637-9c87-5e5ed58430b9",
+    "androidUpdateId": "019d497b-ed74-7ee1-945d-bb8353630bd0",
+    "iosUpdateId": null,
+    "commitBase": "58964085fe4a00ead84c7ee7b7c8a8105a56d225",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/36a447e6-453e-4637-9c87-5e5ed58430b9",
     "status": "published"
   }
 ]
