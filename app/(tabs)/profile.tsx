@@ -987,6 +987,10 @@ export default function ProfileScreen() {
         </Pressable>
       </Modal>
 
+      <Text style={{ color: "#3B82F6", fontSize: 14, fontFamily: "Inter_500Medium", textAlign: "center", marginTop: 24, marginBottom: 8 }}>
+        ciancio
+      </Text>
+
       <View style={{ height: 40 }} />
     </ScrollView>
   );

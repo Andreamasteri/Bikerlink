@@ -1115,6 +1115,27 @@
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/ca9f6229-c78a-44db-8512-bead33ae30f3",
     "apkBuildId": "1c56b89d-31b5-457a-b6dc-eaf04b2259c5",
     "apkUrl": "https://expo.dev/artifacts/eas/4uXX2pRPGhYQTf4shL8U3H.apk",
+    "status": "superseded"
+  },
+
+  {
+    "updateNumber": 3,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-03 (v2.0.0): Test visivo - testo ciancio blu nel profilo",
+    "publishedAt": "2026-04-01",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #373 — OTA di test end-to-end per verificare ricezione OTA-02. Aggiunge testo 'ciancio' in blu (#3B82F6) in fondo al profilo utente. Bundle Hermes .hbc 3.69 MB.",
+    "updateGroupId": "4fc7ea4b-01d8-4117-9de3-03ec435c3701",
+    "androidUpdateId": "019d4aef-7888-77ec-8039-2413647cc0b0",
+    "iosUpdateId": null,
+    "commitBase": "d4d2a579a30e33149ef107a5fc2c267ba2bb3f2c",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/4fc7ea4b-01d8-4117-9de3-03ec435c3701",
+    "apkBuildId": "1c56b89d-31b5-457a-b6dc-eaf04b2259c5",
+    "apkUrl": "https://expo.dev/artifacts/eas/4uXX2pRPGhYQTf4shL8U3H.apk",
     "status": "published"
   }
 ]
