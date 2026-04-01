@@ -368,6 +368,7 @@ export interface IStorage {
   isBlocked(userId1: string, userId2: string): Promise<boolean>;
   hasBlockedUser(blockerId: string, blockedId: string): Promise<boolean>;
   getBlockedUserIds(userId: string): Promise<string[]>;
+  getBlockedUsersByBlocker(blockerId: string): Promise<Array<{ id: string; nickname: string; userType: string | null; avatarUrl: string | null }>>;
   getAllBlockedPairs(): Promise<Array<{ blockerId: string; blockedId: string }>>;
   deleteBikerBikerMatchesBetween(userId1: string, userId2: string): Promise<number>;
 }
@@ -1960,6 +1961,20 @@ export class DatabaseStorage implements IStorage {
       )
     );
     return rows.map(r => r.blockerId === userId ? r.blockedId : r.blockerId);
+  }
+
+  async getBlockedUsersByBlocker(blockerId: string): Promise<Array<{ id: string; nickname: string; userType: string | null; avatarUrl: string | null }>> {
+    const rows = await db
+      .select({
+        id: users.id,
+        nickname: users.nickname,
+        userType: users.userType,
+        avatarUrl: users.avatarUrl,
+      })
+      .from(userBlocks)
+      .innerJoin(users, eq(users.id, userBlocks.blockedId))
+      .where(eq(userBlocks.blockerId, blockerId));
+    return rows;
   }
 
   async getAllBlockedPairs(): Promise<Array<{ blockerId: string; blockedId: string }>> {

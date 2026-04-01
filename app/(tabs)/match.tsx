@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
   TextInput,
+  Image,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
@@ -453,7 +454,7 @@ function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, 
   );
 }
 
-type TabKey = "zavorrine" | "biker" | "proposals";
+type TabKey = "zavorrine" | "biker" | "proposals" | "accepted" | "blacklist";
 
 export default function MatchScreen() {
   const router = useRouter();
@@ -499,11 +500,18 @@ export default function MatchScreen() {
     refetchOnMount: true,
   });
 
+  const { data: blockedUsers, isLoading: blockedLoading, refetch: blockedRefetch, isRefetching: blockedRefetching } = useQuery<any[]>({
+    queryKey: ["/api/users/blocked"],
+    enabled: !!user,
+    refetchOnMount: true,
+  });
+
   const prevMatchCountRef = useRef<number | null>(null);
 
   const allProposalMatches = proposalMatches || [];
   const allGarageMatches = garageMatches || [];
   const allBikerMatches = bikerMatches || [];
+  const allBlockedUsers = blockedUsers || [];
 
   const matchSortScore = (m: any): number => {
     const isSuper = !!m.isSupermatch;
@@ -543,6 +551,22 @@ export default function MatchScreen() {
     });
   const visibleProposalMatches = allProposalMatches.filter((m: any) => m.status !== "rejected" && m.status !== "expired" && m.status !== "accepted");
 
+  const acceptedGarageMatches = allGarageMatches
+    .filter((m: any) => m.status === "accepted")
+    .map((m: any) => ({ ...m, _matchType: "garage" as const }));
+  const acceptedBikerMatches = allBikerMatches
+    .filter((m: any) => m.status === "accepted")
+    .map((m: any) => ({ ...m, _matchType: "biker" as const }));
+  const acceptedProposalMatches = allProposalMatches
+    .filter((m: any) => m.status === "accepted")
+    .map((m: any) => ({ ...m, _matchType: "proposal" as const }));
+  const allAcceptedMatches = [...acceptedGarageMatches, ...acceptedBikerMatches, ...acceptedProposalMatches]
+    .sort((a: any, b: any) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bTime - aTime;
+    });
+
   const newGarageMatches = visibleGarageMatches.filter((m: any) => m.status === "new");
   const newBikerMatches = visibleBikerMatches.filter((m: any) => m.status === "new");
   const newProposalMatches = visibleProposalMatches.filter((m: any) => m.status === "pending");
@@ -567,16 +591,29 @@ export default function MatchScreen() {
   const currentList =
     activeTab === "zavorrine" ? visibleGarageMatches :
     activeTab === "biker" ? visibleBikerMatches :
-    visibleProposalMatches;
+    activeTab === "proposals" ? visibleProposalMatches :
+    activeTab === "accepted" ? allAcceptedMatches :
+    allBlockedUsers;
 
-  const isLoading = activeTab === "zavorrine" ? garageLoading : activeTab === "biker" ? bikerLoading : proposalLoading;
-  const isRefetching = activeTab === "zavorrine" ? garageRefetching : activeTab === "biker" ? bikerRefetching : proposalRefetching;
+  const isLoading =
+    activeTab === "zavorrine" ? garageLoading :
+    activeTab === "biker" ? bikerLoading :
+    activeTab === "proposals" ? proposalLoading :
+    activeTab === "accepted" ? (garageLoading || bikerLoading || proposalLoading) :
+    blockedLoading;
+  const isRefetching =
+    activeTab === "zavorrine" ? garageRefetching :
+    activeTab === "biker" ? bikerRefetching :
+    activeTab === "proposals" ? proposalRefetching :
+    activeTab === "accepted" ? (garageRefetching || bikerRefetching || proposalRefetching) :
+    blockedRefetching;
 
   const onRefresh = useCallback(() => {
     garageRefetch();
     bikerRefetch();
     proposalRefetch();
-  }, [garageRefetch, bikerRefetch, proposalRefetch]);
+    blockedRefetch();
+  }, [garageRefetch, bikerRefetch, proposalRefetch, blockedRefetch]);
 
   const acceptGarageMutation = useMutation({
     mutationFn: async (matchId: string) => {
@@ -649,8 +686,33 @@ export default function MatchScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/biker-matches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/blocked"] });
     },
     onError: (err: Error) => Alert.alert(t("match.error"), err.message),
+  });
+
+  const unblockMutation = useMutation({
+    mutationFn: async (blockedId: string) => {
+      const res = await apiRequest("DELETE", `/api/users/${blockedId}/block`);
+      return res.json();
+    },
+    onMutate: async (blockedId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/users/blocked"] });
+      const previous = queryClient.getQueryData<any[]>(["/api/users/blocked"]);
+      queryClient.setQueryData<any[]>(["/api/users/blocked"], (old) =>
+        (old ?? []).filter((u: any) => u.id !== blockedId)
+      );
+      return { previous };
+    },
+    onError: (err: Error, _blockedId, context: any) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["/api/users/blocked"], context.previous);
+      }
+      Alert.alert(t("match.error"), err.message);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/blocked"] });
+    },
   });
 
   const removeBikerMatchMutation = useMutation({
@@ -800,7 +862,107 @@ export default function MatchScreen() {
     onError: (err: Error) => Alert.alert(t("match.error"), err.message),
   });
 
+  const handleUnblock = useCallback((blockedId: string, nickname: string) => {
+    const msg = t("match.unblockConfirmMsg").replace("{nickname}", nickname);
+    if (Platform.OS === "web") {
+      if (window.confirm(msg)) {
+        unblockMutation.mutate(blockedId);
+      }
+    } else {
+      Alert.alert(t("match.unblockConfirmTitle"), msg, [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("match.unblock"), onPress: () => unblockMutation.mutate(blockedId) },
+      ]);
+    }
+  }, [unblockMutation, t]);
+
   const renderItem = useCallback(({ item }: { item: any }) => {
+    if (activeTab === "blacklist") {
+      const userColor = item.userType === "biker" ? Colors.maleIcon : Colors.femaleIcon;
+      return (
+        <View style={styles.matchCard}>
+          <View style={styles.matchUserInfo}>
+            {item.avatarUrl ? (
+              <Image
+                source={{ uri: item.avatarUrl }}
+                style={styles.blacklistAvatar}
+              />
+            ) : (
+              <View style={[styles.blacklistAvatarPlaceholder, { backgroundColor: userColor + "20" }]}>
+                <Ionicons
+                  name={item.userType === "biker" ? "bicycle" : "person"}
+                  size={22}
+                  color={userColor}
+                />
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.matchNickname, { color: Colors.text }]}>{item.nickname}</Text>
+              <Text style={styles.matchUserType}>{t(`userType.${item.userType || "biker"}`)}</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={[styles.actionBtn, { marginTop: 12, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.accentRed + "50" }]}
+            onPress={() => handleUnblock(item.id, item.nickname)}
+          >
+            <Ionicons name="lock-open-outline" size={16} color={Colors.accentRed} />
+            <Text style={[styles.actionBtnText, { color: Colors.accentRed }]}>{t("match.unblock")}</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (activeTab === "accepted") {
+      if (item._matchType === "biker") {
+        const isBiker1 = item.biker1Id === user?.id;
+        const otherUserId = isBiker1 ? item.biker2Id : item.biker1Id;
+        return (
+          <BikerBikerMatchCard
+            match={item}
+            currentUserId={user?.id || ""}
+            onAccept={() => {}}
+            onReject={() => {}}
+            onBlock={() => {}}
+            onChatPress={() => startChatMutation.mutate(otherUserId)}
+            onRemove={() => confirmRemoveBikerMatch(item.id)}
+            isPending={false}
+            t={t}
+            locale={locale}
+          />
+        );
+      }
+      if (item._matchType === "garage") {
+        const isBiker = item.bikerId === user?.id;
+        const otherUserId = isBiker ? item.zavarrinaId : item.bikerId;
+        return (
+          <GarageMatchCard
+            match={item}
+            currentUserId={user?.id || ""}
+            onAccept={() => {}}
+            onReject={() => {}}
+            onChatPress={() => startChatMutation.mutate(otherUserId)}
+            onRemove={() => confirmRemoveGarageMatch(item.id)}
+            isPending={false}
+            t={t}
+            locale={locale}
+          />
+        );
+      }
+      return (
+        <MatchCardFull
+          match={item}
+          currentUserId={user?.id || ""}
+          onAccept={() => {}}
+          onReject={() => {}}
+          onChatPress={item.conversationId ? () => router.push(`/chat/${item.conversationId}` as any) : undefined}
+          onRemove={() => confirmRemoveProposalMatch(item.id)}
+          isPending={false}
+          t={t}
+          locale={locale}
+        />
+      );
+    }
+
     if (activeTab === "biker") {
       const isBiker1 = item.biker1Id === user?.id;
       const otherUserId = isBiker1 ? item.biker2Id : item.biker1Id;
@@ -865,29 +1027,37 @@ export default function MatchScreen() {
         locale={locale}
       />
     );
-  }, [activeTab, user?.id, pendingMatchId, acceptGarageMutation, rejectGarageMutation, acceptBikerMutation, rejectBikerMutation, blockFromMatchMutation, acceptMutation, rejectMutation, startChatMutation, confirmRemoveGarageMatch, confirmRemoveBikerMatch, confirmRemoveProposalMatch, router, t, locale]);
+  }, [activeTab, user?.id, pendingMatchId, acceptGarageMutation, rejectGarageMutation, acceptBikerMutation, rejectBikerMutation, blockFromMatchMutation, acceptMutation, rejectMutation, startChatMutation, confirmRemoveGarageMatch, confirmRemoveBikerMatch, confirmRemoveProposalMatch, handleUnblock, router, t, locale]);
 
   const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; count: number }[] = [
     { key: "zavorrine", label: t("match.tabZavorrine"), icon: "person", count: newGarageMatches.length },
     { key: "biker", label: t("match.tabBiker"), icon: "bicycle", count: newBikerMatches.length },
     { key: "proposals", label: t("match.tabProposals"), icon: "flash", count: newProposalMatches.length },
+    { key: "accepted", label: t("match.tabAccepted"), icon: "checkmark-circle", count: 0 },
+    { key: "blacklist", label: t("match.tabBlacklist"), icon: "ban", count: 0 },
   ];
 
   const getEmptyIcon = (): keyof typeof Ionicons.glyphMap => {
     if (activeTab === "zavorrine") return "person-outline";
     if (activeTab === "biker") return "bicycle-outline";
+    if (activeTab === "accepted") return "checkmark-circle-outline";
+    if (activeTab === "blacklist") return "ban-outline";
     return "flash-outline";
   };
 
   const getEmptyTitle = () => {
     if (activeTab === "zavorrine") return t("match.emptyZavorrinaTitle");
     if (activeTab === "biker") return t("match.emptyBikerTitle");
+    if (activeTab === "accepted") return t("match.emptyAcceptedTitle");
+    if (activeTab === "blacklist") return t("match.emptyBlacklistTitle");
     return t("match.emptyProposalsTitle");
   };
 
   const getEmptyDesc = () => {
     if (activeTab === "zavorrine") return t("match.emptyZavorrinaDesc");
     if (activeTab === "biker") return t("match.emptyBikerDesc");
+    if (activeTab === "accepted") return t("match.emptyAcceptedDesc");
+    if (activeTab === "blacklist") return t("match.emptyBlacklistDesc");
     return t("match.emptyProposalsDesc");
   };
 
@@ -1193,6 +1363,19 @@ const styles = StyleSheet.create({
   removeBtn: {
     marginLeft: 4,
     padding: 2,
+  },
+  blacklistAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.surface,
+  },
+  blacklistAvatarPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
   },
   loading: {
     flex: 1,

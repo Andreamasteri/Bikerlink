@@ -839,6 +839,17 @@ router.post("/me/cancel-deletion", requireAuth, async (req: Request, res: Respon
   }
 });
 
+router.get("/blocked", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const blockerId = req.session.userId!;
+    const blockedIds = await storage.getBlockedUsersByBlocker(blockerId);
+    return res.json(blockedIds);
+  } catch (error) {
+    console.error("Get blocked users error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.post("/:id/report", requireAuth, async (req: Request, res: Response) => {
   try {
     const reporterId = req.session.userId!;
