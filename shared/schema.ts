@@ -145,6 +145,8 @@ export const proposals = pgTable("proposals", {
   expiresAt: timestamp("expires_at"),
   status: varchar("status", { length: 20 }).notNull().default("active"),
   clubId: varchar("club_id", { length: 36 }),
+  extendToDestination: boolean("extend_to_destination").notNull().default(false),
+  destinationSearchRadius: integer("destination_search_radius"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [

@@ -95,6 +95,14 @@ export default function CreateProposalScreen() {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
   const [mapPickerCoord, setMapPickerCoord] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [mapPickerMode, setMapPickerMode] = useState<"departure" | "destination">("departure");
+
+  const [extendToDestination, setExtendToDestination] = useState(false);
+  const [destinationExtLatStr, setDestinationExtLatStr] = useState("");
+  const [destinationExtLngStr, setDestinationExtLngStr] = useState("");
+  const [destinationExtLat, setDestinationExtLat] = useState<number | null>(null);
+  const [destinationExtLng, setDestinationExtLng] = useState<number | null>(null);
+  const [destinationExtRadius, setDestinationExtRadius] = useState("30");
 
   useEffect(() => {
     if (!showMapPicker) return;
@@ -154,6 +162,7 @@ export default function CreateProposalScreen() {
   const needsMotoSelection = isBikerOrCoppia && ["find_a_friend", "find_a_guest", "hitcher"].includes(searchType);
   const needsWishlistMoto = isZavorrina && searchType === "find_a_biker";
   const needsDestination = searchType === "hitchhiker";
+  const canExtendToDestination = isBikerOrCoppia && (searchType === "find_a_friend" || searchType === "find_a_guest");
 
   const { data: motorcycles } = useQuery({
     queryKey: ["/api/motorcycles"],
@@ -339,6 +348,12 @@ export default function CreateProposalScreen() {
     }
     if (returnDeadline) data.returnDeadline = returnDeadline.toISOString();
     if (selectedClubId) data.clubId = selectedClubId;
+    if (canExtendToDestination && extendToDestination && destinationExtLat && destinationExtLng) {
+      data.extendToDestination = true;
+      data.destinationLatitude = destinationExtLat;
+      data.destinationLongitude = destinationExtLng;
+      data.destinationSearchRadius = parseInt(destinationExtRadius) || 30;
+    }
 
     createMutation.mutate(data);
   };
@@ -568,6 +583,101 @@ export default function CreateProposalScreen() {
               </>
             )}
 
+            {canExtendToDestination && (
+              <>
+                <View style={styles.switchRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.switchLabel}>Estendi invito al punto d'arrivo</Text>
+                    <Text style={styles.switchSub}>Raggiungi chi si trova alla tua destinazione, anche fuori dal raggio normale</Text>
+                  </View>
+                  <Switch
+                    value={extendToDestination}
+                    onValueChange={(v) => {
+                      setExtendToDestination(v);
+                      if (!v) {
+                        setDestinationExtLat(null);
+                        setDestinationExtLng(null);
+                        setDestinationExtLatStr("");
+                        setDestinationExtLngStr("");
+                      }
+                    }}
+                    trackColor={{ false: Colors.border, true: Colors.accent + "80" }}
+                    thumbColor={extendToDestination ? Colors.accent : Colors.textSecondary}
+                  />
+                </View>
+
+                {extendToDestination && (
+                  <>
+                    <Text style={styles.sectionTitle}>Coordinate punto d'arrivo</Text>
+                    <View style={styles.latLngRow}>
+                      <TextInput
+                        style={[styles.input, styles.latLngInput]}
+                        value={destinationExtLatStr}
+                        onChangeText={(v) => {
+                          setDestinationExtLatStr(v);
+                          const parsed = parseFloat(v);
+                          if (!isNaN(parsed)) setDestinationExtLat(parsed);
+                          else setDestinationExtLat(null);
+                        }}
+                        placeholder="Latitudine"
+                        placeholderTextColor={Colors.textSecondary}
+                        keyboardType="decimal-pad"
+                      />
+                      <TextInput
+                        style={[styles.input, styles.latLngInput]}
+                        value={destinationExtLngStr}
+                        onChangeText={(v) => {
+                          setDestinationExtLngStr(v);
+                          const parsed = parseFloat(v);
+                          if (!isNaN(parsed)) setDestinationExtLng(parsed);
+                          else setDestinationExtLng(null);
+                        }}
+                        placeholder="Longitudine"
+                        placeholderTextColor={Colors.textSecondary}
+                        keyboardType="decimal-pad"
+                      />
+                    </View>
+
+                    <TouchableOpacity
+                      style={[styles.gpsButton, { marginTop: 10, alignSelf: "flex-start" },
+                        destinationExtLat && destinationExtLng ? { backgroundColor: Colors.accent + "30", borderColor: Colors.accent, borderWidth: 1 } : {}
+                      ]}
+                      onPress={() => {
+                        setMapPickerMode("destination");
+                        setMapPickerCoord(
+                          destinationExtLat && destinationExtLng
+                            ? { latitude: destinationExtLat, longitude: destinationExtLng }
+                            : departureLat && departureLng
+                              ? { latitude: departureLat, longitude: departureLng }
+                              : null
+                        );
+                        setShowMapPicker(true);
+                      }}
+                    >
+                      <Ionicons
+                        name={destinationExtLat && destinationExtLng ? "checkmark-circle" : "map"}
+                        size={23}
+                        color={destinationExtLat && destinationExtLng ? Colors.success : "#000"}
+                      />
+                      <Text style={styles.gpsButtonText}>
+                        {destinationExtLat && destinationExtLng ? "Destinazione impostata" : "Scegli sulla mappa"}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <Text style={styles.sectionTitle}>Raggio sul punto d'arrivo (km)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={destinationExtRadius}
+                      onChangeText={setDestinationExtRadius}
+                      placeholder="30"
+                      placeholderTextColor={Colors.textSecondary}
+                      keyboardType="number-pad"
+                    />
+                  </>
+                )}
+              </>
+            )}
+
             <View style={styles.dateLabelRow}>
               <Text style={[styles.sectionTitle, { marginTop: 8, marginBottom: 0, flex: 1 }]}>Data e Ora di Partenza *</Text>
               <TouchableOpacity
@@ -771,13 +881,24 @@ export default function CreateProposalScreen() {
             onCoordChange={setMapPickerCoord}
             onConfirm={() => {
               if (mapPickerCoord) {
-                setDepartureLat(mapPickerCoord.latitude);
-                setDepartureLng(mapPickerCoord.longitude);
-                setGpsSource("map");
+                if (mapPickerMode === "destination") {
+                  setDestinationExtLat(mapPickerCoord.latitude);
+                  setDestinationExtLng(mapPickerCoord.longitude);
+                  setDestinationExtLatStr(mapPickerCoord.latitude.toFixed(6));
+                  setDestinationExtLngStr(mapPickerCoord.longitude.toFixed(6));
+                } else {
+                  setDepartureLat(mapPickerCoord.latitude);
+                  setDepartureLng(mapPickerCoord.longitude);
+                  setGpsSource("map");
+                }
               }
+              setMapPickerMode("departure");
               setShowMapPicker(false);
             }}
-            onClose={() => setShowMapPicker(false)}
+            onClose={() => {
+              setMapPickerMode("departure");
+              setShowMapPicker(false);
+            }}
           />
         </View>
       )}
@@ -941,6 +1062,14 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: -4,
     marginBottom: 6,
+  },
+  latLngRow: {
+    flexDirection: "row" as const,
+    gap: 10,
+    marginBottom: 4,
+  },
+  latLngInput: {
+    flex: 1,
   },
   dateLabelRow: {
     flexDirection: "row" as const,

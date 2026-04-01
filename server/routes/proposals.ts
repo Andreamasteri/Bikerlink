@@ -558,7 +558,8 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       departureLatitude, departureLongitude, departureAddress,
       destinationAddress, destinationLatitude, destinationLongitude,
       scheduledAt, departureTimeFrom, departureTimeTo, returnDeadline,
-      stops, maxParticipants,
+      stops, maxParticipants, clubId,
+      extendToDestination, destinationSearchRadius,
     } = req.body;
 
     if (!proposalType || !title) {
@@ -603,6 +604,9 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       stops: stops || null,
       maxParticipants: maxParticipants ?? null,
       expiresAt,
+      clubId: clubId || null,
+      extendToDestination: extendToDestination === true,
+      destinationSearchRadius: destinationSearchRadius ?? null,
     });
 
     await storage.addProposalParticipant({

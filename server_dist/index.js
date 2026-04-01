@@ -199,6 +199,8 @@ var init_schema = __esm({
       expiresAt: (0, import_pg_core.timestamp)("expires_at"),
       status: (0, import_pg_core.varchar)("status", { length: 20 }).notNull().default("active"),
       clubId: (0, import_pg_core.varchar)("club_id", { length: 36 }),
+      extendToDestination: (0, import_pg_core.boolean)("extend_to_destination").notNull().default(false),
+      destinationSearchRadius: (0, import_pg_core.integer)("destination_search_radius"),
       createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow(),
       updatedAt: (0, import_pg_core.timestamp)("updated_at").notNull().defaultNow()
     }, (table) => [
@@ -6564,22 +6566,32 @@ function areCompatible(p1, p2) {
     (r) => r.searchType1 === p1.searchType && r.searchType2 === p2.searchType || r.searchType1 === p2.searchType && r.searchType2 === p1.searchType
   );
   if (!ruleMatch) return false;
-  if (!p1.departureLatitude || !p1.departureLongitude || !p2.departureLatitude || !p2.departureLongitude) return false;
-  const distance = haversineDistance(
-    p1.departureLatitude,
-    p1.departureLongitude,
-    p2.departureLatitude,
-    p2.departureLongitude
-  );
-  const radius1 = p1.searchRadius || 50;
-  const radius2 = p2.searchRadius || 50;
-  const maxAllowedDistance = Math.min(radius1, radius2);
-  if (distance > maxAllowedDistance) return false;
   const date1 = p1.scheduledAt || p1.departureTimeFrom;
   const date2 = p2.scheduledAt || p2.departureTimeFrom;
   if (!sameDay(date1, date2)) return false;
   if (!timeRangesOverlap(p1.departureTimeFrom, p1.departureTimeTo, p2.departureTimeFrom, p2.departureTimeTo)) return false;
-  return true;
+  if (p1.departureLatitude && p1.departureLongitude && p2.departureLatitude && p2.departureLongitude) {
+    const distance = haversineDistance(
+      p1.departureLatitude,
+      p1.departureLongitude,
+      p2.departureLatitude,
+      p2.departureLongitude
+    );
+    const radius1 = p1.searchRadius || 50;
+    const radius2 = p2.searchRadius || 50;
+    if (distance <= Math.min(radius1, radius2)) return true;
+  }
+  if (p1.extendToDestination && p1.destinationLatitude && p1.destinationLongitude && p2.departureLatitude && p2.departureLongitude) {
+    const destRadius1 = p1.destinationSearchRadius || 30;
+    const distDest1 = haversineDistance(p1.destinationLatitude, p1.destinationLongitude, p2.departureLatitude, p2.departureLongitude);
+    if (distDest1 <= destRadius1) return true;
+  }
+  if (p2.extendToDestination && p2.destinationLatitude && p2.destinationLongitude && p1.departureLatitude && p1.departureLongitude) {
+    const destRadius2 = p2.destinationSearchRadius || 30;
+    const distDest2 = haversineDistance(p2.destinationLatitude, p2.destinationLongitude, p1.departureLatitude, p1.departureLongitude);
+    if (distDest2 <= destRadius2) return true;
+  }
+  return false;
 }
 async function runMatching() {
   try {
@@ -7577,7 +7589,10 @@ router5.post("/", requireAuth4, async (req, res) => {
       departureTimeTo,
       returnDeadline,
       stops,
-      maxParticipants
+      maxParticipants,
+      clubId,
+      extendToDestination,
+      destinationSearchRadius
     } = req.body;
     if (!proposalType || !title) {
       return res.status(400).json({ message: "Tipo e titolo sono obbligatori" });
@@ -7617,7 +7632,10 @@ router5.post("/", requireAuth4, async (req, res) => {
       returnDeadline: returnDeadline ? new Date(returnDeadline) : null,
       stops: stops || null,
       maxParticipants: maxParticipants ?? null,
-      expiresAt
+      expiresAt,
+      clubId: clubId || null,
+      extendToDestination: extendToDestination === true,
+      destinationSearchRadius: destinationSearchRadius ?? null
     });
     await storage.addProposalParticipant({
       proposalId: proposal.id,

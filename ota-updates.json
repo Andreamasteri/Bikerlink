@@ -899,6 +899,23 @@
     "iosUpdateId": null,
     "commitBase": "0de4c94a1d1e9956148baf78e755158158b220d0",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/8121fbbf-54d5-46ea-a2f6-050279819069",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 54,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-54: Estendi invito al punto d'arrivo — toggle + lat/lng + raggio + mappa destinazione",
+    "publishedAt": "2026-04-01",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #350 (UI completa): (1) canExtendToDestination = isBikerOrCoppia && (find_a_friend || find_a_guest); (2) Toggle 'Estendi invito al punto d'arrivo' con sottotitolo esplicativo; (3) Campi lat/lng affiancati con TextInput numeric; (4) Pulsante 'Scegli sulla mappa' con MapPickerModal in modalità destination (mapPickerMode); (5) Campo raggio km (default 30); (6) onConfirm MapPickerModal aggiornato: gestisce entrambe le modalità departure e destination; (7) Stili latLngRow e latLngInput aggiunti al StyleSheet. DB: colonne extend_to_destination (boolean NOT NULL DEFAULT false) e destination_search_radius (integer) aggiunte via SQL diretto. Backend ricompilato e riavviato.",
+    "updateGroupId": "502cda77-c787-4e12-9b71-513a0a3d5ca4",
+    "androidUpdateId": "019d47ed-5b86-71e5-8cd8-7961f684dbf7",
+    "iosUpdateId": null,
+    "commitBase": "4cfd4e46ec215d71e1d60edc21ea020251fed654",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/502cda77-c787-4e12-9b71-513a0a3d5ca4",
     "status": "published"
   }
 ]
