@@ -5,6 +5,7 @@ import fs from "fs";
 import { storage } from "../storage";
 import { isProtectedUser } from "../constants";
 import { createRegionalClubInvite } from "./motoclubs";
+import type { InsertReport } from "@shared/schema";
 
 const router = Router();
 
@@ -860,18 +861,23 @@ router.post("/:id/report", requireAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Motivo non valido" });
     }
 
+    if (description && typeof description === "string" && description.length > 500) {
+      return res.status(400).json({ message: "La descrizione non può superare 500 caratteri" });
+    }
+
     const targetUser = await storage.getUser(reportedUserId);
     if (!targetUser) {
       return res.status(404).json({ message: "Utente non trovato" });
     }
 
-    await storage.createReport({
+    const reportData: InsertReport = {
       reporterId,
       reportedUserId,
       reason,
-      description: description || null,
+      description: (description && typeof description === "string") ? description : null,
       status: "pending",
-    } as any);
+    };
+    await storage.createReport(reportData);
 
     return res.json({ message: "Segnalazione inviata con successo" });
   } catch (error) {

@@ -6285,17 +6285,21 @@ router3.post("/:id/report", requireAuth2, async (req, res) => {
     if (!reason || !validReasons.includes(reason)) {
       return res.status(400).json({ message: "Motivo non valido" });
     }
+    if (description && typeof description === "string" && description.length > 500) {
+      return res.status(400).json({ message: "La descrizione non pu\xF2 superare 500 caratteri" });
+    }
     const targetUser = await storage.getUser(reportedUserId);
     if (!targetUser) {
       return res.status(404).json({ message: "Utente non trovato" });
     }
-    await storage.createReport({
+    const reportData = {
       reporterId,
       reportedUserId,
       reason,
-      description: description || null,
+      description: description && typeof description === "string" ? description : null,
       status: "pending"
-    });
+    };
+    await storage.createReport(reportData);
     return res.json({ message: "Segnalazione inviata con successo" });
   } catch (error) {
     console.error("Report user error:", error);
