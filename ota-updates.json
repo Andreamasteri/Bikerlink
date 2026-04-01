@@ -984,6 +984,23 @@
     "iosUpdateId": null,
     "commitBase": "19a6a62f767bd8f1a113a65784fbd26551331fb5",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/9be7830c-40f1-4440-bfde-c41a46624f01",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 58,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-58: Tab Accettati+Blacklist, escludi admin match, solo email supporto, tab match su due righe",
+    "publishedAt": "2026-04-01",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #354 — Tab Accettati e Blacklist nella schermata Match; endpoint /api/users/blocked, /api/users/:id/block, /api/users/:id/unblock. Task #355 — Escludi account admin da tutti i pool di matching (zavorrine, biker, proposte). Task #356 — Rimosso PayPal, invia supporto solo via email su tutte le piattaforme. Task #357 — Layout tab match su due righe: riga 1 Zavorrine/Biker/Proposte, riga 2 Accettati/Blacklist centrati (width 45%); fix ricompilazione backend con rm -f server_dist/index.js nel post-merge.sh; rimossi duplicati chiavi i18n match.tabAccepted/emptyAcceptedTitle/emptyAcceptedDesc da it.ts e en.ts.",
+    "updateGroupId": "102a71fb-4456-4cf8-9b6c-fbaa0ccbed17",
+    "androidUpdateId": "019d492c-bef1-7970-a016-9ac3fda959ce",
+    "iosUpdateId": null,
+    "commitBase": "6e87b4746c7f87ebc7a0013251c4d9d13db8c9d3",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/102a71fb-4456-4cf8-9b6c-fbaa0ccbed17",
     "status": "published"
   }
 ]
