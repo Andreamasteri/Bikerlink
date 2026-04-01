@@ -22,6 +22,21 @@ import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 
+const DAYS_IT = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
+const MONTHS_IT = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
+
+function formatLastSeen(dateStr: string | null): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  const day = DAYS_IT[d.getDay()];
+  const date = d.getDate();
+  const month = MONTHS_IT[d.getMonth()];
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${day} ${date} ${month} · ${hh}:${mm}`;
+}
+
 const REPORT_REASONS = [
   "Spam",
   "Comportamento inappropriato",
@@ -276,13 +291,18 @@ export default function PublicProfileScreen() {
                 {profile.isOnline ? "Online" : "Offline"}
               </Text>
             </View>
-            <View style={[styles.statusBadge, { backgroundColor: profile.isAvailable ? "#FF660022" : "#66666622" }]}>
-              <View style={[styles.statusDot, { backgroundColor: profile.isAvailable ? "#FF6600" : "#888" }]} />
-              <Text style={[styles.statusBadgeText, { color: profile.isAvailable ? "#FF6600" : "#888" }]}>
+            <View style={[styles.statusBadge, { backgroundColor: profile.isAvailable ? "#4CAF5022" : "#66666622" }]}>
+              <View style={[styles.statusDot, { backgroundColor: profile.isAvailable ? Colors.success : "#888" }]} />
+              <Text style={[styles.statusBadgeText, { color: profile.isAvailable ? Colors.success : "#888" }]}>
                 {profile.isAvailable ? "Disponibile" : "Non disponibile"}
               </Text>
             </View>
           </View>
+          {!profile.isOnline && profile.lastLoginAt && (
+            <Text style={styles.lastSeenText}>
+              {"Last seen: " + formatLastSeen(profile.lastLoginAt)}
+            </Text>
+          )}
           <Text style={styles.userType}>
             {getUserTypeLabel(profile.userType)}
             {profile.sex ? ` · ${profile.sex === "M" ? "Maschio" : "Femmina"}` : ""}
@@ -512,6 +532,7 @@ const styles = StyleSheet.create({
   statusBadge: { flexDirection: "row" as const, alignItems: "center" as const, gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   statusDot: { width: 7, height: 7, borderRadius: 3.5 },
   statusBadgeText: { fontSize: 11, fontFamily: "Inter_500Medium" },
+  lastSeenText: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 4 },
   userType: { fontSize: 15, fontFamily: "Inter_500Medium", color: Colors.textSecondary, marginTop: 4 },
   locationRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 },
   locationText: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary },

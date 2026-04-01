@@ -384,6 +384,7 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
       isOnline,
       isAvailable: (profile?.isAvailable || false) && !targetUser.ghostMode,
       isBlockedByMe,
+      lastLoginAt: targetUser.lastLoginAt ?? null,
     });
   } catch (error) {
     console.error("Get public user profile error:", error);
@@ -469,6 +470,7 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
           distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
           isAvailable: item.profile?.isAvailable || false,
           isOnline: onlineIdSet.has(item.user.id),
+          lastLoginAt: item.user.lastLoginAt ?? null,
         };
       });
     return res.json(mapped);
@@ -510,6 +512,7 @@ router.get("/available-list", requireAuth, async (req: Request, res: Response) =
           ridingStyle: firstMoto?.ridingStyle || null,
           distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
           isAvailable: true,
+          lastLoginAt: item.user.lastLoginAt ?? null,
         };
       });
     return res.json(mapped);
@@ -599,6 +602,7 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
         distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
         isAvailable: item.profile?.isAvailable || false,
         isOnline: onlineAvailableIds.has(item.user.id),
+        lastLoginAt: item.user.lastLoginAt ?? null,
       };
     });
     return res.json(mapped);
@@ -664,6 +668,7 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
         distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
         isAvailable: item.profile?.isAvailable || false,
         isOnline: onlineAvailableIds.has(item.user.id),
+        lastLoginAt: item.user.lastLoginAt ?? null,
       };
     });
     return res.json(mapped);

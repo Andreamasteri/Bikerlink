@@ -37,6 +37,21 @@ type UserWithProfileCoords = Omit<User, "password"> & {
   profileLongitude?: number | null;
 };
 
+const DAYS_IT = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
+const MONTHS_IT = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
+
+function formatLastSeen(dateStr: string | null | undefined): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  const day = DAYS_IT[d.getDay()];
+  const date = d.getDate();
+  const month = MONTHS_IT[d.getMonth()];
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${day} ${date} ${month} · ${hh}:${mm}`;
+}
+
 export default function MapScreen() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -1112,13 +1127,16 @@ export default function MapScreen() {
                             {selectedUserDetail.isOnline ? "Online" : "Offline"}
                           </Text>
                         </View>
-                        <View style={[styles.statusBadge, { backgroundColor: selectedUserDetail.isAvailable ? "#FF660022" : "#66666622" }]}>
-                          <View style={[styles.statusDot, { backgroundColor: selectedUserDetail.isAvailable ? Colors.accent : "#888" }]} />
-                          <Text style={[styles.statusBadgeText, { color: selectedUserDetail.isAvailable ? Colors.accent : "#888" }]}>
+                        <View style={[styles.statusBadge, { backgroundColor: selectedUserDetail.isAvailable ? "#4CAF5022" : "#66666622" }]}>
+                          <View style={[styles.statusDot, { backgroundColor: selectedUserDetail.isAvailable ? Colors.success : "#888" }]} />
+                          <Text style={[styles.statusBadgeText, { color: selectedUserDetail.isAvailable ? Colors.success : "#888" }]}>
                             {selectedUserDetail.isAvailable ? "Disponibile" : "Non disponibile"}
                           </Text>
                         </View>
                       </View>
+                    )}
+                    {selectedUserDetail && !selectedUserDetail.isOnline && selectedUserDetail.lastLoginAt && (
+                      <Text style={styles.lastSeenText}>{"Last seen: " + formatLastSeen(selectedUserDetail.lastLoginAt)}</Text>
                     )}
                   </View>
                   <Pressable onPress={() => setSelectedUser(null)}>
@@ -1970,5 +1988,11 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     fontSize: 11,
     fontFamily: "Inter_500Medium",
+  },
+  lastSeenText: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
 });
