@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
 import { Tabs, useRouter, type Href } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { Platform, View, Pressable, Text, StyleSheet, Linking, Modal } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -232,9 +232,12 @@ export default function TabLayout() {
           name="garage"
           options={{
             title: isBikerOrCoppia ? "Garage" : "Wishlist",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name={isBikerOrCoppia ? "build" : "heart"} size={size} color={color} />
-            ),
+            tabBarIcon: ({ color, size }) =>
+              isBikerOrCoppia ? (
+                <MaterialCommunityIcons name="motorbike" size={size} color={color} />
+              ) : (
+                <Ionicons name="heart" size={size} color={color} />
+              ),
             headerTitle: isBikerOrCoppia ? "Il Mio Garage" : "La Mia Wishlist",
             href: null,
           }}
