@@ -480,7 +480,7 @@ export default function FakeUsersAdmin() {
 
   const handleDeleteAllFakeChats = async () => {
     Alert.alert(
-      "Elimina tutte le chat fake",
+      "Elimina tutte le chat degli stregatti",
       "Eliminare TUTTE le conversazioni di TUTTI gli stregatti? L'operazione non è reversibile.",
       [
         { text: "Annulla", style: "cancel" },
@@ -512,8 +512,8 @@ export default function FakeUsersAdmin() {
   const handleDeleteFakeChats = async () => {
     if (!selectedUserId) return;
     Alert.alert(
-      "Elimina Chat Fake",
-      "Eliminare tutte le conversazioni di questo utente fake? L'operazione non è reversibile.",
+      "Elimina Chat Stregatto",
+      "Eliminare tutte le conversazioni di questo stregatto? L'operazione non è reversibile.",
       [
         { text: "Annulla", style: "cancel" },
         {
@@ -649,7 +649,7 @@ export default function FakeUsersAdmin() {
           <View>
             {isFetchingNextPage && <ActivityIndicator color={Colors.accent} style={{ marginVertical: 16 }} />}
             {!isLoading && !isFetchingNextPage && users.length === 0 && (
-              <Text style={styles.emptyText}>Nessun utente fake trovato</Text>
+              <Text style={styles.emptyText}>Nessun stregatto trovato</Text>
             )}
             {users.length > 0 && !isFetchingNextPage && (
               <Text style={styles.paginationInfo}>Visualizzati {users.length} / {totalCount}</Text>
@@ -719,7 +719,7 @@ export default function FakeUsersAdmin() {
             ) : (
               <>
                 <Ionicons name="chatbubbles" size={18} color="#fff" />
-                <Text style={styles.deleteAllBtnText}>Elimina tutte le chat fake</Text>
+                <Text style={styles.deleteAllBtnText}>Elimina tutte le chat degli stregatti</Text>
               </>
             )}
           </TouchableOpacity>
@@ -824,7 +824,7 @@ export default function FakeUsersAdmin() {
           </View>
           <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 12, gap: 8 }}>
             <Text style={[styles.massSeedDesc, { marginBottom: 0 }]}>
-              Distribuisce i fake user esistenti nei motoclub approvati (1-3 club casuali per utente).
+              Distribuisce gli stregatti esistenti nei motoclub approvati (1-3 club casuali per utente).
             </Text>
             {!!distributeResult && (
               <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: distributeResult.type === "success" ? Colors.success : Colors.error }}>
@@ -1013,7 +1013,7 @@ export default function FakeUsersAdmin() {
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 10 }]}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Nuovo Utente Fake</Text>
+                <Text style={styles.modalTitle}>Nuovo Stregatto</Text>
                 <TouchableOpacity onPress={() => setCreateModalVisible(false)}>
                   <Ionicons name="close" size={24} color={Colors.text} />
                 </TouchableOpacity>
@@ -1248,7 +1248,7 @@ export default function FakeUsersAdmin() {
                 {createMutation.isPending ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.createBtnText}>Crea Utente Fake</Text>
+                  <Text style={styles.createBtnText}>Crea Stregatto</Text>
                 )}
               </TouchableOpacity>
               </KeyboardAwareScrollViewCompat>

@@ -967,6 +967,23 @@
     "iosUpdateId": null,
     "commitBase": "a047480d13356bc513502a916f01d265f55040e6",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/973da402-2a38-4f7b-8d55-5bf8d5f451d9",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 57,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-57: Rinomina Fake Users -> Stregatti nell'admin",
+    "publishedAt": "2026-04-01",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #353 — (1) FRONTEND: rinominato app/admin/fake-users.tsx -> app/admin/stregatti.tsx; route /admin/fake-users -> /admin/stregatti; label 'Utenti Fake' -> 'Stregatti' in dashboard admin; tutti i testi UI della schermata aggiornati (Stregatto/Stregatti); (2) BACKEND: 13 rotte /api/admin/fake-users -> /api/admin/stregatti; log e messaggi di risposta aggiornati; colonna DB is_fake e chiave fake_users_enabled rimaste invariate.",
+    "updateGroupId": "9be7830c-40f1-4440-bfde-c41a46624f01",
+    "androidUpdateId": "019d4885-fddd-7eaf-b77e-df5a4449a254",
+    "iosUpdateId": null,
+    "commitBase": "19a6a62f767bd8f1a113a65784fbd26551331fb5",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/9be7830c-40f1-4440-bfde-c41a46624f01",
     "status": "published"
   }
 ]

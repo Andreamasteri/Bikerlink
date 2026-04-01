@@ -1321,7 +1321,7 @@ router.get("/stregatti", async (req: Request, res: Response) => {
     const result = await storage.getFakeUserStats(limit, offset, type);
     return res.json(result);
   } catch (error) {
-    console.error("Admin get fake users error:", error);
+    console.error("Admin get stregatti error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -1550,7 +1550,7 @@ router.post("/stregatti", async (req: Request, res: Response) => {
     const { password: _, ...safeUser } = user;
     return res.status(201).json(safeUser);
   } catch (error) {
-    console.error("Admin create fake user error:", error);
+    console.error("Admin create stregatto error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -1672,15 +1672,15 @@ router.put("/stregatti/toggle-all", async (req: Request, res: Response) => {
       if (enabled && !fakeUser.country) userUpdate.country = "IT";
       await db.update(usersTable).set(userUpdate as any).where(eq(usersTable.id, fakeUser.id));
     }
-    return res.json({ message: `Tutti gli utenti fake sono stati ${enabled ? "abilitati" : "disabilitati"}`, count: fakeUsers.length });
+    return res.json({ message: `Tutti gli stregatti sono stati ${enabled ? "abilitati" : "disabilitati"}`, count: fakeUsers.length });
   } catch (error) {
-    console.error("Admin toggle all fake users error:", error);
+    console.error("Admin toggle all stregatti error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
 
 router.delete("/stregatti", async (req: Request, res: Response) => {
-  console.log("[Admin] DELETE /fake-users ricevuto");
+  console.log("[Admin] DELETE /stregatti ricevuto");
   try {
     const count = await storage.deleteAllFakeUsers();
     await storage.upsertAppSetting("skip_fake_user_seed", "true");
@@ -1689,12 +1689,12 @@ router.delete("/stregatti", async (req: Request, res: Response) => {
       action: "delete_all_fake_users",
       targetType: "user",
       targetId: "",
-      details: `Eliminati tutti gli utenti fake (${count})`,
+      details: `Eliminati tutti gli stregatti (${count})`,
     });
-    console.log(`[Admin] DELETE /fake-users completato: ${count} eliminati`);
-    return res.json({ message: `${count} utenti fake eliminati`, count });
+    console.log(`[Admin] DELETE /stregatti completato: ${count} eliminati`);
+    return res.json({ message: `${count} stregatti eliminati`, count });
   } catch (error) {
-    console.error("[Admin] DELETE /fake-users ERRORE:", error);
+    console.error("[Admin] DELETE /stregatti ERRORE:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -1705,7 +1705,7 @@ router.delete("/stregatti/:id", async (req: Request, res: Response) => {
     await storage.deleteFakeUser(id);
     return res.json({ message: "Utente finto eliminato" });
   } catch (error) {
-    console.error("Admin delete fake user error:", error);
+    console.error("Admin delete stregatto error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -1724,7 +1724,7 @@ router.put("/stregatti/:id/toggle-available", async (req: Request, res: Response
     } as any);
     return res.json({ isAvailable: !profile.isAvailable });
   } catch (error) {
-    console.error("Admin toggle fake user availability error:", error);
+    console.error("Admin toggle stregatto availability error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -1744,7 +1744,7 @@ router.put("/stregatti/:id/toggle-online", async (req: Request, res: Response) =
     await storage.updateUserProfile(id, { adminOverrideUntil: overrideUntil } as any);
     return res.json({ isOnline: !isCurrentlyOnline });
   } catch (error) {
-    console.error("Admin toggle fake user online error:", error);
+    console.error("Admin toggle stregatto online error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -1755,7 +1755,7 @@ router.get("/stregatti/:id/conversations", async (req: Request, res: Response) =
     const convs = await storage.getFakeUserConversations(id);
     return res.json(convs);
   } catch (error) {
-    console.error("Admin get fake user conversations error:", error);
+    console.error("Admin get stregatto conversations error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -1809,7 +1809,7 @@ router.delete("/stregatti/:id/conversations", async (req: Request, res: Response
     });
     return res.json({ deleted, message: `${deleted} conversazioni eliminate` });
   } catch (error) {
-    console.error("Admin delete fake user conversations error:", error);
+    console.error("Admin delete stregatto conversations error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -1829,7 +1829,7 @@ router.get("/stregatti/conversations/:convId/messages", async (req: Request, res
     );
     return res.json(result);
   } catch (error) {
-    console.error("Admin get fake user conversation messages error:", error);
+    console.error("Admin get stregatto conversation messages error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
@@ -2494,7 +2494,7 @@ router.post("/stregatti/wake-all", async (_req: Request, res: Response) => {
     const [{ cnt }] = await db.select({ cnt: sql<number>`cast(count(*) as int)` }).from(users).where(eq(users.isFake, true));
     return res.json({ ok: true, count: cnt });
   } catch (error) {
-    console.error("Admin wake-all fake users error:", error);
+    console.error("Admin wake-all stregatti error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
