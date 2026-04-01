@@ -112,6 +112,8 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
  * Esegue reloadAsync() solo se targetUpdateId non è già l'update in esecuzione.
  * Usa mod.updateId (stato live) come guard anti-loop — non può bloccarsi se
  * reloadAsync() viene interrotto, perché non scrive nulla su AsyncStorage.
+ * Nota: non chiama fetchUpdateAsync() perché viene usata solo quando
+ * isUpdatePending=true, cioè l'update è già stato scaricato.
  */
 async function safeReloadAsync(targetUpdateId: string | null): Promise<void> {
   if (!targetUpdateId) return;
