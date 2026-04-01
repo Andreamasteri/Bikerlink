@@ -55,7 +55,44 @@ config.resolver.blockList = [
 
 config.resolver.platforms = ["ios", "android", "web"];
 
+const SERVER_ONLY_PACKAGES = [
+  "googleapis",
+  "pdfkit",
+  "sharp",
+  "docx",
+  "nodemailer",
+  "archiver",
+  "multer",
+  "express",
+  "pg",
+  "drizzle-orm",
+  "bcryptjs",
+  "connect-pg-simple",
+  "node-forge",
+  "undici",
+  "tsx",
+  "flatted",
+  "picomatch",
+  "http-proxy-middleware",
+  "express-session",
+  "express-rate-limit",
+  "@replit/connectors-sdk",
+  "@replit/object-storage",
+];
+
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (platform === "ios" || platform === "android") {
+    const isServerOnly = SERVER_ONLY_PACKAGES.some(
+      (pkg) => moduleName === pkg || moduleName.startsWith(pkg + "/")
+    );
+    if (isServerOnly) {
+      return {
+        filePath: path.join(__dirname, "mocks/empty.js"),
+        type: "sourceFile",
+      };
+    }
+  }
+
   if (platform === "web") {
     if (moduleName === "react-native-maps") {
       return {
@@ -73,12 +110,13 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
       };
     }
   }
+
   return context.resolveRequest(context, moduleName, platform);
 };
 
 config.maxWorkers = 1;
 
-config.cacheVersion = "v7";
+config.cacheVersion = "v8";
 
 config.cacheStores = [
   new FileStore({ root: path.join(__dirname, ".metro-cache") }),
@@ -86,7 +124,31 @@ config.cacheStores = [
 
 config.transformer = {
   ...config.transformer,
-  minifierConfig: {},
+  minifierConfig: {
+    keep_fnames: true,
+    mangle: {
+      keep_fnames: true,
+    },
+    output: {
+      ascii_only: true,
+      quote_style: 3,
+      wrap_iife: true,
+    },
+    sourceMap: {
+      includeSources: false,
+    },
+    toplevel: false,
+    compress: {
+      reduce_funcs: false,
+      drop_console: true,
+    },
+  },
+  getTransformOptions: async () => ({
+    transform: {
+      experimentalImportSupport: false,
+      inlineRequires: true,
+    },
+  }),
 };
 
 module.exports = config;
