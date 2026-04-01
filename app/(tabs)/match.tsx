@@ -1131,30 +1131,57 @@ export default function MatchScreen() {
         </View>
       )}
 
-      <View style={[styles.tabRow, styles.tabRowSpaced]}>
-        {tabs.map((tab) => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.tab, activeTab === tab.key && styles.tabActive]}
-            onPress={() => setActiveTab(tab.key)}
-          >
-            <Ionicons
-              name={tab.icon}
-              size={14}
-              color={activeTab === tab.key ? Colors.accent : Colors.textSecondary}
-            />
-            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
-              {tab.label}
-            </Text>
-            {tab.count > 0 && (
-              <View style={[styles.countBadge, { backgroundColor: Colors.accentRed }]}>
-                <Text style={[styles.countBadgeText, { color: "#fff" }]}>
-                  {tab.count}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
+      <View style={styles.tabRowSpaced}>
+        <View style={styles.tabRow}>
+          {tabs.slice(0, 3).map((tab) => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+              onPress={() => setActiveTab(tab.key)}
+            >
+              <Ionicons
+                name={tab.icon}
+                size={14}
+                color={activeTab === tab.key ? Colors.accent : Colors.textSecondary}
+              />
+              <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
+                {tab.label}
+              </Text>
+              {tab.count > 0 && (
+                <View style={[styles.countBadge, { backgroundColor: Colors.accentRed }]}>
+                  <Text style={[styles.countBadgeText, { color: "#fff" }]}>
+                    {tab.count}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={[styles.tabRow, styles.tabRowSecond]}>
+          {tabs.slice(3).map((tab) => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.tab, styles.tabSecond, activeTab === tab.key && styles.tabActive]}
+              onPress={() => setActiveTab(tab.key)}
+            >
+              <Ionicons
+                name={tab.icon}
+                size={14}
+                color={activeTab === tab.key ? Colors.accent : Colors.textSecondary}
+              />
+              <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
+                {tab.label}
+              </Text>
+              {tab.count > 0 && (
+                <View style={[styles.countBadge, { backgroundColor: Colors.accentRed }]}>
+                  <Text style={[styles.countBadgeText, { color: "#fff" }]}>
+                    {tab.count}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       {activeTab === "biker" && (
@@ -1216,9 +1243,13 @@ const styles = StyleSheet.create({
   tabRow: {
     flexDirection: "row" as const,
     paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingVertical: 4,
     gap: 6,
     alignItems: "center" as const,
+  },
+  tabRowSecond: {
+    justifyContent: "center" as const,
+    paddingTop: 0,
   },
   tab: {
     flex: 1,
@@ -1226,10 +1257,14 @@ const styles = StyleSheet.create({
     alignItems: "center" as const,
     justifyContent: "center" as const,
     gap: 3,
-    paddingVertical: 9,
+    paddingVertical: 5,
     paddingHorizontal: 4,
     borderRadius: 10,
     backgroundColor: Colors.surface,
+  },
+  tabSecond: {
+    flex: 0,
+    width: "45%" as const,
   },
   tabActive: {
     backgroundColor: Colors.accent + "20",
