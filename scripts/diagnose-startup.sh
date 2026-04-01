@@ -1,6 +1,6 @@
 #!/bin/bash
-# diagnose-startup.sh — Diagnosi rapida degli script di avvio e dello stato del server.
-# Mostra: diff degli script di avvio, stato delle porte 5000 e 8081, ultimi log.
+# diagnose-startup.sh — Diagnosi rapida degli script di avvio e dello stato del backend.
+# Mostra: diff degli script di avvio, stato della porta 5000, ultimi log backend.
 #
 # Uso:
 #   bash scripts/diagnose-startup.sh          # diff troncato a 80 righe
@@ -44,11 +44,9 @@ section "1. FILE CAMBIATI NELL'ULTIMA SESSIONE (git diff --stat)"
 
 KEY_FILES=(
   "scripts/start-backend.sh"
-  "scripts/start-expo.sh"
   "scripts/watchdog.sh"
   "scripts/diagnose-startup.sh"
   "server/index.ts"
-  "metro.config.js"
   "package.json"
 )
 
@@ -97,7 +95,6 @@ section "2. DIFF ESTESO SCRIPT DI AVVIO (HEAD~1 → HEAD)"
 
 STARTUP_SCRIPTS=(
   "scripts/start-backend.sh"
-  "scripts/start-expo.sh"
   "scripts/watchdog.sh"
 )
 
@@ -122,8 +119,8 @@ else
   warn "Impossibile eseguire diff (nessun commit precedente o repository non git)."
 fi
 
-# ── 3. Stato delle porte ──────────────────────────────────────────────────────
-section "3. STATO DELLE PORTE"
+# ── 3. Stato della porta backend ──────────────────────────────────────────────
+section "3. STATO DELLA PORTA BACKEND"
 
 check_port() {
   local port=$1
@@ -155,7 +152,6 @@ check_port() {
 }
 
 check_port 5000 "Backend Express"
-check_port 8081 "Frontend Metro/Expo"
 
 # ── 4. Ultimi log backend ─────────────────────────────────────────────────────
 section "4. ULTIMI 20 LOG BACKEND (/tmp/logs/)"
@@ -171,22 +167,8 @@ else
   ls /tmp/logs/ 2>/dev/null | sed 's/^/    /' || echo "    (directory vuota o inesistente)"
 fi
 
-# ── 5. Ultimi log frontend ────────────────────────────────────────────────────
-section "5. ULTIMI 20 LOG FRONTEND (/tmp/logs/ e /tmp/metro-opt-cycle*.log)"
-
-FRONTEND_LOG=$(ls -t /tmp/logs/*frontend* /tmp/logs/*Frontend* /tmp/metro-opt-cycle*.log 2>/dev/null | head -1)
-if [ -n "$FRONTEND_LOG" ]; then
-  info "File: $FRONTEND_LOG"
-  echo ""
-  tail -20 "$FRONTEND_LOG" 2>/dev/null | sed 's/^/    /' || warn "Impossibile leggere $FRONTEND_LOG"
-else
-  warn "Nessun log frontend trovato in /tmp/logs/ o /tmp/metro-opt-cycle*.log"
-  info "File disponibili in /tmp/logs/:"
-  ls /tmp/logs/ 2>/dev/null | sed 's/^/    /' || echo "    (directory vuota o inesistente)"
-fi
-
-# ── 6. Uptime reset log ───────────────────────────────────────────────────────
-section "6. UPTIME RESET LOG — ultimi 30 eventi (logs/uptime-resets.log)"
+# ── 5. Uptime reset log ───────────────────────────────────────────────────────
+section "5. UPTIME RESET LOG — ultimi 30 eventi (logs/uptime-resets.log)"
 
 UPTIME_LOG="$(pwd)/logs/uptime-resets.log"
 if [ -f "$UPTIME_LOG" ]; then
