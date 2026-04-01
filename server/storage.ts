@@ -1095,7 +1095,7 @@ export class DatabaseStorage implements IStorage {
       .select({ user: users, profile: userProfiles, distance: distanceExpr })
       .from(userProfiles)
       .innerJoin(users, eq(users.id, userProfiles.userId))
-      .where(and(eq(users.status, "active"), eq(userProfiles.isAvailable, true), gte(users.lastLoginAt, since), eq(users.ghostMode, false)))
+      .where(and(eq(users.status, "active"), eq(userProfiles.isAvailable, true), gte(users.lastLoginAt, since), eq(users.ghostMode, false), notInArray(users.role, ["admin", "moderator", "moderatore"])))
       .orderBy(sql`distance`);
     return results;
   }
@@ -1437,6 +1437,7 @@ export class DatabaseStorage implements IStorage {
       or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
       eq(users.ghostMode, false),
       gte(users.lastLoginAt, since),
+      notInArray(users.role, ["admin", "moderator", "moderatore"]),
     ];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const result = await db.select({ count: sql<number>`count(*)::int` })
@@ -1453,6 +1454,7 @@ export class DatabaseStorage implements IStorage {
       eq(users.userType, "zavorrina"),
       eq(users.ghostMode, false),
       gte(users.lastLoginAt, since),
+      notInArray(users.role, ["admin", "moderator", "moderatore"]),
     ];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const result = await db.select({ count: sql<number>`count(*)::int` })
@@ -1472,6 +1474,7 @@ export class DatabaseStorage implements IStorage {
       or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
       eq(users.ghostMode, false),
       gte(users.lastLoginAt, since),
+      notInArray(users.role, ["admin", "moderator", "moderatore"]),
     ];
     if (countries && countries.length > 0) {
       conditions.push(inArray(users.country, countries));
@@ -1494,6 +1497,7 @@ export class DatabaseStorage implements IStorage {
       eq(users.userType, "zavorrina"),
       eq(users.ghostMode, false),
       gte(users.lastLoginAt, since),
+      notInArray(users.role, ["admin", "moderator", "moderatore"]),
     ];
     if (countries && countries.length > 0) {
       conditions.push(inArray(users.country, countries));

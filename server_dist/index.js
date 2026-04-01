@@ -1349,7 +1349,7 @@ var init_storage = __esm({
       }
       async getAvailableUsersList(since, lat, lng) {
         const distanceExpr = lat != null && lng != null ? import_drizzle_orm2.sql`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance") : import_drizzle_orm2.sql`0`.as("distance");
-        const results = await db.select({ user: users, profile: userProfiles, distance: distanceExpr }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.status, "active"), (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true), (0, import_drizzle_orm2.gte)(users.lastLoginAt, since), (0, import_drizzle_orm2.eq)(users.ghostMode, false))).orderBy(import_drizzle_orm2.sql`distance`);
+        const results = await db.select({ user: users, profile: userProfiles, distance: distanceExpr }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(users.status, "active"), (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true), (0, import_drizzle_orm2.gte)(users.lastLoginAt, since), (0, import_drizzle_orm2.eq)(users.ghostMode, false), (0, import_drizzle_orm2.notInArray)(users.role, ["admin", "moderator", "moderatore"]))).orderBy(import_drizzle_orm2.sql`distance`);
         return results;
       }
       async getUnapprovedUserPhotos() {
@@ -1633,7 +1633,8 @@ var init_storage = __esm({
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.userType, "biker"), (0, import_drizzle_orm2.eq)(users.userType, "coppia")),
           (0, import_drizzle_orm2.eq)(users.ghostMode, false),
-          (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)
+          (0, import_drizzle_orm2.gte)(users.lastLoginAt, since),
+          (0, import_drizzle_orm2.notInArray)(users.role, ["admin", "moderator", "moderatore"])
         ];
         if (countries && countries.length > 0) conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
         const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)(...conditions));
@@ -1645,7 +1646,8 @@ var init_storage = __esm({
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           (0, import_drizzle_orm2.eq)(users.userType, "zavorrina"),
           (0, import_drizzle_orm2.eq)(users.ghostMode, false),
-          (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)
+          (0, import_drizzle_orm2.gte)(users.lastLoginAt, since),
+          (0, import_drizzle_orm2.notInArray)(users.role, ["admin", "moderator", "moderatore"])
         ];
         if (countries && countries.length > 0) conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
         const result = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(userProfiles).innerJoin(users, (0, import_drizzle_orm2.eq)(users.id, userProfiles.userId)).where((0, import_drizzle_orm2.and)(...conditions));
@@ -1658,7 +1660,8 @@ var init_storage = __esm({
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(users.userType, "biker"), (0, import_drizzle_orm2.eq)(users.userType, "coppia")),
           (0, import_drizzle_orm2.eq)(users.ghostMode, false),
-          (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)
+          (0, import_drizzle_orm2.gte)(users.lastLoginAt, since),
+          (0, import_drizzle_orm2.notInArray)(users.role, ["admin", "moderator", "moderatore"])
         ];
         if (countries && countries.length > 0) {
           conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
@@ -1672,7 +1675,8 @@ var init_storage = __esm({
           (0, import_drizzle_orm2.eq)(userProfiles.isAvailable, true),
           (0, import_drizzle_orm2.eq)(users.userType, "zavorrina"),
           (0, import_drizzle_orm2.eq)(users.ghostMode, false),
-          (0, import_drizzle_orm2.gte)(users.lastLoginAt, since)
+          (0, import_drizzle_orm2.gte)(users.lastLoginAt, since),
+          (0, import_drizzle_orm2.notInArray)(users.role, ["admin", "moderator", "moderatore"])
         ];
         if (countries && countries.length > 0) {
           conditions.push((0, import_drizzle_orm2.inArray)(users.country, countries));
@@ -5804,6 +5808,9 @@ router3.get("/:id/public", requireAuth2, async (req, res) => {
     if (!targetUser) {
       return res.status(404).json({ message: "Utente non trovato" });
     }
+    if (targetUser.role === "admin" || targetUser.role === "moderator" || targetUser.role === "moderatore") {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
     const isBlockedByTarget = await storage.hasBlockedUser(userId, requesterId);
     if (isBlockedByTarget && requesterId !== userId) {
       return res.status(403).json({ message: "Non puoi visualizzare questo profilo" });
@@ -5993,10 +6000,10 @@ router3.get("/biker-available-list", requireAuth2, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq11, and: and9, or: or4, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq11, and: and9, or: or4, inArray: inArr, notInArray: notInArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const bikerConds = [eq11(usersTable.status, "active"), or4(eq11(usersTable.userType, "biker"), eq11(usersTable.userType, "coppia")), eq11(usersTable.ghostMode, false)];
+      const bikerConds = [eq11(usersTable.status, "active"), or4(eq11(usersTable.userType, "biker"), eq11(usersTable.userType, "coppia")), eq11(usersTable.ghostMode, false), notInArr(usersTable.role, ["admin", "moderator", "moderatore"])];
       if (countriesParam && countriesParam.length > 0) bikerConds.push(inArr(usersTable.country, countriesParam));
       const allBikers = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq11(usersTable.id, profilesTable.userId)).where(and9(...bikerConds)).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));
@@ -6050,10 +6057,10 @@ router3.get("/zavorrine-available-list", requireAuth2, async (req, res) => {
     if (includeOffline) {
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { users: usersTable, userProfiles: profilesTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq11, and: and9, inArray: inArr } = await import("drizzle-orm");
+      const { eq: eq11, and: and9, inArray: inArr, notInArray: notInArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null ? sqlTag`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance") : sqlTag`0`.as("distance");
-      const zavConds = [eq11(usersTable.status, "active"), eq11(usersTable.userType, "zavorrina"), eq11(usersTable.ghostMode, false)];
+      const zavConds = [eq11(usersTable.status, "active"), eq11(usersTable.userType, "zavorrina"), eq11(usersTable.ghostMode, false), notInArr(usersTable.role, ["admin", "moderator", "moderatore"])];
       if (countriesParam && countriesParam.length > 0) zavConds.push(inArr(usersTable.country, countriesParam));
       const allZav = await db2.select({ user: usersTable, profile: profilesTable, distance: distanceExpr }).from(profilesTable).innerJoin(usersTable, eq11(usersTable.id, profilesTable.userId)).where(and9(...zavConds)).orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r) => r.user.id));

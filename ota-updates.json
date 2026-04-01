@@ -864,6 +864,24 @@
     "iosUpdateId": null,
     "commitBase": "38a407de97aadae4dde1741f562f2182afb909c3",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/f9c7fea9-a9e9-4db5-9723-39a968af5c4c",
-    "status": "published"
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 52,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-52: Fix visibilità admin — admin/moderatori esclusi da mappa, liste, profilo pubblico",
+    "publishedAt": "2026-04-01",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #345 — 7 fix backend: (1) storage.ts getAvailableUsersList: aggiunto notInArray(users.role, ['admin','moderator','moderatore']); (2) countAvailableBikers: stesso filtro; (3) countAvailableZavorrine: stesso filtro; (4) getAvailableBikersList: stesso filtro; (5) getAvailableZavorrinaList: stesso filtro; (6) routes/users.ts GET /:id/public: ritorna 404 se targetUser.role è admin/moderator/moderatore — blocca anche badge online/offline; (7) GET /biker-available-list e /zavorrine-available-list ramo includeOffline: aggiunto notInArray sul filtro inline bikerConds/zavConds. CRITICO: richiede ridistribuzione backend produzione (user deve cliccare Publish). OTA-52 aggiorna solo il bundle JS Android.",
+    "updateGroupId": "d6c24117-6fef-4c60-b711-0ee1800d3adc",
+    "androidUpdateId": "019d4660-fecc-7117-8dc8-07689b478f58",
+    "iosUpdateId": null,
+    "commitBase": "8512e5cb9fecafa1b7bad4b69147a751de9ab585",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/d6c24117-6fef-4c60-b711-0ee1800b3adc",
+    "status": "published",
+    "requiresBackendDeploy": true
   }
 ]
