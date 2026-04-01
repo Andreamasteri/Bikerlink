@@ -355,12 +355,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getAppSetting("paypal_email"),
       ]);
       res.json({
-        enabled: enabledSetting?.value !== "false",
+        enabled: enabledSetting?.value === "true",
         text: textSetting?.value || "",
         paypalEmail: paypalSetting?.value || "",
       });
     } catch {
-      res.json({ enabled: true, text: "", paypalEmail: "" });
+      res.json({ enabled: false, text: "", paypalEmail: "" });
     }
   });
 

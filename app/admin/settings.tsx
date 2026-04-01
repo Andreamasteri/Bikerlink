@@ -833,7 +833,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/paypal"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/donation"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      Alert.alert("Successo", "Email PayPal salvata con successo");
+      Alert.alert("Successo", "Email supporto salvata con successo");
     } catch (error: any) {
       Alert.alert("Errore", error.message || "Errore durante il salvataggio");
     } finally {
@@ -1629,11 +1629,11 @@ export default function AdminSettings() {
         <View style={styles.synecoHeader}>
           <View style={styles.synecoInfo}>
             <Ionicons name="heart" size={20} color="#E91E63" />
-            <Text style={styles.synecoLabel}>Donazione PayPal</Text>
+            <Text style={styles.synecoLabel}>Supporto economico</Text>
           </View>
           <Switch
             value={donationEnabled}
-            onValueChange={(val) => setProtectedToggle({ key: "donation_enabled", value: val, label: "Donazione PayPal" })}
+            onValueChange={(val) => setProtectedToggle({ key: "donation_enabled", value: val, label: "Supporto economico" })}
             trackColor={{ false: Colors.border, true: "#E91E63" }}
             thumbColor={donationEnabled ? Colors.text : Colors.textSecondary}
             disabled={protectedToggleMutation.isPending}
@@ -1642,11 +1642,11 @@ export default function AdminSettings() {
         <Text style={styles.synecoDesc}>
           {donationEnabled
             ? "Il blocco 'Supporta BikerLink' è visibile nel profilo utente"
-            : "Il blocco donazione è nascosto dal profilo utente"}
+            : "Il blocco supporto è nascosto dal profilo utente"}
         </Text>
 
         <View style={{ marginTop: 16 }}>
-          <Text style={styles.settingLabel}>Email PayPal</Text>
+          <Text style={styles.settingLabel}>Email supporto</Text>
           <TextInput
             style={[styles.input, { marginTop: 8 }]}
             placeholder="email@esempio.com"

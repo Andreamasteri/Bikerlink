@@ -56,8 +56,8 @@ router.get("/placeholders", async (_req: Request, res: Response) => {
     comingSoon: [
       {
         id: "paypal_donations",
-        name: "Donazioni PayPal",
-        description: "Supporta BikerLink con una donazione via PayPal",
+        name: "Supporto economico",
+        description: "Supporta BikerLink con un contributo economico",
         status: "planned",
         enabled: false,
       },

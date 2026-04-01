@@ -788,29 +788,15 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      {donationData?.enabled !== false && Platform.OS !== 'ios' && (
+      {donationData?.enabled && !!donationData?.paypalEmail && (
         <View style={styles.donationSection}>
-          <View style={styles.donationIconRow}>
-            <Ionicons name="heart" size={28} color={Colors.accentRed} />
-          </View>
-          <Text style={styles.donationTitle}>{t("profile.donate")} BikerLink</Text>
-          <Text style={styles.donationText}>
-            {donationData?.text || t("profile.donationText")}
-          </Text>
-          <Pressable
-            style={styles.donateBtn}
-            onPress={() => {
-              const email = donationData?.paypalEmail;
-              if (!email) {
-                Alert.alert(t("profile.donationTitle"), t("profile.paypalNotConfigured"));
-                return;
-              }
-              Linking.openURL(`https://www.paypal.com/donate?business=${encodeURIComponent(email)}&currency_code=EUR`);
-            }}
-          >
-            <Ionicons name="logo-paypal" size={22} color="#fff" />
-            <Text style={styles.donateBtnText}>{t("profile.donatePaypal")}</Text>
-          </Pressable>
+          <Image
+            source={require("@/assets/images/support-banner.png")}
+            style={styles.supportBannerImage}
+            resizeMode="cover"
+          />
+          <Text style={styles.donationTitle}>{t("profile.supportTitle")}</Text>
+          <Text selectable style={styles.supportEmail}>{donationData.paypalEmail}</Text>
         </View>
       )}
 
@@ -1464,42 +1450,31 @@ const styles = StyleSheet.create({
     marginTop: 16,
     backgroundColor: Colors.surface,
     borderRadius: 16,
-    padding: 20,
+    overflow: "hidden",
     borderWidth: 1,
     borderColor: Colors.accent,
     alignItems: "center",
   },
-  donationIconRow: {
-    marginBottom: 8,
+  supportBannerImage: {
+    width: "100%",
+    height: 80,
   },
   donationTitle: {
     fontSize: 18,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
-    marginBottom: 12,
+    marginTop: 16,
+    marginBottom: 8,
     textAlign: "center",
+    paddingHorizontal: 20,
   },
-  donationText: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    lineHeight: 20,
+  supportEmail: {
+    fontSize: 15,
+    fontFamily: "Inter_500Medium",
+    color: Colors.accent,
     textAlign: "center",
-    marginBottom: 16,
-  },
-  donateBtn: {
-    flexDirection: "row",
-    backgroundColor: "#003087",
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    borderRadius: 12,
-    alignItems: "center",
-    gap: 10,
-  },
-  donateBtnText: {
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-    color: "#fff",
+    marginBottom: 20,
+    paddingHorizontal: 20,
   },
   langDropdownTrigger: {
     flexDirection: "row",
