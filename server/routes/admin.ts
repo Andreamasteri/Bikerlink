@@ -1703,7 +1703,7 @@ router.delete("/stregatti/:id", async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     await storage.deleteFakeUser(id);
-    return res.json({ message: "Utente finto eliminato" });
+    return res.json({ message: "Stregatto eliminato" });
   } catch (error) {
     console.error("Admin delete stregatto error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -1734,7 +1734,7 @@ router.put("/stregatti/:id/toggle-online", async (req: Request, res: Response) =
     const id = req.params.id;
     const user = await storage.getUser(id);
     if (!user || !user.isFake) {
-      return res.status(404).json({ message: "Utente finto non trovato" });
+      return res.status(404).json({ message: "Stregatto non trovato" });
     }
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const isCurrentlyOnline = user.lastLoginAt && new Date(user.lastLoginAt) >= fifteenMinutesAgo;
@@ -1792,7 +1792,7 @@ router.delete("/stregatti/:id/conversations", async (req: Request, res: Response
     const id = req.params.id;
     const user = await storage.getUser(id);
     if (!user || !user.isFake) {
-      return res.status(404).json({ message: "Utente fake non trovato" });
+      return res.status(404).json({ message: "Stregatto non trovato" });
     }
     const convs = await storage.getFakeUserConversations(id);
     let deleted = 0;
