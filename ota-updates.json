@@ -1018,6 +1018,23 @@
     "iosUpdateId": null,
     "commitBase": "58964085fe4a00ead84c7ee7b7c8a8105a56d225",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/36a447e6-453e-4637-9c87-5e5ed58430b9",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 60,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-60: Badge Disponibile verde, Last seen offline (14/04/'26 - 18.32)",
+    "publishedAt": "2026-04-01",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #359 — Badge 'Disponibile' ora verde (Colors.success) invece di arancione, indipendente dallo stato online/offline. Last seen aggiunto nel profilo pubblico e modal home, visibile solo quando offline con lastLoginAt presente. Backend: lastLoginAt esposto in 5 endpoint API (profilo singolo + 4 liste utenti). Task #360 — Formato Last seen aggiornato da 'Gio 14 Apr · 18:32' a '14/04/\\'26 - 18.32' (numerico, anno 2 cifre con apostrofo, punto come separatore ora).",
+    "updateGroupId": "807a706a-5dc7-43c9-85ae-2f75e305b5f4",
+    "androidUpdateId": "019d49e5-8d2f-7efd-9c4c-8131c4b16abd",
+    "iosUpdateId": null,
+    "commitBase": "ec10b7dc7e7ca8b980a9f04ea11241841985ac4e",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/807a706a-5dc7-43c9-85ae-2f75e305b5f4",
     "status": "published"
   }
 ]
