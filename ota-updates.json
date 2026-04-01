@@ -1052,6 +1052,23 @@
     "iosUpdateId": null,
     "commitBase": "2d03162fc27d02ace1c36b4b9f7c94da6be25a03",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/40f8d369-1629-4e68-bbec-412a8dc22074",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 62,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-62: Re-publish sblocco dispositivi bloccati a OTA-60",
+    "publishedAt": "2026-04-01",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #367 — Re-publish identico a OTA-61. Scopo: sbloccare dispositivi fermi a OTA-60 che hanno in AsyncStorage l'ID di OTA-61 (scritto prima del reload fallito dal vecchio checker). Il nuovo ID di OTA-62 è diverso da quello salvato → il vecchio codice OTA-60 lo tratta come aggiornamento inedito → tenta il reload → se va a buon fine il dispositivo finisce su OTA-62 col checker sano (mod.updateId, senza AsyncStorage). Nessuna modifica al codice sorgente rispetto a OTA-61.",
+    "updateGroupId": "a3c9edb8-efdf-44a4-ba9f-9ae39d0978b0",
+    "androidUpdateId": "019d4a64-f608-7bd9-b38a-24d4de7b9b61",
+    "iosUpdateId": null,
+    "commitBase": "b75f97ecf41cde24b8e187b18ad3ac559ad8a182",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/a3c9edb8-efdf-44a4-ba9f-9ae39d0978b0",
     "status": "published"
   }
 ]
