@@ -838,6 +838,48 @@ router.post("/me/cancel-deletion", requireAuth, async (req: Request, res: Respon
   }
 });
 
+router.post("/:id/report", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const reporterId = req.session.userId!;
+    const reportedUserId = req.params.id as string;
+    const { reason, description } = req.body;
+
+    if (reporterId === reportedUserId) {
+      return res.status(400).json({ message: "Non puoi segnalare te stesso" });
+    }
+
+    const validReasons = [
+      "Spam",
+      "Comportamento inappropriato",
+      "Profilo falso/bot",
+      "Molestia",
+      "Contenuto offensivo",
+      "Altro",
+    ];
+    if (!reason || !validReasons.includes(reason)) {
+      return res.status(400).json({ message: "Motivo non valido" });
+    }
+
+    const targetUser = await storage.getUser(reportedUserId);
+    if (!targetUser) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+
+    await storage.createReport({
+      reporterId,
+      reportedUserId,
+      reason,
+      description: description || null,
+      status: "pending",
+    } as any);
+
+    return res.json({ message: "Segnalazione inviata con successo" });
+  } catch (error) {
+    console.error("Report user error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.post("/:id/block", requireAuth, async (req: Request, res: Response) => {
   try {
     const blockerId = req.session.userId!;

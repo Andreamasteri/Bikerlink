@@ -11,6 +11,7 @@ import {
   Image,
   Modal,
   Pressable,
+  TextInput,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -20,6 +21,15 @@ import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
+
+const REPORT_REASONS = [
+  "Spam",
+  "Comportamento inappropriato",
+  "Profilo falso/bot",
+  "Molestia",
+  "Contenuto offensivo",
+  "Altro",
+];
 
 export default function PublicProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -74,6 +84,12 @@ export default function PublicProfileScreen() {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const isBlocked = blockedOverride !== null ? blockedOverride : (profile?.isBlockedByMe ?? false);
 
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
+  const [selectedReason, setSelectedReason] = useState<string>("");
+  const [reportDescription, setReportDescription] = useState("");
+  const [reportSent, setReportSent] = useState(false);
+
   const blockMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/users/${id}/block`, {});
@@ -113,7 +129,21 @@ export default function PublicProfileScreen() {
     },
   });
 
+  const reportMutation = useMutation({
+    mutationFn: async ({ reason, description }: { reason: string; description: string }) => {
+      const res = await apiRequest("POST", `/api/users/${id}/report`, { reason, description: description || undefined });
+      return res.json();
+    },
+    onSuccess: () => {
+      setReportSent(true);
+    },
+    onError: (e: any) => {
+      Alert.alert("Errore", e.message || "Impossibile inviare la segnalazione");
+    },
+  });
+
   const handleBlockUser = () => {
+    setMenuVisible(false);
     Alert.alert(
       "Blocca utente",
       `Sei sicuro di voler bloccare ${profile?.nickname ?? "questo utente"}?\n\nL'utente scomparirà dai match, dal profilo e dalla chat.`,
@@ -129,6 +159,7 @@ export default function PublicProfileScreen() {
   };
 
   const handleUnblockUser = () => {
+    setMenuVisible(false);
     Alert.alert(
       "Sblocca utente",
       `Sbloccare ${profile?.nickname ?? "questo utente"}? Potrete tornare a vedervi nei match e nella chat.`,
@@ -140,6 +171,22 @@ export default function PublicProfileScreen() {
         },
       ]
     );
+  };
+
+  const handleOpenReport = () => {
+    setMenuVisible(false);
+    setSelectedReason("");
+    setReportDescription("");
+    setReportSent(false);
+    setReportVisible(true);
+  };
+
+  const handleSubmitReport = () => {
+    if (!selectedReason) {
+      Alert.alert("Attenzione", "Seleziona un motivo per la segnalazione");
+      return;
+    }
+    reportMutation.mutate({ reason: selectedReason, description: reportDescription });
   };
 
   const handleStartChat = async () => {
@@ -191,6 +238,15 @@ export default function PublicProfileScreen() {
           title: profile.nickname,
           headerStyle: { backgroundColor: Colors.surface },
           headerTintColor: Colors.text,
+          headerRight: !isSelf ? () => (
+            <TouchableOpacity
+              onPress={() => setMenuVisible(true)}
+              style={{ marginRight: 4, padding: 6 }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="ellipsis-vertical" size={22} color={Colors.text} />
+            </TouchableOpacity>
+          ) : undefined,
         }}
       />
       <ScrollView
@@ -357,6 +413,90 @@ export default function PublicProfileScreen() {
           </TouchableOpacity>
         </Pressable>
       </Modal>
+
+      <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
+        <Pressable style={styles.menuOverlay} onPress={() => setMenuVisible(false)}>
+          <View style={[styles.menuSheet, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={styles.menuHandle} />
+            <TouchableOpacity style={styles.menuItem} onPress={handleOpenReport}>
+              <Ionicons name="flag-outline" size={22} color={Colors.warning} />
+              <Text style={[styles.menuItemText, { color: Colors.warning }]}>Segnala utente</Text>
+            </TouchableOpacity>
+            <View style={styles.menuDivider} />
+            {isBlocked ? (
+              <TouchableOpacity style={styles.menuItem} onPress={handleUnblockUser}>
+                <Ionicons name="checkmark-circle-outline" size={22} color={Colors.textSecondary} />
+                <Text style={[styles.menuItemText, { color: Colors.textSecondary }]}>Sblocca utente</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.menuItem} onPress={handleBlockUser}>
+                <Ionicons name="ban" size={22} color={Colors.error} />
+                <Text style={[styles.menuItemText, { color: Colors.error }]}>Blocca utente</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={reportVisible} transparent animationType="slide" onRequestClose={() => setReportVisible(false)}>
+        <Pressable style={styles.menuOverlay} onPress={() => setReportVisible(false)}>
+          <Pressable style={[styles.reportSheet, { paddingBottom: insets.bottom + 16 }]} onPress={() => {}}>
+            <View style={styles.menuHandle} />
+            {reportSent ? (
+              <View style={styles.reportSuccess}>
+                <Ionicons name="checkmark-circle" size={48} color={Colors.success} />
+                <Text style={styles.reportSuccessTitle}>Segnalazione inviata</Text>
+                <Text style={styles.reportSuccessText}>Grazie per averci aiutato a mantenere la community sicura. La esamineremo al più presto.</Text>
+                <TouchableOpacity style={styles.reportCloseBtn} onPress={() => setReportVisible(false)}>
+                  <Text style={styles.reportCloseBtnText}>Chiudi</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.reportTitle}>Segnala {profile?.nickname}</Text>
+                <Text style={styles.reportSubtitle}>Seleziona il motivo della segnalazione</Text>
+                <View style={styles.reasonList}>
+                  {REPORT_REASONS.map((r) => (
+                    <TouchableOpacity
+                      key={r}
+                      style={[styles.reasonItem, selectedReason === r && styles.reasonItemSelected]}
+                      onPress={() => setSelectedReason(r)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.reasonRadio, selectedReason === r && styles.reasonRadioSelected]}>
+                        {selectedReason === r && <View style={styles.reasonRadioDot} />}
+                      </View>
+                      <Text style={[styles.reasonText, selectedReason === r && styles.reasonTextSelected]}>{r}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <TextInput
+                  style={styles.reportInput}
+                  placeholder="Descrizione opzionale..."
+                  placeholderTextColor={Colors.textSecondary}
+                  value={reportDescription}
+                  onChangeText={setReportDescription}
+                  multiline
+                  numberOfLines={3}
+                  maxLength={500}
+                />
+                <TouchableOpacity
+                  style={[styles.reportSubmitBtn, (!selectedReason || reportMutation.isPending) && styles.reportSubmitBtnDisabled]}
+                  onPress={handleSubmitReport}
+                  disabled={!selectedReason || reportMutation.isPending}
+                  activeOpacity={0.8}
+                >
+                  {reportMutation.isPending ? (
+                    <ActivityIndicator size="small" color={Colors.background} />
+                  ) : (
+                    <Text style={styles.reportSubmitBtnText}>Invia segnalazione</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </>
   );
 }
@@ -445,4 +585,106 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 6,
   },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  menuSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 12,
+    paddingHorizontal: 0,
+  },
+  menuHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.border,
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+  },
+  menuItemText: { fontSize: 16, fontFamily: "Inter_500Medium" },
+  menuDivider: { height: 1, backgroundColor: Colors.border, marginHorizontal: 16 },
+  reportSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 12,
+    paddingHorizontal: 20,
+    maxHeight: "85%",
+  },
+  reportTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.text, marginBottom: 4 },
+  reportSubtitle: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginBottom: 16 },
+  reasonList: { gap: 4, marginBottom: 14 },
+  reasonItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  reasonItemSelected: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent + "15",
+  },
+  reasonRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reasonRadioSelected: { borderColor: Colors.accent },
+  reasonRadioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.accent },
+  reasonText: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.text, flex: 1 },
+  reasonTextSelected: { fontFamily: "Inter_500Medium", color: Colors.accent },
+  reportInput: {
+    backgroundColor: Colors.background,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 12,
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: Colors.text,
+    minHeight: 72,
+    textAlignVertical: "top",
+    marginBottom: 16,
+  },
+  reportSubmitBtn: {
+    backgroundColor: Colors.accent,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  reportSubmitBtnDisabled: { opacity: 0.5 },
+  reportSubmitBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.background },
+  reportSuccess: { alignItems: "center", paddingVertical: 24, gap: 12 },
+  reportSuccessTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: Colors.text },
+  reportSuccessText: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary, textAlign: "center", lineHeight: 20 },
+  reportCloseBtn: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginTop: 8,
+  },
+  reportCloseBtnText: { fontSize: 15, fontFamily: "Inter_500Medium", color: Colors.text },
 });

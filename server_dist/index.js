@@ -6266,6 +6266,42 @@ router3.post("/me/cancel-deletion", requireAuth2, async (req, res) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
+router3.post("/:id/report", requireAuth2, async (req, res) => {
+  try {
+    const reporterId = req.session.userId;
+    const reportedUserId = req.params.id;
+    const { reason, description } = req.body;
+    if (reporterId === reportedUserId) {
+      return res.status(400).json({ message: "Non puoi segnalare te stesso" });
+    }
+    const validReasons = [
+      "Spam",
+      "Comportamento inappropriato",
+      "Profilo falso/bot",
+      "Molestia",
+      "Contenuto offensivo",
+      "Altro"
+    ];
+    if (!reason || !validReasons.includes(reason)) {
+      return res.status(400).json({ message: "Motivo non valido" });
+    }
+    const targetUser = await storage.getUser(reportedUserId);
+    if (!targetUser) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    await storage.createReport({
+      reporterId,
+      reportedUserId,
+      reason,
+      description: description || null,
+      status: "pending"
+    });
+    return res.json({ message: "Segnalazione inviata con successo" });
+  } catch (error) {
+    console.error("Report user error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
 router3.post("/:id/block", requireAuth2, async (req, res) => {
   try {
     const blockerId = req.session.userId;

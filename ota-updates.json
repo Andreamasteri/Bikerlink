@@ -950,6 +950,23 @@
     "iosUpdateId": null,
     "commitBase": "52cab5ad7dab03b5793f471430c03b6c239ea9af",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/269c091a-afac-4cef-97a6-5fecd0e73675",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 56,
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-56: Pulsante Segnala sul profilo pubblico — menu tre puntini + modal segnalazione",
+    "publishedAt": "2026-04-01",
+    "runtimeVersion": "1.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #352 — (1) BACKEND: nuovo endpoint POST /api/users/:id/report in server/routes/users.ts — accetta {reason, description}, valida motivo tra 6 predefiniti, salva in tabella reports (già esistente); (2) FRONTEND app/profile/[id].tsx: aggiunto pulsante tre puntini (ellipsis-vertical) in headerRight del profilo pubblico (non su se stessi), apre modal bottom sheet con 'Segnala utente' (arancio) e 'Blocca/Sblocca'; 'Segnala' apre secondo modal con lista radio button motivi (Spam, Comportamento inappropriato, Profilo falso/bot, Molestia, Contenuto offensivo, Altro), textarea descrizione opzionale, pulsante invio; dopo successo mostra schermata di conferma verde.",
+    "updateGroupId": "973da402-2a38-4f7b-8d55-5bf8d5f451d9",
+    "androidUpdateId": "019d487a-ce68-7687-ac88-9753d1599889",
+    "iosUpdateId": null,
+    "commitBase": "a047480d13356bc513502a916f01d265f55040e6",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/973da402-2a38-4f7b-8d55-5bf8d5f451d9",
     "status": "published"
   }
 ]
