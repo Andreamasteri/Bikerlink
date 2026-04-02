@@ -869,8 +869,7 @@ export default function AdminSettings() {
     }
   }
 
-  async function handleSaveSplashList(list: string[]) {
-    setSplashMessagesList(list);
+  async function persistSplashList(list: string[]) {
     try {
       await apiRequest("PUT", "/api/admin/settings/splash_messages_list", { value: JSON.stringify(list) });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
@@ -878,6 +877,11 @@ export default function AdminSettings() {
     } catch (error: any) {
       Alert.alert("Errore", error.message || "Errore durante il salvataggio");
     }
+  }
+
+  async function handleSaveSplashList(list: string[]) {
+    setSplashMessagesList(list);
+    await persistSplashList(list);
   }
 
   const updateMutation = useMutation({
@@ -1434,7 +1438,7 @@ export default function AdminSettings() {
             onValueChange={(val) => setProtectedToggle({ key: "marketplace_enabled", value: val, label: "Mercatino Moto" })}
             trackColor={{ false: Colors.border, true: "#FF9800" }}
             thumbColor={marketplaceEnabled ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending}
+            disabled={protectedToggleMutation.isPending || marketplaceData === undefined}
           />
         </View>
         <Text style={styles.synecoDesc}>
@@ -1455,7 +1459,7 @@ export default function AdminSettings() {
             onValueChange={(val) => setProtectedToggle({ key: "gps_required", value: val, label: "GPS Obbligatorio" })}
             trackColor={{ false: Colors.border, true: "#4CAF50" }}
             thumbColor={gpsRequired ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending}
+            disabled={protectedToggleMutation.isPending || gpsRequiredData === undefined}
           />
         </View>
         <Text style={styles.synecoDesc}>
@@ -1476,7 +1480,7 @@ export default function AdminSettings() {
             onValueChange={(val) => setProtectedToggle({ key: "ghost_mode_enabled", value: val, label: "Ghost Mode" })}
             trackColor={{ false: Colors.border, true: "#9C27B0" }}
             thumbColor={ghostModeEnabled ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending}
+            disabled={protectedToggleMutation.isPending || ghostModeData === undefined}
           />
         </View>
         <Text style={styles.synecoDesc}>
@@ -1517,7 +1521,7 @@ export default function AdminSettings() {
             onValueChange={(val) => setProtectedToggle({ key: "email_verification_enabled", value: val, label: "Verifica Email" })}
             trackColor={{ false: Colors.border, true: Colors.accent }}
             thumbColor={emailVerifEnabled ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending}
+            disabled={protectedToggleMutation.isPending || emailVerifData === undefined}
           />
         </View>
         <Text style={styles.synecoDesc}>
@@ -1536,7 +1540,7 @@ export default function AdminSettings() {
             onValueChange={(val) => setProtectedToggle({ key: "phone_field_enabled", value: val, label: "Campo telefono in registrazione" })}
             trackColor={{ false: Colors.border, true: Colors.accent }}
             thumbColor={phoneFieldEnabled ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending}
+            disabled={protectedToggleMutation.isPending || phoneFieldData === undefined}
           />
         </View>
         <Text style={styles.synecoDesc}>
@@ -1555,7 +1559,7 @@ export default function AdminSettings() {
             onValueChange={(val) => setProtectedToggle({ key: "user_available_on_login", value: val, label: "Utente Disponibile all'accesso" })}
             trackColor={{ false: Colors.border, true: Colors.success }}
             thumbColor={userAvailableOnLogin ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending}
+            disabled={protectedToggleMutation.isPending || userAvailableData === undefined}
           />
         </View>
         <Text style={styles.synecoDesc}>
@@ -1598,7 +1602,7 @@ export default function AdminSettings() {
             onValueChange={(val) => setProtectedToggle({ key: "ads_enabled", value: val, label: "Advertisement" })}
             trackColor={{ false: Colors.border, true: Colors.syneco }}
             thumbColor={adsEnabled ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending}
+            disabled={protectedToggleMutation.isPending || adsEnabledData === undefined}
           />
         </View>
         <Text style={styles.synecoDesc}>
@@ -1617,7 +1621,7 @@ export default function AdminSettings() {
             onValueChange={(val) => setProtectedToggle({ key: "syneco_branding_visible", value: val, label: "Branding Syneco" })}
             trackColor={{ false: Colors.border, true: Colors.syneco }}
             thumbColor={synecoVisible ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending}
+            disabled={protectedToggleMutation.isPending || synecoData === undefined}
           />
         </View>
         <Text style={styles.synecoDesc}>
@@ -1636,7 +1640,7 @@ export default function AdminSettings() {
             onValueChange={(val) => setProtectedToggle({ key: "donation_enabled", value: val, label: "Supporto economico" })}
             trackColor={{ false: Colors.border, true: "#E91E63" }}
             thumbColor={donationEnabled ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending}
+            disabled={protectedToggleMutation.isPending || donationData === undefined}
           />
         </View>
         <Text style={styles.synecoDesc}>
@@ -1912,7 +1916,13 @@ export default function AdminSettings() {
                       onChangeText={(text) => {
                         const updated = [...splashMessagesList];
                         updated[idx] = text;
-                        handleSaveSplashList(updated);
+                        setSplashMessagesList(updated);
+                      }}
+                      onBlur={() => {
+                        setSplashMessagesList((current) => {
+                          persistSplashList(current);
+                          return current;
+                        });
                       }}
                       placeholder={`Messaggio ${idx + 1}`}
                       placeholderTextColor={Colors.textSecondary}
