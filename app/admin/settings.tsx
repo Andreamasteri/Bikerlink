@@ -19,8 +19,6 @@ interface AppSetting {
 
 const defaultSettings = [
   { key: "splash_message", label: "Messaggio Splash", placeholder: "Messaggio da mostrare nello splash..." },
-  { key: "maintenance_mode", label: "Modalita manutenzione", placeholder: "true / false" },
-  { key: "min_app_version", label: "Versione minima app", placeholder: "1.0.0" },
   { key: "max_photos_zavorrina", label: "Max foto zavorrina", placeholder: "3" },
   { key: "max_daily_votes", label: "Max voti giornalieri", placeholder: "10" },
 ];
@@ -1039,8 +1037,6 @@ export default function AdminSettings() {
   }, []);
 
   const splashSetting = defaultSettings.find(s => s.key === "splash_message")!;
-  const maintenanceSetting = defaultSettings.find(s => s.key === "maintenance_mode")!;
-  const minAppVersionSetting = defaultSettings.find(s => s.key === "min_app_version")!;
   const maxPhotosSetting = defaultSettings.find(s => s.key === "max_photos_zavorrina")!;
   const maxVotesSetting = defaultSettings.find(s => s.key === "max_daily_votes")!;
 
@@ -1874,15 +1870,6 @@ export default function AdminSettings() {
           </View>
         </View>
       </Modal>
-
-      {isLoading ? (
-        <Text style={styles.loadingText}>Caricamento...</Text>
-      ) : (
-        <>
-          {renderSettingCard(maintenanceSetting)}
-          {renderSettingCard(minAppVersionSetting)}
-        </>
-      )}
 
       <View style={styles.sectionHeaderRow}>
         <Ionicons name="options" size={20} color={Colors.accent} />
