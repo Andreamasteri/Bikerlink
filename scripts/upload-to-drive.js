@@ -4,6 +4,7 @@ const path = require('path');
 
 const FILES = [
   { name: 'bikerlink-manual.pdf', path: path.join(__dirname, '..', 'server', 'public', 'bikerlink-manual.pdf') },
+  { name: 'bikerlink-manuale-aprile2026.pdf', path: path.join(__dirname, '..', 'manuale-utente-bikerlink-aprile2026.pdf') },
   { name: 'bikerlink-eula.pdf', path: path.join(__dirname, '..', 'server', 'public', 'bikerlink-eula.pdf') },
   { name: 'bikerlink-privacy-policy.pdf', path: path.join(__dirname, '..', 'server', 'public', 'bikerlink-privacy-policy.pdf') },
 ];
