@@ -364,6 +364,32 @@ export default function AdminSettings() {
   });
   const showSearchPrefEnabled = showSearchPrefData?.enabled === true;
 
+  const disableFeatureMutation = useMutation({
+    mutationFn: async (key: string) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/disable-feature", baseUrl);
+      const res = await fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key }),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Errore" }));
+        throw new Error(err.message);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/ads-enabled"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/syneco-branding"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+    onError: (error: Error) => {
+      Alert.alert("Errore", error.message);
+    },
+  });
+
   const protectedToggleMutation = useMutation({
     mutationFn: async ({ key, value, adminPassword }: { key: string; value: string; adminPassword: string }) => {
       const baseUrl = getApiUrl();
@@ -1624,10 +1650,16 @@ export default function AdminSettings() {
           ) : (
             <Switch
               value={adsEnabled}
-              onValueChange={(val) => setProtectedToggle({ key: "ads_enabled", value: val, label: "Advertisement" })}
+              onValueChange={(val) => {
+                if (!val) {
+                  disableFeatureMutation.mutate("ads_enabled");
+                } else {
+                  setProtectedToggle({ key: "ads_enabled", value: val, label: "Advertisement" });
+                }
+              }}
               trackColor={{ false: Colors.border, true: Colors.syneco }}
               thumbColor={adsEnabled ? Colors.text : Colors.textSecondary}
-              disabled={protectedToggleMutation.isPending}
+              disabled={protectedToggleMutation.isPending || disableFeatureMutation.isPending}
             />
           )}
         </View>
@@ -1647,10 +1679,16 @@ export default function AdminSettings() {
           ) : (
             <Switch
               value={synecoVisible}
-              onValueChange={(val) => setProtectedToggle({ key: "syneco_branding_visible", value: val, label: "Branding Syneco" })}
+              onValueChange={(val) => {
+                if (!val) {
+                  disableFeatureMutation.mutate("syneco_branding_visible");
+                } else {
+                  setProtectedToggle({ key: "syneco_branding_visible", value: val, label: "Branding Syneco" });
+                }
+              }}
               trackColor={{ false: Colors.border, true: Colors.syneco }}
               thumbColor={synecoVisible ? Colors.text : Colors.textSecondary}
-              disabled={protectedToggleMutation.isPending}
+              disabled={protectedToggleMutation.isPending || disableFeatureMutation.isPending}
             />
           )}
         </View>

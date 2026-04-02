@@ -834,6 +834,31 @@ router.post("/migrate/verify-real-users", async (_req: Request, res: Response) =
   }
 });
 
+router.put("/settings/disable-feature", async (req: Request, res: Response) => {
+  try {
+    const { key } = req.body as { key: string };
+    const allowedKeys = ["ads_enabled", "syneco_branding_visible"];
+
+    if (!allowedKeys.includes(key)) {
+      return res.status(400).json({ message: "Chiave non valida" });
+    }
+
+    const result = await storage.upsertAppSetting(key, "false");
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_setting",
+      targetType: "setting",
+      targetId: key,
+      details: `${key} = false (disabilitato senza password)`,
+    } as any);
+
+    return res.json(result);
+  } catch (error) {
+    console.error("Admin disable-feature error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/settings/toggle-protected", async (req: Request, res: Response) => {
   try {
     const { key, value, adminPassword } = req.body;
