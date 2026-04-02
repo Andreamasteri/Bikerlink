@@ -600,23 +600,11 @@ I biker possono configurare **chi stanno cercando**:
 
 Questa preferenza viene usata dal sistema di matching per filtrare i risultati e mostrare ai biker i match più pertinenti.
 
-### 10.7 Versione App e Aggiornamenti OTA
-
-In fondo al profilo trovi una **pillola di stato** che mostra la versione attuale dell'app e lo stato degli aggiornamenti OTA (Over The Air). L'app si aggiorna automaticamente in background senza che tu debba fare nulla: quando una nuova versione è disponibile, viene scaricata e applicata al prossimo avvio.
-
-Puoi anche forzare manualmente il controllo aggiornamenti toccando l'icona di refresh accanto alla pillola OTA.
-
-### 10.8 Donazioni
+### 10.7 Donazioni PayPal
 
 Dal profilo puoi accedere al link per **supportare lo sviluppo di BikerLink** tramite donazione PayPal. BikerLink è un progetto indipendente e il supporto della community è fondamentale per continuare a migliorare l'app.
 
-### 10.9 Segnalazione Bug e Suggerimenti
-
-Nella sezione Profilo trovi i pulsanti per:
-- **Segnala un bug**: descrivi il problema riscontrato con quante più informazioni possibile (schermata dove è successo, cosa stavi facendo, cosa ti aspettavi che accadesse)
-- **Proponi una funzione**: hai un'idea per migliorare l'app? Condividila! Le idee della community sono la linfa vitale di BikerLink.
-
-### 10.10 Eliminazione Account
+### 10.8 Eliminazione Account
 
 Se desideri eliminare il tuo account, vai in fondo alle impostazioni del profilo e tocca **"Elimina Account"**. Ti verrà chiesta una conferma. L'eliminazione:
 - È **irreversibile** dopo 30 giorni
@@ -643,20 +631,25 @@ Gli Easter Egg sono distribuiti su tutto il territorio italiano (e in alcune zon
 **Classifiche e punteggi**:
 Il contatore degli Easter Egg raccolti è visibile nel tuo profilo. È un modo giocoso per esplorare nuove zone e confrontarsi con altri utenti.
 
-### 11.2 Aggiornamenti Automatici OTA
+### 11.2 Segnalazione Bug e Suggerimenti
+
+Nella sezione Profilo trovi i pulsanti per comunicare direttamente con il team di BikerLink:
+- **Segnala un bug**: descrivi il problema riscontrato con quante più informazioni possibile (schermata dove è successo, cosa stavi facendo, cosa ti aspettavi che accadesse). Le segnalazioni aiutano a migliorare l'app per tutti.
+- **Proponi una funzione**: hai un'idea per migliorare l'app? Condividila! Le idee della community sono la linfa vitale di BikerLink.
+
+Ogni segnalazione viene letta dal team di sviluppo. Non esistono idee stupide: la migliore versione di BikerLink viene costruita insieme alla sua community.
+
+### 11.3 Sistema Aggiornamenti Automatici OTA
 
 BikerLink usa un sistema di **aggiornamenti Over The Air (OTA)** che permette di ricevere nuove funzioni e correzioni senza dover scaricare una nuova versione dall'app store.
 
 **Come funziona**:
 - All'avvio dell'app, il sistema controlla automaticamente se ci sono aggiornamenti disponibili
-- Se trova un aggiornamento, lo scarica in background
-- Al successivo avvio, l'app è già aggiornata
+- Se trova un aggiornamento, lo scarica in background mentre usi l'app
+- Al successivo avvio, l'app è già aggiornata con le ultime novità
 
-Puoi vedere la versione corrente e lo stato OTA nella pillola in fondo al tuo profilo. Il numero indica quale versione OTA stai usando.
-
-### 11.3 Officine Convenzionate
-
-Sulla mappa compaiono anche le **officine convenzionate** con BikerLink: meccanici e officine che supportano la nostra community. In caso di guasto, puoi trovare un'officina vicina direttamente dalla mappa senza dover cercare su altri siti.
+**Pillola di stato OTA**:
+In fondo al profilo trovi una pillola che mostra la versione corrente dell'app e lo stato OTA. Puoi forzare il controllo manuale toccando l'icona di refresh accanto alla pillola. Il sistema garantisce che tutti gli utenti abbiano sempre l'esperienza più aggiornata senza interruzioni.
 
 ---
 
