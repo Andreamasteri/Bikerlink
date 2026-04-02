@@ -843,6 +843,8 @@ export default function AdminSettings() {
 
   const [splashMode, setSplashMode] = useState<"single" | "cycle">("single");
   const [splashMessagesList, setSplashMessagesList] = useState<string[]>([]);
+  const splashMessagesListRef = React.useRef<string[]>([]);
+  React.useEffect(() => { splashMessagesListRef.current = splashMessagesList; }, [splashMessagesList]);
 
   React.useEffect(() => {
     if (settings && settings.length > 0) {
@@ -1433,13 +1435,17 @@ export default function AdminSettings() {
             <Ionicons name="pricetag" size={20} color="#FF9800" />
             <Text style={styles.synecoLabel}>Mercatino Moto</Text>
           </View>
-          <Switch
-            value={marketplaceEnabled}
-            onValueChange={(val) => setProtectedToggle({ key: "marketplace_enabled", value: val, label: "Mercatino Moto" })}
-            trackColor={{ false: Colors.border, true: "#FF9800" }}
-            thumbColor={marketplaceEnabled ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending || marketplaceData === undefined}
-          />
+          {marketplaceData === undefined ? (
+            <ActivityIndicator size="small" color={Colors.textSecondary} />
+          ) : (
+            <Switch
+              value={marketplaceEnabled}
+              onValueChange={(val) => setProtectedToggle({ key: "marketplace_enabled", value: val, label: "Mercatino Moto" })}
+              trackColor={{ false: Colors.border, true: "#FF9800" }}
+              thumbColor={marketplaceEnabled ? Colors.text : Colors.textSecondary}
+              disabled={protectedToggleMutation.isPending}
+            />
+          )}
         </View>
         <Text style={styles.synecoDesc}>
           {marketplaceEnabled
@@ -1454,13 +1460,17 @@ export default function AdminSettings() {
             <Ionicons name="navigate" size={20} color="#4CAF50" />
             <Text style={styles.synecoLabel}>GPS Obbligatorio</Text>
           </View>
-          <Switch
-            value={gpsRequired}
-            onValueChange={(val) => setProtectedToggle({ key: "gps_required", value: val, label: "GPS Obbligatorio" })}
-            trackColor={{ false: Colors.border, true: "#4CAF50" }}
-            thumbColor={gpsRequired ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending || gpsRequiredData === undefined}
-          />
+          {gpsRequiredData === undefined ? (
+            <ActivityIndicator size="small" color={Colors.textSecondary} />
+          ) : (
+            <Switch
+              value={gpsRequired}
+              onValueChange={(val) => setProtectedToggle({ key: "gps_required", value: val, label: "GPS Obbligatorio" })}
+              trackColor={{ false: Colors.border, true: "#4CAF50" }}
+              thumbColor={gpsRequired ? Colors.text : Colors.textSecondary}
+              disabled={protectedToggleMutation.isPending}
+            />
+          )}
         </View>
         <Text style={styles.synecoDesc}>
           {gpsRequired
@@ -1475,13 +1485,17 @@ export default function AdminSettings() {
             <Ionicons name="eye-off" size={20} color="#9C27B0" />
             <Text style={styles.synecoLabel}>Ghost Mode</Text>
           </View>
-          <Switch
-            value={ghostModeEnabled}
-            onValueChange={(val) => setProtectedToggle({ key: "ghost_mode_enabled", value: val, label: "Ghost Mode" })}
-            trackColor={{ false: Colors.border, true: "#9C27B0" }}
-            thumbColor={ghostModeEnabled ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending || ghostModeData === undefined}
-          />
+          {ghostModeData === undefined ? (
+            <ActivityIndicator size="small" color={Colors.textSecondary} />
+          ) : (
+            <Switch
+              value={ghostModeEnabled}
+              onValueChange={(val) => setProtectedToggle({ key: "ghost_mode_enabled", value: val, label: "Ghost Mode" })}
+              trackColor={{ false: Colors.border, true: "#9C27B0" }}
+              thumbColor={ghostModeEnabled ? Colors.text : Colors.textSecondary}
+              disabled={protectedToggleMutation.isPending}
+            />
+          )}
         </View>
         <Text style={styles.synecoDesc}>
           {ghostModeEnabled
@@ -1516,13 +1530,17 @@ export default function AdminSettings() {
               <Ionicons name="information-circle-outline" size={20} color={Colors.textSecondary} />
             </TouchableOpacity>
           </View>
-          <Switch
-            value={emailVerifEnabled}
-            onValueChange={(val) => setProtectedToggle({ key: "email_verification_enabled", value: val, label: "Verifica Email" })}
-            trackColor={{ false: Colors.border, true: Colors.accent }}
-            thumbColor={emailVerifEnabled ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending || emailVerifData === undefined}
-          />
+          {emailVerifData === undefined ? (
+            <ActivityIndicator size="small" color={Colors.textSecondary} />
+          ) : (
+            <Switch
+              value={emailVerifEnabled}
+              onValueChange={(val) => setProtectedToggle({ key: "email_verification_enabled", value: val, label: "Verifica Email" })}
+              trackColor={{ false: Colors.border, true: Colors.accent }}
+              thumbColor={emailVerifEnabled ? Colors.text : Colors.textSecondary}
+              disabled={protectedToggleMutation.isPending}
+            />
+          )}
         </View>
         <Text style={styles.synecoDesc}>
           {emailVerifEnabled ? "Attiva la verifica email per le nuove registrazioni" : "La verifica email è disattivata"}
@@ -1535,13 +1553,17 @@ export default function AdminSettings() {
             <Ionicons name="call-outline" size={20} color={Colors.accent} />
             <Text style={styles.synecoLabel}>Campo telefono in registrazione</Text>
           </View>
-          <Switch
-            value={phoneFieldEnabled}
-            onValueChange={(val) => setProtectedToggle({ key: "phone_field_enabled", value: val, label: "Campo telefono in registrazione" })}
-            trackColor={{ false: Colors.border, true: Colors.accent }}
-            thumbColor={phoneFieldEnabled ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending || phoneFieldData === undefined}
-          />
+          {phoneFieldData === undefined ? (
+            <ActivityIndicator size="small" color={Colors.textSecondary} />
+          ) : (
+            <Switch
+              value={phoneFieldEnabled}
+              onValueChange={(val) => setProtectedToggle({ key: "phone_field_enabled", value: val, label: "Campo telefono in registrazione" })}
+              trackColor={{ false: Colors.border, true: Colors.accent }}
+              thumbColor={phoneFieldEnabled ? Colors.text : Colors.textSecondary}
+              disabled={protectedToggleMutation.isPending}
+            />
+          )}
         </View>
         <Text style={styles.synecoDesc}>
           {phoneFieldEnabled ? "Il campo telefono è visibile durante la registrazione" : "Il campo telefono è nascosto nella registrazione (default)"}
@@ -1554,13 +1576,17 @@ export default function AdminSettings() {
             <Ionicons name="radio-button-on-outline" size={20} color={Colors.success} />
             <Text style={styles.synecoLabel}>Utente Disponibile all'accesso</Text>
           </View>
-          <Switch
-            value={userAvailableOnLogin}
-            onValueChange={(val) => setProtectedToggle({ key: "user_available_on_login", value: val, label: "Utente Disponibile all'accesso" })}
-            trackColor={{ false: Colors.border, true: Colors.success }}
-            thumbColor={userAvailableOnLogin ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending || userAvailableData === undefined}
-          />
+          {userAvailableData === undefined ? (
+            <ActivityIndicator size="small" color={Colors.textSecondary} />
+          ) : (
+            <Switch
+              value={userAvailableOnLogin}
+              onValueChange={(val) => setProtectedToggle({ key: "user_available_on_login", value: val, label: "Utente Disponibile all'accesso" })}
+              trackColor={{ false: Colors.border, true: Colors.success }}
+              thumbColor={userAvailableOnLogin ? Colors.text : Colors.textSecondary}
+              disabled={protectedToggleMutation.isPending}
+            />
+          )}
         </View>
         <Text style={styles.synecoDesc}>
           {userAvailableOnLogin ? "Gli utenti risultano disponibili appena effettuato il login" : "Gli utenti risultano non disponibili al login (devono attivarsi manualmente)"}
@@ -1597,13 +1623,17 @@ export default function AdminSettings() {
             <Ionicons name="volume-high" size={20} color={Colors.syneco} />
             <Text style={styles.synecoLabel}>Advertisement</Text>
           </View>
-          <Switch
-            value={adsEnabled}
-            onValueChange={(val) => setProtectedToggle({ key: "ads_enabled", value: val, label: "Advertisement" })}
-            trackColor={{ false: Colors.border, true: Colors.syneco }}
-            thumbColor={adsEnabled ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending || adsEnabledData === undefined}
-          />
+          {adsEnabledData === undefined ? (
+            <ActivityIndicator size="small" color={Colors.textSecondary} />
+          ) : (
+            <Switch
+              value={adsEnabled}
+              onValueChange={(val) => setProtectedToggle({ key: "ads_enabled", value: val, label: "Advertisement" })}
+              trackColor={{ false: Colors.border, true: Colors.syneco }}
+              thumbColor={adsEnabled ? Colors.text : Colors.textSecondary}
+              disabled={protectedToggleMutation.isPending}
+            />
+          )}
         </View>
         <Text style={styles.synecoDesc}>
           {adsEnabled ? "Gli advertisement sono attivi nell'app" : "Gli advertisement sono disattivati"}
@@ -1616,13 +1646,17 @@ export default function AdminSettings() {
             <Ionicons name="megaphone" size={20} color={Colors.syneco} />
             <Text style={styles.synecoLabel}>Branding Syneco</Text>
           </View>
-          <Switch
-            value={synecoVisible}
-            onValueChange={(val) => setProtectedToggle({ key: "syneco_branding_visible", value: val, label: "Branding Syneco" })}
-            trackColor={{ false: Colors.border, true: Colors.syneco }}
-            thumbColor={synecoVisible ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending || synecoData === undefined}
-          />
+          {synecoData === undefined ? (
+            <ActivityIndicator size="small" color={Colors.textSecondary} />
+          ) : (
+            <Switch
+              value={synecoVisible}
+              onValueChange={(val) => setProtectedToggle({ key: "syneco_branding_visible", value: val, label: "Branding Syneco" })}
+              trackColor={{ false: Colors.border, true: Colors.syneco }}
+              thumbColor={synecoVisible ? Colors.text : Colors.textSecondary}
+              disabled={protectedToggleMutation.isPending}
+            />
+          )}
         </View>
         <Text style={styles.synecoDesc}>
           {synecoVisible ? "Il branding Syneco è visibile nell'app" : "Il branding Syneco è nascosto"}
@@ -1635,13 +1669,17 @@ export default function AdminSettings() {
             <Ionicons name="heart" size={20} color="#E91E63" />
             <Text style={styles.synecoLabel}>Supporto economico</Text>
           </View>
-          <Switch
-            value={donationEnabled}
-            onValueChange={(val) => setProtectedToggle({ key: "donation_enabled", value: val, label: "Supporto economico" })}
-            trackColor={{ false: Colors.border, true: "#E91E63" }}
-            thumbColor={donationEnabled ? Colors.text : Colors.textSecondary}
-            disabled={protectedToggleMutation.isPending || donationData === undefined}
-          />
+          {donationData === undefined ? (
+            <ActivityIndicator size="small" color={Colors.textSecondary} />
+          ) : (
+            <Switch
+              value={donationEnabled}
+              onValueChange={(val) => setProtectedToggle({ key: "donation_enabled", value: val, label: "Supporto economico" })}
+              trackColor={{ false: Colors.border, true: "#E91E63" }}
+              thumbColor={donationEnabled ? Colors.text : Colors.textSecondary}
+              disabled={protectedToggleMutation.isPending}
+            />
+          )}
         </View>
         <Text style={styles.synecoDesc}>
           {donationEnabled
@@ -1917,13 +1955,9 @@ export default function AdminSettings() {
                         const updated = [...splashMessagesList];
                         updated[idx] = text;
                         setSplashMessagesList(updated);
+                        splashMessagesListRef.current = updated;
                       }}
-                      onBlur={() => {
-                        setSplashMessagesList((current) => {
-                          persistSplashList(current);
-                          return current;
-                        });
-                      }}
+                      onBlur={() => persistSplashList(splashMessagesListRef.current)}
                       placeholder={`Messaggio ${idx + 1}`}
                       placeholderTextColor={Colors.textSecondary}
                     />
