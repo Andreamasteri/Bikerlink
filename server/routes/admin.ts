@@ -850,7 +850,7 @@ router.put("/settings/disable-feature", async (req: Request, res: Response) => {
       targetType: "setting",
       targetId: key,
       details: `${key} = false (disabilitato senza password)`,
-    } as any);
+    });
 
     return res.json(result);
   } catch (error) {
