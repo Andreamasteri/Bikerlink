@@ -38,9 +38,15 @@ function parseMarkdown(mdText) {
     // Horizontal rule → separator
     if (/^---+$/.test(line.trim())) { tokens.push({ type: 'hr' }); i++; continue; }
 
-    // H2 → chapter (## N. Title)
+    // H2 → chapter (## N. Title) — skip "## Indice" (script generates its own TOC)
     const h2 = line.match(/^## (.+)/);
     if (h2) {
+      if (/^indice$/i.test(h2[1].trim())) {
+        // Skip the Indice section header and its list items until next ##
+        i++;
+        while (i < lines.length && !/^## /.test(lines[i])) { i++; }
+        continue;
+      }
       const m = h2[1].match(/^(\d+)\.\s+(.+)/);
       if (m) tokens.push({ type: 'chapter', num: m[1], title: m[2] });
       else    tokens.push({ type: 'chapter', num: '', title: h2[1] });
