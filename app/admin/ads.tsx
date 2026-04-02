@@ -36,15 +36,16 @@ interface Campaign {
   rotationMode: string;
   sortOrder: number;
   placement: string;
+  imageVersion: number;
 }
 
 type TabKey = "biker" | "zavorrina" | "coppia" | "tutti";
 
 const TABS: { key: TabKey; label: string; icon: string; iconSet: "material" | "community" | "ionicons"; color: string }[] = [
+  { key: "tutti", label: "Tutti", icon: "people-outline", iconSet: "ionicons", color: Colors.textSecondary },
   { key: "biker", label: "Biker", icon: "motorcycle", iconSet: "material", color: Colors.accent },
   { key: "zavorrina", label: "Zavorrine", icon: "seat-passenger", iconSet: "community", color: Colors.femaleIcon },
   { key: "coppia", label: "Coppie", icon: "people", iconSet: "material", color: Colors.coupleIcon },
-  { key: "tutti", label: "Tutti", icon: "people-outline", iconSet: "ionicons", color: Colors.textSecondary },
 ];
 
 
@@ -58,9 +59,13 @@ function CampaignCard({
   onDelete: (item: Campaign) => void;
 }) {
   const imageUri = item.imageUrl
-    ? item.imageUrl.startsWith("http")
-      ? item.imageUrl
-      : `${getApiUrl().replace(/\/$/, "")}${item.imageUrl}`
+    ? (() => {
+        const v = item.imageVersion ?? 0;
+        const base = item.imageUrl.startsWith("http")
+          ? item.imageUrl
+          : `${getApiUrl().replace(/\/$/, "")}${item.imageUrl}`;
+        return `${base}${base.includes("?") ? "&" : "?"}v=${v}`;
+      })()
     : null;
 
   return (
@@ -108,7 +113,7 @@ function CampaignCard({
 export default function AdminAds() {
   const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);
-  const [activeTab, setActiveTab] = useState<TabKey>("biker");
+  const [activeTab, setActiveTab] = useState<TabKey>("tutti");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isRestartingAll, setIsRestartingAll] = useState(false);
@@ -125,7 +130,7 @@ export default function AdminAds() {
     queryKey: ["/api/admin/advertisements"],
   });
 
-  const campaigns = allCampaigns.filter((c) => c.targetUserType === activeTab);
+  const campaigns = activeTab === "tutti" ? allCampaigns : allCampaigns.filter((c) => c.targetUserType === activeTab);
 
   const createMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -200,7 +205,7 @@ export default function AdminAds() {
       for (const campaign of activeCampaigns) {
         await apiRequest("PUT", `/api/admin/advertisements/${campaign.id}`, { isActive: false });
         await new Promise((resolve) => setTimeout(resolve, 1000));
-        await apiRequest("PUT", `/api/admin/advertisements/${campaign.id}`, { isActive: true });
+        await apiRequest("PUT", `/api/admin/advertisements/${campaign.id}`, { isActive: true, bumpImageVersion: true });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });

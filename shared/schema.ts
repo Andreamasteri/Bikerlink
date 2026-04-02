@@ -513,6 +513,7 @@ export const adCampaigns = pgTable("ad_campaigns", {
   rotationMode: varchar("rotation_mode", { length: 20 }).notNull().default("sequential"),
   sortOrder: integer("sort_order").notNull().default(0),
   placement: varchar("placement", { length: 30 }).notNull().default("all"),
+  imageVersion: integer("image_version").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -223,6 +223,7 @@ export interface IStorage {
 
   getActiveCampaigns(): Promise<AdCampaign[]>;
   getActiveAdsByUserType(userType: string): Promise<AdCampaign[]>;
+  getAdCampaign(id: string): Promise<AdCampaign | undefined>;
   createAdCampaign(campaign: InsertAdCampaign): Promise<AdCampaign>;
   updateAdCampaign(id: string, data: Partial<InsertAdCampaign>): Promise<AdCampaign | undefined>;
   createAdClick(click: InsertAdClick): Promise<AdClick>;
@@ -883,6 +884,11 @@ export class DatabaseStorage implements IStorage {
 
   async getActiveAdsByUserType(userType: string): Promise<AdCampaign[]> {
     return db.select().from(adCampaigns).where(and(eq(adCampaigns.isActive, true), or(eq(adCampaigns.targetUserType, userType), eq(adCampaigns.targetUserType, "tutti")))).orderBy(asc(adCampaigns.sortOrder));
+  }
+
+  async getAdCampaign(id: string): Promise<AdCampaign | undefined> {
+    const [campaign] = await db.select().from(adCampaigns).where(eq(adCampaigns.id, id)).limit(1);
+    return campaign;
   }
 
   async createAdCampaign(data: InsertAdCampaign): Promise<AdCampaign> {

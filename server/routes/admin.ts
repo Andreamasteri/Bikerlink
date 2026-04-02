@@ -1175,8 +1175,17 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
     if (req.body.startDate !== undefined) updates.startDate = req.body.startDate ? new Date(req.body.startDate) : null;
     if (req.body.endDate !== undefined) updates.endDate = req.body.endDate ? new Date(req.body.endDate) : null;
     if (req.body.placement !== undefined) updates.placement = req.body.placement;
-    if (req.file) updates.imageUrl = `/uploads/ads/${req.file.filename}`;
-    else if (req.body.imageUrl !== undefined) updates.imageUrl = req.body.imageUrl;
+    if (req.file) {
+      updates.imageUrl = `/uploads/ads/${req.file.filename}`;
+      const existing = await storage.getAdCampaign(id);
+      updates.imageVersion = ((existing?.imageVersion ?? 0) + 1);
+    } else if (req.body.imageUrl !== undefined) {
+      updates.imageUrl = req.body.imageUrl;
+    }
+    if (req.body.bumpImageVersion === true || req.body.bumpImageVersion === "true") {
+      const existing = await storage.getAdCampaign(id);
+      updates.imageVersion = ((existing?.imageVersion ?? 0) + 1);
+    }
     const campaign = await storage.updateAdCampaign(id, updates);
     if (!campaign) {
       return res.status(404).json({ message: "Campagna non trovata" });
