@@ -18,5 +18,25 @@
     "apkBuildId": "0160475b-70da-416b-b854-c5c0ed7338be",
     "apkUrl": "https://expo.dev/artifacts/eas/aRCt9ihwPdLrnbUfkMU33.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 2,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-02: Manuale Aprile 2026 + fix campagne imageVersion + fix liste utenti + GPS periodico",
+    "publishedAt": "2026-04-02",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #383-386 — Manuale Aprile 2026, fix imageVersion campagne, fix self-exclusion liste, fix distanza + GPS update ogni 5min.",
+    "updateGroupId": "200787d6-eb5d-41b9-916c-df0e9f2c67d3",
+    "androidUpdateId": "019d4fa6-badc-7d8f-af49-047416e33aef",
+    "iosUpdateId": null,
+    "commitBase": "7919adb9d3705f57911328102390c45032e4a117",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/200787d6-eb5d-41b9-916c-df0e9f2c67d3",
+    "apkBuildId": "0160475b-70da-416b-b854-c5c0ed7338be",
+    "apkUrl": "https://expo.dev/artifacts/eas/aRCt9ihwPdLrnbUfkMU33.apk",
+    "status": "published"
   }
 ]
