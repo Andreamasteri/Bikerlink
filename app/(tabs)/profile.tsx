@@ -743,9 +743,9 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Pressable style={styles.garageCard} onPress={() => router.push("/garage" as any)}>
           {isBikerOrCoppia ? (
-            <MaterialCommunityIcons name="motorbike" size={76} color={Colors.accent} />
+            <MaterialCommunityIcons name="motorbike" size={36} color={Colors.accent} />
           ) : (
-            <Ionicons name="heart" size={76} color={Colors.accent} />
+            <Ionicons name="heart" size={36} color={Colors.accent} />
           )}
           <Text style={styles.garageCardLabel}>
             {isBikerOrCoppia ? "Il Mio Garage" : "La Mia Wishlist"}
@@ -1122,7 +1122,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: Colors.accent + "55",
-    paddingVertical: 8,
+    paddingVertical: 6,
     paddingHorizontal: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
