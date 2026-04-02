@@ -769,6 +769,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  app.get("/api/admin/system-health", requireAdmin, async (_req, res) => {
+    const { SERVER_START_TIME, uptimeState } = await import("./uptime");
+    const now = Date.now();
+    const backendUptimeSec = Math.floor((now - SERVER_START_TIME) / 1000);
+    const metroUptimeSec = uptimeState.metroOnline && uptimeState.metroStartTime > 0
+      ? Math.floor((now - uptimeState.metroStartTime) / 1000)
+      : 0;
+
+    const events: { timestamp: string; message: string; type: string }[] = [];
+    try {
+      const fs = await import("fs");
+      const path = await import("path");
+      const logPath = path.join(process.cwd(), "logs", "uptime-resets.log");
+      if (fs.existsSync(logPath)) {
+        const lines = fs.readFileSync(logPath, "utf-8").trim().split("\n");
+        for (const line of lines) {
+          const spaceIdx = line.indexOf(" ");
+          if (spaceIdx === -1) continue;
+          const timestamp = line.slice(0, spaceIdx);
+          const message = line.slice(spaceIdx + 1);
+          let type = "INFO";
+          if (message.startsWith("BACKEND UP (cold start)")) type = "COLD_START";
+          else if (message.startsWith("BACKEND RESTART")) type = "BACKEND_RESTART";
+          else if (message.startsWith("METRO UP")) type = "METRO_UP";
+          else if (message.startsWith("METRO DOWN")) type = "METRO_DOWN";
+          events.push({ timestamp, message, type });
+        }
+        events.reverse();
+      }
+    } catch {}
+
+    res.json({
+      backendStartedAt: SERVER_START_TIME,
+      backendUptimeSec,
+      metroOnline: uptimeState.metroOnline,
+      metroStartedAt: uptimeState.metroStartTime,
+      metroUptimeSec,
+      events,
+    });
+  });
+
+  app.get("/api/admin/restart-history", requireAdmin, async (_req, res) => {
+    const { db } = await import("./db");
+    const { serverRestarts } = await import("@shared/schema");
+    const { desc, count } = await import("drizzle-orm");
+    const [countResult, rows] = await Promise.all([
+      db.select({ count: count() }).from(serverRestarts),
+      db.select().from(serverRestarts).orderBy(desc(serverRestarts.startedAt)).limit(50),
+    ]);
+    res.json({
+      total: countResult[0]?.count ?? 0,
+      restarts: rows.map((r) => ({
+        id: r.id,
+        startedAt: r.startedAt instanceof Date ? r.startedAt.toISOString() : r.startedAt,
+        reason: r.reason,
+      })),
+    });
+  });
+
   const httpServer = createServer(app);
 
   import("./backup-service").then(({ startScheduler }) => {
