@@ -425,7 +425,7 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
     const onlineResults = await storage.getOnlineUsersList(fifteenMinutesAgo, lat, lng, countriesParam);
-    let allResults = onlineResults.filter((r: any) => !blockedIds.has(r.user.id));
+    let allResults = onlineResults.filter((r: any) => !blockedIds.has(r.user.id) && r.user.id !== requesterId);
     const onlineIdSet = new Set(allResults.map((r: any) => r.user.id));
     if (includeOffline) {
       const { db } = await import("../db");
@@ -443,7 +443,7 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
         .leftJoin(profilesTable, eq(profilesTable.userId, usersTable.id))
         .where(and(...offlineConds))
         .orderBy(sqlTag`distance`);
-      const offlineOnly = offlineResults.filter((r: any) => !onlineIdSet.has(r.user.id) && !blockedIds.has(r.user.id));
+      const offlineOnly = offlineResults.filter((r: any) => !onlineIdSet.has(r.user.id) && !blockedIds.has(r.user.id) && r.user.id !== requesterId);
       allResults = [...allResults, ...offlineOnly];
     }
     const motorcyclesMap: Record<string, any[]> = {};
@@ -488,7 +488,7 @@ router.get("/available-list", requireAuth, async (req: Request, res: Response) =
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
     const allItems = await storage.getAvailableUsersList(threeMinutesAgo, lat, lng);
-    const results = allItems.filter((r: any) => !blockedIds.has(r.user.id));
+    const results = allItems.filter((r: any) => !blockedIds.has(r.user.id) && r.user.id !== requesterId);
     const motorcyclesMap: Record<string, any[]> = {};
     for (const item of results) {
       if (!motorcyclesMap[item.user.id]) {
@@ -556,7 +556,7 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
     const onlineResultsRaw = await storage.getAvailableBikersList(threeMinutesAgo, lat, lng, countriesParam);
-    const onlineResults = onlineResultsRaw.filter((r: any) => !blockedIds.has(r.user.id));
+    const onlineResults = onlineResultsRaw.filter((r: any) => !blockedIds.has(r.user.id) && r.user.id !== requesterId);
     let allResults = onlineResults;
     if (includeOffline) {
       const { db } = await import("../db");
@@ -575,7 +575,7 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
         .where(and(...bikerConds))
         .orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r: any) => r.user.id));
-      const offlineOnly = allBikers.filter((r: any) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
+      const offlineOnly = allBikers.filter((r: any) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id) && r.user.id !== requesterId);
       allResults = [...onlineResults, ...offlineOnly];
     }
     const motorcyclesMap: Record<string, any[]> = {};
@@ -622,7 +622,7 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
     const onlineResultsRaw = await storage.getAvailableZavorrinaList(threeMinutesAgo, lat, lng, countriesParam);
-    const onlineResults = onlineResultsRaw.filter((r: any) => !blockedIds.has(r.user.id));
+    const onlineResults = onlineResultsRaw.filter((r: any) => !blockedIds.has(r.user.id) && r.user.id !== requesterId);
     let allResults = onlineResults;
     if (includeOffline) {
       const { db } = await import("../db");
@@ -641,7 +641,7 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
         .where(and(...zavConds))
         .orderBy(sqlTag`distance`);
       const onlineIds = new Set(onlineResults.map((r: any) => r.user.id));
-      const offlineOnly = allZav.filter((r: any) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
+      const offlineOnly = allZav.filter((r: any) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id) && r.user.id !== requesterId);
       allResults = [...onlineResults, ...offlineOnly];
     }
     const motorcyclesMap: Record<string, any[]> = {};
