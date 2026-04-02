@@ -906,7 +906,7 @@ export default function MapScreen() {
                       {!!u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
                       {!!u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
                     </View>
-                    {u.distance != null && (
+                    {u.distance != null && u.id !== user?.id && (
                       <View style={styles.userListDistance}>
                         <Text style={styles.distanceText}>{u.distance} km</Text>
                       </View>
@@ -952,7 +952,7 @@ export default function MapScreen() {
                       {!!u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
                       {!!u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
                     </View>
-                    {u.distance != null && (
+                    {u.distance != null && u.id !== user?.id && (
                       <View style={styles.userListDistance}>
                         <Text style={styles.distanceText}>{u.distance} km</Text>
                       </View>
@@ -997,7 +997,7 @@ export default function MapScreen() {
                       {!!u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
                       {!!u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
                     </View>
-                    {u.distance != null && (
+                    {u.distance != null && u.id !== user?.id && (
                       <View style={styles.userListDistance}>
                         <Text style={styles.distanceText}>{u.distance} km</Text>
                       </View>

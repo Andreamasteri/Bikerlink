@@ -11,6 +11,7 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
 import { Platform, AppState, ActivityIndicator, View, StyleSheet } from "react-native";
 import { useUpdates } from "expo-updates";
+import * as Location from "expo-location";
 
 if (Platform.OS === "web" && typeof window !== "undefined") {
   const link = document.createElement("link");
@@ -47,6 +48,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 SplashScreen.preventAutoHideAsync();
 
 const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000;
+const LOCATION_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
 
 async function sendHeartbeat() {
   try {
@@ -54,22 +56,55 @@ async function sendHeartbeat() {
   } catch {}
 }
 
+async function sendLocationUpdate() {
+  try {
+    let coords: { latitude: number; longitude: number } | null = null;
+    if (Platform.OS === "web") {
+      if (typeof navigator !== "undefined" && navigator.geolocation) {
+        coords = await new Promise((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+            () => resolve(null),
+            { timeout: 5000, maximumAge: 60000 }
+          );
+        });
+      }
+    } else {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status === "granted") {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+      }
+    }
+    if (coords) {
+      await apiRequest("PUT", "/api/users/location", {
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+      });
+    }
+  } catch {}
+}
+
 function AppStateHandler() {
   const { user } = useAuth();
   const appStateRef = useRef(AppState.currentState);
   const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const locationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!user) return;
 
     sendHeartbeat();
+    sendLocationUpdate();
     heartbeatTimerRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+    locationTimerRef.current = setInterval(sendLocationUpdate, LOCATION_UPDATE_INTERVAL_MS);
 
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       const prev = appStateRef.current;
 
       if (prev.match(/inactive|background/) && nextAppState === "active") {
         sendHeartbeat();
+        sendLocationUpdate();
         queryClient.invalidateQueries({ queryKey: ["/api/users/profile"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users/online-count"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-count"] });
@@ -84,6 +119,7 @@ function AppStateHandler() {
     return () => {
       subscription.remove();
       if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+      if (locationTimerRef.current) clearInterval(locationTimerRef.current);
     };
   }, [user]);
 
