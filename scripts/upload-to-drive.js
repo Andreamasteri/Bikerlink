@@ -75,10 +75,17 @@ async function main() {
     });
 
     const uploadData = await uploadRes.json();
-    console.log(`Uploaded ${file.name}:`, JSON.stringify(uploadData));
+    if (uploadData.id) {
+      const viewLink = `https://drive.google.com/file/d/${uploadData.id}/view`;
+      console.log(`Uploaded ${file.name}: ${viewLink}`);
+    } else {
+      console.log(`Uploaded ${file.name}:`, JSON.stringify(uploadData));
+    }
   }
 
-  console.log('\nAll files uploaded successfully!');
+  const folderLink = `https://drive.google.com/drive/folders/${folderId}`;
+  console.log(`\nAll files uploaded successfully!`);
+  console.log(`Folder: ${folderLink}`);
 }
 
 main().catch(err => {
