@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useSynecoVisible } from "@/lib/syneco-context";
 import Colors from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { pickSplashMessage } from "@/lib/splash-utils";
 
 const loginBg = require("@/assets/images/splash-bg.jpg");
 
@@ -22,12 +23,19 @@ export default function WelcomeScreen() {
   const { isAuthenticated, isLoading } = useAuth();
   const synecoVisible = useSynecoVisible();
   const insets = useSafeAreaInsets();
+  const [dynamicTagline, setDynamicTagline] = useState<string | null>(null);
 
   const isWeb = Platform.OS === "web";
   const titleOpacity = useRef(new Animated.Value(isWeb ? 1 : 0)).current;
   const taglineOpacity = useRef(new Animated.Value(isWeb ? 1 : 0)).current;
   const buttonsTranslateY = useRef(new Animated.Value(isWeb ? 0 : 100)).current;
   const buttonsOpacity = useRef(new Animated.Value(isWeb ? 1 : 0)).current;
+
+  useEffect(() => {
+    pickSplashMessage().then((msg) => {
+      if (msg) setDynamicTagline(msg);
+    });
+  }, []);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -81,7 +89,7 @@ export default function WelcomeScreen() {
             BikerLink
           </Animated.Text>
           <Animated.Text style={[styles.tagline, { opacity: taglineOpacity }]}>
-            U'll never ride alone
+            {dynamicTagline ?? "U'll never ride alone"}
           </Animated.Text>
         </View>
 
