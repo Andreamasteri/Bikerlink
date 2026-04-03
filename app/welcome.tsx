@@ -32,10 +32,13 @@ export default function WelcomeScreen() {
   const buttonsOpacity = useRef(new Animated.Value(isWeb ? 1 : 0)).current;
 
   useEffect(() => {
+    if (isLoading || isAuthenticated) return;
+    let cancelled = false;
     pickSplashMessage().then((msg) => {
-      if (msg) setDynamicTagline(msg);
+      if (!cancelled && msg) setDynamicTagline(msg);
     });
-  }, []);
+    return () => { cancelled = true; };
+  }, [isLoading, isAuthenticated]);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
