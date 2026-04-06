@@ -352,7 +352,7 @@ export default function MapScreen() {
   const { data: adsEnabledData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/ads-enabled"],
     staleTime: 30000,
-    enabled: isAuthenticated && nearbyLoaded,
+    enabled: isAuthenticated && mapReady,
   });
   const adsGloballyEnabled = adsEnabledData?.enabled !== false;
 
@@ -360,7 +360,7 @@ export default function MapScreen() {
     queryKey: ["/api/ads/my-ads"],
     staleTime: 60000,
     refetchInterval: 5 * 60 * 1000,
-    enabled: isAuthenticated && adsGloballyEnabled && nearbyLoaded,
+    enabled: isAuthenticated && adsGloballyEnabled && mapReady,
   });
 
   const { data: homeMessageData, refetch: refetchHomeMessage } = useQuery<{ enabled: boolean; text: string }>({

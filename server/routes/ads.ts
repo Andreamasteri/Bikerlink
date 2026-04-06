@@ -1,7 +1,42 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
+import { Client as ObjectStorageClient } from "@replit/object-storage";
+import path from "path";
+import fs from "fs";
 
 const router = Router();
+const objectStorageClient = new ObjectStorageClient();
+
+router.get("/images/:filename", async (req: Request, res: Response) => {
+  const filename = req.params.filename;
+  if (!filename || filename.includes("..") || filename.includes("/")) {
+    return res.status(400).json({ message: "Nome file non valido" });
+  }
+  const localPath = path.resolve(process.cwd(), "uploads", "ads", filename);
+  if (fs.existsSync(localPath)) {
+    return res.sendFile(localPath);
+  }
+  try {
+    const result = await objectStorageClient.downloadAsBytes(`public/ads/${filename}`);
+    if (!result.ok) {
+      return res.status(404).json({ message: "Immagine non trovata" });
+    }
+    const ext = path.extname(filename).toLowerCase();
+    const mimeMap: Record<string, string> = {
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".png": "image/png",
+      ".webp": "image/webp",
+      ".gif": "image/gif",
+    };
+    res.setHeader("Content-Type", mimeMap[ext] || "application/octet-stream");
+    res.setHeader("Cache-Control", "public, max-age=31536000");
+    return res.send(result.value[0]);
+  } catch (error) {
+    console.error("Ad image serve error:", error);
+    return res.status(404).json({ message: "Immagine non trovata" });
+  }
+});
 
 router.get("/active", async (req: Request, res: Response) => {
   try {

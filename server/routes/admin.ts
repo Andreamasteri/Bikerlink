@@ -3,6 +3,7 @@ import multer from "multer";
 import fs from "fs";
 import path from "path";
 import bcrypt from "bcryptjs";
+import { Client as ObjectStorageClient } from "@replit/object-storage";
 import { storage } from "../storage";
 import { db } from "../db";
 import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts } from "@shared/schema";
@@ -1117,16 +1118,21 @@ const inviteCodeUpload = multer({
   },
 });
 
-const adImageStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, adsDir),
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  },
-});
+const adObjectStorage = new ObjectStorageClient();
+
+async function uploadAdImageToObjectStorage(buffer: Buffer, originalname: string): Promise<string> {
+  const uniqueSuffix = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
+  const filename = uniqueSuffix + path.extname(originalname);
+  const objectPath = `public/ads/${filename}`;
+  const result = await adObjectStorage.uploadFromBytes(objectPath, buffer);
+  if (!result.ok) {
+    throw new Error(`Object Storage upload failed: ${result.error}`);
+  }
+  return `/api/ads/images/${filename}`;
+}
 
 const adUpload = multer({
-  storage: adImageStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -1154,7 +1160,7 @@ router.post("/advertisements", adUpload.single("image"), async (req: Request, re
     if (!name) {
       return res.status(400).json({ message: "Nome campagna obbligatorio" });
     }
-    const imageUrl = req.file ? `/uploads/ads/${req.file.filename}` : (req.body.imageUrl || null);
+    const imageUrl = req.file ? await uploadAdImageToObjectStorage(req.file.buffer, req.file.originalname) : (req.body.imageUrl || null);
     const campaign = await storage.createAdCampaign({
       name,
       sponsor: sponsor || "Syneco Lubrificanti",
@@ -1201,7 +1207,7 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
     if (req.body.endDate !== undefined) updates.endDate = req.body.endDate ? new Date(req.body.endDate) : null;
     if (req.body.placement !== undefined) updates.placement = req.body.placement;
     if (req.file) {
-      updates.imageUrl = `/uploads/ads/${req.file.filename}`;
+      updates.imageUrl = await uploadAdImageToObjectStorage(req.file.buffer, req.file.originalname);
       const existing = await storage.getAdCampaign(id);
       updates.imageVersion = ((existing?.imageVersion ?? 0) + 1);
     } else if (req.body.imageUrl !== undefined) {
