@@ -822,8 +822,10 @@ router.delete("/me/photos/:id", requireAuth, async (req: Request, res: Response)
       const filename = photoUrl.replace("/api/users/photos/", "");
       try { await deleteObject(`public/photos/${filename}`); } catch {}
     } else if (photoUrl.startsWith("/uploads/photos/")) {
-      const filePath = path.join(process.cwd(), photoUrl);
-      if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
+      try {
+        const filePath = path.join(process.cwd(), photoUrl);
+        if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
+      } catch {}
     }
 
     await storage.deleteUserPhoto(photoId);
