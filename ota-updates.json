@@ -38,5 +38,25 @@
     "apkBuildId": "0160475b-70da-416b-b854-c5c0ed7338be",
     "apkUrl": "https://expo.dev/artifacts/eas/aRCt9ihwPdLrnbUfkMU33.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 3,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-03: Fix campagne immagini Object Storage + banner ads indipendente da GPS",
+    "publishedAt": "2026-04-06",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #398 — Fix downloadBuffer (Buffer.concat), nuove route /api/ads/images/:filename e /api/admin/ota/*, immagini campagne su Object Storage persistenti tra redeploy, decoupling banner ads da nearbyLoaded → mapReady.",
+    "updateGroupId": "07fdd3c0-c820-4dc9-9ddb-0aa07856a86c",
+    "androidUpdateId": "019d63f7-25d0-759f-85e9-d7025cea9ebd",
+    "iosUpdateId": null,
+    "commitBase": "afd7aee368752c8a2e82f311d19ca38ab7e0ac89",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/07fdd3c0-c820-4dc9-9ddb-0aa07856a86c",
+    "apkBuildId": "0160475b-70da-416b-b854-c5c0ed7338be",
+    "apkUrl": "https://expo.dev/artifacts/eas/aRCt9ihwPdLrnbUfkMU33.apk",
+    "status": "published"
   }
 ]
