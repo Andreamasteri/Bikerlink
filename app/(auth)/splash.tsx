@@ -31,7 +31,34 @@ export default function SplashAnimatedScreen() {
   const glowOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    pickSplashMessage().then(msg => setSplashMessage(msg));
+    const MESSAGE_TIMEOUT = 1500;
+
+    const startTaglineAnimation = () => {
+      Animated.parallel([
+        Animated.timing(taglineOpacity, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(taglineTranslateY, {
+          toValue: 0,
+          duration: 700,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    };
+
+    const messagePromise = pickSplashMessage();
+    const timeoutPromise = new Promise<null>(resolve =>
+      setTimeout(() => resolve(null), MESSAGE_TIMEOUT)
+    );
+
+    Promise.race([messagePromise, timeoutPromise]).then(msg => {
+      setSplashMessage(msg);
+      startTaglineAnimation();
+    });
 
     Animated.parallel([
       Animated.timing(bgOpacity, {
@@ -65,23 +92,6 @@ export default function SplashAnimatedScreen() {
             toValue: 1,
             duration: 900,
             easing: Easing.out(Easing.back(1.1)),
-            useNativeDriver: true,
-          }),
-        ]),
-      ]),
-      Animated.sequence([
-        Animated.delay(1000),
-        Animated.parallel([
-          Animated.timing(taglineOpacity, {
-            toValue: 1,
-            duration: 700,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.timing(taglineTranslateY, {
-            toValue: 0,
-            duration: 700,
-            easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
           }),
         ]),
