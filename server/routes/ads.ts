@@ -1,11 +1,10 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
-import { Client as ObjectStorageClient } from "@replit/object-storage";
+import { downloadBuffer } from "../objectStorage";
 import path from "path";
 import fs from "fs";
 
 const router = Router();
-const objectStorageClient = new ObjectStorageClient();
 
 router.get("/images/:filename", async (req: Request, res: Response) => {
   const filename = req.params.filename;
@@ -17,10 +16,7 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
     return res.sendFile(localPath);
   }
   try {
-    const result = await objectStorageClient.downloadAsBytes(`public/ads/${filename}`);
-    if (!result.ok) {
-      return res.status(404).json({ message: "Immagine non trovata" });
-    }
+    const imageBuffer = await downloadBuffer(`public/ads/${filename}`);
     const ext = path.extname(filename).toLowerCase();
     const mimeMap: Record<string, string> = {
       ".jpg": "image/jpeg",
@@ -31,7 +27,6 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
     };
     res.setHeader("Content-Type", mimeMap[ext] || "application/octet-stream");
     res.setHeader("Cache-Control", "public, max-age=31536000");
-    const imageBuffer = Buffer.concat(result.value as Buffer[]);
     return res.send(imageBuffer);
   } catch (error) {
     console.error("Ad image serve error:", error);

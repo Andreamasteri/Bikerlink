@@ -35,7 +35,8 @@ export async function downloadBuffer(objectPath: string): Promise<Buffer> {
   if (!result.ok) {
     throw new Error(`Download fallito per ${objectPath}: ${result.error?.message}`);
   }
-  return Buffer.from(result.value!);
+  const chunks = result.value as Buffer[];
+  return Buffer.concat(chunks);
 }
 
 export async function deleteObject(objectPath: string): Promise<void> {
