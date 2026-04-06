@@ -120,6 +120,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         version: release.version,
         releaseNotes: release.release_notes,
         bundlePath: release.bundle_path,
+        manifestUrl: release.bundle_path,
         publishedAt: release.published_at,
       });
     } catch {
