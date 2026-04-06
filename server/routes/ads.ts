@@ -31,7 +31,8 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
     };
     res.setHeader("Content-Type", mimeMap[ext] || "application/octet-stream");
     res.setHeader("Cache-Control", "public, max-age=31536000");
-    return res.send(result.value[0]);
+    const imageBuffer = Buffer.concat(result.value as Buffer[]);
+    return res.send(imageBuffer);
   } catch (error) {
     console.error("Ad image serve error:", error);
     return res.status(404).json({ message: "Immagine non trovata" });
