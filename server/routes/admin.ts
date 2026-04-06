@@ -2953,4 +2953,63 @@ router.get("/system-health", async (_req: Request, res: Response) => {
   }
 });
 
+const otaUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+
+router.post("/ota/upload", otaUpload.single("bundle"), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "File bundle mancante" });
+    const version = (req.query.version as string) || "unknown";
+    const filename = `ota-${version}-${Date.now()}.js`;
+    const objectPath = `private/ota/${filename}`;
+    await uploadBuffer(objectPath, req.file.buffer, "application/javascript");
+    return res.json({ url: objectPath, filename });
+  } catch (error) {
+    console.error("[OTA] Upload error:", error);
+    return res.status(500).json({ message: "Errore upload bundle" });
+  }
+});
+
+router.post("/ota", async (req: Request, res: Response) => {
+  try {
+    const { version, bundlePath, releaseNotes } = req.body;
+    if (!version || !bundlePath) return res.status(400).json({ message: "version e bundlePath obbligatori" });
+    const result = await db.execute(sql`
+      INSERT INTO ota_releases (version, bundle_path, release_notes, status, created_by)
+      VALUES (${version}, ${bundlePath}, ${releaseNotes || null}, 'draft', ${req.session.userId!})
+      RETURNING *
+    `);
+    return res.json(result.rows[0]);
+  } catch (error) {
+    console.error("[OTA] Create error:", error);
+    return res.status(500).json({ message: "Errore creazione release" });
+  }
+});
+
+router.post("/ota/:id/publish", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await db.execute(sql`UPDATE ota_releases SET status = 'inactive', updated_at = NOW() WHERE status = 'active'`);
+    const result = await db.execute(sql`
+      UPDATE ota_releases
+      SET status = 'active', published_at = NOW(), updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING *
+    `);
+    if (!result.rows.length) return res.status(404).json({ message: "Release non trovata" });
+    return res.json(result.rows[0]);
+  } catch (error) {
+    console.error("[OTA] Publish error:", error);
+    return res.status(500).json({ message: "Errore pubblicazione release" });
+  }
+});
+
+router.get("/ota", async (_req: Request, res: Response) => {
+  try {
+    const result = await db.execute(sql`SELECT * FROM ota_releases ORDER BY created_at DESC LIMIT 20`);
+    return res.json(result.rows);
+  } catch (error) {
+    return res.status(500).json({ message: "Errore lettura releases" });
+  }
+});
+
 export default router;

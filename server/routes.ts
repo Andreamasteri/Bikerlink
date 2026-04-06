@@ -107,7 +107,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/motoclubs", motoclubsRoutes);
 
   app.get("/api/updates/check", async (_req: Request, res: Response) => {
-    return res.json({ hasUpdate: false, version: null, releaseNotes: null, manifestUrl: null });
+    try {
+      const result = await pool.query(
+        "SELECT * FROM ota_releases WHERE status = 'active' ORDER BY published_at DESC LIMIT 1"
+      );
+      if (!result.rows.length) {
+        return res.json({ hasUpdate: false, version: null, releaseNotes: null, bundlePath: null, publishedAt: null });
+      }
+      const release = result.rows[0];
+      return res.json({
+        hasUpdate: true,
+        version: release.version,
+        releaseNotes: release.release_notes,
+        bundlePath: release.bundle_path,
+        publishedAt: release.published_at,
+      });
+    } catch {
+      return res.json({ hasUpdate: false, version: null, releaseNotes: null, bundlePath: null, publishedAt: null });
+    }
   });
 
   app.get("/privacy-policy", (_req, res) => {

@@ -49,7 +49,7 @@ echo ""
 echo "[1/6] Login come admin..."
 LOGIN_RESPONSE=$(curl -s -c "$COOKIE_JAR" -X POST "$BACKEND_URL/api/auth/login" \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}")
+  -d "{\"identifier\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}")
 if ! echo "$LOGIN_RESPONSE" | jq -e '.id' > /dev/null 2>&1; then
   echo "   ERRORE login: $LOGIN_RESPONSE"
   exit 1

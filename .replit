@@ -139,3 +139,7 @@ timeoutMs = 120000
 
 [userenv.production]
 NODE_ENV = "production"
+
+[userenv.shared]
+BIKERLINK_ADMIN_EMAIL = "admin@bikerlink.it"
+BIKERLINK_BACKEND_URL = "https://biker-link.replit.app"
