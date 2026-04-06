@@ -10,7 +10,6 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
 import { Platform, AppState, ActivityIndicator, View, StyleSheet } from "react-native";
-import { useUpdates } from "expo-updates";
 import * as Location from "expo-location";
 
 if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -145,47 +144,20 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
 }
 
 function OtaStartupChecker() {
-  const fetchStartedRef = useRef(false);
-  let updates: ReturnType<typeof useUpdates> | null = null;
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    updates = useUpdates();
-  } catch {
-    // expo-updates non disponibile (runtime non supportato)
-  }
-
-  // Applica aggiornamento se già scaricato (isUpdatePending = true)
   useEffect(() => {
     if (__DEV__ || Platform.OS === "web") return;
-    if (!updates) return;
-    if (!updates.isUpdatePending) return;
-    import("expo-updates").then(mod => mod.reloadAsync()).catch(() => {});
-  }, [updates?.isUpdatePending]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Check esplicito se il check automatico ON_LOAD non trova nulla entro 2s
-  useEffect(() => {
-    if (__DEV__ || Platform.OS === "web") return;
-    if (fetchStartedRef.current) return;
-    fetchStartedRef.current = true;
-    const timer = setTimeout(async () => {
+    (async () => {
       try {
         const mod = await import("expo-updates");
-        const result = await mod.checkForUpdateAsync();
-        if (result.isAvailable) {
-          const manifest = result.manifest as { id?: string } | undefined;
-          const targetId = manifest?.id ?? null;
-          // Guard anti-loop solo se targetId è noto
-          if (targetId && mod.updateId === targetId) return;
-          await mod.fetchUpdateAsync();
-          await mod.reloadAsync();
-        }
+        const check = await mod.checkForUpdateAsync();
+        if (!check.isAvailable) return;
+        await mod.fetchUpdateAsync();
+        await mod.reloadAsync();
       } catch {
         // silent fail — EAS non raggiungibile o runtime mismatch
       }
-    }, 2000);
-    return () => clearTimeout(timer);
+    })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   return null;
 }
 
