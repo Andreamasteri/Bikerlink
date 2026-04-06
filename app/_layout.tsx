@@ -144,24 +144,6 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-/**
- * Esegue reloadAsync() solo se targetUpdateId non è già l'update in esecuzione.
- * Usa mod.updateId (stato live) come guard anti-loop — non può bloccarsi se
- * reloadAsync() viene interrotto, perché non scrive nulla su AsyncStorage.
- * Nota: non chiama fetchUpdateAsync() perché viene usata solo quando
- * isUpdatePending=true, cioè l'update è già stato scaricato.
- */
-async function safeReloadAsync(targetUpdateId: string | null): Promise<void> {
-  if (!targetUpdateId) return;
-  try {
-    const mod = await import("expo-updates");
-    if (mod.updateId === targetUpdateId) return;
-    await mod.reloadAsync();
-  } catch {
-    // silent fail
-  }
-}
-
 function OtaStartupChecker() {
   const fetchStartedRef = useRef(false);
   let updates: ReturnType<typeof useUpdates> | null = null;
@@ -177,9 +159,7 @@ function OtaStartupChecker() {
     if (__DEV__ || Platform.OS === "web") return;
     if (!updates) return;
     if (!updates.isUpdatePending) return;
-    // Usa updateId dell'update disponibile — se assente non rilanciare
-    const targetId = updates.availableUpdate?.updateId ?? null;
-    safeReloadAsync(targetId);
+    import("expo-updates").then(mod => mod.reloadAsync()).catch(() => {});
   }, [updates?.isUpdatePending]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check esplicito se il check automatico ON_LOAD non trova nulla entro 2s

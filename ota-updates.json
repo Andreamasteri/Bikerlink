@@ -58,5 +58,25 @@
     "apkBuildId": "0160475b-70da-416b-b854-c5c0ed7338be",
     "apkUrl": "https://expo.dev/artifacts/eas/aRCt9ihwPdLrnbUfkMU33.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 4,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-04: fix OtaStartupChecker (isUpdatePending) + foto profilo Object Storage",
+    "publishedAt": "2026-04-06",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #399 — Fix bug OtaStartupChecker: rimossa guard su availableUpdate?.updateId (era null quando isUpdatePending=true), ora chiama reloadAsync() direttamente. Foto profilo migrate a Object Storage (public/photos/), endpoint /api/users/photos/:filename. Codice OTA bloccato dopo questo fix.",
+    "updateGroupId": "1b68338c-6ba6-4256-99b7-77717e4be949",
+    "androidUpdateId": "019d6513-cb31-7b93-8b2e-71c0e46019b6",
+    "iosUpdateId": null,
+    "commitBase": "b197403078a7d309bd3d2c84828d49f134402f46",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/1b68338c-6ba6-4256-99b7-77717e4be949",
+    "apkBuildId": "0160475b-70da-416b-b854-c5c0ed7338be",
+    "apkUrl": "https://expo.dev/artifacts/eas/aRCt9ihwPdLrnbUfkMU33.apk",
+    "status": "published"
   }
 ]

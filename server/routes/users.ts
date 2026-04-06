@@ -6,6 +6,7 @@ import { storage } from "../storage";
 import { isProtectedUser } from "../constants";
 import { createRegionalClubInvite } from "./motoclubs";
 import type { InsertReport } from "@shared/schema";
+import { uploadBuffer, downloadBuffer, deleteObject } from "../objectStorage";
 
 const router = Router();
 
@@ -57,23 +58,8 @@ async function captureFirstAvailabilityLocation(
   }
 }
 
-const uploadsDir = path.join(process.cwd(), "uploads", "photos");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const photoStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  },
-});
-
 const upload = multer({
-  storage: photoStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
@@ -766,9 +752,6 @@ router.post("/me/photos", requireAuth, upload.single("photo"), async (req: Reque
 
     const count = await storage.getUserPhotoCount(userId);
     if (count >= 3) {
-      if (req.file) {
-        fs.unlinkSync(req.file.path);
-      }
       return res.status(400).json({ message: "Massimo 3 foto consentite" });
     }
 
@@ -776,7 +759,13 @@ router.post("/me/photos", requireAuth, upload.single("photo"), async (req: Reque
       return res.status(400).json({ message: "Nessuna foto caricata" });
     }
 
-    const photoUrl = `/uploads/photos/${req.file.filename}`;
+    const ext = path.extname(req.file.originalname).toLowerCase() || ".jpg";
+    const filename = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9) + ext;
+    const objectPath = `public/photos/${filename}`;
+
+    await uploadBuffer(objectPath, req.file.buffer, req.file.mimetype);
+
+    const photoUrl = `/api/users/photos/${filename}`;
     const sortOrder = await storage.getUserPhotoCount(userId);
 
     const photo = await storage.createUserPhoto({
@@ -790,6 +779,27 @@ router.post("/me/photos", requireAuth, upload.single("photo"), async (req: Reque
   } catch (error) {
     console.error("Upload photo error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/photos/:filename", async (req: Request, res: Response) => {
+  try {
+    const filename = req.params.filename;
+    const objectPath = `public/photos/${filename}`;
+    const buffer = await downloadBuffer(objectPath);
+    const ext = path.extname(filename).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".png": "image/png",
+      ".webp": "image/webp",
+    };
+    const contentType = mimeTypes[ext] ?? "image/jpeg";
+    res.set("Content-Type", contentType);
+    res.set("Cache-Control", "public, max-age=31536000, immutable");
+    return res.send(buffer);
+  } catch {
+    return res.status(404).json({ message: "Foto non trovata" });
   }
 });
 
@@ -807,9 +817,13 @@ router.delete("/me/photos/:id", requireAuth, async (req: Request, res: Response)
       return res.status(403).json({ message: "Non autorizzato" });
     }
 
-    const filePath = path.join(process.cwd(), photo.photoUrl);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    const photoUrl = photo.photoUrl;
+    if (photoUrl.startsWith("/api/users/photos/")) {
+      const filename = photoUrl.replace("/api/users/photos/", "");
+      try { await deleteObject(`public/photos/${filename}`); } catch {}
+    } else if (photoUrl.startsWith("/uploads/photos/")) {
+      const filePath = path.join(process.cwd(), photoUrl);
+      if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
     }
 
     await storage.deleteUserPhoto(photoId);
