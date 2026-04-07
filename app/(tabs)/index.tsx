@@ -1136,6 +1136,16 @@ export default function MapScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.detailName}>{selectedUser?.nickname}</Text>
                     <Text style={styles.detailType}>{getUserTypeLabel(selectedUser || {})}</Text>
+                    {(selectedUser?.country || selectedUser?.region) && (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 }}>
+                        <Ionicons name="location-outline" size={12} color={Colors.textSecondary} />
+                        <Text style={{ fontSize: 11, color: Colors.textSecondary, fontFamily: "Inter_400Regular" }}>
+                          {"Residente in: "}
+                          {selectedUser?.region ? `${selectedUser.region}, ` : ""}
+                          {selectedUser?.country ? `${getCountryFlag(selectedUser.country)} ${getCountryName(selectedUser.country)}` : ""}
+                        </Text>
+                      </View>
+                    )}
                     {selectedUserDetail && (
                       <View style={{ flexDirection: "row", gap: 6, marginTop: 4 }}>
                         <View style={[styles.statusBadge, { backgroundColor: selectedUserDetail.isOnline ? "#4CAF5022" : "#66666622" }]}>

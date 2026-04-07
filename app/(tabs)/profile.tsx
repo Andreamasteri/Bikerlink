@@ -32,6 +32,7 @@ import { useMapConfig } from "@/lib/map-context";
 import { MAP_PROVIDER_LABELS, MAP_PROVIDER_DESCRIPTIONS, type MapProvider } from "@/lib/map-tiles";
 import * as Updates from "expo-updates";
 import otaUpdatesRaw from "@/ota-updates.json";
+import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 
 interface OtaUpdateEntry {
   updateNumber: number;
@@ -530,6 +531,16 @@ export default function ProfileScreen() {
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
             <Ionicons name="star" size={14} color="#FFD700" />
             <Text style={{ fontSize: 12, fontWeight: "bold" as const, color: "#FFD700", fontFamily: "Inter_700Bold" }}>Primal</Text>
+          </View>
+        )}
+        {(!!profile?.region || !!profile?.country) && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
+            <Ionicons name="location-outline" size={13} color={Colors.textSecondary} />
+            <Text style={{ fontSize: 12, color: Colors.textSecondary, fontFamily: "Inter_400Regular" }}>
+              {"Residente in: "}
+              {profile?.region ? `${profile.region}, ` : ""}
+              {profile?.country ? `${getCountryFlag(profile.country)} ${getCountryName(profile.country)}` : ""}
+            </Text>
           </View>
         )}
       </View>

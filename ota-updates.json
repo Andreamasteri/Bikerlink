@@ -158,5 +158,25 @@
     "apkBuildId": "0e9ee874-81ad-46e9-aa91-5c2323204e71",
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 9,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-07",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-09: Residente in — country e regione nel profilo e nella mappa",
+    "note": "Task #416: aggiunto label 'Residente in' con icona 📍 nel profilo personale (profile.tsx, sotto nickname), nel profilo di altri utenti (profile/[id].tsx, locationRow ora con prefisso), e nel modal dettaglio utente dalla mappa (index.tsx, dopo il tipo utente). Usa getCountryFlag/getCountryName da lib/countries-regions già esistente. Zero modifiche DB o backend.",
+    "updateGroupId": "9f06385c-cfef-4095-8089-01cab9db00cf",
+    "androidUpdateId": "019d6a23-2a44-7559-8305-a9db57a3a72f",
+    "iosUpdateId": null,
+    "commitBase": "5ac980dfc3f8ab59210507bb1abc452f410cfd73",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/9f06385c-cfef-4095-8089-01cab9db00cf",
+    "apkBuildId": "0e9ee874-81ad-46e9-aa91-5c2323204e71",
+    "apkUrl": null,
+    "status": "published"
   }
 ]
