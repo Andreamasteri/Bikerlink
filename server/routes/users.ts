@@ -81,8 +81,10 @@ function requireAuth(req: Request, res: Response, next: () => void) {
 router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const requesterId = req.session.userId!;
-    const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
-    const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
+    const latRaw = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
+    const lngRaw = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
+    const lat = Number.isFinite(latRaw) ? latRaw : undefined;
+    const lng = Number.isFinite(lngRaw) ? lngRaw : undefined;
     const blockedIds = await storage.getBlockedUserIds(requesterId);
     const blockedSet = new Set(blockedIds);
 
@@ -105,7 +107,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
         nickname: r.user.nickname,
         avatarUrl: r.user.avatarUrl,
         userType: r.user.userType,
-        distance: Math.round(r.distance * 10) / 10,
+        distance: typeof r.distance === "number" && Number.isFinite(r.distance) ? Math.round(r.distance * 10) / 10 : null,
       })));
     }
 

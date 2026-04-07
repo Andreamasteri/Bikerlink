@@ -462,8 +462,10 @@ export default function ChatScreen() {
                     <Ionicons name="person" size={18} color="#fff" />
                   </View>
                   <Text style={styles.userNickname}>{item.nickname}</Text>
-                  {item.distance != null && (
-                    <Text style={styles.userDistance}>{item.distance} km</Text>
+                  {sortOrder === "distance" && (
+                    <Text style={styles.userDistance}>
+                      {item.distance != null ? `${item.distance} km` : "–"}
+                    </Text>
                   )}
                   <Ionicons name="chatbubble-outline" size={20} color={Colors.accent} />
                 </TouchableOpacity>
