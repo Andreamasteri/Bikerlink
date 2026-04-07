@@ -279,10 +279,10 @@ export interface IStorage {
   getPhoneSharedCount(conversationId: string, userId: string): Promise<number>;
   incrementPhoneSharedCount(conversationId: string, userId: string): Promise<void>;
 
-  countAvailableBikers(since: Date, countries?: string[]): Promise<number>;
-  countAvailableZavorrine(since: Date, countries?: string[]): Promise<number>;
-  getAvailableBikersList(since: Date, lat?: number, lng?: number, countries?: string[]): Promise<any[]>;
-  getAvailableZavorrinaList(since: Date, lat?: number, lng?: number, countries?: string[]): Promise<any[]>;
+  countAvailableBikers(countries?: string[]): Promise<number>;
+  countAvailableZavorrine(countries?: string[]): Promise<number>;
+  getAvailableBikersList(lat?: number, lng?: number, countries?: string[]): Promise<any[]>;
+  getAvailableZavorrinaList(lat?: number, lng?: number, countries?: string[]): Promise<any[]>;
 
   getMotorcyclePhotos(motorcycleId: string): Promise<MotorcyclePhoto[]>;
   addMotorcyclePhoto(data: InsertMotorcyclePhoto): Promise<MotorcyclePhoto>;
