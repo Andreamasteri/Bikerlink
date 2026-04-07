@@ -919,6 +919,8 @@ export const registerSchema = z.object({
 export const loginSchema = z.object({
   identifier: z.string().min(1, "Inserisci email o nickname"),
   password: z.string().min(1, "Inserisci la password"),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
 });
 
 export type User = typeof users.$inferSelect;

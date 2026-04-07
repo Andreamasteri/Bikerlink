@@ -203,7 +203,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       return res.status(400).json({ message: parsed.error.errors[0].message });
     }
 
-    const { identifier: rawIdentifier, password } = parsed.data;
+    const { identifier: rawIdentifier, password, latitude: loginLat, longitude: loginLng } = parsed.data;
     const identifier = rawIdentifier.trim();
 
     let user = await storage.getUserByEmail(identifier);
@@ -246,6 +246,9 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       await storage.upsertUserProfile(user.id, { isAvailable: true }).catch((e: Error) => {
         console.warn("[login] upsertUserProfile failed:", e?.message);
       });
+    }
+    if (typeof loginLat === "number" && typeof loginLng === "number") {
+      storage.upsertUserProfile(user.id, { latitude: loginLat, longitude: loginLng }).catch(() => {});
     }
 
     req.session.userId = user.id;
