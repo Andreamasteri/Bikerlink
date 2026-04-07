@@ -138,5 +138,25 @@
     "apkBuildId": "0e9ee874-81ad-46e9-aa91-5c2323204e71",
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 8,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-07",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-08: Fix registrazione country NULL — derivato da prefisso telefonico",
+    "note": "Task #413 (frontend): aggiunta mappa PHONE_PREFIX_TO_COUNTRY (32 prefissi) in register.tsx. Se l'utente non seleziona il paese in fase di registrazione, viene derivato automaticamente dal prefisso telefonico (+86→CN, +39→IT, ecc.) con fallback 'IT'. Previene country=NULL per nuovi utenti.",
+    "updateGroupId": "faf40ed9-b134-4ffe-951d-7815486ea95c",
+    "androidUpdateId": "019d6a1c-e3ce-7885-ad20-ecb99d753c65",
+    "iosUpdateId": null,
+    "commitBase": "1376c4febfdfca220f84bbf48031b8f12c7be801",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/faf40ed9-b134-4ffe-951d-7815486ea95c",
+    "apkBuildId": "0e9ee874-81ad-46e9-aa91-5c2323204e71",
+    "apkUrl": null,
+    "status": "published"
   }
 ]
