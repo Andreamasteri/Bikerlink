@@ -108,6 +108,7 @@
     "runtimeVersion": "2.0.0",
     "platforms": ["android"],
     "jsEngine": "hermes",
+    "message": "OTA-06: chat fix UI (label rossa, tasto sx, back Android)",
     "note": "Task #408: label email-notifica rinominata e colorata in rosso, tasto Nuova Chat spostato a sinistra, tasto fisico indietro Android chiude il modal Nuova conversazione (onRequestClose).",
     "updateGroupId": "8f0a0c57-3a59-4250-9920-0456404f11f5",
     "androidUpdateId": "019d67b4-97fa-7c62-a2d1-f4e54dd7b51e",
