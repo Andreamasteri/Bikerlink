@@ -786,7 +786,7 @@ export default function MatchScreen() {
   const handleResetAndRematch = useCallback(() => {
     const doRematch = () => {
       const val = pendingKm.trim();
-      if (val) {
+      if (val && distanceMode === "km") {
         setDistanceKm(val);
         AsyncStorage.multiSet([["match_distance_mode", "km"], ["match_distance_km", val]]).catch(() => {});
       }
@@ -803,7 +803,7 @@ export default function MatchScreen() {
         { text: t("common.confirm"), onPress: doRematch },
       ]);
     }
-  }, [resetAndRematchMutation, pendingKm, t]);
+  }, [resetAndRematchMutation, pendingKm, distanceMode, t]);
 
   const confirmRemoveGarageMatch = useCallback((matchId: string) => {
     if (Platform.OS === "web") {
@@ -1084,6 +1084,21 @@ export default function MatchScreen() {
             {t("match.distanceFilterAll")}
           </Text>
         </TouchableOpacity>
+        {distanceMode === "all" && (
+          <TouchableOpacity
+            style={[styles.distanceKmApplyBtn, (isRematching || garageRefetching || bikerRefetching || proposalRefetching) && { opacity: 0.6 }]}
+            disabled={isRematching || garageRefetching || bikerRefetching || proposalRefetching}
+            onPress={() => {
+              handleResetAndRematch();
+            }}
+          >
+            {isRematching ? (
+              <ActivityIndicator size="small" color={Colors.background} />
+            ) : (
+              <MaterialCommunityIcons name="magnify" size={18} color={Colors.background} />
+            )}
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={[styles.distanceModeBtn, distanceMode === "km" && styles.distanceModeBtnActive]}
           onPress={() => {
