@@ -178,5 +178,27 @@
     "apkBuildId": "0e9ee874-81ad-46e9-aa91-5c2323204e71",
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 10,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-07",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-10: Re-match stati selezionati + Residente in nei profili",
+    "note": "Task #414 (merge): bottone re-match nella modalità 'stati selezionati' (match.tsx), guard AsyncStorage km-write solo se distanceMode=km. Task #416: Residente in country+regione nel profilo personale, profilo altrui, e modal mappa.",
+    "updateGroupId": "02bc52c1-207d-4d65-8793-d146108060e2",
+    "androidUpdateId": "019d6a34-f115-7141-b8a0-603490c3ef9b",
+    "iosUpdateId": null,
+    "commitBase": "ce6029ae961b1e8b683370ef5174eae1b3fb7cdf",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/02bc52c1-207d-4d65-8793-d146108060e2",
+    "apkBuildId": "ca5a537a-49c8-46a1-96d8-b3bab1167bb1",
+    "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/ca5a537a-49c8-46a1-96d8-b3bab1167bb1",
+    "apkVersionCode": 6,
+    "apkUrl": null,
+    "status": "building"
   }
 ]
