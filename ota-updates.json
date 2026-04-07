@@ -78,5 +78,25 @@
     "apkBuildId": "0160475b-70da-416b-b854-c5c0ed7338be",
     "apkUrl": "https://expo.dev/artifacts/eas/aRCt9ihwPdLrnbUfkMU33.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 5,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-05: pulizia profilo + etichette IT + sezione Amici + nuova Chat UI",
+    "publishedAt": "2026-04-07",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #402: header profilo pulito (email, OTA pill, badges rimossi). Task #403: etichette rinominate (Giri Affrontati, Km Macinati, Gemme Nascoste). Task #404: emoji ✌️ rimossa dai match accettati. Task #405: sezione Amici nella tab Chat (FlatList orizzontale). Task #406: titolo Chat rimosso, tasto Nuova Chat in corsivo, filtro A-Z/Distanza nel modal.",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "cc1634316b994e56af080aa59e6eb48d575663eb",
+    "easDashboard": null,
+    "apkBuildId": "0e9ee874-81ad-46e9-aa91-5c2323204e71",
+    "apkUrl": null,
+    "status": "publishing"
   }
 ]
