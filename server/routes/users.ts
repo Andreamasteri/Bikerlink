@@ -368,7 +368,7 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
       motorcycles,
       photos: approvedPhotos,
       isOnline,
-      isAvailable: (profile?.isAvailable || false) && !targetUser.ghostMode,
+      isAvailable: (profile?.isAvailable || false) && !targetUser.ghostMode && isOnline,
       isBlockedByMe,
       lastLoginAt: targetUser.lastLoginAt ?? null,
     });
@@ -454,7 +454,7 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
           moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
           ridingStyle: firstMoto?.ridingStyle || null,
           distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
-          isAvailable: item.profile?.isAvailable || false,
+          isAvailable: (item.profile?.isAvailable || false) && onlineIdSet.has(item.user.id),
           isOnline: onlineIdSet.has(item.user.id),
           lastLoginAt: item.user.lastLoginAt ?? null,
         };
@@ -586,7 +586,7 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
         moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
         ridingStyle: firstMoto?.ridingStyle || null,
         distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
-        isAvailable: item.profile?.isAvailable || false,
+        isAvailable: (item.profile?.isAvailable || false) && onlineAvailableIds.has(item.user.id),
         isOnline: onlineAvailableIds.has(item.user.id),
         lastLoginAt: item.user.lastLoginAt ?? null,
       };
@@ -652,7 +652,7 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
         moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
         ridingStyle: firstMoto?.ridingStyle || null,
         distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
-        isAvailable: item.profile?.isAvailable || false,
+        isAvailable: (item.profile?.isAvailable || false) && onlineAvailableIds.has(item.user.id),
         isOnline: onlineAvailableIds.has(item.user.id),
         lastLoginAt: item.user.lastLoginAt ?? null,
       };
@@ -679,9 +679,11 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
     const nearbyUsers = await storage.getNearbyUsers(lat, lng, radius, countriesParam);
 
+    const fifteenMinutesAgoNearby = new Date(Date.now() - 15 * 60 * 1000);
     const results = nearbyUsers
       .filter((item) => !blockedIds.has(item.user.id))
       .map((item) => {
+        const isOnlineNearby = !item.user.ghostMode && item.user.lastLoginAt != null && new Date(item.user.lastLoginAt) >= fifteenMinutesAgoNearby;
         return {
           id: item.user.id,
           nickname: item.user.nickname,
@@ -693,7 +695,7 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
           avatarUrl: item.user.avatarUrl,
           latitude: item.profile?.latitude,
           longitude: item.profile?.longitude,
-          isAvailable: item.profile?.isAvailable || false,
+          isAvailable: (item.profile?.isAvailable || false) && isOnlineNearby,
           bio: item.profile?.bio || null,
           distance: Math.round(item.distance * 10) / 10,
         };
@@ -716,9 +718,11 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
     }
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
     const results = await storage.searchUsers(q);
+    const fifteenMinutesAgoSearch = new Date(Date.now() - 15 * 60 * 1000);
     const safeResults = results
       .filter((item: any) => !blockedIds.has(item.user.id))
       .map((item: any) => {
+        const isOnlineSearch = !item.user.ghostMode && item.user.lastLoginAt != null && new Date(item.user.lastLoginAt) >= fifteenMinutesAgoSearch;
         return {
           id: item.user.id,
           nickname: item.user.nickname,
@@ -730,7 +734,7 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
           avatarUrl: item.user.avatarUrl,
           latitude: item.profile?.latitude || null,
           longitude: item.profile?.longitude || null,
-          isAvailable: item.profile?.isAvailable || false,
+          isAvailable: (item.profile?.isAvailable || false) && isOnlineSearch,
           bio: item.profile?.bio || null,
         };
       });
