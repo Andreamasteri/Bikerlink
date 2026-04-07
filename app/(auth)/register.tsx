@@ -60,6 +60,17 @@ const PHONE_PREFIXES = [
   { code: "+91", country: "India" },
 ];
 
+const PHONE_PREFIX_TO_COUNTRY: Record<string, string> = {
+  "+39": "IT", "+1": "US", "+44": "GB", "+49": "DE",
+  "+33": "FR", "+34": "ES", "+41": "CH", "+43": "AT",
+  "+32": "BE", "+31": "NL", "+351": "PT", "+48": "PL",
+  "+46": "SE", "+47": "NO", "+45": "DK", "+358": "FI",
+  "+30": "GR", "+36": "HU", "+420": "CZ", "+40": "RO",
+  "+385": "HR", "+386": "SI", "+381": "RS", "+355": "AL",
+  "+90": "TR", "+7": "RU", "+61": "AU", "+81": "JP",
+  "+86": "CN", "+55": "BR", "+52": "MX", "+91": "IN",
+};
+
 const EULA_TEXTS: Record<AppLanguage, string> = {
   it: `TERMINI E CONDIZIONI D'USO - BikerLink
 
@@ -426,7 +437,7 @@ export default function RegisterScreen() {
       data.sex = sex;
     }
     if (birthYear) data.birthYear = parseInt(birthYear, 10);
-    if (country) data.country = country;
+    data.country = country || PHONE_PREFIX_TO_COUNTRY[phonePrefix] || "IT";
     if (region) data.region = region;
     if (inviteCode.trim()) data.invitationCode = inviteCode.trim().toUpperCase();
 
