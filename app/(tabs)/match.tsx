@@ -255,9 +255,6 @@ function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, onBlock
         </TouchableOpacity>
       )}
 
-      {isAccepted && (
-        <Text style={{ fontSize: 40, textAlign: "center", marginVertical: 6 }}>✌️</Text>
-      )}
 
       {isNew && (
         <View style={{ marginTop: 6, gap: 5 }}>
