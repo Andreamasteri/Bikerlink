@@ -71,6 +71,7 @@ interface InteractiveMapProps {
   onUserPress?: (user: MapUser) => void;
   onEasterEggPress?: (egg: MapEasterEgg) => void;
   onReady?: () => void;
+  currentUserId?: string | null;
 }
 
 const ITALY_REGION: Region = {
@@ -128,6 +129,7 @@ export default function InteractiveMap({
   onUserPress,
   onEasterEggPress,
   onReady,
+  currentUserId,
 }: InteractiveMapProps) {
   const { enabled: mapsEnabled, resolvedProvider, userChoiceEnabled } = useMapConfig();
   const mapRef = useRef<MapView>(null);
@@ -198,6 +200,7 @@ export default function InteractiveMap({
   }, []);
 
   const filteredUsers = users.filter((u) => {
+    if (currentUserId != null && u.id === currentUserId) return true;
     if (u.userType === "biker" && !filterBiker) return false;
     if (u.userType === "zavorrina" && !filterZavorrina) return false;
     if (u.userType === "coppia" && !filterCoppia) return false;
@@ -252,16 +255,44 @@ export default function InteractiveMap({
           />
         ) : null}
 
-        {filteredUsers.map((u) => (
-          <Marker
-            key={`user-${u.id}`}
-            coordinate={{ latitude: u.latitude, longitude: u.longitude }}
-            title={u.nickname}
-            description={u.country ? `${getCountryFlag(u.country)} ${getCountryName(u.country)}${u.region ? ` · ${u.region}` : ""}` : u.region || undefined}
-            pinColor={getUserMarkerColor(u.userType, u.sex)}
-            onPress={() => onUserPress?.(u)}
-          />
-        ))}
+        {filteredUsers.map((u) => {
+          const isCurrentUser = currentUserId != null && u.id === currentUserId;
+          const markerColor = getUserMarkerColor(u.userType, u.sex);
+          if (isCurrentUser) {
+            return (
+              <Marker
+                key={`user-${u.id}`}
+                coordinate={{ latitude: u.latitude, longitude: u.longitude }}
+                title={u.nickname}
+                description={u.country ? `${getCountryFlag(u.country)} ${getCountryName(u.country)}${u.region ? ` · ${u.region}` : ""}` : u.region || undefined}
+                onPress={() => onUserPress?.(u)}
+              >
+                <View style={currentUserMarkerStyles.wrapper}>
+                  <View style={[currentUserMarkerStyles.labelBadge, { backgroundColor: markerColor }]}>
+                    <Text style={currentUserMarkerStyles.labelText}>Tu</Text>
+                  </View>
+                  <View style={[currentUserMarkerStyles.pin, { backgroundColor: markerColor }]}>
+                    <MaterialCommunityIcons
+                      name={getUserMarkerIcon(u.userType)}
+                      size={18}
+                      color="#fff"
+                    />
+                  </View>
+                </View>
+              </Marker>
+            );
+          }
+          return (
+            <Marker
+              key={`user-${u.id}`}
+              coordinate={{ latitude: u.latitude, longitude: u.longitude }}
+              title={u.nickname}
+              description={u.country ? `${getCountryFlag(u.country)} ${getCountryName(u.country)}${u.region ? ` · ${u.region}` : ""}` : u.region || undefined}
+              pinColor={markerColor}
+              onPress={() => onUserPress?.(u)}
+            />
+          );
+        })}
 
         {workshops.map((ws) => (
           <Marker
@@ -497,6 +528,43 @@ const styles = StyleSheet.create({
   availabilityText: {
     fontSize: 12,
     fontWeight: "600" as const,
+  },
+});
+
+const currentUserMarkerStyles = StyleSheet.create({
+  wrapper: {
+    alignItems: "center",
+  },
+  labelBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginBottom: 3,
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.3, shadowRadius: 2 },
+      android: { elevation: 3 },
+      web: { boxShadow: "0px 1px 3px rgba(0,0,0,0.3)" },
+    }),
+  },
+  labelText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700" as const,
+    letterSpacing: 0.5,
+  },
+  pin: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 3 },
+      android: { elevation: 5 },
+      web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.4)" },
+    }),
   },
 });
 

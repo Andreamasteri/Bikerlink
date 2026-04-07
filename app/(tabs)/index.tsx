@@ -538,6 +538,24 @@ export default function MapScreen() {
   const nearbyUsers = (nearbyUsersQuery.data as any) || [];
   const workshops = (workshopsQuery.data as any) || [];
   const myAds = myAdsQuery.data || [];
+
+  const usersWithSelf = useMemo(() => {
+    const rawList: any[] = Array.isArray(nearbyUsers) ? nearbyUsers : [];
+    if (!user || !location) return rawList;
+    const alreadyPresent = rawList.some((u: any) => u.id === user.id);
+    if (alreadyPresent) return rawList;
+    const selfMarker = {
+      id: user.id,
+      nickname: user.nickname ?? "",
+      userType: (user.userType ?? "biker") as "biker" | "zavorrina" | "coppia",
+      sex: user.sex ?? null,
+      country: user.country ?? null,
+      region: user.region ?? null,
+      latitude: location.latitude,
+      longitude: location.longitude,
+    };
+    return [selfMarker, ...rawList];
+  }, [nearbyUsers, user, location]);
   const onlineCount = onlineCountQuery.data?.count ?? 0;
   const bikerCount = bikerCountQuery.data?.count ?? 0;
   const zavCount = zavCountQuery.data?.count ?? 0;
@@ -705,7 +723,7 @@ export default function MapScreen() {
       <Pressable style={styles.mapContainer} onPress={() => setMapFullscreen(true)}>
         {!mapFullscreen ? (
           <InteractiveMap
-            users={(nearbyUsersQuery.data ?? []).filter((u: any) => u.latitude != null && u.longitude != null && !isNaN(u.latitude) && !isNaN(u.longitude))}
+            users={usersWithSelf.filter((u: any) => u.latitude != null && u.longitude != null && !isNaN(u.latitude) && !isNaN(u.longitude))}
             workshops={(workshopsQuery.data ?? []).filter((w: any) => w.latitude != null && w.longitude != null && !isNaN(w.latitude) && !isNaN(w.longitude))}
             easterEggs={(easterEggsQuery.data ?? []).filter((e: any) => e.latitude != null && e.longitude != null && !isNaN(e.latitude) && !isNaN(e.longitude))}
             activeSosRequests={(activeSosQuery.data ?? []).filter((s: any) => s.latitude != null && s.longitude != null)}
@@ -721,6 +739,7 @@ export default function MapScreen() {
             onUserPress={handleUserPress}
             onEasterEggPress={handleEasterEggPress}
             onReady={() => setMapReady(true)}
+            currentUserId={user?.id ?? null}
           />
         ) : (
           <View style={styles.mapPlaceholder}>
@@ -736,7 +755,7 @@ export default function MapScreen() {
         <View style={styles.fullscreenContainer}>
           {mapFullscreenReady ? (
           <InteractiveMap
-            users={(nearbyUsersQuery.data ?? []).filter((u: any) => u.latitude != null && u.longitude != null && !isNaN(u.latitude) && !isNaN(u.longitude))}
+            users={usersWithSelf.filter((u: any) => u.latitude != null && u.longitude != null && !isNaN(u.latitude) && !isNaN(u.longitude))}
             workshops={(workshopsQuery.data ?? []).filter((w: any) => w.latitude != null && w.longitude != null && !isNaN(w.latitude) && !isNaN(w.longitude))}
             easterEggs={(easterEggsQuery.data ?? []).filter((e: any) => e.latitude != null && e.longitude != null && !isNaN(e.latitude) && !isNaN(e.longitude))}
             activeSosRequests={(activeSosQuery.data ?? []).filter((s: any) => s.latitude != null && s.longitude != null)}
@@ -752,6 +771,7 @@ export default function MapScreen() {
             onToggleFilterCoppia={() => setFilterCoppia((p) => !p)}
             onUserPress={handleUserPress}
             onEasterEggPress={handleEasterEggPress}
+            currentUserId={user?.id ?? null}
           />
           ) : (
             <View style={styles.mapPlaceholder}>
