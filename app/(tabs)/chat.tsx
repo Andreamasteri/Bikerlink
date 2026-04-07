@@ -13,6 +13,7 @@ import {
   TextInput,
   Alert,
   Switch,
+  BackHandler,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native";
 import { useRouter } from "expo-router";
@@ -224,6 +225,18 @@ export default function ChatScreen() {
     })();
   }, [showNewChat]);
 
+  useEffect(() => {
+    if (!showNewChat) return;
+    const onBackPress = () => {
+      setShowNewChat(false);
+      setSearchQuery("");
+      setSortOrder("alpha");
+      return true;
+    };
+    const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => subscription.remove();
+  }, [showNewChat]);
+
   const usersQueryKey = userLocation
     ? [`/api/users?lat=${userLocation.lat}&lng=${userLocation.lng}`]
     : ["/api/users"];
@@ -348,7 +361,7 @@ export default function ChatScreen() {
       <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 16 : insets.top + 12 }]}>
         <View style={styles.emailNotifRow}>
           <Ionicons name="mail-outline" size={15} color={Colors.textSecondary} style={{ marginRight: 6 }} />
-          <Text style={styles.emailNotifLabel}>Inviami i messaggi della chat in email se sono offline</Text>
+          <Text style={styles.emailNotifLabel}>Inviamo i messaggi in email quando sono Offline</Text>
           <Switch
             value={emailNotifEnabled}
             onValueChange={(val) => toggleEmailNotifMutation.mutate(val)}
@@ -498,7 +511,7 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "flex-start",
     alignItems: "center",
   },
   newChatButton: {
@@ -519,7 +532,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
+    color: Colors.error,
   },
   centerContent: {
     flex: 1,
