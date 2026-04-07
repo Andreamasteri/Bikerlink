@@ -16,7 +16,7 @@ interface AuthContextValue {
 
 function useLoginMutation() {
   return useMutation({
-    mutationFn: async (data: { identifier: string; password: string; lat?: number; lng?: number }) => {
+    mutationFn: async (data: { identifier: string; password: string; latitude?: number; longitude?: number }) => {
       const res = await apiRequest("POST", "/api/auth/login", data);
       return await res.json();
     },
