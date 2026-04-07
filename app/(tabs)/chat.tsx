@@ -208,7 +208,7 @@ export default function ChatScreen() {
           if (typeof navigator !== "undefined" && navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
               (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-              () => {}
+              (err) => console.debug("Geolocation unavailable:", err.message)
             );
           }
         } else {
@@ -218,7 +218,8 @@ export default function ChatScreen() {
             setUserLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
           }
         }
-      } catch {
+      } catch (err) {
+        console.debug("Location fetch error:", err);
       }
     })();
   }, [showNewChat]);

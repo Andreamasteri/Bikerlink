@@ -102,7 +102,8 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
           notInArr(usersTable.id, [requesterId, ...Array.from(blockedSet)]),
         ))
         .orderBy(sqlTag`distance`);
-      return res.json(rows.map((r: any) => ({
+      type UserDistanceRow = { user: { id: string; nickname: string; avatarUrl: string | null; userType: string }; distance: number | null };
+      return res.json((rows as UserDistanceRow[]).map((r) => ({
         id: r.user.id,
         nickname: r.user.nickname,
         avatarUrl: r.user.avatarUrl,
