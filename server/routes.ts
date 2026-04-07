@@ -28,6 +28,7 @@ import moderatorRoutes from "./routes/moderator";
 import customRoutesRouter from "./routes/custom-routes";
 import sosRoutes from "./routes/sos";
 import motoclubsRoutes from "./routes/motoclubs";
+import friendsRoutes from "./routes/friends";
 import { triggerMatchingRun, triggerMatchingForUser } from "./matching-engine";
 import { db } from "./db";
 import { users } from "@shared/schema";
@@ -105,6 +106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/moderator", moderatorRoutes);
   app.use("/api/sos", sosRoutes);
   app.use("/api/motoclubs", motoclubsRoutes);
+  app.use("/api/friends", friendsRoutes);
 
   app.get("/api/updates/check", async (_req: Request, res: Response) => {
     try {

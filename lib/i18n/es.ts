@@ -66,6 +66,7 @@ const es: Record<string, string> = {
   "chat.typeMessage": "Escribe un mensaje...",
   "chat.private": "Privado",
   "chat.group": "Grupo",
+  "chat.friends": "Amigos",
 
   "contest.title": "Concurso de Fotos",
   "contest.upload": "Subir foto",

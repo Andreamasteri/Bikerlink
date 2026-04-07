@@ -66,6 +66,7 @@ const en: Record<string, string> = {
   "chat.typeMessage": "Type a message...",
   "chat.private": "Private",
   "chat.group": "Group",
+  "chat.friends": "Friends",
 
   "contest.title": "Photo Contest",
   "contest.upload": "Upload photo",

@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import {
   View,
   Text,
@@ -22,6 +23,13 @@ import { useAuth } from "@/lib/auth-context";
 import { useT } from "@/lib/language-context";
 import { getCurrentLocale } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/query-client";
+
+interface FriendItem {
+  id: string;
+  nickname: string;
+  userType: string;
+  gender: string | null;
+}
 
 interface ConversationItem {
   id: string;
@@ -178,6 +186,16 @@ export default function ChatScreen() {
     refetchInterval: 10000,
   });
 
+  const { data: friends } = useQuery<FriendItem[]>({
+    queryKey: ["/api/friends"],
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: ["/api/friends"] });
+    }, [])
+  );
+
   const { data: users } = useQuery<UserSearchResult[]>({
     queryKey: ["/api/users"],
     enabled: showNewChat,
@@ -251,6 +269,24 @@ export default function ChatScreen() {
     deleteConversationMutation.mutate(convId);
   }, []);
 
+  const handleFriendPress = useCallback(
+    (friend: FriendItem) => {
+      const existing = conversations?.find((conv) =>
+        conv.conversationType === "contact" &&
+        conv.participants.some((p) => p.id === friend.id)
+      );
+      if (existing) {
+        router.push(`/chat/${existing.id}`);
+      } else {
+        createConversationMutation.mutate({
+          conversationType: "contact",
+          participantIds: [friend.id],
+        });
+      }
+    },
+    [conversations, router, createConversationMutation]
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: ConversationItem }) => (
       <ConversationRow
@@ -287,6 +323,31 @@ export default function ChatScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {friends && friends.length > 0 && (
+        <View style={styles.friendsSection}>
+          <Text style={styles.friendsSectionTitle}>{t("chat.friends")}</Text>
+          <FlatList
+            horizontal
+            data={friends}
+            keyExtractor={(item) => item.id}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.friendsListContent}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.friendItem}
+                onPress={() => handleFriendPress(item)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.friendAvatar, { backgroundColor: getUserTypeColor(item.userType, item.gender) }]}>
+                  <Ionicons name="person" size={20} color="#fff" />
+                </View>
+                <Text style={styles.friendNickname} numberOfLines={1}>{item.nickname}</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      )}
 
       {isLoading ? (
         <View style={styles.centerContent}>
@@ -619,5 +680,43 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     marginTop: 20,
+  },
+  friendsSection: {
+    paddingTop: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 0.5,
+    borderBottomColor: Colors.border,
+  },
+  friendsSectionTitle: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  friendsListContent: {
+    paddingHorizontal: 16,
+    gap: 16,
+  },
+  friendItem: {
+    alignItems: "center",
+    width: 64,
+  },
+  friendAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  friendNickname: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: Colors.text,
+    textAlign: "center",
+    width: 64,
   },
 });
