@@ -90,13 +90,13 @@
     "platforms": ["android"],
     "jsEngine": "hermes",
     "note": "Task #402: header profilo pulito (email, OTA pill, badges rimossi). Task #403: etichette rinominate (Giri Affrontati, Km Macinati, Gemme Nascoste). Task #404: emoji ✌️ rimossa dai match accettati. Task #405: sezione Amici nella tab Chat (FlatList orizzontale). Task #406: titolo Chat rimosso, tasto Nuova Chat in corsivo, filtro A-Z/Distanza nel modal.",
-    "updateGroupId": null,
-    "androidUpdateId": null,
+    "updateGroupId": "a7cabcf1-9b11-41b9-ba4b-e16d5142e4fe",
+    "androidUpdateId": "019d6699-2ecd-748d-aa81-9b37dbf80d9a",
     "iosUpdateId": null,
     "commitBase": "cc1634316b994e56af080aa59e6eb48d575663eb",
-    "easDashboard": null,
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/a7cabcf1-9b11-41b9-ba4b-e16d5142e4fe",
     "apkBuildId": "0e9ee874-81ad-46e9-aa91-5c2323204e71",
     "apkUrl": null,
-    "status": "publishing"
+    "status": "published"
   }
 ]
