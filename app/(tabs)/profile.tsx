@@ -895,7 +895,7 @@ export default function ProfileScreen() {
         </Pressable>
       </Modal>
 
-      <Text style={{ textAlign: "center", fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 16, marginBottom: 8 }}>
+      <Text style={{ textAlign: "center", fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.success, marginTop: 16, marginBottom: 8 }}>
         {currentOtaEntry
           ? `OTA-${currentOtaEntry.updateNumber}`
           : latestOta

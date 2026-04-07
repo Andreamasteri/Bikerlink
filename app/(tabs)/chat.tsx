@@ -345,10 +345,10 @@ export default function ChatScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: webTopInset }]}>
-      <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 16 : insets.top + 12 }]}>
+      <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 16 : insets.top + 4 }]}>
         <View style={styles.emailNotifRow}>
           <Ionicons name="mail-outline" size={15} color={Colors.textSecondary} style={{ marginRight: 6 }} />
-          <Text style={styles.emailNotifLabel}>Inviamo i messaggi in email quando sono Offline</Text>
+          <Text style={styles.emailNotifLabel}>Invia i messaggi in email quando sono Offline</Text>
           <Switch
             value={emailNotifEnabled}
             onValueChange={(val) => toggleEmailNotifMutation.mutate(val)}
@@ -503,16 +503,15 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: "row",
-    justifyContent: "flex-start",
+    justifyContent: "center",
     alignItems: "center",
   },
   newChatButton: {
     padding: 4,
   },
   newChatText: {
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-    fontStyle: "italic",
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
     color: Colors.accent,
   },
   emailNotifRow: {
@@ -522,7 +521,7 @@ const styles = StyleSheet.create({
   },
   emailNotifLabel: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 15,
     fontFamily: "Inter_400Regular",
     color: Colors.error,
   },
