@@ -437,7 +437,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async searchUsers(query: string): Promise<{ user: User; profile: UserProfile | null }[]> {
-    const pattern = `%${query}%`;
+    const pattern = `${query}%`;
     const results = await db
       .select({ user: users, profile: userProfiles })
       .from(users)
