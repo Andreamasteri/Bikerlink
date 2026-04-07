@@ -118,5 +118,25 @@
     "apkBuildId": "0e9ee874-81ad-46e9-aa91-5c2323204e71",
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 7,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-07",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-07: UI tweaks chat/profilo + pin Tu sulla mappa",
+    "note": "Task #411: OTA number verde in profilo, label email rinominata/ingrandita, Nuova Chat centrato/bold/no-italic/più grande, spazio header ridotto. Task #412: pin utente corrente (Tu) sempre visibile sulla mappa.",
+    "updateGroupId": "bd828116-433d-4c5c-8575-6a805f9218be",
+    "androidUpdateId": "019d680b-e111-7553-9d09-09948996f255",
+    "iosUpdateId": null,
+    "commitBase": "5ae73c7c3446b629be80fbb9d6e03c0af48d795f",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/bd828116-433d-4c5c-8575-6a805f9218be",
+    "apkBuildId": "0e9ee874-81ad-46e9-aa91-5c2323204e71",
+    "apkUrl": null,
+    "status": "published"
   }
 ]
