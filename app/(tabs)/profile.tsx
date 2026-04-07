@@ -24,7 +24,6 @@ import Colors from "@/constants/colors";
 import { type AppLanguage } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage, useT, useLocale } from "@/lib/language-context";
-import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
@@ -112,14 +111,6 @@ function getUserTypeIcon(userType: string): keyof typeof Ionicons.glyphMap {
   return "bicycle";
 }
 
-function getUserTypeLabelKey(userType: string): string {
-  switch (userType) {
-    case "biker": return "profile.bikerType";
-    case "zavorrina": return "profile.zavorrinaType";
-    case "coppia": return "profile.coupleType";
-    default: return userType;
-  }
-}
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -136,7 +127,6 @@ export default function ProfileScreen() {
   const [isDownloadingEula, setIsDownloadingEula] = useState(false);
   const [isDownloadingPrivacy, setIsDownloadingPrivacy] = useState(false);
   const [isExportingData, setIsExportingData] = useState(false);
-  const [isCheckingOta, setIsCheckingOta] = useState(false);
 
   // Ciclo-aware: filtra le OTA per la runtimeVersion dell'APK corrente
   const currentRv = Updates.runtimeVersion ?? null;
@@ -150,13 +140,6 @@ export default function ProfileScreen() {
   }, null);
   const currentUpdateId = Updates.updateId ?? null;
   const currentOtaEntry = allOtaUpdates.find(e => e.androidUpdateId === currentUpdateId) ?? null;
-  const isOtaUpToDate =
-    __DEV__ || Platform.OS === "web"
-      ? true
-      : currentUpdateId === null
-      ? false
-      : currentUpdateId === latestOta?.androidUpdateId  // match esatto con il latest noto del ciclo
-        || !currentOtaEntry;  // non in lista = bundle più recente del JSON bundled → aggiornato
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -220,9 +203,6 @@ export default function ProfileScreen() {
     queryKey: ["/api/settings/donation"],
   });
 
-  const { data: myClubs } = useQuery<{ id: string; name: string; brandName?: string | null; clubType: string }[]>({
-    queryKey: ["/api/motoclubs/me/clubs"],
-  });
 
   const searchPreference = profile?.profile?.searchPreference ?? "both";
 
@@ -546,84 +526,12 @@ export default function ProfileScreen() {
         <Text style={styles.nickname}>
           {profile?.nickname ?? user?.nickname ?? ""}
         </Text>
-        <Text style={styles.userEmail}>
-          {profile?.email ?? user?.email ?? ""}
-        </Text>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, marginBottom: 2 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: (isOtaUpToDate ? "#22C55E" : "#EF4444") + "18", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-            <Ionicons name="cloud-download-outline" size={11} color={isOtaUpToDate ? "#22C55E" : "#EF4444"} />
-            <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: isOtaUpToDate ? "#22C55E" : "#EF4444" }}>
-              {currentOtaEntry
-                ? `OTA-${currentOtaEntry.updateNumber}${currentRv ? ` · v${currentRv}` : ""}`
-                : latestOta
-                ? `OTA-${latestOta.updateNumber}${currentRv ? ` · v${currentRv}` : ""}`
-                : `OTA${currentRv ? ` · v${currentRv}` : ""}`}
-            </Text>
-          </View>
-          {!__DEV__ && Platform.OS !== "web" && (
-            <TouchableOpacity
-              onPress={async () => {
-                if (isCheckingOta) return;
-                setIsCheckingOta(true);
-                try {
-                  const result = await Updates.checkForUpdateAsync();
-                  if (!result.isAvailable) {
-                    Alert.alert("Aggiornato", "Nessun aggiornamento disponibile.");
-                    setIsCheckingOta(false);
-                    return;
-                  }
-                  await Updates.fetchUpdateAsync();
-                  await Updates.reloadAsync();
-                } catch {
-                  Alert.alert("Errore", "Impossibile scaricare l'aggiornamento.");
-                  setIsCheckingOta(false);
-                }
-              }}
-              disabled={isCheckingOta}
-              style={{ padding: 3 }}
-            >
-              {isCheckingOta
-                ? <ActivityIndicator size="small" color={isOtaUpToDate ? "#22C55E" : "#EF4444"} />
-                : <Ionicons name="refresh-outline" size={14} color={isOtaUpToDate ? "#22C55E" : "#EF4444"} />
-              }
-            </TouchableOpacity>
-          )}
-        </View>
         {profile?.isPrimal === true && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
             <Ionicons name="star" size={14} color="#FFD700" />
             <Text style={{ fontSize: 12, fontWeight: "bold" as const, color: "#FFD700", fontFamily: "Inter_700Bold" }}>Primal</Text>
           </View>
         )}
-        <View style={styles.badges}>
-          <View style={[styles.badge, { backgroundColor: typeColor + "20" }]}>
-            <Text style={[styles.badgeText, { color: typeColor }]}>
-              {t(getUserTypeLabelKey(currentUserType))}
-            </Text>
-          </View>
-          {(profile?.country || profile?.region) && (
-            <View style={styles.badge}>
-              <View style={styles.regionBadge}>
-                <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
-                <Text style={styles.badgeText}>
-                  {profile?.country ? getCountryFlag(profile.country) + " " + getCountryName(profile.country) : ""}
-                  {profile?.country && profile?.region ? " · " : ""}
-                  {profile?.region || ""}
-                </Text>
-              </View>
-            </View>
-          )}
-          {myClubs && myClubs.length > 0 && myClubs.slice(0, 2).map((c) => (
-            <View key={c.id} style={[styles.badge, { backgroundColor: Colors.accent + "22" }]}>
-              <View style={styles.regionBadge}>
-                <Ionicons name="shield" size={13} color={Colors.accent} />
-                <Text style={[styles.badgeText, { color: Colors.accent }]} numberOfLines={1}>
-                  {c.brandName || c.name}
-                </Text>
-              </View>
-            </View>
-          ))}
-        </View>
       </View>
 
       <View style={styles.section}>
@@ -987,6 +895,13 @@ export default function ProfileScreen() {
         </Pressable>
       </Modal>
 
+      <Text style={{ textAlign: "center", fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 16, marginBottom: 8 }}>
+        {currentOtaEntry
+          ? `OTA-${currentOtaEntry.updateNumber}`
+          : latestOta
+          ? `OTA-${latestOta.updateNumber}`
+          : "OTA"}
+      </Text>
       <View style={{ height: 40 }} />
     </ScrollView>
   );
@@ -1045,34 +960,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     color: Colors.text,
     marginTop: 12,
-  },
-  userEmail: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    marginTop: 2,
-    marginBottom: 6,
-  },
-  badges: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 8,
-  },
-  badge: {
-    backgroundColor: Colors.surface,
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-  },
-  badgeText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: Colors.textSecondary,
-  },
-  regionBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
   },
   section: {
     paddingHorizontal: 16,
