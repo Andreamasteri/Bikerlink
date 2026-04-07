@@ -81,8 +81,34 @@ function requireAuth(req: Request, res: Response, next: () => void) {
 router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const requesterId = req.session.userId!;
+    const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
+    const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
     const blockedIds = await storage.getBlockedUserIds(requesterId);
     const blockedSet = new Set(blockedIds);
+
+    if (lat != null && lng != null) {
+      const { db } = await import("../db");
+      const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
+      const { eq, and, notInArray: notInArr } = await import("drizzle-orm");
+      const { sql: sqlTag } = await import("drizzle-orm");
+      const distanceExpr = sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance");
+      const rows = await db
+        .select({ user: usersTable, distance: distanceExpr })
+        .from(usersTable)
+        .leftJoin(profilesTable, eq(profilesTable.userId, usersTable.id))
+        .where(and(
+          notInArr(usersTable.id, [requesterId, ...Array.from(blockedSet)]),
+        ))
+        .orderBy(sqlTag`distance`);
+      return res.json(rows.map((r: any) => ({
+        id: r.user.id,
+        nickname: r.user.nickname,
+        avatarUrl: r.user.avatarUrl,
+        userType: r.user.userType,
+        distance: Math.round(r.distance * 10) / 10,
+      })));
+    }
+
     const allUsers = await storage.getAllUsers();
     const results = allUsers
       .filter((u) => !blockedSet.has(u.id) && u.id !== requesterId)
@@ -91,6 +117,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
         nickname: u.nickname,
         avatarUrl: u.avatarUrl,
         userType: u.userType,
+        distance: null as number | null,
       }));
     return res.json(results);
   } catch (error) {

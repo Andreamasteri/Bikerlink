@@ -1,4 +1,5 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useEffect } from "react";
+import * as Location from "expo-location";
 import { useFocusEffect } from "expo-router";
 import {
   View,
@@ -169,6 +170,8 @@ interface UserSearchResult {
   nickname: string;
   avatarUrl: string | null;
   userType: string;
+  sex?: string | null;
+  distance?: number | null;
 }
 
 export default function ChatScreen() {
@@ -179,7 +182,8 @@ export default function ChatScreen() {
   const userId = user?.id || "";
   const [showNewChat, setShowNewChat] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [chatType, setChatType] = useState<"contact" | "private">("contact");
+  const [sortOrder, setSortOrder] = useState<"alpha" | "distance">("alpha");
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const { data: conversations, isLoading } = useQuery<ConversationItem[]>({
     queryKey: ["/api/chat/conversations"],
@@ -196,8 +200,35 @@ export default function ChatScreen() {
     }, [])
   );
 
+  useEffect(() => {
+    if (!showNewChat) return;
+    (async () => {
+      try {
+        if (Platform.OS === "web") {
+          if (typeof navigator !== "undefined" && navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+              () => {}
+            );
+          }
+        } else {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === "granted") {
+            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            setUserLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+          }
+        }
+      } catch {
+      }
+    })();
+  }, [showNewChat]);
+
+  const usersQueryKey = userLocation
+    ? [`/api/users?lat=${userLocation.lat}&lng=${userLocation.lng}`]
+    : ["/api/users"];
+
   const { data: users } = useQuery<UserSearchResult[]>({
-    queryKey: ["/api/users"],
+    queryKey: usersQueryKey,
     enabled: showNewChat,
   });
 
@@ -225,7 +256,6 @@ export default function ChatScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
       setShowNewChat(false);
       setSearchQuery("");
-      setChatType("contact");
       router.push(`/chat/${conv.id}`);
     },
     onError: () => {
@@ -236,18 +266,28 @@ export default function ChatScreen() {
   const handleContactUser = useCallback(
     (targetUserId: string) => {
       createConversationMutation.mutate({
-        conversationType: chatType,
+        conversationType: "private",
         participantIds: [targetUserId],
       });
     },
-    [chatType, createConversationMutation]
+    [createConversationMutation]
   );
 
-  const filteredUsers = users?.filter(
-    (u) =>
-      u.id !== userId &&
-      u.nickname.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredUsers = React.useMemo(() => {
+    const base = users?.filter(
+      (u) =>
+        u.id !== userId &&
+        u.nickname.toLowerCase().includes(searchQuery.toLowerCase())
+    ) ?? [];
+    if (sortOrder === "alpha") {
+      return [...base].sort((a, b) => a.nickname.localeCompare(b.nickname));
+    }
+    return [...base].sort((a, b) => {
+      const da = a.distance ?? Infinity;
+      const db = b.distance ?? Infinity;
+      return da - db;
+    });
+  }, [users, userId, searchQuery, sortOrder]);
 
   const handleConversationPress = useCallback(
     (convId: string) => {
@@ -317,9 +357,8 @@ export default function ChatScreen() {
           />
         </View>
         <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>{t("chat.title")}</Text>
           <TouchableOpacity onPress={() => setShowNewChat(true)} style={styles.newChatButton}>
-            <Ionicons name="create-outline" size={24} color={Colors.accent} />
+            <Text style={styles.newChatText}>Nuova Chat</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -375,34 +414,26 @@ export default function ChatScreen() {
             <View style={[styles.modalContent, { paddingTop: Platform.OS === "web" ? 24 : insets.top + 12 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Nuova conversazione</Text>
-              <TouchableOpacity onPress={() => { setShowNewChat(false); setSearchQuery(""); setChatType("contact"); }}>
+              <TouchableOpacity onPress={() => { setShowNewChat(false); setSearchQuery(""); }}>
                 <Ionicons name="close" size={28} color={Colors.text} />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.chatTypeRow}>
+            <View style={styles.sortRow}>
               <TouchableOpacity
-                style={[styles.chatTypeOption, chatType === "contact" && styles.chatTypeActive]}
-                onPress={() => setChatType("contact")}
+                style={[styles.sortOption, sortOrder === "alpha" && styles.sortOptionActive]}
+                onPress={() => setSortOrder("alpha")}
               >
-                <Ionicons name="people-circle" size={20} color={chatType === "contact" ? Colors.background : Colors.textSecondary} />
-                <Text style={[styles.chatTypeText, chatType === "contact" && styles.chatTypeTextActive]}>Contatto</Text>
+                <Text style={[styles.sortOptionText, sortOrder === "alpha" && styles.sortOptionTextActive]}>A–Z</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.chatTypeOption, chatType === "private" && styles.chatTypeActive]}
-                onPress={() => setChatType("private")}
+                style={[styles.sortOption, sortOrder === "distance" && styles.sortOptionActive]}
+                onPress={() => setSortOrder("distance")}
               >
-                <Ionicons name="lock-closed" size={20} color={chatType === "private" ? Colors.background : Colors.textSecondary} />
-                <Text style={[styles.chatTypeText, chatType === "private" && styles.chatTypeTextActive]}>Privata</Text>
+                <Ionicons name="location-outline" size={14} color={sortOrder === "distance" ? Colors.background : Colors.textSecondary} style={{ marginRight: 4 }} />
+                <Text style={[styles.sortOptionText, sortOrder === "distance" && styles.sortOptionTextActive]}>Distanza</Text>
               </TouchableOpacity>
             </View>
-
-            {chatType === "private" && (
-              <View style={styles.privateNotice}>
-                <Ionicons name="information-circle" size={16} color={Colors.warning} />
-                <Text style={styles.privateNoticeText}>Consigliamo la chat di contatto</Text>
-              </View>
-            )}
 
             <View style={styles.searchWrapper}>
               <Ionicons name="search" size={18} color={Colors.textSecondary} />
@@ -431,6 +462,9 @@ export default function ChatScreen() {
                     <Ionicons name="person" size={18} color="#fff" />
                   </View>
                   <Text style={styles.userNickname}>{item.nickname}</Text>
+                  {item.distance != null && (
+                    <Text style={styles.userDistance}>{item.distance} km</Text>
+                  )}
                   <Ionicons name="chatbubble-outline" size={20} color={Colors.accent} />
                 </TouchableOpacity>
               )}
@@ -461,16 +495,17 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     alignItems: "center",
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontFamily: "Inter_700Bold",
-    color: Colors.text,
   },
   newChatButton: {
     padding: 4,
+  },
+  newChatText: {
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+    fontStyle: "italic",
+    color: Colors.accent,
   },
   emailNotifRow: {
     flexDirection: "row",
@@ -594,47 +629,31 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     color: Colors.text,
   },
-  chatTypeRow: {
+  sortRow: {
     flexDirection: "row",
     gap: 10,
     marginBottom: 12,
   },
-  chatTypeOption: {
+  sortOption: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  chatTypeActive: {
+  sortOptionActive: {
     backgroundColor: Colors.accent,
     borderColor: Colors.accent,
   },
-  chatTypeText: {
+  sortOptionText: {
     fontSize: 14,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
   },
-  chatTypeTextActive: {
+  sortOptionTextActive: {
     color: Colors.background,
-  },
-  privateNotice: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  privateNoticeText: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: Colors.warning,
   },
   searchWrapper: {
     flexDirection: "row",
@@ -673,6 +692,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Inter_500Medium",
     color: Colors.text,
+  },
+  userDistance: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginRight: 4,
   },
   noUsersText: {
     textAlign: "center" as const,
