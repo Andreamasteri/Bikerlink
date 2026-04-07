@@ -98,5 +98,24 @@
     "apkBuildId": "0e9ee874-81ad-46e9-aa91-5c2323204e71",
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 6,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-07",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #408: label email-notifica rinominata e colorata in rosso, tasto Nuova Chat spostato a sinistra, tasto fisico indietro Android chiude il modal Nuova conversazione (onRequestClose).",
+    "updateGroupId": "8f0a0c57-3a59-4250-9920-0456404f11f5",
+    "androidUpdateId": "019d67b4-97fa-7c62-a2d1-f4e54dd7b51e",
+    "iosUpdateId": null,
+    "commitBase": "b62fb6557830e4df0dbec973f36c9bb53da1aa3b",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/8f0a0c57-3a59-4250-9920-0456404f11f5",
+    "apkBuildId": "0e9ee874-81ad-46e9-aa91-5c2323204e71",
+    "apkUrl": null,
+    "status": "published"
   }
 ]
