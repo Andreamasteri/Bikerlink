@@ -79,9 +79,9 @@ const it: Record<string, string> = {
   "profile.photos": "Foto",
   "profile.motorcycles": "Moto",
   "profile.stats": "Statistiche",
-  "profile.rides": "Giri fatti",
-  "profile.totalKm": "Km totali",
-  "profile.easterEggs": "Easter Eggs",
+  "profile.rides": "Giri Affrontati",
+  "profile.totalKm": "Km Macinati",
+  "profile.easterEggs": "Gemme Nascoste",
   "profile.addMoto": "Aggiungi moto",
   "profile.addPhoto": "Aggiungi foto",
 
@@ -99,7 +99,7 @@ const it: Record<string, string> = {
   "workshops.phone": "Telefono",
   "workshops.whatsapp": "WhatsApp",
 
-  "easterEggs.title": "Easter Eggs",
+  "easterEggs.title": "Gemme Nascoste",
   "easterEggs.collected": "Raccolti",
   "easterEggs.collect": "Raccogli!",
   "easterEggs.congrats": "Complimenti!",
