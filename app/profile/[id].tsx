@@ -309,9 +309,11 @@ export default function PublicProfileScreen() {
               <Ionicons name="location" size={14} color={Colors.textSecondary} />
               <Text style={styles.locationText}>
                 {"Residente in: "}
-                {profile.region ? `${profile.region}, ` : ""}
-                {profile.city ? `${profile.city}, ` : ""}
-                {profile.country ? getCountryFlag(profile.country) + " " + getCountryName(profile.country) : ""}
+                {[
+                  profile.region || null,
+                  profile.city || null,
+                  profile.country ? getCountryFlag(profile.country) + " " + getCountryName(profile.country) : null,
+                ].filter(Boolean).join(", ")}
               </Text>
             </View>
           )}

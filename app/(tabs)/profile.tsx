@@ -538,8 +538,10 @@ export default function ProfileScreen() {
             <Ionicons name="location-outline" size={13} color={Colors.textSecondary} />
             <Text style={{ fontSize: 12, color: Colors.textSecondary, fontFamily: "Inter_400Regular" }}>
               {"Residente in: "}
-              {profile?.region ? `${profile.region}, ` : ""}
-              {profile?.country ? `${getCountryFlag(profile.country)} ${getCountryName(profile.country)}` : ""}
+              {[
+                profile?.region || null,
+                profile?.country ? `${getCountryFlag(profile.country)} ${getCountryName(profile.country)}` : null,
+              ].filter(Boolean).join(", ")}
             </Text>
           </View>
         )}

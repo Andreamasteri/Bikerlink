@@ -1141,8 +1141,10 @@ export default function MapScreen() {
                         <Ionicons name="location-outline" size={12} color={Colors.textSecondary} />
                         <Text style={{ fontSize: 11, color: Colors.textSecondary, fontFamily: "Inter_400Regular" }}>
                           {"Residente in: "}
-                          {selectedUser?.region ? `${selectedUser.region}, ` : ""}
-                          {selectedUser?.country ? `${getCountryFlag(selectedUser.country)} ${getCountryName(selectedUser.country)}` : ""}
+                          {[
+                            selectedUser?.region || null,
+                            selectedUser?.country ? `${getCountryFlag(selectedUser.country)} ${getCountryName(selectedUser.country)}` : null,
+                          ].filter(Boolean).join(", ")}
                         </Text>
                       </View>
                     )}
