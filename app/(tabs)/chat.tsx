@@ -415,9 +415,21 @@ export default function ChatScreen() {
             <View style={[styles.modalContent, { paddingTop: Platform.OS === "web" ? 24 : insets.top + 12 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Nuova conversazione</Text>
-              <TouchableOpacity onPress={() => { setShowNewChat(false); setSearchQuery(""); }}>
+              <TouchableOpacity onPress={() => { setShowNewChat(false); setSearchQuery(""); setSortOrder("alpha"); }}>
                 <Ionicons name="close" size={28} color={Colors.text} />
               </TouchableOpacity>
+            </View>
+
+            <View style={styles.searchWrapper}>
+              <Ionicons name="search" size={18} color={Colors.textSecondary} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Cerca utente..."
+                placeholderTextColor={Colors.textSecondary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoFocus
+              />
             </View>
 
             <View style={styles.sortRow}>
@@ -434,18 +446,6 @@ export default function ChatScreen() {
                 <Ionicons name="location-outline" size={14} color={sortOrder === "distance" ? Colors.background : Colors.textSecondary} style={{ marginRight: 4 }} />
                 <Text style={[styles.sortOptionText, sortOrder === "distance" && styles.sortOptionTextActive]}>Distanza</Text>
               </TouchableOpacity>
-            </View>
-
-            <View style={styles.searchWrapper}>
-              <Ionicons name="search" size={18} color={Colors.textSecondary} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Cerca utente..."
-                placeholderTextColor={Colors.textSecondary}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoFocus
-              />
             </View>
 
             <FlatList
