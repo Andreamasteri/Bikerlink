@@ -13,7 +13,6 @@ import {
   TextInput,
   Alert,
   Switch,
-  BackHandler,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native";
 import { useRouter } from "expo-router";
@@ -225,18 +224,6 @@ export default function ChatScreen() {
     })();
   }, [showNewChat]);
 
-  useEffect(() => {
-    if (!showNewChat) return;
-    const onBackPress = () => {
-      setShowNewChat(false);
-      setSearchQuery("");
-      setSortOrder("alpha");
-      return true;
-    };
-    const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
-    return () => subscription.remove();
-  }, [showNewChat]);
-
   const usersQueryKey = userLocation
     ? [`/api/users?lat=${userLocation.lat}&lng=${userLocation.lng}`]
     : ["/api/users"];
@@ -422,7 +409,12 @@ export default function ChatScreen() {
         />
       )}
 
-      <Modal visible={showNewChat} animationType="slide" transparent>
+      <Modal
+        visible={showNewChat}
+        animationType="slide"
+        transparent
+        onRequestClose={() => { setShowNewChat(false); setSearchQuery(""); setSortOrder("alpha"); }}
+      >
         <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { paddingTop: Platform.OS === "web" ? 24 : insets.top + 12 }]}>
