@@ -606,6 +606,17 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] ota_releases:", e);
         }
 
+        try {
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_home_enabled BOOLEAN NOT NULL DEFAULT false`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS home_latitude DOUBLE PRECISION`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS home_longitude DOUBLE PRECISION`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_home_latitude DOUBLE PRECISION`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_home_longitude DOUBLE PRECISION`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_home_radius INTEGER NOT NULL DEFAULT 2`);
+        } catch (e) {
+          console.warn("[MIGRATION] user_profiles fake_home columns:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 
