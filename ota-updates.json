@@ -200,5 +200,26 @@
     "apkVersionCode": 6,
     "apkUrl": null,
     "status": "building"
+  },
+  {
+    "updateNumber": 11,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-07",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-11: GPS al login — aggiorna lat/lng posizione in modo silenzioso",
+    "note": "Task #415: login.tsx raccoglie GPS silenziosamente prima del mutate (Platform.OS !== web, Accuracy.Balanced). auth-context.tsx typing allineato lat/lng → latitude/longitude. Backend già aggiornato (schema+auth.ts+users.ts) via restart precedente.",
+    "updateGroupId": "806e66c0-540b-49df-878d-8d8732073926",
+    "androidUpdateId": "019d6a64-6b97-782e-99b5-8de5f0dd0cc4",
+    "iosUpdateId": null,
+    "commitBase": "8f5c9cee92f8c9926cadc8d73393c0d19bb2c48a",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/806e66c0-540b-49df-878d-8d8732073926",
+    "apkBuildId": "ca5a537a-49c8-46a1-96d8-b3bab1167bb1",
+    "apkVersionCode": 6,
+    "apkUrl": null,
+    "status": "published"
   }
 ]
