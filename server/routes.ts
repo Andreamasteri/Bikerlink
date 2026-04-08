@@ -78,7 +78,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const foundInTracker = onlineTracker.touch(userId);
       try {
         const user = await storage.getUser(userId);
-        if (user && user.status === "active") {
+        if (user && user.status !== "active") {
+          onlineTracker.setOffline(userId);
+        } else if (user && user.status === "active") {
           if (!foundInTracker) {
             const profile = await storage.getUserProfile(userId).catch(() => null);
             onlineTracker.setOnline(userId, {
