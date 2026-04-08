@@ -863,6 +863,7 @@ export default function ProfileScreen() {
                   privacyMutation.mutate({ positionFuzzKm: n });
                 } else if (v === "" || v === "0") {
                   setPositionFuzzKm(1);
+                  privacyMutation.mutate({ positionFuzzKm: 1 });
                 }
               }}
               maxLength={2}
