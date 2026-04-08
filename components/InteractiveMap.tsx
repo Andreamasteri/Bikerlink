@@ -53,6 +53,11 @@ interface MapSosRequest {
   radiusKm: number;
 }
 
+interface LatLng {
+  latitude: number;
+  longitude: number;
+}
+
 interface InteractiveMapProps {
   users?: MapUser[];
   workshops?: MapWorkshop[];
@@ -72,6 +77,8 @@ interface InteractiveMapProps {
   onEasterEggPress?: (egg: MapEasterEgg) => void;
   onReady?: () => void;
   currentUserId?: string | null;
+  realMeMarker?: LatLng | null;
+  fakeMeMarker?: LatLng | null;
 }
 
 const ITALY_REGION: Region = {
@@ -130,6 +137,8 @@ export default function InteractiveMap({
   onEasterEggPress,
   onReady,
   currentUserId,
+  realMeMarker,
+  fakeMeMarker,
 }: InteractiveMapProps) {
   const { enabled: mapsEnabled, resolvedProvider, userChoiceEnabled } = useMapConfig();
   const mapRef = useRef<MapView>(null);
@@ -344,6 +353,38 @@ export default function InteractiveMap({
             </Marker>
           </React.Fragment>
         ))}
+
+        {realMeMarker != null && (
+          <Marker
+            key="real-me-marker"
+            coordinate={{ latitude: realMeMarker.latitude, longitude: realMeMarker.longitude }}
+            title="RealMe"
+            description="La tua posizione GPS reale"
+          >
+            <View style={privacyMarkerStyles.wrapper}>
+              <View style={[privacyMarkerStyles.badge, { backgroundColor: "#2E7D32" }]}>
+                <Text style={privacyMarkerStyles.badgeText}>RealMe</Text>
+              </View>
+              <View style={[privacyMarkerStyles.dot, { backgroundColor: "#2E7D32" }]} />
+            </View>
+          </Marker>
+        )}
+
+        {fakeMeMarker != null && (
+          <Marker
+            key="fake-me-marker"
+            coordinate={{ latitude: fakeMeMarker.latitude, longitude: fakeMeMarker.longitude }}
+            title="FakeMe"
+            description="La tua posizione fittizia visibile agli altri"
+          >
+            <View style={privacyMarkerStyles.wrapper}>
+              <View style={[privacyMarkerStyles.badge, { backgroundColor: "#E65100" }]}>
+                <Text style={privacyMarkerStyles.badgeText}>FakeMe</Text>
+              </View>
+              <View style={[privacyMarkerStyles.dot, { backgroundColor: "#E65100" }]} />
+            </View>
+          </Marker>
+        )}
       </MapView>
 
       {locationLoading && (
@@ -591,5 +632,42 @@ const sosMarkerStyles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800" as const,
     letterSpacing: 1,
+  },
+});
+
+const privacyMarkerStyles = StyleSheet.create({
+  wrapper: {
+    alignItems: "center",
+  },
+  badge: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginBottom: 4,
+    borderWidth: 1.5,
+    borderColor: "#fff",
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 2 },
+      android: { elevation: 4 },
+      web: { boxShadow: "0px 1px 3px rgba(0,0,0,0.35)" },
+    }),
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700" as const,
+    letterSpacing: 0.5,
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: "#fff",
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.3, shadowRadius: 2 },
+      android: { elevation: 3 },
+      web: { boxShadow: "0px 1px 2px rgba(0,0,0,0.3)" },
+    }),
   },
 });

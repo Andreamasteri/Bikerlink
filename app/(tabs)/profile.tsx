@@ -836,7 +836,7 @@ export default function ProfileScreen() {
           <View style={styles.privacyRowLeft}>
             <Ionicons name="locate-outline" size={20} color={Colors.accent} style={{ marginRight: 10 }} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.privacyLabel}>Altera Precisione Posizione</Text>
+              <Text style={styles.privacyLabel}>Altera Posizione</Text>
               {positionFuzz && (
                 <Text style={styles.privacyWarning}>
                   {"⚠️ Attenzione! Se non volete far sapere precisamente dove siete, potete attivare questa opzione. Ricordatevi di disattivarla prima di un giro in compagnia!!"}
@@ -863,7 +863,7 @@ export default function ProfileScreen() {
         {positionFuzz && (
           <View style={styles.privacyKmRow}>
             <Ionicons name="resize-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 8 }} />
-            <Text style={styles.privacyKmLabel}>Sposta di:</Text>
+            <Text style={styles.privacyKmLabel}>Raggio d'incertezza:</Text>
             <TextInput
               style={styles.privacyKmInput}
               keyboardType="number-pad"
@@ -965,7 +965,7 @@ export default function ProfileScreen() {
 
             <View style={[styles.privacyKmRow, { marginTop: 12 }]}>
               <Ionicons name="radio-button-on-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 8 }} />
-              <Text style={styles.privacyKmLabel}>Raggio:</Text>
+              <Text style={styles.privacyKmLabel}>Ampiezza raggio attivazione:</Text>
               <TextInput
                 style={styles.privacyKmInput}
                 keyboardType="number-pad"
@@ -1672,7 +1672,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   privacyKmInput: {
-    width: 48,
+    minWidth: 64,
     height: 36,
     borderWidth: 1,
     borderColor: Colors.border,

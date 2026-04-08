@@ -376,6 +376,17 @@ export default function MapScreen() {
   });
   const isAvailable = (profileQuery.data as any)?.isAvailable || false;
   const isGhostMode = (profileQuery.data as any)?.ghostMode || false;
+  const fakeHomeEnabled = (profileQuery.data as any)?.fakeHomeEnabled || false;
+  const fakeHomeLat = (profileQuery.data as any)?.fakeHomeLatitude ?? null;
+  const fakeHomeLng = (profileQuery.data as any)?.fakeHomeLongitude ?? null;
+  const realMeMarker =
+    fakeHomeEnabled && fakeHomeLat != null && fakeHomeLng != null && location != null
+      ? { latitude: location.latitude, longitude: location.longitude }
+      : null;
+  const fakeMeMarker =
+    fakeHomeEnabled && fakeHomeLat != null && fakeHomeLng != null
+      ? { latitude: Number(fakeHomeLat), longitude: Number(fakeHomeLng) }
+      : null;
 
   const onlineListQuery = useQuery<any[]>({
     queryKey: ["/api/users/online-list", location?.latitude, location?.longitude, showOfflineOnline, countriesQueryParam],
@@ -740,6 +751,8 @@ export default function MapScreen() {
             onEasterEggPress={handleEasterEggPress}
             onReady={() => setMapReady(true)}
             currentUserId={user?.id ?? null}
+            realMeMarker={realMeMarker}
+            fakeMeMarker={fakeMeMarker}
           />
         ) : (
           <View style={styles.mapPlaceholder}>
@@ -772,6 +785,8 @@ export default function MapScreen() {
             onUserPress={handleUserPress}
             onEasterEggPress={handleEasterEggPress}
             currentUserId={user?.id ?? null}
+            realMeMarker={realMeMarker}
+            fakeMeMarker={fakeMeMarker}
           />
           ) : (
             <View style={styles.mapPlaceholder}>
