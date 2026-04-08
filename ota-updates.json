@@ -433,6 +433,27 @@
     "status": "published"
   },
   {
+    "updateNumber": 23,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-08",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-23: La mia privacy (nascondi mappa + fuzz + Fake Home Position) + fix mercatino + admin sistema",
+    "note": "Task #430: Admin sezione Sistema, fix uptime widget, rimozione card Metro, riordino chip mappa. Task #431: 'La mia privacy' — toggle nascondi mappa + altera posizione (fuzz km). Task #432: dedup annunci mercatino (Set ID già visti). Task #433: fix placeholder ricerca club. Task #435: spostata sezione privacy dopo il Garage nel profilo. Task #434: Fake Home Position — quando si è vicini a casa, la posizione visibile viene sostituita con una fittizia (GPS/map picker, raggio km configurabile).",
+    "updateGroupId": "e3a5c75d-98da-4daa-8e0a-6bd22751b356",
+    "androidUpdateId": "019d6e72-a760-7123-b7b3-ba0f6f9db92f",
+    "iosUpdateId": null,
+    "commitBase": "d73c0f427b2c1dc12c72ecbf614db7eaeb934907",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/e3a5c75d-98da-4daa-8e0a-6bd22751b356",
+    "apkBuildId": null,
+    "apkVersionCode": 6,
+    "apkUrl": null,
+    "status": "published"
+  },
+  {
     "updateNumber": 22,
     "cycle": "2.x",
     "channel": "preview",
