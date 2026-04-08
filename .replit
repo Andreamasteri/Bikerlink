@@ -136,12 +136,12 @@ outputType = "console"
 name = "ota-guard"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "OTA_GUARD_PASSWORD=$BIKERLINK_ADMIN_PASSWORD bash scripts/validate-ota.sh"
-
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/validate-ota.sh"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
