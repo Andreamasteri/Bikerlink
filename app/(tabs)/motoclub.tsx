@@ -320,31 +320,9 @@ export default function MotoclubScreen() {
   });
   const hasPendingRequest = creationStatus?.status === "pending";
 
-  const { data: marketplaceMotos = {}, refetch: refetchMarket } = useQuery<Record<string, MarketplaceMoto[]>>({
-    queryKey: ["/api/motoclubs/marketplace-all", myClubs.map(c => c.id).join(",")],
-    queryFn: async () => {
-      if (!myClubs.length) return {};
-      const raw: Record<string, MarketplaceMoto[]> = {};
-      await Promise.all(
-        myClubs.map(async (club) => {
-          try {
-            const res = await apiRequest("GET", `/api/motoclubs/${club.id}/marketplace`);
-            const data = await res.json();
-            if (data.length > 0) raw[club.id] = data;
-          } catch {}
-        })
-      );
-      const seenIds = new Set<string>();
-      const results: Record<string, MarketplaceMoto[]> = {};
-      for (const club of myClubs) {
-        if (!raw[club.id]) continue;
-        const deduped = raw[club.id].filter((m) => !seenIds.has(m.id));
-        deduped.forEach((m) => seenIds.add(m.id));
-        if (deduped.length > 0) results[club.id] = deduped;
-      }
-      return results;
-    },
-    enabled: marketplaceEnabled && myClubs.length > 0 && tab === "market",
+  const { data: marketplaceMotos = [], refetch: refetchMarket } = useQuery<MarketplaceMoto[]>({
+    queryKey: ["/api/motoclubs/marketplace"],
+    enabled: marketplaceEnabled && tab === "market",
   });
 
   const pendingInvites = invites.filter((i) => i.status === "pending");
@@ -680,18 +658,17 @@ function MarketplaceTab({
   bottomInset,
 }: {
   myClubs: UserClub[];
-  marketplaceMotos: Record<string, MarketplaceMoto[]>;
+  marketplaceMotos: MarketplaceMoto[];
   onRefresh: () => void;
   bottomInset: number;
 }) {
   const router = useRouter();
-  const clubsWithMotos = myClubs.filter((c) => (marketplaceMotos[c.id] || []).length > 0);
-  const totalMotos = Object.values(marketplaceMotos).reduce((sum, arr) => sum + arr.length, 0);
+  const totalMotos = marketplaceMotos.length;
 
   return (
     <FlatList
-      data={clubsWithMotos}
-      keyExtractor={(c) => c.id}
+      data={marketplaceMotos}
+      keyExtractor={(m) => m.id}
       contentContainerStyle={{ padding: 16, paddingBottom: 32 + bottomInset }}
       refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} tintColor={Colors.accent} />}
       ListHeaderComponent={
@@ -714,46 +691,34 @@ function MarketplaceTab({
           </Text>
         </View>
       }
-      renderItem={({ item: club }) => {
-        const motos = marketplaceMotos[club.id] || [];
-        return (
-          <View style={{ marginBottom: 20 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <Ionicons name="shield-checkmark" size={16} color={Colors.accent} />
-              <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.accent }}>{club.name}</Text>
+      renderItem={({ item: moto }) => (
+        <TouchableOpacity
+          style={styles.marketCard}
+          activeOpacity={0.7}
+          onPress={() => router.push(`/profile/${moto.seller.id}`)}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.surfaceLight, alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name="bicycle" size={20} color="#FF9800" />
             </View>
-            {motos.map((moto) => (
-              <TouchableOpacity
-                key={moto.id}
-                style={styles.marketCard}
-                activeOpacity={0.7}
-                onPress={() => router.push(`/profile/${moto.seller.id}`)}
-              >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.surfaceLight, alignItems: "center", justifyContent: "center" }}>
-                    <Ionicons name="bicycle" size={20} color="#FF9800" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.text }}>
-                      {moto.brand} {moto.model}
-                      {moto.displacement ? ` (${moto.displacement}cc)` : ""}
-                    </Text>
-                    <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 }}>
-                      di {moto.seller.nickname}
-                    </Text>
-                    {!!moto.saleDescription && (
-                      <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic", marginTop: 4 }} numberOfLines={2}>
-                        {moto.saleDescription}
-                      </Text>
-                    )}
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
-                </View>
-              </TouchableOpacity>
-            ))}
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.text }}>
+                {moto.brand} {moto.model}
+                {moto.displacement ? ` (${moto.displacement}cc)` : ""}
+              </Text>
+              <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 }}>
+                di {moto.seller.nickname}
+              </Text>
+              {!!moto.saleDescription && (
+                <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic", marginTop: 4 }} numberOfLines={2}>
+                  {moto.saleDescription}
+                </Text>
+              )}
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
           </View>
-        );
-      }}
+        </TouchableOpacity>
+      )}
     />
   );
 }
