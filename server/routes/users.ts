@@ -353,16 +353,32 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
     }
     if (typeof fakeHomeEnabled === "boolean") updateData.fakeHomeEnabled = fakeHomeEnabled;
     if (homeLatitude !== undefined) {
-      updateData.homeLatitude = homeLatitude === null ? null : Number(homeLatitude);
+      if (homeLatitude !== null) {
+        const lat = Number(homeLatitude);
+        if (!Number.isFinite(lat) || lat < -90 || lat > 90) return res.status(400).json({ message: "homeLatitude non valida (range -90/+90)" });
+        updateData.homeLatitude = lat;
+      } else { updateData.homeLatitude = null; }
     }
     if (homeLongitude !== undefined) {
-      updateData.homeLongitude = homeLongitude === null ? null : Number(homeLongitude);
+      if (homeLongitude !== null) {
+        const lng = Number(homeLongitude);
+        if (!Number.isFinite(lng) || lng < -180 || lng > 180) return res.status(400).json({ message: "homeLongitude non valida (range -180/+180)" });
+        updateData.homeLongitude = lng;
+      } else { updateData.homeLongitude = null; }
     }
     if (fakeHomeLatitude !== undefined) {
-      updateData.fakeHomeLatitude = fakeHomeLatitude === null ? null : Number(fakeHomeLatitude);
+      if (fakeHomeLatitude !== null) {
+        const lat = Number(fakeHomeLatitude);
+        if (!Number.isFinite(lat) || lat < -90 || lat > 90) return res.status(400).json({ message: "fakeHomeLatitude non valida (range -90/+90)" });
+        updateData.fakeHomeLatitude = lat;
+      } else { updateData.fakeHomeLatitude = null; }
     }
     if (fakeHomeLongitude !== undefined) {
-      updateData.fakeHomeLongitude = fakeHomeLongitude === null ? null : Number(fakeHomeLongitude);
+      if (fakeHomeLongitude !== null) {
+        const lng = Number(fakeHomeLongitude);
+        if (!Number.isFinite(lng) || lng < -180 || lng > 180) return res.status(400).json({ message: "fakeHomeLongitude non valida (range -180/+180)" });
+        updateData.fakeHomeLongitude = lng;
+      } else { updateData.fakeHomeLongitude = null; }
     }
     if (fakeHomeRadius !== undefined) {
       const r = Number(fakeHomeRadius);
