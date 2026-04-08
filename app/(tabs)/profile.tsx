@@ -974,12 +974,15 @@ export default function ProfileScreen() {
         </Pressable>
       </Modal>
 
-      <Text style={{ textAlign: "center", fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.success, marginTop: 16, marginBottom: 8 }}>
+      <Text style={{ textAlign: "center", fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.success, marginTop: 16, marginBottom: 4 }}>
         {currentOtaEntry
           ? `OTA-${currentOtaEntry.updateNumber}`
           : latestOta
           ? `OTA-${latestOta.updateNumber}`
           : "OTA"}
+      </Text>
+      <Text style={{ textAlign: "center", fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.muted, marginBottom: 8 }}>
+        {((currentOtaEntry?.commitBase ?? latestOta?.commitBase ?? "").substring(0, 7)) || "—"}
       </Text>
       <View style={{ height: 40 }} />
     </ScrollView>
