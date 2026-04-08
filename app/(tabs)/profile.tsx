@@ -981,8 +981,11 @@ export default function ProfileScreen() {
           ? `OTA-${latestOta.updateNumber}`
           : "OTA"}
       </Text>
-      <Text style={{ textAlign: "center", fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.muted, marginBottom: 8 }}>
+      <Text style={{ textAlign: "center", fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.muted, marginBottom: 2 }}>
         {((currentOtaEntry?.commitBase ?? latestOta?.commitBase ?? "").substring(0, 7)) || "—"}
+      </Text>
+      <Text style={{ textAlign: "center", fontSize: 10, fontFamily: "Inter_400Regular", color: Colors.muted, marginBottom: 8, opacity: 0.6 }}>
+        {Updates.updateId ? `eid:${Updates.updateId.substring(0, 8)}` : "embedded"}
       </Text>
       <View style={{ height: 40 }} />
     </ScrollView>

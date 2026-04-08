@@ -11,6 +11,7 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
 import { Platform, AppState, ActivityIndicator, View, StyleSheet } from "react-native";
 import * as Location from "expo-location";
+import * as Updates from "expo-updates";
 
 if (Platform.OS === "web" && typeof window !== "undefined") {
   const link = document.createElement("link");
@@ -148,11 +149,10 @@ function OtaStartupChecker() {
     if (__DEV__ || Platform.OS === "web") return;
     const timer = setTimeout(async () => {
       try {
-        const mod = await import("expo-updates");
-        const check = await mod.checkForUpdateAsync();
+        const check = await Updates.checkForUpdateAsync();
         if (!check.isAvailable) return;
-        await mod.fetchUpdateAsync();
-        await mod.reloadAsync();
+        await Updates.fetchUpdateAsync();
+        await Updates.reloadAsync();
       } catch {
         // silent fail — EAS non raggiungibile o runtime mismatch
       }
