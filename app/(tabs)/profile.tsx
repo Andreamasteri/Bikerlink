@@ -142,7 +142,7 @@ export default function ProfileScreen() {
   const currentUpdateId = Updates.updateId ?? null;
   const currentOtaEntry = allOtaUpdates.find(e => e.androidUpdateId === currentUpdateId) ?? null;
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-  const CURRENT_OTA_NUMBER = 21;
+  const CURRENT_OTA_NUMBER = 22;
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
