@@ -559,22 +559,26 @@ export default function ProfileScreen() {
   const isBikerOrCoppia = currentUserType === "biker" || currentUserType === "coppia";
 
   const pickCoordFromGPS = async (target: "home" | "fake") => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permesso negato", "Concedi l'accesso alla posizione nelle impostazioni dell'app.");
-      return;
-    }
-    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-    const lat = loc.coords.latitude;
-    const lng = loc.coords.longitude;
-    if (target === "home") {
-      setHomeLatitude(lat);
-      setHomeLongitude(lng);
-      privacyMutation.mutate({ homeLatitude: lat, homeLongitude: lng });
-    } else {
-      setFakeHomeLatitude(lat);
-      setFakeHomeLongitude(lng);
-      privacyMutation.mutate({ fakeHomeLatitude: lat, fakeHomeLongitude: lng });
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permesso negato", "Concedi l'accesso alla posizione nelle impostazioni dell'app.");
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const lat = loc.coords.latitude;
+      const lng = loc.coords.longitude;
+      if (target === "home") {
+        setHomeLatitude(lat);
+        setHomeLongitude(lng);
+        privacyMutation.mutate({ homeLatitude: lat, homeLongitude: lng });
+      } else {
+        setFakeHomeLatitude(lat);
+        setFakeHomeLongitude(lng);
+        privacyMutation.mutate({ fakeHomeLatitude: lat, fakeHomeLongitude: lng });
+      }
+    } catch (err) {
+      Alert.alert("Errore GPS", "Impossibile ottenere la posizione attuale. Riprova.");
     }
   };
 
