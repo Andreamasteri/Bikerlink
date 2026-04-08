@@ -144,7 +144,7 @@ function PlaylistBubble({ message, isOwn }: { message: ChatMessage; isOwn: boole
       </View>
       {!isOwn && (
         <TouchableOpacity
-          onPress={() => router.push("/(tabs)/music?tab=ricevute" as any)}
+          onPress={() => router.push({ pathname: "/(tabs)/music", params: { tab: "ricevute" } } as any)}
           style={{ marginTop: 8, backgroundColor: btnBg, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12, alignSelf: "flex-start" }}
         >
           <Text style={{ color: btnText, fontSize: 13, fontWeight: "600" }}>Vedi</Text>

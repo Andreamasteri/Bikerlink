@@ -23,7 +23,7 @@ import { apiRequest } from "@/lib/query-client";
 WebBrowser.maybeCompleteAuthSession();
 
 const SPOTIFY_GREEN = "#1DB954";
-const SCOPES = "user-top-read user-read-recently-played";
+const SCOPES = "user-top-read user-read-recently-played user-library-read";
 
 type Tab = "brani" | "match" | "ricevute";
 
@@ -96,6 +96,8 @@ export default function MusicScreen() {
   });
   const [matchCriteria, setMatchCriteria] = useState<string[]>(["songs", "genre"]);
   const [matchMaxKm, setMatchMaxKm] = useState<number>(100);
+  const [matchLogic, setMatchLogic] = useState<"tutti" | "almeno_uno">("almeno_uno");
+  const [minSongs, setMinSongs] = useState<number>(5);
 
   useEffect(() => {
     if (tabParam === "ricevute" || tabParam === "match" || tabParam === "brani") {
@@ -113,8 +115,8 @@ export default function MusicScreen() {
   });
 
   const matchQuery = useQuery<{ matches: MusicMatch[] }>({
-    queryKey: ["/api/spotify/match/music", matchCriteria.join(","), matchMaxKm],
-    enabled: activeTab === "match" && statusQuery.data?.connected === true,
+    queryKey: ["/api/spotify/match/music", matchCriteria.join(","), matchMaxKm, matchLogic, minSongs],
+    enabled: false,
   });
 
   const sharedPlaylistsQuery = useQuery<{ playlists: SharedPlaylistEntry[] }>({
@@ -212,6 +214,7 @@ export default function MusicScreen() {
 
   const isConnected = statusQuery.data?.connected === true;
   const isLoading = statusQuery.isLoading;
+  const isNotConfigured = !process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID || statusQuery.isError;
 
   if (isLoading) {
     return (
@@ -228,7 +231,7 @@ export default function MusicScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Ionicons name="musical-notes" size={24} color={SPOTIFY_GREEN} />
+          <Ionicons name="musical-notes" size={24} color={isNotConfigured ? Colors.textSecondary : SPOTIFY_GREEN} />
           <Text style={styles.headerTitle}>Musica</Text>
         </View>
         {isConnected && (
@@ -246,7 +249,13 @@ export default function MusicScreen() {
         )}
       </View>
 
-      {!isConnected ? (
+      {isNotConfigured ? (
+        <View style={styles.centered}>
+          <Ionicons name="musical-notes-outline" size={48} color={Colors.textSecondary} />
+          <Text style={[styles.connectTitle, { color: Colors.textSecondary }]}>Spotify non disponibile</Text>
+          <Text style={styles.connectDesc}>L'integrazione Spotify non è configurata in questo ambiente.</Text>
+        </View>
+      ) : !isConnected ? (
         <NotConnectedView onConnect={() => connectMutation.mutate()} isConnecting={connectMutation.isPending} />
       ) : (
         <>
@@ -286,11 +295,17 @@ export default function MusicScreen() {
           {activeTab === "match" && (
             <MatchTab
               matches={matchQuery.data?.matches ?? []}
-              isLoading={matchQuery.isLoading}
+              isFetching={matchQuery.isFetching}
+              hasData={matchQuery.data !== undefined}
               criteria={matchCriteria}
               onToggleCriteria={toggleCriteria}
               maxKm={matchMaxKm}
               onSetMaxKm={setMatchMaxKm}
+              matchLogic={matchLogic}
+              onSetMatchLogic={setMatchLogic}
+              minSongs={minSongs}
+              onSetMinSongs={setMinSongs}
+              onSearch={() => matchQuery.refetch()}
             />
           )}
           {activeTab === "ricevute" && (
@@ -332,10 +347,13 @@ function NotConnectedView({ onConnect, isConnecting }: { onConnect: () => void; 
 }
 
 function MyTracksTab({ data, isLoading }: { data?: MyTracksData; isLoading: boolean }) {
+  const [showAllTracks, setShowAllTracks] = useState(false);
   if (isLoading) return <LoadingView />;
   if (!data || data.tracks.length === 0) {
     return <EmptyView icon="musical-note" text="Nessun brano trovato. Premi aggiorna per sincronizzare." />;
   }
+  const LIMIT = 20;
+  const visibleTracks = showAllTracks ? data.tracks : data.tracks.slice(0, LIMIT);
 
   return (
     <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
@@ -363,8 +381,8 @@ function MyTracksTab({ data, isLoading }: { data?: MyTracksData; isLoading: bool
         </Section>
       )}
 
-      <Section title={`Tutti i Brani (${data.tracks.length})`}>
-        {data.tracks.slice(0, 30).map((track) => (
+      <Section title={`Brani (${data.tracks.length})`}>
+        {visibleTracks.map((track) => (
           <View key={track.id} style={styles.trackRow}>
             <View style={styles.trackInfo}>
               <Text style={styles.trackName} numberOfLines={1}>{track.trackName}</Text>
@@ -373,8 +391,12 @@ function MyTracksTab({ data, isLoading }: { data?: MyTracksData; isLoading: bool
             <Text style={styles.trackPop}>{track.popularity}%</Text>
           </View>
         ))}
-        {data.tracks.length > 30 && (
-          <Text style={styles.moreText}>+{data.tracks.length - 30} altri brani</Text>
+        {data.tracks.length > LIMIT && (
+          <TouchableOpacity onPress={() => setShowAllTracks((v) => !v)} style={{ paddingVertical: 10, alignItems: "center" }}>
+            <Text style={[styles.moreText, { color: Colors.accent }]}>
+              {showAllTracks ? "Mostra meno" : `Mostra altri ${data.tracks.length - LIMIT} brani`}
+            </Text>
+          </TouchableOpacity>
         )}
       </Section>
     </ScrollView>
@@ -383,71 +405,114 @@ function MyTracksTab({ data, isLoading }: { data?: MyTracksData; isLoading: bool
 
 function MatchTab({
   matches,
-  isLoading,
+  isFetching,
+  hasData,
   criteria,
   onToggleCriteria,
   maxKm,
   onSetMaxKm,
+  matchLogic,
+  onSetMatchLogic,
+  minSongs,
+  onSetMinSongs,
+  onSearch,
 }: {
   matches: MusicMatch[];
-  isLoading: boolean;
+  isFetching: boolean;
+  hasData: boolean;
   criteria: string[];
   onToggleCriteria: (c: string) => void;
   maxKm: number;
   onSetMaxKm: (km: number) => void;
+  matchLogic: "tutti" | "almeno_uno";
+  onSetMatchLogic: (v: "tutti" | "almeno_uno") => void;
+  minSongs: number;
+  onSetMinSongs: (v: number) => void;
+  onSearch: () => void;
 }) {
   const KM_OPTIONS = [50, 100, 300, 9999];
+  const MIN_SONGS_OPTIONS = [1, 3, 5, 10];
 
   return (
     <View style={styles.tabContent}>
-      {/* Filters */}
-      <View style={styles.filterBox}>
-        <Text style={styles.filterLabel}>Criteri di match</Text>
-        <View style={styles.filterRow}>
-          {[
-            { key: "songs", label: "Brani" },
-            { key: "genre", label: "Genere" },
-            { key: "artist", label: "Artista" },
-          ].map(({ key, label }) => (
-            <TouchableOpacity
-              key={key}
-              style={[styles.filterChip, criteria.includes(key) && styles.filterChipActive]}
-              onPress={() => onToggleCriteria(key)}
-            >
-              <Text style={[styles.filterChipText, criteria.includes(key) && styles.filterChipTextActive]}>
-                {label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
+        {/* Filters */}
+        <View style={styles.filterBox}>
+          <Text style={styles.filterLabel}>Criteri</Text>
+          <View style={styles.filterRow}>
+            {[
+              { key: "songs", label: "Brani" },
+              { key: "genre", label: "Genere" },
+              { key: "artist", label: "Artista" },
+            ].map(({ key, label }) => (
+              <TouchableOpacity
+                key={key}
+                style={[styles.filterChip, criteria.includes(key) && styles.filterChipActive]}
+                onPress={() => onToggleCriteria(key)}
+              >
+                <Text style={[styles.filterChipText, criteria.includes(key) && styles.filterChipTextActive]}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.filterLabel}>Logica</Text>
+          <View style={styles.filterRow}>
+            {(["tutti", "almeno_uno"] as const).map((logic) => (
+              <TouchableOpacity
+                key={logic}
+                style={[styles.filterChip, matchLogic === logic && styles.filterChipActive]}
+                onPress={() => onSetMatchLogic(logic)}
+              >
+                <Text style={[styles.filterChipText, matchLogic === logic && styles.filterChipTextActive]}>
+                  {logic === "tutti" ? "Tutti i criteri" : "Almeno uno"}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.filterLabel}>Brani in comune (min)</Text>
+          <View style={styles.filterRow}>
+            {MIN_SONGS_OPTIONS.map((n) => (
+              <TouchableOpacity
+                key={n}
+                style={[styles.filterChip, minSongs === n && styles.filterChipActive]}
+                onPress={() => onSetMinSongs(n)}
+              >
+                <Text style={[styles.filterChipText, minSongs === n && styles.filterChipTextActive]}>{n}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.filterLabel}>Raggio</Text>
+          <View style={styles.filterRow}>
+            {KM_OPTIONS.map((km) => (
+              <TouchableOpacity
+                key={km}
+                style={[styles.filterChip, maxKm === km && styles.filterChipActive]}
+                onPress={() => onSetMaxKm(km)}
+              >
+                <Text style={[styles.filterChipText, maxKm === km && styles.filterChipTextActive]}>
+                  {km >= 9999 ? "Ovunque" : `${km} km`}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TouchableOpacity style={styles.searchBtn} onPress={onSearch} disabled={isFetching}>
+            {isFetching ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={styles.searchBtnText}>Cerca</Text>
+            )}
+          </TouchableOpacity>
         </View>
-        <Text style={styles.filterLabel}>Raggio</Text>
-        <View style={styles.filterRow}>
-          {KM_OPTIONS.map((km) => (
-            <TouchableOpacity
-              key={km}
-              style={[styles.filterChip, maxKm === km && styles.filterChipActive]}
-              onPress={() => onSetMaxKm(km)}
-            >
-              <Text style={[styles.filterChipText, maxKm === km && styles.filterChipTextActive]}>
-                {km >= 9999 ? "Ovunque" : `${km} km`}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
 
-      {isLoading ? (
-        <LoadingView />
-      ) : matches.length === 0 ? (
-        <EmptyView icon="people" text="Nessun biker trovato con gusti simili. Prova a cambiare i filtri." />
-      ) : (
-        <FlatList
-          data={matches}
-          keyExtractor={(item) => item.user.id}
-          contentContainerStyle={{ paddingBottom: 100 }}
-          renderItem={({ item }) => <MatchCard match={item} />}
-        />
-      )}
+        {isFetching ? (
+          <LoadingView />
+        ) : !hasData ? null : matches.length === 0 ? (
+          <EmptyView icon="people" text="Nessun biker trovato con gusti simili. Prova a cambiare i filtri." />
+        ) : (
+          matches.map((item) => <MatchCard key={item.user.id} match={item} />)
+        )}
+      </ScrollView>
     </View>
   );
 }
@@ -494,6 +559,67 @@ function MatchCard({ match }: { match: MusicMatch }) {
   );
 }
 
+function SharedPlaylistCard({
+  item,
+  onMerge,
+  isMerging,
+}: {
+  item: SharedPlaylistEntry;
+  onMerge: (id: number) => void;
+  isMerging: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <View style={styles.playlistCard}>
+      <TouchableOpacity style={styles.playlistHeader} onPress={() => setExpanded((v) => !v)} activeOpacity={0.8}>
+        {item.fromUser.photos[0] ? (
+          <Image source={{ uri: item.fromUser.photos[0] }} style={styles.playlistAvatar} />
+        ) : (
+          <View style={[styles.playlistAvatar, styles.matchAvatarPlaceholder]}>
+            <Ionicons name="person" size={18} color={Colors.textSecondary} />
+          </View>
+        )}
+        <View style={styles.playlistMeta}>
+          <Text style={styles.playlistName}>{item.fromUser.nickname}</Text>
+          <Text style={styles.playlistSub}>{item.trackCount} brani · {formatDate(item.sharedAt)}</Text>
+        </View>
+        <Ionicons
+          name={expanded ? "chevron-up" : "chevron-down"}
+          size={18}
+          color={Colors.textSecondary}
+          style={{ marginRight: 8 }}
+        />
+        {item.mergedAt ? (
+          <View style={styles.mergedBadge}>
+            <Ionicons name="checkmark" size={14} color={SPOTIFY_GREEN} />
+            <Text style={styles.mergedText}>Aggiunta</Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.mergeBtn}
+            onPress={() => onMerge(item.id)}
+            disabled={isMerging}
+          >
+            <Text style={styles.mergeBtnText}>Aggiungi</Text>
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+      {expanded && (
+        <View style={{ paddingTop: 4 }}>
+          {item.tracks.map((track, i) => (
+            <View key={i} style={styles.previewTrack}>
+              <Ionicons name="musical-note" size={12} color={Colors.textSecondary} />
+              <Text style={styles.previewTrackText} numberOfLines={1}>
+                {track.trackName} — {track.artistName}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 function SharedPlaylistsTab({
   playlists,
   isLoading,
@@ -517,46 +643,7 @@ function SharedPlaylistsTab({
       style={{ flex: 1 }}
       contentContainerStyle={{ paddingBottom: 100, paddingTop: 10 }}
       renderItem={({ item }) => (
-        <View style={styles.playlistCard}>
-          <View style={styles.playlistHeader}>
-            {item.fromUser.photos[0] ? (
-              <Image source={{ uri: item.fromUser.photos[0] }} style={styles.playlistAvatar} />
-            ) : (
-              <View style={[styles.playlistAvatar, styles.matchAvatarPlaceholder]}>
-                <Ionicons name="person" size={18} color={Colors.textSecondary} />
-              </View>
-            )}
-            <View style={styles.playlistMeta}>
-              <Text style={styles.playlistName}>{item.fromUser.nickname}</Text>
-              <Text style={styles.playlistSub}>{item.trackCount} brani · {formatDate(item.sharedAt)}</Text>
-            </View>
-            {item.mergedAt ? (
-              <View style={styles.mergedBadge}>
-                <Ionicons name="checkmark" size={14} color={SPOTIFY_GREEN} />
-                <Text style={styles.mergedText}>Aggiunta</Text>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.mergeBtn}
-                onPress={() => onMerge(item.id)}
-                disabled={isMerging}
-              >
-                <Text style={styles.mergeBtnText}>Aggiungi</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          {item.tracks.slice(0, 3).map((track, i) => (
-            <View key={i} style={styles.previewTrack}>
-              <Ionicons name="musical-note" size={12} color={Colors.textSecondary} />
-              <Text style={styles.previewTrackText} numberOfLines={1}>
-                {track.trackName} — {track.artistName}
-              </Text>
-            </View>
-          ))}
-          {item.trackCount > 3 && (
-            <Text style={styles.moreText}>+{item.trackCount - 3} altri brani</Text>
-          )}
-        </View>
+        <SharedPlaylistCard item={item} onMerge={onMerge} isMerging={isMerging} />
       )}
     />
   );
@@ -948,6 +1035,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
     color: "#fff",
+  },
+  searchBtn: {
+    marginTop: 12,
+    backgroundColor: SPOTIFY_GREEN,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center" as const,
+  },
+  searchBtnText: {
+    color: "#fff",
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
   },
   previewTrack: {
     flexDirection: "row",
