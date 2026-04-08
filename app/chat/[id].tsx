@@ -27,6 +27,7 @@ interface MessageSender {
   nickname: string;
   avatarUrl: string | null;
   userType: string;
+  sex?: string | null;
 }
 
 interface ChatMessage {
@@ -41,7 +42,10 @@ interface ChatMessage {
   isFiltered: boolean;
   createdAt: string;
   sender: MessageSender | null;
+  playlistId?: number | null;
 }
+
+const SPOTIFY_GREEN = "#1DB954";
 
 interface ConversationDetail {
   id: string;
@@ -112,6 +116,31 @@ function TextWithHashtags({
   );
 }
 
+function PlaylistBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolean }) {
+  let nickname = "un utente";
+  let trackCount = 0;
+  try {
+    if (message.content) {
+      const parsed = JSON.parse(message.content);
+      if (parsed.nickname) nickname = parsed.nickname;
+      if (parsed.trackCount) trackCount = parsed.trackCount;
+    }
+  } catch {}
+  const textColor = isOwn ? "#fff" : Colors.text;
+  const subColor = isOwn ? "rgba(255,255,255,0.75)" : Colors.textSecondary;
+  return (
+    <View style={styles.locationContent}>
+      <Ionicons name="musical-notes" size={20} color={isOwn ? "#fff" : SPOTIFY_GREEN} style={{ marginRight: 6 }} />
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.messageText, { color: textColor, marginBottom: 1 }]}>
+          Playlist di {nickname}
+        </Text>
+        <Text style={{ fontSize: 12, color: subColor }}>{trackCount} brani · apri tab Musica</Text>
+      </View>
+    </View>
+  );
+}
+
 function MessageBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolean }) {
   const hasHashtag =
     message.messageType === "text" &&
@@ -126,7 +155,9 @@ function MessageBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolea
         </Text>
       )}
       <View style={[styles.bubble, isOwn ? styles.ownBubble : styles.otherBubble]}>
-        {message.messageType === "location" && message.latitude && message.longitude ? (
+        {message.messageType === "playlist" ? (
+          <PlaylistBubble message={message} isOwn={isOwn} />
+        ) : message.messageType === "location" && message.latitude && message.longitude ? (
           <View style={styles.locationContent}>
             <Ionicons name="location" size={18} color={isOwn ? "#fff" : Colors.accent} />
             <Text style={[styles.messageText, isOwn ? styles.ownText : styles.otherText]}>
@@ -247,6 +278,51 @@ export default function ChatConversationScreen() {
       router.back();
     },
   });
+
+  const { data: spotifyStatus } = useQuery<{ connected: boolean; trackCount?: number }>({
+    queryKey: ["/api/spotify/status"],
+    retry: false,
+  });
+
+  const sharePlaylistMutation = useMutation({
+    mutationFn: async ({ toUserId }: { toUserId: string }) => {
+      const res = await apiRequest("POST", "/api/spotify/share-playlist", {
+        toUserId,
+        conversationId: id,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", id, "messages"] });
+      Alert.alert("Playlist inviata", "La tua playlist è stata condivisa nella chat.");
+    },
+    onError: () => {
+      Alert.alert("Errore", "Impossibile condividere la playlist. Riprova.");
+    },
+  });
+
+  const otherParticipant = conversation?.participants.find((p) => p.id !== userId);
+  const isPrivateChat = !isMotoclub && conversation?.participants.length === 2;
+
+  const handleSharePlaylist = useCallback(() => {
+    if (!spotifyStatus?.connected) {
+      Alert.alert("Spotify non connesso", "Connetti prima Spotify nel tab Musica.");
+      return;
+    }
+    if (!isPrivateChat || !otherParticipant) return;
+    const trackCount = spotifyStatus.trackCount ?? 0;
+    Alert.alert(
+      "Condividi Playlist",
+      `Invia la tua playlist corrente (${trackCount} brani) a ${otherParticipant.nickname}?`,
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Invia",
+          onPress: () => sharePlaylistMutation.mutate({ toUserId: otherParticipant.id }),
+        },
+      ]
+    );
+  }, [spotifyStatus, isPrivateChat, otherParticipant, sharePlaylistMutation]);
 
   const handleDeleteConversation = useCallback(() => {
     Alert.alert(
@@ -510,6 +586,19 @@ export default function ChatConversationScreen() {
         <TouchableOpacity onPress={handleSendLocation} style={styles.iconButton}>
           <Ionicons name="location-outline" size={24} color={Colors.accent} />
         </TouchableOpacity>
+        {isPrivateChat && (
+          <TouchableOpacity
+            onPress={handleSharePlaylist}
+            style={styles.iconButton}
+            disabled={sharePlaylistMutation.isPending}
+          >
+            <Ionicons
+              name="musical-notes-outline"
+              size={24}
+              color={spotifyStatus?.connected ? SPOTIFY_GREEN : Colors.textSecondary}
+            />
+          </TouchableOpacity>
+        )}
         <View style={styles.inputWrapper}>
           <TextInput
             ref={textInputRef}
