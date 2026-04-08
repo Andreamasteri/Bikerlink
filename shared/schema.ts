@@ -4,6 +4,7 @@ import {
   text,
   varchar,
   integer,
+  serial,
   boolean,
   timestamp,
   doublePrecision,
@@ -252,6 +253,7 @@ export const messages = pgTable("messages", {
   longitude: doublePrecision("longitude"),
   isFiltered: boolean("is_filtered").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  playlistId: integer("playlist_id"),
 }, (table) => [
   index("messages_conversation_id_idx").on(table.conversationId),
   index("messages_sender_id_idx").on(table.senderId),
@@ -1067,3 +1069,69 @@ export const otaReleases = pgTable("ota_releases", {
 
 export type OtaRelease = typeof otaReleases.$inferSelect;
 export type InsertOtaRelease = typeof otaReleases.$inferInsert;
+
+export const userSpotifyTokens = pgTable("user_spotify_tokens", {
+  userId: varchar("user_id", { length: 36 })
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  spotifyUserId: varchar("spotify_user_id", { length: 200 }).notNull(),
+  displayName: varchar("display_name", { length: 200 }),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  connectedAt: timestamp("connected_at").notNull().defaultNow(),
+  lastSyncAt: timestamp("last_sync_at"),
+});
+
+export type UserSpotifyToken = typeof userSpotifyTokens.$inferSelect;
+export type InsertUserSpotifyToken = typeof userSpotifyTokens.$inferInsert;
+
+export const userMusicTracks = pgTable("user_music_tracks", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  spotifyTrackId: varchar("spotify_track_id", { length: 200 }).notNull(),
+  trackName: varchar("track_name", { length: 500 }).notNull(),
+  artistId: varchar("artist_id", { length: 200 }).notNull(),
+  artistName: varchar("artist_name", { length: 300 }).notNull(),
+  albumName: varchar("album_name", { length: 500 }),
+  genres: text("genres").array().default([]),
+  popularity: integer("popularity").default(0),
+  addedAt: timestamp("added_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("user_track_uniq").on(table.userId, table.spotifyTrackId),
+  index("user_music_tracks_user_idx").on(table.userId),
+]);
+
+export type UserMusicTrack = typeof userMusicTracks.$inferSelect;
+export type InsertUserMusicTrack = typeof userMusicTracks.$inferInsert;
+
+export const sharedPlaylists = pgTable("shared_playlists", {
+  id: serial("id").primaryKey(),
+  fromUserId: varchar("from_user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  toUserId: varchar("to_user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  conversationId: varchar("conversation_id", { length: 36 })
+    .references(() => conversations.id, { onDelete: "set null" }),
+  tracksData: jsonb("tracks_data").notNull().$type<Array<{
+    trackId: string;
+    trackName: string;
+    artistId: string;
+    artistName: string;
+    albumName?: string;
+    genres?: string[];
+  }>>(),
+  trackCount: integer("track_count").notNull(),
+  sharedAt: timestamp("shared_at").notNull().defaultNow(),
+  mergedAt: timestamp("merged_at"),
+}, (table) => [
+  index("shared_playlists_to_user_idx").on(table.toUserId),
+  index("shared_playlists_from_user_idx").on(table.fromUserId),
+]);
+
+export type SharedPlaylist = typeof sharedPlaylists.$inferSelect;
+export type InsertSharedPlaylist = typeof sharedPlaylists.$inferInsert;

@@ -53,6 +53,7 @@ BikerLink utilizes a modern full-stack architecture.
 - **Advertisement System**: Targeted ad delivery.
 - **User Types**: Biker, Zavorrina/Zavorrino, Coppia with distinct functionalities.
 - **Multilingual Support**: IT, EN, DE, ES, FR.
+- **Spotify Music Integration** (Task #440/#441): OAuth connection to Spotify, syncs user's top tracks and recently played songs. Music Match feature finds bikers with common music taste. Playlist sharing via chat messages. Backend: `server/routes/spotify.ts` (9 endpoints: callback, disconnect, sync, status, my-tracks, share-playlist, shared-playlists, merge-playlist, match/music). DB tables: `user_spotify_tokens` (AES-256-CBC encrypted tokens), `user_music_tracks`, `shared_playlists`. messages table has new `playlist_id` column. Requires Secrets: `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`. Redirect URIs to register: `bikerlink://spotify-callback` and `https://biker-link.replit.app/api/spotify/callback`.
 
 **Deployment & Operations:**
 - Development workflow includes separate commands for frontend and backend, with watchdog scripts for automatic restarts and error monitoring.

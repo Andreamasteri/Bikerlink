@@ -617,6 +617,69 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] user_profiles fake_home columns:", e);
         }
 
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS user_spotify_tokens (
+              user_id VARCHAR(36) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+              spotify_user_id VARCHAR(200) NOT NULL,
+              display_name VARCHAR(200),
+              access_token TEXT NOT NULL,
+              refresh_token TEXT NOT NULL,
+              expires_at TIMESTAMP NOT NULL,
+              connected_at TIMESTAMP NOT NULL DEFAULT NOW(),
+              last_sync_at TIMESTAMP
+            )
+          `);
+        } catch (e) {
+          console.warn("[MIGRATION] user_spotify_tokens:", e);
+        }
+
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS user_music_tracks (
+              id SERIAL PRIMARY KEY,
+              user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              spotify_track_id VARCHAR(200) NOT NULL,
+              track_name VARCHAR(500) NOT NULL,
+              artist_id VARCHAR(200) NOT NULL,
+              artist_name VARCHAR(300) NOT NULL,
+              album_name VARCHAR(500),
+              genres TEXT[] DEFAULT '{}',
+              popularity INTEGER DEFAULT 0,
+              added_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+          `);
+          await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS user_track_uniq ON user_music_tracks (user_id, spotify_track_id)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS user_music_tracks_user_idx ON user_music_tracks (user_id)`);
+        } catch (e) {
+          console.warn("[MIGRATION] user_music_tracks:", e);
+        }
+
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS shared_playlists (
+              id SERIAL PRIMARY KEY,
+              from_user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              to_user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              conversation_id VARCHAR(36) REFERENCES conversations(id) ON DELETE SET NULL,
+              tracks_data JSONB NOT NULL,
+              track_count INTEGER NOT NULL,
+              shared_at TIMESTAMP NOT NULL DEFAULT NOW(),
+              merged_at TIMESTAMP
+            )
+          `);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS shared_playlists_to_user_idx ON shared_playlists (to_user_id)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS shared_playlists_from_user_idx ON shared_playlists (from_user_id)`);
+        } catch (e) {
+          console.warn("[MIGRATION] shared_playlists:", e);
+        }
+
+        try {
+          await db.execute(sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS playlist_id INTEGER REFERENCES shared_playlists(id) ON DELETE SET NULL`);
+        } catch (e) {
+          console.warn("[MIGRATION] messages.playlist_id:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 
