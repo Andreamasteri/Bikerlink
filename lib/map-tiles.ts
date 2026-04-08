@@ -25,7 +25,7 @@ const TILE_CONFIGS: Record<MapProvider, TileConfig> = {
 };
 
 export const MAP_PROVIDER_LABELS: Record<MapProvider, string> = {
-  esri_gray: "Base Map",
+  esri_gray: "Mappa Base",
   carto_light: "Mappa Dettagliata Light & Dark",
   carto_dark: "FullMap",
 };

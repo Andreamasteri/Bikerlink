@@ -284,6 +284,7 @@ export default function ProfileScreen() {
   const [fakeHomeLatitude, setFakeHomeLatitude] = useState<number | null>(null);
   const [fakeHomeLongitude, setFakeHomeLongitude] = useState<number | null>(null);
   const [fakeHomeRadius, setFakeHomeRadius] = useState(2);
+  const [privacyExpanded, setPrivacyExpanded] = useState(false);
   const [mapPickerVisible, setMapPickerVisible] = useState(false);
   const [mapPickerTarget, setMapPickerTarget] = useState<"home" | "fake" | null>(null);
   const [mapPickerCoord, setMapPickerCoord] = useState<{ latitude: number; longitude: number }>({ latitude: 41.9, longitude: 12.5 });
@@ -838,8 +839,17 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>La mia privacy</Text>
+        <Pressable style={styles.accordionHeader} onPress={() => setPrivacyExpanded((v) => !v)}>
+          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>La mia privacy</Text>
+          <Ionicons
+            name={privacyExpanded ? "chevron-up" : "chevron-down"}
+            size={18}
+            color={Colors.textSecondary}
+          />
+        </Pressable>
 
+        {privacyExpanded && (
+        <>
         <View style={styles.privacyRow}>
           <View style={styles.privacyRowLeft}>
             <Ionicons name="eye-off-outline" size={20} color={Colors.accent} style={{ marginRight: 10 }} />
@@ -993,7 +1003,6 @@ export default function ProfileScreen() {
             </View>
 
             <View style={[styles.privacyKmRow, { marginTop: 12 }]}>
-              <Ionicons name="radio-button-on-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 8 }} />
               <Text style={styles.privacyKmLabel}>Ampiezza raggio attivazione:</Text>
               <TextInput
                 style={styles.privacyKmInput}
@@ -1017,6 +1026,7 @@ export default function ProfileScreen() {
             </View>
           </View>
         )}
+        </>)}
       </View>
 
       {currentUserType === "biker" && showSearchPref && (
@@ -1147,7 +1157,6 @@ export default function ProfileScreen() {
       )}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Menu</Text>
         <MenuItem icon="create" label="Modifica Profilo" onPress={() => router.push("/profile/edit" as any)} />
         <MenuItem icon="bug" label="Segnala un Bug" onPress={() => router.push("/feedback/bug" as any)} color={Colors.accentRed} />
         <MenuItem icon="bulb" label="Richiedi Funzione" onPress={() => router.push("/feedback/feature" as any)} color={Colors.accent} />
@@ -1409,6 +1418,12 @@ const styles = StyleSheet.create({
   section: {
     paddingHorizontal: 16,
     marginTop: 8,
+  },
+  accordionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -1811,7 +1826,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
