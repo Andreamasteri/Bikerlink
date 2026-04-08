@@ -57,7 +57,8 @@ if [ -z "$CURRENT_OTA" ]; then
 else
   LATEST_OTA=$(node -e "
     const data = JSON.parse(require('fs').readFileSync('ota-updates.json','utf8'));
-    const nums = data.map(e => typeof e.updateNumber === 'number' ? e.updateNumber : 0);
+    const nums = data.filter(e => typeof e.updateNumber === 'number').map(e => e.updateNumber);
+    if (nums.length === 0) { process.stderr.write('no numeric entries\n'); process.exit(1); }
     console.log(Math.max(...nums));
   " 2>/dev/null || echo "")
 
