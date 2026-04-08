@@ -177,8 +177,13 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
     }
 
     if (Object.keys(profileUpdate).length > 0) {
-      const existingProfile = await storage.getUserProfile(userId);
-      if (existingProfile) {
+      const existingProfileMe = await storage.getUserProfile(userId);
+      if (existingProfileMe?.positionFuzz && existingProfileMe.positionFuzzKm > 0 && profileUpdate.latitude != null && profileUpdate.longitude != null) {
+        const fuzzed = applyPositionFuzz(profileUpdate.latitude as number, profileUpdate.longitude as number, existingProfileMe.positionFuzzKm);
+        profileUpdate.latitude = fuzzed.lat;
+        profileUpdate.longitude = fuzzed.lng;
+      }
+      if (existingProfileMe) {
         await storage.updateUserProfile(userId, profileUpdate as any);
       } else {
         await storage.createUserProfile({ userId, ...profileUpdate } as any);
@@ -232,8 +237,17 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
     const existingProfile = await storage.getUserProfile(userId);
     const updateData: Record<string, unknown> = {};
     if (typeof isAvailable === "boolean") updateData.isAvailable = isAvailable;
-    if (latitude !== undefined) updateData.latitude = latitude;
-    if (longitude !== undefined) updateData.longitude = longitude;
+    if (latitude !== undefined || longitude !== undefined) {
+      let fLat = latitude;
+      let fLng = longitude;
+      if (existingProfile?.positionFuzz && existingProfile.positionFuzzKm > 0 && latitude != null && longitude != null) {
+        const fuzzed = applyPositionFuzz(latitude, longitude, existingProfile.positionFuzzKm);
+        fLat = fuzzed.lat;
+        fLng = fuzzed.lng;
+      }
+      if (latitude !== undefined) updateData.latitude = fLat;
+      if (longitude !== undefined) updateData.longitude = fLng;
+    }
     if (searchPreference !== undefined) updateData.searchPreference = searchPreference;
     const validMapStyles = ["carto_light", "carto_dark", "esri_gray"];
     if (preferredMapStyle !== undefined) {
@@ -299,9 +313,9 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
     if (typeof hideFromMap === "boolean") updateData.hideFromMap = hideFromMap;
     if (typeof positionFuzz === "boolean") updateData.positionFuzz = positionFuzz;
     if (positionFuzzKm !== undefined) {
-      const km = Math.round(Number(positionFuzzKm));
-      if (isNaN(km) || km < 1 || km > 50) {
-        return res.status(400).json({ message: "positionFuzzKm deve essere tra 1 e 50" });
+      const km = Number(positionFuzzKm);
+      if (!Number.isInteger(km) || km < 1 || km > 50) {
+        return res.status(400).json({ message: "positionFuzzKm deve essere un intero tra 1 e 50" });
       }
       updateData.positionFuzzKm = km;
     }
