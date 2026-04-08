@@ -568,10 +568,12 @@ function LoadingView() {
   );
 }
 
-function EmptyView({ icon, text }: { icon: string; text: string }) {
+type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
+
+function EmptyView({ icon, text }: { icon: IoniconsName; text: string }) {
   return (
     <View style={styles.centered}>
-      <Ionicons name={icon as any} size={40} color={Colors.textSecondary} />
+      <Ionicons name={icon} size={40} color={Colors.textSecondary} />
       <Text style={styles.emptyText}>{text}</Text>
     </View>
   );

@@ -29,7 +29,7 @@ import customRoutesRouter from "./routes/custom-routes";
 import sosRoutes from "./routes/sos";
 import motoclubsRoutes from "./routes/motoclubs";
 import friendsRoutes from "./routes/friends";
-import spotifyRoutes from "./routes/spotify";
+import spotifyRoutes, { handleMusicMatch } from "./routes/spotify";
 import { triggerMatchingRun, triggerMatchingForUser } from "./matching-engine";
 import { db } from "./db";
 import { users } from "@shared/schema";
@@ -125,6 +125,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/motoclubs", motoclubsRoutes);
   app.use("/api/friends", friendsRoutes);
   app.use("/api/spotify", spotifyRoutes);
+  app.get("/api/match/music", (req: Request, res: Response) => {
+    if (!req.session?.userId) return res.status(401).json({ message: "Non autenticato" });
+    if (!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET)) {
+      return res.status(503).json({ message: "Spotify non configurato. Contatta l'amministratore." });
+    }
+    return handleMusicMatch(req, res);
+  });
 
   app.get("/api/updates/check", async (_req: Request, res: Response) => {
     try {

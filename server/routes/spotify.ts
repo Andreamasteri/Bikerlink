@@ -8,6 +8,7 @@ import {
   sharedPlaylists,
   users,
   messages,
+  conversationParticipants,
 } from "@shared/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 
@@ -23,6 +24,13 @@ function requireAuth(req: Request, res: Response, next: () => void) {
 function isSpotifyConfigured(): boolean {
   return !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET);
 }
+
+router.use((_req: Request, res: Response, next: () => void) => {
+  if (!isSpotifyConfigured()) {
+    return res.status(503).json({ message: "Spotify non configurato. Contatta l'amministratore." });
+  }
+  next();
+});
 
 function checkSpotifyConfig(res: Response): boolean {
   if (!isSpotifyConfigured()) {
@@ -433,6 +441,19 @@ router.post("/share-playlist", requireAuth, async (req: Request, res: Response) 
     let messageId: string | undefined;
 
     if (conversationId && newPlaylist) {
+      const participants = await db
+        .select({ userId: conversationParticipants.userId })
+        .from(conversationParticipants)
+        .where(eq(conversationParticipants.conversationId, conversationId));
+
+      const participantIds = participants.map((p) => p.userId);
+      if (!participantIds.includes(userId)) {
+        return res.status(403).json({ message: "Non sei un partecipante di questa conversazione" });
+      }
+      if (!participantIds.includes(toUserId)) {
+        return res.status(403).json({ message: "Il destinatario non è un partecipante di questa conversazione" });
+      }
+
       const me = await storage.getUser(userId);
       const [newMsg] = await db
         .insert(messages)
@@ -557,7 +578,7 @@ router.post("/merge-playlist/:playlistId", requireAuth, async (req: Request, res
   }
 });
 
-router.get("/match/music", requireAuth, async (req: Request, res: Response) => {
+export async function handleMusicMatch(req: Request, res: Response) {
   try {
     const userId = req.session.userId!;
     const criteriaParam = (req.query.criteria as string) ?? "songs";
@@ -690,6 +711,8 @@ router.get("/match/music", requireAuth, async (req: Request, res: Response) => {
     console.error("[Spotify] match/music error:", error);
     return res.status(500).json({ message: "Errore durante il calcolo dei match musicali" });
   }
-});
+}
+
+router.get("/match/music", requireAuth, handleMusicMatch);
 
 export default router;

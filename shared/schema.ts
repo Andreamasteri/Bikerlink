@@ -253,7 +253,7 @@ export const messages = pgTable("messages", {
   longitude: doublePrecision("longitude"),
   isFiltered: boolean("is_filtered").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  playlistId: integer("playlist_id"),
+  playlistId: integer("playlist_id").references(() => sharedPlaylists.id, { onDelete: "set null" }),
 }, (table) => [
   index("messages_conversation_id_idx").on(table.conversationId),
   index("messages_sender_id_idx").on(table.senderId),
