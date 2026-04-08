@@ -1446,12 +1446,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async countAvailableBikers(countries?: string[]): Promise<number> {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const conditions: any[] = [
       eq(users.status, "active"),
       eq(userProfiles.isAvailable, true),
       or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
       eq(users.ghostMode, false),
       notInArray(users.role, ["admin", "moderator", "moderatore"]),
+      gte(users.lastLoginAt, fifteenMinutesAgo),
     ];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const result = await db.select({ count: sql<number>`count(*)::int` })
@@ -1462,12 +1464,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async countAvailableZavorrine(countries?: string[]): Promise<number> {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const conditions: any[] = [
       eq(users.status, "active"),
       eq(userProfiles.isAvailable, true),
       eq(users.userType, "zavorrina"),
       eq(users.ghostMode, false),
       notInArray(users.role, ["admin", "moderator", "moderatore"]),
+      gte(users.lastLoginAt, fifteenMinutesAgo),
     ];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const result = await db.select({ count: sql<number>`count(*)::int` })
@@ -1478,6 +1482,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAvailableBikersList(lat?: number, lng?: number, countries?: string[]): Promise<any[]> {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
@@ -1487,6 +1492,7 @@ export class DatabaseStorage implements IStorage {
       or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
       eq(users.ghostMode, false),
       notInArray(users.role, ["admin", "moderator", "moderatore"]),
+      gte(users.lastLoginAt, fifteenMinutesAgo),
     ];
     if (countries && countries.length > 0) {
       conditions.push(inArray(users.country, countries));
@@ -1500,6 +1506,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAvailableZavorrinaList(lat?: number, lng?: number, countries?: string[]): Promise<any[]> {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
@@ -1509,6 +1516,7 @@ export class DatabaseStorage implements IStorage {
       eq(users.userType, "zavorrina"),
       eq(users.ghostMode, false),
       notInArray(users.role, ["admin", "moderator", "moderatore"]),
+      gte(users.lastLoginAt, fifteenMinutesAgo),
     ];
     if (countries && countries.length > 0) {
       conditions.push(inArray(users.country, countries));
