@@ -347,5 +347,26 @@
     "apkVersionCode": 6,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 18,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-08",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-18: commit ID verde corpo 12 nel profilo",
+    "note": "Commit ID nel profilo: colore verde (Colors.success), fontSize 12. L'eid rimane muted/10pt.",
+    "updateGroupId": "417b476d-25c0-4bbe-8f71-c68f4af84417",
+    "androidUpdateId": "019d6cad-ecd5-7ebb-b66b-9b58967bebbe",
+    "iosUpdateId": null,
+    "commitBase": "7d10b399e95a25ffeaf11880f40400009e2e4086",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/417b476d-25c0-4bbe-8f71-c68f4af84417",
+    "apkBuildId": null,
+    "apkVersionCode": 6,
+    "apkUrl": null,
+    "status": "published"
   }
 ]
