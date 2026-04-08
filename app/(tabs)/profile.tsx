@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -150,6 +150,13 @@ export default function ProfileScreen() {
   });
 
   const profile = profileQuery.data;
+  const [failedPhotos, setFailedPhotos] = useState<Set<string>>(new Set());
+
+  // Clear failed photo state when query is refetched so transient errors don't persist
+  useEffect(() => {
+    setFailedPhotos(new Set());
+  }, [profileQuery.dataUpdatedAt]);
+
   const currentUserType = profile?.userType ?? user?.userType ?? "biker";
   const currentSex = profile?.sex ?? (user as any)?.sex;
   const currentCoupleSexConfig = profile?.coupleSexConfig ?? (user as any)?.coupleSexConfig;
@@ -247,7 +254,6 @@ export default function ProfileScreen() {
   });
 
   const [replacingSlot, setReplacingSlot] = useState<string | null>(null);
-  const [failedPhotos, setFailedPhotos] = useState<Set<string>>(new Set());
 
   const pickImageForSlot = useCallback((existingPhotoId?: string) => {
     showImagePickerMenu(

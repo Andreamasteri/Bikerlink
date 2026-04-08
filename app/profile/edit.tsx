@@ -76,6 +76,12 @@ export default function EditProfileScreen() {
   });
 
   const profile = profileQuery.data;
+  const [failedPhotos, setFailedPhotos] = useState<Set<string>>(new Set());
+
+  // Clear failed photo state when query is refetched so transient errors don't persist
+  useEffect(() => {
+    setFailedPhotos(new Set());
+  }, [profileQuery.dataUpdatedAt]);
 
   const [nickname, setNickname] = useState("");
   const [country, setCountry] = useState("");
@@ -95,7 +101,6 @@ export default function EditProfileScreen() {
   const [ridingStyle, setRidingStyle] = useState("");
 
   const [replacingSlot, setReplacingSlot] = useState<string | null>(null);
-  const [failedPhotos, setFailedPhotos] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (profile) {
