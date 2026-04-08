@@ -6,6 +6,7 @@ import { registerSchema, loginSchema } from "@shared/schema";
 import { storage } from "../storage";
 import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetConfirmationEmail, sendInvitationGiftEmail } from "../email";
 import { createClubInvitesForMoto, createRegionalClubInvite } from "./motoclubs";
+import { onlineTracker } from "../online-tracker";
 
 declare module "express-session" {
   interface SessionData {
@@ -256,6 +257,13 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       req.session.save((err) => { if (err) reject(err); else resolve(); });
     });
 
+    onlineTracker.setOnline(user.id, {
+      userType: userRecord?.userType ?? user.userType ?? "biker",
+      isAvailable: !(userRecord?.ghostMode ?? false),
+      ghostMode: userRecord?.ghostMode ?? false,
+      country: userRecord?.country ?? user.country ?? null,
+    });
+
     const { password: _, ...safeUser } = userRecord ?? user;
     return res.json(safeUser);
   } catch (error) {
@@ -265,10 +273,12 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
 });
 
 router.post("/logout", (req: Request, res: Response) => {
+  const userId = req.session?.userId;
   req.session.destroy((err) => {
     if (err) {
       return res.status(500).json({ message: "Errore durante il logout" });
     }
+    if (userId) onlineTracker.setOffline(userId);
     res.clearCookie("connect.sid");
     return res.json({ message: "Logout effettuato" });
   });
@@ -517,6 +527,7 @@ router.post("/heartbeat", async (req: Request, res: Response) => {
     const userId = req.session?.userId;
     if (!userId) return res.status(401).json({ ok: false });
     await storage.updateUser(userId, { lastLoginAt: new Date() } as any);
+    onlineTracker.touch(userId);
     return res.json({ ok: true });
   } catch {
     return res.status(500).json({ ok: false });

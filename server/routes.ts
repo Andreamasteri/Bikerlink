@@ -33,6 +33,7 @@ import { triggerMatchingRun, triggerMatchingForUser } from "./matching-engine";
 import { db } from "./db";
 import { users } from "@shared/schema";
 import { ilike } from "drizzle-orm";
+import { onlineTracker } from "./online-tracker";
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   const session = (req as any).session as { userId?: string };
@@ -73,12 +74,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use(async (req: any, _res: any, next: any) => {
     if (req.session?.userId) {
+      const userId: string = req.session.userId;
+      const foundInTracker = onlineTracker.touch(userId);
       try {
-        const user = await storage.getUser(req.session.userId);
-        if (user && user.lastLoginAt) {
-          const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
-          if (new Date(user.lastLoginAt) < fiveMinAgo) {
-            await storage.updateUser(req.session.userId, { lastLoginAt: new Date() } as any);
+        const user = await storage.getUser(userId);
+        if (user && user.status === "active") {
+          if (!foundInTracker) {
+            const profile = await storage.getUserProfile(userId).catch(() => null);
+            onlineTracker.setOnline(userId, {
+              userType: user.userType ?? "biker",
+              isAvailable: (profile?.isAvailable ?? false) && !(user.ghostMode ?? false),
+              ghostMode: user.ghostMode ?? false,
+              country: user.country ?? null,
+            });
+          }
+          if (user.lastLoginAt) {
+            const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+            if (new Date(user.lastLoginAt) < fiveMinAgo) {
+              await storage.updateUser(userId, { lastLoginAt: new Date() } as any);
+            }
           }
         }
       } catch {}

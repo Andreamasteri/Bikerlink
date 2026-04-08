@@ -281,8 +281,8 @@ export interface IStorage {
 
   countAvailableBikers(countries?: string[]): Promise<number>;
   countAvailableZavorrine(countries?: string[]): Promise<number>;
-  getAvailableBikersList(lat?: number, lng?: number, countries?: string[]): Promise<any[]>;
-  getAvailableZavorrinaList(lat?: number, lng?: number, countries?: string[]): Promise<any[]>;
+  getAvailableBikersList(lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<any[]>;
+  getAvailableZavorrinaList(lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<any[]>;
 
   getMotorcyclePhotos(motorcycleId: string): Promise<MotorcyclePhoto[]>;
   addMotorcyclePhoto(data: InsertMotorcyclePhoto): Promise<MotorcyclePhoto>;
@@ -1081,11 +1081,16 @@ export class DatabaseStorage implements IStorage {
     return result[0]?.count ?? 0;
   }
 
-  async getOnlineUsersList(since: Date, lat?: number, lng?: number, countries?: string[]): Promise<any[]> {
+  async getOnlineUsersList(since: Date, lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<any[]> {
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
-    const conditions: any[] = [eq(users.status, "active"), gte(users.lastLoginAt, since), eq(users.ghostMode, false), notInArray(users.role, ["admin", "moderator", "moderatore"])];
+    const conditions: any[] = [eq(users.status, "active"), eq(users.ghostMode, false), notInArray(users.role, ["admin", "moderator", "moderatore"])];
+    if (onlineIds && onlineIds.length > 0) {
+      conditions.push(inArray(users.id, onlineIds));
+    } else if (!onlineIds) {
+      conditions.push(gte(users.lastLoginAt, since));
+    }
     if (countries && countries.length > 0) {
       conditions.push(inArray(users.country, countries));
     }
@@ -1481,8 +1486,7 @@ export class DatabaseStorage implements IStorage {
     return result[0]?.count ?? 0;
   }
 
-  async getAvailableBikersList(lat?: number, lng?: number, countries?: string[]): Promise<any[]> {
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+  async getAvailableBikersList(lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<any[]> {
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
@@ -1492,8 +1496,10 @@ export class DatabaseStorage implements IStorage {
       or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
       eq(users.ghostMode, false),
       notInArray(users.role, ["admin", "moderator", "moderatore"]),
-      gte(users.lastLoginAt, fifteenMinutesAgo),
     ];
+    if (onlineIds && onlineIds.length > 0) {
+      conditions.push(inArray(users.id, onlineIds));
+    }
     if (countries && countries.length > 0) {
       conditions.push(inArray(users.country, countries));
     }
@@ -1505,8 +1511,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(sql`distance`);
   }
 
-  async getAvailableZavorrinaList(lat?: number, lng?: number, countries?: string[]): Promise<any[]> {
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+  async getAvailableZavorrinaList(lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<any[]> {
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
@@ -1516,8 +1521,10 @@ export class DatabaseStorage implements IStorage {
       eq(users.userType, "zavorrina"),
       eq(users.ghostMode, false),
       notInArray(users.role, ["admin", "moderator", "moderatore"]),
-      gte(users.lastLoginAt, fifteenMinutesAgo),
     ];
+    if (onlineIds && onlineIds.length > 0) {
+      conditions.push(inArray(users.id, onlineIds));
+    }
     if (countries && countries.length > 0) {
       conditions.push(inArray(users.country, countries));
     }

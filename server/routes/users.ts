@@ -7,6 +7,7 @@ import { isProtectedUser } from "../constants";
 import { createRegionalClubInvite } from "./motoclubs";
 import type { InsertReport } from "@shared/schema";
 import { uploadBuffer, downloadBuffer, deleteObject } from "../objectStorage";
+import { onlineTracker } from "../online-tracker";
 
 const router = Router();
 
@@ -241,9 +242,11 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
 
     if (existingProfile) {
       const profile = await storage.updateUserProfile(userId, updateData as any);
+      if (typeof isAvailable === "boolean") onlineTracker.setAvailability(userId, isAvailable);
       return res.json(profile);
     } else {
       const profile = await storage.createUserProfile({ userId, ...updateData } as any);
+      if (typeof isAvailable === "boolean") onlineTracker.setAvailability(userId, isAvailable);
       return res.json(profile);
     }
   } catch (error) {
@@ -270,6 +273,7 @@ router.put("/me/ghost-mode", requireAuth, async (req: Request, res: Response) =>
         await storage.updateUserProfile(userId, { isAvailable: false } as any);
       }
     }
+    onlineTracker.setGhostMode(userId, enabled);
     return res.json({ ghostMode: enabled });
   } catch (error) {
     console.error("Ghost mode toggle error:", error);
@@ -318,9 +322,11 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
 
     if (existingProfile) {
       const profile = await storage.updateUserProfile(userId, updateData as any);
+      onlineTracker.setAvailability(userId, isAvailable);
       return res.json(profile);
     } else {
       const profile = await storage.createUserProfile({ userId, ...updateData } as any);
+      onlineTracker.setAvailability(userId, isAvailable);
       return res.json(profile);
     }
   } catch (error) {
@@ -382,16 +388,9 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-router.get("/online-count", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
-    const count = await storage.countOnlineUsers(fifteenMinutesAgo, countriesParam);
-    return res.json({ count });
-  } catch (error) {
-    console.error("Online count error:", error);
-    return res.json({ count: 0 });
-  }
+router.get("/online-count", requireAuth, (req: Request, res: Response) => {
+  const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
+  return res.json({ count: onlineTracker.countOnlineUsers(countriesParam) });
 });
 
 router.get("/available-count", requireAuth, async (req: Request, res: Response) => {
@@ -413,9 +412,12 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
     const includeOffline = req.query.includeOffline === "true";
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
-    const onlineResults = await storage.getOnlineUsersList(fifteenMinutesAgo, lat, lng, countriesParam);
+    const trackerOnlineIds = onlineTracker.getOnlineUserIds(countriesParam);
+    const onlineResults = trackerOnlineIds.length > 0
+      ? await storage.getOnlineUsersList(fifteenMinutesAgo, lat, lng, countriesParam, trackerOnlineIds)
+      : [];
     let allResults = onlineResults.filter((r: any) => !blockedIds.has(r.user.id));
-    const onlineIdSet = new Set(allResults.map((r: any) => r.user.id));
+    const onlineIdSet = new Set(trackerOnlineIds);
     if (includeOffline) {
       const { db } = await import("../db");
       const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
@@ -510,26 +512,14 @@ router.get("/available-list", requireAuth, async (req: Request, res: Response) =
   }
 });
 
-router.get("/biker-available-count", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
-    const count = await storage.countAvailableBikers(countriesParam);
-    return res.json({ count });
-  } catch (error) {
-    console.error("Biker available count error:", error);
-    return res.json({ count: 0 });
-  }
+router.get("/biker-available-count", requireAuth, (req: Request, res: Response) => {
+  const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
+  return res.json({ count: onlineTracker.countAvailableBikers(countriesParam) });
 });
 
-router.get("/zavorrine-available-count", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
-    const count = await storage.countAvailableZavorrine(countriesParam);
-    return res.json({ count });
-  } catch (error) {
-    console.error("Zavorrine available count error:", error);
-    return res.json({ count: 0 });
-  }
+router.get("/zavorrine-available-count", requireAuth, (req: Request, res: Response) => {
+  const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
+  return res.json({ count: onlineTracker.countAvailableZavorrine(countriesParam) });
 });
 
 router.get("/biker-available-list", requireAuth, async (req: Request, res: Response) => {
@@ -540,7 +530,10 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
     const includeOffline = req.query.includeOffline === "true";
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
-    const onlineResultsRaw = await storage.getAvailableBikersList(lat, lng, countriesParam);
+    const trackerBikerIds = onlineTracker.getAvailableBikerIds(countriesParam);
+    const onlineResultsRaw = trackerBikerIds.length > 0
+      ? await storage.getAvailableBikersList(lat, lng, countriesParam, trackerBikerIds)
+      : [];
     const onlineResults = onlineResultsRaw.filter((r: any) => !blockedIds.has(r.user.id));
     let allResults = onlineResults;
     if (includeOffline) {
@@ -605,7 +598,10 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
     const includeOffline = req.query.includeOffline === "true";
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
-    const onlineResultsRaw = await storage.getAvailableZavorrinaList(lat, lng, countriesParam);
+    const trackerZavIds = onlineTracker.getAvailableZavorrinaIds(countriesParam);
+    const onlineResultsRaw = trackerZavIds.length > 0
+      ? await storage.getAvailableZavorrinaList(lat, lng, countriesParam, trackerZavIds)
+      : [];
     const onlineResults = onlineResultsRaw.filter((r: any) => !blockedIds.has(r.user.id));
     let allResults = onlineResults;
     if (includeOffline) {

@@ -37,6 +37,7 @@ BikerLink utilizes a modern full-stack architecture.
 - A matching engine runs periodically to connect users based on defined criteria.
 - Fake user generation is implemented for testing and initial user base simulation, with admin controls for management.
 - Email services are handled via Nodemailer with Gmail SMTP.
+- **OnlineTracker** (`server/online-tracker.ts`): In-memory singleton that tracks active sessions in real-time. Counter endpoints (`online-count`, `biker-available-count`, `zavorrine-available-count`) read directly from this tracker (zero DB queries). Updated on login, logout, availability toggle, ghost-mode toggle, heartbeat, and every authenticated API request (middleware in `server/routes.ts`). Stale sessions auto-expire after 15 minutes via a cleanup interval. On server restart, sessions are re-registered transparently from the first API call.
 
 **Core Features:**
 - **Interactive Maps**: Display users, workshops, and easter eggs.
