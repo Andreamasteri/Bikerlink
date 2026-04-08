@@ -342,7 +342,7 @@ export default function ProfileScreen() {
       if (variables.hideFromMap !== undefined) setHideFromMap(!variables.hideFromMap);
       if (variables.positionFuzz !== undefined) setPositionFuzz(!variables.positionFuzz);
       if (variables.fakeHomeEnabled !== undefined) setFakeHomeEnabled(!variables.fakeHomeEnabled);
-      Alert.alert("Errore", "Impossibile salvare le impostazioni privacy. Riprova.");
+      Alert.alert("Errore", "Errore nel salvataggio delle impostazioni privacy. Riprova.");
     },
   });
 
