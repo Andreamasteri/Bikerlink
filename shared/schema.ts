@@ -108,6 +108,9 @@ export const userProfiles = pgTable("user_profiles", {
   searchPreference: varchar("search_preference", { length: 20 }).notNull().default("both"),
   preferredMapStyle: varchar("preferred_map_style", { length: 20 }),
   emailChatNotifications: boolean("email_chat_notifications").notNull().default(false),
+  hideFromMap: boolean("hide_from_map").notNull().default(false),
+  positionFuzz: boolean("position_fuzz").notNull().default(false),
+  positionFuzzKm: integer("position_fuzz_km").notNull().default(1),
   adminOverrideUntil: timestamp("admin_override_until"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [

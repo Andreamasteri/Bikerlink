@@ -53,6 +53,15 @@ function requireAuth(req: Request, res: Response, next: () => void) {
   next();
 }
 
+function applyPositionFuzz(lat: number, lng: number, radiusKm: number): { lat: number; lng: number } {
+  const R = 6371;
+  const r = radiusKm * Math.sqrt(Math.random());
+  const theta = Math.random() * 2 * Math.PI;
+  const dlat = (r / R) * (180 / Math.PI);
+  const dlng = dlat / Math.cos((lat * Math.PI) / 180);
+  return { lat: lat + dlat * Math.sin(theta), lng: lng + dlng * Math.cos(theta) };
+}
+
 router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const requesterId = req.session.userId!;
@@ -282,14 +291,49 @@ router.put("/me/ghost-mode", requireAuth, async (req: Request, res: Response) =>
   }
 });
 
+router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const { hideFromMap, positionFuzz, positionFuzzKm } = req.body;
+    const updateData: Record<string, unknown> = {};
+    if (typeof hideFromMap === "boolean") updateData.hideFromMap = hideFromMap;
+    if (typeof positionFuzz === "boolean") updateData.positionFuzz = positionFuzz;
+    if (positionFuzzKm !== undefined) {
+      const km = Math.round(Number(positionFuzzKm));
+      if (isNaN(km) || km < 1 || km > 50) {
+        return res.status(400).json({ message: "positionFuzzKm deve essere tra 1 e 50" });
+      }
+      updateData.positionFuzzKm = km;
+    }
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ message: "Nessun campo da aggiornare" });
+    }
+    const existingProfile = await storage.getUserProfile(userId);
+    if (existingProfile) {
+      await storage.updateUserProfile(userId, updateData as any);
+    } else {
+      await storage.createUserProfile({ userId, ...updateData } as any);
+    }
+    return res.json({ message: "Impostazioni privacy aggiornate", ...updateData });
+  } catch (error) {
+    console.error("Privacy update error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/location", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const { latitude, longitude } = req.body;
+    let { latitude, longitude } = req.body;
     if (latitude === undefined || longitude === undefined) {
       return res.status(400).json({ message: "Latitudine e longitudine richieste" });
     }
     const existingProfile = await storage.getUserProfile(userId);
+    if (existingProfile?.positionFuzz && existingProfile.positionFuzzKm > 0) {
+      const fuzzed = applyPositionFuzz(latitude, longitude, existingProfile.positionFuzzKm);
+      latitude = fuzzed.lat;
+      longitude = fuzzed.lng;
+    }
     if (existingProfile) {
       await storage.updateUserProfile(userId, { latitude, longitude } as any);
     } else {
@@ -314,8 +358,15 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
     const existingProfile = await storage.getUserProfile(userId);
     const updateData: Record<string, unknown> = { isAvailable };
 
-    if (latitude !== undefined) updateData.latitude = latitude;
-    if (longitude !== undefined) updateData.longitude = longitude;
+    let fuzzedLat = latitude;
+    let fuzzedLng = longitude;
+    if (existingProfile?.positionFuzz && existingProfile.positionFuzzKm > 0 && latitude != null && longitude != null) {
+      const fuzzed = applyPositionFuzz(latitude, longitude, existingProfile.positionFuzzKm);
+      fuzzedLat = fuzzed.lat;
+      fuzzedLng = fuzzed.lng;
+    }
+    if (latitude !== undefined) updateData.latitude = fuzzedLat;
+    if (longitude !== undefined) updateData.longitude = fuzzedLng;
 
     if (isAvailable === true) {
       await captureFirstAvailabilityLocation(userId, latitude, longitude, existingProfile?.latitude, existingProfile?.longitude);
@@ -677,6 +728,7 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
     const fifteenMinutesAgoNearby = new Date(Date.now() - 15 * 60 * 1000);
     const results = nearbyUsers
       .filter((item) => !blockedIds.has(item.user.id))
+      .filter((item) => !item.profile?.hideFromMap)
       .map((item) => {
         const isOnlineNearby = !item.user.ghostMode && item.user.lastLoginAt != null && new Date(item.user.lastLoginAt) >= fifteenMinutesAgoNearby;
         return {

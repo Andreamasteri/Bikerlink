@@ -14,6 +14,8 @@ import {
   Pressable,
   Modal,
   Linking,
+  Switch,
+  TextInput,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -77,6 +79,9 @@ interface ProfileData {
     maxPickupDistance?: number;
     searchPreference?: string;
     preferredMapStyle?: string | null;
+    hideFromMap?: boolean;
+    positionFuzz?: boolean;
+    positionFuzzKm?: number;
   };
   photos?: Array<{
     id: string;
@@ -247,6 +252,27 @@ export default function ProfileScreen() {
   const cancelDeletionMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", "/api/users/me/cancel-deletion");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+    },
+  });
+
+  const [hideFromMap, setHideFromMap] = useState(false);
+  const [positionFuzz, setPositionFuzz] = useState(false);
+  const [positionFuzzKm, setPositionFuzzKm] = useState(1);
+
+  useEffect(() => {
+    if (profile?.profile) {
+      setHideFromMap(profile.profile.hideFromMap ?? false);
+      setPositionFuzz(profile.profile.positionFuzz ?? false);
+      setPositionFuzzKm(profile.profile.positionFuzzKm ?? 1);
+    }
+  }, [profile?.profile]);
+
+  const privacyMutation = useMutation({
+    mutationFn: async (data: { hideFromMap?: boolean; positionFuzz?: boolean; positionFuzzKm?: number }) => {
+      await apiRequest("PUT", "/api/users/me/privacy", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
@@ -770,6 +796,84 @@ export default function ProfileScreen() {
         </View>
       )}
 
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>La mia privacy</Text>
+
+        <View style={styles.privacyRow}>
+          <View style={styles.privacyRowLeft}>
+            <Ionicons name="eye-off-outline" size={20} color={Colors.accent} style={{ marginRight: 10 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.privacyLabel}>Non mostrarmi sulla mappa</Text>
+              <Text style={styles.privacyDesc}>
+                Il tuo segnaposto non sarà visibile sulla mappa degli altri utenti. Continui comunque ad essere conteggiato come online.
+              </Text>
+            </View>
+          </View>
+          <Switch
+            value={hideFromMap}
+            onValueChange={(val) => {
+              setHideFromMap(val);
+              privacyMutation.mutate({ hideFromMap: val });
+            }}
+            trackColor={{ false: Colors.border, true: Colors.accent }}
+            thumbColor={hideFromMap ? Colors.text : Colors.textSecondary}
+          />
+        </View>
+
+        <View style={styles.privacyRow}>
+          <View style={styles.privacyRowLeft}>
+            <Ionicons name="locate-outline" size={20} color={Colors.accent} style={{ marginRight: 10 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.privacyLabel}>Altera Precisione Posizione</Text>
+              {positionFuzz && (
+                <Text style={styles.privacyWarning}>
+                  {"⚠️ Attenzione! Se non volete far sapere precisamente dove siete, potete attivare questa opzione. Ricordatevi di disattivarla prima di un giro in compagnia!!"}
+                </Text>
+              )}
+              {!positionFuzz && (
+                <Text style={styles.privacyDesc}>
+                  Sposta randomicamente la tua posizione visibile di alcuni km dalla posizione reale.
+                </Text>
+              )}
+            </View>
+          </View>
+          <Switch
+            value={positionFuzz}
+            onValueChange={(val) => {
+              setPositionFuzz(val);
+              privacyMutation.mutate({ positionFuzz: val });
+            }}
+            trackColor={{ false: Colors.border, true: Colors.accent }}
+            thumbColor={positionFuzz ? Colors.text : Colors.textSecondary}
+          />
+        </View>
+
+        {positionFuzz && (
+          <View style={styles.privacyKmRow}>
+            <Ionicons name="resize-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 8 }} />
+            <Text style={styles.privacyKmLabel}>Sposta di:</Text>
+            <TextInput
+              style={styles.privacyKmInput}
+              keyboardType="number-pad"
+              value={String(positionFuzzKm)}
+              onChangeText={(v) => {
+                const n = parseInt(v, 10);
+                if (!isNaN(n) && n >= 1 && n <= 50) {
+                  setPositionFuzzKm(n);
+                  privacyMutation.mutate({ positionFuzzKm: n });
+                } else if (v === "" || v === "0") {
+                  setPositionFuzzKm(1);
+                }
+              }}
+              maxLength={2}
+              selectTextOnFocus
+            />
+            <Text style={styles.privacyKmLabel}>km</Text>
+            <Text style={[styles.privacyDesc, { marginLeft: 8 }]}>(max 50)</Text>
+          </View>
+        )}
+      </View>
+
       {donationData?.enabled && !!donationData?.paypalEmail && (
         <View style={styles.donationSection}>
           <Image
@@ -1283,6 +1387,62 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     color: Colors.text,
     textAlign: "right",
+  },
+  privacyRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  privacyRowLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginRight: 12,
+  },
+  privacyLabel: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+    marginBottom: 4,
+  },
+  privacyDesc: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    lineHeight: 16,
+  },
+  privacyWarning: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "#F59E0B",
+    lineHeight: 17,
+  },
+  privacyKmRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+  },
+  privacyKmLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+    marginRight: 6,
+  },
+  privacyKmInput: {
+    width: 48,
+    height: 36,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 8,
+    textAlign: "center",
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+    backgroundColor: Colors.surface,
+    marginRight: 6,
   },
   mapStyleCard: {
     backgroundColor: Colors.surface,
