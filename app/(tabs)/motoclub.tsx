@@ -324,16 +324,24 @@ export default function MotoclubScreen() {
     queryKey: ["/api/motoclubs/marketplace-all", myClubs.map(c => c.id).join(",")],
     queryFn: async () => {
       if (!myClubs.length) return {};
-      const results: Record<string, MarketplaceMoto[]> = {};
+      const raw: Record<string, MarketplaceMoto[]> = {};
       await Promise.all(
         myClubs.map(async (club) => {
           try {
             const res = await apiRequest("GET", `/api/motoclubs/${club.id}/marketplace`);
             const data = await res.json();
-            if (data.length > 0) results[club.id] = data;
+            if (data.length > 0) raw[club.id] = data;
           } catch {}
         })
       );
+      const seenIds = new Set<string>();
+      const results: Record<string, MarketplaceMoto[]> = {};
+      for (const club of myClubs) {
+        if (!raw[club.id]) continue;
+        const deduped = raw[club.id].filter((m) => !seenIds.has(m.id));
+        deduped.forEach((m) => seenIds.add(m.id));
+        if (deduped.length > 0) results[club.id] = deduped;
+      }
       return results;
     },
     enabled: marketplaceEnabled && myClubs.length > 0 && tab === "market",
@@ -475,7 +483,7 @@ export default function MotoclubScreen() {
             <Ionicons name="search" size={16} color={Colors.textSecondary} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Cerca brand, modello..."
+              placeholder="Cerca club..."
               placeholderTextColor={Colors.textSecondary}
               value={search}
               onChangeText={setSearch}
