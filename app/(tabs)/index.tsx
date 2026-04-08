@@ -794,16 +794,16 @@ export default function MapScreen() {
           </Pressable>
           <View style={[styles.fullscreenBottomStats, { bottom: Platform.OS === "web" ? 44 : insets.bottom + 16 }]}>
             <View style={styles.statsChip}>
+              <Ionicons name="radio-button-on" size={12} color={Colors.success} />
+              <Text style={styles.statsChipText}>{onlineCount}</Text>
+            </View>
+            <View style={styles.statsChip}>
               <MaterialCommunityIcons name="motorbike" size={14} color={Colors.maleIcon} />
               <Text style={styles.statsChipText}>{bikerCount}</Text>
             </View>
             <View style={styles.statsChip}>
               <MaterialCommunityIcons name="seat-passenger" size={14} color={Colors.femaleIcon} />
               <Text style={styles.statsChipText}>{zavCount}</Text>
-            </View>
-            <View style={styles.statsChip}>
-              <Ionicons name="radio-button-on" size={12} color={Colors.success} />
-              <Text style={styles.statsChipText}>{onlineCount}</Text>
             </View>
           </View>
           <View style={[styles.fullscreenSearchContainer, { top: Platform.OS === "web" ? 48 : insets.top + 40 }]}>

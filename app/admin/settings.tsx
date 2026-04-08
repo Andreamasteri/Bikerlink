@@ -2012,20 +2012,20 @@ export default function AdminSettings() {
       )}
 
       <View style={styles.sectionHeaderRow}>
-        <Ionicons name="terminal" size={20} color="#00cc66" />
-        <Text style={[styles.sectionTitle, { color: "#00cc66" }]}>Sviluppo</Text>
+        <Ionicons name="server-outline" size={20} color={Colors.accent} />
+        <Text style={styles.sectionTitle}>Sistema</Text>
       </View>
 
       <View style={styles.paidCard}>
         <View style={styles.synecoHeader}>
           <View style={styles.synecoInfo}>
-            <Ionicons name="timer-outline" size={20} color="#00cc66" />
+            <Ionicons name="timer-outline" size={20} color={Colors.accent} />
             <Text style={styles.synecoLabel}>Uptime Counters</Text>
           </View>
           <Switch
             value={uptimeWidgetEnabled}
             onValueChange={handleUptimeToggle}
-            trackColor={{ false: Colors.border, true: "#00cc66" }}
+            trackColor={{ false: Colors.border, true: Colors.accent }}
             thumbColor={uptimeWidgetEnabled ? Colors.text : Colors.textSecondary}
           />
         </View>
@@ -2034,6 +2034,11 @@ export default function AdminSettings() {
             ? "Pannello fluttuante uptime attivo — visibile solo agli admin"
             : "Pannello fluttuante uptime nascosto"}
         </Text>
+      </View>
+
+      <View style={styles.sectionHeaderRow}>
+        <Ionicons name="terminal" size={20} color="#00cc66" />
+        <Text style={[styles.sectionTitle, { color: "#00cc66" }]}>Sviluppo</Text>
       </View>
 
     </KeyboardAwareScrollViewCompat>

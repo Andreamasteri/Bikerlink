@@ -10,7 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface UptimeData {
-  frontendStartTime: number;
+  backendStartedAt: number;
   serverNow: number;
 }
 
@@ -78,8 +78,8 @@ export default function UptimeWidget() {
   const fetchAge = now - fetchTimeRef.current;
 
   const frontendElapsed =
-    data && data.frontendStartTime > 0
-      ? data.serverNow - data.frontendStartTime + fetchAge
+    data && data.backendStartedAt > 0
+      ? data.serverNow - data.backendStartedAt + fetchAge
       : -1;
 
   const bottomBase =

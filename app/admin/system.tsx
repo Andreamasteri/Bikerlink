@@ -43,9 +43,6 @@ interface SystemEvent {
 interface SystemHealth {
   backendStartedAt: number;
   backendUptimeSec: number;
-  metroOnline: boolean;
-  metroStartedAt: number;
-  metroUptimeSec: number;
   events: SystemEvent[];
 }
 
@@ -113,7 +110,6 @@ export default function SystemScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const [backendUptimeSec, setBackendUptimeSec] = useState<number>(0);
-  const [metroUptimeSec, setMetroUptimeSec] = useState<number>(0);
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery<SystemHealth>({
     queryKey: ["/api/admin/system-health"],
@@ -140,17 +136,15 @@ export default function SystemScreen() {
   useEffect(() => {
     if (data) {
       setBackendUptimeSec(data.backendUptimeSec);
-      setMetroUptimeSec(data.metroUptimeSec);
     }
   }, [data]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setBackendUptimeSec((prev) => prev + 1);
-      setMetroUptimeSec((prev) => (data?.metroOnline ? prev + 1 : prev));
     }, 1000);
     return () => clearInterval(interval);
-  }, [data?.metroOnline]);
+  }, []);
 
   const handleRefresh = useCallback(() => {
     refetch();
@@ -216,35 +210,6 @@ export default function SystemScreen() {
             <Text style={styles.startedAt}>
               Avviato: {formatTimestamp(new Date(data.backendStartedAt).toISOString())}
             </Text>
-          </View>
-
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="phone-portrait-outline" size={18} color={Colors.accent} />
-              <Text style={styles.cardTitle}>Metro (Expo)</Text>
-              <View
-                style={[
-                  styles.badge,
-                  { backgroundColor: data.metroOnline ? "#44AA44" : "#FF4444" },
-                ]}
-              >
-                <Text style={styles.badgeText}>
-                  {data.metroOnline ? "ONLINE" : "OFFLINE"}
-                </Text>
-              </View>
-            </View>
-            {data.metroOnline ? (
-              <>
-                <Text style={styles.uptimeTimer}>{formatDuration(metroUptimeSec)}</Text>
-                {data.metroStartedAt > 0 && (
-                  <Text style={styles.startedAt}>
-                    Avviato: {formatTimestamp(new Date(data.metroStartedAt).toISOString())}
-                  </Text>
-                )}
-              </>
-            ) : (
-              <Text style={styles.offlineText}>Metro non raggiungibile</Text>
-            )}
           </View>
 
           {restartHistory && (
