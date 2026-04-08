@@ -326,5 +326,26 @@
     "apkVersionCode": 6,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 17,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-08",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-17: test commit display + checker static import",
+    "note": "OTA di test: nessuna modifica al codice. Verifica che il profilo mostri commit ID e eid corretti.",
+    "updateGroupId": "b674fa34-9cec-4db7-a991-934c44fa3104",
+    "androidUpdateId": "019d6ca6-5452-724c-a893-7af5dac2dea0",
+    "iosUpdateId": null,
+    "commitBase": "e07f9c0f9ecdec875c826615b6c0726477256cd0",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/b674fa34-9cec-4db7-a991-934c44fa3104",
+    "apkBuildId": null,
+    "apkVersionCode": 6,
+    "apkUrl": null,
+    "status": "published"
   }
 ]
