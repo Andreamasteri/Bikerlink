@@ -389,5 +389,26 @@
     "apkVersionCode": 6,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 20,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-08",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-20: rimosso pulsante cerca aggiornamenti dal profilo",
+    "note": "Rimosso pulsante 'Controlla aggiornamenti' dal profilo utente (stato otaCheckState + handleCheckOtaUpdate). Aggiornamenti gestiti solo dallo startup checker automatico.",
+    "updateGroupId": "197cc14b-4a6e-4be7-a7c2-ceed579f9bd6",
+    "androidUpdateId": "019d6cc3-3faa-77ca-adfa-676ee0cb5026",
+    "iosUpdateId": null,
+    "commitBase": "97089d1902d165efe41ab829503eeaed78e92776",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/197cc14b-4a6e-4be7-a7c2-ceed579f9bd6",
+    "apkBuildId": null,
+    "apkVersionCode": 6,
+    "apkUrl": null,
+    "status": "published"
   }
 ]
