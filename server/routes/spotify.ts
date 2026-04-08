@@ -272,6 +272,16 @@ router.post("/callback", requireAuth, async (req: Request, res: Response) => {
 
     const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
 
+    const conflictUpdateSet: Partial<typeof userSpotifyTokens.$inferInsert> = {
+      spotifyUserId: spotifyMe.id,
+      displayName: spotifyMe.display_name ?? null,
+      accessToken: encryptToken(tokenData.access_token),
+      expiresAt,
+    };
+    if (tokenData.refresh_token) {
+      conflictUpdateSet.refreshToken = encryptToken(tokenData.refresh_token);
+    }
+
     await db
       .insert(userSpotifyTokens)
       .values({
@@ -284,13 +294,7 @@ router.post("/callback", requireAuth, async (req: Request, res: Response) => {
       })
       .onConflictDoUpdate({
         target: userSpotifyTokens.userId,
-        set: {
-          spotifyUserId: spotifyMe.id,
-          displayName: spotifyMe.display_name ?? null,
-          accessToken: encryptToken(tokenData.access_token),
-          refreshToken: encryptToken(tokenData.refresh_token ?? ""),
-          expiresAt,
-        },
+        set: conflictUpdateSet,
       });
 
     let trackCount = 0;
