@@ -117,6 +117,7 @@ function TextWithHashtags({
 }
 
 function PlaylistBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolean }) {
+  const router = useRouter();
   let nickname = "un utente";
   let trackCount = 0;
   try {
@@ -128,15 +129,27 @@ function PlaylistBubble({ message, isOwn }: { message: ChatMessage; isOwn: boole
   } catch {}
   const textColor = isOwn ? "#fff" : Colors.text;
   const subColor = isOwn ? "rgba(255,255,255,0.75)" : Colors.textSecondary;
+  const btnBg = isOwn ? "rgba(255,255,255,0.25)" : SPOTIFY_GREEN;
+  const btnText = "#fff";
   return (
-    <View style={styles.locationContent}>
-      <Ionicons name="musical-notes" size={20} color={isOwn ? "#fff" : SPOTIFY_GREEN} style={{ marginRight: 6 }} />
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.messageText, { color: textColor, marginBottom: 1 }]}>
-          Playlist di {nickname}
-        </Text>
-        <Text style={{ fontSize: 12, color: subColor }}>{trackCount} brani · apri tab Musica</Text>
+    <View>
+      <View style={styles.locationContent}>
+        <Ionicons name="musical-notes" size={20} color={isOwn ? "#fff" : SPOTIFY_GREEN} style={{ marginRight: 6 }} />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.messageText, { color: textColor, marginBottom: 1 }]}>
+            Playlist di {nickname}
+          </Text>
+          <Text style={{ fontSize: 12, color: subColor }}>{trackCount} brani · Spotify</Text>
+        </View>
       </View>
+      {!isOwn && (
+        <TouchableOpacity
+          onPress={() => router.push("/(tabs)/music?tab=ricevute" as any)}
+          style={{ marginTop: 8, backgroundColor: btnBg, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12, alignSelf: "flex-start" }}
+        >
+          <Text style={{ color: btnText, fontSize: 13, fontWeight: "600" }}>Vedi</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }

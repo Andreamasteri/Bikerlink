@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
+import { useLocalSearchParams } from "expo-router";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
 
@@ -88,9 +89,19 @@ function formatDate(iso: string): string {
 export default function MusicScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<Tab>("brani");
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    if (tabParam === "ricevute" || tabParam === "match" || tabParam === "brani") return tabParam;
+    return "brani";
+  });
   const [matchCriteria, setMatchCriteria] = useState<string[]>(["songs", "genre"]);
   const [matchMaxKm, setMatchMaxKm] = useState<number>(100);
+
+  useEffect(() => {
+    if (tabParam === "ricevute" || tabParam === "match" || tabParam === "brani") {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
 
   const statusQuery = useQuery<SpotifyStatus>({
     queryKey: ["/api/spotify/status"],
