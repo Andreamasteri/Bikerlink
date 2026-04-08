@@ -473,5 +473,26 @@
     "apkVersionCode": 6,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 24,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-08",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-24: Ritocchi UI privacy — marker RealMe/FakeMe mappa, fix input km, rename etichette",
+    "note": "Task #436. Marker RealMe (verde) e FakeMe (arancione) sulla mappa quando Fake Home Position è attiva. Fix input km più largo (minWidth 64). Rinomina: 'Altera Precisione Posizione'→'Altera Posizione', 'Raggio:'→'Ampiezza raggio attivazione:', 'Sposta di:'→'Raggio d'incertezza:'.",
+    "updateGroupId": "46dd5931-d9f5-4d76-87f9-078f1f71d9ef",
+    "androidUpdateId": "019d6e9a-1eb6-79ce-ac33-97605fd49f76",
+    "iosUpdateId": null,
+    "commitBase": "956f32d66d991fcab927148872e226c56706074b",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/46dd5931-d9f5-4d76-87f9-078f1f71d9ef",
+    "apkBuildId": null,
+    "apkVersionCode": 6,
+    "apkUrl": null,
+    "status": "published"
   }
 ]
