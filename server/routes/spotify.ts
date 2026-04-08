@@ -418,6 +418,21 @@ router.post("/share-playlist", requireAuth, async (req: Request, res: Response) 
       return res.status(400).json({ message: "Nessuna traccia da condividere. Sincronizza prima con Spotify." });
     }
 
+    if (conversationId) {
+      const participants = await db
+        .select({ userId: conversationParticipants.userId })
+        .from(conversationParticipants)
+        .where(eq(conversationParticipants.conversationId, conversationId));
+
+      const participantIds = participants.map((p) => p.userId);
+      if (!participantIds.includes(userId)) {
+        return res.status(403).json({ message: "Non sei un partecipante di questa conversazione" });
+      }
+      if (!participantIds.includes(toUserId)) {
+        return res.status(403).json({ message: "Il destinatario non è un partecipante di questa conversazione" });
+      }
+    }
+
     const tracksData = tracks.map((t) => ({
       trackId: t.spotifyTrackId,
       trackName: t.trackName,
@@ -441,19 +456,6 @@ router.post("/share-playlist", requireAuth, async (req: Request, res: Response) 
     let messageId: string | undefined;
 
     if (conversationId && newPlaylist) {
-      const participants = await db
-        .select({ userId: conversationParticipants.userId })
-        .from(conversationParticipants)
-        .where(eq(conversationParticipants.conversationId, conversationId));
-
-      const participantIds = participants.map((p) => p.userId);
-      if (!participantIds.includes(userId)) {
-        return res.status(403).json({ message: "Non sei un partecipante di questa conversazione" });
-      }
-      if (!participantIds.includes(toUserId)) {
-        return res.status(403).json({ message: "Il destinatario non è un partecipante di questa conversazione" });
-      }
-
       const me = await storage.getUser(userId);
       const [newMsg] = await db
         .insert(messages)
@@ -461,7 +463,7 @@ router.post("/share-playlist", requireAuth, async (req: Request, res: Response) 
           conversationId,
           senderId: userId,
           messageType: "playlist",
-          content: `Playlist di ${me?.nickname ?? "un utente"} — ${tracks.length} brani`,
+          content: JSON.stringify({ playlistId: newPlaylist.id, nickname: me?.nickname ?? "un utente", trackCount: tracks.length }),
           playlistId: newPlaylist.id,
         })
         .returning({ id: messages.id });
@@ -583,8 +585,8 @@ export async function handleMusicMatch(req: Request, res: Response) {
     const userId = req.session.userId!;
     const criteriaParam = (req.query.criteria as string) ?? "songs";
     const criteria = criteriaParam.split(",").map((s) => s.trim());
-    const minSongs = parseInt((req.query.minSongs as string) ?? "3", 10);
-    const maxKm = parseFloat((req.query.maxKm as string) ?? "9999");
+    const minSongs = parseInt((req.query.minSongs as string) ?? "5", 10);
+    const maxKm = parseFloat((req.query.maxKm as string) ?? "50");
     const logic = (req.query.logic as string) === "any" ? "any" : "all";
 
     const myTracks = await db
