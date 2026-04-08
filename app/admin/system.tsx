@@ -88,6 +88,7 @@ function eventIcon(type: string): { name: keyof typeof Ionicons.glyphMap; color:
       return { name: "wifi", color: "#44AA44" };
     case "METRO_DOWN":
       return { name: "wifi-outline", color: "#FF4444" };
+    /* legacy frontend events — kept for historical log display */
     case "OTA_PUBLISHED":
       return { name: "cloud-download-outline", color: Colors.accent };
     default:
@@ -99,8 +100,8 @@ function eventLabel(type: string): string {
   switch (type) {
     case "BACKEND_RESTART": return "Riavvio Backend";
     case "COLD_START": return "Avvio Freddo";
-    case "METRO_UP": return "Metro Online";
-    case "METRO_DOWN": return "Metro Offline";
+    case "METRO_UP": return "Frontend Online";
+    case "METRO_DOWN": return "Frontend Offline";
     case "OTA_PUBLISHED": return "Aggiornamento OTA";
     default: return "Evento generico";
   }
@@ -343,12 +344,6 @@ const styles = StyleSheet.create({
     color: Colors.textMuted ?? "#888",
     fontFamily: "Inter_400Regular",
     fontSize: 12,
-    marginTop: 4,
-  },
-  offlineText: {
-    color: "#FF4444",
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
     marginTop: 4,
   },
   sectionTitle: {
