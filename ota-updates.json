@@ -368,5 +368,26 @@
     "apkVersionCode": 6,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 19,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-08",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-19: numero OTA blu nel profilo",
+    "note": "Numero OTA in fondo al profilo: colore cambiato da verde a blu (Colors.primary). Fix pollo-e-uovo: CURRENT_OTA_NUMBER hardcoded nel bundle. Procedura: entry aggiunta PRIMA della pubblicazione.",
+    "updateGroupId": "81704971-e529-4897-945c-30f3e5dad980",
+    "androidUpdateId": "019d6cbb-b34d-74b3-bc1f-de42e61c9cd1",
+    "iosUpdateId": null,
+    "commitBase": "bd4d45ff23849b518571287fd6214998c9f4d100",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/81704971-e529-4897-945c-30f3e5dad980",
+    "apkBuildId": null,
+    "apkVersionCode": 6,
+    "apkUrl": null,
+    "status": "published"
   }
 ]

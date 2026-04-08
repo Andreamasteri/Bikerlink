@@ -141,6 +141,7 @@ export default function ProfileScreen() {
   }, null);
   const currentUpdateId = Updates.updateId ?? null;
   const currentOtaEntry = allOtaUpdates.find(e => e.androidUpdateId === currentUpdateId) ?? null;
+  const CURRENT_OTA_NUMBER = 19; // aggiornare ad ogni nuova OTA prima di pubblicare
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -974,12 +975,8 @@ export default function ProfileScreen() {
         </Pressable>
       </Modal>
 
-      <Text style={{ textAlign: "center", fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.success, marginTop: 16, marginBottom: 4 }}>
-        {currentOtaEntry
-          ? `OTA-${currentOtaEntry.updateNumber}`
-          : latestOta
-          ? `OTA-${latestOta.updateNumber}`
-          : "OTA"}
+      <Text style={{ textAlign: "center", fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.primary, marginTop: 16, marginBottom: 4 }}>
+        {`OTA-${CURRENT_OTA_NUMBER}`}
       </Text>
       <Text style={{ textAlign: "center", fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.success, marginBottom: 2 }}>
         {((currentOtaEntry?.commitBase ?? latestOta?.commitBase ?? "").substring(0, 7)) || "—"}
