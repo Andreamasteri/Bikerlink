@@ -162,7 +162,7 @@ export default function ProfileScreen() {
   const currentUpdateId = Updates.updateId ?? null;
   const currentOtaEntry = allOtaUpdates.find(e => e.androidUpdateId === currentUpdateId) ?? null;
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-  const CURRENT_OTA_NUMBER = 24;
+  const CURRENT_OTA_NUMBER = 25;
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -300,6 +300,24 @@ export default function ProfileScreen() {
     }
   }, [profile?.profile]);
 
+  const repushLocationForPrivacy = useCallback(async () => {
+    try {
+      if (Platform.OS === "web") return;
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
+      const loc =
+        (await Location.getLastKnownPositionAsync()) ??
+        (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
+      if (loc) {
+        await apiRequest("PUT", "/api/users/location", {
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+        });
+      }
+    } catch {
+    }
+  }, []);
+
   const privacyMutation = useMutation({
     mutationFn: async (data: {
       hideFromMap?: boolean;
@@ -314,8 +332,17 @@ export default function ProfileScreen() {
     }) => {
       await apiRequest("PUT", "/api/users/me/privacy", data);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+      if (variables.positionFuzz === true || variables.fakeHomeEnabled === true) {
+        repushLocationForPrivacy();
+      }
+    },
+    onError: (_err, variables) => {
+      if (variables.hideFromMap !== undefined) setHideFromMap(!variables.hideFromMap);
+      if (variables.positionFuzz !== undefined) setPositionFuzz(!variables.positionFuzz);
+      if (variables.fakeHomeEnabled !== undefined) setFakeHomeEnabled(!variables.fakeHomeEnabled);
+      Alert.alert("Errore", "Impossibile salvare le impostazioni privacy. Riprova.");
     },
   });
 
@@ -1678,11 +1705,14 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: 8,
     textAlign: "center",
+    textAlignVertical: "center",
+    includeFontPadding: false,
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
     backgroundColor: Colors.surface,
     marginRight: 6,
+    paddingVertical: 0,
   },
   fakeHomeCard: {
     backgroundColor: Colors.surface,

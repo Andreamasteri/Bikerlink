@@ -494,5 +494,26 @@
     "apkVersionCode": 6,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 25,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-08",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-25: Fix privacy persistence — error handling, GPS re-push, centratura km",
+    "note": "Task #437. Fix bug critico: privacy settings (hideFromMap, positionFuzz, fakeHome) non persistevano perché PUT /api/users/me/privacy restituiva 404 sul backend di produzione (backend non aggiornato). Aggiunto onError che reverte i toggle e mostra Alert. Aggiunto re-push GPS automatico quando positionFuzz o fakeHome vengono attivati. Fix centratura verticale testo nei campi km (textAlignVertical: center, includeFontPadding: false, paddingVertical: 0).",
+    "updateGroupId": "9862d454-d535-4562-a45d-fe291f6e704e",
+    "androidUpdateId": "019d6eb9-feca-7246-a4cc-0d504d1bc4e8",
+    "iosUpdateId": null,
+    "commitBase": "3ad4b3345f651855c79dd6df5713b7835bd4e89c",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/9862d454-d535-4562-a45d-fe291f6e704e",
+    "apkBuildId": null,
+    "apkVersionCode": 6,
+    "apkUrl": null,
+    "status": "published"
   }
 ]
