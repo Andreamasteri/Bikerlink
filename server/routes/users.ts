@@ -237,6 +237,7 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
 
     if (isAvailable === true) {
       await storage.updateUser(userId, { ghostMode: false } as any);
+      onlineTracker.setGhostMode(userId, false);
       await captureFirstAvailabilityLocation(userId, latitude, longitude, existingProfile?.latitude, existingProfile?.longitude);
     }
 

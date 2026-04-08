@@ -257,10 +257,13 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       req.session.save((err) => { if (err) reject(err); else resolve(); });
     });
 
+    const userProfile = await storage.getUserProfile(user.id).catch(() => null);
+    const isGhost = userRecord?.ghostMode ?? false;
+    const isAvail = !isGhost && (userProfile?.isAvailable ?? false);
     onlineTracker.setOnline(user.id, {
       userType: userRecord?.userType ?? user.userType ?? "biker",
-      isAvailable: !(userRecord?.ghostMode ?? false),
-      ghostMode: userRecord?.ghostMode ?? false,
+      isAvailable: isAvail,
+      ghostMode: isGhost,
       country: userRecord?.country ?? user.country ?? null,
     });
 
