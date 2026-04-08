@@ -245,6 +245,30 @@ export default function ProfileScreen() {
   });
 
   const [replacingSlot, setReplacingSlot] = useState<string | null>(null);
+  const [otaCheckState, setOtaCheckState] = useState<"idle" | "loading" | "found" | "uptodate" | "error">("idle");
+
+  const handleCheckOtaUpdate = useCallback(async () => {
+    if (Platform.OS === "web" || __DEV__) {
+      Alert.alert("Aggiornamenti OTA", "Il controllo OTA non è disponibile in questo ambiente.");
+      return;
+    }
+    if (otaCheckState === "loading") return;
+    setOtaCheckState("loading");
+    try {
+      const check = await Updates.checkForUpdateAsync();
+      if (check.isAvailable) {
+        setOtaCheckState("found");
+        await Updates.fetchUpdateAsync();
+        await Updates.reloadAsync();
+      } else {
+        setOtaCheckState("uptodate");
+        setTimeout(() => setOtaCheckState("idle"), 3000);
+      }
+    } catch (e) {
+      setOtaCheckState("error");
+      setTimeout(() => setOtaCheckState("idle"), 4000);
+    }
+  }, [otaCheckState]);
 
   const pickImageForSlot = useCallback((existingPhotoId?: string) => {
     showImagePickerMenu(
@@ -863,6 +887,48 @@ export default function ProfileScreen() {
       </View>
 
       <View style={[styles.section, { marginTop: 32, gap: 10 }]}>
+        <Pressable
+          style={[
+            styles.clearCacheBtn,
+            otaCheckState === "found" && { borderColor: Colors.success, borderWidth: 1 },
+            otaCheckState === "error" && { borderColor: Colors.accentRed, borderWidth: 1 },
+          ]}
+          onPress={handleCheckOtaUpdate}
+          disabled={otaCheckState === "loading"}
+        >
+          {otaCheckState === "loading" ? (
+            <ActivityIndicator size="small" color={Colors.accent} />
+          ) : (
+            <Ionicons
+              name="cloud-download-outline"
+              size={20}
+              color={
+                otaCheckState === "found" ? Colors.success
+                : otaCheckState === "uptodate" ? Colors.success
+                : otaCheckState === "error" ? Colors.accentRed
+                : Colors.textSecondary
+              }
+            />
+          )}
+          <Text
+            style={[
+              styles.clearCacheBtnText,
+              otaCheckState === "found" && { color: Colors.success },
+              otaCheckState === "uptodate" && { color: Colors.success },
+              otaCheckState === "error" && { color: Colors.accentRed },
+            ]}
+          >
+            {otaCheckState === "loading"
+              ? "Controllo in corso..."
+              : otaCheckState === "found"
+              ? "Aggiornamento trovato — riavvio..."
+              : otaCheckState === "uptodate"
+              ? "Sei aggiornato"
+              : otaCheckState === "error"
+              ? "Errore durante il controllo"
+              : "Controlla aggiornamenti"}
+          </Text>
+        </Pressable>
         <Pressable style={styles.clearCacheBtn} onPress={handleClearCache}>
           <Ionicons name="trash-bin-outline" size={20} color={Colors.textSecondary} />
           <Text style={styles.clearCacheBtnText}>Cancella cache locale</Text>

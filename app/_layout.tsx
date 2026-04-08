@@ -146,7 +146,7 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
 function OtaStartupChecker() {
   useEffect(() => {
     if (__DEV__ || Platform.OS === "web") return;
-    (async () => {
+    const timer = setTimeout(async () => {
       try {
         const mod = await import("expo-updates");
         const check = await mod.checkForUpdateAsync();
@@ -156,7 +156,8 @@ function OtaStartupChecker() {
       } catch {
         // silent fail — EAS non raggiungibile o runtime mismatch
       }
-    })();
+    }, 3000);
+    return () => clearTimeout(timer);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
 }
