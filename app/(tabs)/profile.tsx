@@ -719,83 +719,6 @@ export default function ProfileScreen() {
         </Pressable>
       </View>
 
-      {currentUserType === "biker" && showSearchPref && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Ricerca Match con ...</Text>
-          <View style={styles.searchPrefRow}>
-            {([
-              { value: "bikers" as const, label: "Solo Biker", icon: "bicycle" as keyof typeof Ionicons.glyphMap },
-              { value: "zavorrine" as const, label: "Solo Zavorrine", icon: "person" as keyof typeof Ionicons.glyphMap },
-              { value: "both" as const, label: "Entrambi", icon: "people" as keyof typeof Ionicons.glyphMap },
-            ]).map((opt) => {
-              const isSelected = searchPreference === opt.value;
-              return (
-                <Pressable
-                  key={opt.value}
-                  style={[
-                    styles.searchPrefBtn,
-                    isSelected && styles.searchPrefBtnActive,
-                  ]}
-                  onPress={() => searchPreferenceMutation.mutate(opt.value)}
-                >
-                  <Ionicons
-                    name={opt.icon}
-                    size={20}
-                    color={isSelected ? Colors.background : Colors.textSecondary}
-                  />
-                  <Text
-                    style={[
-                      styles.searchPrefLabel,
-                      isSelected && styles.searchPrefLabelActive,
-                    ]}
-                  >
-                    {opt.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-      )}
-
-      {mapsEnabled && userChoiceEnabled && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Stile Mappa</Text>
-          <View style={styles.mapStyleCard}>
-            {(["esri_gray", "carto_light"] as MapProvider[]).map((p) => {
-              const rawStyle = profile?.profile?.preferredMapStyle as MapProvider | null | undefined;
-              const currentStyle: MapProvider = (!rawStyle || rawStyle === "carto_dark") ? "carto_light" : rawStyle;
-              const isSelected = currentStyle === p;
-              return (
-                <Pressable
-                  key={p}
-                  style={[styles.mapStyleOption, isSelected && styles.mapStyleOptionActive]}
-                  onPress={() => mapStyleMutation.mutate(p)}
-                  disabled={mapStyleMutation.isPending}
-                >
-                  <Ionicons
-                    name={p === "carto_dark" ? "moon" : p === "esri_gray" ? "map-outline" : "sunny"}
-                    size={20}
-                    color={isSelected ? Colors.accent : Colors.textSecondary}
-                  />
-                  <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={[styles.mapStyleName, isSelected && { color: Colors.accent }]}>
-                      {MAP_PROVIDER_LABELS[p]}
-                    </Text>
-                    <Text style={styles.mapStyleDesc} numberOfLines={2}>
-                      {MAP_PROVIDER_DESCRIPTIONS[p]}
-                    </Text>
-                  </View>
-                  {isSelected && (
-                    <Ionicons name="checkmark-circle" size={20} color={Colors.accent} />
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-      )}
-
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>La mia privacy</Text>
 
@@ -874,6 +797,83 @@ export default function ProfileScreen() {
           </View>
         )}
       </View>
+
+      {currentUserType === "biker" && showSearchPref && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Ricerca Match con ...</Text>
+          <View style={styles.searchPrefRow}>
+            {([
+              { value: "bikers" as const, label: "Solo Biker", icon: "bicycle" as keyof typeof Ionicons.glyphMap },
+              { value: "zavorrine" as const, label: "Solo Zavorrine", icon: "person" as keyof typeof Ionicons.glyphMap },
+              { value: "both" as const, label: "Entrambi", icon: "people" as keyof typeof Ionicons.glyphMap },
+            ]).map((opt) => {
+              const isSelected = searchPreference === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  style={[
+                    styles.searchPrefBtn,
+                    isSelected && styles.searchPrefBtnActive,
+                  ]}
+                  onPress={() => searchPreferenceMutation.mutate(opt.value)}
+                >
+                  <Ionicons
+                    name={opt.icon}
+                    size={20}
+                    color={isSelected ? Colors.background : Colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.searchPrefLabel,
+                      isSelected && styles.searchPrefLabelActive,
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      {mapsEnabled && userChoiceEnabled && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Stile Mappa</Text>
+          <View style={styles.mapStyleCard}>
+            {(["esri_gray", "carto_light"] as MapProvider[]).map((p) => {
+              const rawStyle = profile?.profile?.preferredMapStyle as MapProvider | null | undefined;
+              const currentStyle: MapProvider = (!rawStyle || rawStyle === "carto_dark") ? "carto_light" : rawStyle;
+              const isSelected = currentStyle === p;
+              return (
+                <Pressable
+                  key={p}
+                  style={[styles.mapStyleOption, isSelected && styles.mapStyleOptionActive]}
+                  onPress={() => mapStyleMutation.mutate(p)}
+                  disabled={mapStyleMutation.isPending}
+                >
+                  <Ionicons
+                    name={p === "carto_dark" ? "moon" : p === "esri_gray" ? "map-outline" : "sunny"}
+                    size={20}
+                    color={isSelected ? Colors.accent : Colors.textSecondary}
+                  />
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={[styles.mapStyleName, isSelected && { color: Colors.accent }]}>
+                      {MAP_PROVIDER_LABELS[p]}
+                    </Text>
+                    <Text style={styles.mapStyleDesc} numberOfLines={2}>
+                      {MAP_PROVIDER_DESCRIPTIONS[p]}
+                    </Text>
+                  </View>
+                  {isSelected && (
+                    <Ionicons name="checkmark-circle" size={20} color={Colors.accent} />
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
 
       {donationData?.enabled && !!donationData?.paypalEmail && (
         <View style={styles.donationSection}>
