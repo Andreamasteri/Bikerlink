@@ -62,6 +62,32 @@ function applyPositionFuzz(lat: number, lng: number, radiusKm: number): { lat: n
   return { lat: lat + dlat * Math.sin(theta), lng: lng + dlng * Math.cos(theta) };
 }
 
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function applyFakeHome(
+  lat: number,
+  lng: number,
+  profile: any
+): { lat: number; lng: number; applied: boolean } {
+  if (!profile?.fakeHomeEnabled) return { lat, lng, applied: false };
+  if (profile.homeLatitude == null || profile.homeLongitude == null) return { lat, lng, applied: false };
+  if (profile.fakeHomeLatitude == null || profile.fakeHomeLongitude == null) return { lat, lng, applied: false };
+  const radius = profile.fakeHomeRadius ?? 2;
+  const dist = haversineKm(lat, lng, profile.homeLatitude, profile.homeLongitude);
+  if (dist <= radius) {
+    return { lat: profile.fakeHomeLatitude, lng: profile.fakeHomeLongitude, applied: true };
+  }
+  return { lat, lng, applied: false };
+}
+
 router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const requesterId = req.session.userId!;
@@ -240,10 +266,16 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
     if (latitude !== undefined || longitude !== undefined) {
       let fLat = latitude;
       let fLng = longitude;
-      if (existingProfile?.positionFuzz && existingProfile.positionFuzzKm > 0 && latitude != null && longitude != null) {
-        const fuzzed = applyPositionFuzz(latitude, longitude, existingProfile.positionFuzzKm);
-        fLat = fuzzed.lat;
-        fLng = fuzzed.lng;
+      if (latitude != null && longitude != null) {
+        const fakeResult = applyFakeHome(latitude, longitude, existingProfile);
+        if (fakeResult.applied) {
+          fLat = fakeResult.lat;
+          fLng = fakeResult.lng;
+        } else if (existingProfile?.positionFuzz && existingProfile.positionFuzzKm > 0) {
+          const fuzzed = applyPositionFuzz(latitude, longitude, existingProfile.positionFuzzKm);
+          fLat = fuzzed.lat;
+          fLng = fuzzed.lng;
+        }
       }
       if (latitude !== undefined) updateData.latitude = fLat;
       if (longitude !== undefined) updateData.longitude = fLng;
@@ -308,7 +340,7 @@ router.put("/me/ghost-mode", requireAuth, async (req: Request, res: Response) =>
 router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const { hideFromMap, positionFuzz, positionFuzzKm } = req.body;
+    const { hideFromMap, positionFuzz, positionFuzzKm, fakeHomeEnabled, homeLatitude, homeLongitude, fakeHomeLatitude, fakeHomeLongitude, fakeHomeRadius } = req.body;
     const updateData: Record<string, unknown> = {};
     if (typeof hideFromMap === "boolean") updateData.hideFromMap = hideFromMap;
     if (typeof positionFuzz === "boolean") updateData.positionFuzz = positionFuzz;
@@ -318,6 +350,26 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
         return res.status(400).json({ message: "positionFuzzKm deve essere un intero tra 1 e 50" });
       }
       updateData.positionFuzzKm = km;
+    }
+    if (typeof fakeHomeEnabled === "boolean") updateData.fakeHomeEnabled = fakeHomeEnabled;
+    if (homeLatitude !== undefined) {
+      updateData.homeLatitude = homeLatitude === null ? null : Number(homeLatitude);
+    }
+    if (homeLongitude !== undefined) {
+      updateData.homeLongitude = homeLongitude === null ? null : Number(homeLongitude);
+    }
+    if (fakeHomeLatitude !== undefined) {
+      updateData.fakeHomeLatitude = fakeHomeLatitude === null ? null : Number(fakeHomeLatitude);
+    }
+    if (fakeHomeLongitude !== undefined) {
+      updateData.fakeHomeLongitude = fakeHomeLongitude === null ? null : Number(fakeHomeLongitude);
+    }
+    if (fakeHomeRadius !== undefined) {
+      const r = Number(fakeHomeRadius);
+      if (!Number.isInteger(r) || r < 1 || r > 100) {
+        return res.status(400).json({ message: "fakeHomeRadius deve essere un intero tra 1 e 100" });
+      }
+      updateData.fakeHomeRadius = r;
     }
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ message: "Nessun campo da aggiornare" });
@@ -343,7 +395,11 @@ router.put("/location", requireAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Latitudine e longitudine richieste" });
     }
     const existingProfile = await storage.getUserProfile(userId);
-    if (existingProfile?.positionFuzz && existingProfile.positionFuzzKm > 0) {
+    const fakeResult = applyFakeHome(latitude, longitude, existingProfile);
+    if (fakeResult.applied) {
+      latitude = fakeResult.lat;
+      longitude = fakeResult.lng;
+    } else if (existingProfile?.positionFuzz && existingProfile.positionFuzzKm > 0) {
       const fuzzed = applyPositionFuzz(latitude, longitude, existingProfile.positionFuzzKm);
       latitude = fuzzed.lat;
       longitude = fuzzed.lng;
@@ -374,10 +430,16 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
 
     let fuzzedLat = latitude;
     let fuzzedLng = longitude;
-    if (existingProfile?.positionFuzz && existingProfile.positionFuzzKm > 0 && latitude != null && longitude != null) {
-      const fuzzed = applyPositionFuzz(latitude, longitude, existingProfile.positionFuzzKm);
-      fuzzedLat = fuzzed.lat;
-      fuzzedLng = fuzzed.lng;
+    if (latitude != null && longitude != null) {
+      const fakeResult = applyFakeHome(latitude, longitude, existingProfile);
+      if (fakeResult.applied) {
+        fuzzedLat = fakeResult.lat;
+        fuzzedLng = fakeResult.lng;
+      } else if (existingProfile?.positionFuzz && existingProfile.positionFuzzKm > 0) {
+        const fuzzed = applyPositionFuzz(latitude, longitude, existingProfile.positionFuzzKm);
+        fuzzedLat = fuzzed.lat;
+        fuzzedLng = fuzzed.lng;
+      }
     }
     if (latitude !== undefined) updateData.latitude = fuzzedLat;
     if (longitude !== undefined) updateData.longitude = fuzzedLng;

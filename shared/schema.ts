@@ -111,6 +111,12 @@ export const userProfiles = pgTable("user_profiles", {
   hideFromMap: boolean("hide_from_map").notNull().default(false),
   positionFuzz: boolean("position_fuzz").notNull().default(false),
   positionFuzzKm: integer("position_fuzz_km").notNull().default(1),
+  fakeHomeEnabled: boolean("fake_home_enabled").notNull().default(false),
+  homeLatitude: doublePrecision("home_latitude"),
+  homeLongitude: doublePrecision("home_longitude"),
+  fakeHomeLatitude: doublePrecision("fake_home_latitude"),
+  fakeHomeLongitude: doublePrecision("fake_home_longitude"),
+  fakeHomeRadius: integer("fake_home_radius").notNull().default(2),
   adminOverrideUntil: timestamp("admin_override_until"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [

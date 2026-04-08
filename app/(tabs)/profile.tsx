@@ -33,8 +33,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMapConfig } from "@/lib/map-context";
 import { MAP_PROVIDER_LABELS, MAP_PROVIDER_DESCRIPTIONS, type MapProvider } from "@/lib/map-tiles";
 import * as Updates from "expo-updates";
+import * as Location from "expo-location";
 import otaUpdatesRaw from "@/ota-updates.json";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
+
+let MapView: any = null;
+let Marker: any = null;
+if (Platform.OS !== "web") {
+  const maps = require("react-native-maps");
+  MapView = maps.default;
+  Marker = maps.Marker;
+}
 
 interface OtaUpdateEntry {
   updateNumber: number;
@@ -82,6 +91,12 @@ interface ProfileData {
     hideFromMap?: boolean;
     positionFuzz?: boolean;
     positionFuzzKm?: number;
+    fakeHomeEnabled?: boolean;
+    homeLatitude?: number | null;
+    homeLongitude?: number | null;
+    fakeHomeLatitude?: number | null;
+    fakeHomeLongitude?: number | null;
+    fakeHomeRadius?: number;
   };
   photos?: Array<{
     id: string;
@@ -261,17 +276,42 @@ export default function ProfileScreen() {
   const [hideFromMap, setHideFromMap] = useState(false);
   const [positionFuzz, setPositionFuzz] = useState(false);
   const [positionFuzzKm, setPositionFuzzKm] = useState(1);
+  const [fakeHomeEnabled, setFakeHomeEnabled] = useState(false);
+  const [homeLatitude, setHomeLatitude] = useState<number | null>(null);
+  const [homeLongitude, setHomeLongitude] = useState<number | null>(null);
+  const [fakeHomeLatitude, setFakeHomeLatitude] = useState<number | null>(null);
+  const [fakeHomeLongitude, setFakeHomeLongitude] = useState<number | null>(null);
+  const [fakeHomeRadius, setFakeHomeRadius] = useState(2);
+  const [mapPickerVisible, setMapPickerVisible] = useState(false);
+  const [mapPickerTarget, setMapPickerTarget] = useState<"home" | "fake" | null>(null);
+  const [mapPickerCoord, setMapPickerCoord] = useState<{ latitude: number; longitude: number }>({ latitude: 41.9, longitude: 12.5 });
 
   useEffect(() => {
     if (profile?.profile) {
       setHideFromMap(profile.profile.hideFromMap ?? false);
       setPositionFuzz(profile.profile.positionFuzz ?? false);
       setPositionFuzzKm(profile.profile.positionFuzzKm ?? 1);
+      setFakeHomeEnabled(profile.profile.fakeHomeEnabled ?? false);
+      setHomeLatitude(profile.profile.homeLatitude ?? null);
+      setHomeLongitude(profile.profile.homeLongitude ?? null);
+      setFakeHomeLatitude(profile.profile.fakeHomeLatitude ?? null);
+      setFakeHomeLongitude(profile.profile.fakeHomeLongitude ?? null);
+      setFakeHomeRadius(profile.profile.fakeHomeRadius ?? 2);
     }
   }, [profile?.profile]);
 
   const privacyMutation = useMutation({
-    mutationFn: async (data: { hideFromMap?: boolean; positionFuzz?: boolean; positionFuzzKm?: number }) => {
+    mutationFn: async (data: {
+      hideFromMap?: boolean;
+      positionFuzz?: boolean;
+      positionFuzzKm?: number;
+      fakeHomeEnabled?: boolean;
+      homeLatitude?: number | null;
+      homeLongitude?: number | null;
+      fakeHomeLatitude?: number | null;
+      fakeHomeLongitude?: number | null;
+      fakeHomeRadius?: number;
+    }) => {
       await apiRequest("PUT", "/api/users/me/privacy", data);
     },
     onSuccess: () => {
@@ -517,6 +557,51 @@ export default function ProfileScreen() {
   const easterEggs = profile?.profile?.easterEggsCollected ?? 0;
   const isZavorrina = currentUserType === "zavorrina";
   const isBikerOrCoppia = currentUserType === "biker" || currentUserType === "coppia";
+
+  const pickCoordFromGPS = async (target: "home" | "fake") => {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permesso negato", "Concedi l'accesso alla posizione nelle impostazioni dell'app.");
+      return;
+    }
+    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+    const lat = loc.coords.latitude;
+    const lng = loc.coords.longitude;
+    if (target === "home") {
+      setHomeLatitude(lat);
+      setHomeLongitude(lng);
+      privacyMutation.mutate({ homeLatitude: lat, homeLongitude: lng });
+    } else {
+      setFakeHomeLatitude(lat);
+      setFakeHomeLongitude(lng);
+      privacyMutation.mutate({ fakeHomeLatitude: lat, fakeHomeLongitude: lng });
+    }
+  };
+
+  const openMapPicker = (target: "home" | "fake") => {
+    setMapPickerTarget(target);
+    if (target === "home" && homeLatitude != null && homeLongitude != null) {
+      setMapPickerCoord({ latitude: homeLatitude, longitude: homeLongitude });
+    } else if (target === "fake" && fakeHomeLatitude != null && fakeHomeLongitude != null) {
+      setMapPickerCoord({ latitude: fakeHomeLatitude, longitude: fakeHomeLongitude });
+    } else {
+      setMapPickerCoord({ latitude: 41.9, longitude: 12.5 });
+    }
+    setMapPickerVisible(true);
+  };
+
+  const confirmMapPicker = () => {
+    if (mapPickerTarget === "home") {
+      setHomeLatitude(mapPickerCoord.latitude);
+      setHomeLongitude(mapPickerCoord.longitude);
+      privacyMutation.mutate({ homeLatitude: mapPickerCoord.latitude, homeLongitude: mapPickerCoord.longitude });
+    } else if (mapPickerTarget === "fake") {
+      setFakeHomeLatitude(mapPickerCoord.latitude);
+      setFakeHomeLongitude(mapPickerCoord.longitude);
+      privacyMutation.mutate({ fakeHomeLatitude: mapPickerCoord.latitude, fakeHomeLongitude: mapPickerCoord.longitude });
+    }
+    setMapPickerVisible(false);
+  };
 
   const MenuItem = ({ icon, label, onPress, color }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; color?: string }) => (
     <Pressable style={styles.menuItem} onPress={onPress}>
@@ -796,6 +881,109 @@ export default function ProfileScreen() {
             <Text style={[styles.privacyDesc, { marginLeft: 8 }]}>(max 50)</Text>
           </View>
         )}
+
+        <View style={styles.privacyRow}>
+          <View style={styles.privacyRowLeft}>
+            <Ionicons name="home-outline" size={20} color={Colors.accent} style={{ marginRight: 10 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.privacyLabel}>Fake Home Position</Text>
+              <Text style={styles.privacyDesc}>
+                Quando sei vicino a casa, la tua posizione visibile viene sostituita con una posizione fittizia.
+              </Text>
+            </View>
+          </View>
+          <Switch
+            value={fakeHomeEnabled}
+            onValueChange={(val) => {
+              setFakeHomeEnabled(val);
+              privacyMutation.mutate({ fakeHomeEnabled: val });
+            }}
+            trackColor={{ false: Colors.border, true: Colors.accent }}
+            thumbColor={fakeHomeEnabled ? Colors.text : Colors.textSecondary}
+          />
+        </View>
+
+        {fakeHomeEnabled && (
+          <View style={styles.fakeHomeCard}>
+            <View style={styles.fakeHomeSection}>
+              <Text style={styles.fakeHomeSectionLabel}>Posizione Casa</Text>
+              <Text style={styles.fakeHomeCoords}>
+                {homeLatitude != null && homeLongitude != null
+                  ? `${homeLatitude.toFixed(5)}, ${homeLongitude.toFixed(5)}`
+                  : "Non impostata"}
+              </Text>
+              <View style={styles.fakeHomeBtnRow}>
+                <Pressable
+                  style={styles.fakeHomeBtn}
+                  onPress={() => pickCoordFromGPS("home")}
+                >
+                  <Ionicons name="locate" size={15} color={Colors.text} />
+                  <Text style={styles.fakeHomeBtnLabel}>GPS</Text>
+                </Pressable>
+                {Platform.OS !== "web" && (
+                  <Pressable
+                    style={styles.fakeHomeBtn}
+                    onPress={() => openMapPicker("home")}
+                  >
+                    <Ionicons name="map-outline" size={15} color={Colors.text} />
+                    <Text style={styles.fakeHomeBtnLabel}>Mappa</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+
+            <View style={[styles.fakeHomeSection, { borderTopWidth: 1, borderTopColor: Colors.border, marginTop: 12, paddingTop: 12 }]}>
+              <Text style={styles.fakeHomeSectionLabel}>Posizione Fittizia</Text>
+              <Text style={styles.fakeHomeCoords}>
+                {fakeHomeLatitude != null && fakeHomeLongitude != null
+                  ? `${fakeHomeLatitude.toFixed(5)}, ${fakeHomeLongitude.toFixed(5)}`
+                  : "Non impostata"}
+              </Text>
+              <View style={styles.fakeHomeBtnRow}>
+                <Pressable
+                  style={styles.fakeHomeBtn}
+                  onPress={() => pickCoordFromGPS("fake")}
+                >
+                  <Ionicons name="locate" size={15} color={Colors.text} />
+                  <Text style={styles.fakeHomeBtnLabel}>GPS</Text>
+                </Pressable>
+                {Platform.OS !== "web" && (
+                  <Pressable
+                    style={styles.fakeHomeBtn}
+                    onPress={() => openMapPicker("fake")}
+                  >
+                    <Ionicons name="map-outline" size={15} color={Colors.text} />
+                    <Text style={styles.fakeHomeBtnLabel}>Mappa</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+
+            <View style={[styles.privacyKmRow, { marginTop: 12 }]}>
+              <Ionicons name="radio-button-on-outline" size={16} color={Colors.textSecondary} style={{ marginRight: 8 }} />
+              <Text style={styles.privacyKmLabel}>Raggio:</Text>
+              <TextInput
+                style={styles.privacyKmInput}
+                keyboardType="number-pad"
+                value={String(fakeHomeRadius)}
+                onChangeText={(v) => {
+                  const n = parseInt(v, 10);
+                  if (!isNaN(n) && n >= 1 && n <= 100) {
+                    setFakeHomeRadius(n);
+                    privacyMutation.mutate({ fakeHomeRadius: n });
+                  } else if (v === "" || v === "0") {
+                    setFakeHomeRadius(1);
+                    privacyMutation.mutate({ fakeHomeRadius: 1 });
+                  }
+                }}
+                maxLength={3}
+                selectTextOnFocus
+              />
+              <Text style={styles.privacyKmLabel}>km</Text>
+              <Text style={[styles.privacyDesc, { marginLeft: 8 }]}>(max 100)</Text>
+            </View>
+          </View>
+        )}
       </View>
 
       {currentUserType === "biker" && showSearchPref && (
@@ -1030,6 +1218,53 @@ export default function ProfileScreen() {
             </View>
           </View>
         </Pressable>
+      </Modal>
+
+      <Modal visible={mapPickerVisible} transparent={false} animationType="slide" onRequestClose={() => setMapPickerVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: Colors.background }}>
+          <View style={{ flexDirection: "row", alignItems: "center", padding: 16, paddingTop: insets.top + 8, backgroundColor: Colors.card, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+            <Pressable onPress={() => setMapPickerVisible(false)} style={{ marginRight: 12 }}>
+              <Ionicons name="close" size={24} color={Colors.text} />
+            </Pressable>
+            <Text style={{ flex: 1, fontSize: 16, fontWeight: "600", color: Colors.text }}>
+              {mapPickerTarget === "home" ? "Posizione Casa" : "Posizione Fittizia"}
+            </Text>
+            <Pressable
+              onPress={confirmMapPicker}
+              style={{ backgroundColor: Colors.accent, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16 }}
+            >
+              <Text style={{ color: "#fff", fontWeight: "700" }}>Conferma</Text>
+            </Pressable>
+          </View>
+          {Platform.OS !== "web" && MapView ? (
+            <MapView
+              style={{ flex: 1 }}
+              initialRegion={{
+                latitude: mapPickerCoord.latitude,
+                longitude: mapPickerCoord.longitude,
+                latitudeDelta: 0.05,
+                longitudeDelta: 0.05,
+              }}
+              onPress={(e: any) => setMapPickerCoord(e.nativeEvent.coordinate)}
+            >
+              {Marker && (
+                <Marker coordinate={mapPickerCoord} />
+              )}
+            </MapView>
+          ) : (
+            <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+              <Text style={{ color: Colors.textSecondary }}>Mappa non disponibile su web</Text>
+            </View>
+          )}
+          <View style={{ padding: 12, paddingBottom: insets.bottom + 8, backgroundColor: Colors.card }}>
+            <Text style={{ textAlign: "center", color: Colors.textSecondary, fontSize: 13 }}>
+              Tocca sulla mappa per spostare il pin
+            </Text>
+            <Text style={{ textAlign: "center", color: Colors.text, fontSize: 13, marginTop: 4 }}>
+              {`${mapPickerCoord.latitude.toFixed(5)}, ${mapPickerCoord.longitude.toFixed(5)}`}
+            </Text>
+          </View>
+        </View>
       </Modal>
 
       <Text style={{ textAlign: "center", fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.primary, marginTop: 16, marginBottom: 4 }}>
@@ -1444,6 +1679,52 @@ const styles = StyleSheet.create({
     color: Colors.text,
     backgroundColor: Colors.surface,
     marginRight: 6,
+  },
+  fakeHomeCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    marginHorizontal: 4,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  fakeHomeSection: {
+    gap: 6,
+  },
+  fakeHomeSectionLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  fakeHomeCoords: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.text,
+    opacity: 0.7,
+  },
+  fakeHomeBtnRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 2,
+  },
+  fakeHomeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  fakeHomeBtnLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: Colors.text,
   },
   mapStyleCard: {
     backgroundColor: Colors.surface,
