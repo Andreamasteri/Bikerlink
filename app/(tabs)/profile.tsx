@@ -247,6 +247,7 @@ export default function ProfileScreen() {
   });
 
   const [replacingSlot, setReplacingSlot] = useState<string | null>(null);
+  const [failedPhotos, setFailedPhotos] = useState<Set<string>>(new Set());
 
   const pickImageForSlot = useCallback((existingPhotoId?: string) => {
     showImagePickerMenu(
@@ -608,7 +609,18 @@ export default function ProfileScreen() {
                   : `${getApiUrl()}${photo.photoUrl}`;
                 return (
                   <View key={photo.id} style={styles.photoItem}>
-                    <Image source={{ uri: photoUri }} style={styles.photoImage} />
+                    {failedPhotos.has(photo.id) ? (
+                      <View style={styles.photoBroken}>
+                        <Ionicons name="image-outline" size={28} color={Colors.textSecondary} />
+                      </View>
+                    ) : (
+                      <Image
+                        source={{ uri: photoUri }}
+                        style={styles.photoImage}
+                        resizeMode="cover"
+                        onError={() => setFailedPhotos(prev => new Set(prev).add(photo.id))}
+                      />
+                    )}
                     {isReplacing && (
                       <View style={styles.photoOverlay}>
                         <ActivityIndicator color="#FFFFFF" />
@@ -1150,10 +1162,18 @@ const styles = StyleSheet.create({
     height: photoSize,
     borderRadius: 12,
     overflow: "hidden",
+    backgroundColor: Colors.surfaceLight,
   },
   photoImage: {
     width: "100%",
     height: "100%",
+  },
+  photoBroken: {
+    width: "100%",
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.surfaceLight,
   },
   photoOverlay: {
     ...StyleSheet.absoluteFillObject,

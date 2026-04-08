@@ -359,7 +359,7 @@ export default function PublicProfileScreen() {
                 const uri = p.photoUrl?.startsWith("http") ? p.photoUrl : `${baseUrl}${p.photoUrl}`;
                 return (
                   <TouchableOpacity key={p.id} onPress={() => setSelectedPhoto(uri)} activeOpacity={0.8}>
-                    <Image source={{ uri }} style={styles.photoThumb} />
+                    <Image source={{ uri }} style={styles.photoThumb} resizeMode="cover" />
                   </TouchableOpacity>
                 );
               })}
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
   },
   blockButtonText: { fontSize: 15, fontWeight: "600" as const, color: Colors.error },
   avatarImage: { width: 96, height: 96, borderRadius: 48 },
-  photoThumb: { width: 80, height: 80, borderRadius: 10, marginRight: 8 },
+  photoThumb: { width: 80, height: 80, borderRadius: 10, marginRight: 8, backgroundColor: Colors.surfaceLight },
   photoModal: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.92)",

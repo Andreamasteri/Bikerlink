@@ -740,6 +740,9 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// Foto utente — memorizzate su Replit Object Storage (cloud), path: public/photos/<filename>
+// Persistono tra APK update, OTA update e cache del dispositivo.
+// Vengono eliminate solo con deleteObject() oppure se l'account viene cancellato (cascade).
 router.post("/me/photos", requireAuth, upload.single("photo"), async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;

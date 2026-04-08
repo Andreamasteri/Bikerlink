@@ -9,7 +9,8 @@ export function getApiUrl(): string {
 
   let url = new URL(`https://${host}`);
 
-  return url.href;
+  // Strip trailing slash so string concatenation like `${getApiUrl()}${path}` works correctly.
+  return url.href.replace(/\/$/, "");
 }
 
 function handleUnauthorized() {
