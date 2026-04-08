@@ -7,12 +7,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/lib/auth-context";
 import { useLocationGate } from "@/lib/location-context";
 import { useQuery } from "@tanstack/react-query";
+import { useTaskbarStyle } from "@/lib/taskbar-style-context";
+import CustomTabBar, { type TabItem } from "@/components/CustomTabBar";
+import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const { isGpsGateActive, requestPermission } = useLocationGate();
+  const { taskbarStyle } = useTaskbarStyle();
   const prevUnreadRef = useRef<number>(0);
 
   useEffect(() => {
@@ -108,6 +112,59 @@ export default function TabLayout() {
 
   const gpsTabHref = isGpsGateActive ? null : undefined;
 
+  const HIDDEN_TAB_NAMES = new Set(["tracking", "garage"]);
+  if (isGpsGateActive) {
+    ["index", "proposals", "ready", "motoclub", "match", "music", "chat", "contest"].forEach(
+      (n) => HIDDEN_TAB_NAMES.add(n)
+    );
+  }
+
+  const renderCustomTabBar = (props: BottomTabBarProps) => {
+    const { state, descriptors, navigation } = props;
+
+    const tabs: TabItem[] = state.routes
+      .filter((route) => !HIDDEN_TAB_NAMES.has(route.name))
+      .map((route, _idx) => {
+        const descriptor = descriptors[route.key];
+        const options = descriptor.options;
+        const index = state.routes.findIndex((r) => r.key === route.key);
+        const isFocused = state.index === index;
+        const iconFn = options.tabBarIcon;
+
+        return {
+          name: route.name,
+          title:
+            typeof options.tabBarLabel === "string"
+              ? options.tabBarLabel
+              : (options.title ?? route.name),
+          isFocused,
+          icon: (color: string, size: number) => {
+            if (!iconFn) return null;
+            return iconFn({ focused: isFocused, color, size }) as React.ReactNode;
+          },
+          onPress: () => {
+            const event = navigation.emit({
+              type: "tabPress",
+              target: route.key,
+              canPreventDefault: true,
+            });
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          },
+        };
+      });
+
+    return (
+      <CustomTabBar
+        tabs={tabs}
+        style={taskbarStyle}
+        tabBarHeight={tabBarHeight}
+        tabBarPaddingBottom={tabBarPaddingBottom}
+      />
+    );
+  };
+
   return (
     <>
       {isGpsGateActive && (
@@ -133,6 +190,7 @@ export default function TabLayout() {
         </View>
       )}
       <Tabs
+        tabBar={taskbarStyle !== "tutti" ? renderCustomTabBar : undefined}
         screenOptions={{
           tabBarActiveTintColor: Colors.accent,
           tabBarInactiveTintColor: Colors.textSecondary,
@@ -193,7 +251,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="motoclub"
           options={{
-            title: "Motoclub",
+            title: "Clubs",
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="shield" size={size} color={color} />
             ),
@@ -209,6 +267,54 @@ export default function TabLayout() {
               <Ionicons name="flash" size={size} color={color} />
             ),
             headerShown: false,
+            href: gpsTabHref,
+          }}
+        />
+        <Tabs.Screen
+          name="music"
+          options={{
+            title: "Music",
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="musical-notes" size={size} color={color} />
+            ),
+            headerTitle: "Music",
+            href: gpsTabHref,
+          }}
+        />
+        <Tabs.Screen
+          name="chat"
+          options={{
+            title: "Chat",
+            tabBarIcon: ({ color, size }) => (
+              <View>
+                <Ionicons name="chatbubbles" size={size} color={color} />
+                {unreadCount > 0 && (
+                  <View
+                    style={{
+                      position: "absolute",
+                      top: -2,
+                      right: -4,
+                      width: 10,
+                      height: 10,
+                      borderRadius: 5,
+                      backgroundColor: Colors.accent,
+                    }}
+                  />
+                )}
+              </View>
+            ),
+            headerTitle: "Chat",
+            href: gpsTabHref,
+          }}
+        />
+        <Tabs.Screen
+          name="contest"
+          options={{
+            title: "Pic!",
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="camera" size={size} color={color} />
+            ),
+            headerTitle: "Pic!",
             href: gpsTabHref,
           }}
         />
@@ -240,43 +346,6 @@ export default function TabLayout() {
               ),
             headerTitle: isBikerOrCoppia ? "Il Mio Garage" : "La Mia Wishlist",
             href: null,
-          }}
-        />
-        <Tabs.Screen
-          name="contest"
-          options={{
-            title: "Pic!",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="camera" size={size} color={color} />
-            ),
-            headerTitle: "Pic!",
-            href: gpsTabHref,
-          }}
-        />
-        <Tabs.Screen
-          name="chat"
-          options={{
-            title: "Chat",
-            tabBarIcon: ({ color, size }) => (
-              <View>
-                <Ionicons name="chatbubbles" size={size} color={color} />
-                {unreadCount > 0 && (
-                  <View
-                    style={{
-                      position: "absolute",
-                      top: -2,
-                      right: -4,
-                      width: 10,
-                      height: 10,
-                      borderRadius: 5,
-                      backgroundColor: Colors.accent,
-                    }}
-                  />
-                )}
-              </View>
-            ),
-            headerTitle: "Chat",
-            href: gpsTabHref,
           }}
         />
         <Tabs.Screen

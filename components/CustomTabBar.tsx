@@ -1,0 +1,351 @@
+import React, { useState, useRef } from "react";
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Dimensions,
+  Modal,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import Colors from "@/constants/colors";
+import { type TaskbarStyle } from "@/lib/taskbar-style-context";
+
+export interface TabItem {
+  name: string;
+  title: string;
+  icon: (color: string, size: number) => React.ReactNode;
+  isFocused: boolean;
+  onPress: () => void;
+}
+
+interface CustomTabBarProps {
+  tabs: TabItem[];
+  style: TaskbarStyle;
+  tabBarHeight: number;
+  tabBarPaddingBottom: number;
+}
+
+const COMMUNITY_TABS = new Set(["match", "motoclub", "contest", "music"]);
+const MAX_SCORRI_VISIBLE = 6;
+
+function TabIcon({ tab, isActive }: { tab: TabItem; isActive: boolean }) {
+  const color = isActive ? Colors.accent : Colors.textSecondary;
+  return (
+    <Pressable style={styles.tabItem} onPress={tab.onPress}>
+      {tab.icon(color, 24)}
+      <Text style={[styles.tabLabel, { color }]} numberOfLines={1}>
+        {tab.title}
+      </Text>
+    </Pressable>
+  );
+}
+
+function ScrollTabIcon({
+  tab,
+  isActive,
+  itemWidth,
+}: {
+  tab: TabItem;
+  isActive: boolean;
+  itemWidth: number;
+}) {
+  const color = isActive ? Colors.accent : Colors.textSecondary;
+  return (
+    <Pressable
+      style={[styles.tabItem, { width: itemWidth, flex: 0 }]}
+      onPress={tab.onPress}
+    >
+      {tab.icon(color, 24)}
+      <Text style={[styles.tabLabel, { color }]} numberOfLines={1}>
+        {tab.title}
+      </Text>
+    </Pressable>
+  );
+}
+
+export default function CustomTabBar({
+  tabs,
+  style,
+  tabBarHeight,
+  tabBarPaddingBottom,
+}: CustomTabBarProps) {
+  const [communityOpen, setCommunityOpen] = useState(false);
+  const [showAltroOverride, setShowAltroOverride] = useState<boolean | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+
+  const barStyle = {
+    height: tabBarHeight,
+    paddingBottom: tabBarPaddingBottom,
+    backgroundColor: Colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+  };
+
+  if (style === "tutti") {
+    return (
+      <View style={[styles.bar, barStyle]}>
+        {tabs.map((tab) => (
+          <TabIcon key={tab.name} tab={tab} isActive={tab.isFocused} />
+        ))}
+      </View>
+    );
+  }
+
+  if (style === "scorri") {
+    const screenWidth = Dimensions.get("window").width;
+    const arrowWidth = 32;
+    const availableWidth = screenWidth - arrowWidth * 2;
+    const itemWidth = Math.floor(availableWidth / MAX_SCORRI_VISIBLE);
+
+    return (
+      <View style={[barStyle, styles.scorriBar]}>
+        <Pressable
+          style={styles.arrowBtn}
+          onPress={() => scrollRef.current?.scrollTo({ x: 0, animated: true })}
+        >
+          <Ionicons name="chevron-back" size={18} color={Colors.textSecondary} />
+        </Pressable>
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scorriContent}
+          style={{ flex: 1 }}
+        >
+          {tabs.map((tab) => (
+            <ScrollTabIcon
+              key={tab.name}
+              tab={tab}
+              isActive={tab.isFocused}
+              itemWidth={itemWidth}
+            />
+          ))}
+        </ScrollView>
+        <Pressable
+          style={styles.arrowBtn}
+          onPress={() => scrollRef.current?.scrollToEnd({ animated: true })}
+        >
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color={Colors.textSecondary}
+          />
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (style === "altro") {
+    const firstFive = tabs.slice(0, 5);
+    const rest = tabs.slice(5);
+    const restHasFocused = rest.some((t) => t.isFocused);
+    const showAltro = showAltroOverride !== null ? showAltroOverride : restHasFocused;
+    const displayTabs = showAltro ? rest : firstFive;
+    const altroActive = showAltro || restHasFocused;
+
+    return (
+      <View style={[styles.bar, barStyle]}>
+        {displayTabs.map((tab) => (
+          <TabIcon key={tab.name} tab={tab} isActive={tab.isFocused} />
+        ))}
+        <Pressable
+          style={styles.tabItem}
+          onPress={() => setShowAltroOverride((prev) => !(prev !== null ? prev : restHasFocused))}
+        >
+          <Ionicons
+            name={showAltro ? "grid" : "ellipsis-horizontal"}
+            size={24}
+            color={altroActive ? Colors.accent : Colors.textSecondary}
+          />
+          <Text
+            style={[
+              styles.tabLabel,
+              { color: altroActive ? Colors.accent : Colors.textSecondary },
+            ]}
+          >
+            Altro...
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (style === "raggruppa") {
+    const communityMembers = tabs.filter((t) => COMMUNITY_TABS.has(t.name));
+    const communityFocused = communityMembers.some((t) => t.isFocused);
+
+    const displayItems: Array<TabItem | "community"> = [];
+    let communityInserted = false;
+    tabs.forEach((tab) => {
+      if (COMMUNITY_TABS.has(tab.name)) {
+        if (!communityInserted) {
+          displayItems.push("community");
+          communityInserted = true;
+        }
+      } else {
+        displayItems.push(tab);
+      }
+    });
+
+    return (
+      <>
+        <View style={[styles.bar, barStyle]}>
+          {displayItems.map((item, idx) => {
+            if (item === "community") {
+              return (
+                <Pressable
+                  key="community"
+                  style={styles.tabItem}
+                  onPress={() => setCommunityOpen(true)}
+                >
+                  <Ionicons
+                    name="people"
+                    size={24}
+                    color={
+                      communityFocused ? Colors.accent : Colors.textSecondary
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.tabLabel,
+                      {
+                        color: communityFocused
+                          ? Colors.accent
+                          : Colors.textSecondary,
+                      },
+                    ]}
+                  >
+                    Community
+                  </Text>
+                </Pressable>
+              );
+            }
+            return (
+              <TabIcon
+                key={item.name}
+                tab={item}
+                isActive={item.isFocused}
+              />
+            );
+          })}
+        </View>
+
+        <Modal
+          visible={communityOpen}
+          transparent
+          animationType="none"
+          onRequestClose={() => setCommunityOpen(false)}
+        >
+          <Pressable
+            style={styles.communityOverlay}
+            onPress={() => setCommunityOpen(false)}
+          >
+            <View
+              style={[styles.communityMenu, { bottom: tabBarHeight }]}
+            >
+              {communityMembers.map((tab) => (
+                <Pressable
+                  key={tab.name}
+                  style={[
+                    styles.communityItem,
+                    tab.isFocused && styles.communityItemActive,
+                  ]}
+                  onPress={() => {
+                    setCommunityOpen(false);
+                    tab.onPress();
+                  }}
+                >
+                  {tab.icon(
+                    tab.isFocused ? Colors.accent : Colors.text,
+                    22
+                  )}
+                  <Text
+                    style={[
+                      styles.communityItemLabel,
+                      tab.isFocused && { color: Colors.accent },
+                    ]}
+                  >
+                    {tab.title}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </Pressable>
+        </Modal>
+      </>
+    );
+  }
+
+  return null;
+}
+
+const styles = StyleSheet.create({
+  bar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+  },
+  scorriBar: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  scorriContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  arrowBtn: {
+    width: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabItem: {
+    flex: 1,
+    minWidth: 56,
+    maxWidth: 90,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 6,
+    gap: 2,
+  },
+  tabLabel: {
+    fontSize: 10,
+    fontFamily: "Inter_500Medium",
+    textAlign: "center",
+  },
+  communityOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "flex-end",
+  },
+  communityMenu: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    paddingVertical: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  communityItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    gap: 16,
+    borderRadius: 10,
+  },
+  communityItemActive: {
+    backgroundColor: Colors.background,
+  },
+  communityItemLabel: {
+    fontSize: 16,
+    fontFamily: "Inter_500Medium",
+    color: Colors.text,
+  },
+});

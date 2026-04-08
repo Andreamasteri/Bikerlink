@@ -32,6 +32,7 @@ import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMapConfig } from "@/lib/map-context";
 import { MAP_PROVIDER_LABELS, MAP_PROVIDER_DESCRIPTIONS, type MapProvider } from "@/lib/map-tiles";
+import { useTaskbarStyle, type TaskbarStyle } from "@/lib/taskbar-style-context";
 import * as Updates from "expo-updates";
 import * as Location from "expo-location";
 import otaUpdatesRaw from "@/ota-updates.json";
@@ -141,6 +142,7 @@ export default function ProfileScreen() {
   const t = useT();
   const locale = useLocale();
   const { enabled: mapsEnabled, userChoiceEnabled } = useMapConfig();
+  const { taskbarStyle, setTaskbarStyle } = useTaskbarStyle();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showRevokeConsentModal, setShowRevokeConsentModal] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
@@ -1094,6 +1096,44 @@ export default function ProfileScreen() {
         </View>
       )}
 
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Taskbar Style</Text>
+        <View style={taskbarStyles.row}>
+          {([
+            { value: "tutti" as TaskbarStyle, label: "Tutti" },
+            { value: "scorri" as TaskbarStyle, label: "Scorri" },
+            { value: "altro" as TaskbarStyle, label: "Altro..." },
+            { value: "raggruppa" as TaskbarStyle, label: "Raggruppa" },
+          ]).map((opt) => {
+            const isSelected = taskbarStyle === opt.value;
+            return (
+              <Pressable
+                key={opt.value}
+                style={taskbarStyles.optionCol}
+                onPress={() => setTaskbarStyle(opt.value)}
+              >
+                <View
+                  style={[
+                    taskbarStyles.dot,
+                    isSelected
+                      ? taskbarStyles.dotSelected
+                      : taskbarStyles.dotUnselected,
+                  ]}
+                />
+                <Text
+                  style={[
+                    taskbarStyles.dotLabel,
+                    isSelected && { color: Colors.accent },
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
       {donationData?.enabled && !!donationData?.paypalEmail && (
         <View style={styles.donationSection}>
           <Image
@@ -2000,5 +2040,38 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontFamily: "Inter_600SemiBold",
     color: "#fff",
+  },
+});
+
+const taskbarStyles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  optionCol: {
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+  },
+  dot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: Colors.accent,
+  },
+  dotSelected: {
+    backgroundColor: Colors.accent,
+  },
+  dotUnselected: {
+    backgroundColor: "transparent",
+  },
+  dotLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+    textAlign: "center",
   },
 });

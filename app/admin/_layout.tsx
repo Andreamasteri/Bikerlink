@@ -24,7 +24,7 @@ export default function AdminLayout() {
       <Stack.Screen name="stregatti" options={{ title: "Stregatti" }} />
       <Stack.Screen name="db-debug" options={{ title: "DB Debug" }} />
       <Stack.Screen name="ota-history" options={{ title: "Storico OTA" }} />
-      <Stack.Screen name="motoclubs" options={{ title: "Motoclub" }} />
+      <Stack.Screen name="motoclubs" options={{ title: "Clubs" }} />
       <Stack.Screen name="invite-codes" options={{ title: "Codici Invito" }} />
       <Stack.Screen name="backup" options={{ title: "Backup automatici" }} />
       <Stack.Screen name="system" options={{ title: "Sistema" }} />

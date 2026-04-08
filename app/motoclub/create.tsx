@@ -163,7 +163,7 @@ export default function CreateMotoclub() {
             Riceverai una notifica quando la tua richiesta sarà approvata dall'admin.
           </Text>
           <TouchableOpacity style={styles.doneBtn} onPress={() => router.back()}>
-            <Text style={styles.doneBtnText}>Torna ai Motoclub</Text>
+            <Text style={styles.doneBtnText}>Torna ai Clubs</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -176,7 +176,7 @@ export default function CreateMotoclub() {
         <TouchableOpacity onPress={() => (step === 0 ? router.back() : setStep((s) => s - 1))} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Nuovo Motoclub</Text>
+        <Text style={styles.headerTitle}>Nuovo Club</Text>
         <View style={{ width: 40 }} />
       </View>
 

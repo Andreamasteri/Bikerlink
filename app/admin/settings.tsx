@@ -1121,7 +1121,7 @@ export default function AdminSettings() {
         <View style={styles.synecoHeader}>
           <View style={styles.synecoInfo}>
             <Ionicons name="people" size={20} color={Colors.warning} />
-            <Text style={styles.synecoLabel}>Creazione Motoclub da Utenti</Text>
+            <Text style={styles.synecoLabel}>Creazione Club da Utenti</Text>
           </View>
           <Switch
             value={motoclubCreationEnabled}
@@ -1274,7 +1274,7 @@ export default function AdminSettings() {
         <View style={styles.synecoHeader}>
           <View style={styles.synecoInfo}>
             <Ionicons name="people-circle" size={20} color={Colors.warning} />
-            <Text style={styles.synecoLabel}>Zavorrine nei Motoclub</Text>
+            <Text style={styles.synecoLabel}>Zavorrine nei Club</Text>
           </View>
           <Switch
             value={motoclubZavEnabled}

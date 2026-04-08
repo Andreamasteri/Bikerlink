@@ -41,6 +41,7 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { LocationProvider } from "@/lib/location-context";
 import { LanguageProvider, useLanguage } from "@/lib/language-context";
 import { MapSettingsProvider, useMapConfig } from "@/lib/map-context";
+import { TaskbarStyleProvider } from "@/lib/taskbar-style-context";
 import Colors from "@/constants/colors";
 import UptimeWidget from "@/components/UptimeWidget";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -264,6 +265,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <MapSettingsProvider>
+              <TaskbarStyleProvider>
               <LocationProvider>
                 <StartupGate ready={ready}>
                   <OtaStartupChecker />
@@ -274,6 +276,7 @@ export default function RootLayout() {
                   </MapReadyGate>
                 </StartupGate>
               </LocationProvider>
+              </TaskbarStyleProvider>
             </MapSettingsProvider>
           </AuthProvider>
         </QueryClientProvider>

@@ -306,7 +306,7 @@ export default function ChatConversationScreen() {
 
   const getTitle = (): string => {
     if (conversation?.title) return conversation.title;
-    if (conversation?.conversationType === "motoclub") return "MotoClub";
+    if (conversation?.conversationType === "motoclub") return "Clubs";
     if (conversation?.conversationType === "contact") {
       const others = conversation.participants.filter((p) => p.id !== userId);
       if (others.length === 0) return "Chat di contatto";
