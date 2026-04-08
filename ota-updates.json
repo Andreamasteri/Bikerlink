@@ -443,14 +443,14 @@
     "jsEngine": "hermes",
     "message": "OTA-22: fix foto profilo sfondo nero (getApiUrl trailing slash) + fallback UI errore foto",
     "note": "Task #429. getApiUrl() restituiva trailing slash causando double-slash negli URL foto (/api/users/photos/...) → 404 → foto nera. Fix: .replace(/\\/$/, '') in lib/query-client.ts. UI: failedPhotos Set state + onError handler + placeholder image-outline nei profili (profile.tsx, edit.tsx, profile/[id].tsx). Reset failedPhotos su dataUpdatedAt per evitare placeholder permanenti dopo errori transitori.",
-    "updateGroupId": "PENDING",
-    "androidUpdateId": "PENDING",
+    "updateGroupId": "00be23d7-610a-4602-a0f6-66770f05f959",
+    "androidUpdateId": "019d6dc7-1e4e-76f9-91f1-e744998a23e9",
     "iosUpdateId": null,
-    "commitBase": "72eff7d7f7283dfcebf777a07d763d5a6653d30c",
-    "easDashboard": "PENDING",
+    "commitBase": "d637c6e50c9cb4ac2e4a716efc9eb7fbb0763d3f",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/00be23d7-610a-4602-a0f6-66770f05f959",
     "apkBuildId": null,
     "apkVersionCode": 6,
     "apkUrl": null,
-    "status": "publishing"
+    "status": "published"
   }
 ]
