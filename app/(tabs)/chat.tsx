@@ -505,6 +505,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: Colors.accent,
+    paddingVertical: 4,
   },
   newChatButton: {
     padding: 4,
@@ -523,7 +527,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontFamily: "Inter_400Regular",
-    color: Colors.error,
+    color: Colors.warning,
   },
   centerContent: {
     flex: 1,

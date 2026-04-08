@@ -142,7 +142,7 @@ export default function ProfileScreen() {
   const currentUpdateId = Updates.updateId ?? null;
   const currentOtaEntry = allOtaUpdates.find(e => e.androidUpdateId === currentUpdateId) ?? null;
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-  const CURRENT_OTA_NUMBER = 20;
+  const CURRENT_OTA_NUMBER = 21;
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -539,7 +539,6 @@ export default function ProfileScreen() {
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 }}>
             <Ionicons name="location-outline" size={13} color={Colors.textSecondary} />
             <Text style={{ fontSize: 12, color: Colors.textSecondary, fontFamily: "Inter_400Regular" }}>
-              {"Residente in: "}
               {[
                 profile?.region || null,
                 profile?.country ? `${getCountryFlag(profile.country)} ${getCountryName(profile.country)}` : null,

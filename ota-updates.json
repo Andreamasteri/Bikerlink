@@ -410,5 +410,26 @@
     "apkVersionCode": 6,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 21,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-08",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-21: Chat UI (bordi arancioni Nuova Chat, label gialla), rimozione 'Residente in:', easter egg solo full map",
+    "note": "Task #428. Chat: bordi arancioni sopra/sotto 'Nuova Chat' (borderTopWidth/BottomWidth:1 Colors.accent), label email-notif gialla (Colors.warning). 'Residente in:' rimosso da profile.tsx/[id].tsx/index.tsx (rimane icona+regione/paese). Easter egg nascosti sulla base map (easterEggs=[]), visibili solo aprendo la full map (Modal).",
+    "updateGroupId": "2c441305-b71b-4029-b48b-512c91d07f9f",
+    "androidUpdateId": "019d6d0c-df4a-7391-97e7-543c7c974888",
+    "iosUpdateId": null,
+    "commitBase": "53e640a25434566c094b89420e3ce45d964fad1a",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/2c441305-b71b-4029-b48b-512c91d07f9f",
+    "apkBuildId": null,
+    "apkVersionCode": 6,
+    "apkUrl": null,
+    "status": "published"
   }
 ]

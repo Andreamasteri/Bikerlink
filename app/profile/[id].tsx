@@ -308,7 +308,6 @@ export default function PublicProfileScreen() {
             <View style={styles.locationRow}>
               <Ionicons name="location" size={14} color={Colors.textSecondary} />
               <Text style={styles.locationText}>
-                {"Residente in: "}
                 {[
                   profile.region || null,
                   profile.city || null,

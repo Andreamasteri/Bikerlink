@@ -725,7 +725,7 @@ export default function MapScreen() {
           <InteractiveMap
             users={usersWithSelf.filter((u: any) => u.latitude != null && u.longitude != null && !isNaN(u.latitude) && !isNaN(u.longitude))}
             workshops={(workshopsQuery.data ?? []).filter((w: any) => w.latitude != null && w.longitude != null && !isNaN(w.latitude) && !isNaN(w.longitude))}
-            easterEggs={(easterEggsQuery.data ?? []).filter((e: any) => e.latitude != null && e.longitude != null && !isNaN(e.latitude) && !isNaN(e.longitude))}
+            easterEggs={[]}
             activeSosRequests={(activeSosQuery.data ?? []).filter((s: any) => s.latitude != null && s.longitude != null)}
             isAvailable={isAvailable}
             ghostMode={isGhostMode}
@@ -1140,7 +1140,6 @@ export default function MapScreen() {
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 }}>
                         <Ionicons name="location-outline" size={12} color={Colors.textSecondary} />
                         <Text style={{ fontSize: 11, color: Colors.textSecondary, fontFamily: "Inter_400Regular" }}>
-                          {"Residente in: "}
                           {[
                             selectedUser?.region || null,
                             selectedUser?.country ? `${getCountryFlag(selectedUser.country)} ${getCountryName(selectedUser.country)}` : null,
