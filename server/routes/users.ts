@@ -168,13 +168,16 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
 
-    const allowedUserFields = ["nickname", "phone", "sex", "coupleSexConfig", "birthYear", "region", "country", "avatarUrl"];
+    const b = req.body;
     const userUpdate: Record<string, unknown> = {};
-    for (const field of allowedUserFields) {
-      if (req.body[field] !== undefined) {
-        userUpdate[field] = req.body[field];
-      }
-    }
+    if (b.nickname !== undefined) userUpdate.nickname = b.nickname;
+    if (b.phone !== undefined) userUpdate.phone = b.phone;
+    if (b.sex !== undefined) userUpdate.sex = b.sex;
+    if (b.coupleSexConfig !== undefined) userUpdate.coupleSexConfig = b.coupleSexConfig;
+    if (b.birthYear !== undefined) userUpdate.birthYear = b.birthYear;
+    if (b.region !== undefined) userUpdate.region = b.region;
+    if (b.country !== undefined) userUpdate.country = b.country;
+    if (b.avatarUrl !== undefined) userUpdate.avatarUrl = b.avatarUrl;
 
     if (Object.keys(userUpdate).length > 0) {
       if (userUpdate.nickname) {
@@ -194,13 +197,11 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
       }
     }
 
-    const allowedProfileFields = ["bio", "maxPickupDistance", "latitude", "longitude"];
     const profileUpdate: Record<string, unknown> = {};
-    for (const field of allowedProfileFields) {
-      if (req.body[field] !== undefined) {
-        profileUpdate[field] = req.body[field];
-      }
-    }
+    if (b.bio !== undefined) profileUpdate.bio = b.bio;
+    if (b.maxPickupDistance !== undefined) profileUpdate.maxPickupDistance = b.maxPickupDistance;
+    if (b.latitude !== undefined) profileUpdate.latitude = b.latitude;
+    if (b.longitude !== undefined) profileUpdate.longitude = b.longitude;
 
     if (Object.keys(profileUpdate).length > 0) {
       const existingProfileMe = await storage.getUserProfile(userId);

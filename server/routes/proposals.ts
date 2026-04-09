@@ -634,19 +634,27 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Non autorizzato" });
     }
 
-    const allowedFields = [
-      "title", "description", "departureLatitude", "departureLongitude", "departureAddress",
-      "destinationAddress", "destinationLatitude", "destinationLongitude",
-      "scheduledAt", "departureTimeFrom", "departureTimeTo", "returnDeadline",
-      "searchRadius", "motorcycleId", "wishlistMotoId", "anyMotoOk",
-      "stops", "maxParticipants", "status",
-    ];
+    const b = req.body;
     const updateData: Record<string, unknown> = {};
-    for (const field of allowedFields) {
-      if (req.body[field] !== undefined) {
-        updateData[field] = req.body[field];
-      }
-    }
+    if (b.title !== undefined) updateData.title = b.title;
+    if (b.description !== undefined) updateData.description = b.description;
+    if (b.departureLatitude !== undefined) updateData.departureLatitude = b.departureLatitude;
+    if (b.departureLongitude !== undefined) updateData.departureLongitude = b.departureLongitude;
+    if (b.departureAddress !== undefined) updateData.departureAddress = b.departureAddress;
+    if (b.destinationAddress !== undefined) updateData.destinationAddress = b.destinationAddress;
+    if (b.destinationLatitude !== undefined) updateData.destinationLatitude = b.destinationLatitude;
+    if (b.destinationLongitude !== undefined) updateData.destinationLongitude = b.destinationLongitude;
+    if (b.scheduledAt !== undefined) updateData.scheduledAt = b.scheduledAt;
+    if (b.departureTimeFrom !== undefined) updateData.departureTimeFrom = b.departureTimeFrom;
+    if (b.departureTimeTo !== undefined) updateData.departureTimeTo = b.departureTimeTo;
+    if (b.returnDeadline !== undefined) updateData.returnDeadline = b.returnDeadline;
+    if (b.searchRadius !== undefined) updateData.searchRadius = b.searchRadius;
+    if (b.motorcycleId !== undefined) updateData.motorcycleId = b.motorcycleId;
+    if (b.wishlistMotoId !== undefined) updateData.wishlistMotoId = b.wishlistMotoId;
+    if (b.anyMotoOk !== undefined) updateData.anyMotoOk = b.anyMotoOk;
+    if (b.stops !== undefined) updateData.stops = b.stops;
+    if (b.maxParticipants !== undefined) updateData.maxParticipants = b.maxParticipants;
+    if (b.status !== undefined) updateData.status = b.status;
 
     const dateFields = ["scheduledAt", "departureTimeFrom", "departureTimeTo", "returnDeadline"];
     for (const f of dateFields) {

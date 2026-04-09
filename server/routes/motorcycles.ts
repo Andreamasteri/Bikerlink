@@ -137,13 +137,19 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Non autorizzato" });
     }
 
-    const allowedFields = ["brand", "model", "year", "displacement", "motorcycleType", "ridingStyle", "photoUrl", "isForSale", "saleDescription", "isDefault", "motoDescription"];
+    const b = req.body;
     const updateData: Record<string, unknown> = {};
-    for (const field of allowedFields) {
-      if (req.body[field] !== undefined) {
-        updateData[field] = req.body[field];
-      }
-    }
+    if (b.brand !== undefined) updateData.brand = b.brand;
+    if (b.model !== undefined) updateData.model = b.model;
+    if (b.year !== undefined) updateData.year = b.year;
+    if (b.displacement !== undefined) updateData.displacement = b.displacement;
+    if (b.motorcycleType !== undefined) updateData.motorcycleType = b.motorcycleType;
+    if (b.ridingStyle !== undefined) updateData.ridingStyle = b.ridingStyle;
+    if (b.photoUrl !== undefined) updateData.photoUrl = b.photoUrl;
+    if (b.isForSale !== undefined) updateData.isForSale = b.isForSale;
+    if (b.saleDescription !== undefined) updateData.saleDescription = b.saleDescription;
+    if (b.isDefault !== undefined) updateData.isDefault = b.isDefault;
+    if (b.motoDescription !== undefined) updateData.motoDescription = b.motoDescription;
 
     if (updateData.isDefault !== undefined) {
       updateData.isDefault = updateData.isDefault === true || updateData.isDefault === "true";

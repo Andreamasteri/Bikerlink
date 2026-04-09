@@ -169,9 +169,9 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       await storage.createEmailVerificationToken(user.id, token, expiresAt);
       const emailSent = await sendVerificationEmail(user.email, user.nickname, token);
       if (emailSent) {
-        console.log(`[EMAIL VERIFICATION] Email inviata a ${user.email}`);
+        console.log(`[EMAIL VERIFICATION] Email inviata a utente ${user.id}`);
       } else {
-        console.warn(`[EMAIL VERIFICATION] Email NON inviata a ${user.email} - fallback notifica admin`);
+        console.warn(`[EMAIL VERIFICATION] Email NON inviata a utente ${user.id} - fallback notifica admin`);
       }
 
       try {
@@ -353,9 +353,9 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res:
 
     const emailSent = await sendPasswordResetEmail(user.email, user.nickname, code);
     if (emailSent) {
-      console.log(`[PASSWORD RESET] Codice reset inviato a ${user.email}`);
+      console.log(`[PASSWORD RESET] Codice reset inviato a utente ${user.id}`);
     } else {
-      console.warn(`[PASSWORD RESET] Email NON inviata a ${user.email}`);
+      console.warn(`[PASSWORD RESET] Email NON inviata a utente ${user.id}`);
     }
 
     return res.json({ message: "Se l'email è registrata, riceverai un codice di recupero" });
