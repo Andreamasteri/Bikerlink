@@ -451,7 +451,7 @@ function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, 
   );
 }
 
-type TabKey = "zavorrine" | "biker" | "proposals" | "accepted" | "blacklist";
+type TabKey = "zavorrine" | "biker" | "proposals" | "music" | "accepted" | "blacklist";
 
 export default function MatchScreen() {
   const router = useRouter();
@@ -502,6 +502,18 @@ export default function MatchScreen() {
     enabled: !!user,
     refetchOnMount: true,
   });
+
+  const { data: spotifyStatus } = useQuery<{ connected: boolean }>({
+    queryKey: ["/api/spotify/status"],
+    enabled: !!user && activeTab === "music",
+  });
+
+  const { data: musicMatchData, isLoading: musicLoading, isRefetching: musicRefetching, refetch: musicRefetch } = useQuery<{ matches: any[] }>({
+    queryKey: ["/api/spotify/match/music"],
+    enabled: !!user && activeTab === "music" && spotifyStatus?.connected === true,
+  });
+
+  const musicMatches = musicMatchData?.matches ?? [];
 
   const prevMatchCountRef = useRef<number | null>(null);
 
@@ -589,6 +601,7 @@ export default function MatchScreen() {
     activeTab === "zavorrine" ? visibleGarageMatches :
     activeTab === "biker" ? visibleBikerMatches :
     activeTab === "proposals" ? visibleProposalMatches :
+    activeTab === "music" ? musicMatches :
     activeTab === "accepted" ? allAcceptedMatches :
     allBlockedUsers;
 
@@ -596,12 +609,14 @@ export default function MatchScreen() {
     activeTab === "zavorrine" ? garageLoading :
     activeTab === "biker" ? bikerLoading :
     activeTab === "proposals" ? proposalLoading :
+    activeTab === "music" ? musicLoading :
     activeTab === "accepted" ? (garageLoading || bikerLoading || proposalLoading) :
     blockedLoading;
   const isRefetching =
     activeTab === "zavorrine" ? garageRefetching :
     activeTab === "biker" ? bikerRefetching :
     activeTab === "proposals" ? proposalRefetching :
+    activeTab === "music" ? musicRefetching :
     activeTab === "accepted" ? (garageRefetching || bikerRefetching || proposalRefetching) :
     blockedRefetching;
 
@@ -610,7 +625,8 @@ export default function MatchScreen() {
     bikerRefetch();
     proposalRefetch();
     blockedRefetch();
-  }, [garageRefetch, bikerRefetch, proposalRefetch, blockedRefetch]);
+    if (activeTab === "music") musicRefetch();
+  }, [garageRefetch, bikerRefetch, proposalRefetch, blockedRefetch, musicRefetch, activeTab]);
 
   const acceptGarageMutation = useMutation({
     mutationFn: async (matchId: string) => {
@@ -874,6 +890,44 @@ export default function MatchScreen() {
   }, [unblockMutation, t]);
 
   const renderItem = useCallback(({ item }: { item: any }) => {
+    if (activeTab === "music") {
+      const musicUser = item.user ?? {};
+      const avatar = Array.isArray(musicUser.photos) ? musicUser.photos[0] : undefined;
+      return (
+        <View style={styles.matchCard}>
+          <View style={styles.matchUserInfo}>
+            {avatar ? (
+              <Image source={{ uri: avatar }} style={styles.blacklistAvatar} />
+            ) : (
+              <View style={[styles.blacklistAvatarPlaceholder, { backgroundColor: Colors.accent + "20" }]}>
+                <Ionicons name="musical-notes" size={22} color={Colors.accent} />
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.matchNickname, { color: Colors.text }]}>{musicUser.nickname ?? "—"}</Text>
+              <Text style={styles.matchUserType}>{musicUser.userType ? t(`userType.${musicUser.userType}`) : ""}</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: "row" as const, flexWrap: "wrap" as const, gap: 6, marginTop: 8 }}>
+            {item.songsInCommon > 0 && (
+              <View style={[styles.countBadge, { backgroundColor: Colors.accent + "20", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }]}>
+                <Text style={{ fontSize: 12, color: Colors.accent, fontFamily: "Inter_500Medium" }}>{item.songsInCommon} brani in comune</Text>
+              </View>
+            )}
+            {item.sharedArtist && (
+              <View style={[styles.countBadge, { backgroundColor: Colors.surface, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }]}>
+                <Text style={{ fontSize: 12, color: Colors.textSecondary, fontFamily: "Inter_500Medium" }}>{item.sharedArtist}</Text>
+              </View>
+            )}
+            {item.sharedGenre && (
+              <View style={[styles.countBadge, { backgroundColor: Colors.surface, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }]}>
+                <Text style={{ fontSize: 12, color: Colors.textSecondary, fontFamily: "Inter_500Medium" }}>{item.sharedGenre}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      );
+    }
     if (activeTab === "blacklist") {
       const userColor = item.userType === "biker" ? Colors.maleIcon : Colors.femaleIcon;
       return (
@@ -1030,6 +1084,7 @@ export default function MatchScreen() {
     { key: "zavorrine", label: t("match.tabZavorrine"), icon: "person", count: newGarageMatches.length },
     { key: "biker", label: t("match.tabBiker"), icon: "bicycle", count: newBikerMatches.length },
     { key: "proposals", label: t("match.tabProposals"), icon: "flash", count: newProposalMatches.length },
+    { key: "music", label: t("match.tabMusic"), icon: "musical-notes", count: 0 },
     { key: "accepted", label: t("match.tabAccepted"), icon: "checkmark-circle", count: 0 },
     { key: "blacklist", label: t("match.tabBlacklist"), icon: "ban", count: 0 },
   ];
@@ -1037,6 +1092,7 @@ export default function MatchScreen() {
   const getEmptyIcon = (): keyof typeof Ionicons.glyphMap => {
     if (activeTab === "zavorrine") return "person-outline";
     if (activeTab === "biker") return "bicycle-outline";
+    if (activeTab === "music") return "musical-notes-outline";
     if (activeTab === "accepted") return "checkmark-circle-outline";
     if (activeTab === "blacklist") return "ban-outline";
     return "flash-outline";
@@ -1045,6 +1101,7 @@ export default function MatchScreen() {
   const getEmptyTitle = () => {
     if (activeTab === "zavorrine") return t("match.emptyZavorrinaTitle");
     if (activeTab === "biker") return t("match.emptyBikerTitle");
+    if (activeTab === "music") return t("match.emptyMusicTitle");
     if (activeTab === "accepted") return t("match.emptyAcceptedTitle");
     if (activeTab === "blacklist") return t("match.emptyBlacklistTitle");
     return t("match.emptyProposalsTitle");
@@ -1053,6 +1110,7 @@ export default function MatchScreen() {
   const getEmptyDesc = () => {
     if (activeTab === "zavorrine") return t("match.emptyZavorrinaDesc");
     if (activeTab === "biker") return t("match.emptyBikerDesc");
+    if (activeTab === "music") return t("match.emptyMusicDesc");
     if (activeTab === "accepted") return t("match.emptyAcceptedDesc");
     if (activeTab === "blacklist") return t("match.emptyBlacklistDesc");
     return t("match.emptyProposalsDesc");
@@ -1145,17 +1203,19 @@ export default function MatchScreen() {
 
       <View style={styles.tabRowSpaced}>
         <View style={styles.tabRow}>
-          {tabs.slice(0, 3).map((tab) => (
+          {tabs.slice(0, 4).map((tab) => (
             <TouchableOpacity
               key={tab.key}
               style={[styles.tab, activeTab === tab.key && styles.tabActive]}
               onPress={() => setActiveTab(tab.key)}
             >
-              <Ionicons
-                name={tab.icon}
-                size={14}
-                color={activeTab === tab.key ? Colors.accent : Colors.textSecondary}
-              />
+              {tab.key !== "zavorrine" && tab.key !== "biker" && (
+                <Ionicons
+                  name={tab.icon}
+                  size={13}
+                  color={activeTab === tab.key ? Colors.accent : Colors.textSecondary}
+                />
+              )}
               <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
                 {tab.label}
               </Text>
@@ -1170,7 +1230,7 @@ export default function MatchScreen() {
           ))}
         </View>
         <View style={[styles.tabRow, styles.tabRowSecond]}>
-          {tabs.slice(3).map((tab) => (
+          {tabs.slice(4).map((tab) => (
             <TouchableOpacity
               key={tab.key}
               style={[styles.tab, styles.tabSecond, activeTab === tab.key && styles.tabActive]}
@@ -1203,14 +1263,20 @@ export default function MatchScreen() {
         </View>
       )}
 
-      {isLoading ? (
+      {activeTab === "music" && spotifyStatus?.connected !== true ? (
+        <View style={styles.empty}>
+          <Ionicons name="musical-notes-outline" size={48} color={Colors.textSecondary} />
+          <Text style={styles.emptyTitle}>{t("match.emptyMusicTitle")}</Text>
+          <Text style={styles.emptyDesc}>{t("match.emptyMusicSpotifyDesc")}</Text>
+        </View>
+      ) : isLoading ? (
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={Colors.accent} />
         </View>
       ) : (
         <FlatList
           data={currentList}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.id?.toString() ?? item.user?.id ?? item.spotifyTrackId ?? String(item.songsInCommon) + (item.user?.id ?? "")}
           renderItem={renderItem}
           extraData={[currentList, activeTab]}
           contentContainerStyle={styles.list}
@@ -1254,9 +1320,9 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: "row" as const,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 4,
-    gap: 6,
+    gap: 4,
     alignItems: "center" as const,
   },
   tabRowSecond: {
@@ -1268,9 +1334,9 @@ const styles = StyleSheet.create({
     flexDirection: "row" as const,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    gap: 3,
+    gap: 2,
     paddingVertical: 5,
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
     borderRadius: 10,
     backgroundColor: Colors.surface,
   },
@@ -1284,7 +1350,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent + "40",
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
   },
