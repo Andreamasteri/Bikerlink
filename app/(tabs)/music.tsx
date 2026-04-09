@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -9,46 +9,40 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  TextInput,
   Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import * as WebBrowser from "expo-web-browser";
-import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 
-WebBrowser.maybeCompleteAuthSession();
-
 const SPOTIFY_GREEN = "#1DB954";
-const SCOPES = "user-top-read";
 
 type Tab = "brani" | "match" | "ricevute";
 
-interface SpotifyStatus {
-  connected: boolean;
-  displayName?: string | null;
-  trackCount?: number;
-  lastSyncAt?: string | null;
+interface SearchTrack {
+  spotifyTrackId: string;
+  trackName: string;
+  artistId: string;
+  artistName: string;
+  albumName?: string | null;
+  imageUrl?: string | null;
+  popularity: number;
 }
 
-interface TrackEntry {
+interface LibraryTrack {
   id: number;
   spotifyTrackId: string;
   trackName: string;
   artistName: string;
   albumName?: string | null;
-  genres?: string[];
+  imageUrl?: string | null;
   popularity: number;
-}
-
-interface MyTracksData {
-  tracks: TrackEntry[];
-  topArtists: Array<{ id: string; name: string; count: number }>;
-  topGenres: string[];
+  addedAt: string;
 }
 
 interface MusicMatch {
@@ -68,17 +62,6 @@ interface SharedPlaylistEntry {
   tracks: Array<{ trackId: string; trackName: string; artistId: string; artistName: string }>;
 }
 
-function buildSpotifyAuthUrl(clientId: string, redirectUri: string): string {
-  const params = new URLSearchParams({
-    client_id: clientId,
-    response_type: "code",
-    redirect_uri: redirectUri,
-    scope: SCOPES,
-    show_dialog: "false",
-  });
-  return `https://accounts.spotify.com/authorize?${params.toString()}`;
-}
-
 function formatDate(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" });
@@ -95,10 +78,16 @@ export default function MusicScreen() {
     if (tabParam === "ricevute" || tabParam === "match" || tabParam === "brani") return tabParam;
     return "brani";
   });
+
   const [matchCriteria, setMatchCriteria] = useState<string[]>(["songs", "genre"]);
   const [matchMaxKm, setMatchMaxKm] = useState<number>(100);
   const [matchLogic, setMatchLogic] = useState<"tutti" | "almeno_uno">("almeno_uno");
   const [minSongs, setMinSongs] = useState<number>(5);
+
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [pendingAddId, setPendingAddId] = useState<string | null>(null);
+  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
 
   useEffect(() => {
     if (tabParam === "ricevute" || tabParam === "match" || tabParam === "brani") {
@@ -119,18 +108,26 @@ export default function MusicScreen() {
       .catch(() => {});
   }, []);
 
-  const comingSoonQuery = useQuery<{ enabled: boolean }>({
-    queryKey: ["/api/settings/spotify-coming-soon"],
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchInput.trim()), 400);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  const searchQuery = useQuery<{ tracks: SearchTrack[] }>({
+    queryKey: ["/api/spotify/search", debouncedQuery],
+    queryFn: async () => {
+      const url = new URL("/api/spotify/search", getApiUrl());
+      url.searchParams.set("q", debouncedQuery);
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) throw new Error(`${res.status}`);
+      return res.json();
+    },
+    enabled: debouncedQuery.length >= 2 && activeTab === "brani",
+    staleTime: 30_000,
   });
 
-  const statusQuery = useQuery<SpotifyStatus>({
-    queryKey: ["/api/spotify/status"],
-    enabled: comingSoonQuery.data?.enabled !== true,
-  });
-
-  const myTracksQuery = useQuery<MyTracksData>({
-    queryKey: ["/api/spotify/my-tracks"],
-    enabled: statusQuery.data?.connected === true,
+  const tracksQuery = useQuery<{ tracks: LibraryTrack[] }>({
+    queryKey: ["/api/spotify/tracks"],
   });
 
   const matchQuery = useQuery<{ matches: MusicMatch[] }>({
@@ -150,98 +147,53 @@ export default function MusicScreen() {
 
   const sharedPlaylistsQuery = useQuery<{ playlists: SharedPlaylistEntry[] }>({
     queryKey: ["/api/spotify/shared-playlists"],
-    enabled: activeTab === "ricevute" && statusQuery.data?.connected === true,
+    enabled: activeTab === "ricevute",
   });
 
-  const connectMutation = useMutation({
-    mutationFn: async () => {
-      const clientId = process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID;
-      if (!clientId) {
-        throw new Error("Spotify non configurato. Contatta l'amministratore.");
-      }
-      const redirectUri = Linking.createURL("spotify-callback");
-      const authUrl = buildSpotifyAuthUrl(clientId, redirectUri);
-
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
-      if (result.type !== "success" || !result.url) {
-        if (result.type === "cancel" || result.type === "dismiss") return null;
-        throw new Error("Autenticazione annullata o fallita");
-      }
-
-      const parsed = Linking.parse(result.url);
-      const spotifyRedirectError = parsed.queryParams?.error as string | undefined;
-      if (spotifyRedirectError) {
-        const knownErrors: Record<string, string> = {
-          access_denied: "Il tuo account Spotify non è ancora autorizzato. L'app è in modalità Development: contattaci per essere aggiunto alla lista degli utenti autorizzati.",
-          invalid_client: "Configurazione Spotify non valida. Contatta l'amministratore.",
-        };
-        throw new Error(knownErrors[spotifyRedirectError] ?? `Spotify ha negato l'accesso: ${spotifyRedirectError}`);
-      }
-      const code = parsed.queryParams?.code as string | undefined;
-      if (!code) throw new Error("Codice di autorizzazione non ricevuto da Spotify");
-
-      const response = await apiRequest("POST", "/api/spotify/callback", { code, redirectUri });
-      return response.json();
+  const addTrackMutation = useMutation({
+    mutationFn: async (track: SearchTrack) => {
+      setPendingAddId(track.spotifyTrackId);
+      const res = await apiRequest("POST", "/api/spotify/tracks", track);
+      return res.json();
     },
-    onSuccess: (data) => {
-      if (!data) return;
-      queryClient.invalidateQueries({ queryKey: ["/api/spotify/status"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/spotify/my-tracks"] });
-      Alert.alert("Spotify Connesso!", `Ciao ${data.displayName ?? ""}! ${data.trackCount ?? 0} brani sincronizzati.`);
-    },
-    onError: (err: Error) => {
-      Alert.alert("Errore", err.message ?? "Impossibile connettersi a Spotify");
-    },
-  });
-
-  const disconnectMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/spotify/disconnect", {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/spotify/status"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/spotify/my-tracks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/spotify/match/music"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/spotify/tracks"] });
     },
     onError: (err: Error) => {
-      Alert.alert("Errore", err.message);
+      Alert.alert("Errore", err.message ?? "Impossibile aggiungere il brano");
     },
+    onSettled: () => setPendingAddId(null),
   });
 
-  const syncMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/spotify/sync", {}).then((r) => r.json() as Promise<{ synced: boolean; trackCount: number }>),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/spotify/status"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/spotify/my-tracks"] });
-      Alert.alert("Sincronizzato", `${data.trackCount ?? 0} brani aggiornati.`);
+  const removeTrackMutation = useMutation({
+    mutationFn: async (spotifyTrackId: string) => {
+      setPendingRemoveId(spotifyTrackId);
+      const res = await apiRequest("DELETE", `/api/spotify/tracks/${spotifyTrackId}`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/spotify/tracks"] });
     },
     onError: (err: Error) => {
-      Alert.alert("Errore sincronizzazione", err.message);
+      Alert.alert("Errore", err.message ?? "Impossibile rimuovere il brano");
     },
+    onSettled: () => setPendingRemoveId(null),
   });
 
   const mergePlaylistMutation = useMutation({
-    mutationFn: (playlistId: number) =>
-      apiRequest("POST", `/api/spotify/merge-playlist/${playlistId}`, {}),
-    onSuccess: (data, playlistId) => {
+    mutationFn: async (playlistId: number) => {
+      const res = await apiRequest("POST", `/api/spotify/merge-playlist/${playlistId}`, {});
+      return res.json() as Promise<{ newTracksAdded: number }>;
+    },
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/spotify/shared-playlists"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/spotify/my-tracks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/spotify/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/spotify/tracks"] });
       Alert.alert("Playlist Aggiunta!", `${data.newTracksAdded ?? 0} nuovi brani aggiunti alla tua libreria.`);
     },
     onError: (err: Error) => {
       Alert.alert("Errore", err.message);
     },
   });
-
-  const handleDisconnect = useCallback(() => {
-    Alert.alert(
-      "Disconnetti Spotify",
-      "Vuoi disconnettere il tuo account Spotify? I tuoi brani salvati verranno eliminati.",
-      [
-        { text: "Annulla", style: "cancel" },
-        { text: "Disconnetti", style: "destructive", onPress: () => disconnectMutation.mutate() },
-      ]
-    );
-  }, [disconnectMutation]);
 
   const toggleCriteria = useCallback((c: string) => {
     setMatchCriteria((prev) => {
@@ -261,225 +213,266 @@ export default function MusicScreen() {
     AsyncStorage.setItem("music_match_min_songs", String(v)).catch(() => {});
   }, []);
 
-  const isConnected = statusQuery.data?.connected === true;
-  const isComingSoon = comingSoonQuery.data?.enabled === true;
-  const isLoading = statusQuery.isLoading && !isComingSoon;
-  const isNotConfigured =
-    !isComingSoon && (
-      !process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID ||
-      (statusQuery.isError && (statusQuery.error as Error)?.message?.startsWith("503"))
-    );
-
-  if (isLoading) {
-    return (
-      <View style={[styles.centered, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
-        <ActivityIndicator color={Colors.accent} />
-      </View>
-    );
-  }
-
+  const savedIds = new Set((tracksQuery.data?.tracks ?? []).map((t) => t.spotifyTrackId));
   const topPadding = insets.top + (Platform.OS === "web" ? 67 : 0);
 
   return (
     <View style={[styles.container, { paddingTop: topPadding }]}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Ionicons name="musical-notes" size={24} color={isNotConfigured ? Colors.textSecondary : SPOTIFY_GREEN} />
+          <Ionicons name="musical-notes" size={24} color={SPOTIFY_GREEN} />
           <Text style={styles.headerTitle}>Musica</Text>
         </View>
-        {isConnected && (
+        <View style={styles.headerRight}>
+          <Text style={styles.headerCount}>
+            {tracksQuery.data ? `${tracksQuery.data.tracks.length} brani` : ""}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.tabBar}>
+        {(["brani", "match", "ricevute"] as Tab[]).map((tab) => (
           <TouchableOpacity
-            style={styles.syncBtn}
-            onPress={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending}
+            key={tab}
+            style={[styles.tabItem, activeTab === tab && styles.tabItemActive]}
+            onPress={() => setActiveTab(tab)}
           >
-            {syncMutation.isPending ? (
-              <ActivityIndicator size="small" color={Colors.accent} />
-            ) : (
-              <Ionicons name="refresh" size={20} color={Colors.accent} />
-            )}
+            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+              {tab === "brani" ? "Brani" : tab === "match" ? "Match" : "Ricevute"}
+            </Text>
           </TouchableOpacity>
-        )}
+        ))}
       </View>
 
-      {/* Info banner */}
-      <View style={styles.infoBanner}>
-        <Ionicons name="information-circle-outline" size={16} color={Colors.textSecondary} />
-        <Text style={styles.infoBannerText}>
-          Per il match musicale e le playlist condivise è necessario un account Spotify (gratuito). L'accesso avviene tramite browser in modo sicuro.
-        </Text>
-      </View>
-
-      {isComingSoon ? (
-        <View style={styles.centered}>
-          <View style={[styles.spotifyLogo, { opacity: 0.4 }]}>
-            <Ionicons name="time-outline" size={48} color={Colors.textSecondary} />
-          </View>
-          <Text style={[styles.connectTitle, { color: Colors.textSecondary }]}>Funzione in arrivo</Text>
-          <Text style={styles.connectDesc}>La funzione Spotify è in arrivo. Stiamo aspettando l'Extended Quota Mode da Spotify.</Text>
-          <TouchableOpacity style={[styles.connectBtn, { opacity: 0.5 }]} disabled>
-            <Ionicons name="logo-spotify" size={20} color="#fff" />
-            <Text style={styles.connectBtnText}>Funzione in arrivo</Text>
-          </TouchableOpacity>
-        </View>
-      ) : isNotConfigured ? (
-        <View style={styles.centered}>
-          <View style={[styles.spotifyLogo, { opacity: 0.4 }]}>
-            <Ionicons name="musical-notes" size={48} color={Colors.textSecondary} />
-          </View>
-          <Text style={[styles.connectTitle, { color: Colors.textSecondary }]}>Spotify non disponibile</Text>
-          <Text style={styles.connectDesc}>Spotify non è configurato in questa versione dell'app. Aggiorna l'app per abilitarlo.</Text>
-          <TouchableOpacity style={[styles.connectBtn, { opacity: 0.5 }]} disabled>
-            <Ionicons name="logo-spotify" size={20} color="#fff" />
-            <Text style={styles.connectBtnText}>Aggiorna l'app</Text>
-          </TouchableOpacity>
-        </View>
-      ) : !isConnected ? (
-        <NotConnectedView onConnect={() => connectMutation.mutate()} isConnecting={connectMutation.isPending} />
-      ) : (
-        <>
-          {/* Spotify card */}
-          <View style={styles.connectedCard}>
-            <View style={styles.connectedLeft}>
-              <Ionicons name="checkmark-circle" size={20} color={SPOTIFY_GREEN} />
-              <View>
-                <Text style={styles.connectedName}>{statusQuery.data?.displayName ?? "Connesso"}</Text>
-                <Text style={styles.connectedSub}>{statusQuery.data?.trackCount ?? 0} brani · Spotify</Text>
-              </View>
-            </View>
-            <TouchableOpacity onPress={handleDisconnect} disabled={disconnectMutation.isPending}>
-              <Ionicons name="log-out-outline" size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Tabs */}
-          <View style={styles.tabBar}>
-            {(["brani", "match", "ricevute"] as Tab[]).map((tab) => (
-              <TouchableOpacity
-                key={tab}
-                style={[styles.tabItem, activeTab === tab && styles.tabItemActive]}
-                onPress={() => setActiveTab(tab)}
-              >
-                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                  {tab === "brani" ? "I Miei Brani" : tab === "match" ? "Match" : "Ricevute"}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Tab content */}
-          {activeTab === "brani" && (
-            <MyTracksTab data={myTracksQuery.data} isLoading={myTracksQuery.isLoading} />
-          )}
-          {activeTab === "match" && (
-            <MatchTab
-              matches={matchQuery.data?.matches ?? []}
-              isFetching={matchQuery.isFetching}
-              hasData={matchQuery.data !== undefined}
-              criteria={matchCriteria}
-              onToggleCriteria={toggleCriteria}
-              maxKm={matchMaxKm}
-              onSetMaxKm={setMatchMaxKm}
-              matchLogic={matchLogic}
-              onSetMatchLogic={handleSetMatchLogic}
-              minSongs={minSongs}
-              onSetMinSongs={handleSetMinSongs}
-              onSearch={() => matchQuery.refetch()}
-            />
-          )}
-          {activeTab === "ricevute" && (
-            <SharedPlaylistsTab
-              playlists={sharedPlaylistsQuery.data?.playlists ?? []}
-              isLoading={sharedPlaylistsQuery.isLoading}
-              onMerge={(id) => mergePlaylistMutation.mutate(id)}
-              isMerging={mergePlaylistMutation.isPending}
-            />
-          )}
-        </>
+      {activeTab === "brani" && (
+        <BraniTab
+          searchInput={searchInput}
+          onSearchChange={setSearchInput}
+          debouncedQuery={debouncedQuery}
+          searchResults={searchQuery.data?.tracks ?? []}
+          searchLoading={searchQuery.isLoading}
+          searchError={searchQuery.isError}
+          library={tracksQuery.data?.tracks ?? []}
+          libraryLoading={tracksQuery.isLoading}
+          savedIds={savedIds}
+          onAdd={(track) => addTrackMutation.mutate(track)}
+          onRemove={(id) => removeTrackMutation.mutate(id)}
+          pendingAddId={pendingAddId}
+          pendingRemoveId={pendingRemoveId}
+        />
+      )}
+      {activeTab === "match" && (
+        <MatchTab
+          matches={matchQuery.data?.matches ?? []}
+          isFetching={matchQuery.isFetching}
+          hasData={matchQuery.data !== undefined}
+          criteria={matchCriteria}
+          onToggleCriteria={toggleCriteria}
+          maxKm={matchMaxKm}
+          onSetMaxKm={setMatchMaxKm}
+          matchLogic={matchLogic}
+          onSetMatchLogic={handleSetMatchLogic}
+          minSongs={minSongs}
+          onSetMinSongs={handleSetMinSongs}
+          onSearch={() => matchQuery.refetch()}
+        />
+      )}
+      {activeTab === "ricevute" && (
+        <SharedPlaylistsTab
+          playlists={sharedPlaylistsQuery.data?.playlists ?? []}
+          isLoading={sharedPlaylistsQuery.isLoading}
+          onMerge={(id) => mergePlaylistMutation.mutate(id)}
+          isMerging={mergePlaylistMutation.isPending}
+        />
       )}
     </View>
   );
 }
 
-function NotConnectedView({ onConnect, isConnecting }: { onConnect: () => void; isConnecting: boolean }) {
+function BraniTab({
+  searchInput,
+  onSearchChange,
+  debouncedQuery,
+  searchResults,
+  searchLoading,
+  searchError,
+  library,
+  libraryLoading,
+  savedIds,
+  onAdd,
+  onRemove,
+  pendingAddId,
+  pendingRemoveId,
+}: {
+  searchInput: string;
+  onSearchChange: (v: string) => void;
+  debouncedQuery: string;
+  searchResults: SearchTrack[];
+  searchLoading: boolean;
+  searchError: boolean;
+  library: LibraryTrack[];
+  libraryLoading: boolean;
+  savedIds: Set<string>;
+  onAdd: (t: SearchTrack) => void;
+  onRemove: (id: string) => void;
+  pendingAddId: string | null;
+  pendingRemoveId: string | null;
+}) {
   return (
-    <View style={styles.centered}>
-      <View style={styles.spotifyLogo}>
-        <Ionicons name="musical-notes" size={48} color={SPOTIFY_GREEN} />
+    <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+      <View style={styles.searchBarWrapper}>
+        <Ionicons name="search" size={18} color={Colors.textSecondary} style={{ marginRight: 8 }} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Cerca brani su Spotify…"
+          placeholderTextColor={Colors.textSecondary}
+          value={searchInput}
+          onChangeText={onSearchChange}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+          autoCorrect={false}
+          autoCapitalize="none"
+        />
+        {searchInput.length > 0 && Platform.OS !== "ios" && (
+          <TouchableOpacity onPress={() => onSearchChange("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
+          </TouchableOpacity>
+        )}
       </View>
-      <Text style={styles.connectTitle}>Connetti Spotify</Text>
-      <Text style={styles.connectDesc}>
-        Sincronizza i tuoi brani preferiti e scopri bikers con gusti musicali simili ai tuoi.
-      </Text>
-      <TouchableOpacity style={styles.connectBtn} onPress={onConnect} disabled={isConnecting}>
-        {isConnecting ? (
-          <ActivityIndicator color="#fff" />
+
+      {debouncedQuery.length >= 2 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Risultati di ricerca</Text>
+          {searchLoading ? (
+            <ActivityIndicator color={Colors.accent} style={{ marginVertical: 20 }} />
+          ) : searchError ? (
+            <Text style={styles.emptyText}>Errore nella ricerca. Riprova.</Text>
+          ) : searchResults.length === 0 ? (
+            <Text style={styles.emptyText}>Nessun risultato per "{debouncedQuery}"</Text>
+          ) : (
+            searchResults.map((track) => (
+              <SearchTrackRow
+                key={track.spotifyTrackId}
+                track={track}
+                isAdded={savedIds.has(track.spotifyTrackId)}
+                isAdding={pendingAddId === track.spotifyTrackId}
+                onAdd={onAdd}
+              />
+            ))
+          )}
+        </View>
+      )}
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>
+          La mia libreria{library.length > 0 ? ` (${library.length})` : ""}
+        </Text>
+        {libraryLoading ? (
+          <ActivityIndicator color={Colors.accent} style={{ marginVertical: 20 }} />
+        ) : library.length === 0 ? (
+          <View style={styles.emptyLibrary}>
+            <Ionicons name="musical-note" size={32} color={Colors.textSecondary} />
+            <Text style={styles.emptyLibraryText}>Cerca un brano e aggiungilo alla tua libreria</Text>
+          </View>
         ) : (
-          <>
-            <Ionicons name="logo-spotify" size={20} color="#fff" />
-            <Text style={styles.connectBtnText}>Collega con Spotify</Text>
-          </>
+          library.map((track) => (
+            <LibraryTrackRow
+              key={track.spotifyTrackId}
+              track={track}
+              isRemoving={pendingRemoveId === track.spotifyTrackId}
+              onRemove={onRemove}
+            />
+          ))
+        )}
+      </View>
+    </ScrollView>
+  );
+}
+
+function SearchTrackRow({
+  track,
+  isAdded,
+  isAdding,
+  onAdd,
+}: {
+  track: SearchTrack;
+  isAdded: boolean;
+  isAdding: boolean;
+  onAdd: (t: SearchTrack) => void;
+}) {
+  return (
+    <View style={styles.trackRow}>
+      {track.imageUrl ? (
+        <Image source={{ uri: track.imageUrl }} style={styles.albumArt} />
+      ) : (
+        <View style={[styles.albumArt, styles.albumArtPlaceholder]}>
+          <Ionicons name="musical-note" size={16} color={Colors.textSecondary} />
+        </View>
+      )}
+      <View style={styles.trackInfo}>
+        <Text style={styles.trackName} numberOfLines={1}>{track.trackName}</Text>
+        <Text style={styles.trackArtist} numberOfLines={1}>{track.artistName}</Text>
+      </View>
+      <TouchableOpacity
+        style={[styles.addBtn, isAdded && styles.addBtnDone]}
+        onPress={() => !isAdded && !isAdding && onAdd(track)}
+        disabled={isAdded || isAdding}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        {isAdding ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <Ionicons name={isAdded ? "checkmark" : "add"} size={18} color="#fff" />
         )}
       </TouchableOpacity>
     </View>
   );
 }
 
-function MyTracksTab({ data, isLoading }: { data?: MyTracksData; isLoading: boolean }) {
-  const [showAllTracks, setShowAllTracks] = useState(false);
-  if (isLoading) return <LoadingView />;
-  if (!data || data.tracks.length === 0) {
-    return <EmptyView icon="musical-note" text="Nessun brano trovato. Premi aggiorna per sincronizzare." />;
-  }
-  const LIMIT = 20;
-  const visibleTracks = showAllTracks ? data.tracks : data.tracks.slice(0, LIMIT);
-
+function LibraryTrackRow({
+  track,
+  isRemoving,
+  onRemove,
+}: {
+  track: LibraryTrack;
+  isRemoving: boolean;
+  onRemove: (id: string) => void;
+}) {
   return (
-    <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-      {data.topGenres.length > 0 && (
-        <Section title="I Tuoi Generi">
-          <View style={styles.genreWrap}>
-            {data.topGenres.slice(0, 8).map((g) => (
-              <View key={g} style={styles.genreChip}>
-                <Text style={styles.genreText}>{g}</Text>
-              </View>
-            ))}
-          </View>
-        </Section>
+    <View style={styles.trackRow}>
+      {track.imageUrl ? (
+        <Image source={{ uri: track.imageUrl }} style={styles.albumArt} />
+      ) : (
+        <View style={[styles.albumArt, styles.albumArtPlaceholder]}>
+          <Ionicons name="musical-note" size={16} color={Colors.textSecondary} />
+        </View>
       )}
-
-      {data.topArtists.length > 0 && (
-        <Section title="Artisti Top">
-          {data.topArtists.slice(0, 6).map((artist) => (
-            <View key={artist.id} style={styles.artistRow}>
-              <View style={styles.artistDot} />
-              <Text style={styles.artistName}>{artist.name}</Text>
-              <Text style={styles.artistCount}>{artist.count} brani</Text>
-            </View>
-          ))}
-        </Section>
-      )}
-
-      <Section title={`Brani (${data.tracks.length})`}>
-        {visibleTracks.map((track) => (
-          <View key={track.id} style={styles.trackRow}>
-            <View style={styles.trackInfo}>
-              <Text style={styles.trackName} numberOfLines={1}>{track.trackName}</Text>
-              <Text style={styles.trackArtist} numberOfLines={1}>{track.artistName}</Text>
-            </View>
-            <Text style={styles.trackPop}>{track.popularity}%</Text>
-          </View>
-        ))}
-        {data.tracks.length > LIMIT && (
-          <TouchableOpacity onPress={() => setShowAllTracks((v) => !v)} style={{ paddingVertical: 10, alignItems: "center" }}>
-            <Text style={[styles.moreText, { color: Colors.accent }]}>
-              {showAllTracks ? "Mostra meno" : `Mostra altri ${data.tracks.length - LIMIT} brani`}
-            </Text>
-          </TouchableOpacity>
+      <View style={styles.trackInfo}>
+        <Text style={styles.trackName} numberOfLines={1}>{track.trackName}</Text>
+        <Text style={styles.trackArtist} numberOfLines={1}>{track.artistName}</Text>
+      </View>
+      <TouchableOpacity
+        style={styles.removeBtn}
+        onPress={() => {
+          Alert.alert(
+            "Rimuovi brano",
+            `Vuoi rimuovere "${track.trackName}" dalla tua libreria?`,
+            [
+              { text: "Annulla", style: "cancel" },
+              { text: "Rimuovi", style: "destructive", onPress: () => onRemove(track.spotifyTrackId) },
+            ]
+          );
+        }}
+        disabled={isRemoving}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        {isRemoving ? (
+          <ActivityIndicator size="small" color={Colors.textSecondary} />
+        ) : (
+          <Ionicons name="trash-outline" size={18} color={Colors.textSecondary} />
         )}
-      </Section>
-    </ScrollView>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -516,7 +509,6 @@ function MatchTab({
   return (
     <View style={styles.tabContent}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
-        {/* Filters */}
         <View style={styles.filterBox}>
           <Text style={styles.filterLabel}>Criteri</Text>
           <View style={styles.filterRow}>
@@ -586,9 +578,14 @@ function MatchTab({
         </View>
 
         {isFetching ? (
-          <LoadingView />
+          <View style={styles.centered}>
+            <ActivityIndicator color={Colors.accent} />
+          </View>
         ) : !hasData ? null : matches.length === 0 ? (
-          <EmptyView icon="people" text="Nessun biker trovato con gusti simili. Prova a cambiare i filtri." />
+          <View style={styles.centered}>
+            <Ionicons name="people" size={40} color={Colors.textSecondary} />
+            <Text style={styles.emptyText}>Nessun biker trovato con gusti simili. Prova a cambiare i filtri.</Text>
+          </View>
         ) : (
           matches.map((item) => <MatchCard key={item.user.id} match={item} />)
         )}
@@ -748,9 +745,20 @@ function SharedPlaylistsTab({
   onMerge: (id: number) => void;
   isMerging: boolean;
 }) {
-  if (isLoading) return <LoadingView />;
+  if (isLoading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator color={Colors.accent} />
+      </View>
+    );
+  }
   if (playlists.length === 0) {
-    return <EmptyView icon="albums" text="Nessuna playlist ricevuta ancora. Chiedi a un biker di condividere la sua musica!" />;
+    return (
+      <View style={styles.centered}>
+        <Ionicons name="albums" size={40} color={Colors.textSecondary} />
+        <Text style={styles.emptyText}>Nessuna playlist ricevuta ancora. Chiedi a un biker di condividere la sua musica!</Text>
+      </View>
+    );
   }
 
   return (
@@ -763,34 +771,6 @@ function SharedPlaylistsTab({
         <SharedPlaylistCard item={item} onMerge={onMerge} isMerging={isMerging} />
       )}
     />
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {children}
-    </View>
-  );
-}
-
-function LoadingView() {
-  return (
-    <View style={styles.centered}>
-      <ActivityIndicator color={Colors.accent} />
-    </View>
-  );
-}
-
-type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
-
-function EmptyView({ icon, text }: { icon: IoniconsName; text: string }) {
-  return (
-    <View style={styles.centered}>
-      <Ionicons name={icon} size={40} color={Colors.textSecondary} />
-      <Text style={styles.emptyText}>{text}</Text>
-    </View>
   );
 }
 
@@ -820,73 +800,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+  headerRight: {},
   headerTitle: {
     fontSize: 20,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
   },
-  syncBtn: {
-    padding: 6,
-  },
-  spotifyLogo: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: Colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  connectTitle: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-    color: Colors.text,
-    textAlign: "center",
-  },
-  connectDesc: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  connectBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: SPOTIFY_GREEN,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: 30,
-    marginTop: 8,
-  },
-  connectBtnText: {
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-    color: "#fff",
-  },
-  connectedCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: Colors.surface,
-    marginHorizontal: 16,
-    marginVertical: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  connectedLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  connectedName: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
-  },
-  connectedSub: {
-    fontSize: 12,
+  headerCount: {
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
   },
@@ -917,60 +838,35 @@ const styles = StyleSheet.create({
   tabContent: {
     flex: 1,
   },
+  searchBarWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 16,
+    marginTop: 14,
+    marginBottom: 4,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: Colors.text,
+    paddingVertical: 0,
+  },
   section: {
-    marginBottom: 20,
     paddingHorizontal: 16,
+    marginTop: 16,
   },
   sectionTitle: {
     fontSize: 15,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
     marginBottom: 10,
-    marginTop: 14,
-  },
-  genreWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  genreChip: {
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  genreText: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    color: Colors.textSecondary,
-    textTransform: "capitalize",
-  },
-  artistRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 7,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    gap: 10,
-  },
-  artistDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: SPOTIFY_GREEN,
-  },
-  artistName: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: "Inter_500Medium",
-    color: Colors.text,
-  },
-  artistCount: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
   },
   trackRow: {
     flexDirection: "row",
@@ -978,6 +874,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    gap: 10,
+  },
+  albumArt: {
+    width: 42,
+    height: 42,
+    borderRadius: 6,
+  },
+  albumArtPlaceholder: {
+    backgroundColor: Colors.surfaceLight,
+    alignItems: "center",
+    justifyContent: "center",
   },
   trackInfo: {
     flex: 1,
@@ -991,19 +898,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
+    marginTop: 2,
   },
-  trackPop: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    marginLeft: 8,
+  addBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: SPOTIFY_GREEN,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  moreText: {
-    fontSize: 12,
+  addBtnDone: {
+    backgroundColor: Colors.border,
+  },
+  removeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.surfaceLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyText: {
+    fontSize: 14,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     textAlign: "center",
-    marginTop: 8,
+    lineHeight: 20,
+  },
+  emptyLibrary: {
+    alignItems: "center",
+    paddingVertical: 32,
+    gap: 10,
+  },
+  emptyLibraryText: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 18,
   },
   filterBox: {
     backgroundColor: Colors.surface,
@@ -1195,30 +1128,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     flex: 1,
   },
-  emptyText: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  infoBanner: {
-    flexDirection: "row" as const,
-    alignItems: "flex-start" as const,
-    gap: 8,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    backgroundColor: Colors.surface,
-    borderLeftWidth: 3,
-    borderLeftColor: "#1DB954",
-    borderRadius: 8,
-    padding: 10,
-  },
-  infoBannerText: {
-    flex: 1,
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    lineHeight: 18,
+  surfaceLight: {
+    backgroundColor: Colors.surfaceLight,
   },
 });

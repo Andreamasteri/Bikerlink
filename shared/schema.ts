@@ -1096,6 +1096,7 @@ export const userMusicTracks = pgTable("user_music_tracks", {
   artistId: varchar("artist_id", { length: 200 }).notNull(),
   artistName: varchar("artist_name", { length: 300 }).notNull(),
   albumName: varchar("album_name", { length: 500 }),
+  imageUrl: varchar("image_url", { length: 500 }),
   genres: text("genres").array().default([]),
   popularity: integer("popularity").default(0),
   addedAt: timestamp("added_at").notNull().defaultNow(),

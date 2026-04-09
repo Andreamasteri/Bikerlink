@@ -45,13 +45,21 @@ echo "║       BikerLink OTA Publisher v${VERSION}$(printf '%*s' $((28 - ${#VER
 echo "╚══════════════════════════════════════════════════╝"
 echo ""
 
-# Step 1: Login
+# Step 1: Login — extract session cookie from headers (needed for Secure cookies over HTTP)
 echo "[1/6] Login come admin..."
-LOGIN_RESPONSE=$(curl -s -c "$COOKIE_JAR" -X POST "$BACKEND_URL/api/auth/login" \
+RAW_LOGIN=$(curl -s -D - -X POST "$BACKEND_URL/api/auth/login" \
   -H "Content-Type: application/json" \
+  -H "X-Forwarded-Proto: https" \
   -d "{\"identifier\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}")
-if ! echo "$LOGIN_RESPONSE" | jq -e '.id' > /dev/null 2>&1; then
-  echo "   ERRORE login: $LOGIN_RESPONSE"
+LOGIN_RESPONSE=$(echo "$RAW_LOGIN" | sed '/^\r$/q' | tail -1 && echo "$RAW_LOGIN" | awk 'BEGIN{body=0} /^\r$/{body=1; next} body{print}')
+LOGIN_BODY=$(echo "$RAW_LOGIN" | awk 'BEGIN{body=0} /^\r$/{body=1; next} body{print}')
+if ! echo "$LOGIN_BODY" | jq -e '.id' > /dev/null 2>&1; then
+  echo "   ERRORE login: $LOGIN_BODY"
+  exit 1
+fi
+SESSION_COOKIE=$(echo "$RAW_LOGIN" | grep -i "^set-cookie:" | grep "connect.sid" | head -1 | sed 's/.*connect\.sid=\([^;]*\).*/connect.sid=\1/' | tr -d '\r')
+if [ -z "$SESSION_COOKIE" ]; then
+  echo "   ERRORE: nessun session cookie ricevuto"
   exit 1
 fi
 echo "   OK — autenticato"
@@ -98,12 +106,10 @@ BUNDLE_SIZE=$(wc -c < "$BUNDLE_FILE")
 BUNDLE_SIZE_HUMAN=$(node -e "const s=$BUNDLE_SIZE; process.stdout.write(s>1048576 ? (s/1048576).toFixed(1)+' MB' : Math.round(s/1024)+' KB')")
 echo "   Bundle trovato: $(basename "$BUNDLE_FILE") ($BUNDLE_SIZE_HUMAN)"
 
-# Step 4: Upload bundle
+# Step 4: Upload bundle directly via object storage (bypass HTTP layer)
 echo "[4/6] Upload bundle su object storage..."
-UPLOAD_RESPONSE=$(curl -s -b "$COOKIE_JAR" -X POST \
-  "${BACKEND_URL}/api/admin/ota/upload?version=${VERSION}" \
-  -F "bundle=@${BUNDLE_FILE};type=application/javascript")
-BUNDLE_URL=$(echo "$UPLOAD_RESPONSE" | jq -r '.url // empty' 2>/dev/null)
+UPLOAD_RESPONSE=$(node "$(dirname "$0")/ota-upload-bundle.mjs" "$BUNDLE_FILE" "$VERSION" 2>&1)
+BUNDLE_URL=$(echo "$UPLOAD_RESPONSE" | jq -r '.url // empty' 2>/dev/null || true)
 if [ -z "$BUNDLE_URL" ]; then
   echo "   ERRORE upload: $UPLOAD_RESPONSE"
   exit 1
@@ -113,7 +119,7 @@ echo "   Bundle URL: $BUNDLE_URL"
 # Step 5: Create release (draft) then publish explicitly
 echo "[5/6] Creazione release OTA..."
 NOTES_JSON=$(node -e "process.stdout.write(JSON.stringify(process.argv[1]))" -- "$RELEASE_NOTES")
-CREATE_RESPONSE=$(curl -s -b "$COOKIE_JAR" -X POST "$BACKEND_URL/api/admin/ota" \
+CREATE_RESPONSE=$(curl -s -H "Cookie: $SESSION_COOKIE" -H "X-Forwarded-Proto: https" -X POST "$BACKEND_URL/api/admin/ota" \
   -H "Content-Type: application/json" \
   -d "{\"version\":\"$VERSION\",\"bundlePath\":\"$BUNDLE_URL\",\"releaseNotes\":$NOTES_JSON}")
 RELEASE_ID=$(echo "$CREATE_RESPONSE" | jq -r '.id // empty' 2>/dev/null)
@@ -124,7 +130,7 @@ fi
 echo "   Release creata (draft) — ID: $RELEASE_ID"
 
 echo "   Pubblicazione release..."
-PUBLISH_RESPONSE=$(curl -s -b "$COOKIE_JAR" -X POST "$BACKEND_URL/api/admin/ota/$RELEASE_ID/publish")
+PUBLISH_RESPONSE=$(curl -s -H "Cookie: $SESSION_COOKIE" -H "X-Forwarded-Proto: https" -X POST "$BACKEND_URL/api/admin/ota/$RELEASE_ID/publish")
 PUBLISH_STATUS=$(echo "$PUBLISH_RESPONSE" | jq -r '.status // empty' 2>/dev/null)
 if [ "$PUBLISH_STATUS" != "active" ]; then
   echo "   ERRORE pubblicazione: $PUBLISH_RESPONSE"

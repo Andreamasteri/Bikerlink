@@ -25,6 +25,161 @@ function isSpotifyConfigured(): boolean {
   return !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET);
 }
 
+let appTokenCache: { token: string; expiresAt: number } | null = null;
+
+async function getAppAccessToken(): Promise<string> {
+  if (appTokenCache && Date.now() < appTokenCache.expiresAt) {
+    return appTokenCache.token;
+  }
+  const data = await callSpotifyTokenEndpoint({ grant_type: "client_credentials" });
+  appTokenCache = {
+    token: data.access_token,
+    expiresAt: Date.now() + (data.expires_in - 60) * 1000,
+  };
+  return appTokenCache.token;
+}
+
+router.get("/search", requireAuth, async (req: Request, res: Response) => {
+  if (!isSpotifyConfigured()) {
+    return res.status(503).json({ message: "Spotify non configurato. Contatta l'amministratore." });
+  }
+  const q = (req.query.q as string ?? "").trim();
+  if (q.length < 2) {
+    return res.status(400).json({ message: "Query troppo corta" });
+  }
+  try {
+    const token = await getAppAccessToken();
+    const searchUrl = new URL("https://api.spotify.com/v1/search");
+    searchUrl.searchParams.set("q", q);
+    searchUrl.searchParams.set("type", "track");
+    searchUrl.searchParams.set("limit", "20");
+    searchUrl.searchParams.set("market", "IT");
+    const resp = await fetch(searchUrl.toString(), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "");
+      throw new Error(`Spotify search ${resp.status}: ${body}`);
+    }
+    const data = await resp.json() as { tracks?: { items?: unknown[] } };
+    const items = (data.tracks?.items ?? []) as Array<{
+      id: string;
+      name: string;
+      popularity: number;
+      artists: Array<{ id: string; name: string }>;
+      album: { name: string; images: Array<{ url: string }> };
+    }>;
+    const tracks = items.map((item) => ({
+      spotifyTrackId: item.id,
+      trackName: item.name,
+      artistId: item.artists?.[0]?.id ?? "",
+      artistName: item.artists?.[0]?.name ?? "",
+      albumName: item.album?.name ?? null,
+      imageUrl: item.album?.images?.[0]?.url ?? null,
+      popularity: item.popularity ?? 0,
+    }));
+    return res.json({ tracks });
+  } catch (error) {
+    console.error("[Spotify] search error:", error);
+    return res.status(500).json({ message: "Errore durante la ricerca Spotify" });
+  }
+});
+
+router.get("/tracks", requireAuth, async (req: Request, res: Response) => {
+  if (!isSpotifyConfigured()) {
+    return res.status(503).json({ message: "Spotify non configurato. Contatta l'amministratore." });
+  }
+  try {
+    const userId = req.session.userId!;
+    const rows = await db
+      .select()
+      .from(userMusicTracks)
+      .where(eq(userMusicTracks.userId, userId))
+      .orderBy(sql`${userMusicTracks.addedAt} DESC`);
+    return res.json({
+      tracks: rows.map((t) => ({
+        id: t.id,
+        spotifyTrackId: t.spotifyTrackId,
+        trackName: t.trackName,
+        artistName: t.artistName,
+        albumName: t.albumName ?? null,
+        imageUrl: t.imageUrl ?? null,
+        popularity: t.popularity ?? 0,
+        addedAt: t.addedAt.toISOString(),
+      })),
+    });
+  } catch (error) {
+    console.error("[Spotify] GET tracks error:", error);
+    return res.status(500).json({ message: "Errore nel recupero della libreria" });
+  }
+});
+
+router.post("/tracks", requireAuth, async (req: Request, res: Response) => {
+  if (!isSpotifyConfigured()) {
+    return res.status(503).json({ message: "Spotify non configurato. Contatta l'amministratore." });
+  }
+  try {
+    const userId = req.session.userId!;
+    const { spotifyTrackId, trackName, artistId, artistName, albumName, imageUrl, popularity } = req.body as {
+      spotifyTrackId?: string;
+      trackName?: string;
+      artistId?: string;
+      artistName?: string;
+      albumName?: string | null;
+      imageUrl?: string | null;
+      popularity?: number;
+    };
+    if (!spotifyTrackId || !trackName || !artistName) {
+      return res.status(400).json({ message: "Dati brano incompleti (spotifyTrackId, trackName, artistName richiesti)" });
+    }
+    const [track] = await db
+      .insert(userMusicTracks)
+      .values({
+        userId,
+        spotifyTrackId: spotifyTrackId.slice(0, 200),
+        trackName: trackName.slice(0, 500),
+        artistId: (artistId ?? "").slice(0, 200),
+        artistName: artistName.slice(0, 300),
+        albumName: albumName ? albumName.slice(0, 500) : null,
+        imageUrl: imageUrl ? imageUrl.slice(0, 500) : null,
+        genres: [],
+        popularity: popularity ?? 0,
+      })
+      .onConflictDoUpdate({
+        target: [userMusicTracks.userId, userMusicTracks.spotifyTrackId],
+        set: {
+          trackName: trackName.slice(0, 500),
+          artistName: artistName.slice(0, 300),
+          albumName: albumName ? albumName.slice(0, 500) : null,
+          imageUrl: imageUrl ? imageUrl.slice(0, 500) : null,
+          popularity: popularity ?? 0,
+        },
+      })
+      .returning();
+    return res.json({ track });
+  } catch (error) {
+    console.error("[Spotify] POST tracks error:", error);
+    return res.status(500).json({ message: "Errore durante il salvataggio del brano" });
+  }
+});
+
+router.delete("/tracks/:spotifyTrackId", requireAuth, async (req: Request, res: Response) => {
+  if (!isSpotifyConfigured()) {
+    return res.status(503).json({ message: "Spotify non configurato. Contatta l'amministratore." });
+  }
+  try {
+    const userId = req.session.userId!;
+    const { spotifyTrackId } = req.params;
+    await db
+      .delete(userMusicTracks)
+      .where(and(eq(userMusicTracks.userId, userId), eq(userMusicTracks.spotifyTrackId, spotifyTrackId)));
+    return res.json({ removed: true });
+  } catch (error) {
+    console.error("[Spotify] DELETE tracks error:", error);
+    return res.status(500).json({ message: "Errore durante la rimozione del brano" });
+  }
+});
+
 router.use(async (_req: Request, res: Response, next: () => void) => {
   try {
     const setting = await storage.getAppSetting("spotify_coming_soon");
@@ -738,12 +893,12 @@ export async function handleMusicMatch(req: Request, res: Response) {
     const myLat = myProfile?.latitude ?? null;
     const myLng = myProfile?.longitude ?? null;
 
-    const candidateTokens = await db
-      .select({ userId: userSpotifyTokens.userId })
-      .from(userSpotifyTokens)
-      .where(sql`${userSpotifyTokens.userId} != ${userId}`);
+    const candidateRows = await db
+      .selectDistinct({ userId: userMusicTracks.userId })
+      .from(userMusicTracks)
+      .where(sql`${userMusicTracks.userId} != ${userId}`);
 
-    const candidateUserIds = candidateTokens.map((c) => c.userId);
+    const candidateUserIds = candidateRows.map((c) => c.userId);
     if (candidateUserIds.length === 0) {
       return res.json({ matches: [] });
     }

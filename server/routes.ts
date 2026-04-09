@@ -50,6 +50,7 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  app.set("trust proxy", 1);
   const PgStore = connectPgSimple(session);
 
   app.use(
