@@ -18,7 +18,7 @@ import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import { useLocalSearchParams } from "expo-router";
 import Colors from "@/constants/colors";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -115,7 +115,17 @@ export default function MusicScreen() {
   });
 
   const matchQuery = useQuery<{ matches: MusicMatch[] }>({
-    queryKey: ["/api/spotify/match/music", matchCriteria.join(","), matchMaxKm, matchLogic, minSongs],
+    queryKey: ["/api/spotify/match/music"],
+    queryFn: async () => {
+      const url = new URL("/api/spotify/match/music", getApiUrl());
+      url.searchParams.set("criteria", matchCriteria.join(","));
+      url.searchParams.set("maxKm", String(matchMaxKm));
+      url.searchParams.set("logic", matchLogic === "tutti" ? "all" : "any");
+      url.searchParams.set("minSongs", String(minSongs));
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) throw new Error(`${res.status}`);
+      return res.json();
+    },
     enabled: false,
   });
 
