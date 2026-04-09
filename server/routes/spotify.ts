@@ -25,13 +25,6 @@ function isSpotifyConfigured(): boolean {
   return !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET);
 }
 
-router.use((_req: Request, res: Response, next: () => void) => {
-  if (!isSpotifyConfigured()) {
-    return res.status(503).json({ message: "Spotify non configurato. Contatta l'amministratore." });
-  }
-  next();
-});
-
 router.use(async (_req: Request, res: Response, next: () => void) => {
   try {
     const setting = await storage.getAppSetting("spotify_coming_soon");
@@ -40,6 +33,13 @@ router.use(async (_req: Request, res: Response, next: () => void) => {
     }
   } catch {
     // ignore, proceed normally
+  }
+  next();
+});
+
+router.use((_req: Request, res: Response, next: () => void) => {
+  if (!isSpotifyConfigured()) {
+    return res.status(503).json({ message: "Spotify non configurato. Contatta l'amministratore." });
   }
   next();
 });
