@@ -118,10 +118,21 @@ async function getValidAccessToken(userId: string): Promise<string> {
   }
 
   const refreshToken = decryptToken(tokenRow.refreshToken);
-  const tokenData = await callSpotifyTokenEndpoint({
-    grant_type: "refresh_token",
-    refresh_token: refreshToken,
-  });
+  let tokenData: { access_token: string; refresh_token?: string; expires_in: number };
+  try {
+    tokenData = await callSpotifyTokenEndpoint({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+    });
+  } catch (refreshErr) {
+    const rawMsg = (refreshErr as Error).message ?? "";
+    const mapped = mapSpotifyError(rawMsg);
+    const err = new Error(mapped.message);
+    (err as any).spotifyError = mapped.spotifyError;
+    (err as any).spotifyErrorDescription = mapped.spotifyErrorDescription;
+    (err as any).httpStatus = mapped.status;
+    throw err;
+  }
 
   const newExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
   const updatedFields: Partial<typeof userSpotifyTokens.$inferInsert> = {
@@ -256,7 +267,14 @@ async function syncSpotifyTracks(userId: string): Promise<number> {
   return Number(count);
 }
 
-function mapSpotifyError(rawMessage: string): { status: number; message: string; spotifyError?: string } {
+interface SpotifyMappedError {
+  status: number;
+  message: string;
+  spotifyError?: string;
+  spotifyErrorDescription?: string;
+}
+
+function mapSpotifyError(rawMessage: string): SpotifyMappedError {
   const httpStatusMatch = rawMessage.match(/\b([45]\d{2})\b/);
   const httpStatus = httpStatusMatch ? parseInt(httpStatusMatch[1]) : 0;
 
@@ -271,39 +289,47 @@ function mapSpotifyError(rawMessage: string): { status: number; message: string;
     } catch {}
   }
 
+  const base: Pick<SpotifyMappedError, "spotifyError" | "spotifyErrorDescription"> = {
+    spotifyError,
+    spotifyErrorDescription: spotifyErrorDesc,
+  };
+
   if (spotifyError === "invalid_grant") {
-    return { status: 422, message: "Autorizzazione Spotify scaduta o già usata. Riprova a collegare l'account.", spotifyError };
+    return { status: 422, message: "Autorizzazione Spotify scaduta o già usata. Riprova a collegare l'account.", ...base };
   }
   if (spotifyError === "invalid_client") {
-    return { status: 503, message: "Credenziali app Spotify non valide. Contatta l'amministratore.", spotifyError };
+    return { status: 503, message: "Credenziali app Spotify non valide. Contatta l'amministratore.", ...base };
   }
   if (spotifyError === "access_denied") {
-    return { status: 403, message: "Accesso negato da Spotify. L'app è in modalità Development: solo gli utenti autorizzati possono collegare Spotify.", spotifyError };
+    return { status: 403, message: "Accesso negato da Spotify. L'app è in modalità Development: solo gli utenti autorizzati possono collegare Spotify.", ...base };
   }
   if (spotifyError === "invalid_scope") {
-    return { status: 422, message: "Permesso Spotify non valido. Contatta l'amministratore.", spotifyError };
+    return { status: 422, message: "Permesso Spotify non valido. Contatta l'amministratore.", ...base };
   }
   if (spotifyError === "unsupported_grant_type") {
-    return { status: 422, message: "Tipo di autorizzazione Spotify non supportato. Contatta l'amministratore.", spotifyError };
+    return { status: 422, message: "Tipo di autorizzazione Spotify non supportato. Contatta l'amministratore.", ...base };
   }
 
   if (httpStatus === 401) {
-    return { status: 401, message: "Token Spotify non valido. Ricollega il tuo account Spotify.", spotifyError };
+    return { status: 401, message: "Token Spotify non valido. Ricollega il tuo account Spotify.", ...base };
   }
   if (httpStatus === 403) {
-    return { status: 422, message: "Spotify non supportato: l'app è in attesa dell'Extended Quota Mode. Riprova più tardi o contatta l'amministratore.", spotifyError };
+    return { status: 422, message: "Spotify non supportato: l'app è in attesa dell'Extended Quota Mode. Riprova più tardi o contatta l'amministratore.", ...base };
   }
   if (httpStatus === 429) {
-    return { status: 429, message: "Troppe richieste a Spotify. Riprova tra qualche minuto.", spotifyError };
+    return { status: 429, message: "Troppe richieste a Spotify. Riprova tra qualche minuto.", ...base };
   }
   if (httpStatus >= 500) {
-    return { status: 502, message: "Spotify non disponibile al momento. Riprova tra qualche minuto.", spotifyError };
+    const technicalDetail = spotifyError
+      ? `${spotifyError}${spotifyErrorDesc ? ": " + spotifyErrorDesc : ""}`
+      : `HTTP ${httpStatus}`;
+    return { status: 502, message: `Spotify non disponibile al momento. Riprova tra qualche minuto. (${technicalDetail})`, ...base };
   }
 
   const detail = spotifyError
     ? ` (${spotifyError}${spotifyErrorDesc ? ": " + spotifyErrorDesc : ""})`
-    : "";
-  return { status: 500, message: `Errore durante la connessione a Spotify${detail}.`, spotifyError };
+    : rawMessage.length < 200 ? ` — ${rawMessage}` : "";
+  return { status: 500, message: `Errore durante la connessione a Spotify${detail}.`, ...base };
 }
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -371,10 +397,17 @@ router.post("/callback", requireAuth, async (req: Request, res: Response) => {
 
     return res.json({ connected: true, displayName: spotifyMe.display_name ?? null, trackCount });
   } catch (error) {
-    const rawMsg = (error as Error).message ?? "";
+    const err = error as any;
+    const rawMsg = err.message ?? "";
     console.error("[Spotify] callback error:", rawMsg);
-    const { status, message, spotifyError } = mapSpotifyError(rawMsg);
-    return res.status(status).json({ message, spotifyError });
+    const mapped = err.httpStatus
+      ? { status: err.httpStatus, message: rawMsg, spotifyError: err.spotifyError, spotifyErrorDescription: err.spotifyErrorDescription }
+      : mapSpotifyError(rawMsg);
+    return res.status(mapped.status).json({
+      message: mapped.message,
+      spotifyError: mapped.spotifyError,
+      spotifyErrorDescription: mapped.spotifyErrorDescription,
+    });
   }
 });
 
@@ -397,10 +430,17 @@ router.post("/sync", requireAuth, async (req: Request, res: Response) => {
     const trackCount = await syncSpotifyTracks(userId);
     return res.json({ synced: true, trackCount });
   } catch (error) {
-    const rawMsg = (error as Error).message ?? "";
+    const err = error as any;
+    const rawMsg = err.message ?? "";
     console.error("[Spotify] sync error:", rawMsg);
-    const { status, message, spotifyError } = mapSpotifyError(rawMsg);
-    return res.status(status).json({ message, spotifyError });
+    const mapped = err.httpStatus
+      ? { status: err.httpStatus, message: rawMsg, spotifyError: err.spotifyError, spotifyErrorDescription: err.spotifyErrorDescription }
+      : mapSpotifyError(rawMsg);
+    return res.status(mapped.status).json({
+      message: mapped.message,
+      spotifyError: mapped.spotifyError,
+      spotifyErrorDescription: mapped.spotifyErrorDescription,
+    });
   }
 });
 
