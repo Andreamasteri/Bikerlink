@@ -180,9 +180,11 @@ else
     echo "   Eseguire manualmente: npx eas-cli@16 update --channel preview --message \"$RELEASE_NOTES\" --platform android"
     EAS_STATUS="FALLITO — eseguire manualmente"
   else
-    EAS_UPDATE_GROUP_ID=$(grep -o 'Update group ID[[:space:]]*[a-f0-9-]*' "$EAS_LOG" | awk '{print $NF}' | head -1)
-    EAS_ANDROID_UPDATE_ID=$(grep -o 'Android update ID[[:space:]]*[a-f0-9-]*' "$EAS_LOG" | awk '{print $NF}' | head -1)
-    EAS_DASHBOARD_URL=$(grep -o 'https://expo\.dev/accounts/[^ ]*' "$EAS_LOG" | head -1)
+    set +e
+    EAS_UPDATE_GROUP_ID=$(grep -o 'Update group ID[[:space:]]*[a-f0-9-]*' "$EAS_LOG" 2>/dev/null | awk '{print $NF}' | head -1 || true)
+    EAS_ANDROID_UPDATE_ID=$(grep -o 'Android update ID[[:space:]]*[a-f0-9-]*' "$EAS_LOG" 2>/dev/null | awk '{print $NF}' | head -1 || true)
+    EAS_DASHBOARD_URL=$(grep -o 'https://expo\.dev/accounts/[^ ]*' "$EAS_LOG" 2>/dev/null | head -1 || true)
+    set -e
     [ -z "$EAS_UPDATE_GROUP_ID" ] && EAS_UPDATE_GROUP_ID="N/A (vedi log EAS)"
     [ -z "$EAS_ANDROID_UPDATE_ID" ] && EAS_ANDROID_UPDATE_ID="N/A (vedi log EAS)"
     [ -z "$EAS_DASHBOARD_URL" ] && EAS_DASHBOARD_URL="N/A"
