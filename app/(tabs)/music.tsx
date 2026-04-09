@@ -169,11 +169,19 @@ export default function MusicScreen() {
       }
 
       const parsed = Linking.parse(result.url);
+      const spotifyRedirectError = parsed.queryParams?.error as string | undefined;
+      if (spotifyRedirectError) {
+        const knownErrors: Record<string, string> = {
+          access_denied: "Accesso negato da Spotify. L'app è in modalità Development: solo gli utenti autorizzati possono collegare Spotify.",
+          invalid_client: "Configurazione Spotify non valida. Contatta l'amministratore.",
+        };
+        throw new Error(knownErrors[spotifyRedirectError] ?? `Spotify ha negato l'accesso: ${spotifyRedirectError}`);
+      }
       const code = parsed.queryParams?.code as string | undefined;
       if (!code) throw new Error("Codice di autorizzazione non ricevuto da Spotify");
 
       const response = await apiRequest("POST", "/api/spotify/callback", { code, redirectUri });
-      return response;
+      return response.json();
     },
     onSuccess: (data) => {
       if (!data) return;

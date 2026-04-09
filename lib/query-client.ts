@@ -27,7 +27,12 @@ async function throwIfResNotOk(res: Response) {
     if (text.trimStart().startsWith("<!DOCTYPE") || text.trimStart().startsWith("<html")) {
       throw new Error("Server non disponibile. Riprova tra un momento.");
     }
-    throw new Error(`${res.status}: ${text}`);
+    let errorMessage: string | null = null;
+    try {
+      const json = JSON.parse(text);
+      if (typeof json.message === "string") errorMessage = json.message;
+    } catch {}
+    throw new Error(errorMessage ?? `${res.status}: ${text}`);
   }
 }
 

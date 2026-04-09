@@ -256,6 +256,56 @@ async function syncSpotifyTracks(userId: string): Promise<number> {
   return Number(count);
 }
 
+function mapSpotifyError(rawMessage: string): { status: number; message: string; spotifyError?: string } {
+  const httpStatusMatch = rawMessage.match(/\b([45]\d{2})\b/);
+  const httpStatus = httpStatusMatch ? parseInt(httpStatusMatch[1]) : 0;
+
+  let spotifyError: string | undefined;
+  let spotifyErrorDesc: string | undefined;
+  const jsonMatch = rawMessage.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      spotifyError = parsed.error;
+      spotifyErrorDesc = parsed.error_description;
+    } catch {}
+  }
+
+  if (spotifyError === "invalid_grant") {
+    return { status: 422, message: "Autorizzazione Spotify scaduta o già usata. Riprova a collegare l'account.", spotifyError };
+  }
+  if (spotifyError === "invalid_client") {
+    return { status: 503, message: "Credenziali app Spotify non valide. Contatta l'amministratore.", spotifyError };
+  }
+  if (spotifyError === "access_denied") {
+    return { status: 403, message: "Accesso negato da Spotify. L'app è in modalità Development: solo gli utenti autorizzati possono collegare Spotify.", spotifyError };
+  }
+  if (spotifyError === "invalid_scope") {
+    return { status: 422, message: "Permesso Spotify non valido. Contatta l'amministratore.", spotifyError };
+  }
+  if (spotifyError === "unsupported_grant_type") {
+    return { status: 422, message: "Tipo di autorizzazione Spotify non supportato. Contatta l'amministratore.", spotifyError };
+  }
+
+  if (httpStatus === 401) {
+    return { status: 401, message: "Token Spotify non valido. Ricollega il tuo account Spotify.", spotifyError };
+  }
+  if (httpStatus === 403) {
+    return { status: 422, message: "Spotify non supportato: l'app è in attesa dell'Extended Quota Mode. Riprova più tardi o contatta l'amministratore.", spotifyError };
+  }
+  if (httpStatus === 429) {
+    return { status: 429, message: "Troppe richieste a Spotify. Riprova tra qualche minuto.", spotifyError };
+  }
+  if (httpStatus >= 500) {
+    return { status: 502, message: "Spotify non disponibile al momento. Riprova tra qualche minuto.", spotifyError };
+  }
+
+  const detail = spotifyError
+    ? ` (${spotifyError}${spotifyErrorDesc ? ": " + spotifyErrorDesc : ""})`
+    : "";
+  return { status: 500, message: `Errore durante la connessione a Spotify${detail}.`, spotifyError };
+}
+
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -321,12 +371,10 @@ router.post("/callback", requireAuth, async (req: Request, res: Response) => {
 
     return res.json({ connected: true, displayName: spotifyMe.display_name ?? null, trackCount });
   } catch (error) {
-    console.error("[Spotify] callback error:", error);
-    const msg = (error as Error).message ?? "";
-    if (msg.includes("403")) {
-      return res.status(422).json({ message: "Spotify non supportato: l'app è in attesa dell'Extended Quota Mode. Riprova più tardi o contatta l'amministratore." });
-    }
-    return res.status(500).json({ message: "Errore durante la connessione a Spotify" });
+    const rawMsg = (error as Error).message ?? "";
+    console.error("[Spotify] callback error:", rawMsg);
+    const { status, message, spotifyError } = mapSpotifyError(rawMsg);
+    return res.status(status).json({ message, spotifyError });
   }
 });
 
@@ -349,8 +397,10 @@ router.post("/sync", requireAuth, async (req: Request, res: Response) => {
     const trackCount = await syncSpotifyTracks(userId);
     return res.json({ synced: true, trackCount });
   } catch (error) {
-    console.error("[Spotify] sync error:", error);
-    return res.status(500).json({ message: "Errore durante la sincronizzazione" });
+    const rawMsg = (error as Error).message ?? "";
+    console.error("[Spotify] sync error:", rawMsg);
+    const { status, message, spotifyError } = mapSpotifyError(rawMsg);
+    return res.status(status).json({ message, spotifyError });
   }
 });
 
