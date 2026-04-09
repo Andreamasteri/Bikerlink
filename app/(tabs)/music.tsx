@@ -263,9 +263,15 @@ export default function MusicScreen() {
 
       {isNotConfigured ? (
         <View style={styles.centered}>
-          <Ionicons name="musical-notes-outline" size={48} color={Colors.textSecondary} />
+          <View style={[styles.spotifyLogo, { opacity: 0.4 }]}>
+            <Ionicons name="musical-notes" size={48} color={Colors.textSecondary} />
+          </View>
           <Text style={[styles.connectTitle, { color: Colors.textSecondary }]}>Spotify non disponibile</Text>
           <Text style={styles.connectDesc}>L'integrazione Spotify non è configurata in questo ambiente.</Text>
+          <TouchableOpacity style={[styles.connectBtn, { opacity: 0.5 }]} disabled>
+            <Ionicons name="logo-spotify" size={20} color="#fff" />
+            <Text style={styles.connectBtnText}>Funzione in arrivo</Text>
+          </TouchableOpacity>
         </View>
       ) : !isConnected ? (
         <NotConnectedView onConnect={() => connectMutation.mutate()} isConnecting={connectMutation.isPending} />

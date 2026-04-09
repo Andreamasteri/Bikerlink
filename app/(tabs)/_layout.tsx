@@ -273,11 +273,11 @@ export default function TabLayout() {
         <Tabs.Screen
           name="music"
           options={{
-            title: "Music",
+            title: "Musica",
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="musical-notes" size={size} color={color} />
+              <Ionicons name="musical-notes-outline" size={size} color={color} />
             ),
-            headerTitle: "Music",
+            headerTitle: "Musica",
             href: gpsTabHref,
           }}
         />
