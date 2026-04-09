@@ -40,10 +40,19 @@ interface SystemEvent {
   type: string;
 }
 
+interface OtaErrorEntry {
+  error: string;
+  failCount: number;
+  updateId: string;
+  runtimeVersion: string;
+  timestamp: string;
+}
+
 interface SystemHealth {
   backendStartedAt: number;
   backendUptimeSec: number;
   events: SystemEvent[];
+  otaErrors?: OtaErrorEntry[];
 }
 
 interface ServerRestart {
@@ -235,6 +244,31 @@ export default function SystemScreen() {
                   <Text style={styles.restartTime}>
                     {formatTimestamp(r.startedAt)}
                   </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {(data.otaErrors ?? []).length > 0 && (
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Ionicons name="warning-outline" size={18} color="#FF4444" />
+                <Text style={[styles.cardTitle, { color: "#FF4444" }]}>Errori OTA checker</Text>
+                <View style={[styles.badge, { backgroundColor: "#FF4444" }]}>
+                  <Text style={styles.badgeText}>{(data.otaErrors ?? []).length}</Text>
+                </View>
+              </View>
+              {(data.otaErrors ?? []).slice(0, 10).map((e, i) => (
+                <View key={i} style={styles.restartRow}>
+                  <Ionicons name="alert-circle-outline" size={14} color="#FF4444" />
+                  <View style={{ flex: 1, marginLeft: 6 }}>
+                    <Text style={[styles.restartReason, { color: "#FF8888", fontSize: 11 }]} numberOfLines={2}>
+                      {e.error}
+                    </Text>
+                    <Text style={styles.restartTime}>
+                      rv={e.runtimeVersion} · fail#{e.failCount} · {formatTimestamp(e.timestamp)}
+                    </Text>
+                  </View>
                 </View>
               ))}
             </View>

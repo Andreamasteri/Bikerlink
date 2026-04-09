@@ -17,6 +17,16 @@ import { SERVER_START_TIME, uptimeState } from "../uptime";
 
 const router = Router();
 
+interface OtaErrorEntry {
+  error: string;
+  failCount: number;
+  updateId: string;
+  runtimeVersion: string;
+  timestamp: string;
+}
+const otaErrors: OtaErrorEntry[] = [];
+const OTA_ERRORS_MAX = 50;
+
 interface ClubAssignStats {
   assigned: number;
   skipped: number;
@@ -69,6 +79,31 @@ function requireAdmin(req: Request, res: Response, next: Function) {
     return res.status(500).json({ message: "Errore autenticazione admin" });
   });
 }
+
+router.post("/ota-error", (req: Request, res: Response) => {
+  try {
+    const { error, failCount, updateId, runtimeVersion } = req.body as {
+      error?: string;
+      failCount?: number;
+      updateId?: string;
+      runtimeVersion?: string;
+    };
+    if (!error) return res.status(400).json({ message: "error is required" });
+    const entry: OtaErrorEntry = {
+      error: String(error).substring(0, 500),
+      failCount: typeof failCount === "number" ? failCount : 0,
+      updateId: String(updateId ?? "unknown").substring(0, 64),
+      runtimeVersion: String(runtimeVersion ?? "unknown").substring(0, 16),
+      timestamp: new Date().toISOString(),
+    };
+    otaErrors.push(entry);
+    if (otaErrors.length > OTA_ERRORS_MAX) otaErrors.splice(0, otaErrors.length - OTA_ERRORS_MAX);
+    console.warn(`[OTA-ERROR] rv=${entry.runtimeVersion} uid=${entry.updateId} fail#${entry.failCount}: ${entry.error}`);
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
 
 router.use(requireAdmin);
 
@@ -2946,6 +2981,7 @@ router.get("/system-health", async (_req: Request, res: Response) => {
       metroStartedAt: uptimeState.metroStartTime,
       metroUptimeSec,
       events,
+      otaErrors: otaErrors.slice().reverse(),
     });
   } catch (error) {
     console.error("Admin system-health error:", error);

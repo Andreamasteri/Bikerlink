@@ -9,6 +9,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
+import { getApiUrl } from "@/lib/query-client";
 import { Platform, AppState, ActivityIndicator, View, StyleSheet } from "react-native";
 import * as Location from "expo-location";
 import * as Updates from "expo-updates";
@@ -147,23 +148,44 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
 
 function OtaStartupChecker() {
   const lastCheckRef = useRef<number>(0);
+  const failCountRef = useRef<number>(0);
 
   const runCheck = React.useCallback(async () => {
     if (__DEV__ || Platform.OS === "web") return;
     const now = Date.now();
-    if (now - lastCheckRef.current < 60_000) return;
+    const cooldown = failCountRef.current >= 3 ? 5 * 60_000 : 60_000;
+    if (now - lastCheckRef.current < cooldown) return;
     lastCheckRef.current = now;
     try {
       console.log("[OTA] Checking for update...");
       const check = await Updates.checkForUpdateAsync();
       console.log("[OTA] isAvailable:", check.isAvailable);
-      if (!check.isAvailable) return;
+      if (!check.isAvailable) {
+        failCountRef.current = 0;
+        return;
+      }
       console.log("[OTA] Fetching update...");
       await Updates.fetchUpdateAsync();
       console.log("[OTA] Reloading...");
       await Updates.reloadAsync();
     } catch (err) {
-      console.warn("[OTA] Check/fetch/reload fallito:", String(err));
+      failCountRef.current += 1;
+      const errMsg = String(err);
+      console.warn(`[OTA] Tentativo ${failCountRef.current} fallito:`, errMsg);
+      try {
+        fetch(new URL("/api/admin/ota-error", getApiUrl()).toString(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            error: errMsg,
+            failCount: failCountRef.current,
+            updateId: Updates.updateId ?? "embedded",
+            runtimeVersion: Updates.runtimeVersion ?? "unknown",
+          }),
+        }).catch(() => {});
+      } catch {
+        // fire-and-forget: mai bloccare per errori di reporting
+      }
     }
   }, []);
 

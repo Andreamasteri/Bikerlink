@@ -48,7 +48,7 @@ for CALL in "Updates.checkForUpdateAsync" "Updates.fetchUpdateAsync" "Updates.re
   fi
 done
 
-# ── 3. CURRENT_OTA_NUMBER aggiornato ─────────────────────────
+# ── 3. CURRENT_OTA_NUMBER aggiornato (cycle-aware) ───────────
 CURRENT_OTA=$(grep -oE 'CURRENT_OTA_NUMBER\s*=\s*[0-9]+' "$PROFILE_FILE" 2>/dev/null \
   | grep -oE '[0-9]+$' || true)
 
@@ -56,27 +56,33 @@ if [ -z "$CURRENT_OTA" ]; then
   fail "CURRENT_OTA_NUMBER non trovato in $PROFILE_FILE"
 else
   LATEST_OTA=$(node -e "
+    const appJson = JSON.parse(require('fs').readFileSync('app.json','utf8'));
+    const rv = appJson?.expo?.runtimeVersion ?? null;
     const data = JSON.parse(require('fs').readFileSync('ota-updates.json','utf8'));
-    const nums = data.filter(e => typeof e.updateNumber === 'number').map(e => e.updateNumber);
-    if (nums.length === 0) { process.stderr.write('no numeric entries\n'); process.exit(1); }
-    console.log(Math.max(...nums));
+    const cycle = data.filter(e => typeof e.updateNumber === 'number' && e.runtimeVersion === rv);
+    if (cycle.length === 0) { console.log('NEW_CYCLE'); process.exit(0); }
+    console.log(Math.max(...cycle.map(e => e.updateNumber)));
   " 2>/dev/null || echo "")
 
-  if [ -z "$LATEST_OTA" ] || [ "$LATEST_OTA" = "-Infinity" ]; then
+  if [ -z "$LATEST_OTA" ]; then
     fail "Impossibile leggere updateNumber da ota-updates.json"
+  elif [ "$LATEST_OTA" = "NEW_CYCLE" ]; then
+    ok "Nuovo ciclo runtimeVersion — nessuna OTA pubblicata ancora (CURRENT_OTA_NUMBER=$CURRENT_OTA atteso a 1)"
   elif [ "$CURRENT_OTA" = "$LATEST_OTA" ]; then
     ok "CURRENT_OTA_NUMBER = $CURRENT_OTA corrisponde a latestOta = $LATEST_OTA"
   else
-    fail "CURRENT_OTA_NUMBER=$CURRENT_OTA in profile.tsx ma l'ultima OTA in ota-updates.json è $LATEST_OTA. Aggiornare il numero prima di pubblicare."
+    fail "CURRENT_OTA_NUMBER=$CURRENT_OTA in profile.tsx ma l'ultima OTA del ciclo corrente in ota-updates.json è $LATEST_OTA. Aggiornare prima di pubblicare."
   fi
 fi
 
-# ── 4. NESSUN PENDING nell'ultima entry ota-updates.json ──────
+# ── 4. NESSUN PENDING nell'ultima entry del ciclo corrente ────
 PENDING_CHECK=$(node -e "
+  const appJson = JSON.parse(require('fs').readFileSync('app.json','utf8'));
+  const rv = appJson?.expo?.runtimeVersion ?? null;
   const data = JSON.parse(require('fs').readFileSync('ota-updates.json','utf8'));
-  const latest = data.reduce((best, e) =>
-    (typeof e.updateNumber === 'number' && e.updateNumber > (best ? best.updateNumber : -1)) ? e : best, null);
-  if (!latest) { console.log('NO_ENTRY'); process.exit(0); }
+  const cycle = data.filter(e => typeof e.updateNumber === 'number' && e.runtimeVersion === rv);
+  if (cycle.length === 0) { console.log('NO_ENTRY'); process.exit(0); }
+  const latest = cycle.reduce((best, e) => e.updateNumber > best.updateNumber ? e : best, cycle[0]);
   const pending = Object.entries(latest).filter(([,v]) => v === 'PENDING').map(([k]) => k);
   console.log(pending.length > 0 ? 'PENDING:' + pending.join(',') : 'OK');
 " 2>/dev/null || echo "ERROR")
@@ -87,7 +93,7 @@ elif [[ "$PENDING_CHECK" == PENDING:* ]]; then
   FIELDS="${PENDING_CHECK#PENDING:}"
   fail "ota-updates.json ha campi PENDING nell'ultima entry: $FIELDS. Finalizzare prima di pubblicare."
 elif [ "$PENDING_CHECK" = "NO_ENTRY" ]; then
-  fail "ota-updates.json è vuoto o non ha entry valide."
+  ok "ota-updates.json: nuovo ciclo runtimeVersion, nessuna entry ancora — OK"
 else
   fail "Impossibile analizzare ota-updates.json."
 fi
