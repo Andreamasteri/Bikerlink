@@ -384,10 +384,15 @@ export async function autoSeedFakeUsers() {
 
 const APPLE_REVIEWER_EMAIL = "applereview@bikerlink.it";
 const APPLE_REVIEWER_NICKNAME = "AppleReviewer";
-const APPLE_REVIEWER_PASSWORD = "AppleReview2026!";
 const APPLE_REVIEW_INVITE_CODE = "APPLE-REVIEW-2026";
 
 export async function seedAppleReviewerAccount(): Promise<void> {
+  const appleReviewerPassword = process.env.APPLE_REVIEWER_PASSWORD;
+  if (!appleReviewerPassword) {
+    console.warn("[SEED] APPLE_REVIEWER_PASSWORD env var not set — skipping Apple Reviewer seed");
+    return;
+  }
+
   try {
     await db
       .insert(invitationCodes)
@@ -410,7 +415,7 @@ export async function seedAppleReviewerAccount(): Promise<void> {
       return;
     }
 
-    const hashedPassword = await bcrypt.hash(APPLE_REVIEWER_PASSWORD, 12);
+    const hashedPassword = await bcrypt.hash(appleReviewerPassword, 12);
 
     const [user] = await db
       .insert(users)
