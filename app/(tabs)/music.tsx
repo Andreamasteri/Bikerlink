@@ -11,6 +11,7 @@ import {
   Image,
   Platform,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -104,6 +105,19 @@ export default function MusicScreen() {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
+
+  useEffect(() => {
+    AsyncStorage.multiGet(["music_match_criteria", "music_match_logic", "music_match_min_songs"])
+      .then(pairs => {
+        const criteria = pairs[0][1];
+        const logic = pairs[1][1];
+        const minS = pairs[2][1];
+        if (criteria) setMatchCriteria(criteria.split(",").filter(Boolean));
+        if (logic === "tutti" || logic === "almeno_uno") setMatchLogic(logic);
+        if (minS) setMinSongs(parseInt(minS, 10) || 5);
+      })
+      .catch(() => {});
+  }, []);
 
   const comingSoonQuery = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/spotify-coming-soon"],
@@ -222,9 +236,21 @@ export default function MusicScreen() {
   }, [disconnectMutation]);
 
   const toggleCriteria = useCallback((c: string) => {
-    setMatchCriteria((prev) =>
-      prev.includes(c) ? (prev.length > 1 ? prev.filter((x) => x !== c) : prev) : [...prev, c]
-    );
+    setMatchCriteria((prev) => {
+      const next = prev.includes(c) ? (prev.length > 1 ? prev.filter((x) => x !== c) : prev) : [...prev, c];
+      AsyncStorage.setItem("music_match_criteria", next.join(",")).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const handleSetMatchLogic = useCallback((v: "tutti" | "almeno_uno") => {
+    setMatchLogic(v);
+    AsyncStorage.setItem("music_match_logic", v).catch(() => {});
+  }, []);
+
+  const handleSetMinSongs = useCallback((v: number) => {
+    setMinSongs(v);
+    AsyncStorage.setItem("music_match_min_songs", String(v)).catch(() => {});
   }, []);
 
   const isConnected = statusQuery.data?.connected === true;
@@ -348,9 +374,9 @@ export default function MusicScreen() {
               maxKm={matchMaxKm}
               onSetMaxKm={setMatchMaxKm}
               matchLogic={matchLogic}
-              onSetMatchLogic={setMatchLogic}
+              onSetMatchLogic={handleSetMatchLogic}
               minSongs={minSongs}
-              onSetMinSongs={setMinSongs}
+              onSetMinSongs={handleSetMinSongs}
               onSearch={() => matchQuery.refetch()}
             />
           )}

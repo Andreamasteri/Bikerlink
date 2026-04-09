@@ -464,6 +464,9 @@ export default function MatchScreen() {
   const [distanceMode, setDistanceMode] = useState<"all" | "km">("all");
   const [distanceKm, setDistanceKm] = useState<string>("50");
   const [pendingKm, setPendingKm] = useState<string>("50");
+  const [musicCriteria, setMusicCriteria] = useState<string>("songs,genre");
+  const [musicLogic, setMusicLogic] = useState<string>("almeno_uno");
+  const [musicMinSongs, setMusicMinSongs] = useState<number>(5);
 
   useFocusEffect(
     useCallback(() => {
@@ -475,6 +478,20 @@ export default function MatchScreen() {
       }).catch(() => {});
     }, [])
   );
+
+  useEffect(() => {
+    if (activeTab !== "music") return;
+    AsyncStorage.multiGet(["music_match_criteria", "music_match_logic", "music_match_min_songs"])
+      .then(pairs => {
+        const criteria = pairs[0][1] ?? "songs,genre";
+        const logic = pairs[1][1] ?? "almeno_uno";
+        const minS = pairs[2][1] ?? "5";
+        setMusicCriteria(criteria);
+        setMusicLogic(logic);
+        setMusicMinSongs(parseInt(minS, 10) || 5);
+      })
+      .catch(() => {});
+  }, [activeTab]);
 
   const { data: proposalMatches, isLoading: proposalLoading, refetch: proposalRefetch, isRefetching: proposalRefetching } = useQuery<any[]>({
     queryKey: ["/api/proposals/matches"],
@@ -509,7 +526,20 @@ export default function MatchScreen() {
   });
 
   const { data: musicMatchData, isLoading: musicLoading, isRefetching: musicRefetching, refetch: musicRefetch } = useQuery<{ matches: any[] }>({
-    queryKey: ["/api/spotify/match/music"],
+    queryKey: ["/api/spotify/match/music", distanceMode, distanceKm, musicCriteria, musicLogic, musicMinSongs],
+    queryFn: async () => {
+      const parsedKmLocal = parseFloat(distanceKm);
+      const kmLimitLocal = Number.isFinite(parsedKmLocal) && parsedKmLocal > 0 ? parsedKmLocal : 50;
+      const maxKm = distanceMode === "km" ? kmLimitLocal : 500;
+      const url = new URL("/api/spotify/match/music", getApiUrl());
+      url.searchParams.set("criteria", musicCriteria);
+      url.searchParams.set("maxKm", String(maxKm));
+      url.searchParams.set("logic", musicLogic === "tutti" ? "all" : "any");
+      url.searchParams.set("minSongs", String(musicMinSongs));
+      const res = await globalThis.fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) throw new Error(`${res.status}`);
+      return res.json();
+    },
     enabled: !!user && activeTab === "music" && spotifyStatus?.connected === true,
   });
 
@@ -1263,6 +1293,22 @@ export default function MatchScreen() {
         </View>
       )}
 
+      {activeTab === "music" && spotifyStatus?.connected === true && (
+        <View style={styles.musicCriteriaChip}>
+          <Ionicons name="musical-notes" size={13} color={Colors.accent} />
+          <Text style={styles.musicCriteriaText}>
+            {musicCriteria.split(",").map(c =>
+              c === "songs" ? "Brani" : c === "genre" ? "Genere" : c === "artist" ? "Artista" : c
+            ).join(" + ")}
+            {" · min "}{musicMinSongs}
+            {distanceMode === "km" ? ` · ≤ ${kmLimit} km` : " · Qualsiasi distanza"}
+          </Text>
+          <TouchableOpacity onPress={() => router.push("/(tabs)/music" as any)}>
+            <Text style={styles.musicCriteriaChange}>Cambia</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {activeTab === "music" && spotifyStatus?.connected !== true ? (
         <View style={styles.empty}>
           <Ionicons name="musical-notes-outline" size={48} color={Colors.textSecondary} />
@@ -1673,5 +1719,26 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "center" as const,
     lineHeight: 20,
+  },
+  musicCriteriaChip: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  musicCriteriaText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+  },
+  musicCriteriaChange: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.accent,
   },
 });
