@@ -2560,4 +2560,18 @@ const styles = StyleSheet.create({
   countryChipTextSelected: {
     color: Colors.warning, fontFamily: "Inter_600SemiBold",
   },
+  accordionPanel: {
+    borderRadius: 12, borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: Colors.surface, marginBottom: 12, overflow: "hidden",
+  },
+  accordionPanelHeader: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 16, paddingVertical: 14,
+  },
+  accordionPanelTitle: {
+    fontFamily: "Inter_600SemiBold", fontSize: 15, color: Colors.text, marginLeft: 8,
+  },
+  accordionPanelContent: {
+    paddingHorizontal: 12, paddingBottom: 12,
+  },
 });

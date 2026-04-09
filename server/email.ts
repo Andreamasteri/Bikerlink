@@ -209,6 +209,72 @@ export async function sendInvitationGiftEmail(
   }
 }
 
+export async function sendNewUserNotificationEmail(user: {
+  nickname: string;
+  email: string;
+  phone?: string | null;
+  userType?: string | null;
+  sex?: string | null;
+  birthYear?: number | null;
+  region?: string | null;
+  country?: string | null;
+}, invitationCode?: string | null): Promise<boolean> {
+  const adminEmail = "bikerlinkapp@gmail.com";
+  const esc = (v: string) =>
+    v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const now = new Date();
+  const registrationTime = now.toLocaleString("it-IT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZone: "Europe/Rome",
+  });
+
+  const rows = [
+    ["Nickname", esc(user.nickname)],
+    ["Email", esc(user.email)],
+    ["Telefono", user.phone ? esc(user.phone) : "—"],
+    ["Tipo utente", user.userType ? esc(user.userType) : "—"],
+    ["Sesso", user.sex ? esc(user.sex) : "—"],
+    ["Anno di nascita", user.birthYear ? String(user.birthYear) : "—"],
+    ["Regione", user.region ? esc(user.region) : "—"],
+    ["Paese", user.country ? esc(user.country) : "—"],
+    ["Data/ora registrazione", esc(registrationTime)],
+    ["Codice invito/promo", invitationCode ? esc(invitationCode) : "—"],
+  ];
+
+  const tableRows = rows
+    .map(
+      ([label, value]) =>
+        `<tr><td style="padding:8px 12px;color:#aaa;white-space:nowrap;font-size:14px;">${label}</td><td style="padding:8px 12px;color:#fff;font-size:14px;">${value}</td></tr>`
+    )
+    .join("");
+
+  const subject = `[BikerLink] Nuova registrazione: ${user.nickname}`;
+  const html = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:0 auto;padding:20px;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <h1 style="color:#FF6B35;margin:0;font-size:26px;">🏍️ BikerLink</h1>
+        <p style="color:#888;font-size:13px;margin-top:4px;">Notifica nuova registrazione</p>
+      </div>
+      <div style="background:#1a1a2e;border-radius:12px;padding:24px;color:#fff;">
+        <h2 style="margin-top:0;font-size:18px;color:#FF6B35;">Nuovo utente registrato</h2>
+        <table style="width:100%;border-collapse:collapse;">
+          ${tableRows}
+        </table>
+      </div>
+      <p style="text-align:center;color:#666;font-size:11px;margin-top:16px;">
+        © ${now.getFullYear()} BikerLink — notifica automatica
+      </p>
+    </div>
+  `;
+
+  return sendEmail(adminEmail, subject, html);
+}
+
 export async function sendPasswordResetEmail(to: string, nickname: string, code: string): Promise<boolean> {
   const subject = "BikerLink - Recupero password";
   const html = `

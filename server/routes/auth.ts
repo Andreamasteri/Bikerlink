@@ -4,7 +4,7 @@ import crypto from "crypto";
 import rateLimit from "express-rate-limit";
 import { registerSchema, loginSchema } from "@shared/schema";
 import { storage } from "../storage";
-import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetConfirmationEmail, sendInvitationGiftEmail } from "../email";
+import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetConfirmationEmail, sendInvitationGiftEmail, sendNewUserNotificationEmail } from "../email";
 import { createClubInvitesForMoto, createRegionalClubInvite } from "./motoclubs";
 import { onlineTracker } from "../online-tracker";
 
@@ -131,6 +131,20 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     });
 
     await storage.createUserProfile({ userId: user.id });
+
+    sendNewUserNotificationEmail(
+      {
+        nickname: user.nickname,
+        email: user.email,
+        phone: user.phone,
+        userType: user.userType,
+        sex: user.sex,
+        birthYear: user.birthYear,
+        region: user.region,
+        country: user.country,
+      },
+      invitationCodeStr ?? null
+    ).catch((e) => console.warn("[EMAIL] Admin notification failed (non-blocking):", e));
 
     if (data.region) {
       createRegionalClubInvite(user.id, data.region).catch(() => {});
