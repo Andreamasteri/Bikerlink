@@ -840,7 +840,7 @@ export default function ProfileScreen() {
 
       <View style={styles.section}>
         <Pressable style={styles.accordionHeader} onPress={() => setPrivacyExpanded((v) => !v)}>
-          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>La mia privacy</Text>
+          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>La mia privacy - Altera Posizione</Text>
           <Ionicons
             name={privacyExpanded ? "chevron-up" : "chevron-down"}
             size={18}
