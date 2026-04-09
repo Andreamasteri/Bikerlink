@@ -16,7 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 
@@ -224,7 +224,9 @@ export default function MusicScreen() {
 
   const isConnected = statusQuery.data?.connected === true;
   const isLoading = statusQuery.isLoading;
-  const isNotConfigured = !process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID || statusQuery.isError;
+  const isNotConfigured =
+    !process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID ||
+    (statusQuery.isError && (statusQuery.error as Error)?.message?.startsWith("503"));
 
   if (isLoading) {
     return (
@@ -528,6 +530,24 @@ function MatchTab({
 }
 
 function MatchCard({ match }: { match: MusicMatch }) {
+  const router = useRouter();
+  const localQueryClient = useQueryClient();
+  const [chatLoading, setChatLoading] = useState(false);
+
+  const openChat = useCallback(async () => {
+    setChatLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/chat/conversations", { participantId: match.user.id });
+      const data = await res.json();
+      localQueryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      router.push(`/chat/${data.id}` as any);
+    } catch {
+      Alert.alert("Errore", "Impossibile aprire la chat. Riprova.");
+    } finally {
+      setChatLoading(false);
+    }
+  }, [match.user.id, router, localQueryClient]);
+
   return (
     <View style={styles.matchCard}>
       <View style={styles.matchLeft}>
@@ -564,6 +584,25 @@ function MatchCard({ match }: { match: MusicMatch }) {
         {match.distanceKm > 0 && (
           <Text style={styles.matchDist}>{match.distanceKm} km di distanza</Text>
         )}
+        <View style={styles.matchActions}>
+          <TouchableOpacity
+            style={styles.matchActionBtn}
+            onPress={() => router.push(`/profile/${match.user.id}` as any)}
+          >
+            <Text style={styles.matchActionText}>Profilo</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.matchActionBtn, { backgroundColor: Colors.accent }]}
+            onPress={openChat}
+            disabled={chatLoading}
+          >
+            {chatLoading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={[styles.matchActionText, { color: "#fff" }]}>Scrivi</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -993,6 +1032,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
+  },
+  matchActions: {
+    flexDirection: "row" as const,
+    gap: 8,
+    marginTop: 10,
+  },
+  matchActionBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  matchActionText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
   },
   playlistCard: {
     backgroundColor: Colors.surface,
