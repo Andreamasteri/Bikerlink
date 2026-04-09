@@ -274,6 +274,31 @@ export default function SystemScreen() {
             </View>
           )}
 
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="cloud-download-outline" size={18} color={Colors.accent} />
+              <Text style={styles.cardTitle}>Storico OTA</Text>
+              <View style={[styles.badge, { backgroundColor: Colors.accent }]}>
+                <Text style={styles.badgeText}>{otaUpdates.length}</Text>
+              </View>
+            </View>
+            {otaUpdates.slice().reverse().slice(0, 8).map((u) => (
+              <View key={u.updateNumber} style={styles.restartRow}>
+                <Ionicons
+                  name={u.status === "published" ? "checkmark-circle-outline" : "ellipse-outline"}
+                  size={14}
+                  color={u.status === "published" ? Colors.accent : Colors.textMuted ?? "#888"}
+                />
+                <Text style={styles.restartReason} numberOfLines={1}>
+                  OTA-{u.updateNumber}: {u.message}
+                </Text>
+                <Text style={styles.restartTime}>
+                  {u.publishedAt ? new Date(u.publishedAt).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }) : "—"}
+                </Text>
+              </View>
+            ))}
+          </View>
+
           <Text style={styles.sectionTitle}>Ultimi eventi ({mergedEvents.length})</Text>
         </>
       }

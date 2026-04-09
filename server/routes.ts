@@ -277,6 +277,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/music-match", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("music_match_enabled");
+      const enabled = setting?.value !== "false";
+      res.json({ enabled });
+    } catch {
+      res.json({ enabled: true });
+    }
+  });
+
+  app.get("/api/settings/music-export-playlist", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("music_export_playlist_enabled");
+      const enabled = setting?.value !== "false";
+      res.json({ enabled });
+    } catch {
+      res.json({ enabled: true });
+    }
+  });
+
+  app.get("/api/settings/music-import-playlist", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("music_import_playlist_enabled");
+      const enabled = setting?.value !== "false";
+      res.json({ enabled });
+    } catch {
+      res.json({ enabled: true });
+    }
+  });
+
   app.get("/api/settings/primal-user", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("primal_user_enabled");

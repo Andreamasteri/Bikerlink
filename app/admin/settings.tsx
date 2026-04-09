@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Switch, Modal, ScrollView } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Switch, Modal, ScrollView, Pressable } from "react-native";
 import { EUROPEAN_COUNTRIES } from "@/lib/countries-regions";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -288,6 +288,10 @@ export default function AdminSettings() {
   const [matchingTriggerFeedback, setMatchingTriggerFeedback] = useState<string | null>(null);
   const [clubInviteFeedback, setClubInviteFeedback] = useState<string | null>(null);
   const [uptimeWidgetEnabled, setUptimeWidgetEnabled] = useState<boolean>(true);
+  const [matchingEngineExpanded, setMatchingEngineExpanded] = useState(false);
+  const [musicSystemExpanded, setMusicSystemExpanded] = useState(false);
+  const [mapsExpanded, setMapsExpanded] = useState(false);
+  const [docsExpanded, setDocsExpanded] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem("uptime_widget_enabled").then((val) => {
@@ -435,6 +439,21 @@ export default function AdminSettings() {
   });
   const spotifyComingSoon = spotifyComingSoonData?.enabled === true;
 
+  const { data: musicMatchData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/music-match"],
+  });
+  const musicMatchEnabled = musicMatchData?.enabled !== false;
+
+  const { data: musicExportData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/music-export-playlist"],
+  });
+  const musicExportEnabled = musicExportData?.enabled !== false;
+
+  const { data: musicImportData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/music-import-playlist"],
+  });
+  const musicImportEnabled = musicImportData?.enabled !== false;
+
   const { data: homeMessageData } = useQuery<{ enabled: boolean; text: string }>({
     queryKey: ["/api/settings/home-message"],
   });
@@ -517,6 +536,63 @@ export default function AdminSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/spotify-coming-soon"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const musicMatchMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/music_match_enabled", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/music-match"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const musicExportMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/music_export_playlist_enabled", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/music-export-playlist"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const musicImportMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/music_import_playlist_enabled", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/music-import-playlist"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
   });
@@ -1104,11 +1180,21 @@ export default function AdminSettings() {
         <Text style={styles.sectionTitle}>Funzionalità App</Text>
       </View>
 
-      <View style={styles.paidCard}>
-        <View style={styles.synecoHeader}>
+      <View style={styles.accordionPanel}>
+        <Pressable style={styles.accordionPanelHeader} onPress={() => setMatchingEngineExpanded((v) => !v)}>
           <View style={styles.synecoInfo}>
-            <Ionicons name="git-compare" size={20} color={Colors.warning} />
-            <Text style={styles.synecoLabel}>Match Automatico</Text>
+            <Ionicons name="git-network" size={20} color={Colors.warning} />
+            <Text style={styles.accordionPanelTitle}>Matching Engine</Text>
+          </View>
+          <Ionicons name={matchingEngineExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+        </Pressable>
+        {matchingEngineExpanded && (
+          <View style={styles.accordionPanelContent}>
+            <View style={styles.paidCard}>
+              <View style={styles.synecoHeader}>
+                <View style={styles.synecoInfo}>
+                  <Ionicons name="git-compare" size={20} color={Colors.warning} />
+                  <Text style={styles.synecoLabel}>Match Automatico</Text>
           </View>
           <Switch
             value={autoMatchEnabled}
@@ -1316,6 +1402,28 @@ export default function AdminSettings() {
         </Text>
       </View>
 
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="musical-notes" size={20} color={Colors.warning} />
+            <Text style={styles.synecoLabel}>Music Match</Text>
+          </View>
+          <Switch
+            value={musicMatchEnabled}
+            onValueChange={(val) => musicMatchMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: Colors.warning }}
+            thumbColor={musicMatchEnabled ? Colors.text : Colors.textSecondary}
+            disabled={musicMatchMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {musicMatchEnabled ? "Il matching musicale tra biker è attivo" : "Il matching musicale è disattivato"}
+        </Text>
+      </View>
+          </View>
+        )}
+      </View>
+
       <View style={styles.synecoCard}>
         <View style={styles.synecoHeader}>
           <View style={styles.synecoInfo}>
@@ -1335,32 +1443,82 @@ export default function AdminSettings() {
         </Text>
       </View>
 
-      <View style={styles.synecoCard}>
-        <View style={styles.synecoHeader}>
+      <View style={styles.accordionPanel}>
+        <Pressable style={styles.accordionPanelHeader} onPress={() => setMusicSystemExpanded((v) => !v)}>
           <View style={styles.synecoInfo}>
-            <Ionicons name="logo-spotify" size={20} color="#1DB954" />
-            <Text style={styles.synecoLabel}>Spotify — In Arrivo</Text>
+            <Ionicons name="musical-notes" size={20} color="#1DB954" />
+            <Text style={styles.accordionPanelTitle}>Music System</Text>
           </View>
-          <Switch
-            value={spotifyComingSoon}
-            onValueChange={(val) => spotifyComingSoonMutation.mutate(val)}
-            trackColor={{ false: Colors.border, true: "#1DB954" }}
-            thumbColor={spotifyComingSoon ? Colors.text : Colors.textSecondary}
-            disabled={spotifyComingSoonMutation.isPending}
-          />
-        </View>
-        <Text style={styles.synecoDesc}>
-          {spotifyComingSoon
-            ? "Spotify mostra lo stato 'in arrivo' agli utenti (Extended Quota Mode in attesa)"
-            : "Spotify funziona normalmente (se configurato)"}
-        </Text>
+          <Ionicons name={musicSystemExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+        </Pressable>
+        {musicSystemExpanded && (
+          <View style={styles.accordionPanelContent}>
+            <View style={styles.synecoHeader}>
+              <View style={styles.synecoInfo}>
+                <Ionicons name="share-outline" size={20} color="#1DB954" />
+                <Text style={styles.synecoLabel}>Consenti export playlist</Text>
+              </View>
+              <Switch
+                value={musicExportEnabled}
+                onValueChange={(val) => musicExportMutation.mutate(val)}
+                trackColor={{ false: Colors.border, true: "#1DB954" }}
+                thumbColor={musicExportEnabled ? Colors.text : Colors.textSecondary}
+                disabled={musicExportMutation.isPending}
+              />
+            </View>
+            <Text style={styles.synecoDesc}>
+              {musicExportEnabled ? "Gli utenti possono esportare la propria playlist" : "Export playlist disabilitato"}
+            </Text>
+            <View style={[styles.synecoHeader, { marginTop: 12 }]}>
+              <View style={styles.synecoInfo}>
+                <Ionicons name="download-outline" size={20} color="#1DB954" />
+                <Text style={styles.synecoLabel}>Consenti import playlist</Text>
+              </View>
+              <Switch
+                value={musicImportEnabled}
+                onValueChange={(val) => musicImportMutation.mutate(val)}
+                trackColor={{ false: Colors.border, true: "#1DB954" }}
+                thumbColor={musicImportEnabled ? Colors.text : Colors.textSecondary}
+                disabled={musicImportMutation.isPending}
+              />
+            </View>
+            <Text style={styles.synecoDesc}>
+              {musicImportEnabled ? "Gli utenti possono importare playlist" : "Import playlist disabilitato"}
+            </Text>
+            <View style={[styles.synecoHeader, { marginTop: 12 }]}>
+              <View style={styles.synecoInfo}>
+                <Ionicons name="logo-spotify" size={20} color="#1DB954" />
+                <Text style={styles.synecoLabel}>Spotify</Text>
+              </View>
+              <Switch
+                value={!spotifyComingSoon}
+                onValueChange={(val) => spotifyComingSoonMutation.mutate(!val)}
+                trackColor={{ false: Colors.border, true: "#1DB954" }}
+                thumbColor={!spotifyComingSoon ? Colors.text : Colors.textSecondary}
+                disabled={spotifyComingSoonMutation.isPending}
+              />
+            </View>
+            <Text style={styles.synecoDesc}>
+              {!spotifyComingSoon ? "Spotify attivo per gli utenti" : "Spotify in arrivo (Extended Quota Mode in attesa)"}
+            </Text>
+          </View>
+        )}
       </View>
 
-      <View style={styles.paidCard}>
-        <View style={styles.synecoHeader}>
+      <View style={styles.accordionPanel}>
+        <Pressable style={styles.accordionPanelHeader} onPress={() => setMapsExpanded((v) => !v)}>
           <View style={styles.synecoInfo}>
             <Ionicons name="map" size={20} color={Colors.accent} />
-            <Text style={styles.synecoLabel}>Sistema Mappe</Text>
+            <Text style={styles.accordionPanelTitle}>Stile Mappa</Text>
+          </View>
+          <Ionicons name={mapsExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+        </Pressable>
+        {mapsExpanded && (
+          <View style={styles.accordionPanelContent}>
+            <View style={styles.synecoHeader}>
+              <View style={styles.synecoInfo}>
+                <Ionicons name="map" size={20} color={Colors.accent} />
+                <Text style={styles.synecoLabel}>Sistema Mappe</Text>
           </View>
           <Switch
             value={mapsEnabled}
@@ -1454,6 +1612,8 @@ export default function AdminSettings() {
             ? "Gli utenti possono scegliere il proprio stile mappa"
             : "Tutti gli utenti vedono il provider di default"}
         </Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.paidCard}>
@@ -1817,28 +1977,36 @@ export default function AdminSettings() {
         </View>
       </View>
 
-      <View style={styles.sectionHeaderRow}>
-        <Ionicons name="book" size={20} color={Colors.accent} />
-        <Text style={styles.sectionTitle}>Documenti PDF</Text>
+      <View style={styles.accordionPanel}>
+        <Pressable style={styles.accordionPanelHeader} onPress={() => setDocsExpanded((v) => !v)}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="book" size={20} color={Colors.accent} />
+            <Text style={styles.accordionPanelTitle}>Documenti PDF</Text>
+          </View>
+          <Ionicons name={docsExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+        </Pressable>
+        {docsExpanded && (
+          <View style={styles.accordionPanelContent}>
+            <ManualAdminSection />
+
+            <PdfDocumentAdminSection
+              title="EULA"
+              fileName="BikerLink-EULA.pdf"
+              infoEndpoint="/api/eula/info"
+              downloadEndpoint="/api/eula/download"
+              uploadEndpoint="/api/admin/eula/upload"
+            />
+
+            <PdfDocumentAdminSection
+              title="Privacy Policy"
+              fileName="BikerLink-PrivacyPolicy.pdf"
+              infoEndpoint="/api/privacy-policy/info"
+              downloadEndpoint="/api/privacy-policy/download"
+              uploadEndpoint="/api/admin/privacy-policy/upload"
+            />
+          </View>
+        )}
       </View>
-
-      <ManualAdminSection />
-
-      <PdfDocumentAdminSection
-        title="EULA"
-        fileName="BikerLink-EULA.pdf"
-        infoEndpoint="/api/eula/info"
-        downloadEndpoint="/api/eula/download"
-        uploadEndpoint="/api/admin/eula/upload"
-      />
-
-      <PdfDocumentAdminSection
-        title="Privacy Policy"
-        fileName="BikerLink-PrivacyPolicy.pdf"
-        infoEndpoint="/api/privacy-policy/info"
-        downloadEndpoint="/api/privacy-policy/download"
-        uploadEndpoint="/api/admin/privacy-policy/upload"
-      />
 
       <View style={styles.sectionHeaderRow}>
         <Ionicons name="construct" size={20} color={Colors.accent} />
@@ -2208,6 +2376,20 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontFamily: "Inter_700Bold", fontSize: 16, color: Colors.textSecondary,
     textTransform: "uppercase", letterSpacing: 0.5,
+  },
+  accordionPanel: {
+    backgroundColor: Colors.surface, borderRadius: 12, marginBottom: 16,
+    borderWidth: 1, borderColor: Colors.border, overflow: "hidden",
+  },
+  accordionPanelHeader: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    padding: 14,
+  },
+  accordionPanelTitle: {
+    fontFamily: "Inter_600SemiBold", fontSize: 15, color: Colors.text,
+  },
+  accordionPanelContent: {
+    padding: 14, paddingTop: 0, borderTopWidth: 1, borderTopColor: Colors.border,
   },
   synecoCard: {
     backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 16,

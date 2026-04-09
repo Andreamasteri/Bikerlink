@@ -39,7 +39,7 @@ const adminGroups: AdminGroup[] = [
     items: [
       { key: "users", label: "Utenti", icon: "people", iconSet: "MaterialIcons", route: "/admin/users" },
       { key: "stregatti", label: "Stregatti", icon: "robot", iconSet: "MaterialCommunityIcons", route: "/admin/stregatti" },
-      { key: "reports", label: "Segnalazioni", icon: "flag", iconSet: "MaterialIcons", route: "/admin/reports" },
+      { key: "reports", label: "Bugs & Co", icon: "flag", iconSet: "MaterialIcons", route: "/admin/reports" },
     ],
   },
   {
@@ -61,7 +61,7 @@ const adminGroups: AdminGroup[] = [
       { key: "analytics", label: "Analytics", icon: "analytics", iconSet: "MaterialIcons", route: "/admin/analytics" },
       { key: "performance", label: "Performance", icon: "speedometer", iconSet: "Ionicons", route: "/admin/performance" },
       { key: "db-debug", label: "DB Debug", icon: "database", iconSet: "MaterialCommunityIcons", route: "/admin/db-debug" },
-      { key: "ota-history", label: "Storico OTA", icon: "update", iconSet: "MaterialCommunityIcons", route: "/admin/ota-history" },
+      { key: "system", label: "System Monitor", icon: "pulse-outline", iconSet: "Ionicons", route: "/admin/system", accentColor: "#FF4444" },
     ],
   },
   {
@@ -72,7 +72,6 @@ const adminGroups: AdminGroup[] = [
       { key: "settings", label: "Impostazioni", icon: "settings", iconSet: "MaterialIcons", route: "/admin/settings" },
       { key: "invite-codes", label: "Codici Invito", icon: "gift", iconSet: "Ionicons", route: "/admin/invite-codes" },
       { key: "backup", label: "Backup automatici", icon: "cloud-upload", iconSet: "MaterialCommunityIcons", route: "/admin/backup" },
-      { key: "system", label: "Sistema", icon: "pulse-outline", iconSet: "Ionicons", route: "/admin/system", accentColor: "#FF4444" },
     ],
   },
 ];
