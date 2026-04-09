@@ -207,7 +207,7 @@ export default function MusicScreen() {
   });
 
   const syncMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/spotify/sync", {}),
+    mutationFn: () => apiRequest("POST", "/api/spotify/sync", {}).then((r) => r.json() as Promise<{ synced: boolean; trackCount: number }>),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/spotify/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/spotify/my-tracks"] });
