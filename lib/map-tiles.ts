@@ -31,7 +31,7 @@ export const MAP_PROVIDER_LABELS: Record<MapProvider, string> = {
 };
 
 export const MAP_PROVIDER_DESCRIPTIONS: Record<MapProvider, string> = {
-  esri_gray: "Mappa base. Utile se hai poco segnale o preferisci il minimalismo.",
+  esri_gray: "Utile se hai poco segnale o preferisci il minimalismo.",
   carto_light: "Mappa dettagliata con modalità chiara e scura. Cambia tema con il toggle sulla mappa.",
   carto_dark: "Mappa dettagliata, modalità notte.",
 };
