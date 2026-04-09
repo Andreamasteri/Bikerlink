@@ -479,20 +479,6 @@ export default function MatchScreen() {
     }, [])
   );
 
-  useEffect(() => {
-    if (activeTab !== "music") return;
-    AsyncStorage.multiGet(["music_match_criteria", "music_match_logic", "music_match_min_songs"])
-      .then(pairs => {
-        const criteria = pairs[0][1] ?? "songs,genre";
-        const logic = pairs[1][1] ?? "almeno_uno";
-        const minS = pairs[2][1] ?? "5";
-        setMusicCriteria(criteria);
-        setMusicLogic(logic);
-        setMusicMinSongs(parseInt(minS, 10) || 5);
-      })
-      .catch(() => {});
-  }, [activeTab]);
-
   useFocusEffect(
     useCallback(() => {
       if (activeTab !== "music") return;
