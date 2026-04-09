@@ -31,6 +31,7 @@ interface SearchTrack {
   artistName: string;
   albumName?: string | null;
   imageUrl?: string | null;
+  genres: string[];
   popularity: number;
 }
 

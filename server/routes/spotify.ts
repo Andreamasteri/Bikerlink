@@ -67,17 +67,50 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
       name: string;
       popularity: number;
       artists: Array<{ id: string; name: string }>;
-      album: { name: string; images: Array<{ url: string }> };
+      album: { name: string; images: Array<{ url: string; width?: number }> };
     }>;
-    const tracks = items.map((item) => ({
-      spotifyTrackId: item.id,
-      trackName: item.name,
-      artistId: item.artists?.[0]?.id ?? "",
-      artistName: item.artists?.[0]?.name ?? "",
-      albumName: item.album?.name ?? null,
-      imageUrl: item.album?.images?.[0]?.url ?? null,
-      popularity: item.popularity ?? 0,
-    }));
+
+    // Batch-fetch artist genres (Client Credentials can call /v1/artists)
+    const artistIds = [...new Set(items.map((item) => item.artists?.[0]?.id).filter(Boolean))] as string[];
+    const genresByArtistId = new Map<string, string[]>();
+    if (artistIds.length > 0) {
+      try {
+        // Spotify batch endpoint: max 50 artists per request
+        const chunks: string[][] = [];
+        for (let i = 0; i < artistIds.length; i += 50) {
+          chunks.push(artistIds.slice(i, i + 50));
+        }
+        for (const chunk of chunks) {
+          const artistUrl = `https://api.spotify.com/v1/artists?ids=${chunk.join(",")}`;
+          const artistResp = await fetch(artistUrl, { headers: { Authorization: `Bearer ${token}` } });
+          if (artistResp.ok) {
+            const artistData = await artistResp.json() as { artists?: Array<{ id: string; genres?: string[] }> };
+            for (const artist of artistData.artists ?? []) {
+              if (artist?.id) genresByArtistId.set(artist.id, artist.genres ?? []);
+            }
+          }
+        }
+      } catch (genreErr) {
+        console.warn("[Spotify] genre fetch failed (non bloccante):", (genreErr as Error).message);
+      }
+    }
+
+    const tracks = items.map((item) => {
+      const artistId = item.artists?.[0]?.id ?? "";
+      // Prefer 300px image (index 1); fall back to largest (index 0)
+      const images = item.album?.images ?? [];
+      const image300 = images.find((img) => img.width === 300) ?? images[1] ?? images[0];
+      return {
+        spotifyTrackId: item.id,
+        trackName: item.name,
+        artistId,
+        artistName: item.artists?.[0]?.name ?? "",
+        albumName: item.album?.name ?? null,
+        imageUrl: image300?.url ?? null,
+        genres: genresByArtistId.get(artistId) ?? [],
+        popularity: item.popularity ?? 0,
+      };
+    });
     return res.json({ tracks });
   } catch (error) {
     console.error("[Spotify] search error:", error);
@@ -120,18 +153,20 @@ router.post("/tracks", requireAuth, async (req: Request, res: Response) => {
   }
   try {
     const userId = req.session.userId!;
-    const { spotifyTrackId, trackName, artistId, artistName, albumName, imageUrl, popularity } = req.body as {
+    const { spotifyTrackId, trackName, artistId, artistName, albumName, imageUrl, genres, popularity } = req.body as {
       spotifyTrackId?: string;
       trackName?: string;
       artistId?: string;
       artistName?: string;
       albumName?: string | null;
       imageUrl?: string | null;
+      genres?: string[];
       popularity?: number;
     };
     if (!spotifyTrackId || !trackName || !artistName) {
       return res.status(400).json({ message: "Dati brano incompleti (spotifyTrackId, trackName, artistName richiesti)" });
     }
+    const safeGenres = Array.isArray(genres) ? genres.map(String) : [];
     const [track] = await db
       .insert(userMusicTracks)
       .values({
@@ -142,7 +177,7 @@ router.post("/tracks", requireAuth, async (req: Request, res: Response) => {
         artistName: artistName.slice(0, 300),
         albumName: albumName ? albumName.slice(0, 500) : null,
         imageUrl: imageUrl ? imageUrl.slice(0, 500) : null,
-        genres: [],
+        genres: safeGenres,
         popularity: popularity ?? 0,
       })
       .onConflictDoUpdate({
@@ -152,6 +187,7 @@ router.post("/tracks", requireAuth, async (req: Request, res: Response) => {
           artistName: artistName.slice(0, 300),
           albumName: albumName ? albumName.slice(0, 500) : null,
           imageUrl: imageUrl ? imageUrl.slice(0, 500) : null,
+          genres: safeGenres,
           popularity: popularity ?? 0,
         },
       })
