@@ -11,15 +11,17 @@ set -uo pipefail
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
 ERRORS=0
 
-ok()  { echo -e "${GREEN}✔${RESET} $1"; }
-fail(){ echo -e "${RED}✖ ERRORE:${RESET} $1"; ERRORS=$((ERRORS + 1)); }
-info(){ echo -e "${CYAN}ℹ${RESET} $1"; }
+ok()   { echo -e "${GREEN}✔${RESET} $1"; }
+fail() { echo -e "${RED}✖ ERRORE:${RESET} $1"; ERRORS=$((ERRORS + 1)); }
+warn() { echo -e "${YELLOW}⚠ ATTENZIONE:${RESET} $1"; }
+info() { echo -e "${CYAN}ℹ${RESET} $1"; }
 
 echo ""
 echo -e "${BOLD}════════════════════════════════════════${RESET}"
@@ -96,6 +98,30 @@ elif [ "$PENDING_CHECK" = "NO_ENTRY" ]; then
   ok "ota-updates.json: nuovo ciclo runtimeVersion, nessuna entry ancora — OK"
 else
   fail "Impossibile analizzare ota-updates.json."
+fi
+
+# ── 5. CICLI MULTIPLI — warning se il registro ha più runtimeVersion ──
+MULTI_CYCLE_CHECK=$(node -e "
+  const appJson = JSON.parse(require('fs').readFileSync('app.json','utf8'));
+  const currentRv = appJson?.expo?.runtimeVersion ?? null;
+  const data = JSON.parse(require('fs').readFileSync('ota-updates.json','utf8'));
+  const rvSet = [...new Set(data.filter(e => typeof e.updateNumber === 'number').map(e => e.runtimeVersion))];
+  if (rvSet.length <= 1) { console.log('OK'); process.exit(0); }
+  const others = rvSet.filter(rv => rv !== currentRv);
+  console.log('MULTI:currentRv=' + currentRv + ':others=' + others.join(','));
+" 2>/dev/null || echo "ERROR")
+
+if [ "$MULTI_CYCLE_CHECK" = "OK" ]; then
+  ok "ota-updates.json: un solo ciclo runtimeVersion — nessun mismatch"
+elif [ "$MULTI_CYCLE_CHECK" = "ERROR" ]; then
+  warn "Impossibile verificare i cicli runtimeVersion in ota-updates.json"
+elif [[ "$MULTI_CYCLE_CHECK" == MULTI:* ]]; then
+  CURRENT_RV_VAL=$(echo "$MULTI_CYCLE_CHECK" | grep -o 'currentRv=[^:]*' | cut -d= -f2)
+  OTHERS_VAL=$(echo "$MULTI_CYCLE_CHECK" | grep -o 'others=.*' | cut -d= -f2)
+  warn "Il registro OTA contiene cicli multipli (runtimeVersion: $OTHERS_VAL e $CURRENT_RV_VAL)."
+  info "  L'APK installato usa runtimeVersion $CURRENT_RV_VAL."
+  info "  Le OTA con runtimeVersion $OTHERS_VAL NON verranno mai ricevute da questo APK."
+  info "  Questo è normale se il registro è storico — ma verifica che le OTA attive siano solo per $CURRENT_RV_VAL."
 fi
 
 # ── RISULTATO FINALE ──────────────────────────────────────────
