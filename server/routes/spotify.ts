@@ -75,6 +75,19 @@ function decryptToken(encrypted: string): string {
   return Buffer.concat([decipher.update(encryptedBuf), decipher.final()]).toString("utf8");
 }
 
+class SpotifyApiError extends Error {
+  constructor(
+    message: string,
+    public readonly httpStatus: number,
+    public readonly spotifyError?: string,
+    public readonly spotifyErrorDescription?: string,
+    public readonly rawBody?: string,
+  ) {
+    super(message);
+    this.name = "SpotifyApiError";
+  }
+}
+
 async function callSpotifyTokenEndpoint(params: Record<string, string>): Promise<{
   access_token: string;
   refresh_token?: string;
@@ -95,8 +108,10 @@ async function callSpotifyTokenEndpoint(params: Record<string, string>): Promise
   });
 
   if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Spotify token error ${resp.status}: ${text}`);
+    const rawBody = await resp.text();
+    console.error(`[Spotify] Token endpoint error ${resp.status}:`, rawBody);
+    const mapped = mapSpotifyError(`Spotify token error ${resp.status}: ${rawBody}`);
+    throw new SpotifyApiError(mapped.message, mapped.status, mapped.spotifyError, mapped.spotifyErrorDescription, rawBody);
   }
   return resp.json() as Promise<{ access_token: string; refresh_token?: string; expires_in: number }>;
 }
@@ -118,21 +133,10 @@ async function getValidAccessToken(userId: string): Promise<string> {
   }
 
   const refreshToken = decryptToken(tokenRow.refreshToken);
-  let tokenData: { access_token: string; refresh_token?: string; expires_in: number };
-  try {
-    tokenData = await callSpotifyTokenEndpoint({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-    });
-  } catch (refreshErr) {
-    const rawMsg = (refreshErr as Error).message ?? "";
-    const mapped = mapSpotifyError(rawMsg);
-    const err = new Error(mapped.message);
-    (err as any).spotifyError = mapped.spotifyError;
-    (err as any).spotifyErrorDescription = mapped.spotifyErrorDescription;
-    (err as any).httpStatus = mapped.status;
-    throw err;
-  }
+  const tokenData = await callSpotifyTokenEndpoint({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
 
   const newExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
   const updatedFields: Partial<typeof userSpotifyTokens.$inferInsert> = {
@@ -153,8 +157,10 @@ async function spotifyGet(accessToken: string, path: string): Promise<unknown> {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Spotify API error ${resp.status} on ${path}: ${text}`);
+    const rawBody = await resp.text();
+    console.error(`[Spotify] API error on ${path} (${resp.status}):`, rawBody);
+    const mapped = mapSpotifyError(`Spotify API error ${resp.status} on ${path}: ${rawBody}`);
+    throw new SpotifyApiError(mapped.message, mapped.status, mapped.spotifyError, mapped.spotifyErrorDescription, rawBody);
   }
   return resp.json();
 }
@@ -397,12 +403,17 @@ router.post("/callback", requireAuth, async (req: Request, res: Response) => {
 
     return res.json({ connected: true, displayName: spotifyMe.display_name ?? null, trackCount });
   } catch (error) {
-    const err = error as any;
-    const rawMsg = err.message ?? "";
-    console.error("[Spotify] callback error:", rawMsg);
-    const mapped = err.httpStatus
-      ? { status: err.httpStatus, message: rawMsg, spotifyError: err.spotifyError, spotifyErrorDescription: err.spotifyErrorDescription }
-      : mapSpotifyError(rawMsg);
+    if (error instanceof SpotifyApiError) {
+      console.error("[Spotify] callback error:", error.message, error.rawBody ? `| Raw: ${error.rawBody}` : "");
+      return res.status(error.httpStatus).json({
+        message: error.message,
+        spotifyError: error.spotifyError,
+        spotifyErrorDescription: error.spotifyErrorDescription,
+      });
+    }
+    const rawMsg = (error as Error).message ?? String(error);
+    console.error("[Spotify] callback unexpected error:", rawMsg);
+    const mapped = mapSpotifyError(rawMsg);
     return res.status(mapped.status).json({
       message: mapped.message,
       spotifyError: mapped.spotifyError,
@@ -430,12 +441,17 @@ router.post("/sync", requireAuth, async (req: Request, res: Response) => {
     const trackCount = await syncSpotifyTracks(userId);
     return res.json({ synced: true, trackCount });
   } catch (error) {
-    const err = error as any;
-    const rawMsg = err.message ?? "";
-    console.error("[Spotify] sync error:", rawMsg);
-    const mapped = err.httpStatus
-      ? { status: err.httpStatus, message: rawMsg, spotifyError: err.spotifyError, spotifyErrorDescription: err.spotifyErrorDescription }
-      : mapSpotifyError(rawMsg);
+    if (error instanceof SpotifyApiError) {
+      console.error("[Spotify] sync error:", error.message, error.rawBody ? `| Raw: ${error.rawBody}` : "");
+      return res.status(error.httpStatus).json({
+        message: error.message,
+        spotifyError: error.spotifyError,
+        spotifyErrorDescription: error.spotifyErrorDescription,
+      });
+    }
+    const rawMsg = (error as Error).message ?? String(error);
+    console.error("[Spotify] sync unexpected error:", rawMsg);
+    const mapped = mapSpotifyError(rawMsg);
     return res.status(mapped.status).json({
       message: mapped.message,
       spotifyError: mapped.spotifyError,
