@@ -269,6 +269,14 @@ export default function MusicScreen() {
         )}
       </View>
 
+      {/* Info banner */}
+      <View style={styles.infoBanner}>
+        <Ionicons name="information-circle-outline" size={16} color={Colors.textSecondary} />
+        <Text style={styles.infoBannerText}>
+          Per il match musicale e le playlist condivise è necessario un account Spotify (gratuito). L'accesso avviene tramite browser in modo sicuro.
+        </Text>
+      </View>
+
       {isComingSoon ? (
         <View style={styles.centered}>
           <View style={[styles.spotifyLogo, { opacity: 0.4 }]}>
@@ -1159,5 +1167,24 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "center",
     lineHeight: 20,
+  },
+  infoBanner: {
+    flexDirection: "row" as const,
+    alignItems: "flex-start" as const,
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: Colors.surface,
+    borderLeftWidth: 3,
+    borderLeftColor: "#1DB954",
+    borderRadius: 8,
+    padding: 10,
+  },
+  infoBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    lineHeight: 18,
   },
 });
