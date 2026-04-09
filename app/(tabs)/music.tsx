@@ -172,7 +172,7 @@ export default function MusicScreen() {
       const spotifyRedirectError = parsed.queryParams?.error as string | undefined;
       if (spotifyRedirectError) {
         const knownErrors: Record<string, string> = {
-          access_denied: "Accesso negato da Spotify. L'app è in modalità Development: solo gli utenti autorizzati possono collegare Spotify.",
+          access_denied: "Il tuo account Spotify non è ancora autorizzato. L'app è in modalità Development: contattaci per essere aggiunto alla lista degli utenti autorizzati.",
           invalid_client: "Configurazione Spotify non valida. Contatta l'amministratore.",
         };
         throw new Error(knownErrors[spotifyRedirectError] ?? `Spotify ha negato l'accesso: ${spotifyRedirectError}`);

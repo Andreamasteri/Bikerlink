@@ -578,5 +578,26 @@
     "apkVersionCode": 7,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 2,
+    "cycle": "3.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-09",
+    "runtimeVersion": "3.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-2 rv3.0.0: messaggio access_denied Spotify con istruzione contatto",
+    "note": "Task #460. Messaggio access_denied aggiornato: aggiunta istruzione 'contattaci per essere aggiunto alla lista'. Era: 'solo gli utenti autorizzati possono collegare Spotify'. Ora: 'contattaci per essere aggiunto alla lista degli utenti autorizzati.'",
+    "updateGroupId": "11048f5e-91de-4011-b0dc-3cf5ddf2723d",
+    "androidUpdateId": "019d7352-398f-71e7-bdc8-81f1bdb05d2d",
+    "iosUpdateId": null,
+    "commitBase": "78b20badefd23037b5efbc8bbb1d6364c0f0ebcf",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/11048f5e-91de-4011-b0dc-3cf5ddf2723d",
+    "apkBuildId": "beef4c1f-99a4-4390-9fd7-2593b4b1142e",
+    "apkVersionCode": 7,
+    "apkUrl": null,
+    "status": "published"
   }
 ]
