@@ -23,7 +23,7 @@ import { apiRequest, getApiUrl } from "@/lib/query-client";
 WebBrowser.maybeCompleteAuthSession();
 
 const SPOTIFY_GREEN = "#1DB954";
-const SCOPES = "user-top-read user-read-recently-played user-library-read";
+const SCOPES = "user-top-read";
 
 type Tab = "brani" | "match" | "ricevute";
 
@@ -105,8 +105,13 @@ export default function MusicScreen() {
     }
   }, [tabParam]);
 
+  const comingSoonQuery = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/spotify-coming-soon"],
+  });
+
   const statusQuery = useQuery<SpotifyStatus>({
     queryKey: ["/api/spotify/status"],
+    enabled: comingSoonQuery.data?.enabled !== true,
   });
 
   const myTracksQuery = useQuery<MyTracksData>({
@@ -223,10 +228,13 @@ export default function MusicScreen() {
   }, []);
 
   const isConnected = statusQuery.data?.connected === true;
-  const isLoading = statusQuery.isLoading;
+  const isComingSoon = comingSoonQuery.data?.enabled === true;
+  const isLoading = statusQuery.isLoading && !isComingSoon;
   const isNotConfigured =
-    !process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID ||
-    (statusQuery.isError && (statusQuery.error as Error)?.message?.startsWith("503"));
+    !isComingSoon && (
+      !process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID ||
+      (statusQuery.isError && (statusQuery.error as Error)?.message?.startsWith("503"))
+    );
 
   if (isLoading) {
     return (
@@ -261,7 +269,19 @@ export default function MusicScreen() {
         )}
       </View>
 
-      {isNotConfigured ? (
+      {isComingSoon ? (
+        <View style={styles.centered}>
+          <View style={[styles.spotifyLogo, { opacity: 0.4 }]}>
+            <Ionicons name="time-outline" size={48} color={Colors.textSecondary} />
+          </View>
+          <Text style={[styles.connectTitle, { color: Colors.textSecondary }]}>Funzione in arrivo</Text>
+          <Text style={styles.connectDesc}>La funzione Spotify è in arrivo. Stiamo aspettando l'Extended Quota Mode da Spotify.</Text>
+          <TouchableOpacity style={[styles.connectBtn, { opacity: 0.5 }]} disabled>
+            <Ionicons name="logo-spotify" size={20} color="#fff" />
+            <Text style={styles.connectBtnText}>Funzione in arrivo</Text>
+          </TouchableOpacity>
+        </View>
+      ) : isNotConfigured ? (
         <View style={styles.centered}>
           <View style={[styles.spotifyLogo, { opacity: 0.4 }]}>
             <Ionicons name="musical-notes" size={48} color={Colors.textSecondary} />

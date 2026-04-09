@@ -32,6 +32,18 @@ router.use((_req: Request, res: Response, next: () => void) => {
   next();
 });
 
+router.use(async (_req: Request, res: Response, next: () => void) => {
+  try {
+    const setting = await storage.getAppSetting("spotify_coming_soon");
+    if (setting?.value === "true") {
+      return res.status(503).json({ message: "La funzione Spotify è in arrivo. Stiamo aspettando l'Extended Quota Mode di Spotify." });
+    }
+  } catch {
+    // ignore, proceed normally
+  }
+  next();
+});
+
 function checkSpotifyConfig(res: Response): boolean {
   if (!isSpotifyConfigured()) {
     res.status(503).json({ message: "Spotify non configurato. Contatta l'amministratore." });
@@ -154,9 +166,6 @@ interface SpotifyTopTracksResponse {
 interface SpotifyTopArtistsResponse {
   items?: SpotifyArtistItem[];
 }
-interface SpotifyRecentlyPlayedResponse {
-  items?: Array<{ track?: SpotifyTrackItem }>;
-}
 interface SpotifyMeResponse {
   id: string;
   display_name?: string;
@@ -165,11 +174,20 @@ interface SpotifyMeResponse {
 async function syncSpotifyTracks(userId: string): Promise<number> {
   const accessToken = await getValidAccessToken(userId);
 
-  const [topTracksData, topArtistsData, recentData] = await Promise.all([
-    spotifyGet(accessToken, "/me/top/tracks?limit=50&time_range=medium_term") as Promise<SpotifyTopTracksResponse>,
-    spotifyGet(accessToken, "/me/top/artists?limit=50&time_range=medium_term") as Promise<SpotifyTopArtistsResponse>,
-    spotifyGet(accessToken, "/me/player/recently-played?limit=50") as Promise<SpotifyRecentlyPlayedResponse>,
-  ]);
+  let topTracksData: SpotifyTopTracksResponse = { items: [] };
+  let topArtistsData: SpotifyTopArtistsResponse = { items: [] };
+
+  try {
+    topTracksData = await spotifyGet(accessToken, "/me/top/tracks?limit=50&time_range=medium_term") as SpotifyTopTracksResponse;
+  } catch (err) {
+    console.warn("[Spotify] top/tracks failed (non bloccante):", (err as Error).message);
+  }
+
+  try {
+    topArtistsData = await spotifyGet(accessToken, "/me/top/artists?limit=50&time_range=medium_term") as SpotifyTopArtistsResponse;
+  } catch (err) {
+    console.warn("[Spotify] top/artists failed (non bloccante):", (err as Error).message);
+  }
 
   const genresByArtistId = new Map<string, string[]>();
   for (const artist of topArtistsData.items ?? []) {
@@ -204,9 +222,6 @@ async function syncSpotifyTracks(userId: string): Promise<number> {
   };
 
   for (const track of topTracksData.items ?? []) processTrack(track);
-  for (const item of recentData.items ?? []) {
-    if (item.track) processTrack(item.track);
-  }
 
   const tracksArray = Array.from(trackMap.values());
 
@@ -307,6 +322,10 @@ router.post("/callback", requireAuth, async (req: Request, res: Response) => {
     return res.json({ connected: true, displayName: spotifyMe.display_name ?? null, trackCount });
   } catch (error) {
     console.error("[Spotify] callback error:", error);
+    const msg = (error as Error).message ?? "";
+    if (msg.includes("403")) {
+      return res.status(422).json({ message: "Spotify non supportato: l'app è in attesa dell'Extended Quota Mode. Riprova più tardi o contatta l'amministratore." });
+    }
     return res.status(500).json({ message: "Errore durante la connessione a Spotify" });
   }
 });

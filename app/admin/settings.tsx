@@ -430,6 +430,11 @@ export default function AdminSettings() {
   });
   const sosEnabled = sosData?.enabled !== false;
 
+  const { data: spotifyComingSoonData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/spotify-coming-soon"],
+  });
+  const spotifyComingSoon = spotifyComingSoonData?.enabled === true;
+
   const { data: homeMessageData } = useQuery<{ enabled: boolean; text: string }>({
     queryKey: ["/api/settings/home-message"],
   });
@@ -491,6 +496,26 @@ export default function AdminSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/sos-enabled"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const spotifyComingSoonMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/spotify_coming_soon", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/spotify-coming-soon"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
@@ -1307,6 +1332,27 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {sosEnabled ? "Gli utenti possono inviare e accogliere richieste SOS" : "La funzione SOS è disattivata per tutti"}
+        </Text>
+      </View>
+
+      <View style={styles.synecoCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="logo-spotify" size={20} color="#1DB954" />
+            <Text style={styles.synecoLabel}>Spotify — In Arrivo</Text>
+          </View>
+          <Switch
+            value={spotifyComingSoon}
+            onValueChange={(val) => spotifyComingSoonMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: "#1DB954" }}
+            thumbColor={spotifyComingSoon ? Colors.text : Colors.textSecondary}
+            disabled={spotifyComingSoonMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {spotifyComingSoon
+            ? "Spotify mostra lo stato 'in arrivo' agli utenti (Extended Quota Mode in attesa)"
+            : "Spotify funziona normalmente (se configurato)"}
         </Text>
       </View>
 

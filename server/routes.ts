@@ -247,6 +247,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/spotify-coming-soon", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("spotify_coming_soon");
+      const enabled = setting?.value === "true";
+      res.json({ enabled });
+    } catch {
+      res.json({ enabled: false });
+    }
+  });
+
   app.get("/api/settings/custom-routes", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("custom_routes_enabled");
