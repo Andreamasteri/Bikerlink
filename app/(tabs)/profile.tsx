@@ -36,7 +36,6 @@ import { useTaskbarStyle, type TaskbarStyle } from "@/lib/taskbar-style-context"
 import * as Updates from "expo-updates";
 import Constants from "expo-constants";
 import * as Location from "expo-location";
-import otaUpdatesRaw from "@/ota-updates.json";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 
 let MapView: any = null;
@@ -47,23 +46,6 @@ if (Platform.OS !== "web") {
   Marker = maps.Marker;
 }
 
-interface OtaUpdateEntry {
-  updateNumber: number;
-  channel: string;
-  message: string;
-  publishedAt: string;
-  androidUpdateId: string | null;
-  iosUpdateId: string | null;
-  status: string;
-  runtimeVersion?: string;
-  cycle?: string;
-}
-
-const allOtaUpdates: OtaUpdateEntry[] = (otaUpdatesRaw as unknown[])
-  .filter((e): e is OtaUpdateEntry => {
-    const entry = e as Record<string, unknown>;
-    return !entry._comment && entry.androidUpdateId !== undefined;
-  });
 
 interface ProfileData {
   id: string;
@@ -152,18 +134,6 @@ export default function ProfileScreen() {
   const [isDownloadingPrivacy, setIsDownloadingPrivacy] = useState(false);
   const [isExportingData, setIsExportingData] = useState(false);
 
-  // Ciclo-aware: filtra le OTA per la runtimeVersion dell'APK corrente
-  const currentRv = Updates.runtimeVersion ?? null;
-  const cycleOtaUpdates = currentRv
-    ? allOtaUpdates.filter(e => e.runtimeVersion === currentRv)
-    : allOtaUpdates;
-
-  const latestOta = cycleOtaUpdates.reduce<OtaUpdateEntry | null>((best, entry) => {
-    if (!best || entry.updateNumber > best.updateNumber) return entry;
-    return best;
-  }, null);
-  const currentUpdateId = Updates.updateId ?? null;
-  const currentOtaEntry = allOtaUpdates.find(e => e.androidUpdateId === currentUpdateId) ?? null;
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
   const CURRENT_OTA_NUMBER = 5;
 
