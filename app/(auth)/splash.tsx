@@ -8,17 +8,31 @@ import {
   Platform,
   Animated,
   Easing,
+  Pressable,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { t } from "@/lib/i18n";
+import { useLanguage, useT } from "@/lib/language-context";
+import { type AppLanguage } from "@/lib/i18n";
 import { pickSplashMessage } from "@/lib/splash-utils";
 
 const { width, height } = Dimensions.get("window");
 const AnimatedImageBackground = Animated.createAnimatedComponent(ImageBackground);
 
+const LANGUAGES: { code: AppLanguage; flag: string; label: string }[] = [
+  { code: "it", flag: "🇮🇹", label: "Italiano" },
+  { code: "en", flag: "🇬🇧", label: "English" },
+  { code: "de", flag: "🇩🇪", label: "Deutsch" },
+  { code: "es", flag: "🇪🇸", label: "Español" },
+  { code: "fr", flag: "🇫🇷", label: "Français" },
+];
+
 export default function SplashAnimatedScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { language, setLanguage } = useLanguage();
+  const t = useT();
   const [splashMessage, setSplashMessage] = useState<string | null>(null);
 
   const bgOpacity = useRef(new Animated.Value(0)).current;
@@ -130,6 +144,8 @@ export default function SplashAnimatedScreen() {
 
   const displayMessage = splashMessage || t("app.tagline");
 
+  const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
+
   return (
     <View style={styles.container}>
       <AnimatedImageBackground
@@ -174,6 +190,23 @@ export default function SplashAnimatedScreen() {
               },
             ]}
           />
+        </View>
+
+        <View style={[styles.langBar, { paddingBottom: bottomInset + 16 }]}>
+          {LANGUAGES.map((lang) => {
+            const isActive = language === lang.code;
+            return (
+              <Pressable
+                key={lang.code}
+                style={[styles.langBtn, isActive && styles.langBtnActive]}
+                onPress={() => setLanguage(lang.code)}
+                accessibilityLabel={lang.label}
+              >
+                <Text style={styles.langFlag}>{lang.flag}</Text>
+                <Text style={[styles.langLabel, isActive && styles.langLabelActive]}>{lang.label}</Text>
+              </Pressable>
+            );
+          })}
         </View>
       </AnimatedImageBackground>
     </View>
@@ -245,5 +278,40 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     marginTop: 20,
     opacity: 0.7,
+  },
+  langBar: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    paddingHorizontal: 16,
+  },
+  langBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    borderWidth: 1.5,
+    borderColor: "transparent",
+  },
+  langBtnActive: {
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderColor: Colors.accent,
+  },
+  langFlag: {
+    fontSize: 18,
+  },
+  langLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "rgba(255,255,255,0.75)",
+  },
+  langLabelActive: {
+    color: Colors.accent,
+    fontFamily: "Inter_600SemiBold",
   },
 });
