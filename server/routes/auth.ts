@@ -447,7 +447,7 @@ router.post("/resend-reset-code", resendResetLimiter, async (req: Request, res: 
 
     const emailSent = await sendPasswordResetEmail(user.email, user.nickname, code);
     if (!emailSent) {
-      console.warn(`[PASSWORD RESET] Resend: email NON inviata a ${user.email}`);
+      console.warn(`[PASSWORD RESET] Resend: email NON inviata a utente ${user.id}`);
     }
 
     return res.json({ message: "Se l'email è registrata, riceverai un nuovo codice" });
@@ -515,7 +515,7 @@ router.post("/resend-verification", async (req: Request, res: Response) => {
     await storage.createEmailVerificationToken(user.id, token, expiresAt);
     const emailSent = await sendVerificationEmail(user.email, user.nickname, token);
     if (!emailSent) {
-      console.warn(`[EMAIL VERIFICATION] Resend: email NON inviata a ${user.email}`);
+      console.warn(`[EMAIL VERIFICATION] Resend: email NON inviata a utente ${user.id}`);
     }
 
     return res.json({ message: "Nuovo codice inviato" });
