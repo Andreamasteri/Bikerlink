@@ -15,6 +15,16 @@ import { useSynecoVisible } from "@/lib/syneco-context";
 import Colors from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { pickSplashMessage } from "@/lib/splash-utils";
+import { useLanguage } from "@/lib/language-context";
+import { type AppLanguage } from "@/lib/i18n";
+
+const LANGUAGES: { code: AppLanguage; flag: string; label: string }[] = [
+  { code: "it", flag: "🇮🇹", label: "Italiano" },
+  { code: "en", flag: "🇬🇧", label: "English" },
+  { code: "de", flag: "🇩🇪", label: "Deutsch" },
+  { code: "es", flag: "🇪🇸", label: "Español" },
+  { code: "fr", flag: "🇫🇷", label: "Français" },
+];
 
 const loginBg = require("@/assets/images/splash-bg.jpg");
 
@@ -24,6 +34,7 @@ export default function WelcomeScreen() {
   const synecoVisible = useSynecoVisible();
   const insets = useSafeAreaInsets();
   const [dynamicTagline, setDynamicTagline] = useState<string | null>(null);
+  const { language, setLanguage } = useLanguage();
 
   const isWeb = Platform.OS === "web";
   const titleOpacity = useRef(new Animated.Value(isWeb ? 1 : 0)).current;
@@ -120,6 +131,24 @@ export default function WelcomeScreen() {
           {synecoVisible && (
             <Text style={styles.sponsorText}>powered by Syneco Lubrificanti</Text>
           )}
+
+          <View style={styles.langBar}>
+            {LANGUAGES.map((lang) => {
+              const isActive = language === lang.code;
+              return (
+                <Pressable
+                  key={lang.code}
+                  style={[styles.langBtn, isActive && styles.langBtnActive]}
+                  onPress={() => setLanguage(lang.code)}
+                  accessibilityLabel={lang.label}
+                >
+                  <Text style={styles.langFlag}>{lang.flag}</Text>
+                  <Text style={[styles.langLabel, isActive && styles.langLabelActive]}>{lang.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
           <Pressable onPress={() => router.push("/privacy-policy")}>
             <Text style={styles.privacyLink}>Privacy Policy</Text>
           </Pressable>
@@ -210,10 +239,47 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   privacyLink: {
-    marginTop: 15,
+    marginTop: 12,
     fontSize: 12,
     color: Colors.textSecondary,
     textAlign: "center",
     textDecorationLine: "underline" as const,
+  },
+  langBar: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    paddingHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 4,
+  },
+  langBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    borderWidth: 1.5,
+    borderColor: "transparent",
+  },
+  langBtnActive: {
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderColor: Colors.accent,
+  },
+  langFlag: {
+    fontSize: 18,
+  },
+  langLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "rgba(255,255,255,0.75)",
+  },
+  langLabelActive: {
+    color: Colors.accent,
+    fontFamily: "Inter_600SemiBold",
   },
 });
