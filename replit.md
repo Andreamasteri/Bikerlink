@@ -88,6 +88,19 @@ Il seed imposta `emailVerified: true` per tutti gli utenti creati.
 - **Nodemailer**: Module for sending emails.
 - **Gmail SMTP**: Email sending service.
 - **eas-cli**: Command-line interface for Expo Application Services builds.
+## APK Build — Regola Obbligatoria
+
+**Nessuna build APK può essere avviata senza autorizzazione esplicita dell'utente.**
+
+Usare SEMPRE `scripts/build-apk.sh` — mai `npx eas-cli build` direttamente.
+
+Procedura:
+1. Ottenere approvazione esplicita dall'utente ("sì, avvia la build APK")
+2. `touch .local/apk-build-authorized`  ← token monouso, viene eliminato dopo l'uso
+3. `bash scripts/build-apk.sh [preview|production]`
+
+Lo script blocca l'esecuzione se `.local/apk-build-authorized` non esiste, logga ogni build in `logs/apk-build-history.log`, e richiede un nuovo token per ogni build successiva.
+
 ## Dev vs Production JS Engine (Android)
 - **Sviluppo (Expo Go)**: `app.json` → `expo.android.jsEngine: "jsc"` — Metro serve JS normale senza bytecode Hermes, evitando OOM durante la compilazione.
 - **Build EAS** (preview/production): `eas.json` → `android.jsEngine: "hermes"` — sovrascrive il valore di app.json; le APK/AAB di produzione usano Hermes come da progetto originale.
