@@ -146,20 +146,38 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
 }
 
 function OtaStartupChecker() {
-  useEffect(() => {
+  const lastCheckRef = useRef<number>(0);
+
+  const runCheck = React.useCallback(async () => {
     if (__DEV__ || Platform.OS === "web") return;
-    const timer = setTimeout(async () => {
-      try {
-        const check = await Updates.checkForUpdateAsync();
-        if (!check.isAvailable) return;
-        await Updates.fetchUpdateAsync();
-        await Updates.reloadAsync();
-      } catch {
-        // silent fail — EAS non raggiungibile o runtime mismatch
-      }
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const now = Date.now();
+    if (now - lastCheckRef.current < 60_000) return;
+    lastCheckRef.current = now;
+    try {
+      console.log("[OTA] Checking for update...");
+      const check = await Updates.checkForUpdateAsync();
+      console.log("[OTA] isAvailable:", check.isAvailable);
+      if (!check.isAvailable) return;
+      console.log("[OTA] Fetching update...");
+      await Updates.fetchUpdateAsync();
+      console.log("[OTA] Reloading...");
+      await Updates.reloadAsync();
+    } catch (err) {
+      console.warn("[OTA] Check/fetch/reload fallito:", String(err));
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(runCheck, 3000);
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") runCheck();
+    });
+    return () => {
+      clearTimeout(timer);
+      sub.remove();
+    };
+  }, [runCheck]);
+
   return null;
 }
 

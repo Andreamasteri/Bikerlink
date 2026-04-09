@@ -536,5 +536,26 @@
     "apkVersionCode": 6,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 29,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-09",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-29: Fix OTA checker — errori loggati + retry al foreground",
+    "note": "Task #455 — OtaStartupChecker refactored: catch silenzioso rimosso, aggiunto console.warn con messaggio errore, aggiunto AppState listener per retry automatico ogni 60s al ritorno in foreground. Diagnostica per capire perché OTA-28 non si applicava. CURRENT_OTA_NUMBER aggiornato 28→29.",
+    "updateGroupId": "66f091e1-712e-464a-818a-b3b7f8975b38",
+    "androidUpdateId": "019d7175-ecc4-759e-9a0e-969488c10a1b",
+    "iosUpdateId": null,
+    "commitBase": "d7e14fa37896b9226f5fe140c006d0345e049986",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/66f091e1-712e-464a-818a-b3b7f8975b38",
+    "apkBuildId": null,
+    "apkVersionCode": 6,
+    "apkUrl": null,
+    "status": "published"
   }
 ]
