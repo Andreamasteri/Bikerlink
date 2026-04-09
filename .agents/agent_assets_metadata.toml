@@ -23,3 +23,9 @@ id = "3rtGPTyhqHQwerDZqP15T"
 uri = "file://assets/images/playstore-feature-graphic.png"
 type = "image"
 title = "Feature Graphic — 1024×500 PNG"
+
+[[outputs]]
+id = "kkQudZ8ML8pkh1VpW6DY4"
+uri = "file://.local/tasks/testi-italiani-completi.md"
+type = "text"
+title = "Tutti i testi italiani — BikerLink"

@@ -601,6 +601,27 @@
     "status": "published"
   },
   {
+    "updateNumber": 3,
+    "cycle": "3.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-09",
+    "runtimeVersion": "3.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-3 rv3.0.0: fix commitBase PENDING nel registro OTA + CURRENT_OTA_NUMBER=3",
+    "note": "Fix correttivo: OTA-1 era stata pubblicata con commitBase='PENDING' nel bundle, causando la scritta verde PENDING in fondo al profilo utente. Questa OTA-3 include i commitBase corretti per OTA-1/OTA-2/OTA-3 e aggiorna CURRENT_OTA_NUMBER a 3.",
+    "updateGroupId": "982a5183-fa29-4a6d-bc73-48740a4338bd",
+    "androidUpdateId": "019d737d-afba-7968-9a37-bffac2ca6c5a",
+    "iosUpdateId": null,
+    "commitBase": "30fbe1f6733ec0312a5693944ae21976780df535",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/982a5183-fa29-4a6d-bc73-48740a4338bd",
+    "apkBuildId": "beef4c1f-99a4-4390-9fd7-2593b4b1142e",
+    "apkVersionCode": 7,
+    "apkUrl": null,
+    "status": "published"
+  },
+  {
     "updateNumber": null,
     "cycle": "3.x",
     "channel": "preview",
