@@ -1107,7 +1107,7 @@ export default function ProfileScreen() {
       )}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Taskbar Style</Text>
+        <Text style={styles.sectionTitle}>Stile Taskbar</Text>
         <View style={taskbarStyles.row}>
           {([
             { value: "tutti" as TaskbarStyle, label: "Tutti" },
