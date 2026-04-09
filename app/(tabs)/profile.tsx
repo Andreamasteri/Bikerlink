@@ -34,6 +34,7 @@ import { useMapConfig } from "@/lib/map-context";
 import { MAP_PROVIDER_LABELS, MAP_PROVIDER_DESCRIPTIONS, type MapProvider } from "@/lib/map-tiles";
 import { useTaskbarStyle, type TaskbarStyle } from "@/lib/taskbar-style-context";
 import * as Updates from "expo-updates";
+import Constants from "expo-constants";
 import * as Location from "expo-location";
 import otaUpdatesRaw from "@/ota-updates.json";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
@@ -164,7 +165,7 @@ export default function ProfileScreen() {
   const currentUpdateId = Updates.updateId ?? null;
   const currentOtaEntry = allOtaUpdates.find(e => e.androidUpdateId === currentUpdateId) ?? null;
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-  const CURRENT_OTA_NUMBER = 4;
+  const CURRENT_OTA_NUMBER = 5;
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -1347,15 +1348,24 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      <Text style={{ textAlign: "center", fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.primary, marginTop: 16, marginBottom: 4 }}>
-        {`OTA-${CURRENT_OTA_NUMBER}`}
-      </Text>
-      <Text style={{ textAlign: "center", fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.success, marginBottom: 2 }}>
-        {((currentOtaEntry?.commitBase ?? latestOta?.commitBase ?? "").substring(0, 7)) || "—"}
-      </Text>
-      <Text style={{ textAlign: "center", fontSize: 10, fontFamily: "Inter_400Regular", color: Colors.muted, marginBottom: 8, opacity: 0.6 }}>
-        {Updates.updateId ? `eid:${Updates.updateId.substring(0, 8)}` : "embedded"}
-      </Text>
+      <View style={{ alignItems: "center", marginTop: 16, marginBottom: 8 }}>
+        <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
+          <Text style={styles.versionLabel}>Versione app</Text>
+          <Text style={styles.versionValue}>
+            {`v${Constants.expoConfig?.android?.versionCode ?? "?"}`}
+          </Text>
+        </View>
+        <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
+          <Text style={styles.versionLabel}>Versione OTA</Text>
+          <Text style={styles.versionValue}>{`OTA-${CURRENT_OTA_NUMBER}`}</Text>
+        </View>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <Text style={styles.versionLabel}>Commit EAS</Text>
+          <Text style={styles.versionValue}>
+            {Updates.updateId ? Updates.updateId.substring(0, 8) : "embedded"}
+          </Text>
+        </View>
+      </View>
       <View style={{ height: 40 }} />
     </ScrollView>
   );
@@ -1709,6 +1719,16 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     color: Colors.text,
     textAlign: "right",
+  },
+  versionLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+  },
+  versionValue: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
   },
   privacyRow: {
     flexDirection: "row",

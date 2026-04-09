@@ -664,5 +664,28 @@
     "apkVersionCode": 8,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 5,
+    "cycle": "3.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-09",
+    "runtimeVersion": "3.0.0",
+    "platforms": ["android"],
+    "jsEngine": "metro",
+    "message": "OTA-5 rv3.0.0: fix display versioni profilo (Versione app/OTA/Commit EAS) — nessun trattino",
+    "note": "Task #473. Fix: sostituito blocco versioni (3 Text inline) con layout verticale 3 righe etichetta+valore. Commit EAS ora usa Updates.updateId direttamente (non commitBase da ota-updates.json — inaffidabile). CURRENT_OTA_NUMBER portato a 5. Import Constants da expo-constants aggiunto.",
+    "releaseId": "00b33a9b-2e4f-4740-8c72-6363c1829e05",
+    "bundleUrl": "private/ota/ota-5.0.0-1775778322243.js",
+    "updateGroupId": "5dae6ff5-0b83-43f5-b39e-f0ed24a6796d",
+    "androidUpdateId": "019d74a3-68f1-7052-95ef-7840de601a8b",
+    "iosUpdateId": null,
+    "commitBase": "0f104a286a973ece9137507c52936f14ae602e33",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/5dae6ff5-0b83-43f5-b39e-f0ed24a6796d",
+    "apkBuildId": "5da77f1c-4d34-44ea-9143-da247d8e85cc",
+    "apkVersionCode": 8,
+    "apkUrl": null,
+    "status": "published"
   }
 ]
