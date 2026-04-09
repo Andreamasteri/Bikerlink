@@ -645,7 +645,7 @@
   {
     "updateNumber": 4,
     "cycle": "3.x",
-    "channel": "custom-backend",
+    "channel": "preview",
     "platform": "android",
     "publishedAt": "2026-04-09",
     "runtimeVersion": "3.0.0",
