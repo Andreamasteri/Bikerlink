@@ -62,7 +62,8 @@ fi
 mkdir -p logs
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-echo "$TIMESTAMP  APK BUILD AVVIATA — profilo=$PROFILE commit=$COMMIT" >> "$LOG_FILE"
+AUTHORIZED_BY=$(whoami 2>/dev/null || echo "unknown")
+echo "$TIMESTAMP  APK BUILD AVVIATA — profilo=$PROFILE commit=$COMMIT utente=$AUTHORIZED_BY" >> "$LOG_FILE"
 echo "  ✔  Evento loggato in $LOG_FILE"
 
 # ── 5. Riepilogo pre-build ───────────────────────────────────────────────────
@@ -76,7 +77,8 @@ echo "  (Ctrl+C per annullare)"
 echo ""
 sleep 5
 
-# ── 6. Build EAS ────────────────────────────────────────────────────────────
+# ── 6. Build EAS (set -e disabilitato attorno al comando per catturare exit code) ─
+set +e
 CI=1 \
 EAS_SKIP_AUTO_FINGERPRINT=1 \
 EXPO_PUBLIC_DOMAIN=biker-link.replit.app \
@@ -85,16 +87,16 @@ npx eas-cli@latest build \
   --platform android \
   --profile "$PROFILE" \
   --non-interactive
-
 BUILD_EXIT=$?
+set -e
 
 # ── 7. Log risultato ─────────────────────────────────────────────────────────
 if [ $BUILD_EXIT -eq 0 ]; then
-  echo "$TIMESTAMP  APK BUILD COMPLETATA — profilo=$PROFILE commit=$COMMIT" >> "$LOG_FILE"
+  echo "$TIMESTAMP  APK BUILD COMPLETATA — profilo=$PROFILE commit=$COMMIT utente=$AUTHORIZED_BY" >> "$LOG_FILE"
   echo ""
   echo "  ✅ Build completata con successo."
 else
-  echo "$TIMESTAMP  APK BUILD FALLITA (exit=$BUILD_EXIT) — profilo=$PROFILE commit=$COMMIT" >> "$LOG_FILE"
+  echo "$TIMESTAMP  APK BUILD FALLITA (exit=$BUILD_EXIT) — profilo=$PROFILE commit=$COMMIT utente=$AUTHORIZED_BY" >> "$LOG_FILE"
   echo ""
   echo "  ✖  Build fallita (exit code $BUILD_EXIT). Controlla l'output sopra."
   exit $BUILD_EXIT
