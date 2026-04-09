@@ -515,5 +515,26 @@
     "apkVersionCode": 6,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 28,
+    "cycle": "2.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-09",
+    "runtimeVersion": "2.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-28: aggiornamento onnicomprensivo Task #446-452 (Spotify fix, Match Music, diagnostica errori)",
+    "note": "Aggiornamento unico che copre tutto il lavoro dal Task #446 al #452 (OTA-26 e OTA-27 erano state cancellate su EAS). Contenuto: Task #446 Spotify no-Premium fix + toggle admin In Arrivo; Task #447 Match Tab sezione Music + pulizia icone; Task #448 rinomina Stile Taskbar; Task #449 banner informativo Spotify; Task #450 filtro km e criteri match musicali; Task #452 SpotifyApiError diagnostica errori in italiano + syncMutation fix conteggio brani.",
+    "updateGroupId": "7dba70da-a6c6-472f-b32a-710f770c1e86",
+    "androidUpdateId": "019d6ffd-539d-7ff2-a691-7a7936514573",
+    "iosUpdateId": null,
+    "commitBase": "00daa565efa3cedab90256fd09476bfd91c7a2bf",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/7dba70da-a6c6-472f-b32a-710f770c1e86",
+    "apkBuildId": null,
+    "apkVersionCode": 6,
+    "apkUrl": null,
+    "status": "published"
   }
 ]
