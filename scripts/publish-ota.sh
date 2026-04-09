@@ -16,6 +16,7 @@ if [ -z "$VERSION" ] || [ -z "$RELEASE_NOTES" ]; then
   echo ""
   echo "Variabili d'ambiente opzionali:"
   echo "  BIKERLINK_BACKEND_URL    — URL backend (default: http://localhost:5000)"
+  echo "  EXPO_TOKEN               — token EAS (se mancante, passo EAS viene saltato)"
   exit 1
 fi
 
@@ -46,7 +47,7 @@ echo "╚═══════════════════════�
 echo ""
 
 # Step 1: Login — extract session cookie from headers (needed for Secure cookies over HTTP)
-echo "[1/6] Login come admin..."
+echo "[1/7] Login come admin..."
 RAW_LOGIN=$(curl -s -D - -X POST "$BACKEND_URL/api/auth/login" \
   -H "Content-Type: application/json" \
   -H "X-Forwarded-Proto: https" \
@@ -65,7 +66,7 @@ fi
 echo "   OK — autenticato"
 
 # Step 2: Export bundle
-echo "[2/6] Esportazione bundle JavaScript..."
+echo "[2/7] Esportazione bundle JavaScript..."
 rm -rf "$DIST_DIR"
 EXPO_LOG="/tmp/ota-expo-$$.log"
 if ! EXPO_PUBLIC_DOMAIN=biker-link.replit.app npx expo export --platform android --output-dir "$DIST_DIR" > "$EXPO_LOG" 2>&1; then
@@ -79,7 +80,7 @@ rm -f "$EXPO_LOG"
 echo "   Esportazione completata"
 
 # Step 3: Find bundle file — prefer entry (index) bundle, fallback to largest JS file
-echo "[3/6] Ricerca bundle principale..."
+echo "[3/7] Ricerca bundle principale..."
 ANDROID_DIR="$DIST_DIR/_expo/static/js/android"
 if [ ! -d "$ANDROID_DIR" ]; then
   echo "   ERRORE: directory $ANDROID_DIR non trovata"
@@ -107,7 +108,7 @@ BUNDLE_SIZE_HUMAN=$(node -e "const s=$BUNDLE_SIZE; process.stdout.write(s>104857
 echo "   Bundle trovato: $(basename "$BUNDLE_FILE") ($BUNDLE_SIZE_HUMAN)"
 
 # Step 4: Upload bundle directly via object storage (bypass HTTP layer)
-echo "[4/6] Upload bundle su object storage..."
+echo "[4/7] Upload bundle su object storage..."
 UPLOAD_RESPONSE=$(node "$(dirname "$0")/ota-upload-bundle.mjs" "$BUNDLE_FILE" "$VERSION" 2>&1)
 BUNDLE_URL=$(echo "$UPLOAD_RESPONSE" | jq -r '.url // empty' 2>/dev/null || true)
 if [ -z "$BUNDLE_URL" ]; then
@@ -117,7 +118,7 @@ fi
 echo "   Bundle URL: $BUNDLE_URL"
 
 # Step 5: Create release (draft) then publish explicitly
-echo "[5/6] Creazione release OTA..."
+echo "[5/7] Creazione release OTA..."
 NOTES_JSON=$(node -e "process.stdout.write(JSON.stringify(process.argv[1]))" -- "$RELEASE_NOTES")
 CREATE_RESPONSE=$(curl -s -H "Cookie: $SESSION_COOKIE" -H "X-Forwarded-Proto: https" -X POST "$BACKEND_URL/api/admin/ota" \
   -H "Content-Type: application/json" \
@@ -139,23 +140,73 @@ fi
 echo "   Release pubblicata — stato: $PUBLISH_STATUS"
 
 # Step 6: Confirm active version via /api/updates/check
-echo "[6/6] Verifica stato OTA attivo..."
+echo "[6/7] Verifica stato OTA attivo..."
 CHECK_RESPONSE=$(curl -s "$BACKEND_URL/api/updates/check?appVersion=$VERSION")
 ACTIVE_VERSION=$(echo "$CHECK_RESPONSE" | jq -r '.version // "nessuno"' 2>/dev/null)
 ACTIVE_BUNDLE=$(echo "$CHECK_RESPONSE" | jq -r '.bundlePath // "N/A"' 2>/dev/null)
 MANIFEST_URL=$(echo "$CHECK_RESPONSE" | jq -r '.manifestUrl // "N/A"' 2>/dev/null)
 PUBLISHED_AT=$(echo "$CHECK_RESPONSE" | jq -r '.publishedAt // "N/A"' 2>/dev/null)
+echo "   Versione attiva: $ACTIVE_VERSION"
+
+# Step 7: Publish to EAS (best-effort — if EXPO_TOKEN is missing or EAS fails, warn and continue)
+echo "[7/7] Pubblicazione su EAS (expo-updates)..."
+EAS_UPDATE_GROUP_ID="N/A"
+EAS_ANDROID_UPDATE_ID="N/A"
+EAS_DASHBOARD_URL="N/A"
+EAS_STATUS="skipped"
+
+if [ -z "${EXPO_TOKEN:-}" ]; then
+  echo "   ⚠️  EXPO_TOKEN non impostato — passo EAS saltato."
+  echo "   Per abilitarlo: imposta EXPO_TOKEN nei secrets Replit."
+  EAS_STATUS="skipped (EXPO_TOKEN mancante)"
+else
+  EAS_LOG="/tmp/ota-eas-$$.log"
+  set +e
+  CI=1 EXPO_PUBLIC_DOMAIN=biker-link.replit.app npx eas-cli@16 update \
+    --skip-bundler \
+    --input-dir "$DIST_DIR" \
+    --channel preview \
+    --message "$RELEASE_NOTES" \
+    --non-interactive \
+    --platform android \
+    > "$EAS_LOG" 2>&1
+  EAS_EXIT=$?
+  set -e
+
+  if [ $EAS_EXIT -ne 0 ]; then
+    echo "   ⚠️  EAS update fallito (exit $EAS_EXIT) — custom backend rimane attivo."
+    echo "   Errore:"
+    tail -10 "$EAS_LOG" | sed 's/^/     /'
+    echo "   Eseguire manualmente: npx eas-cli@16 update --channel preview --message \"$RELEASE_NOTES\" --platform android"
+    EAS_STATUS="FALLITO — eseguire manualmente"
+  else
+    EAS_UPDATE_GROUP_ID=$(grep -o 'Update group ID[[:space:]]*[a-f0-9-]*' "$EAS_LOG" | awk '{print $NF}' | head -1)
+    EAS_ANDROID_UPDATE_ID=$(grep -o 'Android update ID[[:space:]]*[a-f0-9-]*' "$EAS_LOG" | awk '{print $NF}' | head -1)
+    EAS_DASHBOARD_URL=$(grep -o 'https://expo\.dev/accounts/[^ ]*' "$EAS_LOG" | head -1)
+    [ -z "$EAS_UPDATE_GROUP_ID" ] && EAS_UPDATE_GROUP_ID="N/A (vedi log EAS)"
+    [ -z "$EAS_ANDROID_UPDATE_ID" ] && EAS_ANDROID_UPDATE_ID="N/A (vedi log EAS)"
+    [ -z "$EAS_DASHBOARD_URL" ] && EAS_DASHBOARD_URL="N/A"
+    EAS_STATUS="pubblicato"
+    echo "   ✅ EAS update pubblicato — group: $EAS_UPDATE_GROUP_ID"
+  fi
+  rm -f "$EAS_LOG"
+fi
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════════╗"
 echo "║  ✅ Release OTA v${VERSION} pubblicata con successo!$(printf '%*s' $((17 - ${#VERSION})) '')║"
 echo "╠══════════════════════════════════════════════════════════════════╣"
-echo "║  Release ID     : $RELEASE_ID"
-echo "║  Bundle URL     : $BUNDLE_URL"
-echo "║  Manifest URL   : $MANIFEST_URL"
-echo "║  Versione att.  : $ACTIVE_VERSION"
-echo "║  Bundle attivo  : $ACTIVE_BUNDLE"
-echo "║  Pubblicato il  : $PUBLISHED_AT"
+echo "║  Release ID       : $RELEASE_ID"
+echo "║  Bundle URL       : $BUNDLE_URL"
+echo "║  Manifest URL     : $MANIFEST_URL"
+echo "║  Versione att.    : $ACTIVE_VERSION"
+echo "║  Bundle attivo    : $ACTIVE_BUNDLE"
+echo "║  Pubblicato il    : $PUBLISHED_AT"
+echo "╠══════════════════════════════════════════════════════════════════╣"
+echo "║  EAS Status       : $EAS_STATUS"
+echo "║  EAS Update Group : $EAS_UPDATE_GROUP_ID"
+echo "║  EAS Android ID   : $EAS_ANDROID_UPDATE_ID"
+echo "║  EAS Dashboard    : $EAS_DASHBOARD_URL"
 echo "╚══════════════════════════════════════════════════════════════════╝"
 echo ""
 echo "   Tutti gli utenti riceveranno l'aggiornamento al prossimo avvio."
