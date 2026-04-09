@@ -557,5 +557,26 @@
     "apkVersionCode": 6,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 1,
+    "cycle": "3.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-09",
+    "runtimeVersion": "3.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-1 rv3.0.0: selettore lingua welcome + fix Spotify client ID nel bundle + testo isNotConfigured",
+    "note": "Task #459+#460. Selettore lingua (5 bandiere IT/EN/DE/ES/FR) aggiunto in welcome.tsx (sostituisce splash.tsx mai raggiunta). EXPO_PUBLIC_SPOTIFY_CLIENT_ID incluso nel bundle OTA — la tab Musica ora mostra 'Connetti Spotify' invece di 'Funzione in arrivo'. Testo stato isNotConfigured aggiornato: 'Aggiorna l'app'. eas.json aggiornato con EXPO_PUBLIC_SPOTIFY_CLIENT_ID per future build APK.",
+    "updateGroupId": "db652c10-8932-43a6-bd89-e3dbefb3ce6a",
+    "androidUpdateId": "019d734e-af37-7c95-a562-6a0b9ec180b1",
+    "iosUpdateId": null,
+    "commitBase": "b0183e69d1ba21254fd79e1ff5d9fb1602df2fab",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/db652c10-8932-43a6-bd89-e3dbefb3ce6a",
+    "apkBuildId": "beef4c1f-99a4-4390-9fd7-2593b4b1142e",
+    "apkVersionCode": 7,
+    "apkUrl": null,
+    "status": "published"
   }
 ]

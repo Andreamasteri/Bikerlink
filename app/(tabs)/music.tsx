@@ -329,10 +329,10 @@ export default function MusicScreen() {
             <Ionicons name="musical-notes" size={48} color={Colors.textSecondary} />
           </View>
           <Text style={[styles.connectTitle, { color: Colors.textSecondary }]}>Spotify non disponibile</Text>
-          <Text style={styles.connectDesc}>L'integrazione Spotify non è configurata in questo ambiente.</Text>
+          <Text style={styles.connectDesc}>Spotify non è configurato in questa versione dell'app. Aggiorna l'app per abilitarlo.</Text>
           <TouchableOpacity style={[styles.connectBtn, { opacity: 0.5 }]} disabled>
             <Ionicons name="logo-spotify" size={20} color="#fff" />
-            <Text style={styles.connectBtnText}>Funzione in arrivo</Text>
+            <Text style={styles.connectBtnText}>Aggiorna l'app</Text>
           </TouchableOpacity>
         </View>
       ) : !isConnected ? (
