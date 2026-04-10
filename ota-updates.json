@@ -895,5 +895,28 @@
     "apkVersionCode": 8,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 15,
+    "cycle": "3.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-10",
+    "runtimeVersion": "3.0.0",
+    "platforms": ["android"],
+    "jsEngine": "metro",
+    "message": "OTA-15 rv3.0.0: fix stelle placeholder Last.fm + link Apri su Last.fm",
+    "note": "Task #487. Fix imageUrl Last.fm: filtra URL placeholder 2a96cbd8b46e442fc41c2b86b821562f nel backend (syncLastfmTracks + search tracks). Brani senza cover mostrano icona musical-note locale. onError fallback su Image in SearchTrackRow e LibraryTrackRow. Aggiunto link open-outline 'Apri su Last.fm' in entrambi i componenti. CURRENT_OTA_NUMBER=15.",
+    "releaseId": "fbec2743-1655-42f7-bfa5-394c724b2742",
+    "bundleUrl": "private/ota/ota-3.0.0-1775860571748.js",
+    "updateGroupId": "98a12690-9df6-450b-a06d-e281c8b49230",
+    "androidUpdateId": "019d798a-7f21-728a-bd60-f19b3b7d0019",
+    "iosUpdateId": null,
+    "commitBase": "597d0e5af6a2a3b26add6e9d32f1f06731f8e218",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/98a12690-9df6-450b-a06d-e281c8b49230",
+    "apkBuildId": "5da77f1c-4d34-44ea-9143-da247d8e85cc",
+    "apkVersionCode": 8,
+    "apkUrl": null,
+    "status": "published"
   }
 ]

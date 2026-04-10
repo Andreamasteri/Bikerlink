@@ -99,7 +99,9 @@ async function syncLastfmTracks(userId: string, sessionKey: string, username: st
     } catch {
     }
 
-    const imageUrl = (t.image ?? []).find((img) => img.size === "medium")?.["#text"] ?? null;
+    const LASTFM_PLACEHOLDER = "2a96cbd8b46e442fc41c2b86b821562f";
+    const rawImageUrl = (t.image ?? []).find((img) => img.size === "medium")?.["#text"] ?? "";
+    const imageUrl = rawImageUrl && !rawImageUrl.includes(LASTFM_PLACEHOLDER) ? rawImageUrl : null;
 
     try {
       await db
@@ -237,14 +239,16 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
       const trackName = t.name ?? "";
       const artistName = t.artist ?? "";
       const trackId = t.mbid && t.mbid.length > 0 ? t.mbid : `${artistName}::${trackName}`;
-      const imageUrl = (t.image ?? []).find((img) => img.size === "medium")?.["#text"] ?? null;
+      const LASTFM_PLACEHOLDER = "2a96cbd8b46e442fc41c2b86b821562f";
+      const rawImageUrl2 = (t.image ?? []).find((img) => img.size === "medium")?.["#text"] ?? "";
+      const imageUrl = rawImageUrl2 && !rawImageUrl2.includes(LASTFM_PLACEHOLDER) ? rawImageUrl2 : null;
       return {
         spotifyTrackId: trackId,
         trackName,
         artistId: artistName,
         artistName,
         albumName: null,
-        imageUrl: imageUrl && imageUrl.length > 0 ? imageUrl : null,
+        imageUrl,
         genres: [] as string[],
         popularity: 0,
       };

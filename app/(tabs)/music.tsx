@@ -767,10 +767,12 @@ function SearchTrackRow({
   isAdding: boolean;
   onAdd: (t: SearchTrack) => void;
 }) {
+  const [imgError, setImgError] = useState(false);
+  const lastfmUrl = `https://www.last.fm/music/${encodeURIComponent(track.artistName)}/_/${encodeURIComponent(track.trackName)}`;
   return (
     <View style={styles.trackRow}>
-      {track.imageUrl ? (
-        <Image source={{ uri: track.imageUrl }} style={styles.albumArt} />
+      {track.imageUrl && !imgError ? (
+        <Image source={{ uri: track.imageUrl }} style={styles.albumArt} onError={() => setImgError(true)} />
       ) : (
         <View style={[styles.albumArt, styles.albumArtPlaceholder]}>
           <Ionicons name="musical-note" size={16} color={Colors.textSecondary} />
@@ -780,6 +782,13 @@ function SearchTrackRow({
         <Text style={styles.trackName} numberOfLines={1}>{track.trackName}</Text>
         <Text style={styles.trackArtist} numberOfLines={1}>{track.artistName}</Text>
       </View>
+      <TouchableOpacity
+        onPress={() => Linking.openURL(lastfmUrl)}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        style={{ marginRight: 6 }}
+      >
+        <Ionicons name="open-outline" size={16} color={Colors.textSecondary} />
+      </TouchableOpacity>
       <TouchableOpacity
         style={[styles.addBtn, isAdded && styles.addBtnDone]}
         onPress={() => !isAdded && !isAdding && onAdd(track)}
@@ -805,10 +814,12 @@ function LibraryTrackRow({
   isRemoving: boolean;
   onRemove: (id: string) => void;
 }) {
+  const [imgError, setImgError] = useState(false);
+  const lastfmUrl = `https://www.last.fm/music/${encodeURIComponent(track.artistName)}/_/${encodeURIComponent(track.trackName)}`;
   return (
     <View style={styles.trackRow}>
-      {track.imageUrl ? (
-        <Image source={{ uri: track.imageUrl }} style={styles.albumArt} />
+      {track.imageUrl && !imgError ? (
+        <Image source={{ uri: track.imageUrl }} style={styles.albumArt} onError={() => setImgError(true)} />
       ) : (
         <View style={[styles.albumArt, styles.albumArtPlaceholder]}>
           <Ionicons name="musical-note" size={16} color={Colors.textSecondary} />
@@ -818,6 +829,13 @@ function LibraryTrackRow({
         <Text style={styles.trackName} numberOfLines={1}>{track.trackName}</Text>
         <Text style={styles.trackArtist} numberOfLines={1}>{track.artistName}</Text>
       </View>
+      <TouchableOpacity
+        onPress={() => Linking.openURL(lastfmUrl)}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        style={{ marginRight: 6 }}
+      >
+        <Ionicons name="open-outline" size={16} color={Colors.textSecondary} />
+      </TouchableOpacity>
       <TouchableOpacity
         style={styles.removeBtn}
         onPress={() => {
