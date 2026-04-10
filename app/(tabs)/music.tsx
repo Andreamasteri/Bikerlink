@@ -783,7 +783,7 @@ function SearchTrackRow({
         <Text style={styles.trackArtist} numberOfLines={1}>{track.artistName}</Text>
       </View>
       <TouchableOpacity
-        onPress={() => Linking.openURL(lastfmUrl)}
+        onPress={() => Linking.openURL(lastfmUrl).catch(() => {})}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         style={{ marginRight: 6 }}
       >
@@ -830,7 +830,7 @@ function LibraryTrackRow({
         <Text style={styles.trackArtist} numberOfLines={1}>{track.artistName}</Text>
       </View>
       <TouchableOpacity
-        onPress={() => Linking.openURL(lastfmUrl)}
+        onPress={() => Linking.openURL(lastfmUrl).catch(() => {})}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         style={{ marginRight: 6 }}
       >

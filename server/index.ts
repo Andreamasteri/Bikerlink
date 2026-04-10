@@ -757,6 +757,25 @@ function setupErrorHandler(app: express.Application) {
         }
         console.log("[INIT] Phase 3 essential seed + settings done");
 
+        // Phase 3.5: one-time cleanup — null out Last.fm placeholder imageUrls
+        try {
+          const { db: dbClean } = await import("./db");
+          const { userMusicTracks } = await import("@shared/schema");
+          const { like, and, eq } = await import("drizzle-orm");
+          await dbClean
+            .update(userMusicTracks)
+            .set({ imageUrl: null })
+            .where(
+              and(
+                eq(userMusicTracks.provider, "lastfm"),
+                like(userMusicTracks.imageUrl!, "%2a96cbd8b46e442fc41c2b86b821562f%")
+              )
+            );
+          console.log("[INIT] Phase 3.5 Last.fm placeholder imageUrl cleanup done");
+        } catch (e) {
+          console.warn("[INIT] Phase 3.5 lastfm placeholder cleanup error:", e);
+        }
+
         // Phase 4: motoclub migration + reseed (heavy — many DB inserts)
         await delay(2_000);
         try {
