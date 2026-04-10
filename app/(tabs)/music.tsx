@@ -259,7 +259,7 @@ export default function MusicScreen() {
           debouncedQuery={debouncedQuery}
           searchResults={searchQuery.data?.tracks ?? []}
           searchLoading={searchQuery.isLoading}
-          searchError={searchQuery.isError ? (searchQuery.error?.message ?? "Errore nella ricerca. Riprova.") : null}
+          searchError={searchQuery.isError ? ((searchQuery.error?.message && searchQuery.error.message.length > 5) ? searchQuery.error.message : "Errore nella ricerca. Riprova.") : null}
           library={tracksQuery.data?.tracks ?? []}
           libraryLoading={tracksQuery.isLoading}
           savedIds={savedIds}
