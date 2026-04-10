@@ -30,6 +30,7 @@ import sosRoutes from "./routes/sos";
 import motoclubsRoutes from "./routes/motoclubs";
 import friendsRoutes from "./routes/friends";
 import spotifyRoutes, { handleMusicMatch } from "./routes/spotify";
+import lastfmRoutes from "./routes/lastfm";
 import { triggerMatchingRun, triggerMatchingForUser } from "./matching-engine";
 import { db } from "./db";
 import { users } from "@shared/schema";
@@ -126,6 +127,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/motoclubs", motoclubsRoutes);
   app.use("/api/friends", friendsRoutes);
   app.use("/api/spotify", spotifyRoutes);
+  app.use("/api/lastfm", lastfmRoutes);
+
+  app.get("/api/settings/music-provider", async (_req: Request, res: Response) => {
+    try {
+      const setting = await storage.getAppSetting("music_provider");
+      const provider = (setting?.value as "lastfm" | "spotify") ?? "lastfm";
+      return res.json({ provider });
+    } catch {
+      return res.json({ provider: "lastfm" });
+    }
+  });
+
   app.get("/api/match/music", (req: Request, res: Response) => {
     if (!req.session?.userId) return res.status(401).json({ message: "Non autenticato" });
     if (!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET)) {

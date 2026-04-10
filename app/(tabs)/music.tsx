@@ -31,6 +31,7 @@ function getSpotifyRedirectUri(): string {
 }
 
 const SPOTIFY_GREEN = "#1DB954";
+const LASTFM_RED = "#D51007";
 
 type Tab = "brani" | "match" | "ricevute";
 
@@ -102,9 +103,17 @@ export default function MusicScreen() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [searchNeedsReconnect, setSearchNeedsReconnect] = useState(false);
 
-  const statusQuery = useQuery<{ connected: boolean; displayName?: string; trackCount: number }>({
-    queryKey: ["/api/spotify/status"],
+  const { data: providerData } = useQuery<{ provider: string }>({
+    queryKey: ["/api/settings/music-provider"],
+    staleTime: 120_000,
+  });
+  const musicProvider: "lastfm" | "spotify" = (providerData?.provider as "lastfm" | "spotify") ?? "lastfm";
+  const apiPrefix = musicProvider === "lastfm" ? "/api/lastfm" : "/api/spotify";
+
+  const statusQuery = useQuery<{ connected: boolean; displayName?: string; username?: string; trackCount: number }>({
+    queryKey: [`${apiPrefix}/status`],
     staleTime: 60_000,
+    enabled: !!providerData,
   });
 
   useEffect(() => {
@@ -135,9 +144,9 @@ export default function MusicScreen() {
   }, [searchInput]);
 
   const searchQuery = useQuery<{ tracks: SearchTrack[] }>({
-    queryKey: ["/api/spotify/search", debouncedQuery],
+    queryKey: [`${apiPrefix}/search`, debouncedQuery],
     queryFn: async () => {
-      const url = new URL("/api/spotify/search", getApiUrl());
+      const url = new URL(`${apiPrefix}/search`, getApiUrl());
       url.searchParams.set("q", debouncedQuery);
       const res = await fetch(url.toString(), { credentials: "include" });
       if (!res.ok) {
@@ -156,12 +165,15 @@ export default function MusicScreen() {
       setSearchNeedsReconnect(false);
       return res.json();
     },
-    enabled: debouncedQuery.length >= 2 && activeTab === "brani" && statusQuery.data?.connected === true,
+    enabled: debouncedQuery.length >= 2 && activeTab === "brani" && (
+      musicProvider === "lastfm" ? true : statusQuery.data?.connected === true
+    ),
     staleTime: 30_000,
   });
 
   const tracksQuery = useQuery<{ tracks: LibraryTrack[] }>({
-    queryKey: ["/api/spotify/tracks"],
+    queryKey: [`${apiPrefix}/tracks`],
+    enabled: !!providerData,
   });
 
   const matchQuery = useQuery<{ matches: MusicMatch[] }>({
@@ -187,11 +199,11 @@ export default function MusicScreen() {
   const addTrackMutation = useMutation({
     mutationFn: async (track: SearchTrack) => {
       setPendingAddId(track.spotifyTrackId);
-      const res = await apiRequest("POST", "/api/spotify/tracks", track);
+      const res = await apiRequest("POST", `${apiPrefix}/tracks`, track);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/spotify/tracks"] });
+      queryClient.invalidateQueries({ queryKey: [`${apiPrefix}/tracks`] });
     },
     onError: (err: Error) => {
       Alert.alert("Errore", err.message ?? "Impossibile aggiungere il brano");
@@ -202,11 +214,11 @@ export default function MusicScreen() {
   const removeTrackMutation = useMutation({
     mutationFn: async (spotifyTrackId: string) => {
       setPendingRemoveId(spotifyTrackId);
-      const res = await apiRequest("DELETE", `/api/spotify/tracks/${spotifyTrackId}`, {});
+      const res = await apiRequest("DELETE", `${apiPrefix}/tracks/${spotifyTrackId}`, {});
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/spotify/tracks"] });
+      queryClient.invalidateQueries({ queryKey: [`${apiPrefix}/tracks`] });
     },
     onError: (err: Error) => {
       Alert.alert("Errore", err.message ?? "Impossibile rimuovere il brano");
@@ -301,30 +313,85 @@ export default function MusicScreen() {
     }
   }, [queryClient]);
 
+  const connectLastfm = useCallback(async () => {
+    if (Platform.OS === "web") {
+      Alert.alert("Info", "Collega Last.fm dall'app mobile BikerLink.");
+      return;
+    }
+    setIsConnecting(true);
+    try {
+      const resp = await fetch(new URL("/api/lastfm/auth-url", getApiUrl()).toString(), { credentials: "include" });
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({})) as { message?: string };
+        throw new Error(body.message ?? "Errore nell'avvio della connessione Last.fm");
+      }
+      const { authUrl } = await resp.json() as { authUrl: string; token: string };
+      const redirectUri = "bikerlink://lastfm-callback";
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+      if (result.type === "success") {
+        const resultUrl = new URL(result.url);
+        const token = resultUrl.searchParams.get("token") ?? undefined;
+        if (!token) {
+          Alert.alert("Errore", "Token Last.fm mancante. Riprova.");
+          return;
+        }
+        const callbackResp = await apiRequest("POST", "/api/lastfm/callback", { token });
+        const callbackData = await callbackResp.json() as { connected?: boolean; username?: string; trackCount?: number; message?: string };
+        if (!callbackResp.ok) {
+          Alert.alert("Errore", callbackData.message ?? "Errore durante la connessione Last.fm");
+          return;
+        }
+        queryClient.invalidateQueries({ queryKey: ["/api/lastfm/status"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/lastfm/tracks"] });
+        const tracksMsg = callbackData.trackCount ? ` ${callbackData.trackCount} brani sincronizzati.` : "";
+        Alert.alert(
+          "Last.fm Collegato!",
+          callbackData.username
+            ? `Benvenuto, ${callbackData.username}!${tracksMsg}`
+            : `Last.fm collegato con successo!${tracksMsg}`
+        );
+      }
+    } catch (err) {
+      console.error("[Last.fm connect]", err);
+      Alert.alert("Errore", (err as Error).message ?? "Impossibile connettersi a Last.fm");
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [queryClient]);
+
+  const handleConnect = useCallback(() => {
+    if (musicProvider === "lastfm") {
+      connectLastfm();
+    } else {
+      connectSpotify();
+    }
+  }, [musicProvider, connectLastfm, connectSpotify]);
+
   const disconnectMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/spotify/disconnect", {});
+      const res = await apiRequest("POST", `${apiPrefix}/disconnect`, {});
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/spotify/status"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/spotify/tracks"] });
+      queryClient.invalidateQueries({ queryKey: [`${apiPrefix}/status`] });
+      queryClient.invalidateQueries({ queryKey: [`${apiPrefix}/tracks`] });
     },
     onError: (err: Error) => {
-      Alert.alert("Errore", err.message ?? "Impossibile disconnettere Spotify");
+      Alert.alert("Errore", err.message ?? "Impossibile disconnettere");
     },
   });
 
   const handleDisconnect = useCallback(() => {
+    const providerName = musicProvider === "lastfm" ? "Last.fm" : "Spotify";
     Alert.alert(
-      "Disconnetti Spotify",
-      "Rimuovere la connessione Spotify? I brani salvati verranno eliminati.",
+      `Disconnetti ${providerName}`,
+      `Rimuovere la connessione ${providerName}? I brani salvati verranno eliminati.`,
       [
         { text: "Annulla", style: "cancel" },
         { text: "Disconnetti", style: "destructive", onPress: () => disconnectMutation.mutate() },
       ]
     );
-  }, [disconnectMutation]);
+  }, [disconnectMutation, musicProvider]);
 
   const toggleCriteria = useCallback((c: string) => {
     setMatchCriteria((prev) => {
@@ -346,12 +413,13 @@ export default function MusicScreen() {
 
   const savedIds = new Set((tracksQuery.data?.tracks ?? []).map((t) => t.spotifyTrackId));
   const topPadding = insets.top + (Platform.OS === "web" ? 67 : 0);
+  const providerColor = musicProvider === "lastfm" ? LASTFM_RED : SPOTIFY_GREEN;
 
   return (
     <View style={[styles.container, { paddingTop: topPadding }]}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Ionicons name="musical-notes" size={24} color={SPOTIFY_GREEN} />
+          <Ionicons name="musical-notes" size={24} color={providerColor} />
           <Text style={styles.headerTitle}>Musica</Text>
         </View>
         <View style={styles.headerRight}>
@@ -388,9 +456,10 @@ export default function MusicScreen() {
 
       {activeTab === "brani" && (
         <BraniTab
+          provider={musicProvider}
           isConnected={statusQuery.isLoading ? null : (statusQuery.data?.connected ?? false)}
           isConnecting={isConnecting}
-          onConnect={connectSpotify}
+          onConnect={handleConnect}
           searchNeedsReconnect={searchNeedsReconnect}
           searchInput={searchInput}
           onSearchChange={setSearchInput}
@@ -436,6 +505,7 @@ export default function MusicScreen() {
 }
 
 function BraniTab({
+  provider,
   isConnected,
   isConnecting,
   onConnect,
@@ -454,6 +524,7 @@ function BraniTab({
   pendingAddId,
   pendingRemoveId,
 }: {
+  provider: "lastfm" | "spotify";
   isConnected: boolean | null;
   isConnecting: boolean;
   onConnect: () => void;
@@ -472,10 +543,14 @@ function BraniTab({
   pendingAddId: string | null;
   pendingRemoveId: string | null;
 }) {
+  const isLastfm = provider === "lastfm";
+  const providerColor = isLastfm ? LASTFM_RED : SPOTIFY_GREEN;
+  const providerName = isLastfm ? "Last.fm" : "Spotify";
+
   if (isConnected === null) {
     return (
       <View style={styles.connectContainer}>
-        <ActivityIndicator color={SPOTIFY_GREEN} size="large" />
+        <ActivityIndicator color={providerColor} size="large" />
       </View>
     );
   }
@@ -483,20 +558,22 @@ function BraniTab({
   if (!isConnected) {
     return (
       <View style={styles.connectContainer}>
-        <Ionicons name="musical-notes" size={52} color={SPOTIFY_GREEN} />
-        <Text style={styles.connectTitle}>Collega Spotify</Text>
+        <Ionicons name={isLastfm ? "radio" : "musical-notes"} size={52} color={providerColor} />
+        <Text style={styles.connectTitle}>Collega {providerName}</Text>
         <Text style={styles.connectDesc}>
-          Collega il tuo account Spotify per cercare brani e costruire il tuo profilo musicale con i bikers.
+          {isLastfm
+            ? "Collega il tuo account Last.fm per sincronizzare i tuoi brani più ascoltati con i bikers."
+            : "Collega il tuo account Spotify per cercare brani e costruire il tuo profilo musicale con i bikers."}
         </Text>
         <TouchableOpacity
-          style={[styles.connectBtn, isConnecting && styles.connectBtnDisabled]}
+          style={[styles.connectBtn, { backgroundColor: providerColor }, isConnecting && styles.connectBtnDisabled]}
           onPress={onConnect}
           disabled={isConnecting}
         >
           {isConnecting ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.connectBtnText}>Connetti Spotify</Text>
+            <Text style={styles.connectBtnText}>Connetti {providerName}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -509,7 +586,7 @@ function BraniTab({
         <Ionicons name="search" size={18} color={Colors.textSecondary} style={{ marginRight: 8 }} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Cerca brani su Spotify…"
+          placeholder={isLastfm ? "Cerca brani su Last.fm…" : "Cerca brani su Spotify…"}
           placeholderTextColor={Colors.textSecondary}
           value={searchInput}
           onChangeText={onSearchChange}
@@ -532,17 +609,17 @@ function BraniTab({
             <ActivityIndicator color={Colors.accent} style={{ marginVertical: 20 }} />
           ) : searchNeedsReconnect ? (
             <View style={styles.reconnectBox}>
-              <Ionicons name="musical-notes" size={32} color={SPOTIFY_GREEN} style={{ marginBottom: 8 }} />
-              <Text style={styles.reconnectText}>La sessione Spotify è scaduta.</Text>
+              <Ionicons name={isLastfm ? "radio" : "musical-notes"} size={32} color={providerColor} style={{ marginBottom: 8 }} />
+              <Text style={styles.reconnectText}>La sessione {providerName} è scaduta.</Text>
               <TouchableOpacity
-                style={[styles.connectBtn, { marginTop: 12 }]}
+                style={[styles.connectBtn, { backgroundColor: providerColor, marginTop: 12 }]}
                 onPress={onConnect}
                 disabled={isConnecting}
               >
                 {isConnecting ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Text style={styles.connectBtnText}>Riconnetti Spotify</Text>
+                  <Text style={styles.connectBtnText}>Riconnetti {providerName}</Text>
                 )}
               </TouchableOpacity>
             </View>

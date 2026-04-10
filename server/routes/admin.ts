@@ -1049,6 +1049,27 @@ router.put("/settings/maps_provider", async (req: Request, res: Response) => {
   }
 });
 
+router.put("/settings/music_provider", async (req: Request, res: Response) => {
+  try {
+    const { value } = req.body as { value: string };
+    if (value !== "lastfm" && value !== "spotify") {
+      return res.status(400).json({ message: "Provider non valido: usare 'lastfm' o 'spotify'" });
+    }
+    const setting = await storage.upsertAppSetting("music_provider", value);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_setting",
+      targetType: "app_setting",
+      targetId: "music_provider",
+      details: `music_provider = ${value}`,
+    });
+    return res.json(setting);
+  } catch (error) {
+    console.error("Admin music_provider error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/settings/maps_user_choice_enabled", async (req: Request, res: Response) => {
   try {
     const { value } = req.body as { value: string };

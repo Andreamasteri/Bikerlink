@@ -454,6 +454,11 @@ export default function AdminSettings() {
   });
   const musicImportEnabled = musicImportData?.enabled !== false;
 
+  const { data: musicProviderData } = useQuery<{ provider: string }>({
+    queryKey: ["/api/settings/music-provider"],
+  });
+  const musicProvider = musicProviderData?.provider ?? "lastfm";
+
   const { data: homeMessageData } = useQuery<{ enabled: boolean; text: string }>({
     queryKey: ["/api/settings/home-message"],
   });
@@ -594,6 +599,24 @@ export default function AdminSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/music-import-playlist"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const musicProviderMutation = useMutation({
+    mutationFn: async (provider: "lastfm" | "spotify") => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/music_provider", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: provider }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/music-provider"] });
     },
   });
 
@@ -1453,6 +1476,36 @@ export default function AdminSettings() {
         </Pressable>
         {musicSystemExpanded && (
           <View style={styles.accordionPanelContent}>
+            <Text style={[styles.synecoLabel, { marginBottom: 8, marginTop: 4 }]}>Provider Musicale</Text>
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
+              {([
+                { value: "lastfm", label: "Last.fm", color: "#D51007", icon: "radio" as const },
+                { value: "spotify", label: "Spotify", color: "#1DB954", icon: "logo-spotify" as const },
+              ] as const).map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[
+                    styles.providerOption,
+                    { flex: 1 },
+                    musicProvider === opt.value && styles.providerOptionActive,
+                    musicProvider === opt.value && { borderColor: opt.color },
+                  ]}
+                  onPress={() => musicProviderMutation.mutate(opt.value)}
+                  disabled={musicProviderMutation.isPending}
+                >
+                  <Ionicons name={opt.icon} size={18} color={musicProvider === opt.value ? opt.color : Colors.textSecondary} />
+                  <Text style={[styles.providerLabel, musicProvider === opt.value && { color: opt.color, fontFamily: "Inter_600SemiBold" }]}>
+                    {opt.label}
+                  </Text>
+                  {musicProvider === opt.value && (
+                    <Ionicons name="checkmark-circle" size={16} color={opt.color} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={[styles.synecoDesc, { marginBottom: 12 }]}>
+              {musicProvider === "lastfm" ? "Last.fm attivo — gratuito, no Premium" : "Spotify attivo — richiede Premium developer"}
+            </Text>
             <View style={styles.synecoHeader}>
               <View style={styles.synecoInfo}>
                 <Ionicons name="share-outline" size={20} color="#1DB954" />

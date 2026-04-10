@@ -1099,14 +1099,27 @@ export const userMusicTracks = pgTable("user_music_tracks", {
   imageUrl: varchar("image_url", { length: 500 }),
   genres: text("genres").array().default([]),
   popularity: integer("popularity").default(0),
+  provider: varchar("provider", { length: 20 }).notNull().default("spotify"),
   addedAt: timestamp("added_at").notNull().defaultNow(),
 }, (table) => [
-  uniqueIndex("user_track_uniq").on(table.userId, table.spotifyTrackId),
+  uniqueIndex("user_track_uniq").on(table.userId, table.spotifyTrackId, table.provider),
   index("user_music_tracks_user_idx").on(table.userId),
 ]);
 
 export type UserMusicTrack = typeof userMusicTracks.$inferSelect;
 export type InsertUserMusicTrack = typeof userMusicTracks.$inferInsert;
+
+export const userLastfmSessions = pgTable("user_lastfm_sessions", {
+  userId: varchar("user_id", { length: 36 })
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  lastfmUsername: varchar("lastfm_username", { length: 200 }).notNull(),
+  sessionKey: varchar("session_key", { length: 500 }).notNull(),
+  connectedAt: timestamp("connected_at").defaultNow().notNull(),
+});
+
+export type UserLastfmSession = typeof userLastfmSessions.$inferSelect;
+export type InsertUserLastfmSession = typeof userLastfmSessions.$inferInsert;
 
 export const sharedPlaylists = pgTable("shared_playlists", {
   id: serial("id").primaryKey(),

@@ -826,5 +826,28 @@
     "apkVersionCode": 8,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 12,
+    "cycle": "3.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-10",
+    "runtimeVersion": "3.0.0",
+    "platforms": ["android"],
+    "jsEngine": "metro",
+    "message": "OTA-12 rv3.0.0: integrazione Last.fm + switch provider admin + accordion profilo",
+    "note": "Task #481/#482. Integrazione Last.fm come provider musicale alternativo a Spotify. Aggiunta tabella user_lastfm_sessions, colonna provider in user_music_tracks. Admin toggle music_provider (lastfm/spotify). Frontend music.tsx adattato a entrambi i provider. Accordion collassabile per 'Stile Mappa' e 'Documentazione' nel profilo. CURRENT_OTA_NUMBER=12.",
+    "releaseId": "5e3c0400-d328-4a3a-b74b-c931196f6ab9",
+    "bundleUrl": "private/ota/ota-12-1775850655538.js",
+    "updateGroupId": "ac6c9f4c-c660-41c8-b212-d0cd115c0256",
+    "androidUpdateId": "019d78f3-a77b-7843-bec8-ccdce08a3c98",
+    "iosUpdateId": null,
+    "commitBase": null,
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/ac6c9f4c-c660-41c8-b212-d0cd115c0256",
+    "apkBuildId": "5da77f1c-4d34-44ea-9143-da247d8e85cc",
+    "apkVersionCode": 8,
+    "apkUrl": null,
+    "status": "published"
   }
 ]

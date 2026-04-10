@@ -135,7 +135,7 @@ export default function ProfileScreen() {
   const [isExportingData, setIsExportingData] = useState(false);
 
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-  const CURRENT_OTA_NUMBER = 11;
+  const CURRENT_OTA_NUMBER = 12;
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -256,6 +256,8 @@ export default function ProfileScreen() {
   const [fakeHomeLongitude, setFakeHomeLongitude] = useState<number | null>(null);
   const [fakeHomeRadius, setFakeHomeRadius] = useState(2);
   const [privacyExpanded, setPrivacyExpanded] = useState(false);
+  const [mapStyleExpanded, setMapStyleExpanded] = useState(false);
+  const [docsExpanded, setDocsExpanded] = useState(false);
   const [mapPickerVisible, setMapPickerVisible] = useState(false);
   const [mapPickerTarget, setMapPickerTarget] = useState<"home" | "fake" | null>(null);
   const [mapPickerCoord, setMapPickerCoord] = useState<{ latitude: number; longitude: number }>({ latitude: 41.9, longitude: 12.5 });
@@ -1041,39 +1043,44 @@ export default function ProfileScreen() {
 
       {mapsEnabled && userChoiceEnabled && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Stile Mappa</Text>
-          <View style={styles.mapStyleCard}>
-            {(["esri_gray", "carto_light"] as MapProvider[]).map((p) => {
-              const rawStyle = profile?.profile?.preferredMapStyle as MapProvider | null | undefined;
-              const currentStyle: MapProvider = (!rawStyle || rawStyle === "carto_dark") ? "carto_light" : rawStyle;
-              const isSelected = currentStyle === p;
-              return (
-                <Pressable
-                  key={p}
-                  style={[styles.mapStyleOption, isSelected && styles.mapStyleOptionActive]}
-                  onPress={() => mapStyleMutation.mutate(p)}
-                  disabled={mapStyleMutation.isPending}
-                >
-                  <Ionicons
-                    name={p === "carto_dark" ? "moon" : p === "esri_gray" ? "map-outline" : "sunny"}
-                    size={20}
-                    color={isSelected ? Colors.accent : Colors.textSecondary}
-                  />
-                  <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={[styles.mapStyleName, isSelected && { color: Colors.accent }]}>
-                      {MAP_PROVIDER_LABELS[p]}
-                    </Text>
-                    <Text style={styles.mapStyleDesc} numberOfLines={2}>
-                      {MAP_PROVIDER_DESCRIPTIONS[p]}
-                    </Text>
-                  </View>
-                  {isSelected && (
-                    <Ionicons name="checkmark-circle" size={20} color={Colors.accent} />
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
+          <Pressable style={styles.accordionHeader} onPress={() => setMapStyleExpanded(v => !v)}>
+            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Stile Mappa</Text>
+            <Ionicons name={mapStyleExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+          </Pressable>
+          {mapStyleExpanded && (
+            <View style={styles.mapStyleCard}>
+              {(["esri_gray", "carto_light"] as MapProvider[]).map((p) => {
+                const rawStyle = profile?.profile?.preferredMapStyle as MapProvider | null | undefined;
+                const currentStyle: MapProvider = (!rawStyle || rawStyle === "carto_dark") ? "carto_light" : rawStyle;
+                const isSelected = currentStyle === p;
+                return (
+                  <Pressable
+                    key={p}
+                    style={[styles.mapStyleOption, isSelected && styles.mapStyleOptionActive]}
+                    onPress={() => mapStyleMutation.mutate(p)}
+                    disabled={mapStyleMutation.isPending}
+                  >
+                    <Ionicons
+                      name={p === "carto_dark" ? "moon" : p === "esri_gray" ? "map-outline" : "sunny"}
+                      size={20}
+                      color={isSelected ? Colors.accent : Colors.textSecondary}
+                    />
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={[styles.mapStyleName, isSelected && { color: Colors.accent }]}>
+                        {MAP_PROVIDER_LABELS[p]}
+                      </Text>
+                      <Text style={styles.mapStyleDesc} numberOfLines={2}>
+                        {MAP_PROVIDER_DESCRIPTIONS[p]}
+                      </Text>
+                    </View>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={20} color={Colors.accent} />
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
         </View>
       )}
 
@@ -1142,31 +1149,38 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{t("profile.documentation")}</Text>
-        <MenuItem
-          icon="document-text"
-          label={isDownloadingManual ? t("profile.downloading") : t("profile.downloadManual")}
-          onPress={handleDownloadManual}
-          color={Colors.accent}
-        />
-        <MenuItem
-          icon="shield-checkmark-outline"
-          label={isDownloadingEula ? t("profile.downloading") : t("profile.downloadEula")}
-          onPress={handleDownloadEula}
-          color={Colors.accent}
-        />
-        <MenuItem
-          icon="document-text-outline"
-          label={isDownloadingPrivacy ? t("profile.downloading") : t("profile.downloadPrivacyPolicy")}
-          onPress={handleDownloadPrivacyPolicy}
-          color={Colors.accent}
-        />
-        <MenuItem
-          icon="cloud-download-outline"
-          label={isExportingData ? t("profile.downloading") : t("profile.exportUserData")}
-          onPress={handleExportUserData}
-          color={Colors.accent}
-        />
+        <Pressable style={styles.accordionHeader} onPress={() => setDocsExpanded(v => !v)}>
+          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>{t("profile.documentation")}</Text>
+          <Ionicons name={docsExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+        </Pressable>
+        {docsExpanded && (
+          <>
+            <MenuItem
+              icon="document-text"
+              label={isDownloadingManual ? t("profile.downloading") : t("profile.downloadManual")}
+              onPress={handleDownloadManual}
+              color={Colors.accent}
+            />
+            <MenuItem
+              icon="shield-checkmark-outline"
+              label={isDownloadingEula ? t("profile.downloading") : t("profile.downloadEula")}
+              onPress={handleDownloadEula}
+              color={Colors.accent}
+            />
+            <MenuItem
+              icon="document-text-outline"
+              label={isDownloadingPrivacy ? t("profile.downloading") : t("profile.downloadPrivacyPolicy")}
+              onPress={handleDownloadPrivacyPolicy}
+              color={Colors.accent}
+            />
+            <MenuItem
+              icon="cloud-download-outline"
+              label={isExportingData ? t("profile.downloading") : t("profile.exportUserData")}
+              onPress={handleExportUserData}
+              color={Colors.accent}
+            />
+          </>
+        )}
       </View>
 
       <View style={[styles.section, { marginTop: 16 }]}>
