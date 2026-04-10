@@ -67,13 +67,7 @@
       "expo-web-browser",
       "expo-camera",
       "expo-image",
-      "expo-sharing",
-      [
-        "react-native-track-player",
-        {
-          "enableBackgroundRemoteControl": true
-        }
-      ]
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true
