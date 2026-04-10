@@ -710,5 +710,28 @@
     "apkVersionCode": 8,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 7,
+    "cycle": "3.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-10",
+    "runtimeVersion": "3.0.0",
+    "platforms": ["android"],
+    "jsEngine": "metro",
+    "message": "OTA-7 rv3.0.0: login Spotify utente OAuth — ricerca usa token personale",
+    "note": "Task #475. OAuth Authorization Code flow: GET /api/spotify/auth-url (backend), WebBrowser.openAuthSessionAsync, POST /api/spotify/callback. GET /search usa getValidAccessToken(userId) invece di getAppAccessToken(). BraniTab mostra connect UI quando non collegato. redirectUri: bikerlink://spotify-callback (aggiungere in Spotify Dev Dashboard). CURRENT_OTA_NUMBER=7.",
+    "releaseId": "080a348c-834f-47c5-9c3b-6e6daa23c68f",
+    "bundleUrl": "private/ota/ota-7.0.0-1775780246413.js",
+    "updateGroupId": "ed4766c0-e752-4c31-84b9-0da1c188a660",
+    "androidUpdateId": "019d74c0-cd42-7bba-bb51-d5aa26bb6b7a",
+    "iosUpdateId": null,
+    "commitBase": "0b1429d415edc2ce5d3a333cf6d62e99fc3e922d",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/ed4766c0-e752-4c31-84b9-0da1c188a660",
+    "apkBuildId": "5da77f1c-4d34-44ea-9143-da247d8e85cc",
+    "apkVersionCode": 8,
+    "apkUrl": null,
+    "status": "published"
   }
 ]

@@ -12,6 +12,7 @@ import {
   TextInput,
   Platform,
 } from "react-native";
+import * as WebBrowser from "expo-web-browser";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,6 +22,7 @@ import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 
 const SPOTIFY_GREEN = "#1DB954";
+const SPOTIFY_REDIRECT_URI = "bikerlink://spotify-callback";
 
 type Tab = "brani" | "match" | "ricevute";
 
@@ -89,6 +91,12 @@ export default function MusicScreen() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [pendingAddId, setPendingAddId] = useState<string | null>(null);
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+
+  const statusQuery = useQuery<{ connected: boolean; displayName?: string; trackCount: number }>({
+    queryKey: ["/api/spotify/status"],
+    staleTime: 60_000,
+  });
 
   useEffect(() => {
     if (tabParam === "ricevute" || tabParam === "match" || tabParam === "brani") {
@@ -130,7 +138,7 @@ export default function MusicScreen() {
       }
       return res.json();
     },
-    enabled: debouncedQuery.length >= 2 && activeTab === "brani",
+    enabled: debouncedQuery.length >= 2 && activeTab === "brani" && statusQuery.data?.connected === true,
     staleTime: 30_000,
   });
 
@@ -203,6 +211,100 @@ export default function MusicScreen() {
     },
   });
 
+  const connectSpotify = useCallback(async () => {
+    if (Platform.OS === "web") {
+      Alert.alert("Info", "Collega Spotify dall'app mobile BikerLink.");
+      return;
+    }
+    setIsConnecting(true);
+    try {
+      const urlObj = new URL("/api/spotify/auth-url", getApiUrl());
+      urlObj.searchParams.set("redirectUri", SPOTIFY_REDIRECT_URI);
+      const resp = await fetch(urlObj.toString(), { credentials: "include" });
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({})) as { message?: string };
+        throw new Error(body.message ?? "Errore nell'avvio della connessione Spotify");
+      }
+      const { authUrl } = await resp.json() as { authUrl: string };
+
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, SPOTIFY_REDIRECT_URI);
+
+      if (result.type === "success") {
+        const redirectUrl = result.url;
+        const codeMatch = redirectUrl.match(/[?&]code=([^&]+)/);
+        const errorMatch = redirectUrl.match(/[?&]error=([^&]+)/);
+        const code = codeMatch ? decodeURIComponent(codeMatch[1]) : null;
+        const oauthError = errorMatch ? decodeURIComponent(errorMatch[1]) : null;
+
+        if (oauthError) {
+          Alert.alert(
+            "Connessione Spotify",
+            oauthError === "access_denied"
+              ? "Accesso negato. Riprova quando vuoi."
+              : `Errore Spotify: ${oauthError}`
+          );
+          return;
+        }
+        if (!code) {
+          Alert.alert("Errore", "Codice di autorizzazione mancante. Riprova.");
+          return;
+        }
+
+        const callbackResp = await apiRequest("POST", "/api/spotify/callback", {
+          code,
+          redirectUri: SPOTIFY_REDIRECT_URI,
+        });
+        const callbackData = await callbackResp.json() as { connected?: boolean; displayName?: string | null; trackCount?: number; message?: string };
+
+        if (!callbackResp.ok) {
+          Alert.alert("Errore", callbackData.message ?? "Errore durante la connessione Spotify");
+          return;
+        }
+
+        queryClient.invalidateQueries({ queryKey: ["/api/spotify/status"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/spotify/tracks"] });
+
+        const tracksMsg = callbackData.trackCount ? ` ${callbackData.trackCount} brani sincronizzati.` : "";
+        Alert.alert(
+          "Spotify Collegato!",
+          callbackData.displayName
+            ? `Benvenuto, ${callbackData.displayName}!${tracksMsg}`
+            : `Spotify collegato con successo!${tracksMsg}`
+        );
+      }
+    } catch (err) {
+      console.error("[Spotify connect]", err);
+      Alert.alert("Errore", (err as Error).message ?? "Impossibile connettersi a Spotify");
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [queryClient]);
+
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/spotify/disconnect", {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/spotify/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/spotify/tracks"] });
+    },
+    onError: (err: Error) => {
+      Alert.alert("Errore", err.message ?? "Impossibile disconnettere Spotify");
+    },
+  });
+
+  const handleDisconnect = useCallback(() => {
+    Alert.alert(
+      "Disconnetti Spotify",
+      "Rimuovere la connessione Spotify? I brani salvati verranno eliminati.",
+      [
+        { text: "Annulla", style: "cancel" },
+        { text: "Disconnetti", style: "destructive", onPress: () => disconnectMutation.mutate() },
+      ]
+    );
+  }, [disconnectMutation]);
+
   const toggleCriteria = useCallback((c: string) => {
     setMatchCriteria((prev) => {
       const next = prev.includes(c) ? (prev.length > 1 ? prev.filter((x) => x !== c) : prev) : [...prev, c];
@@ -232,9 +334,20 @@ export default function MusicScreen() {
           <Text style={styles.headerTitle}>Musica</Text>
         </View>
         <View style={styles.headerRight}>
-          <Text style={styles.headerCount}>
-            {tracksQuery.data ? `${tracksQuery.data.tracks.length} brani` : ""}
-          </Text>
+          {statusQuery.data?.connected && (
+            <>
+              <Text style={styles.headerCount}>
+                {tracksQuery.data ? `${tracksQuery.data.tracks.length} brani` : ""}
+              </Text>
+              <TouchableOpacity
+                onPress={handleDisconnect}
+                style={{ marginLeft: 10 }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="log-out-outline" size={20} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </View>
 
@@ -254,6 +367,9 @@ export default function MusicScreen() {
 
       {activeTab === "brani" && (
         <BraniTab
+          isConnected={statusQuery.isLoading ? null : (statusQuery.data?.connected ?? false)}
+          isConnecting={isConnecting}
+          onConnect={connectSpotify}
           searchInput={searchInput}
           onSearchChange={setSearchInput}
           debouncedQuery={debouncedQuery}
@@ -298,6 +414,9 @@ export default function MusicScreen() {
 }
 
 function BraniTab({
+  isConnected,
+  isConnecting,
+  onConnect,
   searchInput,
   onSearchChange,
   debouncedQuery,
@@ -312,6 +431,9 @@ function BraniTab({
   pendingAddId,
   pendingRemoveId,
 }: {
+  isConnected: boolean | null;
+  isConnecting: boolean;
+  onConnect: () => void;
   searchInput: string;
   onSearchChange: (v: string) => void;
   debouncedQuery: string;
@@ -326,6 +448,37 @@ function BraniTab({
   pendingAddId: string | null;
   pendingRemoveId: string | null;
 }) {
+  if (isConnected === null) {
+    return (
+      <View style={styles.connectContainer}>
+        <ActivityIndicator color={SPOTIFY_GREEN} size="large" />
+      </View>
+    );
+  }
+
+  if (!isConnected) {
+    return (
+      <View style={styles.connectContainer}>
+        <Ionicons name="musical-notes" size={52} color={SPOTIFY_GREEN} />
+        <Text style={styles.connectTitle}>Collega Spotify</Text>
+        <Text style={styles.connectDesc}>
+          Collega il tuo account Spotify per cercare brani e costruire il tuo profilo musicale con i bikers.
+        </Text>
+        <TouchableOpacity
+          style={[styles.connectBtn, isConnecting && styles.connectBtnDisabled]}
+          onPress={onConnect}
+          disabled={isConnecting}
+        >
+          {isConnecting ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.connectBtnText}>Connetti Spotify</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
       <View style={styles.searchBarWrapper}>
@@ -1138,5 +1291,42 @@ const styles = StyleSheet.create({
   },
   surfaceLight: {
     backgroundColor: Colors.surfaceLight,
+  },
+  connectContainer: {
+    flex: 1,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    paddingHorizontal: 36,
+    gap: 16,
+  },
+  connectTitle: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+    textAlign: "center" as const,
+  },
+  connectDesc: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center" as const,
+    lineHeight: 21,
+  },
+  connectBtn: {
+    marginTop: 8,
+    backgroundColor: SPOTIFY_GREEN,
+    paddingHorizontal: 36,
+    paddingVertical: 14,
+    borderRadius: 28,
+    minWidth: 200,
+    alignItems: "center" as const,
+  },
+  connectBtnDisabled: {
+    opacity: 0.6,
+  },
+  connectBtnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
   },
 });

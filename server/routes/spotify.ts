@@ -47,8 +47,23 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
   if (q.length < 2) {
     return res.status(400).json({ message: "Query troppo corta" });
   }
+  const userId = req.session.userId!;
   try {
-    const token = await getAppAccessToken();
+    // Check if user has a linked Spotify account
+    const [userTokenRow] = await db
+      .select({ userId: userSpotifyTokens.userId })
+      .from(userSpotifyTokens)
+      .where(eq(userSpotifyTokens.userId, userId))
+      .limit(1);
+
+    if (!userTokenRow) {
+      return res.status(401).json({
+        needsSpotifyAuth: true,
+        message: "Collega il tuo account Spotify per cercare brani.",
+      });
+    }
+
+    const token = await getValidAccessToken(userId);
     const searchUrl = new URL("https://api.spotify.com/v1/search");
     searchUrl.searchParams.set("q", q);
     searchUrl.searchParams.set("type", "track");
@@ -70,7 +85,7 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
       album: { name: string; images: Array<{ url: string; width?: number }> };
     }>;
 
-    // Batch-fetch artist genres (Client Credentials can call /v1/artists)
+    // Batch-fetch artist genres via user token (/v1/artists)
     const artistIds = [...new Set(items.map((item) => item.artists?.[0]?.id).filter(Boolean))] as string[];
     const genresByArtistId = new Map<string, string[]>();
     if (artistIds.length > 0) {
@@ -552,6 +567,24 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
     Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
+
+router.get("/auth-url", requireAuth, async (req: Request, res: Response) => {
+  if (!checkSpotifyConfig(res)) return;
+  const redirectUri = (req.query.redirectUri as string ?? "").trim();
+  if (!redirectUri) {
+    return res.status(400).json({ message: "redirectUri obbligatorio" });
+  }
+  const scopes = ["user-read-private", "user-read-email", "user-top-read"].join(" ");
+  const params = new URLSearchParams({
+    client_id: process.env.SPOTIFY_CLIENT_ID!,
+    response_type: "code",
+    redirect_uri: redirectUri,
+    scope: scopes,
+    show_dialog: "false",
+  });
+  const authUrl = `https://accounts.spotify.com/authorize?${params.toString()}`;
+  return res.json({ authUrl });
+});
 
 router.post("/callback", requireAuth, async (req: Request, res: Response) => {
   if (!checkSpotifyConfig(res)) return;
