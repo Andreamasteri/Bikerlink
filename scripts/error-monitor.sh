@@ -67,7 +67,11 @@ check_backend() {
 }
 
 # ── Check 2: Route Spotify produzione ────────────────────────────────────────
-# Eseguito ogni 10 cicli (~5 minuti) per non sovraccaricare la produzione.
+# Eseguito ogni 10 cicli (~5 minuti). SPOTIFY_ROUTE_OK è loggato solo al
+# cambio di stato o ogni 30 cicli (~15 min) per ridurre il rumore nei log.
+SPOTIFY_LAST_STATUS=""
+SPOTIFY_OK_CYCLES=0
+
 check_spotify_prod() {
   local http_code
   http_code=$(curl -s --max-time 8 --connect-timeout 5 \
@@ -75,13 +79,30 @@ check_spotify_prod() {
     "${PROD_HOST}/api/spotify/auth-url?redirectUri=monitor-check" 2>/dev/null)
 
   if [ "$http_code" = "404" ]; then
-    log "SPOTIFY_ROUTE_MISSING: GET ${PROD_HOST}/api/spotify/auth-url → 404 — backend produzione non aggiornato!"
+    SPOTIFY_OK_CYCLES=0
+    if [ "$SPOTIFY_LAST_STATUS" != "MISSING" ]; then
+      log "SPOTIFY_ROUTE_MISSING: GET ${PROD_HOST}/api/spotify/auth-url → 404 — backend produzione non aggiornato!"
+      SPOTIFY_LAST_STATUS="MISSING"
+    else
+      log "SPOTIFY_ROUTE_MISSING: ancora 404 (backend produzione non aggiornato)"
+    fi
   elif [ "$http_code" = "401" ] || [ "$http_code" = "400" ]; then
-    log "SPOTIFY_ROUTE_OK: GET ${PROD_HOST}/api/spotify/auth-url → $http_code (route presente)"
+    SPOTIFY_OK_CYCLES=$((SPOTIFY_OK_CYCLES + 1))
+    if [ "$SPOTIFY_LAST_STATUS" != "OK" ]; then
+      log "SPOTIFY_ROUTE_OK: GET ${PROD_HOST}/api/spotify/auth-url → $http_code (route presente — backend aggiornato!)"
+      SPOTIFY_LAST_STATUS="OK"
+    elif [ $((SPOTIFY_OK_CYCLES % 3)) -eq 0 ]; then
+      log "SPOTIFY_ROUTE_OK: $http_code (route presente, ciclo $SPOTIFY_OK_CYCLES)"
+    fi
   elif [ "$http_code" = "000" ] || [ -z "$http_code" ]; then
-    log "SPOTIFY_PROD_DOWN: produzione non raggiungibile (timeout/network)"
+    if [ "$SPOTIFY_LAST_STATUS" != "DOWN" ]; then
+      log "SPOTIFY_PROD_DOWN: produzione non raggiungibile (timeout/network)"
+      SPOTIFY_LAST_STATUS="DOWN"
+    fi
+    SPOTIFY_OK_CYCLES=0
   else
     log "SPOTIFY_ROUTE_WARN: GET ${PROD_HOST}/api/spotify/auth-url → $http_code (inatteso)"
+    SPOTIFY_OK_CYCLES=0
   fi
 }
 
