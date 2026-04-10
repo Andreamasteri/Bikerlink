@@ -3,6 +3,7 @@
 # Metro/frontend non più in uso (EAS build + OTA).
 
 BACKEND_PORT=5000
+PROD_HOST="https://biker-link.replit.app"
 LOG_FILE="logs/error-monitor.log"
 CHECK_INTERVAL=30
 LOG_MAX_LINES=2000
@@ -65,7 +66,26 @@ check_backend() {
   fi
 }
 
-# ── Check 2: Crash backend recenti ───────────────────────────────────────────
+# ── Check 2: Route Spotify produzione ────────────────────────────────────────
+# Eseguito ogni 10 cicli (~5 minuti) per non sovraccaricare la produzione.
+check_spotify_prod() {
+  local http_code
+  http_code=$(curl -s --max-time 8 --connect-timeout 5 \
+    -o /dev/null -w "%{http_code}" \
+    "${PROD_HOST}/api/spotify/auth-url?redirectUri=monitor-check" 2>/dev/null)
+
+  if [ "$http_code" = "404" ]; then
+    log "SPOTIFY_ROUTE_MISSING: GET ${PROD_HOST}/api/spotify/auth-url → 404 — backend produzione non aggiornato!"
+  elif [ "$http_code" = "401" ] || [ "$http_code" = "400" ]; then
+    log "SPOTIFY_ROUTE_OK: GET ${PROD_HOST}/api/spotify/auth-url → $http_code (route presente)"
+  elif [ "$http_code" = "000" ] || [ -z "$http_code" ]; then
+    log "SPOTIFY_PROD_DOWN: produzione non raggiungibile (timeout/network)"
+  else
+    log "SPOTIFY_ROUTE_WARN: GET ${PROD_HOST}/api/spotify/auth-url → $http_code (inatteso)"
+  fi
+}
+
+# ── Check 3: Crash backend recenti ───────────────────────────────────────────
 check_recent_crashes() {
   [ -f "logs/backend-crashes.log" ] || return 0
 
@@ -93,12 +113,15 @@ touch /tmp/em_last_crash_check 2>/dev/null
 log "============================================"
 log "ERROR MONITOR AVVIATO"
 log "  Backend port: $BACKEND_PORT"
+log "  Produzione:   $PROD_HOST"
 log "  Intervallo:   ${CHECK_INTERVAL}s"
 log "  Log:          $LOG_FILE"
 log "  Checks/ciclo: backend, backend-crashes"
+log "  Check Spotify produzione: ogni 10 cicli (~5 min)"
 log "============================================"
 
 run_all_checks
+check_spotify_prod
 
 CYCLE=0
 while true; do
@@ -106,6 +129,10 @@ while true; do
   CYCLE=$((CYCLE + 1))
 
   run_all_checks
+
+  if [ $((CYCLE % 10)) -eq 0 ]; then
+    check_spotify_prod
+  fi
 
   if [ $((CYCLE % 20)) -eq 0 ]; then
     rotate_log
