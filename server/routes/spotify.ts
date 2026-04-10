@@ -574,7 +574,6 @@ router.get("/auth-url", requireAuth, async (req: Request, res: Response) => {
   if (!redirectUri) {
     return res.status(400).json({ message: "redirectUri obbligatorio" });
   }
-  const crypto = await import("crypto");
   const state = crypto.randomBytes(16).toString("hex");
   req.session.spotifyOauthState = state;
   await new Promise<void>((resolve, reject) => req.session.save((err) => err ? reject(err) : resolve()));
