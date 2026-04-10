@@ -1017,7 +1017,7 @@
     ],
     "jsEngine": "metro",
     "message": "APK v9 — Ciclo OTA 4.0.0 — SDK 55 + Player Musicale (RNTP, radio, preview 30s, MiniPlayer)",
-    "note": "Nuovo APK: Expo SDK 55 (RN 0.83.4), react-native-track-player@4.1.2, expo-media-library. Player musicale completo: radio streaming (Radio Browser API), preview 30s iTunes, MiniPlayer barra persistente + modal fullscreen. Backend: /api/music/genres, /stations/:genre, /preview, /preview-playlist. versionCode 9. CURRENT_OTA_NUMBER=0 (nuovo ciclo — OTA-1 sarà la prima aggiornamento dopo il rilascio APK).",
+    "note": "Nuovo APK: Expo SDK 55 (RN 0.83.4), react-native-track-player@4.1.2, expo-media-library. Player musicale completo: radio streaming (Radio Browser API), preview 30s iTunes, MiniPlayer barra persistente + modal fullscreen. Backend: /api/music/genres, /stations/:genre, /preview, /preview-playlist. versionCode 9. CURRENT_OTA_NUMBER=0 (nuovo ciclo — OTA-1 sarà la prima aggiornamento dopo il rilascio APK). NOTA: build 3c8912cd fallita (commit 6a31aa8 — prima del code review fix). Nuova build avviata con commit 592bf13.",
     "releaseId": null,
     "bundleUrl": null,
     "updateGroupId": null,
@@ -1028,6 +1028,6 @@
     "apkBuildId": "3c8912cd-f86b-4614-8d19-28db652b1bfa",
     "apkVersionCode": 9,
     "apkUrl": null,
-    "status": "building"
+    "status": "errored"
   }
 ]
