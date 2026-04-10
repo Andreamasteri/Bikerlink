@@ -214,7 +214,7 @@ export default function MusicScreen() {
   const removeTrackMutation = useMutation({
     mutationFn: async (spotifyTrackId: string) => {
       setPendingRemoveId(spotifyTrackId);
-      const res = await apiRequest("DELETE", `${apiPrefix}/tracks/${spotifyTrackId}`, {});
+      const res = await apiRequest("DELETE", `${apiPrefix}/tracks/${encodeURIComponent(spotifyTrackId)}`, {});
       return res.json();
     },
     onSuccess: () => {

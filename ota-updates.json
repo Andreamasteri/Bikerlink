@@ -849,5 +849,28 @@
     "apkVersionCode": 8,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 13,
+    "cycle": "3.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-10",
+    "runtimeVersion": "3.0.0",
+    "platforms": ["android"],
+    "jsEngine": "metro",
+    "message": "OTA-13 rv3.0.0: fix encodeURIComponent delete track + seed music_provider + align schema lastfm sessions",
+    "note": "Task #481 fix code-review comments. encodeURIComponent su spotifyTrackId nel DELETE URL (per artisti tipo AC/DC con slash nel nome). Seed esplicito music_provider='lastfm' in startup. Allineamento SQL startup user_lastfm_sessions con schema.ts (user_id PK, session_key VARCHAR(500)). CURRENT_OTA_NUMBER=13.",
+    "releaseId": "7b86b827-d5cb-4ca0-9c27-3c8f8490b3d4",
+    "bundleUrl": "private/ota/ota-13-1775851525495.js",
+    "updateGroupId": "087d43ad-def1-4ccb-9108-f8885e100dc0",
+    "androidUpdateId": "019d7900-7248-72b3-b97a-198577764065",
+    "iosUpdateId": null,
+    "commitBase": null,
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/087d43ad-def1-4ccb-9108-f8885e100dc0",
+    "apkBuildId": "5da77f1c-4d34-44ea-9143-da247d8e85cc",
+    "apkVersionCode": 8,
+    "apkUrl": null,
+    "status": "published"
   }
 ]

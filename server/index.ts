@@ -697,15 +697,12 @@ function setupErrorHandler(app: express.Application) {
         try {
           await db.execute(sql`
             CREATE TABLE IF NOT EXISTS user_lastfm_sessions (
-              id SERIAL PRIMARY KEY,
-              user_id VARCHAR(36) NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-              session_key VARCHAR(200) NOT NULL,
-              lastfm_username VARCHAR(100) NOT NULL,
-              connected_at TIMESTAMP NOT NULL DEFAULT NOW(),
-              last_sync_at TIMESTAMP
+              user_id VARCHAR(36) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+              lastfm_username VARCHAR(200) NOT NULL,
+              session_key VARCHAR(500) NOT NULL,
+              connected_at TIMESTAMP NOT NULL DEFAULT NOW()
             )
           `);
-          await db.execute(sql`CREATE INDEX IF NOT EXISTS user_lastfm_sessions_user_idx ON user_lastfm_sessions (user_id)`);
         } catch (e) {
           console.warn("[MIGRATION] user_lastfm_sessions:", e);
         }
@@ -753,6 +750,8 @@ function setupErrorHandler(app: express.Application) {
           if (!showSearchPrefSetting) await storage.upsertAppSetting("show_search_preference", "false");
           const mapsUserChoiceSetting = await storage.getAppSetting("maps_user_choice_enabled");
           if (!mapsUserChoiceSetting) await storage.upsertAppSetting("maps_user_choice_enabled", "true");
+          const musicProviderSetting = await storage.getAppSetting("music_provider");
+          if (!musicProviderSetting) await storage.upsertAppSetting("music_provider", "lastfm");
         } catch (e) {
           console.warn("[SEED] splash settings:", e);
         }

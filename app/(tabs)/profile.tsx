@@ -135,7 +135,7 @@ export default function ProfileScreen() {
   const [isExportingData, setIsExportingData] = useState(false);
 
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-  const CURRENT_OTA_NUMBER = 12;
+  const CURRENT_OTA_NUMBER = 13;
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
