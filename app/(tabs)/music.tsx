@@ -13,8 +13,6 @@ import {
   Platform,
 } from "react-native";
 import * as WebBrowser from "expo-web-browser";
-import * as AuthSession from "expo-auth-session";
-import { makeRedirectUri } from "expo-auth-session";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,6 +22,13 @@ import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 
 WebBrowser.maybeCompleteAuthSession();
+
+function getSpotifyRedirectUri(): string {
+  if (Platform.OS === "web") {
+    return `${typeof window !== "undefined" ? window.location.origin : ""}/spotify-callback`;
+  }
+  return "bikerlink://spotify-callback";
+}
 
 const SPOTIFY_GREEN = "#1DB954";
 
@@ -231,10 +236,7 @@ export default function MusicScreen() {
     }
     setIsConnecting(true);
     try {
-      const redirectUri = makeRedirectUri({
-        scheme: "bikerlink",
-        path: "spotify-callback",
-      });
+      const redirectUri = getSpotifyRedirectUri();
 
       const urlObj = new URL("/api/spotify/auth-url", getApiUrl());
       urlObj.searchParams.set("redirectUri", redirectUri);
@@ -245,10 +247,13 @@ export default function MusicScreen() {
       }
       const { authUrl } = await resp.json() as { authUrl: string };
 
-      const result = await AuthSession.startAsync({ authUrl, returnUrl: redirectUri });
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
 
       if (result.type === "success") {
-        const { code, state, error: oauthError } = result.params as { code?: string; state?: string; error?: string };
+        const resultUrl = new URL(result.url);
+        const code = resultUrl.searchParams.get("code") ?? undefined;
+        const state = resultUrl.searchParams.get("state") ?? undefined;
+        const oauthError = resultUrl.searchParams.get("error") ?? undefined;
 
         if (oauthError) {
           Alert.alert(

@@ -779,5 +779,28 @@
     "apkVersionCode": 8,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 10,
+    "cycle": "3.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-10",
+    "runtimeVersion": "3.0.0",
+    "platforms": ["android"],
+    "jsEngine": "metro",
+    "message": "OTA-10 rv3.0.0: fix crash Music tab — rimosso expo-auth-session/expo-crypto (native, non in APK)",
+    "note": "Task #477. Causa crash: expo-auth-session@55 importa expo-crypto@55 che ha codice nativo (android/, ios/) non compilato nell'APK 5da77f1c. Fix: rimossi import expo-auth-session e makeRedirectUri; aggiunta funzione getSpotifyRedirectUri() locale ('bikerlink://spotify-callback' su native, window.location su web); AuthSession.startAsync sostituito con WebBrowser.openAuthSessionAsync + parsing manuale URL params (code, state, error). Backend invariato (state anti-CSRF rimane). Bundle: 1523 moduli (vs 1559 OTA-9). CURRENT_OTA_NUMBER=10.",
+    "releaseId": "a5e13ad6-ba94-4cf2-b1cd-dbb1df99e1e2",
+    "bundleUrl": "private/ota/ota-10.0.0-1775808329354.js",
+    "updateGroupId": "N/A",
+    "androidUpdateId": "N/A",
+    "iosUpdateId": null,
+    "commitBase": "873433e",
+    "easDashboard": null,
+    "apkBuildId": "5da77f1c-4d34-44ea-9143-da247d8e85cc",
+    "apkVersionCode": 8,
+    "apkUrl": null,
+    "status": "published"
   }
 ]
