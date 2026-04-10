@@ -219,11 +219,20 @@ else
   set -e
 
   if [ $EAS_EXIT -ne 0 ]; then
-    echo "   ⚠️  EAS update fallito (exit $EAS_EXIT) — custom backend rimane attivo."
-    echo "   Errore:"
-    tail -10 "$EAS_LOG" | sed 's/^/     /'
-    echo "   Eseguire manualmente: npx eas-cli@16 update --channel preview --message \"$RELEASE_NOTES\" --platform android"
-    EAS_STATUS="FALLITO — eseguire manualmente"
+    # Rileva specificamente timeout vs altri errori EAS
+    if grep -qiE "(timeout|timed out|ETIMEDOUT|ECONNRESET)" "$EAS_LOG" 2>/dev/null; then
+      echo "   ⚠️  EAS update andato in TIMEOUT (exit $EAS_EXIT) — il bundle custom è già attivo."
+      echo "   Il comando EAS ha impiegato troppo tempo e non ha completato."
+      echo "   Per completare la pubblicazione su EAS, eseguire manualmente:"
+      echo "     npx eas-cli@16 update --channel preview --message \"$RELEASE_NOTES\" --platform android"
+      EAS_STATUS="TIMEOUT — eseguire manualmente"
+    else
+      echo "   ⚠️  EAS update fallito (exit $EAS_EXIT) — custom backend rimane attivo."
+      echo "   Errore:"
+      tail -10 "$EAS_LOG" | sed 's/^/     /'
+      echo "   Eseguire manualmente: npx eas-cli@16 update --channel preview --message \"$RELEASE_NOTES\" --platform android"
+      EAS_STATUS="FALLITO — eseguire manualmente"
+    fi
   else
     set +e
     EAS_UPDATE_GROUP_ID=$(grep -o 'Update group ID[[:space:]]*[a-f0-9-]*' "$EAS_LOG" 2>/dev/null | awk '{print $NF}' | head -1 || true)
