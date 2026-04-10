@@ -700,6 +700,13 @@ export default function RegisterScreen() {
         </TouchableOpacity>
       </View>
 
+      {error ? (
+        <View style={styles.errorBanner}>
+          <Ionicons name="alert-circle" size={18} color={Colors.error} />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
+
       <View style={styles.inputWrapper}>
         <Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
         <TextInput
@@ -944,7 +951,7 @@ export default function RegisterScreen() {
 
         {renderStepIndicator()}
 
-        {error ? (
+        {error && step !== 3 ? (
           <View style={styles.errorBanner}>
             <Ionicons name="alert-circle" size={18} color={Colors.error} />
             <Text style={styles.errorText}>{error}</Text>
