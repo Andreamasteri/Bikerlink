@@ -141,9 +141,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/match/music", (req: Request, res: Response) => {
     if (!req.session?.userId) return res.status(401).json({ message: "Non autenticato" });
-    if (!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET)) {
-      return res.status(503).json({ message: "Spotify non configurato. Contatta l'amministratore." });
-    }
     return handleMusicMatch(req, res);
   });
 

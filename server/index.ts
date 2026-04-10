@@ -680,6 +680,36 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] messages.playlist_id:", e);
         }
 
+        try {
+          await db.execute(sql`ALTER TABLE user_music_tracks ADD COLUMN IF NOT EXISTS image_url TEXT`);
+        } catch (e) {
+          console.warn("[MIGRATION] user_music_tracks.image_url:", e);
+        }
+
+        try {
+          await db.execute(sql`ALTER TABLE user_music_tracks ADD COLUMN IF NOT EXISTS provider VARCHAR(20) NOT NULL DEFAULT 'spotify'`);
+          await db.execute(sql`DROP INDEX IF EXISTS user_track_uniq`);
+          await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS user_track_uniq ON user_music_tracks (user_id, spotify_track_id, provider)`);
+        } catch (e) {
+          console.warn("[MIGRATION] user_music_tracks.provider + unique index:", e);
+        }
+
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS user_lastfm_sessions (
+              id SERIAL PRIMARY KEY,
+              user_id VARCHAR(36) NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+              session_key VARCHAR(200) NOT NULL,
+              lastfm_username VARCHAR(100) NOT NULL,
+              connected_at TIMESTAMP NOT NULL DEFAULT NOW(),
+              last_sync_at TIMESTAMP
+            )
+          `);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS user_lastfm_sessions_user_idx ON user_lastfm_sessions (user_id)`);
+        } catch (e) {
+          console.warn("[MIGRATION] user_lastfm_sessions:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 

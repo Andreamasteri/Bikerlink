@@ -151,7 +151,7 @@ router.get("/tracks", requireAuth, async (req: Request, res: Response) => {
     const rows = await db
       .select()
       .from(userMusicTracks)
-      .where(eq(userMusicTracks.userId, userId))
+      .where(and(eq(userMusicTracks.userId, userId), eq(userMusicTracks.provider, "spotify")))
       .orderBy(sql`${userMusicTracks.addedAt} DESC`);
     return res.json({
       tracks: rows.map((t) => ({
@@ -203,9 +203,10 @@ router.post("/tracks", requireAuth, async (req: Request, res: Response) => {
         imageUrl: imageUrl ? imageUrl.slice(0, 500) : null,
         genres: safeGenres,
         popularity: popularity ?? 0,
+        provider: "spotify",
       })
       .onConflictDoUpdate({
-        target: [userMusicTracks.userId, userMusicTracks.spotifyTrackId],
+        target: [userMusicTracks.userId, userMusicTracks.spotifyTrackId, userMusicTracks.provider],
         set: {
           trackName: trackName.slice(0, 500),
           artistName: artistName.slice(0, 300),
@@ -232,7 +233,7 @@ router.delete("/tracks/:spotifyTrackId", requireAuth, async (req: Request, res: 
     const { spotifyTrackId } = req.params;
     await db
       .delete(userMusicTracks)
-      .where(and(eq(userMusicTracks.userId, userId), eq(userMusicTracks.spotifyTrackId, spotifyTrackId)));
+      .where(and(eq(userMusicTracks.userId, userId), eq(userMusicTracks.spotifyTrackId, spotifyTrackId), eq(userMusicTracks.provider, "spotify")));
     return res.json({ removed: true });
   } catch (error) {
     console.error("[Spotify] DELETE tracks error:", error);
@@ -461,9 +462,9 @@ async function syncSpotifyTracks(userId: string): Promise<number> {
     for (const track of tracksArray) {
       await db
         .insert(userMusicTracks)
-        .values({ userId, ...track })
+        .values({ userId, provider: "spotify", ...track })
         .onConflictDoUpdate({
-          target: [userMusicTracks.userId, userMusicTracks.spotifyTrackId],
+          target: [userMusicTracks.userId, userMusicTracks.spotifyTrackId, userMusicTracks.provider],
           set: {
             trackName: track.trackName,
             artistName: track.artistName,
@@ -483,7 +484,7 @@ async function syncSpotifyTracks(userId: string): Promise<number> {
   const [{ count }] = await db
     .select({ count: sql<number>`COUNT(*)` })
     .from(userMusicTracks)
-    .where(eq(userMusicTracks.userId, userId));
+    .where(and(eq(userMusicTracks.userId, userId), eq(userMusicTracks.provider, "spotify")));
 
   return Number(count);
 }
@@ -667,7 +668,7 @@ router.post("/disconnect", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
     await db.delete(userSpotifyTokens).where(eq(userSpotifyTokens.userId, userId));
-    await db.delete(userMusicTracks).where(eq(userMusicTracks.userId, userId));
+    await db.delete(userMusicTracks).where(and(eq(userMusicTracks.userId, userId), eq(userMusicTracks.provider, "spotify")));
     return res.json({ disconnected: true });
   } catch (error) {
     console.error("[Spotify] disconnect error:", error);
@@ -712,7 +713,7 @@ router.get("/status", requireAuth, async (req: Request, res: Response) => {
     const [{ count }] = await db
       .select({ count: sql<number>`COUNT(*)` })
       .from(userMusicTracks)
-      .where(eq(userMusicTracks.userId, userId));
+      .where(and(eq(userMusicTracks.userId, userId), eq(userMusicTracks.provider, "spotify")));
 
     return res.json({
       connected: true,
@@ -732,7 +733,7 @@ router.get("/my-tracks", requireAuth, async (req: Request, res: Response) => {
     const tracks = await db
       .select()
       .from(userMusicTracks)
-      .where(eq(userMusicTracks.userId, userId))
+      .where(and(eq(userMusicTracks.userId, userId), eq(userMusicTracks.provider, "spotify")))
       .orderBy(sql`popularity DESC`);
 
     const artistMap = new Map<string, { id: string; name: string; count: number }>();
@@ -776,7 +777,7 @@ router.post("/share-playlist", requireAuth, async (req: Request, res: Response) 
     const tracks = await db
       .select()
       .from(userMusicTracks)
-      .where(eq(userMusicTracks.userId, userId))
+      .where(and(eq(userMusicTracks.userId, userId), eq(userMusicTracks.provider, "spotify")))
       .orderBy(sql`popularity DESC`);
 
     if (tracks.length === 0) {
