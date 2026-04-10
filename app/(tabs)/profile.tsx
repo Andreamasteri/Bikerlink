@@ -135,7 +135,8 @@ export default function ProfileScreen() {
   const [isExportingData, setIsExportingData] = useState(false);
 
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-  const CURRENT_OTA_NUMBER = 15;
+  // Ciclo 4.0.0 — APK v9 — nessuna OTA pubblicata ancora
+  const CURRENT_OTA_NUMBER = 0;
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -1341,7 +1342,7 @@ export default function ProfileScreen() {
         </View>
         <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
           <Text style={styles.versionLabel}>Versione OTA</Text>
-          <Text style={styles.versionValue}>{`OTA-${CURRENT_OTA_NUMBER}`}</Text>
+          <Text style={styles.versionValue}>{CURRENT_OTA_NUMBER === 0 ? "APK embed (rv4.0.0)" : `OTA-${CURRENT_OTA_NUMBER}`}</Text>
         </View>
         <View style={{ flexDirection: "row", gap: 8 }}>
           <Text style={styles.versionLabel}>Commit EAS</Text>

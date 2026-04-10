@@ -7,7 +7,9 @@
     "message": "OTA-01: Test ciaociao — nuovo workflow",
     "publishedAt": "2026-04-01",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "note": "Task #379 — Prima OTA del nuovo ciclo con APK versionCode 4. Nuovo workflow: entry pre-popolata prima della pubblicazione. Bundle Hermes .hbc 3.61 MB (1514 modules).",
     "updateGroupId": "99d3613f-a7a8-494e-a8fc-7af955c39996",
@@ -27,7 +29,9 @@
     "message": "OTA-02: Manuale Aprile 2026 + fix campagne imageVersion + fix liste utenti + GPS periodico",
     "publishedAt": "2026-04-02",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "note": "Task #383-386 — Manuale Aprile 2026, fix imageVersion campagne, fix self-exclusion liste, fix distanza + GPS update ogni 5min.",
     "updateGroupId": "200787d6-eb5d-41b9-916c-df0e9f2c67d3",
@@ -47,7 +51,9 @@
     "message": "OTA-03: Fix campagne immagini Object Storage + banner ads indipendente da GPS",
     "publishedAt": "2026-04-06",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "note": "Task #398 — Fix downloadBuffer (Buffer.concat), nuove route /api/ads/images/:filename e /api/admin/ota/*, immagini campagne su Object Storage persistenti tra redeploy, decoupling banner ads da nearbyLoaded → mapReady.",
     "updateGroupId": "07fdd3c0-c820-4dc9-9ddb-0aa07856a86c",
@@ -67,7 +73,9 @@
     "message": "OTA-04: fix OtaStartupChecker (isUpdatePending) + foto profilo Object Storage",
     "publishedAt": "2026-04-06",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "note": "Task #399 — Fix bug OtaStartupChecker: rimossa guard su availableUpdate?.updateId (era null quando isUpdatePending=true), ora chiama reloadAsync() direttamente. Foto profilo migrate a Object Storage (public/photos/), endpoint /api/users/photos/:filename. Codice OTA bloccato dopo questo fix.",
     "updateGroupId": "1b68338c-6ba6-4256-99b7-77717e4be949",
@@ -87,7 +95,9 @@
     "message": "OTA-05: pulizia profilo + etichette IT + sezione Amici + nuova Chat UI",
     "publishedAt": "2026-04-07",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "note": "Task #402: header profilo pulito (email, OTA pill, badges rimossi). Task #403: etichette rinominate (Giri Affrontati, Km Macinati, Gemme Nascoste). Task #404: emoji ✌️ rimossa dai match accettati. Task #405: sezione Amici nella tab Chat (FlatList orizzontale). Task #406: titolo Chat rimosso, tasto Nuova Chat in corsivo, filtro A-Z/Distanza nel modal.",
     "updateGroupId": "a7cabcf1-9b11-41b9-ba4b-e16d5142e4fe",
@@ -106,7 +116,9 @@
     "platform": "android",
     "publishedAt": "2026-04-07",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-06: chat fix UI (label rossa, tasto sx, back Android)",
     "note": "Task #408: label email-notifica rinominata e colorata in rosso, tasto Nuova Chat spostato a sinistra, tasto fisico indietro Android chiude il modal Nuova conversazione (onRequestClose).",
@@ -126,7 +138,9 @@
     "platform": "android",
     "publishedAt": "2026-04-07",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-07: UI tweaks chat/profilo + pin Tu sulla mappa",
     "note": "Task #411: OTA number verde in profilo, label email rinominata/ingrandita, Nuova Chat centrato/bold/no-italic/più grande, spazio header ridotto. Task #412: pin utente corrente (Tu) sempre visibile sulla mappa.",
@@ -146,7 +160,9 @@
     "platform": "android",
     "publishedAt": "2026-04-07",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-08: Fix registrazione country NULL — derivato da prefisso telefonico",
     "note": "Task #413 (frontend): aggiunta mappa PHONE_PREFIX_TO_COUNTRY (32 prefissi) in register.tsx. Se l'utente non seleziona il paese in fase di registrazione, viene derivato automaticamente dal prefisso telefonico (+86→CN, +39→IT, ecc.) con fallback 'IT'. Previene country=NULL per nuovi utenti.",
@@ -166,7 +182,9 @@
     "platform": "android",
     "publishedAt": "2026-04-07",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-09: Residente in — country e regione nel profilo e nella mappa",
     "note": "Task #416: aggiunto label 'Residente in' con icona 📍 nel profilo personale (profile.tsx, sotto nickname), nel profilo di altri utenti (profile/[id].tsx, locationRow ora con prefisso), e nel modal dettaglio utente dalla mappa (index.tsx, dopo il tipo utente). Usa getCountryFlag/getCountryName da lib/countries-regions già esistente. Zero modifiche DB o backend.",
@@ -186,7 +204,9 @@
     "platform": "android",
     "publishedAt": "2026-04-07",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-10: Re-match stati selezionati + Residente in nei profili",
     "note": "Task #414 (merge): bottone re-match nella modalità 'stati selezionati' (match.tsx), guard AsyncStorage km-write solo se distanceMode=km. Task #416: Residente in country+regione nel profilo personale, profilo altrui, e modal mappa.",
@@ -208,7 +228,9 @@
     "platform": "android",
     "publishedAt": "2026-04-07",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-11: GPS al login — aggiorna lat/lng posizione in modo silenzioso",
     "note": "Task #415: login.tsx raccoglie GPS silenziosamente prima del mutate (Platform.OS !== web, Accuracy.Balanced). auth-context.tsx typing allineato lat/lng → latitude/longitude. Backend già aggiornato (schema+auth.ts+users.ts) via restart precedente.",
@@ -229,7 +251,9 @@
     "platform": "android",
     "publishedAt": "2026-04-08",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-12: OnlineTracker in-memory fix (login isAvailable da DB, ghost-mode sync, evict non-active)",
     "note": "Task #419. Eliminata dal canale EAS dopo blocco OTA-11.",
@@ -250,7 +274,9 @@
     "platform": "android",
     "publishedAt": "2026-04-08",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-13: Delay avvio check OTA (3s), pulsante manuale Controlla aggiornamenti nel profilo",
     "note": "Task #418. Eliminata dal canale EAS dopo blocco OTA-11.",
@@ -271,7 +297,9 @@
     "platform": "android",
     "publishedAt": "2026-04-08",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-14: GPS login + OnlineTracker + checker delay 3s + pulsante manuale profilo",
     "note": "Contiene tutto OTA-11/12/13. Pubblicato dopo eliminazione OTA-11/12/13 dal canale preview.",
@@ -292,7 +320,9 @@
     "platform": "android",
     "publishedAt": "2026-04-08",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-15: registro OTA-14 + commit ID sotto al numero OTA nel profilo",
     "note": "Fix: OTA-14 non era in ota-updates.json, causava mismatch updateId e mostrava OTA-11. Aggiunto campo commitBase sotto numero OTA nel profilo.",
@@ -313,7 +343,9 @@
     "platform": "android",
     "publishedAt": "2026-04-08",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-16: fix checker (static import) + updateId nel profilo + registro OTA-12/13",
     "note": "Fix principale: OtaStartupChecker usava dynamic import expo-updates che falliva silenziosamente. Sostituito con static import. Aggiunto Updates.updateId (eid:XXXXXXXX) nel profilo come ground truth.",
@@ -334,7 +366,9 @@
     "platform": "android",
     "publishedAt": "2026-04-08",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-17: test commit display + checker static import",
     "note": "OTA di test: nessuna modifica al codice. Verifica che il profilo mostri commit ID e eid corretti.",
@@ -355,7 +389,9 @@
     "platform": "android",
     "publishedAt": "2026-04-08",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-18: commit ID verde corpo 12 nel profilo",
     "note": "Commit ID nel profilo: colore verde (Colors.success), fontSize 12. L'eid rimane muted/10pt.",
@@ -376,7 +412,9 @@
     "platform": "android",
     "publishedAt": "2026-04-08",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-19: numero OTA blu nel profilo",
     "note": "Numero OTA in fondo al profilo: colore cambiato da verde a blu (Colors.primary). Fix pollo-e-uovo: CURRENT_OTA_NUMBER hardcoded nel bundle. Procedura: entry aggiunta PRIMA della pubblicazione.",
@@ -397,7 +435,9 @@
     "platform": "android",
     "publishedAt": "2026-04-08",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-20: rimosso pulsante cerca aggiornamenti dal profilo",
     "note": "Rimosso pulsante 'Controlla aggiornamenti' dal profilo utente (stato otaCheckState + handleCheckOtaUpdate). Aggiornamenti gestiti solo dallo startup checker automatico.",
@@ -418,7 +458,9 @@
     "platform": "android",
     "publishedAt": "2026-04-08",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-21: Chat UI (bordi arancioni Nuova Chat, label gialla), rimozione 'Residente in:', easter egg solo full map",
     "note": "Task #428. Chat: bordi arancioni sopra/sotto 'Nuova Chat' (borderTopWidth/BottomWidth:1 Colors.accent), label email-notif gialla (Colors.warning). 'Residente in:' rimosso da profile.tsx/[id].tsx/index.tsx (rimane icona+regione/paese). Easter egg nascosti sulla base map (easterEggs=[]), visibili solo aprendo la full map (Modal).",
@@ -439,7 +481,9 @@
     "platform": "android",
     "publishedAt": "2026-04-08",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-23: La mia privacy (nascondi mappa + fuzz + Fake Home Position) + fix mercatino + admin sistema",
     "note": "Task #430: Admin sezione Sistema, fix uptime widget, rimozione card Metro, riordino chip mappa. Task #431: 'La mia privacy' — toggle nascondi mappa + altera posizione (fuzz km). Task #432: dedup annunci mercatino (Set ID già visti). Task #433: fix placeholder ricerca club. Task #435: spostata sezione privacy dopo il Garage nel profilo. Task #434: Fake Home Position — quando si è vicini a casa, la posizione visibile viene sostituita con una fittizia (GPS/map picker, raggio km configurabile).",
@@ -460,7 +504,9 @@
     "platform": "android",
     "publishedAt": "2026-04-08",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-22: fix foto profilo sfondo nero (getApiUrl trailing slash) + fallback UI errore foto",
     "note": "Task #429. getApiUrl() restituiva trailing slash causando double-slash negli URL foto (/api/users/photos/...) → 404 → foto nera. Fix: .replace(/\\/$/, '') in lib/query-client.ts. UI: failedPhotos Set state + onError handler + placeholder image-outline nei profili (profile.tsx, edit.tsx, profile/[id].tsx). Reset failedPhotos su dataUpdatedAt per evitare placeholder permanenti dopo errori transitori.",
@@ -481,7 +527,9 @@
     "platform": "android",
     "publishedAt": "2026-04-08",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-24: Ritocchi UI privacy — marker RealMe/FakeMe mappa, fix input km, rename etichette",
     "note": "Task #436. Marker RealMe (verde) e FakeMe (arancione) sulla mappa quando Fake Home Position è attiva. Fix input km più largo (minWidth 64). Rinomina: 'Altera Precisione Posizione'→'Altera Posizione', 'Raggio:'→'Ampiezza raggio attivazione:', 'Sposta di:'→'Raggio d'incertezza:'.",
@@ -502,7 +550,9 @@
     "platform": "android",
     "publishedAt": "2026-04-08",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-25: Fix privacy persistence — error handling, GPS re-push, centratura km",
     "note": "Task #437. Fix bug critico: privacy settings (hideFromMap, positionFuzz, fakeHome) non persistevano perché PUT /api/users/me/privacy restituiva 404 sul backend di produzione (backend non aggiornato). Aggiunto onError che reverte i toggle e mostra Alert. Aggiunto re-push GPS automatico quando positionFuzz o fakeHome vengono attivati. Fix centratura verticale testo nei campi km (textAlignVertical: center, includeFontPadding: false, paddingVertical: 0).",
@@ -523,7 +573,9 @@
     "platform": "android",
     "publishedAt": "2026-04-09",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-28: aggiornamento onnicomprensivo Task #446-452 (Spotify fix, Match Music, diagnostica errori)",
     "note": "Aggiornamento unico che copre tutto il lavoro dal Task #446 al #452 (OTA-26 e OTA-27 erano state cancellate su EAS). Contenuto: Task #446 Spotify no-Premium fix + toggle admin In Arrivo; Task #447 Match Tab sezione Music + pulizia icone; Task #448 rinomina Stile Taskbar; Task #449 banner informativo Spotify; Task #450 filtro km e criteri match musicali; Task #452 SpotifyApiError diagnostica errori in italiano + syncMutation fix conteggio brani.",
@@ -544,7 +596,9 @@
     "platform": "android",
     "publishedAt": "2026-04-09",
     "runtimeVersion": "2.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-29: Fix OTA checker — errori loggati + retry al foreground",
     "note": "Task #455 — OtaStartupChecker refactored: catch silenzioso rimosso, aggiunto console.warn con messaggio errore, aggiunto AppState listener per retry automatico ogni 60s al ritorno in foreground. Diagnostica per capire perché OTA-28 non si applicava. CURRENT_OTA_NUMBER aggiornato 28→29.",
@@ -565,7 +619,9 @@
     "platform": "android",
     "publishedAt": "2026-04-09",
     "runtimeVersion": "3.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-1 rv3.0.0: selettore lingua welcome + fix Spotify client ID nel bundle + testo isNotConfigured",
     "note": "Task #459+#460. Selettore lingua (5 bandiere IT/EN/DE/ES/FR) aggiunto in welcome.tsx (sostituisce splash.tsx mai raggiunta). EXPO_PUBLIC_SPOTIFY_CLIENT_ID incluso nel bundle OTA — la tab Musica ora mostra 'Connetti Spotify' invece di 'Funzione in arrivo'. Testo stato isNotConfigured aggiornato: 'Aggiorna l'app'. eas.json aggiornato con EXPO_PUBLIC_SPOTIFY_CLIENT_ID per future build APK.",
@@ -586,7 +642,9 @@
     "platform": "android",
     "publishedAt": "2026-04-09",
     "runtimeVersion": "3.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-2 rv3.0.0: messaggio access_denied Spotify con istruzione contatto",
     "note": "Task #460. Messaggio access_denied aggiornato: aggiunta istruzione 'contattaci per essere aggiunto alla lista'. Era: 'solo gli utenti autorizzati possono collegare Spotify'. Ora: 'contattaci per essere aggiunto alla lista degli utenti autorizzati.'",
@@ -607,7 +665,9 @@
     "platform": "android",
     "publishedAt": "2026-04-09",
     "runtimeVersion": "3.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-3 rv3.0.0: fix commitBase PENDING nel registro OTA + CURRENT_OTA_NUMBER=3",
     "note": "Fix correttivo: OTA-1 era stata pubblicata con commitBase='PENDING' nel bundle, causando la scritta verde PENDING in fondo al profilo utente. Questa OTA-3 include i commitBase corretti per OTA-1/OTA-2/OTA-3 e aggiorna CURRENT_OTA_NUMBER a 3.",
@@ -628,7 +688,9 @@
     "platform": "android",
     "publishedAt": "2026-04-09",
     "runtimeVersion": "3.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "APK v8: prima build nativa con EXPO_PUBLIC_SPOTIFY_CLIENT_ID nel bundle",
     "note": "Task #460. Prima build APK del ciclo 3.x con EXPO_PUBLIC_SPOTIFY_CLIENT_ID incluso nell'env di build (eas.json preview). APK v7 già fixata via OTA-1/OTA-2. APK v8 garantisce che anche installazioni fresche (senza OTA) abbiano il client ID nel bundle nativo.",
@@ -649,7 +711,9 @@
     "platform": "android",
     "publishedAt": "2026-04-09",
     "runtimeVersion": "3.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "metro",
     "message": "OTA-4 rv3.0.0: Spotify Client Credentials — ricerca brani senza OAuth, libreria add/remove, matching engine aggiornato (v1 eliminata, v2 pulita)",
     "note": "Task #464+#472. Prima pubblicazione (8eee82b) eliminata da EAS e custom backend — bundle aveva commit hash errato. Ripubblicata il 2026-04-09 da Task #472 dal commit 7cedcc97 (HEAD con tutto il lavoro fino a Task #471 incluso). Bundle esportato con Metro 1520 moduli, 4.1 MB.",
@@ -672,7 +736,9 @@
     "platform": "android",
     "publishedAt": "2026-04-09",
     "runtimeVersion": "3.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "metro",
     "message": "OTA-5 rv3.0.0: fix display versioni profilo (Versione app/OTA/Commit EAS) — nessun trattino",
     "note": "Task #473. Fix: sostituito blocco versioni (3 Text inline) con layout verticale 3 righe etichetta+valore. Commit EAS ora usa Updates.updateId direttamente (non commitBase da ota-updates.json — inaffidabile). CURRENT_OTA_NUMBER portato a 5. Import Constants da expo-constants aggiunto.",
@@ -695,7 +761,9 @@
     "platform": "android",
     "publishedAt": "2026-04-09",
     "runtimeVersion": "3.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "metro",
     "message": "OTA-6 rv3.0.0: fix messaggio errore ricerca Spotify — propaga errore reale dal backend invece di generico",
     "note": "Task #474. Fix: backend search route usa mapSpotifyError per 403 (ritorna 422 + messaggio chiaro invece di 500 generico). Frontend queryFn legge JSON body dell'errore. BraniTab mostra messaggio reale. CURRENT_OTA_NUMBER portato a 6. Causa root: account Spotify developer senza Premium — Spotify blocca Client Credentials search con 403.",
@@ -718,7 +786,9 @@
     "platform": "android",
     "publishedAt": "2026-04-10",
     "runtimeVersion": "3.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "metro",
     "message": "OTA-7 rv3.0.0: login Spotify utente OAuth — ricerca usa token personale",
     "note": "Task #475. OAuth Authorization Code flow: GET /api/spotify/auth-url (backend), WebBrowser.openAuthSessionAsync, POST /api/spotify/callback. GET /search usa getValidAccessToken(userId) invece di getAppAccessToken(). BraniTab mostra connect UI quando non collegato. redirectUri: bikerlink://spotify-callback (aggiungere in Spotify Dev Dashboard). CURRENT_OTA_NUMBER=7.",
@@ -741,7 +811,9 @@
     "platform": "android",
     "publishedAt": "2026-04-10",
     "runtimeVersion": "3.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "metro",
     "message": "OTA-8 rv3.0.0: fix OAuth Spotify — makeRedirectUri + AuthSession.startAsync + CTA riconnetti",
     "note": "Task #475 fix code review. (1) expo-auth-session installato. (2) makeRedirectUri({scheme:'bikerlink',path:'spotify-callback'}) sostituisce SPOTIFY_REDIRECT_URI hardcoded. (3) AuthSession.startAsync({authUrl, returnUrl}) sostituisce WebBrowser.openAuthSessionAsync; result.params.code estratto automaticamente. (4) searchNeedsReconnect state: searchQuery detecta needsSpotifyAuth:true dal body 401 → mostra CTA 'Riconnetti Spotify' inline nella sezione Risultati. WebBrowser.maybeCompleteAuthSession() aggiunto. CURRENT_OTA_NUMBER=8.",
@@ -764,7 +836,9 @@
     "platform": "android",
     "publishedAt": "2026-04-10",
     "runtimeVersion": "3.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "metro",
     "message": "OTA-9 rv3.0.0: OAuth Spotify con state anti-CSRF — sicurezza rafforzata",
     "note": "Task #475 fix code review. (1) Backend /auth-url genera crypto.randomBytes(16) state, lo salva in req.session.spotifyOauthState e lo include nei params Spotify. (2) Backend /callback valida state === req.session.spotifyOauthState (400 se mancante/non coincide), poi cancella dallo store. (3) Frontend estrae result.params.state e lo invia a /callback. (4) Build fix: esbuild alias @shared/schema=./shared/schema aggiunto in start-backend.sh. CURRENT_OTA_NUMBER=9.",
@@ -787,7 +861,9 @@
     "platform": "android",
     "publishedAt": "2026-04-10",
     "runtimeVersion": "3.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "metro",
     "message": "OTA-10 rv3.0.0: fix crash Music tab — rimosso expo-auth-session/expo-crypto (native, non in APK)",
     "note": "Task #477. Causa crash: expo-auth-session@55 importa expo-crypto@55 che ha codice nativo (android/, ios/) non compilato nell'APK 5da77f1c. Fix: rimossi import expo-auth-session e makeRedirectUri; aggiunta funzione getSpotifyRedirectUri() locale ('bikerlink://spotify-callback' su native, window.location su web); AuthSession.startAsync sostituito con WebBrowser.openAuthSessionAsync + parsing manuale URL params (code, state, error). Backend invariato (state anti-CSRF rimane). Bundle: 1523 moduli (vs 1559 OTA-9). CURRENT_OTA_NUMBER=10.",
@@ -811,7 +887,9 @@
     "platform": "android",
     "publishedAt": "2026-04-10",
     "runtimeVersion": "3.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "metro",
     "message": "OTA-11 rv3.0.0: pubblicazione EAS fix crash Music tab (OTA-10 replica)",
     "note": "Task #478. OTA-10 non aveva raggiunto EAS (step 7 publish-ota.sh andò in timeout). Questa OTA-11 pubblica lo stesso codice di OTA-10 (rimossi expo-auth-session/expo-crypto, WebBrowser.openAuthSessionAsync) completando la pubblicazione su EAS. CURRENT_OTA_NUMBER=11.",
@@ -834,7 +912,9 @@
     "platform": "android",
     "publishedAt": "2026-04-10",
     "runtimeVersion": "3.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "metro",
     "message": "OTA-12 rv3.0.0: integrazione Last.fm + switch provider admin + accordion profilo",
     "note": "Task #481/#482. Integrazione Last.fm come provider musicale alternativo a Spotify. Aggiunta tabella user_lastfm_sessions, colonna provider in user_music_tracks. Admin toggle music_provider (lastfm/spotify). Frontend music.tsx adattato a entrambi i provider. Accordion collassabile per 'Stile Mappa' e 'Documentazione' nel profilo. CURRENT_OTA_NUMBER=12.",
@@ -857,7 +937,9 @@
     "platform": "android",
     "publishedAt": "2026-04-10",
     "runtimeVersion": "3.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "metro",
     "message": "OTA-13 rv3.0.0: fix encodeURIComponent delete track + seed music_provider + align schema lastfm sessions",
     "note": "Task #481 fix code-review comments. encodeURIComponent su spotifyTrackId nel DELETE URL (per artisti tipo AC/DC con slash nel nome). Seed esplicito music_provider='lastfm' in startup. Allineamento SQL startup user_lastfm_sessions con schema.ts (user_id PK, session_key VARCHAR(500)). CURRENT_OTA_NUMBER=13.",
@@ -880,7 +962,9 @@
     "platform": "android",
     "publishedAt": "2026-04-10",
     "runtimeVersion": "3.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "metro",
     "message": "OTA-14 rv3.0.0: fix Last.fm OAuth Android (token-first) + errore reg step3 tra campi password",
     "note": "Task #485+#483. Fix Last.fm OAuth su Android: requestToken salvato prima di aprire browser, dopo chiusura (qualunque result.type) tentato sempre lo scambio token — funziona anche quando intentFilters non include lastfm-callback. Annullamento silenzioso (nessun Alert). Task #483: banner errore registrazione step3 spostato tra Password e Conferma Password. CURRENT_OTA_NUMBER=14.",
@@ -903,7 +987,9 @@
     "platform": "android",
     "publishedAt": "2026-04-10",
     "runtimeVersion": "3.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "metro",
     "message": "OTA-15 rv3.0.0: fix stelle placeholder Last.fm + link Apri su Last.fm",
     "note": "Task #487. Fix imageUrl Last.fm: filtra URL placeholder 2a96cbd8b46e442fc41c2b86b821562f nel backend (syncLastfmTracks + search tracks). Brani senza cover mostrano icona musical-note locale. onError fallback su Image in SearchTrackRow e LibraryTrackRow. Aggiunto link open-outline 'Apri su Last.fm' in entrambi i componenti. CURRENT_OTA_NUMBER=15.",
@@ -918,5 +1004,30 @@
     "apkVersionCode": 8,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 0,
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-10",
+    "runtimeVersion": "4.0.0",
+    "platforms": [
+      "android"
+    ],
+    "jsEngine": "metro",
+    "message": "APK v9 — Ciclo OTA 4.0.0 — SDK 55 + Player Musicale (RNTP, radio, preview 30s, MiniPlayer)",
+    "note": "Nuovo APK: Expo SDK 55 (RN 0.83.4), react-native-track-player@4.1.2, expo-media-library. Player musicale completo: radio streaming (Radio Browser API), preview 30s iTunes, MiniPlayer barra persistente + modal fullscreen. Backend: /api/music/genres, /stations/:genre, /preview, /preview-playlist. versionCode 9. CURRENT_OTA_NUMBER=0 (nuovo ciclo — OTA-1 sarà la prima aggiornamento dopo il rilascio APK).",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "6a31aa806520aaeb2a90e916a28c520669be52ae",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/3c8912cd-f86b-4614-8d19-28db652b1bfa",
+    "apkBuildId": "3c8912cd-f86b-4614-8d19-28db652b1bfa",
+    "apkVersionCode": 9,
+    "apkUrl": null,
+    "status": "building"
   }
 ]
