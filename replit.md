@@ -1,7 +1,7 @@
 # BikerLink
 
 ## Overview
-BikerLink is a React Native (Expo SDK 54) mobile application designed to connect motorcyclists ("biker") and passengers ("zavorrine") across Italy, with a vision to expand Pan-European. The application aims to foster a community for motorcycle enthusiasts, enabling them to find riding partners, organize group rides, and share experiences. The tagline, "U'll never ride alone," encapsulates its core mission. Sponsored by Syneco Lubrificanti, BikerLink also integrates advertising and services relevant to its user base, such as Syneco workshops. The project seeks to create a dynamic platform for the motorcycle community, offering interactive maps, social features, and essential tools for riders.
+BikerLink is a React Native (Expo SDK 55) mobile application designed to connect motorcyclists ("biker") and passengers ("zavorrine") across Italy, with a vision to expand Pan-European. The application aims to foster a community for motorcycle enthusiasts, enabling them to find riding partners, organize group rides, and share experiences. The tagline, "U'll never ride alone," encapsulates its core mission. Sponsored by Syneco Lubrificanti, BikerLink also integrates advertising and services relevant to its user base, such as Syneco workshops. The project seeks to create a dynamic platform for the motorcycle community, offering interactive maps, social features, and essential tools for riders.
 
 ## User Preferences
 I prefer detailed explanations and iterative development. Ask before making major changes. Do not make changes to folder `node_modules`. Do not make changes to file `package-lock.json`.
@@ -10,7 +10,7 @@ I prefer detailed explanations and iterative development. Ask before making majo
 BikerLink utilizes a modern full-stack architecture.
 
 **Frontend:**
-- Developed with Expo SDK 54 and React Native for cross-platform compatibility.
+- Developed with Expo SDK 55 (React Native 0.83.4) for cross-platform compatibility.
 - Navigation is handled by Expo Router, leveraging file-based routing.
 - State management relies on `@tanstack/react-query` for data fetching and caching, complemented by React Context for global state.
 - Internationalization supports 5 languages (IT/EN/DE/ES/FR) via `lib/i18n.ts` and `lib/language-context.tsx`.
@@ -53,6 +53,7 @@ BikerLink utilizes a modern full-stack architecture.
 - **Advertisement System**: Targeted ad delivery.
 - **User Types**: Biker, Zavorrina/Zavorrino, Coppia with distinct functionalities.
 - **Multilingual Support**: IT, EN, DE, ES, FR.
+- **Player Musicale in-app** (SDK 55 cycle): `lib/player-context.tsx` (PlayerProvider con RNTP graceful degradation per Expo Go/web, sleep timer, preferiti AsyncStorage). `components/MiniPlayer.tsx` (barra persistente + modal fullscreen con griglia generi radio). Backend: `server/routes/radio.ts` — `/api/music/genres`, `/stations/:genre` (Radio Browser API), `/preview` + `/preview-playlist` (iTunes Search API), `/suggested-genres`. Pulsante anteprima 30s nelle SharedPlaylistCard in music.tsx. `react-native-track-player@4.1.2` + `expo-media-library`. UIBackgroundModes["audio"] e permessi READ_MEDIA_AUDIO/FOREGROUND_SERVICE in app.json.
 - **Spotify Music Integration** (Task #440/#441): OAuth connection to Spotify, syncs user's top tracks and recently played songs. Music Match feature finds bikers with common music taste. Playlist sharing via chat messages. Backend: `server/routes/spotify.ts` (9 endpoints: callback, disconnect, sync, status, my-tracks, share-playlist, shared-playlists, merge-playlist, match/music). DB tables: `user_spotify_tokens` (AES-256-CBC encrypted tokens), `user_music_tracks`, `shared_playlists`. messages table has new `playlist_id` column. Requires Secrets: `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`. Redirect URIs to register: `bikerlink://spotify-callback` and `https://biker-link.replit.app/api/spotify/callback`.
 
 **Deployment & Operations:**
@@ -73,7 +74,9 @@ Seed script: `npx tsx server/seed.ts` (idempotente, salta utenti esistenti).
 Il seed imposta `emailVerified: true` per tutti gli utenti creati.
 
 ## External Dependencies
-- **Expo SDK 54**: Core framework for React Native development.
+- **Expo SDK 55** (React Native 0.83.4): Core framework for React Native development.
+- **react-native-track-player@4.1.2**: Audio playback (radio streaming, MP3) con background playback.
+- **expo-media-library**: Accesso alla libreria musicale del dispositivo.
 - **React Native**: Frontend UI framework.
 - **Express 5**: Backend web application framework.
 - **TypeScript**: Superset of JavaScript for type safety.
@@ -102,6 +105,6 @@ Procedura:
 Lo script blocca l'esecuzione se `.local/apk-build-authorized` non esiste, logga ogni build in `logs/apk-build-history.log`, e richiede un nuovo token per ogni build successiva.
 
 ## Dev vs Production JS Engine (Android)
-- **Sviluppo (Expo Go)**: `app.json` → `expo.android.jsEngine: "jsc"` — Metro serve JS normale senza bytecode Hermes, evitando OOM durante la compilazione.
-- **Build EAS** (preview/production): `eas.json` → `android.jsEngine: "hermes"` — sovrascrive il valore di app.json; le APK/AAB di produzione usano Hermes come da progetto originale.
-- Non modificare questa configurazione per evitare crash Metro al 68% su Expo Go Android.
+- **SDK 55**: Il campo `jsEngine` è stato rimosso da `app.json` (la configurazione è ora automatica).
+- **Build EAS** (preview/production): `eas.json` → `android.jsEngine: "hermes"` — le APK/AAB usano Hermes.
+- **Expo Go**: Metro gestisce automaticamente il bundling senza bisogno di configurazione esplicita jsEngine.
