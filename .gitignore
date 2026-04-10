@@ -49,6 +49,9 @@ logs/
 # Static build (generated artifacts — non includere nel repo)
 static-build/
 
+# OTA build artifacts (rimossi da cleanup trap in publish-ota.sh)
+dist-ota/
+
 # Compiled server
 server_dist/
 server_dist/index.js
