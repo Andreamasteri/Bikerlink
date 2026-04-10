@@ -13,6 +13,8 @@ import {
   Platform,
 } from "react-native";
 import * as WebBrowser from "expo-web-browser";
+import * as AuthSession from "expo-auth-session";
+import { makeRedirectUri } from "expo-auth-session";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,8 +23,9 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 
+WebBrowser.maybeCompleteAuthSession();
+
 const SPOTIFY_GREEN = "#1DB954";
-const SPOTIFY_REDIRECT_URI = "bikerlink://spotify-callback";
 
 type Tab = "brani" | "match" | "ricevute";
 
@@ -92,6 +95,7 @@ export default function MusicScreen() {
   const [pendingAddId, setPendingAddId] = useState<string | null>(null);
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [searchNeedsReconnect, setSearchNeedsReconnect] = useState(false);
 
   const statusQuery = useQuery<{ connected: boolean; displayName?: string; trackCount: number }>({
     queryKey: ["/api/spotify/status"],
@@ -118,7 +122,10 @@ export default function MusicScreen() {
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(searchInput.trim()), 400);
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchInput.trim());
+      setSearchNeedsReconnect(false);
+    }, 400);
     return () => clearTimeout(timer);
   }, [searchInput]);
 
@@ -130,12 +137,18 @@ export default function MusicScreen() {
       const res = await fetch(url.toString(), { credentials: "include" });
       if (!res.ok) {
         let msg = `${res.status}`;
+        let needsAuth = false;
         try {
           const body = await res.json();
           if (typeof body.message === "string") msg = body.message;
+          if (body.needsSpotifyAuth === true) needsAuth = true;
         } catch {}
+        if (needsAuth) {
+          setSearchNeedsReconnect(true);
+        }
         throw new Error(msg);
       }
+      setSearchNeedsReconnect(false);
       return res.json();
     },
     enabled: debouncedQuery.length >= 2 && activeTab === "brani" && statusQuery.data?.connected === true,
@@ -218,8 +231,13 @@ export default function MusicScreen() {
     }
     setIsConnecting(true);
     try {
+      const redirectUri = makeRedirectUri({
+        scheme: "bikerlink",
+        path: "spotify-callback",
+      });
+
       const urlObj = new URL("/api/spotify/auth-url", getApiUrl());
-      urlObj.searchParams.set("redirectUri", SPOTIFY_REDIRECT_URI);
+      urlObj.searchParams.set("redirectUri", redirectUri);
       const resp = await fetch(urlObj.toString(), { credentials: "include" });
       if (!resp.ok) {
         const body = await resp.json().catch(() => ({})) as { message?: string };
@@ -227,14 +245,10 @@ export default function MusicScreen() {
       }
       const { authUrl } = await resp.json() as { authUrl: string };
 
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, SPOTIFY_REDIRECT_URI);
+      const result = await AuthSession.startAsync({ authUrl, returnUrl: redirectUri });
 
       if (result.type === "success") {
-        const redirectUrl = result.url;
-        const codeMatch = redirectUrl.match(/[?&]code=([^&]+)/);
-        const errorMatch = redirectUrl.match(/[?&]error=([^&]+)/);
-        const code = codeMatch ? decodeURIComponent(codeMatch[1]) : null;
-        const oauthError = errorMatch ? decodeURIComponent(errorMatch[1]) : null;
+        const { code, error: oauthError } = result.params as { code?: string; error?: string };
 
         if (oauthError) {
           Alert.alert(
@@ -252,7 +266,7 @@ export default function MusicScreen() {
 
         const callbackResp = await apiRequest("POST", "/api/spotify/callback", {
           code,
-          redirectUri: SPOTIFY_REDIRECT_URI,
+          redirectUri,
         });
         const callbackData = await callbackResp.json() as { connected?: boolean; displayName?: string | null; trackCount?: number; message?: string };
 
@@ -261,6 +275,7 @@ export default function MusicScreen() {
           return;
         }
 
+        setSearchNeedsReconnect(false);
         queryClient.invalidateQueries({ queryKey: ["/api/spotify/status"] });
         queryClient.invalidateQueries({ queryKey: ["/api/spotify/tracks"] });
 
@@ -370,12 +385,13 @@ export default function MusicScreen() {
           isConnected={statusQuery.isLoading ? null : (statusQuery.data?.connected ?? false)}
           isConnecting={isConnecting}
           onConnect={connectSpotify}
+          searchNeedsReconnect={searchNeedsReconnect}
           searchInput={searchInput}
           onSearchChange={setSearchInput}
           debouncedQuery={debouncedQuery}
           searchResults={searchQuery.data?.tracks ?? []}
           searchLoading={searchQuery.isLoading}
-          searchError={searchQuery.isError ? ((searchQuery.error?.message && searchQuery.error.message.length > 5) ? searchQuery.error.message : "Errore nella ricerca. Riprova.") : null}
+          searchError={searchQuery.isError && !searchNeedsReconnect ? ((searchQuery.error?.message && searchQuery.error.message.length > 5) ? searchQuery.error.message : "Errore nella ricerca. Riprova.") : null}
           library={tracksQuery.data?.tracks ?? []}
           libraryLoading={tracksQuery.isLoading}
           savedIds={savedIds}
@@ -417,6 +433,7 @@ function BraniTab({
   isConnected,
   isConnecting,
   onConnect,
+  searchNeedsReconnect,
   searchInput,
   onSearchChange,
   debouncedQuery,
@@ -434,6 +451,7 @@ function BraniTab({
   isConnected: boolean | null;
   isConnecting: boolean;
   onConnect: () => void;
+  searchNeedsReconnect: boolean;
   searchInput: string;
   onSearchChange: (v: string) => void;
   debouncedQuery: string;
@@ -506,6 +524,22 @@ function BraniTab({
           <Text style={styles.sectionTitle}>Risultati di ricerca</Text>
           {searchLoading ? (
             <ActivityIndicator color={Colors.accent} style={{ marginVertical: 20 }} />
+          ) : searchNeedsReconnect ? (
+            <View style={styles.reconnectBox}>
+              <Ionicons name="musical-notes" size={32} color={SPOTIFY_GREEN} style={{ marginBottom: 8 }} />
+              <Text style={styles.reconnectText}>La sessione Spotify è scaduta.</Text>
+              <TouchableOpacity
+                style={[styles.connectBtn, { marginTop: 12 }]}
+                onPress={onConnect}
+                disabled={isConnecting}
+              >
+                {isConnecting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.connectBtnText}>Riconnetti Spotify</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           ) : searchError !== null ? (
             <Text style={styles.emptyText}>{searchError}</Text>
           ) : searchResults.length === 0 ? (
@@ -1328,5 +1362,16 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
+  },
+  reconnectBox: {
+    alignItems: "center" as const,
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+  },
+  reconnectText: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center" as const,
   },
 });

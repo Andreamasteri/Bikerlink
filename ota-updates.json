@@ -733,5 +733,28 @@
     "apkVersionCode": 8,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 8,
+    "cycle": "3.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-10",
+    "runtimeVersion": "3.0.0",
+    "platforms": ["android"],
+    "jsEngine": "metro",
+    "message": "OTA-8 rv3.0.0: fix OAuth Spotify — makeRedirectUri + AuthSession.startAsync + CTA riconnetti",
+    "note": "Task #475 fix code review. (1) expo-auth-session installato. (2) makeRedirectUri({scheme:'bikerlink',path:'spotify-callback'}) sostituisce SPOTIFY_REDIRECT_URI hardcoded. (3) AuthSession.startAsync({authUrl, returnUrl}) sostituisce WebBrowser.openAuthSessionAsync; result.params.code estratto automaticamente. (4) searchNeedsReconnect state: searchQuery detecta needsSpotifyAuth:true dal body 401 → mostra CTA 'Riconnetti Spotify' inline nella sezione Risultati. WebBrowser.maybeCompleteAuthSession() aggiunto. CURRENT_OTA_NUMBER=8.",
+    "releaseId": "5effeba8-0dd5-403f-a179-3ab35a9cf4fc",
+    "bundleUrl": "private/ota/ota-8.0.0-1775780704663.js",
+    "updateGroupId": "cfffea4b-b748-48b5-add4-de37f118fb2c",
+    "androidUpdateId": "019d74c8-184e-76a6-b6b8-44f418f992c3",
+    "iosUpdateId": null,
+    "commitBase": "ca74c0b6cb360b598d0617d16666981fbbc416d1",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/cfffea4b-b748-48b5-add4-de37f118fb2c",
+    "apkBuildId": "5da77f1c-4d34-44ea-9143-da247d8e85cc",
+    "apkVersionCode": 8,
+    "apkUrl": null,
+    "status": "published"
   }
 ]
