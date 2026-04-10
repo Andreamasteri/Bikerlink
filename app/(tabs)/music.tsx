@@ -325,22 +325,11 @@ export default function MusicScreen() {
         const body = await resp.json().catch(() => ({})) as { message?: string };
         throw new Error(body.message ?? "Errore nell'avvio della connessione Last.fm");
       }
-      const { authUrl } = await resp.json() as { authUrl: string; token: string };
-      const redirectUri = "bikerlink://lastfm-callback";
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
-      if (result.type === "success") {
-        const resultUrl = new URL(result.url);
-        const token = resultUrl.searchParams.get("token") ?? undefined;
-        if (!token) {
-          Alert.alert("Errore", "Token Last.fm mancante. Riprova.");
-          return;
-        }
-        const callbackResp = await apiRequest("POST", "/api/lastfm/callback", { token });
-        const callbackData = await callbackResp.json() as { connected?: boolean; username?: string; trackCount?: number; message?: string };
-        if (!callbackResp.ok) {
-          Alert.alert("Errore", callbackData.message ?? "Errore durante la connessione Last.fm");
-          return;
-        }
+      const { authUrl, token: requestToken } = await resp.json() as { authUrl: string; token: string };
+      await WebBrowser.openAuthSessionAsync(authUrl, "bikerlink://lastfm-callback");
+      const callbackResp = await apiRequest("POST", "/api/lastfm/callback", { token: requestToken });
+      const callbackData = await callbackResp.json() as { connected?: boolean; username?: string; trackCount?: number; message?: string };
+      if (callbackResp.ok && callbackData.connected) {
         queryClient.invalidateQueries({ queryKey: ["/api/lastfm/status"] });
         queryClient.invalidateQueries({ queryKey: ["/api/lastfm/tracks"] });
         const tracksMsg = callbackData.trackCount ? ` ${callbackData.trackCount} brani sincronizzati.` : "";
@@ -350,6 +339,12 @@ export default function MusicScreen() {
             ? `Benvenuto, ${callbackData.username}!${tracksMsg}`
             : `Last.fm collegato con successo!${tracksMsg}`
         );
+      } else if (callbackResp.ok === false) {
+        const msg = callbackData.message ?? "";
+        const isCancelled = msg.toLowerCase().includes("autorizzaz") || msg.toLowerCase().includes("not been authorized");
+        if (!isCancelled) {
+          Alert.alert("Errore", msg || "Errore durante la connessione Last.fm");
+        }
       }
     } catch (err) {
       console.error("[Last.fm connect]", err);

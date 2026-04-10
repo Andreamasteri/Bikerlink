@@ -872,5 +872,28 @@
     "apkVersionCode": 8,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 14,
+    "cycle": "3.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-10",
+    "runtimeVersion": "3.0.0",
+    "platforms": ["android"],
+    "jsEngine": "metro",
+    "message": "OTA-14 rv3.0.0: fix Last.fm OAuth Android (token-first) + errore reg step3 tra campi password",
+    "note": "Task #485+#483. Fix Last.fm OAuth su Android: requestToken salvato prima di aprire browser, dopo chiusura (qualunque result.type) tentato sempre lo scambio token — funziona anche quando intentFilters non include lastfm-callback. Annullamento silenzioso (nessun Alert). Task #483: banner errore registrazione step3 spostato tra Password e Conferma Password. CURRENT_OTA_NUMBER=14.",
+    "releaseId": "925449b5-6eea-4159-8acb-e5f8d0abc3dc",
+    "bundleUrl": "private/ota/ota-3.0.0-1775857088140.js",
+    "updateGroupId": "8eeb1440-4977-4a2d-a345-759fc7885619",
+    "androidUpdateId": "019d7958-df87-73b5-9f31-9984948ec727",
+    "iosUpdateId": null,
+    "commitBase": "5fb42ffea4011c1feaf51205acf4587f568ddc56",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/8eeb1440-4977-4a2d-a345-759fc7885619",
+    "apkBuildId": "5da77f1c-4d34-44ea-9143-da247d8e85cc",
+    "apkVersionCode": 8,
+    "apkUrl": null,
+    "status": "published"
   }
 ]
