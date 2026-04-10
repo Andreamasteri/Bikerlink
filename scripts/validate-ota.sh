@@ -135,7 +135,7 @@ COMMITBASE_CHECK=$(node -e "
   const cb = latest.commitBase;
   if (cb === null || cb === undefined) { console.log('NULL'); }
   else if (cb === '' || cb === 'PENDING' || cb === 'N/A') { console.log('INVALID:' + JSON.stringify(cb)); }
-  else if (/^[0-9a-fA-F]{7,}$/.test(String(cb))) { console.log('OK:' + cb.substring(0,12)); }
+  else if (/^[0-9a-fA-F]{7,40}$/.test(String(cb))) { console.log('OK:' + cb.substring(0,12)); }
   else { console.log('INVALID:' + JSON.stringify(cb)); }
 " 2>/dev/null || echo "ERROR")
 
