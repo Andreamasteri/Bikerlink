@@ -248,7 +248,7 @@ export default function MusicScreen() {
       const result = await AuthSession.startAsync({ authUrl, returnUrl: redirectUri });
 
       if (result.type === "success") {
-        const { code, error: oauthError } = result.params as { code?: string; error?: string };
+        const { code, state, error: oauthError } = result.params as { code?: string; state?: string; error?: string };
 
         if (oauthError) {
           Alert.alert(
@@ -267,6 +267,7 @@ export default function MusicScreen() {
         const callbackResp = await apiRequest("POST", "/api/spotify/callback", {
           code,
           redirectUri,
+          state,
         });
         const callbackData = await callbackResp.json() as { connected?: boolean; displayName?: string | null; trackCount?: number; message?: string };
 

@@ -11,6 +11,7 @@ import { onlineTracker } from "../online-tracker";
 declare module "express-session" {
   interface SessionData {
     userId?: string;
+    spotifyOauthState?: string;
   }
 }
 

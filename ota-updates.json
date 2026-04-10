@@ -756,5 +756,28 @@
     "apkVersionCode": 8,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 9,
+    "cycle": "3.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-10",
+    "runtimeVersion": "3.0.0",
+    "platforms": ["android"],
+    "jsEngine": "metro",
+    "message": "OTA-9 rv3.0.0: OAuth Spotify con state anti-CSRF — sicurezza rafforzata",
+    "note": "Task #475 fix code review. (1) Backend /auth-url genera crypto.randomBytes(16) state, lo salva in req.session.spotifyOauthState e lo include nei params Spotify. (2) Backend /callback valida state === req.session.spotifyOauthState (400 se mancante/non coincide), poi cancella dallo store. (3) Frontend estrae result.params.state e lo invia a /callback. (4) Build fix: esbuild alias @shared/schema=./shared/schema aggiunto in start-backend.sh. CURRENT_OTA_NUMBER=9.",
+    "releaseId": "ab300f14-8156-4b7a-b1b0-30bed327ba7a",
+    "bundleUrl": "private/ota/ota-9.0.0-1775782303769.js",
+    "updateGroupId": "8682f3bd-03f2-465d-be06-e2430c712c44",
+    "androidUpdateId": "019d74e0-30e8-7821-bddc-23ec4ee7358f",
+    "iosUpdateId": null,
+    "commitBase": "e495493",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/8682f3bd-03f2-465d-be06-e2430c712c44",
+    "apkBuildId": "5da77f1c-4d34-44ea-9143-da247d8e85cc",
+    "apkVersionCode": 8,
+    "apkUrl": null,
+    "status": "published"
   }
 ]

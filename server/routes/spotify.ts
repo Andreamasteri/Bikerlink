@@ -574,12 +574,17 @@ router.get("/auth-url", requireAuth, async (req: Request, res: Response) => {
   if (!redirectUri) {
     return res.status(400).json({ message: "redirectUri obbligatorio" });
   }
+  const crypto = await import("crypto");
+  const state = crypto.randomBytes(16).toString("hex");
+  req.session.spotifyOauthState = state;
+  await new Promise<void>((resolve, reject) => req.session.save((err) => err ? reject(err) : resolve()));
   const scopes = ["user-read-private", "user-read-email", "user-top-read"].join(" ");
   const params = new URLSearchParams({
     client_id: process.env.SPOTIFY_CLIENT_ID!,
     response_type: "code",
     redirect_uri: redirectUri,
     scope: scopes,
+    state,
     show_dialog: "false",
   });
   const authUrl = `https://accounts.spotify.com/authorize?${params.toString()}`;
@@ -590,10 +595,16 @@ router.post("/callback", requireAuth, async (req: Request, res: Response) => {
   if (!checkSpotifyConfig(res)) return;
   try {
     const userId = req.session.userId!;
-    const { code, redirectUri } = req.body as { code?: string; redirectUri?: string };
+    const { code, redirectUri, state } = req.body as { code?: string; redirectUri?: string; state?: string };
     if (!code || !redirectUri) {
       return res.status(400).json({ message: "code e redirectUri sono obbligatori" });
     }
+    const expectedState = req.session.spotifyOauthState;
+    if (!state || !expectedState || state !== expectedState) {
+      return res.status(400).json({ message: "State OAuth non valido o scaduto. Riprova." });
+    }
+    req.session.spotifyOauthState = undefined;
+    await new Promise<void>((resolve, reject) => req.session.save((err) => err ? reject(err) : resolve()));
 
     const tokenData = await callSpotifyTokenEndpoint({
       grant_type: "authorization_code",
