@@ -23,6 +23,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { usePlayer, PlayerTrack } from "@/lib/player-context";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -1068,6 +1069,46 @@ function SharedPlaylistCard({
   isMerging: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const { playQueue, isAvailable: playerAvailable } = usePlayer();
+
+  const handlePreview = useCallback(async () => {
+    if (!playerAvailable) {
+      Alert.alert("Player non disponibile", "Il player audio non è disponibile su questo dispositivo.");
+      return;
+    }
+    if (item.tracks.length === 0) return;
+    setPreviewLoading(true);
+    try {
+      const tracksParam = encodeURIComponent(
+        JSON.stringify(item.tracks.map((t) => ({ trackName: t.trackName, artistName: t.artistName })))
+      );
+      const url = new URL(`/api/music/preview-playlist?tracks=${tracksParam}`, getApiUrl());
+      const resp = await fetch(url.toString());
+      if (!resp.ok) throw new Error("Errore nel caricamento");
+      const previews = await resp.json();
+      if (!previews || previews.length === 0) {
+        Alert.alert("Nessuna anteprima", "Nessun brano di questa playlist ha un'anteprima disponibile.");
+        return;
+      }
+      const tracks: PlayerTrack[] = previews.map((p: any) => ({
+        id: p.trackId,
+        url: p.previewUrl,
+        title: p.trackName,
+        artist: p.artistName,
+        album: p.albumName,
+        artwork: p.artworkUrl,
+        duration: p.durationMs ? p.durationMs / 1000 : 30,
+        source: "preview" as const,
+      }));
+      await playQueue(tracks, 0);
+    } catch {
+      Alert.alert("Errore", "Impossibile caricare le anteprime.");
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, [item.tracks, playQueue, playerAvailable]);
+
   return (
     <View style={styles.playlistCard}>
       <TouchableOpacity style={styles.playlistHeader} onPress={() => setExpanded((v) => !v)} activeOpacity={0.8}>
@@ -1113,6 +1154,22 @@ function SharedPlaylistCard({
               </Text>
             </View>
           ))}
+          {item.tracks.length > 0 && (
+            <TouchableOpacity
+              style={styles.previewBtn}
+              onPress={handlePreview}
+              disabled={previewLoading}
+            >
+              {previewLoading ? (
+                <ActivityIndicator size="small" color={Colors.accent} />
+              ) : (
+                <>
+                  <Ionicons name="play-circle" size={16} color={Colors.accent} />
+                  <Text style={styles.previewBtnText}>Anteprima 30s</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </View>
@@ -1512,6 +1569,25 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     flex: 1,
+  },
+  previewBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: Colors.accent + "18",
+    alignSelf: "flex-start",
+    minWidth: 80,
+    minHeight: 36,
+    justifyContent: "center",
+  },
+  previewBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.accent,
   },
   surfaceLight: {
     backgroundColor: Colors.surfaceLight,

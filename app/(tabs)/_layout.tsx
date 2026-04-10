@@ -9,6 +9,7 @@ import { useLocationGate } from "@/lib/location-context";
 import { useQuery } from "@tanstack/react-query";
 import { useTaskbarStyle } from "@/lib/taskbar-style-context";
 import CustomTabBar, { type TabItem } from "@/components/CustomTabBar";
+import { MiniPlayer, MINI_PLAYER_HEIGHT } from "@/components/MiniPlayer";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
 export default function TabLayout() {
@@ -165,8 +166,11 @@ export default function TabLayout() {
     );
   };
 
+  const miniPlayerBottom = tabBarHeight + 8;
+
   return (
     <>
+      <MiniPlayer bottomOffset={miniPlayerBottom} />
       {isGpsGateActive && (
         <View style={[gpsBannerStyles.banner, { paddingTop: Platform.OS === "web" ? 67 + 12 : insets.top + 12 }]}>
           <Ionicons name="navigate-outline" size={28} color="#fff" />

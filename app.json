@@ -20,19 +20,24 @@
         "NSLocationWhenInUseUsageDescription": "BikerLink usa la tua posizione per mostrare i motociclisti vicini e registrare i tuoi giri.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "BikerLink usa la posizione in background per registrare il percorso anche a schermo spento.",
         "NSPhotoLibraryUsageDescription": "BikerLink accede alle tue foto per caricare immagini del profilo e delle moto.",
-        "NSCameraUsageDescription": "BikerLink accede alla fotocamera per scattare foto del profilo e delle moto."
+        "NSCameraUsageDescription": "BikerLink accede alla fotocamera per scattare foto del profilo e delle moto.",
+        "NSMusicUsageDescription": "BikerLink accede alla tua libreria musicale per riprodurre brani in-app.",
+        "NSAppleMusicUsageDescription": "BikerLink accede ad Apple Music per mostrare e riprodurre brani.",
+        "UIBackgroundModes": ["audio", "fetch"]
       }
     },
     "android": {
-      "jsEngine": "hermes",
       "package": "com.bikerlink.app",
-      "versionCode": 8,
+      "versionCode": 9,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "READ_MEDIA_IMAGES",
-        "CAMERA"
+        "READ_MEDIA_AUDIO",
+        "CAMERA",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#1A1A2E",
@@ -60,7 +65,15 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "expo-camera"
+      "expo-camera",
+      "expo-image",
+      "expo-sharing",
+      [
+        "react-native-track-player",
+        {
+          "enableBackgroundRemoteControl": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -71,7 +84,7 @@
       "fallbackToCacheTimeout": 0,
       "checkAutomatically": "ON_ERROR_RECOVERY"
     },
-    "runtimeVersion": "3.0.0",
+    "runtimeVersion": "4.0.0",
     "extra": {
       "router": {
         "origin": "https://replit.com/"

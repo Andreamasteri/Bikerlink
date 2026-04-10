@@ -43,6 +43,7 @@ import { LocationProvider } from "@/lib/location-context";
 import { LanguageProvider, useLanguage } from "@/lib/language-context";
 import { MapSettingsProvider, useMapConfig } from "@/lib/map-context";
 import { TaskbarStyleProvider } from "@/lib/taskbar-style-context";
+import { PlayerProvider } from "@/lib/player-context";
 import Colors from "@/constants/colors";
 import UptimeWidget from "@/components/UptimeWidget";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -307,6 +308,7 @@ export default function RootLayout() {
             <MapSettingsProvider>
               <TaskbarStyleProvider>
               <LocationProvider>
+                <PlayerProvider>
                 <StartupGate ready={ready}>
                   <OtaStartupChecker />
                   <MapReadyGate>
@@ -315,6 +317,7 @@ export default function RootLayout() {
                     <LanguageKeyedRoot />
                   </MapReadyGate>
                 </StartupGate>
+                </PlayerProvider>
               </LocationProvider>
               </TaskbarStyleProvider>
             </MapSettingsProvider>
