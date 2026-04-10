@@ -40,10 +40,55 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Cattura hash git corrente (per il log finale)
+GIT_COMMIT_HASH=$(git rev-parse HEAD 2>/dev/null || echo "N/A")
+GIT_COMMIT_SHORT="${GIT_COMMIT_HASH:0:12}"
+
 echo ""
 echo "╔══════════════════════════════════════════════════╗"
 echo "║       BikerLink OTA Publisher v${VERSION}$(printf '%*s' $((28 - ${#VERSION})) '')║"
 echo "╚══════════════════════════════════════════════════╝"
+echo ""
+echo "  Commit: $GIT_COMMIT_SHORT"
+echo ""
+echo "╔══════════════════════════════════════════════════╗"
+echo "║  CHECKLIST PRE-PUBBLICAZIONE (da fare PRIMA)    ║"
+echo "╠══════════════════════════════════════════════════╣"
+echo "║  ① Aggiorna CURRENT_OTA_NUMBER in profile.tsx  ║"
+echo "║  ② Aggiungi entry in ota-updates.json con:     ║"
+echo "║     - commitBase = hash git (non PENDING)       ║"
+echo "║     - IDs sconosciuti = null (non PENDING)      ║"
+echo "╠══════════════════════════════════════════════════╣"
+echo "║  Questo script esegue automaticamente:          ║"
+echo "║  ③ Guard validate-ota.sh  (blocca se fallisce) ║"
+echo "║  ④ Export bundle JavaScript (Metro bundler)    ║"
+echo "║  ⑤ Upload bundle su object storage             ║"
+echo "║  ⑥ Pubblicazione release sul backend custom    ║"
+echo "║  ⑦ Pubblicazione aggiornamento su EAS          ║"
+echo "╠══════════════════════════════════════════════════╣"
+echo "║  DOPO la pubblicazione (usa gli ID qui sotto):  ║"
+echo "║  ⑧ Aggiorna ota-updates.json con ID reali      ║"
+echo "║  ⑨ Riesegui validate-ota.sh per conferma       ║"
+echo "╚══════════════════════════════════════════════════╝"
+echo ""
+
+# Step 0 (Guard): Esecuzione validate-ota.sh — blocca se fallisce
+echo "[0/7] Guard OTA — validate-ota.sh..."
+GUARD_SCRIPT="$(dirname "$0")/validate-ota.sh"
+if [ ! -f "$GUARD_SCRIPT" ]; then
+  echo "   ERRORE: script di validazione non trovato: $GUARD_SCRIPT"
+  exit 1
+fi
+if ! bash "$GUARD_SCRIPT"; then
+  echo ""
+  echo "   ╔════════════════════════════════════════════════════╗"
+  echo "   ║  ❌ PUBBLICAZIONE BLOCCATA — Guard OTA fallito    ║"
+  echo "   ║  Correggi gli errori sopra e riprova.              ║"
+  echo "   ╚════════════════════════════════════════════════════╝"
+  echo ""
+  exit 1
+fi
+echo "   Guard OK — procedo con la pubblicazione"
 echo ""
 
 # Step 1: Login — extract session cookie from headers (needed for Secure cookies over HTTP)
@@ -198,6 +243,7 @@ echo ""
 echo "╔══════════════════════════════════════════════════════════════════╗"
 echo "║  ✅ Release OTA v${VERSION} pubblicata con successo!$(printf '%*s' $((17 - ${#VERSION})) '')║"
 echo "╠══════════════════════════════════════════════════════════════════╣"
+echo "║  Commit hash      : $GIT_COMMIT_HASH"
 echo "║  Release ID       : $RELEASE_ID"
 echo "║  Bundle URL       : $BUNDLE_URL"
 echo "║  Manifest URL     : $MANIFEST_URL"
@@ -209,6 +255,9 @@ echo "║  EAS Status       : $EAS_STATUS"
 echo "║  EAS Update Group : $EAS_UPDATE_GROUP_ID"
 echo "║  EAS Android ID   : $EAS_ANDROID_UPDATE_ID"
 echo "║  EAS Dashboard    : $EAS_DASHBOARD_URL"
+echo "╠══════════════════════════════════════════════════════════════════╣"
+echo "║  ⑧ Aggiorna ota-updates.json con gli ID qui sopra             ║"
+echo "║  ⑨ Riesegui: bash scripts/validate-ota.sh                     ║"
 echo "╚══════════════════════════════════════════════════════════════════╝"
 echo ""
 echo "   Tutti gli utenti riceveranno l'aggiornamento al prossimo avvio."
