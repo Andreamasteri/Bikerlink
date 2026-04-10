@@ -801,6 +801,30 @@
     "apkBuildId": "5da77f1c-4d34-44ea-9143-da247d8e85cc",
     "apkVersionCode": 8,
     "apkUrl": null,
+    "status": "skipped-eas",
+    "skippedEasNote": "Task #477: publish-ota.sh step 7 (EAS) andò in timeout prima del completamento. Bundle pubblicato solo sul custom backend (releaseId a5e13ad6). EAS update non completato. Il fix arriva via OTA-11 (Task #478)."
+  },
+  {
+    "updateNumber": 11,
+    "cycle": "3.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-10",
+    "runtimeVersion": "3.0.0",
+    "platforms": ["android"],
+    "jsEngine": "metro",
+    "message": "OTA-11 rv3.0.0: pubblicazione EAS fix crash Music tab (OTA-10 replica)",
+    "note": "Task #478. OTA-10 non aveva raggiunto EAS (step 7 publish-ota.sh andò in timeout). Questa OTA-11 pubblica lo stesso codice di OTA-10 (rimossi expo-auth-session/expo-crypto, WebBrowser.openAuthSessionAsync) completando la pubblicazione su EAS. CURRENT_OTA_NUMBER=11.",
+    "releaseId": "f151cbdc-5d17-4145-9839-42e0e699878f",
+    "bundleUrl": "private/ota/ota-11.0.0-1775818497529.js",
+    "updateGroupId": "d528e34f-a8a2-4f67-a14a-19e91bee0791",
+    "androidUpdateId": "019d7708-e63d-760a-815f-fe22ff51323f",
+    "iosUpdateId": null,
+    "commitBase": "8dc4cf51798ae584d92137a4a3a3d2708c86abd3",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/d528e34f-a8a2-4f67-a14a-19e91bee0791",
+    "apkBuildId": "5da77f1c-4d34-44ea-9143-da247d8e85cc",
+    "apkVersionCode": 8,
+    "apkUrl": null,
     "status": "published"
   }
 ]
