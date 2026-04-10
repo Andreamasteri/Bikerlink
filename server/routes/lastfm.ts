@@ -125,55 +125,47 @@ async function syncLastfmTracks(userId: string, sessionKey: string, username: st
   return synced;
 }
 
-router.get("/auth-url", requireAuth, async (req: Request, res: Response) => {
+router.post("/mobile-auth", requireAuth, async (req: Request, res: Response) => {
   if (!isLastfmConfigured()) {
     return res.status(503).json({ message: "Last.fm non configurato. Contatta l'amministratore." });
   }
-  try {
-    const tokenData = await lastfmApiCall({ method: "auth.getToken" }) as { token?: string };
-    const token = tokenData?.token;
-    if (!token) return res.status(500).json({ message: "Impossibile ottenere token Last.fm" });
-
-    const authUrl = `https://www.last.fm/api/auth/?api_key=${process.env.LASTFM_API_KEY}&token=${token}&cb=bikerlink://lastfm-callback`;
-    return res.json({ authUrl, token });
-  } catch (err) {
-    console.error("[Last.fm auth-url]", err);
-    return res.status(500).json({ message: "Errore nell'avvio connessione Last.fm" });
+  const { username, password } = req.body as { username?: string; password?: string };
+  if (!username || !password) {
+    return res.status(400).json({ message: "Username e password sono obbligatori." });
   }
-});
-
-router.post("/callback", requireAuth, async (req: Request, res: Response) => {
-  if (!isLastfmConfigured()) {
-    return res.status(503).json({ message: "Last.fm non configurato." });
-  }
-  const { token } = req.body as { token?: string };
-  if (!token) return res.status(400).json({ message: "Token mancante" });
   const userId = req.session.userId!;
   try {
+    const passwordMd5 = crypto.createHash("md5").update(password, "utf8").digest("hex");
     const sessionData = await lastfmApiCall({
-      method: "auth.getSession",
-      token,
-    }) as { session?: { key?: string; name?: string } };
+      method: "auth.getMobileSession",
+      username,
+      password: passwordMd5,
+    }, "POST") as { session?: { key?: string; name?: string }; error?: number; message?: string };
+
+    if (sessionData?.error) {
+      const errMsg = sessionData.message ?? "Credenziali non valide. Riprova.";
+      return res.status(401).json({ message: errMsg });
+    }
 
     const sessionKey = sessionData?.session?.key;
-    const username = sessionData?.session?.name;
-    if (!sessionKey || !username) {
-      return res.status(400).json({ message: "Autorizzazione Last.fm fallita. Riprova." });
+    const lastfmUsername = sessionData?.session?.name ?? username;
+    if (!sessionKey) {
+      return res.status(400).json({ message: "Autorizzazione Last.fm fallita. Controlla username e password." });
     }
 
     await db
       .insert(userLastfmSessions)
-      .values({ userId, lastfmUsername: username, sessionKey })
+      .values({ userId, lastfmUsername, sessionKey })
       .onConflictDoUpdate({
         target: [userLastfmSessions.userId],
-        set: { lastfmUsername: username, sessionKey, connectedAt: new Date() },
+        set: { lastfmUsername, sessionKey, connectedAt: new Date() },
       });
 
-    const trackCount = await syncLastfmTracks(userId, sessionKey, username);
+    const trackCount = await syncLastfmTracks(userId, sessionKey, lastfmUsername);
 
-    return res.json({ connected: true, username, trackCount });
+    return res.json({ connected: true, username: lastfmUsername, trackCount });
   } catch (err) {
-    console.error("[Last.fm callback]", err);
+    console.error("[Last.fm mobile-auth]", err);
     return res.status(500).json({ message: "Errore nella connessione Last.fm. Riprova." });
   }
 });

@@ -11,6 +11,9 @@ import {
   Image,
   TextInput,
   Platform,
+  Modal,
+  KeyboardAvoidingView,
+  Linking,
 } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -102,6 +105,12 @@ export default function MusicScreen() {
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [searchNeedsReconnect, setSearchNeedsReconnect] = useState(false);
+
+  const [lastfmModalVisible, setLastfmModalVisible] = useState(false);
+  const [lastfmUsername, setLastfmUsername] = useState("");
+  const [lastfmPassword, setLastfmPassword] = useState("");
+  const [lastfmError, setLastfmError] = useState<string | null>(null);
+  const [lastfmConnecting, setLastfmConnecting] = useState(false);
 
   const { data: providerData } = useQuery<{ provider: string }>({
     queryKey: ["/api/settings/music-provider"],
@@ -313,46 +322,45 @@ export default function MusicScreen() {
     }
   }, [queryClient]);
 
-  const connectLastfm = useCallback(async () => {
-    if (Platform.OS === "web") {
-      Alert.alert("Info", "Collega Last.fm dall'app mobile BikerLink.");
+  const connectLastfm = useCallback(() => {
+    setLastfmUsername("");
+    setLastfmPassword("");
+    setLastfmError(null);
+    setLastfmModalVisible(true);
+  }, []);
+
+  const submitLastfmLogin = useCallback(async () => {
+    if (!lastfmUsername.trim() || !lastfmPassword.trim()) {
+      setLastfmError("Inserisci username e password.");
       return;
     }
-    setIsConnecting(true);
+    setLastfmConnecting(true);
+    setLastfmError(null);
     try {
-      const resp = await fetch(new URL("/api/lastfm/auth-url", getApiUrl()).toString(), { credentials: "include" });
-      if (!resp.ok) {
-        const body = await resp.json().catch(() => ({})) as { message?: string };
-        throw new Error(body.message ?? "Errore nell'avvio della connessione Last.fm");
-      }
-      const { authUrl, token: requestToken } = await resp.json() as { authUrl: string; token: string };
-      await WebBrowser.openAuthSessionAsync(authUrl, "bikerlink://lastfm-callback");
-      const callbackResp = await apiRequest("POST", "/api/lastfm/callback", { token: requestToken });
-      const callbackData = await callbackResp.json() as { connected?: boolean; username?: string; trackCount?: number; message?: string };
-      if (callbackResp.ok && callbackData.connected) {
-        queryClient.invalidateQueries({ queryKey: ["/api/lastfm/status"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/lastfm/tracks"] });
-        const tracksMsg = callbackData.trackCount ? ` ${callbackData.trackCount} brani sincronizzati.` : "";
-        Alert.alert(
-          "Last.fm Collegato!",
-          callbackData.username
-            ? `Benvenuto, ${callbackData.username}!${tracksMsg}`
-            : `Last.fm collegato con successo!${tracksMsg}`
-        );
-      } else if (callbackResp.ok === false) {
-        const msg = callbackData.message ?? "";
-        const isCancelled = msg.toLowerCase().includes("autorizzaz") || msg.toLowerCase().includes("not been authorized");
-        if (!isCancelled) {
-          Alert.alert("Errore", msg || "Errore durante la connessione Last.fm");
-        }
-      }
+      const resp = await apiRequest("POST", "/api/lastfm/mobile-auth", {
+        username: lastfmUsername.trim(),
+        password: lastfmPassword,
+      });
+      const data = await resp.json() as { connected?: boolean; username?: string; trackCount?: number };
+      setLastfmModalVisible(false);
+      setLastfmUsername("");
+      setLastfmPassword("");
+      queryClient.invalidateQueries({ queryKey: ["/api/lastfm/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lastfm/tracks"] });
+      const tracksMsg = data.trackCount ? ` ${data.trackCount} brani sincronizzati.` : "";
+      Alert.alert(
+        "Last.fm Collegato!",
+        data.username
+          ? `Benvenuto, ${data.username}!${tracksMsg}`
+          : `Last.fm collegato con successo!${tracksMsg}`
+      );
     } catch (err) {
-      console.error("[Last.fm connect]", err);
-      Alert.alert("Errore", (err as Error).message ?? "Impossibile connettersi a Last.fm");
+      console.error("[Last.fm mobile-auth]", err);
+      setLastfmError((err as Error).message ?? "Impossibile connettersi a Last.fm");
     } finally {
-      setIsConnecting(false);
+      setLastfmConnecting(false);
     }
-  }, [queryClient]);
+  }, [lastfmUsername, lastfmPassword, queryClient]);
 
   const handleConnect = useCallback(() => {
     if (musicProvider === "lastfm") {
@@ -495,6 +503,92 @@ export default function MusicScreen() {
           isMerging={mergePlaylistMutation.isPending}
         />
       )}
+
+      <Modal
+        visible={lastfmModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !lastfmConnecting && setLastfmModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Ionicons name="radio" size={28} color={LASTFM_RED} />
+              <Text style={styles.modalTitle}>Accedi a Last.fm</Text>
+            </View>
+            <Text style={styles.modalSubtitle}>
+              Inserisci le tue credenziali Last.fm per collegare l'account.
+            </Text>
+
+            <Text style={styles.modalLabel}>Username</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Il tuo username Last.fm"
+              placeholderTextColor={Colors.textSecondary}
+              value={lastfmUsername}
+              onChangeText={setLastfmUsername}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!lastfmConnecting}
+              returnKeyType="next"
+            />
+
+            <Text style={styles.modalLabel}>Password</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="La tua password"
+              placeholderTextColor={Colors.textSecondary}
+              value={lastfmPassword}
+              onChangeText={setLastfmPassword}
+              secureTextEntry
+              editable={!lastfmConnecting}
+              returnKeyType="done"
+              onSubmitEditing={submitLastfmLogin}
+            />
+
+            {lastfmError !== null && (
+              <View style={styles.modalErrorBox}>
+                <Ionicons name="alert-circle-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+                <Text style={styles.modalErrorText}>{lastfmError}</Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[styles.modalConnectBtn, lastfmConnecting && { opacity: 0.7 }]}
+              onPress={submitLastfmLogin}
+              disabled={lastfmConnecting}
+            >
+              {lastfmConnecting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.modalConnectBtnText}>Connetti</Text>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.modalDivider} />
+
+            <TouchableOpacity
+              style={styles.modalCreateAccountBtn}
+              onPress={() => Linking.openURL("https://www.last.fm/join")}
+              disabled={lastfmConnecting}
+            >
+              <Ionicons name="person-add-outline" size={16} color={LASTFM_RED} style={{ marginRight: 6 }} />
+              <Text style={styles.modalCreateAccountText}>Crea nuovo account Last.fm</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalCancelBtn}
+              onPress={() => setLastfmModalVisible(false)}
+              disabled={lastfmConnecting}
+            >
+              <Text style={styles.modalCancelText}>Annulla</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -1451,5 +1545,107 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     textAlign: "center" as const,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
+  },
+  modalHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 10,
+    marginBottom: 8,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginBottom: 20,
+    lineHeight: 19,
+  },
+  modalLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary,
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  modalInput: {
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    color: Colors.text,
+    marginBottom: 12,
+  },
+  modalErrorBox: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    backgroundColor: "#c0392b",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 12,
+  },
+  modalErrorText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: "#fff",
+    flex: 1,
+  },
+  modalConnectBtn: {
+    backgroundColor: LASTFM_RED,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center" as const,
+    marginTop: 4,
+  },
+  modalConnectBtnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginVertical: 16,
+  },
+  modalCreateAccountBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  modalCreateAccountText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: LASTFM_RED,
+  },
+  modalCancelBtn: {
+    alignItems: "center" as const,
+    paddingVertical: 8,
+  },
+  modalCancelText: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
   },
 });
