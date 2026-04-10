@@ -120,7 +120,14 @@ export default function MusicScreen() {
       const url = new URL("/api/spotify/search", getApiUrl());
       url.searchParams.set("q", debouncedQuery);
       const res = await fetch(url.toString(), { credentials: "include" });
-      if (!res.ok) throw new Error(`${res.status}`);
+      if (!res.ok) {
+        let msg = `${res.status}`;
+        try {
+          const body = await res.json();
+          if (typeof body.message === "string") msg = body.message;
+        } catch {}
+        throw new Error(msg);
+      }
       return res.json();
     },
     enabled: debouncedQuery.length >= 2 && activeTab === "brani",
@@ -252,7 +259,7 @@ export default function MusicScreen() {
           debouncedQuery={debouncedQuery}
           searchResults={searchQuery.data?.tracks ?? []}
           searchLoading={searchQuery.isLoading}
-          searchError={searchQuery.isError}
+          searchError={searchQuery.isError ? (searchQuery.error?.message ?? "Errore nella ricerca. Riprova.") : null}
           library={tracksQuery.data?.tracks ?? []}
           libraryLoading={tracksQuery.isLoading}
           savedIds={savedIds}
@@ -310,7 +317,7 @@ function BraniTab({
   debouncedQuery: string;
   searchResults: SearchTrack[];
   searchLoading: boolean;
-  searchError: boolean;
+  searchError: string | null;
   library: LibraryTrack[];
   libraryLoading: boolean;
   savedIds: Set<string>;
@@ -346,8 +353,8 @@ function BraniTab({
           <Text style={styles.sectionTitle}>Risultati di ricerca</Text>
           {searchLoading ? (
             <ActivityIndicator color={Colors.accent} style={{ marginVertical: 20 }} />
-          ) : searchError ? (
-            <Text style={styles.emptyText}>Errore nella ricerca. Riprova.</Text>
+          ) : searchError !== null ? (
+            <Text style={styles.emptyText}>{searchError}</Text>
           ) : searchResults.length === 0 ? (
             <Text style={styles.emptyText}>Nessun risultato per "{debouncedQuery}"</Text>
           ) : (

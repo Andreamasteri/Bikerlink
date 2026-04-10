@@ -114,6 +114,15 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
     return res.json({ tracks });
   } catch (error) {
     console.error("[Spotify] search error:", error);
+    const errMsg = (error as Error).message ?? "";
+    const statusMatch = errMsg.match(/Spotify search (\d+):/);
+    const bodyMatch = errMsg.match(/Spotify search \d+: ([\s\S]*)/);
+    if (statusMatch && bodyMatch) {
+      const httpStatus = parseInt(statusMatch[1], 10);
+      const rawBody = bodyMatch[1].trim();
+      const mapped = mapSpotifyError({ httpStatus, rawBody });
+      return res.status(mapped.status).json({ message: mapped.message });
+    }
     return res.status(500).json({ message: "Errore durante la ricerca Spotify" });
   }
 });

@@ -687,5 +687,28 @@
     "apkVersionCode": 8,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 6,
+    "cycle": "3.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-09",
+    "runtimeVersion": "3.0.0",
+    "platforms": ["android"],
+    "jsEngine": "metro",
+    "message": "OTA-6 rv3.0.0: fix messaggio errore ricerca Spotify — propaga errore reale dal backend invece di generico",
+    "note": "Task #474. Fix: backend search route usa mapSpotifyError per 403 (ritorna 422 + messaggio chiaro invece di 500 generico). Frontend queryFn legge JSON body dell'errore. BraniTab mostra messaggio reale. CURRENT_OTA_NUMBER portato a 6. Causa root: account Spotify developer senza Premium — Spotify blocca Client Credentials search con 403.",
+    "releaseId": "b613e97a-5e9e-48f0-8e53-f440954429a7",
+    "bundleUrl": "private/ota/ota-6.0.0-1775779109548.js",
+    "updateGroupId": "736d192f-a74a-4da4-8a5d-773fc6d3711f",
+    "androidUpdateId": "019d74af-7462-79e8-a8ab-276c41d3c2eb",
+    "iosUpdateId": null,
+    "commitBase": "110efcc9ef5915039e4a97e0b16b4168112e83b9",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/736d192f-a74a-4da4-8a5d-773fc6d3711f",
+    "apkBuildId": "5da77f1c-4d34-44ea-9143-da247d8e85cc",
+    "apkVersionCode": 8,
+    "apkUrl": null,
+    "status": "published"
   }
 ]
