@@ -6,6 +6,13 @@ import { eq } from "drizzle-orm";
 
 const router = Router();
 
+function requireAuth(req: Request, res: Response, next: () => void) {
+  if (!(req.session as any)?.userId) {
+    return res.status(401).json({ message: "Non autenticato" });
+  }
+  next();
+}
+
 const CURATED_GENRES = [
   { id: "rock", label: "Rock", icon: "🎸" },
   { id: "metal", label: "Metal", icon: "🤘" },
@@ -223,9 +230,8 @@ router.get("/preview-playlist", async (req: Request, res: Response) => {
   return res.json(results);
 });
 
-router.get("/suggested-genres", async (req: Request, res: Response) => {
-  const { userId } = req.query as { userId?: string };
-  if (!userId) return res.status(400).json({ error: "userId required" });
+router.get("/suggested-genres", requireAuth, async (req: Request, res: Response) => {
+  const userId = (req.session as any).userId as string;
 
   try {
     const tracks = await db

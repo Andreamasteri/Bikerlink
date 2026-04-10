@@ -10,6 +10,7 @@ import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type PlayerSource = "radio" | "library" | "file" | "preview";
+export type RepeatMode = "off" | "track" | "queue";
 
 export interface PlayerTrack {
   id: string;
@@ -48,6 +49,7 @@ interface PlayerState {
   favoriteStationIds: string[];
   selectedGenre: string | null;
   isShuffled: boolean;
+  repeatMode: RepeatMode;
 }
 
 interface PlayerContextType extends PlayerState {
@@ -63,6 +65,7 @@ interface PlayerContextType extends PlayerState {
   setSleepTimer: (minutes: number | null) => void;
   toggleFavorite: (stationId: string) => void;
   toggleShuffle: () => void;
+  toggleRepeat: () => void;
   setSelectedGenre: (genre: string | null) => void;
 }
 
@@ -75,6 +78,7 @@ let TrackPlayer: any = null;
 let Capability: any = null;
 let State: any = null;
 let Event: any = null;
+let RepeatModeRNTP: any = null;
 let playerReady = false;
 
 async function initTrackPlayer(): Promise<boolean> {
@@ -85,6 +89,12 @@ async function initTrackPlayer(): Promise<boolean> {
     Capability = module.Capability;
     State = module.State;
     Event = module.Event;
+    RepeatModeRNTP = module.RepeatMode;
+
+    // Registra il playback service PRIMA di setupPlayer — obbligatorio per
+    // i controlli lockscreen / notification bar nella build nativa.
+    const { PlaybackService } = await import("./player-service");
+    TrackPlayer.registerPlaybackService(() => PlaybackService);
 
     await TrackPlayer.setupPlayer({
       maxCacheSize: 1024 * 5,
@@ -130,6 +140,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [favoriteStationIds, setFavoriteStationIds] = useState<string[]>([]);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [isShuffled, setIsShuffled] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
 
   const sleepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const positionIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -349,6 +360,25 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const toggleShuffle = useCallback(() => setIsShuffled((v) => !v), []);
 
+  const toggleRepeat = useCallback(() => {
+    setRepeatMode((prev) => {
+      const next: RepeatMode =
+        prev === "off" ? "track" : prev === "track" ? "queue" : "off";
+      if (TrackPlayer && playerReady && RepeatModeRNTP) {
+        try {
+          const rnMode =
+            next === "track"
+              ? RepeatModeRNTP.Track
+              : next === "queue"
+              ? RepeatModeRNTP.Queue
+              : RepeatModeRNTP.Off;
+          TrackPlayer.setRepeatMode(rnMode);
+        } catch {}
+      }
+      return next;
+    });
+  }, []);
+
   const value: PlayerContextType = {
     isAvailable,
     isPlaying,
@@ -364,6 +394,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     favoriteStationIds,
     selectedGenre,
     isShuffled,
+    repeatMode,
     play,
     pause,
     togglePlay,
@@ -376,6 +407,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setSleepTimer,
     toggleFavorite,
     toggleShuffle,
+    toggleRepeat,
     setSelectedGenre,
   };
 

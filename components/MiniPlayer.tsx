@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,16 +6,20 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
+  FlatList,
   Image,
   ActivityIndicator,
   Pressable,
   Platform,
   Alert,
+  Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
-import { usePlayer, PlayerTrack, RadioStation } from "@/lib/player-context";
+import * as MediaLibrary from "expo-media-library";
+import * as DocumentPicker from "expo-document-picker";
+import { usePlayer, PlayerTrack, RadioStation, RepeatMode } from "@/lib/player-context";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
 
@@ -97,7 +101,7 @@ function ProgressBar({
       >
         <View style={progressStyles.track}>
           <View style={[progressStyles.fill, { width: `${progress * 100}%` }]} />
-          <View style={[progressStyles.thumb, { left: `${progress * 100}%` as any }]} />
+          <View style={[progressStyles.thumb, { left: `${Math.round(progress * 100)}%` as `${number}%` }]} />
         </View>
       </TouchableOpacity>
       <Text style={progressStyles.time}>
@@ -157,9 +161,15 @@ function RadioTab({
 }) {
   const { selectedGenre, setSelectedGenre, favoriteStationIds, toggleFavorite, currentTrack } =
     usePlayer();
+  const [useLastFm, setUseLastFm] = useState(false);
 
   const { data: genres = [] } = useQuery<Genre[]>({
     queryKey: ["/api/music/genres"],
+  });
+
+  const { data: suggestedGenreIds = [] } = useQuery<string[]>({
+    queryKey: ["/api/music/suggested-genres"],
+    enabled: useLastFm,
   });
 
   const { data: stations = [], isLoading: loadingStations } = useQuery<RadioStation[]>({
@@ -167,30 +177,61 @@ function RadioTab({
     enabled: !!selectedGenre,
   });
 
+  const displayedGenres = useLastFm && suggestedGenreIds.length > 0
+    ? [...genres].sort((a, b) => {
+        const aIdx = suggestedGenreIds.indexOf(a.id);
+        const bIdx = suggestedGenreIds.indexOf(b.id);
+        if (aIdx !== -1 && bIdx === -1) return -1;
+        if (bIdx !== -1 && aIdx === -1) return 1;
+        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+        return 0;
+      })
+    : genres;
+
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
+      <View style={radioStyles.lastFmRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={radioStyles.lastFmLabel}>Suggerisci da Last.fm</Text>
+          <Text style={radioStyles.lastFmSub}>Generi basati sulla tua musica</Text>
+        </View>
+        <Switch
+          value={useLastFm}
+          onValueChange={setUseLastFm}
+          trackColor={{ false: Colors.border, true: Colors.accent + "66" }}
+          thumbColor={useLastFm ? Colors.accent : Colors.textSecondary}
+        />
+      </View>
+
       <Text style={radioStyles.sectionTitle}>Generi</Text>
       <View style={radioStyles.genreGrid}>
-        {genres.map((g) => (
-          <TouchableOpacity
-            key={g.id}
-            style={[
-              radioStyles.genreChip,
-              selectedGenre === g.id && radioStyles.genreChipActive,
-            ]}
-            onPress={() => setSelectedGenre(g.id === selectedGenre ? null : g.id)}
-          >
-            <Text style={radioStyles.genreIcon}>{g.icon}</Text>
-            <Text
+        {displayedGenres.map((g) => {
+          const isSuggested = suggestedGenreIds.includes(g.id);
+          return (
+            <TouchableOpacity
+              key={g.id}
               style={[
-                radioStyles.genreLabel,
-                selectedGenre === g.id && radioStyles.genreLabelActive,
+                radioStyles.genreChip,
+                selectedGenre === g.id && radioStyles.genreChipActive,
+                useLastFm && isSuggested && radioStyles.genreChipSuggested,
               ]}
+              onPress={() => setSelectedGenre(g.id === selectedGenre ? null : g.id)}
             >
-              {g.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <Text style={radioStyles.genreIcon}>{g.icon}</Text>
+              <Text
+                style={[
+                  radioStyles.genreLabel,
+                  selectedGenre === g.id && radioStyles.genreLabelActive,
+                ]}
+              >
+                {g.label}
+              </Text>
+              {useLastFm && isSuggested && (
+                <Ionicons name="star" size={10} color={Colors.accent} />
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {selectedGenre && (
@@ -203,7 +244,7 @@ function RadioTab({
           ) : (
             stations.map((s) => {
               const isFav = favoriteStationIds.includes(s.id);
-              const isPlaying = currentTrack?.id === s.id;
+              const isActive = currentTrack?.id === s.id;
               return (
                 <View key={s.id} style={radioStyles.stationRow}>
                   <TouchableOpacity
@@ -215,7 +256,7 @@ function RadioTab({
                       <Text
                         style={[
                           radioStyles.stationName,
-                          isPlaying && { color: Colors.accent },
+                          isActive && { color: Colors.accent },
                         ]}
                         numberOfLines={1}
                       >
@@ -254,7 +295,256 @@ function RadioTab({
   );
 }
 
+function LibraryTab({
+  onPlayTrack,
+}: {
+  onPlayTrack: (track: PlayerTrack) => void;
+}) {
+  const [permission, requestPermission] = MediaLibrary.usePermissions();
+  const [assets, setAssets] = useState<MediaLibrary.Asset[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [endCursor, setEndCursor] = useState<string | undefined>(undefined);
+
+  const loadAssets = useCallback(
+    async (cursor?: string) => {
+      if (loading) return;
+      setLoading(true);
+      try {
+        const result = await MediaLibrary.getAssetsAsync({
+          mediaType: MediaLibrary.MediaType.audio,
+          first: 30,
+          after: cursor,
+          sortBy: MediaLibrary.SortBy.default,
+        });
+        setAssets((prev) => (cursor ? [...prev, ...result.assets] : result.assets));
+        setHasMore(result.hasNextPage);
+        setEndCursor(result.endCursor);
+      } catch {
+        setHasMore(false);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loading]
+  );
+
+  const handlePermissionRequest = useCallback(async () => {
+    const result = await requestPermission();
+    if (result.granted) {
+      loadAssets();
+    }
+  }, [requestPermission, loadAssets]);
+
+  React.useEffect(() => {
+    if (Platform.OS !== "web" && permission?.granted) {
+      loadAssets();
+    }
+  }, [permission?.granted]);
+
+  const pickFile = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "audio/*",
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (!result.canceled && result.assets[0]) {
+        const file = result.assets[0];
+        onPlayTrack({
+          id: file.uri,
+          url: file.uri,
+          title: (file.name ?? "").replace(/\.[^.]+$/, "") || "File audio",
+          artist: "File locale",
+          source: "file",
+        });
+      }
+    } catch {
+      Alert.alert("Errore", "Impossibile aprire il file audio.");
+    }
+  }, [onPlayTrack]);
+
+  if (Platform.OS === "web") {
+    return (
+      <View style={libStyles.center}>
+        <Ionicons name="musical-notes-outline" size={40} color={Colors.textSecondary} />
+        <Text style={libStyles.emptyText}>Libreria non disponibile sul web</Text>
+        <TouchableOpacity style={libStyles.permBtn} onPress={pickFile}>
+          <Text style={libStyles.permBtnText}>Apri file audio</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!permission) {
+    return (
+      <View style={libStyles.center}>
+        <ActivityIndicator color={Colors.accent} />
+      </View>
+    );
+  }
+
+  if (!permission.granted) {
+    return (
+      <View style={libStyles.center}>
+        <Ionicons name="musical-notes-outline" size={40} color={Colors.textSecondary} />
+        <Text style={libStyles.emptyText}>
+          {permission.canAskAgain
+            ? "Concedi l'accesso alla libreria musicale"
+            : "Accesso negato. Apri un file singolo."}
+        </Text>
+        {permission.canAskAgain && (
+          <TouchableOpacity style={libStyles.permBtn} onPress={handlePermissionRequest}>
+            <Text style={libStyles.permBtnText}>Concedi accesso</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={[libStyles.permBtn, { marginTop: 8, backgroundColor: Colors.surface }]}
+          onPress={pickFile}
+        >
+          <Text style={[libStyles.permBtnText, { color: Colors.text }]}>
+            Apri file singolo
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (assets.length === 0 && !loading) {
+    return (
+      <View style={libStyles.center}>
+        <Ionicons name="musical-notes-outline" size={40} color={Colors.textSecondary} />
+        <Text style={libStyles.emptyText}>Nessun brano trovato</Text>
+        <TouchableOpacity style={libStyles.permBtn} onPress={pickFile}>
+          <Text style={libStyles.permBtnText}>Apri file singolo</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <TouchableOpacity style={libStyles.filePickerRow} onPress={pickFile}>
+        <Ionicons name="document-outline" size={18} color={Colors.accent} />
+        <Text style={libStyles.filePickerText}>Apri file singolo</Text>
+      </TouchableOpacity>
+      <FlatList
+        data={assets}
+        keyExtractor={(item) => item.id}
+        showsVerticalScrollIndicator={false}
+        onEndReached={() => hasMore && endCursor && loadAssets(endCursor)}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={loading ? <ActivityIndicator color={Colors.accent} style={{ padding: 12 }} /> : null}
+        renderItem={({ item }) => {
+          const title = (item.filename ?? "").replace(/\.[^.]+$/, "") || "Brano";
+          const durationSec = item.duration ?? 0;
+          return (
+            <TouchableOpacity
+              style={libStyles.trackRow}
+              onPress={() =>
+                onPlayTrack({
+                  id: item.id,
+                  url: item.uri,
+                  title,
+                  artist: "Libreria locale",
+                  duration: durationSec,
+                  source: "library",
+                })
+              }
+            >
+              <Ionicons name="musical-note" size={20} color={Colors.textSecondary} style={{ marginRight: 10 }} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={libStyles.trackTitle} numberOfLines={1}>{title}</Text>
+                <Text style={libStyles.trackMeta}>{formatTime(durationSec)}</Text>
+              </View>
+              <Ionicons name="play-circle-outline" size={24} color={Colors.accent} />
+            </TouchableOpacity>
+          );
+        }}
+      />
+    </View>
+  );
+}
+
+const libStyles = StyleSheet.create({
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    paddingVertical: 24,
+  },
+  emptyText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    paddingHorizontal: 16,
+  },
+  permBtn: {
+    backgroundColor: Colors.accent,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  permBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: "#fff",
+  },
+  filePickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    marginBottom: 8,
+  },
+  filePickerText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.accent,
+  },
+  trackRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  trackTitle: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: Colors.text,
+  },
+  trackMeta: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+});
+
 const radioStyles = StyleSheet.create({
+  lastFmRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    marginBottom: 4,
+  },
+  lastFmLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: Colors.text,
+  },
+  lastFmSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
   sectionTitle: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
@@ -281,6 +571,9 @@ const radioStyles = StyleSheet.create({
   genreChipActive: {
     backgroundColor: Colors.accent + "22",
     borderColor: Colors.accent,
+  },
+  genreChipSuggested: {
+    borderColor: Colors.accent + "88",
   },
   genreIcon: { fontSize: 14 },
   genreLabel: {
@@ -363,6 +656,12 @@ const controlStyles = StyleSheet.create({
   },
 });
 
+function repeatIcon(mode: RepeatMode): string {
+  if (mode === "track") return "repeat";
+  if (mode === "queue") return "repeat";
+  return "repeat-outline";
+}
+
 export function FullPlayerModal({
   visible,
   onClose,
@@ -379,15 +678,18 @@ export function FullPlayerModal({
     duration,
     isBuffering,
     isShuffled,
+    repeatMode,
     togglePlay,
     next,
     prev,
     seekTo,
     toggleShuffle,
+    toggleRepeat,
     playRadioStation,
+    playTrack,
     isAvailable,
   } = usePlayer();
-  const [activeTab, setActiveTab] = useState<"radio" | "info">("radio");
+  const [activeTab, setActiveTab] = useState<"radio" | "library">("radio");
 
   const handlePlayStation = useCallback(
     (station: RadioStation, genreId: string) => {
@@ -396,8 +698,18 @@ export function FullPlayerModal({
     [playRadioStation]
   );
 
+  const handlePlayLibraryTrack = useCallback(
+    (track: PlayerTrack) => {
+      playTrack(track);
+    },
+    [playTrack]
+  );
+
   const isRadio = source === "radio";
-  const isPreview = source === "preview";
+  const repeatColor =
+    repeatMode === "off" ? Colors.textSecondary : Colors.accent;
+  const repeatLabel =
+    repeatMode === "track" ? "1" : repeatMode === "queue" ? "∞" : undefined;
 
   return (
     <Modal
@@ -409,7 +721,10 @@ export function FullPlayerModal({
       <View
         style={[
           modalStyles.container,
-          { paddingTop: Platform.OS === "web" ? 67 : insets.top + 16, paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16 },
+          {
+            paddingTop: Platform.OS === "web" ? 67 : insets.top + 16,
+            paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16,
+          },
         ]}
       >
         <View style={modalStyles.header}>
@@ -417,13 +732,19 @@ export function FullPlayerModal({
             <Ionicons name="chevron-down" size={28} color={Colors.text} />
           </TouchableOpacity>
           <Text style={modalStyles.headerTitle}>
-            {source === "radio" ? "Radio" : source === "preview" ? "Anteprima 30s" : source === "library" ? "Libreria" : "File"}
+            {source === "radio"
+              ? "Radio"
+              : source === "preview"
+              ? "Anteprima 30s"
+              : source === "library"
+              ? "Libreria"
+              : "File"}
           </Text>
           <SleepTimerButton />
         </View>
 
         <View style={modalStyles.artworkContainer}>
-          <ArtworkImage uri={currentTrack?.artwork} size={240} style={{ borderRadius: 16 }} />
+          <ArtworkImage uri={currentTrack?.artwork} size={220} style={{ borderRadius: 16 }} />
         </View>
 
         <View style={modalStyles.trackInfo}>
@@ -431,7 +752,8 @@ export function FullPlayerModal({
             {currentTrack?.title || "Nessuna traccia"}
           </Text>
           <Text style={modalStyles.trackArtist} numberOfLines={1}>
-            {currentTrack?.artist || (isAvailable ? "Seleziona una sorgente" : "Player non disponibile")}
+            {currentTrack?.artist ||
+              (isAvailable ? "Seleziona una sorgente" : "Player non disponibile")}
           </Text>
         </View>
 
@@ -452,12 +774,12 @@ export function FullPlayerModal({
           <TouchableOpacity
             style={modalStyles.controlBtn}
             onPress={toggleShuffle}
-            disabled={!isAvailable}
+            disabled={!isAvailable || isRadio}
           >
             <Ionicons
               name="shuffle"
               size={24}
-              color={isShuffled ? Colors.accent : Colors.textSecondary}
+              color={isShuffled && !isRadio ? Colors.accent : Colors.textSecondary}
             />
           </TouchableOpacity>
 
@@ -501,8 +823,23 @@ export function FullPlayerModal({
             />
           </TouchableOpacity>
 
-          <TouchableOpacity style={modalStyles.controlBtn} onPress={() => {}}>
-            <Ionicons name="repeat" size={24} color={Colors.textSecondary} />
+          <TouchableOpacity
+            style={modalStyles.controlBtn}
+            onPress={toggleRepeat}
+            disabled={!isAvailable || isRadio}
+          >
+            <View style={{ alignItems: "center" }}>
+              <Ionicons
+                name={repeatIcon(repeatMode)}
+                size={24}
+                color={isRadio ? Colors.border : repeatColor}
+              />
+              {repeatLabel && !isRadio && (
+                <Text style={{ fontSize: 9, color: Colors.accent, fontFamily: "Inter_700Bold", marginTop: 1 }}>
+                  {repeatLabel}
+                </Text>
+              )}
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -525,11 +862,33 @@ export function FullPlayerModal({
               Radio
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[modalStyles.tab, activeTab === "library" && modalStyles.tabActive]}
+            onPress={() => setActiveTab("library")}
+          >
+            <Ionicons
+              name="musical-notes"
+              size={16}
+              color={activeTab === "library" ? Colors.accent : Colors.textSecondary}
+            />
+            <Text
+              style={[
+                modalStyles.tabText,
+                activeTab === "library" && modalStyles.tabTextActive,
+              ]}
+            >
+              Libreria
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <View style={modalStyles.tabContent}>
           {activeTab === "radio" && (
             <RadioTab onPlayStation={handlePlayStation} />
+          )}
+          {activeTab === "library" && (
+            <LibraryTab onPlayTrack={handlePlayLibraryTrack} />
           )}
         </View>
       </View>
