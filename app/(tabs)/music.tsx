@@ -25,7 +25,7 @@ WebBrowser.maybeCompleteAuthSession();
 
 function getSpotifyRedirectUri(): string {
   if (Platform.OS === "web") {
-    return `${typeof window !== "undefined" ? window.location.origin : ""}/spotify-callback`;
+    return "/spotify-callback";
   }
   return "bikerlink://spotify-callback";
 }
