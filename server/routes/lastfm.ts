@@ -5,6 +5,9 @@ import { storage } from "../storage";
 import {
   userLastfmSessions,
   userMusicTracks,
+  sharedPlaylists,
+  messages,
+  conversationParticipants,
 } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
@@ -334,6 +337,83 @@ router.post("/tracks", requireAuth, async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[Last.fm add track]", err);
     return res.status(500).json({ message: "Errore nell'aggiunta del brano" });
+  }
+});
+
+router.post("/share-playlist", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const { toUserId, conversationId } = req.body as { toUserId?: string; conversationId?: string };
+    if (!toUserId) {
+      return res.status(400).json({ message: "toUserId è obbligatorio" });
+    }
+
+    const tracks = await db
+      .select()
+      .from(userMusicTracks)
+      .where(and(eq(userMusicTracks.userId, userId), eq(userMusicTracks.provider, "lastfm")))
+      .orderBy(userMusicTracks.trackName);
+
+    if (tracks.length === 0) {
+      return res.status(400).json({ message: "Nessun brano Last.fm sincronizzato. Sincronizza prima nel tab Musica." });
+    }
+
+    if (conversationId) {
+      const participants = await db
+        .select({ userId: conversationParticipants.userId })
+        .from(conversationParticipants)
+        .where(eq(conversationParticipants.conversationId, conversationId));
+
+      const participantIds = participants.map((p) => p.userId);
+      if (!participantIds.includes(userId)) {
+        return res.status(403).json({ message: "Non sei un partecipante di questa conversazione" });
+      }
+      if (!participantIds.includes(toUserId)) {
+        return res.status(403).json({ message: "Il destinatario non è un partecipante di questa conversazione" });
+      }
+    }
+
+    const tracksData = tracks.map((t) => ({
+      trackId: t.spotifyTrackId,
+      trackName: t.trackName,
+      artistId: t.artistId,
+      artistName: t.artistName,
+      albumName: t.albumName ?? undefined,
+      genres: t.genres ?? [],
+    }));
+
+    const [newPlaylist] = await db
+      .insert(sharedPlaylists)
+      .values({
+        fromUserId: userId,
+        toUserId,
+        conversationId: conversationId ?? null,
+        tracksData,
+        trackCount: tracks.length,
+      })
+      .returning();
+
+    let messageId: string | undefined;
+
+    if (conversationId && newPlaylist) {
+      const me = await storage.getUser(userId);
+      const [newMsg] = await db
+        .insert(messages)
+        .values({
+          conversationId,
+          senderId: userId,
+          messageType: "playlist",
+          content: JSON.stringify({ playlistId: newPlaylist.id, nickname: me?.nickname ?? "un utente", trackCount: tracks.length }),
+          playlistId: newPlaylist.id,
+        })
+        .returning({ id: messages.id });
+      messageId = newMsg?.id;
+    }
+
+    return res.json({ sharedPlaylistId: newPlaylist?.id, messageId });
+  } catch (error) {
+    console.error("[Last.fm] share-playlist error:", error);
+    return res.status(500).json({ message: "Errore durante la condivisione della libreria" });
   }
 });
 

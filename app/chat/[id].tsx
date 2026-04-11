@@ -297,9 +297,18 @@ export default function ChatConversationScreen() {
     retry: false,
   });
 
+  const { data: lastfmStatus } = useQuery<{ connected: boolean; trackCount?: number }>({
+    queryKey: ["/api/lastfm/status"],
+    retry: false,
+  });
+
+  const musicProvider = spotifyStatus?.connected ? "spotify" : lastfmStatus?.connected ? "lastfm" : null;
+  const musicTrackCount = spotifyStatus?.trackCount ?? lastfmStatus?.trackCount ?? 0;
+
   const sharePlaylistMutation = useMutation({
     mutationFn: async ({ toUserId }: { toUserId: string }) => {
-      const res = await apiRequest("POST", "/api/spotify/share-playlist", {
+      const endpoint = musicProvider === "lastfm" ? "/api/lastfm/share-playlist" : "/api/spotify/share-playlist";
+      const res = await apiRequest("POST", endpoint, {
         toUserId,
         conversationId: id,
       });
@@ -307,10 +316,10 @@ export default function ChatConversationScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", id, "messages"] });
-      Alert.alert("Playlist inviata", "La tua playlist è stata condivisa nella chat.");
+      Alert.alert("Libreria inviata", "La tua libreria è stata condivisa nella chat.");
     },
     onError: () => {
-      Alert.alert("Errore", "Impossibile condividere la playlist. Riprova.");
+      Alert.alert("Errore", "Impossibile condividere la libreria. Riprova.");
     },
   });
 
@@ -318,15 +327,15 @@ export default function ChatConversationScreen() {
   const isPrivateChat = !isMotoclub && conversation?.participants.length === 2;
 
   const handleSharePlaylist = useCallback(() => {
-    if (!spotifyStatus?.connected) {
-      Alert.alert("Spotify non connesso", "Connetti prima Spotify nel tab Musica.");
+    if (!musicProvider) {
+      Alert.alert("Musica non connessa", "Collega Last.fm o Spotify nel tab Musica.");
       return;
     }
     if (!isPrivateChat || !otherParticipant) return;
-    const trackCount = spotifyStatus.trackCount ?? 0;
+    const providerName = musicProvider === "lastfm" ? "Last.fm" : "Spotify";
     Alert.alert(
-      "Condividi Playlist",
-      `Invia la tua playlist corrente (${trackCount} brani) a ${otherParticipant.nickname}?`,
+      "Invia libreria",
+      `Invia la tua libreria ${providerName} (${musicTrackCount} brani) a ${otherParticipant.nickname}?`,
       [
         { text: "Annulla", style: "cancel" },
         {
@@ -335,7 +344,7 @@ export default function ChatConversationScreen() {
         },
       ]
     );
-  }, [spotifyStatus, isPrivateChat, otherParticipant, sharePlaylistMutation]);
+  }, [musicProvider, musicTrackCount, isPrivateChat, otherParticipant, sharePlaylistMutation]);
 
   const handleDeleteConversation = useCallback(() => {
     Alert.alert(
@@ -379,17 +388,24 @@ export default function ChatConversationScreen() {
           (position) => {
             insertCoords(position.coords.latitude, position.coords.longitude);
           },
-          () => {}
+          () => {
+            Alert.alert("Posizione non disponibile", "Abilita la geolocalizzazione nel browser.");
+          }
         );
       }
     } else {
       try {
         const Location = require("expo-location");
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") return;
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (status !== "granted") {
+          Alert.alert("Permesso negato", "Abilita la posizione per BikerLink nelle impostazioni del dispositivo.");
+          return;
+        }
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
         insertCoords(loc.coords.latitude, loc.coords.longitude);
-      } catch {}
+      } catch {
+        Alert.alert("Errore posizione", "Impossibile ottenere la posizione GPS. Riprova.");
+      }
     }
   }, []);
 
@@ -608,7 +624,7 @@ export default function ChatConversationScreen() {
             <Ionicons
               name="musical-notes-outline"
               size={24}
-              color={spotifyStatus?.connected ? SPOTIFY_GREEN : Colors.textSecondary}
+              color={musicProvider ? Colors.accent : Colors.textSecondary}
             />
           </TouchableOpacity>
         )}
