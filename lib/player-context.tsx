@@ -8,13 +8,7 @@ import React, {
 } from "react";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type RNTrackPlayer from "react-native-track-player";
-import type {
-  Capability as CapabilityType,
-  State as StateType,
-  Event as EventType,
-  RepeatMode as RepeatModeType,
-} from "react-native-track-player";
+import { Audio, AVPlaybackStatus } from "expo-av";
 
 export type PlayerSource = "radio" | "library" | "file" | "preview";
 export type RepeatMode = "off" | "track" | "queue";
@@ -81,58 +75,6 @@ const PlayerContext = createContext<PlayerContextType | null>(null);
 const FAVORITES_KEY = "player_favorite_stations";
 const SLEEP_KEY = "player_sleep_timer";
 
-let TrackPlayer: typeof RNTrackPlayer | null = null;
-let Capability: typeof CapabilityType | null = null;
-let State: typeof StateType | null = null;
-let Event: typeof EventType | null = null;
-let RepeatModeRNTP: typeof RepeatModeType | null = null;
-let playerReady = false;
-
-async function initTrackPlayer(): Promise<boolean> {
-  if (Platform.OS === "web") return false;
-  try {
-    const module = await import("react-native-track-player");
-    TrackPlayer = module.default;
-    Capability = module.Capability;
-    State = module.State;
-    Event = module.Event;
-    RepeatModeRNTP = module.RepeatMode;
-
-    // Registra il playback service PRIMA di setupPlayer — obbligatorio per
-    // i controlli lockscreen / notification bar nella build nativa.
-    const { PlaybackService } = await import("./player-service");
-    TrackPlayer.registerPlaybackService(() => PlaybackService);
-
-    await TrackPlayer.setupPlayer({
-      maxCacheSize: 1024 * 5,
-    });
-
-    await TrackPlayer.updateOptions({
-      capabilities: [
-        Capability.Play,
-        Capability.Pause,
-        Capability.SkipToNext,
-        Capability.SkipToPrevious,
-        Capability.Stop,
-      ],
-      compactCapabilities: [Capability.Play, Capability.Pause, Capability.SkipToNext],
-      notificationCapabilities: [
-        Capability.Play,
-        Capability.Pause,
-        Capability.SkipToNext,
-        Capability.SkipToPrevious,
-      ],
-      progressUpdateEventInterval: 1000,
-    });
-
-    playerReady = true;
-    return true;
-  } catch (err) {
-    console.warn("[Player] initTrackPlayer error:", err);
-    return false;
-  }
-}
-
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [isAvailable, setIsAvailable] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -150,15 +92,32 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [isShuffled, setIsShuffled] = useState(false);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
 
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const queueRef = useRef<PlayerTrack[]>([]);
+  const queueIndexRef = useRef(0);
+  const repeatModeRef = useRef<RepeatMode>("off");
+  const isPlayingRef = useRef(false);
   const sleepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const positionIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => { queueRef.current = queue; }, [queue]);
+  useEffect(() => { queueIndexRef.current = queueIndex; }, [queueIndex]);
+  useEffect(() => { repeatModeRef.current = repeatMode; }, [repeatMode]);
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const ok = await initTrackPlayer();
-      if (!mounted) return;
-      setIsAvailable(ok);
+      try {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: true,
+          shouldDuckAndroid: true,
+        });
+        if (mounted) setIsAvailable(true);
+      } catch (err) {
+        console.warn("[Player] Audio mode setup error:", err);
+        if (mounted) setIsAvailable(true);
+      }
     })();
 
     AsyncStorage.getItem(FAVORITES_KEY).then((v) => {
@@ -173,68 +132,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       mounted = false;
+      soundRef.current?.unloadAsync().catch(() => {});
     };
   }, []);
-
-  useEffect(() => {
-    if (!isAvailable || !TrackPlayer || !Event) return;
-
-    let subs: Array<{ remove?: () => void }> = [];
-    try {
-      subs = [
-        TrackPlayer.addEventListener(
-          Event.PlaybackState,
-          (data: { state: unknown }) => {
-            if (!State) return;
-            setIsPlaying(data.state === State.Playing);
-            setIsBuffering(
-              data.state === State.Buffering || data.state === State.Loading
-            );
-          }
-        ),
-        TrackPlayer.addEventListener(
-          Event.PlaybackActiveTrackChanged,
-          (data: { track?: { id?: string; url: string; title?: string; artist?: string; album?: string; artwork?: string; duration?: number; source?: string } }) => {
-            if (data.track) {
-              const t = data.track;
-              setCurrentTrack({
-                id: t.id || t.url,
-                url: t.url,
-                title: t.title || "Traccia sconosciuta",
-                artist: t.artist || "",
-                album: t.album,
-                artwork: t.artwork,
-                duration: t.duration,
-                source: (t.source as PlayerSource) || "radio",
-              });
-            }
-          }
-        ),
-        TrackPlayer.addEventListener(Event.PlaybackQueueEnded, () => {
-          setIsPlaying(false);
-        }),
-      ];
-    } catch (err) {
-      console.warn("[Player] event listener setup error:", err);
-    }
-
-    positionIntervalRef.current = setInterval(async () => {
-      if (!TrackPlayer || !playerReady) return;
-      try {
-        const pos = await TrackPlayer.getPosition();
-        const dur = await TrackPlayer.getDuration();
-        setPosition(isNaN(pos) ? 0 : pos);
-        setDuration(isNaN(dur) ? 0 : dur);
-      } catch (err) {
-        console.warn("[Player] position poll error:", err);
-      }
-    }, 1000);
-
-    return () => {
-      subs.forEach((s) => { try { s.remove?.(); } catch (err) { console.warn("[Player] sub remove error:", err); } });
-      if (positionIntervalRef.current) clearInterval(positionIntervalRef.current);
-    };
-  }, [isAvailable]);
 
   useEffect(() => {
     if (sleepTimerRef.current) clearTimeout(sleepTimerRef.current);
@@ -249,115 +149,116 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     return () => { if (sleepTimerRef.current) clearTimeout(sleepTimerRef.current); };
   }, [sleepTimerEnd]);
 
+  const onPlaybackStatus = useCallback((status: AVPlaybackStatus) => {
+    if (!status.isLoaded) {
+      if (status.error) console.warn("[Player] Playback error:", status.error);
+      return;
+    }
+    setIsPlaying(status.isPlaying);
+    setIsBuffering(status.isBuffering);
+    setPosition(status.positionMillis / 1000);
+    setDuration((status.durationMillis ?? 0) / 1000);
+
+    if (status.didJustFinish && !status.isLooping) {
+      const mode = repeatModeRef.current;
+      const q = queueRef.current;
+      const idx = queueIndexRef.current;
+      if (mode === "track") {
+        soundRef.current?.replayAsync().catch((err) => console.warn("[Player] replay error:", err));
+      } else if (mode === "queue" || idx < q.length - 1) {
+        const nextIdx = (idx + 1) % q.length;
+        loadAndPlay(q[nextIdx], nextIdx);
+      } else {
+        setIsPlaying(false);
+      }
+    }
+  }, []);
+
+  const loadAndPlay = useCallback(async (track: PlayerTrack, trackIndex: number) => {
+    try {
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync().catch(() => {});
+        soundRef.current = null;
+      }
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: track.url },
+        { shouldPlay: true, progressUpdateIntervalMillis: 1000 },
+        onPlaybackStatus
+      );
+      soundRef.current = sound;
+      setCurrentTrack(track);
+      setQueueIndex(trackIndex);
+      setSource(track.source);
+      setIsPlaying(true);
+      setIsBuffering(false);
+      setPosition(0);
+    } catch (err) {
+      console.warn("[Player] loadAndPlay error:", err);
+    }
+  }, [onPlaybackStatus]);
+
   const play = useCallback(async () => {
-    if (!TrackPlayer || !playerReady) return;
-    try { await TrackPlayer.play(); } catch (err) { console.warn("[Player] play error:", err); }
+    try { await soundRef.current?.playAsync(); } catch (err) { console.warn("[Player] play error:", err); }
   }, []);
 
   const pause = useCallback(async () => {
-    if (!TrackPlayer || !playerReady) return;
-    try { await TrackPlayer.pause(); } catch (err) { console.warn("[Player] pause error:", err); }
+    try { await soundRef.current?.pauseAsync(); } catch (err) { console.warn("[Player] pause error:", err); }
   }, []);
 
   const togglePlay = useCallback(() => {
-    if (isPlaying) pause(); else play();
-  }, [isPlaying, play, pause]);
+    if (isPlayingRef.current) pause(); else play();
+  }, [play, pause]);
 
   const playTrack = useCallback(async (track: PlayerTrack) => {
-    if (!TrackPlayer || !playerReady) return;
-    try {
-      await TrackPlayer.reset();
-      await TrackPlayer.add([{
-        id: track.id,
-        url: track.url,
-        title: track.title,
-        artist: track.artist,
-        album: track.album,
-        artwork: track.artwork,
-        duration: track.duration,
-        source: track.source,
-      }]);
-      await TrackPlayer.play();
-      setQueue([track]);
-      setQueueIndex(0);
-      setSource(track.source);
-      setCurrentTrack(track);
-    } catch (err) {
-      console.warn("[Player] playTrack error:", err);
-    }
-  }, []);
+    setQueue([track]);
+    queueRef.current = [track];
+    await loadAndPlay(track, 0);
+  }, [loadAndPlay]);
 
   const playQueue = useCallback(async (tracks: PlayerTrack[], startIndex = 0) => {
-    if (!TrackPlayer || !playerReady || tracks.length === 0) return;
-    try {
-      await TrackPlayer.reset();
-      const rnTracks = tracks.map((t) => ({
-        id: t.id,
-        url: t.url,
-        title: t.title,
-        artist: t.artist,
-        album: t.album,
-        artwork: t.artwork,
-        duration: t.duration,
-        source: t.source,
-      }));
-      await TrackPlayer.add(rnTracks);
-      if (startIndex > 0) await TrackPlayer.skip(startIndex);
-      await TrackPlayer.play();
-      setQueue(tracks);
-      setQueueIndex(startIndex);
-      setSource(tracks[startIndex]?.source || "preview");
-      setCurrentTrack(tracks[startIndex] || null);
-    } catch (err) {
-      console.warn("[Player] playQueue error:", err);
-    }
-  }, []);
+    if (tracks.length === 0) return;
+    setQueue(tracks);
+    queueRef.current = tracks;
+    await loadAndPlay(tracks[startIndex], startIndex);
+  }, [loadAndPlay]);
 
   const playRadioStation = useCallback(async (station: RadioStation, genreId?: string) => {
-    if (!TrackPlayer || !playerReady) return;
-    try {
-      await TrackPlayer.reset();
-      await TrackPlayer.add([{
-        id: station.id,
-        url: station.streamUrl,
-        title: station.name,
-        artist: station.country || "Radio",
-        artwork: station.favicon || undefined,
-        isLiveStream: true,
-        source: "radio",
-      }]);
-      await TrackPlayer.play();
-      const track: PlayerTrack = {
-        id: station.id,
-        url: station.streamUrl,
-        title: station.name,
-        artist: station.country || "Radio",
-        artwork: station.favicon || undefined,
-        source: "radio",
-      };
-      setQueue([track]);
-      setQueueIndex(0);
-      setSource("radio");
-      setCurrentTrack(track);
-      if (genreId) setSelectedGenre(genreId);
-    } catch (err) {
-      console.warn("[Player] playRadioStation error:", err);
-    }
-  }, []);
+    const track: PlayerTrack = {
+      id: station.id,
+      url: station.streamUrl,
+      title: station.name,
+      artist: station.country || "Radio",
+      artwork: station.favicon || undefined,
+      source: "radio",
+    };
+    setQueue([track]);
+    queueRef.current = [track];
+    await loadAndPlay(track, 0);
+    if (genreId) setSelectedGenre(genreId);
+  }, [loadAndPlay]);
 
   const next = useCallback(async () => {
-    if (!TrackPlayer || !playerReady) return;
-    try { await TrackPlayer.skipToNext(); } catch (err) { console.warn("[Player] next error:", err); }
-  }, []);
+    const q = queueRef.current;
+    const idx = queueIndexRef.current;
+    if (q.length <= 1) return;
+    const nextIdx = (idx + 1) % q.length;
+    await loadAndPlay(q[nextIdx], nextIdx);
+  }, [loadAndPlay]);
 
   const prev = useCallback(async () => {
-    if (!TrackPlayer || !playerReady) return;
-    try { await TrackPlayer.skipToPrevious(); } catch (err) { console.warn("[Player] prev error:", err); }
-  }, []);
+    const q = queueRef.current;
+    const idx = queueIndexRef.current;
+    if (position > 3) {
+      try { await soundRef.current?.setPositionAsync(0); } catch (err) { console.warn("[Player] rewind error:", err); }
+      return;
+    }
+    if (q.length <= 1) return;
+    const prevIdx = idx === 0 ? q.length - 1 : idx - 1;
+    await loadAndPlay(q[prevIdx], prevIdx);
+  }, [loadAndPlay, position]);
 
   const seekTo = useCallback(async (pos: number) => {
-    if (!TrackPlayer || !playerReady) return;
-    try { await TrackPlayer.seekTo(pos); } catch (err) { console.warn("[Player] seekTo error:", err); }
+    try { await soundRef.current?.setPositionAsync(pos * 1000); } catch (err) { console.warn("[Player] seekTo error:", err); }
   }, []);
 
   const setSleepTimer = useCallback((minutes: number | null) => {
@@ -386,18 +287,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setRepeatMode((prev) => {
       const next: RepeatMode =
         prev === "off" ? "track" : prev === "track" ? "queue" : "off";
-      if (TrackPlayer && playerReady && RepeatModeRNTP) {
-        try {
-          const rnMode =
-            next === "track"
-              ? RepeatModeRNTP.Track
-              : next === "queue"
-              ? RepeatModeRNTP.Queue
-              : RepeatModeRNTP.Off;
-          TrackPlayer.setRepeatMode(rnMode);
-        } catch (err) {
-          console.warn("[Player] setRepeatMode error:", err);
-        }
+      repeatModeRef.current = next;
+      if (next === "track" && soundRef.current) {
+        soundRef.current.setIsLoopingAsync(true).catch((err) => console.warn("[Player] setLooping error:", err));
+      } else if (soundRef.current) {
+        soundRef.current.setIsLoopingAsync(false).catch((err) => console.warn("[Player] setLooping error:", err));
       }
       return next;
     });

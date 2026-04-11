@@ -29,7 +29,6 @@
     "android": {
       "package": "com.bikerlink.app",
       "versionCode": 9,
-      "newArchEnabled": false,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -77,16 +76,7 @@
           "isAccessMediaLocationEnabled": true
         }
       ],
-      "expo-document-picker",
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "extraMavenRepos": ["https://jitpack.io"],
-            "kotlinVersion": "1.9.25"
-          }
-        }
-      ]
+      "expo-document-picker"
     ],
     "experiments": {
       "typedRoutes": true
