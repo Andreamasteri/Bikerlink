@@ -392,6 +392,8 @@ export default function ChatConversationScreen() {
             Alert.alert("Posizione non disponibile", "Abilita la geolocalizzazione nel browser.");
           }
         );
+      } else {
+        Alert.alert("Non supportato", "Il tuo browser non supporta la geolocalizzazione.");
       }
     } else {
       try {
