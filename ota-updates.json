@@ -1159,16 +1159,16 @@
     "jsEngine": "hermes",
     "message": "OTA-5 rv4.0.0: chat pulsante libreria Last.fm/Spotify unificato, feedback posizione GPS reale, fix CURRENT_OTA_NUMBER",
     "note": "Task #507. Chat: pulsante nota musicale ora supporta Last.fm (non solo Spotify) — usa provider connesso, nuovo endpoint /api/lastfm/share-playlist. Pulsante posizione: accuracy High, alert su permesso negato/errore GPS. CURRENT_OTA_NUMBER corretto a 5 nel bundle.",
-    "releaseId": null,
-    "bundleUrl": null,
-    "updateGroupId": null,
-    "androidUpdateId": null,
+    "releaseId": "a64d72d3-3079-41dd-bac5-dedb1918e9cd",
+    "bundleUrl": "private/ota/ota-1.5.0-1775910688609.js",
+    "updateGroupId": "5bdb5be0-01d7-4ddb-ae73-21d1bdb48378",
+    "androidUpdateId": "019d7c87-43e9-78ca-9743-7c3c801c3562",
     "iosUpdateId": null,
-    "commitBase": "e5e28a7cdc8a06ec8d1d02e469b020cc17616460",
-    "easDashboard": null,
+    "commitBase": "43672fb938f29c3d155df8d9ae0c171d80686ded",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/5bdb5be0-01d7-4ddb-ae73-21d1bdb48378",
     "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
-    "status": "pending"
+    "status": "published"
   }
 ]
