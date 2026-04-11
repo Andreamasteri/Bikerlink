@@ -2399,8 +2399,6 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   tabBar: {
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   tabBarContent: {
     flexDirection: "row" as const,
@@ -2408,12 +2406,13 @@ const styles = StyleSheet.create({
   },
   tabItem: {
     paddingTop: 10,
-    paddingBottom: 0,
+    paddingBottom: 2,
     paddingHorizontal: 12,
     alignItems: "center" as const,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
   },
   tabItemActive: {
-    borderBottomWidth: 2,
     borderBottomColor: Colors.accent,
   },
   tabText: {

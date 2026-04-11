@@ -295,7 +295,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="musical-notes-outline" size={size} color={color} />
             ),
-            headerTitle: "Musica",
+            headerShown: false,
             href: gpsTabHref,
           }}
         />
