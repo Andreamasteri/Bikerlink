@@ -140,8 +140,8 @@ export default function ProfileScreen() {
   const [isExportingData, setIsExportingData] = useState(false);
 
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-  // Ciclo 4.0.0 — APK v10 — OTA-7: Raduni/Eventi, Mappa Europea, Traduzioni+Turco, Brand Theme Switcher, fix Radio/Player
-  const CURRENT_OTA_NUMBER = 7;
+  // Ciclo 4.0.0 — APK v10 — OTA-8: stessa OTA-7 + fix distribuzione EAS (EAS era rimasto a OTA-6)
+  const CURRENT_OTA_NUMBER = 8;
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],

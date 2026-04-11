@@ -1216,5 +1216,28 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 8,
+    "version": "1.8.0",
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-8 rv4.0.0: fix distribuzione EAS — contenuto identico OTA-7 (Raduni/Eventi, Mappa Europea, Traduzioni+Turco, Brand Theme Switcher, fix Radio/Player)",
+    "note": "OTA-7 non era arrivata agli utenti perché il passo EAS aveva fatto timeout. OTA-8 ripubblica lo stesso contenuto assicurando il completamento EAS. Tasks #509-#516. CURRENT_OTA_NUMBER=8.",
+    "releaseId": "be2f8ded-b30a-4f55-b95b-4a33e389d8c4",
+    "bundleUrl": "private/ota/ota-1.8.0-1775946522068.js",
+    "updateGroupId": "323c3800-65d6-4c9b-95a4-9c84c2e2a2c4",
+    "androidUpdateId": "019d7ea9-ffd6-7fe6-a460-c9c600dea322",
+    "iosUpdateId": null,
+    "commitBase": "0dcc513712ac2b7a1709c7d74f4f203878cbe821",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/323c3800-65d6-4c9b-95a4-9c84c2e2a2c4",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "published"
   }
 ]
