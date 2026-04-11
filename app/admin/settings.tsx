@@ -6,8 +6,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
-import Colors, { THEMES } from "@/constants/colors";
-import type { ThemeName } from "@/constants/colors";
+import Colors from "@/constants/colors";
+import { THEMES, THEME_META, ThemeName } from "@/constants/colors";
 import { useTheme } from "@/lib/theme-context";
 import { getApiUrl, queryClient, apiRequest } from "@/lib/query-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -282,7 +282,7 @@ function PdfDocumentAdminSection({
 
 export default function AdminSettings() {
   const insets = useSafeAreaInsets();
-  const { currentTheme, setTheme } = useTheme();
+  const { currentTheme, setTheme, colors: themeColors } = useTheme();
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [protectedToggle, setProtectedToggle] = useState<{ key: string; value: boolean; label: string } | null>(null);
@@ -370,6 +370,50 @@ export default function AdminSettings() {
     queryKey: ["/api/settings/show-search-preference"],
   });
   const showSearchPrefEnabled = showSearchPrefData?.enabled === true;
+
+  const { data: themeServerData } = useQuery<{ userSwitchingEnabled: boolean; defaultTheme: string }>({
+    queryKey: ["/api/settings/theme"],
+  });
+  const themeUserSwitching = themeServerData?.userSwitchingEnabled === true;
+  const themeDefaultName: ThemeName = (["attuale", "asfalto", "velocita", "rotta"] as ThemeName[]).includes(themeServerData?.defaultTheme as ThemeName)
+    ? (themeServerData!.defaultTheme as ThemeName)
+    : "attuale";
+
+  const themeSwitchingMutation = useMutation({
+    mutationFn: async (value: boolean) => {
+      const url = new URL("/api/admin/settings/theme_user_switching_enabled", getApiUrl());
+      const res = await fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: value ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Errore aggiornamento impostazione tema");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/theme"] });
+    },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
+  });
+
+  const themeDefaultMutation = useMutation({
+    mutationFn: async (value: ThemeName) => {
+      const url = new URL("/api/admin/settings/theme_default", getApiUrl());
+      const res = await fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Errore aggiornamento tema default");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/theme"] });
+    },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
+  });
 
   const disableFeatureMutation = useMutation({
     mutationFn: async (key: string) => {
@@ -1196,12 +1240,70 @@ export default function AdminSettings() {
   return (
     <>
     <KeyboardAwareScrollViewCompat
-      style={styles.container}
+      style={[styles.container, { backgroundColor: themeColors.background }]}
       contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}
       bottomOffset={20}
     >
 
       <View style={[styles.sectionHeaderRow, { marginTop: 0 }]}>
+        <Ionicons name="color-palette" size={20} color={Colors.accent} />
+        <Text style={styles.sectionTitle}>Tema Brand</Text>
+      </View>
+
+      <View style={themeStyles.switchRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={themeStyles.switchLabel}>Permetti agli utenti di cambiare tema</Text>
+          <Text style={themeStyles.switchDesc}>
+            {themeUserSwitching
+              ? "Ogni utente sceglie il proprio stile visivo"
+              : "Tutti gli utenti vedono il tema selezionato qui sotto"}
+          </Text>
+        </View>
+        <Switch
+          value={themeUserSwitching}
+          onValueChange={(val) => themeSwitchingMutation.mutate(val)}
+          trackColor={{ false: Colors.border, true: Colors.accent + "88" }}
+          thumbColor={themeUserSwitching ? Colors.accent : Colors.textSecondary}
+          disabled={themeSwitchingMutation.isPending}
+        />
+      </View>
+
+      {!themeUserSwitching && (
+        <>
+          <Text style={themeStyles.defaultLabel}>Tema predefinito per tutti gli utenti:</Text>
+          <View style={themeStyles.grid}>
+            {(["attuale", "asfalto", "velocita", "rotta"] as ThemeName[]).map((name) => {
+              const theme = THEMES[name];
+              const meta = THEME_META[name];
+              const isActive = themeDefaultName === name;
+              return (
+                <TouchableOpacity
+                  key={name}
+                  style={[themeStyles.card, isActive && themeStyles.cardActive]}
+                  onPress={() => themeDefaultMutation.mutate(name)}
+                  activeOpacity={0.8}
+                  disabled={themeDefaultMutation.isPending}
+                >
+                  {isActive && (
+                    <View style={themeStyles.checkmark}>
+                      <Ionicons name="checkmark-circle" size={18} color={theme.accent} />
+                    </View>
+                  )}
+                  <View style={themeStyles.swatches}>
+                    <View style={[themeStyles.swatch, { backgroundColor: theme.background }]} />
+                    <View style={[themeStyles.swatch, { backgroundColor: theme.accent }]} />
+                    <View style={[themeStyles.swatch, { backgroundColor: theme.surface }]} />
+                  </View>
+                  <Text style={themeStyles.cardLabel} numberOfLines={1}>{meta.label}</Text>
+                  <Text style={themeStyles.cardDesc} numberOfLines={2}>{meta.description}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </>
+      )}
+
+      <View style={styles.sectionHeaderRow}>
         <Ionicons name="apps" size={20} color={Colors.accent} />
         <Text style={styles.sectionTitle}>Funzionalità App</Text>
       </View>
@@ -2656,92 +2758,82 @@ const styles = StyleSheet.create({
   countryChipTextSelected: {
     color: Colors.warning, fontFamily: "Inter_600SemiBold",
   },
-  accordionPanel: {
-    borderRadius: 12, borderWidth: 1, borderColor: Colors.border,
-    backgroundColor: Colors.surface, marginBottom: 12, overflow: "hidden",
-  },
-  accordionPanelHeader: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 16, paddingVertical: 14,
-  },
-  accordionPanelTitle: {
-    fontFamily: "Inter_600SemiBold", fontSize: 15, color: Colors.text, marginLeft: 8,
-  },
-  accordionPanelContent: {
-    paddingHorizontal: 12, paddingBottom: 12,
-  },
 });
 
-const brandThemeStyles = StyleSheet.create({
-  container: {
-    marginBottom: 16,
-  },
-  subtitle: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginBottom: 12,
-  },
-  grid: {
-    gap: 10,
-  },
-  card: {
+const themeStyles = StyleSheet.create({
+  switchRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 14,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.border,
-    backgroundColor: Colors.surface,
     gap: 12,
   },
-  cardSelected: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.surfaceLight,
-  },
-  swatch: {
-    width: 52,
-    height: 52,
-    borderRadius: 10,
-    overflow: "hidden",
-    position: "relative",
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  swatchAccent: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 18,
-  },
-  swatchSurface: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 24,
-  },
-  swatchText: {
-    position: "absolute",
-    top: 22,
-    left: 6,
-    right: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  cardBody: {
-    flex: 1,
-    gap: 2,
-  },
-  cardLabel: {
+  switchLabel: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
+    fontSize: 14,
     color: Colors.text,
+    marginBottom: 2,
   },
-  cardDesc: {
+  switchDesc: {
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     color: Colors.textSecondary,
+  },
+  defaultLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginBottom: 10,
+    marginLeft: 2,
+  },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 20,
+  },
+  card: {
+    width: "47%",
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+  },
+  cardActive: {
+    borderColor: Colors.accent,
+  },
+  checkmark: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+  },
+  swatches: {
+    flexDirection: "row",
+    gap: 6,
+    marginBottom: 10,
+  },
+  swatch: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  cardLabel: {
+    color: Colors.text,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    marginBottom: 3,
+  },
+  cardDesc: {
+    color: Colors.textSecondary,
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    lineHeight: 15,
   },
 });

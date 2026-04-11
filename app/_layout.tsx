@@ -43,9 +43,8 @@ import { LocationProvider } from "@/lib/location-context";
 import { LanguageProvider, useLanguage } from "@/lib/language-context";
 import { MapSettingsProvider, useMapConfig } from "@/lib/map-context";
 import { TaskbarStyleProvider } from "@/lib/taskbar-style-context";
+import { ThemeProvider, useTheme } from "@/lib/theme-context";
 import { PlayerProvider } from "@/lib/player-context";
-import { ThemeProvider } from "@/lib/theme-context";
-import Colors from "@/constants/colors";
 import UptimeWidget from "@/components/UptimeWidget";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -138,10 +137,11 @@ function StartupGate({ ready, children }: { ready: boolean; children: React.Reac
 function MapReadyGate({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { isLoading } = useMapConfig();
+  const { colors } = useTheme();
   if (user && isLoading) {
     return (
-      <View style={styles.mapGateLoader}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+      <View style={[styles.mapGateLoader, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -236,11 +236,12 @@ function LanguageKeyedRoot() {
 }
 
 function RootLayoutNav() {
+  const { colors } = useTheme();
   return (
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: Colors.background },
+        contentStyle: { backgroundColor: colors.background },
       }}
     >
       <Stack.Screen name="welcome" />
@@ -256,7 +257,7 @@ function RootLayoutNav() {
       <Stack.Screen name="moderator" options={{ headerShown: false }} />
       <Stack.Screen name="contest" options={{ headerShown: false }} />
       <Stack.Screen name="privacy-policy" options={{ headerShown: false }} />
-      <Stack.Screen name="feedback/index" options={{ headerShown: true, headerTitle: "Feedback", headerStyle: { backgroundColor: Colors.surface }, headerTintColor: Colors.text }} />
+      <Stack.Screen name="feedback/index" options={{ headerShown: true, headerTitle: "Feedback", headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text }} />
     </Stack>
   );
 }
@@ -309,6 +310,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <MapSettingsProvider>
+              <ThemeProvider>
               <TaskbarStyleProvider>
               <LocationProvider>
                 <PlayerProvider>
@@ -323,6 +325,7 @@ export default function RootLayout() {
                 </PlayerProvider>
               </LocationProvider>
               </TaskbarStyleProvider>
+              </ThemeProvider>
             </MapSettingsProvider>
           </AuthProvider>
         </QueryClientProvider>
@@ -337,6 +340,5 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: Colors.background,
   },
 });

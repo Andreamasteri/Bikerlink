@@ -16,6 +16,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
+import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
@@ -27,6 +28,7 @@ import * as Location from "expo-location";
 const sosLaunchIcon = require("@/assets/images/sos-launch-icon.png");
 
 export default function ReadyToRideScreen() {
+  const colors = useColors();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -178,15 +180,15 @@ export default function ReadyToRideScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color={Colors.accent} />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={[
         styles.scrollContent,
         {

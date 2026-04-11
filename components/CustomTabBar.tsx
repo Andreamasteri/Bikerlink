@@ -9,7 +9,7 @@ import {
   Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Colors from "@/constants/colors";
+import { useColors } from "@/hooks/useColors";
 import { type TaskbarStyle } from "@/lib/taskbar-style-context";
 
 export interface TabItem {
@@ -31,11 +31,12 @@ const COMMUNITY_TABS = new Set(["match", "motoclub", "contest", "music", "eventi
 const MAX_SCORRI_VISIBLE = 6;
 
 function TabIcon({ tab, isActive }: { tab: TabItem; isActive: boolean }) {
-  const color = isActive ? Colors.accent : Colors.textSecondary;
+  const colors = useColors();
+  const color = isActive ? colors.accent : colors.textSecondary;
   return (
-    <Pressable style={styles.tabItem} onPress={tab.onPress}>
+    <Pressable style={staticStyles.tabItem} onPress={tab.onPress}>
       {tab.icon(color, 24)}
-      <Text style={[styles.tabLabel, { color }]} numberOfLines={1}>
+      <Text style={[staticStyles.tabLabel, { color }]} numberOfLines={1}>
         {tab.title}
       </Text>
     </Pressable>
@@ -51,14 +52,15 @@ function ScrollTabIcon({
   isActive: boolean;
   itemWidth: number;
 }) {
-  const color = isActive ? Colors.accent : Colors.textSecondary;
+  const colors = useColors();
+  const color = isActive ? colors.accent : colors.textSecondary;
   return (
     <Pressable
-      style={[styles.tabItem, { width: itemWidth, flex: 0 }]}
+      style={[staticStyles.tabItem, { width: itemWidth, flex: 0 }]}
       onPress={tab.onPress}
     >
       {tab.icon(color, 24)}
-      <Text style={[styles.tabLabel, { color }]} numberOfLines={1}>
+      <Text style={[staticStyles.tabLabel, { color }]} numberOfLines={1}>
         {tab.title}
       </Text>
     </Pressable>
@@ -71,6 +73,7 @@ export default function CustomTabBar({
   tabBarHeight,
   tabBarPaddingBottom,
 }: CustomTabBarProps) {
+  const colors = useColors();
   const [communityOpen, setCommunityOpen] = useState(false);
   const [showAltroOverride, setShowAltroOverride] = useState<boolean | null>(null);
   const scrollRef = useRef<ScrollView>(null);
@@ -78,14 +81,14 @@ export default function CustomTabBar({
   const barStyle = {
     height: tabBarHeight,
     paddingBottom: tabBarPaddingBottom,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   };
 
   if (style === "tutti") {
     return (
-      <View style={[styles.bar, barStyle]}>
+      <View style={[staticStyles.bar, barStyle]}>
         {tabs.map((tab) => (
           <TabIcon key={tab.name} tab={tab} isActive={tab.isFocused} />
         ))}
@@ -100,18 +103,18 @@ export default function CustomTabBar({
     const itemWidth = Math.floor(availableWidth / MAX_SCORRI_VISIBLE);
 
     return (
-      <View style={[barStyle, styles.scorriBar]}>
+      <View style={[barStyle, staticStyles.scorriBar]}>
         <Pressable
-          style={styles.arrowBtn}
+          style={staticStyles.arrowBtn}
           onPress={() => scrollRef.current?.scrollTo({ x: 0, animated: true })}
         >
-          <Ionicons name="chevron-back" size={18} color={Colors.textSecondary} />
+          <Ionicons name="chevron-back" size={18} color={colors.textSecondary} />
         </Pressable>
         <ScrollView
           ref={scrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.scorriContent}
+          contentContainerStyle={staticStyles.scorriContent}
           style={{ flex: 1 }}
         >
           {tabs.map((tab) => (
@@ -124,13 +127,13 @@ export default function CustomTabBar({
           ))}
         </ScrollView>
         <Pressable
-          style={styles.arrowBtn}
+          style={staticStyles.arrowBtn}
           onPress={() => scrollRef.current?.scrollToEnd({ animated: true })}
         >
           <Ionicons
             name="chevron-forward"
             size={18}
-            color={Colors.textSecondary}
+            color={colors.textSecondary}
           />
         </Pressable>
       </View>
@@ -146,23 +149,23 @@ export default function CustomTabBar({
     const altroActive = showAltro || restHasFocused;
 
     return (
-      <View style={[styles.bar, barStyle]}>
+      <View style={[staticStyles.bar, barStyle]}>
         {displayTabs.map((tab) => (
           <TabIcon key={tab.name} tab={tab} isActive={tab.isFocused} />
         ))}
         <Pressable
-          style={styles.tabItem}
+          style={staticStyles.tabItem}
           onPress={() => setShowAltroOverride((prev) => !(prev !== null ? prev : restHasFocused))}
         >
           <Ionicons
             name={showAltro ? "grid" : "ellipsis-horizontal"}
             size={24}
-            color={altroActive ? Colors.accent : Colors.textSecondary}
+            color={altroActive ? colors.accent : colors.textSecondary}
           />
           <Text
             style={[
-              styles.tabLabel,
-              { color: altroActive ? Colors.accent : Colors.textSecondary },
+              staticStyles.tabLabel,
+              { color: altroActive ? colors.accent : colors.textSecondary },
             ]}
           >
             Altro...
@@ -191,30 +194,24 @@ export default function CustomTabBar({
 
     return (
       <>
-        <View style={[styles.bar, barStyle]}>
+        <View style={[staticStyles.bar, barStyle]}>
           {displayItems.map((item, idx) => {
             if (item === "community") {
               return (
                 <Pressable
                   key="community"
-                  style={styles.tabItem}
+                  style={staticStyles.tabItem}
                   onPress={() => setCommunityOpen(true)}
                 >
                   <Ionicons
                     name="people"
                     size={24}
-                    color={
-                      communityFocused ? Colors.accent : Colors.textSecondary
-                    }
+                    color={communityFocused ? colors.accent : colors.textSecondary}
                   />
                   <Text
                     style={[
-                      styles.tabLabel,
-                      {
-                        color: communityFocused
-                          ? Colors.accent
-                          : Colors.textSecondary,
-                      },
+                      staticStyles.tabLabel,
+                      { color: communityFocused ? colors.accent : colors.textSecondary },
                     ]}
                   >
                     Community
@@ -239,32 +236,32 @@ export default function CustomTabBar({
           onRequestClose={() => setCommunityOpen(false)}
         >
           <Pressable
-            style={styles.communityOverlay}
+            style={staticStyles.communityOverlay}
             onPress={() => setCommunityOpen(false)}
           >
             <View
-              style={[styles.communityMenu, { bottom: tabBarHeight }]}
+              style={[
+                staticStyles.communityMenu,
+                { bottom: tabBarHeight, backgroundColor: colors.surface },
+              ]}
             >
               {communityMembers.map((tab) => (
                 <Pressable
                   key={tab.name}
                   style={[
-                    styles.communityItem,
-                    tab.isFocused && styles.communityItemActive,
+                    staticStyles.communityItem,
+                    tab.isFocused && { backgroundColor: colors.background },
                   ]}
                   onPress={() => {
                     setCommunityOpen(false);
                     tab.onPress();
                   }}
                 >
-                  {tab.icon(
-                    tab.isFocused ? Colors.accent : Colors.text,
-                    22
-                  )}
+                  {tab.icon(tab.isFocused ? colors.accent : colors.text, 22)}
                   <Text
                     style={[
-                      styles.communityItemLabel,
-                      tab.isFocused && { color: Colors.accent },
+                      staticStyles.communityItemLabel,
+                      { color: tab.isFocused ? colors.accent : colors.text },
                     ]}
                   >
                     {tab.title}
@@ -281,7 +278,7 @@ export default function CustomTabBar({
   return null;
 }
 
-const styles = StyleSheet.create({
+const staticStyles = StyleSheet.create({
   bar: {
     flexDirection: "row",
     alignItems: "center",
@@ -323,7 +320,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 16,
     right: 16,
-    backgroundColor: Colors.surface,
     borderRadius: 14,
     paddingVertical: 8,
     shadowColor: "#000",
@@ -340,12 +336,8 @@ const styles = StyleSheet.create({
     gap: 16,
     borderRadius: 10,
   },
-  communityItemActive: {
-    backgroundColor: Colors.background,
-  },
   communityItemLabel: {
     fontSize: 16,
     fontFamily: "Inter_500Medium",
-    color: Colors.text,
   },
 });

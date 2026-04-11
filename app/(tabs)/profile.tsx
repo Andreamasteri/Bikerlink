@@ -23,6 +23,9 @@ import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
 import Colors from "@/constants/colors";
+import { THEMES, THEME_META, ThemeName } from "@/constants/colors";
+import { useColors } from "@/hooks/useColors";
+import { useTheme } from "@/lib/theme-context";
 import { type AppLanguage } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage, useT, useLocale } from "@/lib/language-context";
@@ -119,12 +122,14 @@ function getUserTypeIcon(userType: string): keyof typeof Ionicons.glyphMap {
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
   const { user, logoutMutation } = useAuth();
   const router = useRouter();
   const { language, setLanguage } = useLanguage();
   const t = useT();
   const locale = useLocale();
   const { enabled: mapsEnabled, userChoiceEnabled } = useMapConfig();
+  const { currentTheme, setTheme, userSwitchingEnabled } = useTheme();
   const { taskbarStyle, setTaskbarStyle } = useTaskbarStyle();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showRevokeConsentModal, setShowRevokeConsentModal] = useState(false);
@@ -258,6 +263,7 @@ export default function ProfileScreen() {
   const [fakeHomeRadius, setFakeHomeRadius] = useState(2);
   const [privacyExpanded, setPrivacyExpanded] = useState(false);
   const [mapStyleExpanded, setMapStyleExpanded] = useState(false);
+  const [themeExpanded, setThemeExpanded] = useState(false);
   const [docsExpanded, setDocsExpanded] = useState(false);
   const [mapPickerVisible, setMapPickerVisible] = useState(false);
   const [mapPickerTarget, setMapPickerTarget] = useState<"home" | "fake" | null>(null);
@@ -623,7 +629,7 @@ export default function ProfileScreen() {
     <ScrollView
       style={[
         styles.container,
-        { paddingTop: Platform.OS === "web" ? 67 : insets.top },
+        { paddingTop: Platform.OS === "web" ? 67 : insets.top, backgroundColor: colors.background },
       ]}
       contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16 }}
       showsVerticalScrollIndicator={false}
@@ -631,7 +637,7 @@ export default function ProfileScreen() {
         <RefreshControl
           refreshing={profileQuery.isRefetching}
           onRefresh={() => profileQuery.refetch()}
-          tintColor={Colors.accent}
+          tintColor={colors.accent}
         />
       }
     >
@@ -1077,6 +1083,45 @@ export default function ProfileScreen() {
                     {isSelected && (
                       <Ionicons name="checkmark-circle" size={20} color={Colors.accent} />
                     )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </View>
+      )}
+
+      {userSwitchingEnabled && (
+        <View style={styles.section}>
+          <Pressable style={styles.accordionHeader} onPress={() => setThemeExpanded(v => !v)}>
+            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Stile Visivo</Text>
+            <Ionicons name={themeExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+          </Pressable>
+          {themeExpanded && (
+            <View style={{ paddingTop: 12, gap: 8 }}>
+              {(["attuale", "asfalto", "velocita", "rotta"] as ThemeName[]).map((name) => {
+                const theme = THEMES[name];
+                const meta = THEME_META[name];
+                const isActive = currentTheme === name;
+                return (
+                  <Pressable
+                    key={name}
+                    style={[
+                      styles.mapStyleOption,
+                      isActive && styles.mapStyleOptionActive,
+                    ]}
+                    onPress={() => setTheme(name)}
+                  >
+                    <View style={{ flexDirection: "row", gap: 6 }}>
+                      <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: theme.background, borderWidth: 1, borderColor: Colors.border }} />
+                      <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: theme.accent, borderWidth: 1, borderColor: Colors.border }} />
+                      <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: theme.surface, borderWidth: 1, borderColor: Colors.border }} />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={[styles.mapStyleName, isActive && { color: Colors.accent }]}>{meta.label}</Text>
+                      <Text style={styles.mapStyleDesc} numberOfLines={1}>{meta.description}</Text>
+                    </View>
+                    {isActive && <Ionicons name="checkmark-circle" size={20} color={Colors.accent} />}
                   </Pressable>
                 );
               })}

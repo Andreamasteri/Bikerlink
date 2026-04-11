@@ -17,7 +17,8 @@ BikerLink utilizes a modern full-stack architecture.
 - Navigation is handled by Expo Router, leveraging file-based routing.
 - State management relies on `@tanstack/react-query` for data fetching and caching, complemented by React Context for global state.
 - Internationalization supports 5 languages (IT/EN/DE/ES/FR) via `lib/i18n.ts` and `lib/language-context.tsx`.
-- The UI/UX features a dark theme (background `#0D0D0D`, accent `#FF6600`) and includes custom icons like a Shark Carbon helmet for SOS.
+- The UI/UX features a dark theme by default (background `#0D0D0D`, accent `#FF6600`) and includes custom icons like a Shark Carbon helmet for SOS.
+- **Brand Theme Switcher**: Admin panel includes a 4-theme selector ("Attuale", "Asfalto Caldo", "Velocità Pura", "Rotta Libera"). Themes are defined in `constants/colors.ts` (`THEMES`), managed via `ThemeProvider` in `lib/theme-context.tsx`, persisted in AsyncStorage. Components use `useColors()` from `hooks/useColors.ts` to receive dynamic colors.
 - Interactive maps are implemented using `react-native-maps`, with web-specific components (`.web.tsx`) providing alternative UIs where native map features are not available.
 - Features include user profiles (Biker, Zavorrina/Zavorrino, Coppia), interactive maps displaying users, Syneco workshops, and collectible easter eggs.
 - Users can create and respond to ride proposals, engage in private and group chats, and track GPS routes with performance statistics.

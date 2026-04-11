@@ -21,6 +21,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, getApiUrl } from "@/lib/query-client";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { useColors } from "@/hooks/useColors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import { useSynecoVisible } from "@/lib/syneco-context";
@@ -51,6 +52,7 @@ function formatLastSeen(dateStr: string | null | undefined): string {
 
 export default function MapScreen() {
   const router = useRouter();
+  const colors = useColors();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const t = useT();
   const locale = useLocale();
@@ -688,7 +690,7 @@ export default function MapScreen() {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={{ paddingTop: Platform.OS === "web" ? 67 : insets.top, paddingBottom: 16 }}
     >
       <View style={styles.header}>

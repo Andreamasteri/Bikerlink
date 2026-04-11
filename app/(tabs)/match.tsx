@@ -19,6 +19,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { useColors } from "@/hooks/useColors";
 import { queryClient, getApiUrl, apiRequest } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import { useT, useLocale } from "@/lib/language-context";
@@ -455,6 +456,7 @@ type TabKey = "zavorrine" | "biker" | "proposals" | "music" | "accepted" | "blac
 
 export default function MatchScreen() {
   const router = useRouter();
+  const colors = useColors();
   const { user } = useAuth();
   const t = useT();
   const locale = useLocale();
@@ -1149,7 +1151,7 @@ export default function MatchScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: Platform.OS === "web" ? insets.top + 67 : insets.top }, Platform.OS === "web" && { paddingBottom: 34 }]}>
+    <View style={[styles.container, { paddingTop: Platform.OS === "web" ? insets.top + 67 : insets.top, backgroundColor: colors.background }, Platform.OS === "web" && { paddingBottom: 34 }]}>
       <View style={styles.inlineHeader}>
         <Text style={styles.inlineTitle}>{t("match.title")}</Text>
       </View>

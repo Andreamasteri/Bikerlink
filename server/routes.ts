@@ -396,6 +396,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/theme", async (_req, res) => {
+    try {
+      const [switchingSetting, defaultSetting] = await Promise.all([
+        storage.getAppSetting("theme_user_switching_enabled"),
+        storage.getAppSetting("theme_default"),
+      ]);
+      const userSwitchingEnabled = switchingSetting?.value === "true";
+      const defaultTheme = defaultSetting?.value || "attuale";
+      res.json({ userSwitchingEnabled, defaultTheme });
+    } catch {
+      res.json({ userSwitchingEnabled: false, defaultTheme: "attuale" });
+    }
+  });
+
   app.get("/api/users/search", async (req, res) => {
     if (!req.session?.userId) return res.status(401).json({ message: "Non autenticato" });
     try {

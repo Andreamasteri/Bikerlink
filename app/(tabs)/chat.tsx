@@ -20,6 +20,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth-context";
 import { useT } from "@/lib/language-context";
 import { getCurrentLocale } from "@/lib/i18n";
@@ -177,6 +178,7 @@ interface UserSearchResult {
 export default function ChatScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useColors();
   const { user } = useAuth();
   const t = useT();
   const userId = user?.id || "";
@@ -344,10 +346,10 @@ export default function ChatScreen() {
   const webTopInset = Platform.OS === "web" ? 67 : 0;
 
   return (
-    <View style={[styles.container, { paddingTop: webTopInset }]}>
-      <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 16 : insets.top + 4 }]}>
+    <View style={[styles.container, { paddingTop: webTopInset, backgroundColor: colors.background }]}>
+      <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 16 : insets.top + 4, backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <View style={styles.emailNotifRow}>
-          <Ionicons name="mail-outline" size={15} color={Colors.textSecondary} style={{ marginRight: 6 }} />
+          <Ionicons name="mail-outline" size={15} color={colors.textSecondary} style={{ marginRight: 6 }} />
           <Text style={styles.emailNotifLabel}>Invia i messaggi in email quando sono Offline</Text>
           <Switch
             value={emailNotifEnabled}

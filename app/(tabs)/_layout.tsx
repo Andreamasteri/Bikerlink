@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import { Tabs, useRouter, usePathname, type Href } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import Colors from "@/constants/colors";
+import { useColors } from "@/hooks/useColors";
 import { Platform, View, Pressable, Text, StyleSheet, Linking, Modal } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/lib/auth-context";
@@ -14,6 +14,7 @@ import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
   const router = useRouter();
   const pathname = usePathname();
   const { user, isLoading } = useAuth();
@@ -198,11 +199,11 @@ export default function TabLayout() {
       <Tabs
         tabBar={taskbarStyle !== "tutti" ? renderCustomTabBar : undefined}
         screenOptions={{
-          tabBarActiveTintColor: Colors.accent,
-          tabBarInactiveTintColor: Colors.textSecondary,
+          tabBarActiveTintColor: colors.accent,
+          tabBarInactiveTintColor: colors.textSecondary,
           tabBarStyle: {
-            backgroundColor: Colors.surface,
-            borderTopColor: Colors.border,
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
             height: tabBarHeight,
             paddingBottom: tabBarPaddingBottom,
           },
@@ -211,9 +212,9 @@ export default function TabLayout() {
             fontFamily: "Inter_500Medium",
           },
           headerStyle: {
-            backgroundColor: Colors.surface,
+            backgroundColor: colors.surface,
           },
-          headerTintColor: Colors.text,
+          headerTintColor: colors.text,
           headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
         }}
       >
@@ -247,7 +248,7 @@ export default function TabLayout() {
               <Ionicons
                 name="bicycle"
                 size={22}
-                color={isAvailable ? Colors.success : Colors.accentRed}
+                color={isAvailable ? colors.success : colors.accentRed}
               />
             ),
             headerTitle: "Ride!",
@@ -314,7 +315,7 @@ export default function TabLayout() {
                       width: 10,
                       height: 10,
                       borderRadius: 5,
-                      backgroundColor: Colors.accent,
+                      backgroundColor: colors.accent,
                     }}
                   />
                 )}
@@ -346,7 +347,7 @@ export default function TabLayout() {
             href: null,
             headerLeft: () => (
               <Pressable onPress={() => router.back()} style={{ marginLeft: 8 }}>
-                <Ionicons name="arrow-back" size={24} color={Colors.text} />
+                <Ionicons name="arrow-back" size={24} color={colors.text} />
               </Pressable>
             ),
           }}
@@ -384,20 +385,20 @@ export default function TabLayout() {
         onRequestClose={() => setShowGarageReminder(false)}
       >
         <View style={reminderStyles.overlay}>
-          <View style={reminderStyles.card}>
+          <View style={[reminderStyles.card, { backgroundColor: colors.surface }]}>
             <Ionicons
               name={isBikerOrCoppia ? "build" : "heart"}
               size={36}
-              color={Colors.accent}
+              color={colors.accent}
               style={{ marginBottom: 12 }}
             />
-            <Text style={reminderStyles.text}>
+            <Text style={[reminderStyles.text, { color: colors.text }]}>
               {isBikerOrCoppia
                 ? "Ehi, ricordati di parcheggiare le tue moto nel garage!! Lo trovi sotto Profilo Utente, in fondo a destra"
                 : "Ehi, ricordati di condividere la tua lista dei desideri motociclistica! La trovi sotto Profilo Utente, in fondo a destra"}
             </Text>
             <Pressable
-              style={reminderStyles.btn}
+              style={[reminderStyles.btn, { backgroundColor: colors.accent }]}
               onPress={() => {
                 setShowGarageReminder(false);
                 router.push("/garage" as Href);
@@ -458,7 +459,6 @@ const reminderStyles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   card: {
-    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: 28,
     alignItems: "center",
@@ -473,13 +473,11 @@ const reminderStyles = StyleSheet.create({
   text: {
     fontFamily: "Inter_400Regular",
     fontSize: 15,
-    color: Colors.text,
     textAlign: "center",
     lineHeight: 22,
     marginBottom: 20,
   },
   btn: {
-    backgroundColor: Colors.accent,
     borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 40,
