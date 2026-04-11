@@ -1004,7 +1004,7 @@ const modalStyles = StyleSheet.create({
 
 function sourceLabel(source: string): string {
   switch (source) {
-    case "file": return "📱 Telefono";
+    case "file": return "📱 Da telefono";
     case "radio": return "📻 Radio";
     case "preview": return "🎵 Anteprima 30s";
     case "library": return "🎵 Libreria";
