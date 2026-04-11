@@ -6,7 +6,9 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
-import Colors from "@/constants/colors";
+import Colors, { THEMES } from "@/constants/colors";
+import type { ThemeName } from "@/constants/colors";
+import { useTheme } from "@/lib/theme-context";
 import { getApiUrl, queryClient, apiRequest } from "@/lib/query-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -280,6 +282,7 @@ function PdfDocumentAdminSection({
 
 export default function AdminSettings() {
   const insets = useSafeAreaInsets();
+  const { currentTheme, setTheme } = useTheme();
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [protectedToggle, setProtectedToggle] = useState<{ key: string; value: boolean; label: string } | null>(null);
@@ -2062,6 +2065,46 @@ export default function AdminSettings() {
       </View>
 
       <View style={styles.sectionHeaderRow}>
+        <Ionicons name="color-palette" size={20} color={Colors.accent} />
+        <Text style={styles.sectionTitle}>Brand Theme</Text>
+      </View>
+
+      <View style={brandThemeStyles.container}>
+        <Text style={brandThemeStyles.subtitle}>
+          Seleziona lo stile visivo dell&apos;app. Il tema viene salvato localmente su questo dispositivo.
+        </Text>
+        <View style={brandThemeStyles.grid}>
+          {(Object.keys(THEMES) as ThemeName[]).map((key) => {
+            const theme = THEMES[key];
+            const isSelected = currentTheme === key;
+            return (
+              <TouchableOpacity
+                key={key}
+                style={[brandThemeStyles.card, isSelected && brandThemeStyles.cardSelected]}
+                onPress={() => setTheme(key)}
+                activeOpacity={0.75}
+              >
+                <View style={[brandThemeStyles.swatch, { backgroundColor: theme.colors.background }]}>
+                  <View style={[brandThemeStyles.swatchAccent, { backgroundColor: theme.colors.accent }]} />
+                  <View style={[brandThemeStyles.swatchSurface, { backgroundColor: theme.colors.surface }]} />
+                  <View style={[brandThemeStyles.swatchText, { backgroundColor: theme.colors.text + "33" }]} />
+                </View>
+                <View style={brandThemeStyles.cardBody}>
+                  <Text style={[brandThemeStyles.cardLabel, isSelected && { color: Colors.accent }]}>
+                    {theme.label}
+                  </Text>
+                  <Text style={brandThemeStyles.cardDesc}>{theme.description}</Text>
+                </View>
+                {isSelected && (
+                  <Ionicons name="checkmark-circle" size={20} color={Colors.accent} style={{ marginLeft: "auto" }} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.sectionHeaderRow}>
         <Ionicons name="construct" size={20} color={Colors.accent} />
         <Text style={styles.sectionTitle}>Configurazione Tecnica</Text>
       </View>
@@ -2626,5 +2669,79 @@ const styles = StyleSheet.create({
   },
   accordionPanelContent: {
     paddingHorizontal: 12, paddingBottom: 12,
+  },
+});
+
+const brandThemeStyles = StyleSheet.create({
+  container: {
+    marginBottom: 16,
+  },
+  subtitle: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginBottom: 12,
+  },
+  grid: {
+    gap: 10,
+  },
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    gap: 12,
+  },
+  cardSelected: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.surfaceLight,
+  },
+  swatch: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    overflow: "hidden",
+    position: "relative",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  swatchAccent: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 18,
+  },
+  swatchSurface: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 24,
+  },
+  swatchText: {
+    position: "absolute",
+    top: 22,
+    left: 6,
+    right: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  cardBody: {
+    flex: 1,
+    gap: 2,
+  },
+  cardLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: Colors.text,
+  },
+  cardDesc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
   },
 });

@@ -44,6 +44,7 @@ import { LanguageProvider, useLanguage } from "@/lib/language-context";
 import { MapSettingsProvider, useMapConfig } from "@/lib/map-context";
 import { TaskbarStyleProvider } from "@/lib/taskbar-style-context";
 import { PlayerProvider } from "@/lib/player-context";
+import { ThemeProvider } from "@/lib/theme-context";
 import Colors from "@/constants/colors";
 import UptimeWidget from "@/components/UptimeWidget";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -303,6 +304,7 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
+      <ThemeProvider>
       <LanguageProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
@@ -325,6 +327,7 @@ export default function RootLayout() {
           </AuthProvider>
         </QueryClientProvider>
       </LanguageProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }
