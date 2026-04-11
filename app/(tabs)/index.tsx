@@ -749,6 +749,7 @@ export default function MapScreen() {
             onToggleFilterCoppia={() => setFilterCoppia((p) => !p)}
             onUserPress={handleUserPress}
             onEasterEggPress={handleEasterEggPress}
+            onEventPress={(id) => router.push(`/evento/${id}` as any)}
             onReady={() => setMapReady(true)}
             currentUserId={user?.id ?? null}
             realMeMarker={realMeMarker}
@@ -784,6 +785,7 @@ export default function MapScreen() {
             onToggleFilterCoppia={() => setFilterCoppia((p) => !p)}
             onUserPress={handleUserPress}
             onEasterEggPress={handleEasterEggPress}
+            onEventPress={(id) => { setMapFullscreen(false); router.push(`/evento/${id}` as any); }}
             currentUserId={user?.id ?? null}
             realMeMarker={realMeMarker}
             fakeMeMarker={fakeMeMarker}

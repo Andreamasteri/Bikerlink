@@ -38,11 +38,10 @@ export default function EventiScreen() {
 
   const { data, isLoading, isRefetching, refetch } = useQuery<EventDTO[]>({
     queryKey: ["/api/events"],
-    select: (d) => {
-      if (!d) return [];
-      return (d as EventDTO[]).filter((e) =>
-        filter === "tutti" || e.eventType === filter
-      );
+    select: (d: unknown) => {
+      const raw = d as { events?: EventDTO[] } | EventDTO[];
+      const list = Array.isArray(raw) ? raw : (raw?.events ?? []);
+      return list.filter((e) => filter === "tutti" || e.eventType === filter);
     },
   });
 

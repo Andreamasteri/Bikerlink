@@ -226,9 +226,10 @@ export default function AdminEventiScreen() {
 
   const allQuery = useQuery<EventDTO[]>({
     queryKey: ["/api/events/admin/all"],
-    select: (d) => {
-      if (!d) return [];
-      return (d as EventDTO[]).filter((e) => e.status === allFilter);
+    select: (d: unknown) => {
+      const raw = d as { events?: EventDTO[] } | EventDTO[];
+      const list = Array.isArray(raw) ? raw : (raw?.events ?? []);
+      return list.filter((e) => e.status === allFilter);
     },
   });
 

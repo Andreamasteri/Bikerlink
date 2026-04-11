@@ -105,7 +105,7 @@ export default function EventoDetail() {
 
   const joinMutation = useMutation({
     mutationFn: async (status: "going" | "interested") => {
-      return apiRequest("POST", `/api/events/${id}/join`, { participationStatus: status });
+      return apiRequest("POST", `/api/events/${id}/join`, { status });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/events", id] });

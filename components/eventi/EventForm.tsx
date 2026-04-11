@@ -124,10 +124,12 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
       let evt: EventDTO;
       if (isEditing && editingEvent) {
         const res = await apiRequest("PUT", `/api/events/${editingEvent.id}`, body);
-        evt = await res.json();
+        const json = await res.json();
+        evt = json as EventDTO;
       } else {
         const res = await apiRequest("POST", "/api/events", body);
-        evt = await res.json();
+        const json = await res.json();
+        evt = (json.event ?? json) as EventDTO;
       }
 
       for (const uri of pendingImages) {
