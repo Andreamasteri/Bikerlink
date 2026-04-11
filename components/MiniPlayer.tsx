@@ -1071,6 +1071,7 @@ const miniStyles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 8,
+    zIndex: 999,
     borderWidth: 1,
     borderColor: Colors.border,
   },

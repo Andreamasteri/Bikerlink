@@ -17,6 +17,8 @@ import {
   Switch,
 } from "react-native";
 import * as WebBrowser from "expo-web-browser";
+import * as FileSystem from "expo-file-system/legacy";
+import * as MediaLibrary from "expo-media-library";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,6 +27,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { usePlayer, PlayerTrack, RadioStation } from "@/lib/player-context";
+import { useAuth } from "@/lib/auth-context";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -88,6 +91,12 @@ interface SharedPlaylistEntry {
   sharedAt: string;
   mergedAt: string | null;
   tracks: Array<{ trackId: string; trackName: string; artistId: string; artistName: string }>;
+}
+
+interface ChatConversation {
+  id: string;
+  participants: Array<{ id: string; nickname: string; avatarUrl: string | null }>;
+  lastMessage?: { content?: string } | null;
 }
 
 function formatDate(iso: string): string {
@@ -405,6 +414,45 @@ export default function MusicScreen() {
   const [lastfmPassword, setLastfmPassword] = useState("");
   const [lastfmError, setLastfmError] = useState<string | null>(null);
   const [lastfmConnecting, setLastfmConnecting] = useState(false);
+
+  const [sendModalVisible, setSendModalVisible] = useState(false);
+  const [sendingToConv, setSendingToConv] = useState<string | null>(null);
+  const { user: currentUser } = useAuth();
+  const router = useRouter();
+
+  const conversationsQuery = useQuery<ChatConversation[]>({
+    queryKey: ["/api/chat/conversations"],
+    enabled: sendModalVisible,
+    staleTime: 30_000,
+  });
+
+  const handleSendPlaylist = useCallback(async (conv: ChatConversation) => {
+    const otherUser = conv.participants.find((p) => p.id !== currentUser?.id);
+    if (!otherUser) return;
+    setSendingToConv(conv.id);
+    try {
+      const res = await apiRequest("POST", "/api/spotify/share-playlist", {
+        toUserId: otherUser.id,
+        conversationId: conv.id,
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        const msg = (body as { message?: string }).message ?? "Errore";
+        if (msg.toLowerCase().includes("nessuna traccia")) {
+          Alert.alert("Libreria vuota", "Connetti prima Spotify e sincronizza i tuoi brani per poterli condividere.");
+        } else {
+          Alert.alert("Errore", msg);
+        }
+        return;
+      }
+      setSendModalVisible(false);
+      router.push(`/chat/${conv.id}` as any);
+    } catch {
+      Alert.alert("Errore", "Impossibile inviare la playlist. Riprova.");
+    } finally {
+      setSendingToConv(null);
+    }
+  }, [currentUser, router]);
 
   const { data: providerData } = useQuery<{ provider: string }>({
     queryKey: ["/api/settings/music-provider"],
@@ -727,6 +775,15 @@ export default function MusicScreen() {
               <Text style={styles.headerCount}>
                 {tracksQuery.data ? `${tracksQuery.data.tracks.length} brani` : ""}
               </Text>
+              {(tracksQuery.data?.tracks.length ?? 0) > 0 && (
+                <TouchableOpacity
+                  onPress={() => setSendModalVisible(true)}
+                  style={{ marginLeft: 10 }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="paper-plane-outline" size={20} color={Colors.accent} />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 onPress={handleDisconnect}
                 style={{ marginLeft: 10 }}
@@ -899,6 +956,71 @@ export default function MusicScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <Modal
+        visible={sendModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => !sendingToConv && setSendModalVisible(false)}
+      >
+        <View style={styles.sendModalOverlay}>
+          <View style={styles.sendModalCard}>
+            <View style={styles.sendModalHeader}>
+              <Ionicons name="paper-plane" size={22} color={Colors.accent} />
+              <Text style={styles.sendModalTitle}>Invia la mia musica</Text>
+              <TouchableOpacity
+                onPress={() => setSendModalVisible(false)}
+                disabled={!!sendingToConv}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={22} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.sendModalSub}>Scegli una chat a cui inviare la tua libreria musicale</Text>
+            {conversationsQuery.isLoading ? (
+              <ActivityIndicator color={Colors.accent} style={{ marginVertical: 24 }} />
+            ) : (conversationsQuery.data ?? []).length === 0 ? (
+              <View style={{ alignItems: "center", paddingVertical: 24, gap: 8 }}>
+                <Ionicons name="chatbubbles-outline" size={36} color={Colors.textSecondary} />
+                <Text style={styles.sendModalEmpty}>Nessuna chat attiva. Inizia una conversazione prima.</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={conversationsQuery.data ?? []}
+                keyExtractor={(item) => item.id}
+                style={{ maxHeight: 340 }}
+                renderItem={({ item: conv }) => {
+                  const otherUser = conv.participants.find((p) => p.id !== currentUser?.id);
+                  if (!otherUser) return null;
+                  const isSending = sendingToConv === conv.id;
+                  return (
+                    <TouchableOpacity
+                      style={styles.sendConvRow}
+                      onPress={() => handleSendPlaylist(conv)}
+                      disabled={!!sendingToConv}
+                      activeOpacity={0.7}
+                    >
+                      {otherUser.avatarUrl ? (
+                        <Image source={{ uri: otherUser.avatarUrl }} style={styles.sendConvAvatar} />
+                      ) : (
+                        <View style={[styles.sendConvAvatar, styles.sendConvAvatarPlaceholder]}>
+                          <Ionicons name="person" size={16} color={Colors.textSecondary} />
+                        </View>
+                      )}
+                      <Text style={styles.sendConvName} numberOfLines={1}>{otherUser.nickname}</Text>
+                      {isSending ? (
+                        <ActivityIndicator size="small" color={Colors.accent} />
+                      ) : (
+                        <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -945,6 +1067,41 @@ function BraniTab({
   const isLastfm = provider === "lastfm";
   const providerColor = isLastfm ? LASTFM_RED : SPOTIFY_GREEN;
   const providerName = isLastfm ? "Last.fm" : "Spotify";
+  const { playQueue, isAvailable: playerAvailable } = usePlayer();
+  const [playAllLoading, setPlayAllLoading] = useState(false);
+
+  const handlePlayAll = useCallback(async () => {
+    if (!playerAvailable || library.length === 0) return;
+    setPlayAllLoading(true);
+    try {
+      const tracksParam = encodeURIComponent(
+        JSON.stringify(library.map((t) => ({ trackName: t.trackName, artistName: t.artistName })))
+      );
+      const url = new URL(`/api/music/radio/preview-playlist?tracks=${tracksParam}`, getApiUrl());
+      const resp = await fetch(url.toString());
+      if (!resp.ok) throw new Error("Errore");
+      const previews: PreviewResult[] = await resp.json();
+      if (!previews || previews.length === 0) {
+        Alert.alert("Nessuna anteprima", "Nessun brano della libreria ha un'anteprima disponibile su iTunes.");
+        return;
+      }
+      const tracks: PlayerTrack[] = previews.map((p) => ({
+        id: p.trackId,
+        url: p.previewUrl,
+        title: p.trackName,
+        artist: p.artistName,
+        album: p.albumName ?? undefined,
+        artwork: p.artworkUrl ?? undefined,
+        duration: p.durationMs ? p.durationMs / 1000 : 30,
+        source: "preview" as const,
+      }));
+      await playQueue(tracks, 0);
+    } catch {
+      Alert.alert("Errore", "Impossibile caricare le anteprime.");
+    } finally {
+      setPlayAllLoading(false);
+    }
+  }, [library, playQueue, playerAvailable]);
 
   if (isConnected === null) {
     return (
@@ -1041,14 +1198,33 @@ function BraniTab({
       )}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          La mia libreria{library.length > 0 ? ` (${library.length})` : ""}
-        </Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            La mia libreria{library.length > 0 ? ` (${library.length})` : ""}
+          </Text>
+          {library.length > 0 && (
+            <TouchableOpacity
+              style={styles.playAllBtn}
+              onPress={handlePlayAll}
+              disabled={playAllLoading}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              {playAllLoading ? (
+                <ActivityIndicator size="small" color={Colors.accent} />
+              ) : (
+                <>
+                  <Ionicons name="play-circle-outline" size={18} color={Colors.accent} />
+                  <Text style={styles.playAllBtnText}>Riproduci tutto</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
         {libraryLoading ? (
           <ActivityIndicator color={Colors.accent} style={{ marginVertical: 20 }} />
         ) : library.length === 0 ? (
           <View style={styles.emptyLibrary}>
-            <Ionicons name="musical-note" size={32} color={Colors.textSecondary} />
+            <Ionicons name="musical-notes" size={32} color={Colors.textSecondary} />
             <Text style={styles.emptyLibraryText}>Cerca un brano e aggiungilo alla tua libreria</Text>
           </View>
         ) : (
@@ -1078,27 +1254,73 @@ function SearchTrackRow({
   onAdd: (t: SearchTrack) => void;
 }) {
   const [imgError, setImgError] = useState(false);
-  const lastfmUrl = `https://www.last.fm/music/${encodeURIComponent(track.artistName)}/_/${encodeURIComponent(track.trackName)}`;
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const { playTrack, isAvailable: playerAvailable, currentTrack, isPlaying } = usePlayer();
+
+  const handlePlay = useCallback(async () => {
+    if (!playerAvailable) return;
+    setLoadingPreview(true);
+    try {
+      const url = new URL(
+        `/api/music/radio/preview?track=${encodeURIComponent(track.trackName)}&artist=${encodeURIComponent(track.artistName)}`,
+        getApiUrl()
+      );
+      const resp = await fetch(url.toString());
+      if (!resp.ok) throw new Error("No preview");
+      const preview: PreviewResult = await resp.json();
+      await playTrack({
+        id: preview.trackId,
+        url: preview.previewUrl,
+        title: preview.trackName,
+        artist: preview.artistName,
+        album: preview.albumName ?? undefined,
+        artwork: preview.artworkUrl ?? undefined,
+        duration: preview.durationMs ? preview.durationMs / 1000 : 30,
+        source: "preview" as const,
+      });
+    } catch {
+      Alert.alert("Anteprima non disponibile", "Questo brano non ha un'anteprima disponibile su iTunes.");
+    } finally {
+      setLoadingPreview(false);
+    }
+  }, [track, playTrack, playerAvailable]);
+
+  const isThisPlaying =
+    currentTrack?.title === track.trackName &&
+    currentTrack?.artist === track.artistName &&
+    isPlaying;
+
   return (
     <View style={styles.trackRow}>
       {track.imageUrl && !imgError ? (
         <Image source={{ uri: track.imageUrl }} style={styles.albumArt} onError={() => setImgError(true)} />
       ) : (
         <View style={[styles.albumArt, styles.albumArtPlaceholder]}>
-          <Ionicons name="musical-note" size={16} color={Colors.textSecondary} />
+          <Ionicons name="musical-notes" size={16} color={Colors.accent} />
         </View>
       )}
       <View style={styles.trackInfo}>
         <Text style={styles.trackName} numberOfLines={1}>{track.trackName}</Text>
         <Text style={styles.trackArtist} numberOfLines={1}>{track.artistName}</Text>
       </View>
-      <TouchableOpacity
-        onPress={() => Linking.openURL(lastfmUrl).catch(() => {})}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        style={{ marginRight: 6 }}
-      >
-        <Ionicons name="open-outline" size={16} color={Colors.textSecondary} />
-      </TouchableOpacity>
+      {playerAvailable && (
+        <TouchableOpacity
+          onPress={handlePlay}
+          disabled={loadingPreview}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={{ marginRight: 4 }}
+        >
+          {loadingPreview ? (
+            <ActivityIndicator size="small" color={Colors.accent} />
+          ) : (
+            <Ionicons
+              name={isThisPlaying ? "pause-circle" : "play-circle-outline"}
+              size={22}
+              color={Colors.accent}
+            />
+          )}
+        </TouchableOpacity>
+      )}
       <TouchableOpacity
         style={[styles.addBtn, isAdded && styles.addBtnDone]}
         onPress={() => !isAdded && !isAdding && onAdd(track)}
@@ -1125,27 +1347,73 @@ function LibraryTrackRow({
   onRemove: (id: string) => void;
 }) {
   const [imgError, setImgError] = useState(false);
-  const lastfmUrl = `https://www.last.fm/music/${encodeURIComponent(track.artistName)}/_/${encodeURIComponent(track.trackName)}`;
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const { playTrack, isAvailable: playerAvailable, currentTrack, isPlaying } = usePlayer();
+
+  const handlePlay = useCallback(async () => {
+    if (!playerAvailable) return;
+    setLoadingPreview(true);
+    try {
+      const url = new URL(
+        `/api/music/radio/preview?track=${encodeURIComponent(track.trackName)}&artist=${encodeURIComponent(track.artistName)}`,
+        getApiUrl()
+      );
+      const resp = await fetch(url.toString());
+      if (!resp.ok) throw new Error("No preview");
+      const preview: PreviewResult = await resp.json();
+      await playTrack({
+        id: preview.trackId,
+        url: preview.previewUrl,
+        title: preview.trackName,
+        artist: preview.artistName,
+        album: preview.albumName ?? undefined,
+        artwork: preview.artworkUrl ?? undefined,
+        duration: preview.durationMs ? preview.durationMs / 1000 : 30,
+        source: "preview" as const,
+      });
+    } catch {
+      Alert.alert("Anteprima non disponibile", "Questo brano non ha un'anteprima disponibile su iTunes.");
+    } finally {
+      setLoadingPreview(false);
+    }
+  }, [track, playTrack, playerAvailable]);
+
+  const isThisPlaying =
+    currentTrack?.title === track.trackName &&
+    currentTrack?.artist === track.artistName &&
+    isPlaying;
+
   return (
     <View style={styles.trackRow}>
       {track.imageUrl && !imgError ? (
         <Image source={{ uri: track.imageUrl }} style={styles.albumArt} onError={() => setImgError(true)} />
       ) : (
         <View style={[styles.albumArt, styles.albumArtPlaceholder]}>
-          <Ionicons name="musical-note" size={16} color={Colors.textSecondary} />
+          <Ionicons name="musical-notes" size={16} color={Colors.accent} />
         </View>
       )}
       <View style={styles.trackInfo}>
         <Text style={styles.trackName} numberOfLines={1}>{track.trackName}</Text>
         <Text style={styles.trackArtist} numberOfLines={1}>{track.artistName}</Text>
       </View>
-      <TouchableOpacity
-        onPress={() => Linking.openURL(lastfmUrl).catch(() => {})}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        style={{ marginRight: 6 }}
-      >
-        <Ionicons name="open-outline" size={16} color={Colors.textSecondary} />
-      </TouchableOpacity>
+      {playerAvailable && (
+        <TouchableOpacity
+          onPress={handlePlay}
+          disabled={loadingPreview}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={{ marginRight: 4 }}
+        >
+          {loadingPreview ? (
+            <ActivityIndicator size="small" color={Colors.accent} />
+          ) : (
+            <Ionicons
+              name={isThisPlaying ? "pause-circle" : "play-circle-outline"}
+              size={22}
+              color={Colors.accent}
+            />
+          )}
+        </TouchableOpacity>
+      )}
       <TouchableOpacity
         style={styles.removeBtn}
         onPress={() => {
@@ -1379,7 +1647,37 @@ function SharedPlaylistCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [downloadingTrack, setDownloadingTrack] = useState<string | null>(null);
   const { playQueue, isAvailable: playerAvailable } = usePlayer();
+
+  const handleDownloadTrack = useCallback(async (track: { trackName: string; artistName: string }) => {
+    const trackKey = `${track.trackName}__${track.artistName}`;
+    setDownloadingTrack(trackKey);
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permesso negato", "Concedi l'accesso alla libreria musicale per salvare il brano.");
+        return;
+      }
+      const url = new URL(
+        `/api/music/radio/preview?track=${encodeURIComponent(track.trackName)}&artist=${encodeURIComponent(track.artistName)}`,
+        getApiUrl()
+      );
+      const resp = await fetch(url.toString());
+      if (!resp.ok) throw new Error("No preview");
+      const preview: PreviewResult = await resp.json();
+      const safeName = `${track.trackName} - ${track.artistName}`.replace(/[^a-zA-Z0-9_\- ]/g, "_");
+      const destUri = FileSystem.documentDirectory + safeName + ".m4a";
+      const downloadRes = await FileSystem.downloadAsync(preview.previewUrl, destUri);
+      if (downloadRes.status !== 200) throw new Error("Download failed");
+      await MediaLibrary.saveToLibraryAsync(downloadRes.uri);
+      Alert.alert("Salvato!", `"${track.trackName}" salvato nella tua libreria musicale.`);
+    } catch {
+      Alert.alert("Errore", "Impossibile scaricare l'anteprima. Riprova.");
+    } finally {
+      setDownloadingTrack(null);
+    }
+  }, []);
 
   const handlePreview = useCallback(async () => {
     if (!playerAvailable) {
@@ -1456,14 +1754,30 @@ function SharedPlaylistCard({
       </TouchableOpacity>
       {expanded && (
         <View style={{ paddingTop: 4 }}>
-          {item.tracks.map((track, i) => (
-            <View key={i} style={styles.previewTrack}>
-              <Ionicons name="musical-note" size={12} color={Colors.textSecondary} />
-              <Text style={styles.previewTrackText} numberOfLines={1}>
-                {track.trackName} — {track.artistName}
-              </Text>
-            </View>
-          ))}
+          {item.tracks.map((track, i) => {
+            const trackKey = `${track.trackName}__${track.artistName}`;
+            const isDownloading = downloadingTrack === trackKey;
+            return (
+              <View key={i} style={styles.previewTrack}>
+                <Ionicons name="musical-note" size={12} color={Colors.textSecondary} />
+                <Text style={[styles.previewTrackText, { flex: 1 }]} numberOfLines={1}>
+                  {track.trackName} — {track.artistName}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => handleDownloadTrack(track)}
+                  disabled={!!downloadingTrack}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={{ marginLeft: 6 }}
+                >
+                  {isDownloading ? (
+                    <ActivityIndicator size="small" color={Colors.accent} />
+                  ) : (
+                    <Ionicons name="cloud-download-outline" size={16} color={Colors.accent} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            );
+          })}
           {item.tracks.length > 0 && (
             <TouchableOpacity
               style={styles.previewBtn}
@@ -1552,7 +1866,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  headerRight: {},
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   headerTitle: {
     fontSize: 20,
     fontFamily: "Inter_700Bold",
@@ -1614,11 +1931,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginTop: 16,
   },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
   sectionTitle: {
     fontSize: 15,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
-    marginBottom: 10,
+    marginBottom: 0,
+  },
+  playAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: Colors.accent + "18",
+  },
+  playAllBtnText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.accent,
   },
   trackRow: {
     flexDirection: "row",
@@ -1634,7 +1971,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   albumArtPlaceholder: {
-    backgroundColor: Colors.surfaceLight,
+    backgroundColor: Colors.accent + "22",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2051,5 +2388,67 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
+  },
+  sendModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+  },
+  sendModalCard: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  sendModalHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 10,
+    marginBottom: 6,
+  },
+  sendModalTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+  },
+  sendModalSub: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginBottom: 16,
+  },
+  sendModalEmpty: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center" as const,
+    paddingHorizontal: 16,
+  },
+  sendConvRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    gap: 12,
+  },
+  sendConvAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  sendConvAvatarPlaceholder: {
+    backgroundColor: Colors.surfaceLight,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  sendConvName: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: "Inter_500Medium",
+    color: Colors.text,
   },
 });
