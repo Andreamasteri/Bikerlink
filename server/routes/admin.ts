@@ -3069,4 +3069,403 @@ router.get("/ota", async (_req: Request, res: Response) => {
   }
 });
 
+
+const TRANSLATIONS_STAGING: {
+  keyMap: Record<string, { position: string; it: string }>;
+  importedData: Record<string, Record<string, string>>;
+  exportedFileId: string | null;
+  exportedLangs: string[];
+} = {
+  keyMap: {},
+  importedData: {},
+  exportedFileId: null,
+  exportedLangs: [],
+};
+
+const ALLOWED_LANGS = new Set(["en", "de", "es", "fr", "tr"]);
+
+const LANG_FILE_MAP: Record<string, string> = {
+  en: path.resolve(process.cwd(), "lib/i18n/en.ts"),
+  de: path.resolve(process.cwd(), "lib/i18n/de.ts"),
+  es: path.resolve(process.cwd(), "lib/i18n/es.ts"),
+  fr: path.resolve(process.cwd(), "lib/i18n/fr.ts"),
+  tr: path.resolve(process.cwd(), "lib/i18n/tr.ts"),
+};
+
+const LANG_LABELS: Record<string, string> = {
+  en: "Inglese (EN)",
+  de: "Tedesco (DE)",
+  es: "Spagnolo (ES)",
+  fr: "Francese (FR)",
+  tr: "Turco (TR)",
+};
+
+function buildKeyPositionLabel(key: string): string {
+  const parts = key.split(".");
+  const prefix = parts[0];
+  const rest = parts.slice(1).join(".");
+
+  const prefixMap: Record<string, string> = {
+    app: "App",
+    auth: "Autenticazione",
+    register: "Registrazione",
+    tabs: "Tab navigazione",
+    map: "Schermata Mappa",
+    proposals: "Proposte",
+    chat: "Chat",
+    contest: "Contest Foto",
+    profile: "Profilo",
+    tracking: "Tracking GPS",
+    workshops: "Officine",
+    easterEggs: "Easter Eggs",
+    notifications: "Notifiche",
+    feedback: "Feedback",
+    admin: "Pannello Admin",
+    report: "Segnalazione",
+    common: "Comune",
+    validation: "Validazione form",
+    syneco: "Syneco",
+    language: "Lingua",
+    userType: "Tipo utente",
+    match: "Match",
+    garage: "Garage",
+    home: "Home",
+    ride: "Ride",
+  };
+
+  const sectionLabel = prefixMap[prefix] || prefix;
+  const fieldLabel = rest
+    .replace(/\./g, " → ")
+    .replace(/([A-Z])/g, " $1")
+    .toLowerCase()
+    .trim();
+
+  return `${sectionLabel} → ${fieldLabel || key}`;
+}
+
+router.post("/translations/prepare", async (_req: Request, res: Response) => {
+  try {
+    const itPath = path.resolve(process.cwd(), "lib/i18n/it.ts");
+    const raw = fs.readFileSync(itPath, "utf-8");
+
+    const keyMap: Record<string, { position: string; it: string }> = {};
+    const lineRegex = /^\s*"([^"]+)":\s*"((?:[^"\\]|\\.)*)"/;
+
+    for (const line of raw.split("\n")) {
+      const match = line.match(lineRegex);
+      if (match) {
+        const key = match[1];
+        const itText = match[2].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+        keyMap[key] = {
+          position: buildKeyPositionLabel(key),
+          it: itText,
+        };
+      }
+    }
+
+    TRANSLATIONS_STAGING.keyMap = keyMap;
+    TRANSLATIONS_STAGING.importedData = {};
+
+    const totalKeys = Object.keys(keyMap).length;
+    const langCounts: Record<string, number> = {};
+    for (const lang of Array.from(ALLOWED_LANGS)) {
+      try {
+        const existing = fs.readFileSync(LANG_FILE_MAP[lang], "utf-8");
+        const kvRegex = /^\s*"([^"]+)"\s*:\s*"((?:[^"\\]|\\.)+)"\s*,?\s*$/gm;
+        let count = 0;
+        let m: RegExpExecArray | null;
+        while ((m = kvRegex.exec(existing)) !== null) {
+          if (m[2].trim()) count++;
+        }
+        langCounts[lang] = count;
+      } catch {
+        langCounts[lang] = 0;
+      }
+    }
+
+    return res.json({
+      count: totalKeys,
+      langCounts,
+      message: `${totalKeys} stringhe trovate nel file IT`,
+    });
+  } catch (error) {
+    console.error("[translations/prepare] error:", error);
+    return res.status(500).json({ message: "Errore durante la preparazione" });
+  }
+});
+
+router.post("/translations/export", async (req: Request, res: Response) => {
+  try {
+    const { langs } = req.body as { langs: string[] };
+    if (!langs || !Array.isArray(langs) || langs.length === 0) {
+      return res.status(400).json({ message: "Seleziona almeno una lingua" });
+    }
+    const invalidLangsExport = langs.filter((l) => !ALLOWED_LANGS.has(l));
+    if (invalidLangsExport.length > 0) {
+      return res.status(400).json({ message: `Lingue non valide: ${invalidLangsExport.join(", ")}` });
+    }
+
+    const { keyMap } = TRANSLATIONS_STAGING;
+    if (Object.keys(keyMap).length === 0) {
+      return res.status(400).json({ message: "Esegui prima 'Prepara generazione'" });
+    }
+
+    const { ReplitConnectors } = await import("@replit/connectors-sdk");
+    const connectors = new ReplitConnectors();
+
+    const spreadsheetTitle = `BikerLink Traduzioni ${new Date().toISOString().slice(0, 10)}`;
+
+    const headers = ["Chiave", "Posizione nell'app", "IT (fonte)", ...langs.map((l) => `${l.toUpperCase()}`)];
+    const rows = Object.entries(keyMap).map(([key, val]) => {
+      const row: string[] = [key, val.position, val.it];
+      for (const _ of langs) {
+        row.push("");
+      }
+      return row;
+    });
+
+    const createBody = {
+      properties: { title: spreadsheetTitle },
+      sheets: [
+        {
+          properties: { title: "Traduzioni", sheetId: 0 },
+          data: [
+            {
+              startRow: 0,
+              startColumn: 0,
+              rowData: [
+                {
+                  values: headers.map((h) => ({
+                    userEnteredValue: { stringValue: h },
+                    userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.2, green: 0.6, blue: 0.9 } },
+                  })),
+                },
+                ...rows.map((row) => ({
+                  values: row.map((cell) => ({ userEnteredValue: { stringValue: cell } })),
+                })),
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const createResp = await connectors.proxy("google-drive", "/v4/spreadsheets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(createBody),
+    });
+
+    if (!createResp.ok) {
+      const errText = await createResp.text();
+      console.error("[translations/export] Sheets create error:", errText);
+      return res.status(500).json({ message: "Errore nella creazione del Google Sheet" });
+    }
+
+    const sheet = await createResp.json() as { spreadsheetId: string; spreadsheetUrl: string };
+
+    TRANSLATIONS_STAGING.exportedFileId = sheet.spreadsheetId;
+    TRANSLATIONS_STAGING.exportedLangs = langs;
+
+    return res.json({
+      fileId: sheet.spreadsheetId,
+      fileUrl: `https://docs.google.com/spreadsheets/d/${sheet.spreadsheetId}/edit`,
+      langs,
+      message: `Sheet creato con ${Object.keys(keyMap).length} stringhe e colonne: ${langs.join(", ")}`,
+    });
+  } catch (error) {
+    console.error("[translations/export] error:", error);
+    return res.status(500).json({ message: "Errore durante l'esportazione" });
+  }
+});
+
+function getImportInfo() {
+  return {
+    exportedFileId: TRANSLATIONS_STAGING.exportedFileId,
+    exportedLangs: TRANSLATIONS_STAGING.exportedLangs,
+  };
+}
+
+router.get("/translations/import-info", (_req: Request, res: Response) => {
+  return res.json(getImportInfo());
+});
+
+router.get("/translations/import", (_req: Request, res: Response) => {
+  return res.json(getImportInfo());
+});
+
+router.post("/translations/import", async (req: Request, res: Response) => {
+  try {
+    const { langs } = req.body as { langs: string[] };
+    if (!langs || !Array.isArray(langs) || langs.length === 0) {
+      return res.status(400).json({ message: "Seleziona almeno una lingua da importare" });
+    }
+
+    const { exportedFileId, exportedLangs, keyMap } = TRANSLATIONS_STAGING;
+    if (!exportedFileId) {
+      return res.status(400).json({ message: "Nessun file esportato. Esegui prima 'Genera ed esporta'" });
+    }
+
+    const invalidLangsImport = langs.filter((l) => !ALLOWED_LANGS.has(l));
+    if (invalidLangsImport.length > 0) {
+      return res.status(400).json({ message: `Lingue non valide: ${invalidLangsImport.join(", ")}` });
+    }
+    const invalidLangs = langs.filter((l) => !exportedLangs.includes(l));
+    if (invalidLangs.length > 0) {
+      return res.status(400).json({ message: `Lingue non presenti nell'esportazione: ${invalidLangs.join(", ")}` });
+    }
+
+    const { ReplitConnectors } = await import("@replit/connectors-sdk");
+    const connectors = new ReplitConnectors();
+
+    const rangeResp = await connectors.proxy(
+      "google-drive",
+      `/v4/spreadsheets/${exportedFileId}/values/Traduzioni`,
+      { method: "GET" }
+    );
+
+    if (!rangeResp.ok) {
+      const errText = await rangeResp.text();
+      console.error("[translations/import] read error:", errText);
+      return res.status(500).json({ message: "Errore nella lettura del Google Sheet" });
+    }
+
+    const sheetData = await rangeResp.json() as { values?: string[][] };
+    const allRows = sheetData.values || [];
+
+    if (allRows.length < 2) {
+      return res.status(400).json({ message: "Il foglio è vuoto o mancano le righe" });
+    }
+
+    const headerRow = allRows[0];
+    const langColumnIndexes: Record<string, number> = {};
+    for (const lang of langs) {
+      const colHeader = lang.toUpperCase();
+      const idx = headerRow.indexOf(colHeader);
+      if (idx !== -1) {
+        langColumnIndexes[lang] = idx;
+      }
+    }
+
+    const importedData: Record<string, Record<string, string>> = {};
+    for (const lang of langs) {
+      importedData[lang] = {};
+    }
+
+    for (let i = 1; i < allRows.length; i++) {
+      const row = allRows[i];
+      const key = row[0];
+      if (!key || !keyMap[key]) continue;
+      for (const lang of langs) {
+        const colIdx = langColumnIndexes[lang];
+        if (colIdx !== undefined) {
+          const val = row[colIdx] || "";
+          if (val.trim()) {
+            importedData[lang][key] = val;
+          }
+        }
+      }
+    }
+
+    TRANSLATIONS_STAGING.importedData = importedData;
+
+    const summary = langs.map((l) => `${l.toUpperCase()}: ${Object.keys(importedData[l] || {}).length} stringhe`).join(", ");
+    return res.json({
+      langs,
+      summary,
+      message: `Dati importati: ${summary}`,
+    });
+  } catch (error) {
+    console.error("[translations/import] error:", error);
+    return res.status(500).json({ message: "Errore durante l'importazione" });
+  }
+});
+
+router.post("/translations/apply", async (_req: Request, res: Response) => {
+  try {
+    const { importedData, keyMap } = TRANSLATIONS_STAGING;
+
+    if (Object.keys(importedData).length === 0) {
+      return res.status(400).json({ message: "Nessun dato importato. Esegui prima 'Importa da Drive'" });
+    }
+
+    const allKeys = Object.keys(keyMap);
+    const summaryByLang: Record<string, { updated: number; skipped: number }> = {};
+
+    for (const [lang, translations] of Object.entries(importedData)) {
+      if (!ALLOWED_LANGS.has(lang)) {
+        console.warn(`[translations/apply] skipping unknown lang: ${lang}`);
+        continue;
+      }
+      const filePath = LANG_FILE_MAP[lang];
+
+      const existingValues: Record<string, string> = {};
+      try {
+        const existing = fs.readFileSync(filePath, "utf-8");
+        const kvRegex = /^\s*"([^"]+)"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,?\s*$/gm;
+        let m: RegExpExecArray | null;
+        while ((m = kvRegex.exec(existing)) !== null) {
+          const k = m[1].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+          const v = m[2].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+          existingValues[k] = v;
+        }
+      } catch {
+      }
+
+      const varName = lang;
+      const lines: string[] = [`const ${varName}: Record<string, string> = {`];
+
+      let updated = 0;
+      let skipped = 0;
+
+      for (const key of allKeys) {
+        const imported = translations[key];
+        if (imported && imported.trim()) {
+          const escaped = imported.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+          lines.push(`  "${key}": "${escaped}",`);
+          updated++;
+        } else {
+          const preserved = existingValues[key] ?? "";
+          const escaped = preserved.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+          lines.push(`  "${key}": "${escaped}",`);
+          skipped++;
+        }
+      }
+
+      lines.push(`};`);
+      lines.push(``);
+      lines.push(`export default ${varName};`);
+      lines.push(``);
+
+      fs.writeFileSync(filePath, lines.join("\n"), "utf-8");
+      summaryByLang[lang] = { updated, skipped };
+    }
+
+    const summaryStr = Object.entries(summaryByLang)
+      .map(([l, s]) => `${l.toUpperCase()}: ${s.updated} aggiornate, ${s.skipped} preservate`)
+      .join(" | ");
+
+    return res.json({
+      summary: summaryByLang,
+      message: `Traduzioni applicate: ${summaryStr}`,
+    });
+  } catch (error) {
+    console.error("[translations/apply] error:", error);
+    return res.status(500).json({ message: "Errore durante l'applicazione delle traduzioni" });
+  }
+});
+
+router.post("/translations/restart", async (_req: Request, res: Response) => {
+  try {
+    res.json({ ok: true, message: "Backend in riavvio..." });
+    setTimeout(() => {
+      process.exit(0);
+    }, 500);
+  } catch (error) {
+    console.error("[translations/restart] error:", error);
+    return res.status(500).json({ message: "Errore durante il riavvio" });
+  }
+});
+
 export default router;
+

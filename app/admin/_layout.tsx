@@ -29,6 +29,7 @@ export default function AdminLayout() {
       <Stack.Screen name="backup" options={{ title: "Backup automatici" }} />
       <Stack.Screen name="system" options={{ title: "System Monitor" }} />
       <Stack.Screen name="eventi" options={{ title: "Raduni — Moderazione" }} />
+      <Stack.Screen name="traduzioni" options={{ title: "Sistema Traduzioni" }} />
     </Stack>
   );
 }

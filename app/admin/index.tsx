@@ -75,6 +75,14 @@ const adminGroups: AdminGroup[] = [
       { key: "backup", label: "Backup automatici", icon: "cloud-upload", iconSet: "MaterialCommunityIcons", route: "/admin/backup" },
     ],
   },
+  {
+    title: "Traduzioni",
+    headerIcon: "translate",
+    headerIconSet: "MaterialIcons",
+    items: [
+      { key: "traduzioni", label: "Traduzioni", icon: "translate", iconSet: "MaterialIcons", route: "/admin/traduzioni", accentColor: "#9C27B0" },
+    ],
+  },
 ];
 
 function renderIcon(item: AdminItem, size = 28, color = Colors.accent) {
