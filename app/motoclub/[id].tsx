@@ -7,13 +7,17 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  Modal,
+  TextInput,
+  Alert,
 } from "react-native";
-import { useQuery } from "@tanstack/react-query";
-import { Ionicons } from "@expo/vector-icons";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Colors from "@/constants/colors";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, queryClient } from "@/lib/query-client";
+import * as Location from "expo-location";
 
 const PAGE_SIZE = 30;
 const INITIAL_VISIBLE = 5;
@@ -38,6 +42,11 @@ interface ClubDetail {
   activityScore: number | null;
   createdAt: string;
   conversationId: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  proposedLatitude: number | null;
+  proposedLongitude: number | null;
+  proposedAddress: string | null;
   members: Member[];
   totalCount: number;
   hasMore: boolean;
@@ -98,6 +107,11 @@ export default function ClubDetailScreen() {
   const [extraMembers, setExtraMembers] = useState<Member[]>([]);
   const [nextOffset, setNextOffset] = useState(PAGE_SIZE);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [showProposeModal, setShowProposeModal] = useState(false);
+  const [proposeAddress, setProposeAddress] = useState("");
+  const [proposeLatitude, setProposeLatitude] = useState("");
+  const [proposeLongitude, setProposeLongitude] = useState("");
+  const [gettingLocation, setGettingLocation] = useState(false);
 
   useEffect(() => {
     setExpanded(false);
@@ -131,6 +145,58 @@ export default function ClubDetailScreen() {
     } finally {
       setLoadingMore(false);
     }
+  }
+
+  const proposeLocationMutation = useMutation({
+    mutationFn: async ({ latitude, longitude, address }: { latitude: number; longitude: number; address: string }) => {
+      const res = await apiRequest("POST", `/api/motoclubs/${id}/propose-location`, { latitude, longitude, address: address || null });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any).message || "Errore nella proposta");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/motoclubs/${id}/detail?limit=${PAGE_SIZE}&offset=0`] });
+      setShowProposeModal(false);
+      setProposeAddress("");
+      setProposeLatitude("");
+      setProposeLongitude("");
+      Alert.alert("Inviata!", "La proposta di sede è in attesa di approvazione dell'admin.");
+    },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
+  });
+
+  async function handleGetGPS() {
+    setGettingLocation(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permesso negato", "Abilita la posizione nelle impostazioni");
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      setProposeLatitude(pos.coords.latitude.toFixed(6));
+      setProposeLongitude(pos.coords.longitude.toFixed(6));
+    } catch {
+      Alert.alert("Errore", "Impossibile ottenere la posizione GPS");
+    } finally {
+      setGettingLocation(false);
+    }
+  }
+
+  function handleSubmitPropose() {
+    const lat = parseFloat(proposeLatitude);
+    const lng = parseFloat(proposeLongitude);
+    if (isNaN(lat) || lat < -90 || lat > 90) {
+      Alert.alert("Errore", "Latitudine non valida (deve essere tra -90 e 90)");
+      return;
+    }
+    if (isNaN(lng) || lng < -180 || lng > 180) {
+      Alert.alert("Errore", "Longitudine non valida (deve essere tra -180 e 180)");
+      return;
+    }
+    proposeLocationMutation.mutate({ latitude: lat, longitude: lng, address: proposeAddress });
   }
 
   const resolvedConvId = conversationId ?? club?.conversationId ?? null;
@@ -330,9 +396,106 @@ export default function ClubDetailScreen() {
                 <Text style={styles.chatBtnText}>Apri chat del club</Text>
               </TouchableOpacity>
             )}
+
+            {club.isApproved && (
+              <View style={styles.locationSection}>
+                {club.latitude != null ? (
+                  <View style={styles.locationRow}>
+                    <MaterialCommunityIcons name="map-marker-check" size={18} color={Colors.success} />
+                    <Text style={styles.locationText}>Sede confermata in mappa</Text>
+                  </View>
+                ) : (
+                  <View style={styles.locationRow}>
+                    <MaterialCommunityIcons name="map-marker-question" size={18} color={Colors.textSecondary} />
+                    <Text style={styles.locationText}>Nessuna sede fisssata</Text>
+                  </View>
+                )}
+                {club.proposedLatitude != null && (
+                  <View style={styles.locationRow}>
+                    <MaterialCommunityIcons name="clock-outline" size={16} color="#F59E0B" />
+                    <Text style={[styles.locationText, { color: "#F59E0B" }]}>Proposta in attesa di approvazione</Text>
+                  </View>
+                )}
+                {club.proposedLatitude == null && (
+                  <TouchableOpacity
+                    style={styles.proposeBtn}
+                    onPress={() => setShowProposeModal(true)}
+                  >
+                    <MaterialCommunityIcons name="map-marker-plus" size={16} color="#fff" />
+                    <Text style={styles.proposeBtnText}>Proponi sede</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
           </View>
         }
       />
+
+      <Modal visible={showProposeModal} transparent animationType="slide" onRequestClose={() => setShowProposeModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 20 }]}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Proponi sede fisica</Text>
+            <Text style={styles.modalSub}>Indica la posizione della sede fisica di "{club.name}". L'admin approverà la proposta prima che appaia in mappa.</Text>
+
+            <TouchableOpacity style={styles.gpsBtn} onPress={handleGetGPS} disabled={gettingLocation}>
+              {gettingLocation ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="locate" size={16} color="#fff" />
+                  <Text style={styles.gpsBtnText}>Usa la mia posizione GPS</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <Text style={styles.inputLabel}>Latitudine</Text>
+            <TextInput
+              style={styles.coordInput}
+              value={proposeLatitude}
+              onChangeText={setProposeLatitude}
+              placeholder="es. 45.4654"
+              placeholderTextColor={Colors.textSecondary}
+              keyboardType="numeric"
+            />
+
+            <Text style={styles.inputLabel}>Longitudine</Text>
+            <TextInput
+              style={styles.coordInput}
+              value={proposeLongitude}
+              onChangeText={setProposeLongitude}
+              placeholder="es. 9.1859"
+              placeholderTextColor={Colors.textSecondary}
+              keyboardType="numeric"
+            />
+
+            <Text style={styles.inputLabel}>Indirizzo (opzionale)</Text>
+            <TextInput
+              style={[styles.coordInput, { height: 60 }]}
+              value={proposeAddress}
+              onChangeText={setProposeAddress}
+              placeholder="Via Roma 1, Milano..."
+              placeholderTextColor={Colors.textSecondary}
+              multiline
+            />
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowProposeModal(false)}>
+                <Text style={styles.modalCancelBtnText}>Annulla</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmitBtn, proposeLocationMutation.isPending && { opacity: 0.6 }]}
+                onPress={handleSubmitPropose}
+                disabled={proposeLocationMutation.isPending}
+              >
+                <Text style={styles.modalSubmitBtnText}>
+                  {proposeLocationMutation.isPending ? "Invio..." : "Invia proposta"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -467,4 +630,102 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   chatBtnText: { fontFamily: "Inter_700Bold", fontSize: 16, color: "#fff" },
+
+  locationSection: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 14,
+    marginTop: 8,
+    marginBottom: 8,
+    gap: 8,
+  },
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  locationText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    flex: 1,
+  },
+  proposeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#2979FF",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginTop: 4,
+  },
+  proposeBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: "#fff" },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalSheet: {
+    backgroundColor: Colors.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    gap: 10,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.border,
+    alignSelf: "center",
+    marginBottom: 8,
+  },
+  modalTitle: { fontFamily: "Inter_700Bold", fontSize: 18, color: Colors.text, textAlign: "center" },
+  modalSub: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, textAlign: "center", marginBottom: 8 },
+  gpsBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.accent,
+    borderRadius: 10,
+    paddingVertical: 12,
+  },
+  gpsBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: "#fff" },
+  inputLabel: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.text },
+  coordInput: {
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: Colors.text,
+  },
+  modalBtnRow: { flexDirection: "row", gap: 10, marginTop: 8 },
+  modalCancelBtn: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingVertical: 13,
+    alignItems: "center",
+  },
+  modalCancelBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: Colors.text },
+  modalSubmitBtn: {
+    flex: 2,
+    backgroundColor: "#2979FF",
+    borderRadius: 10,
+    paddingVertical: 13,
+    alignItems: "center",
+  },
+  modalSubmitBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: "#fff" },
 });

@@ -66,10 +66,24 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+interface PendingLocation {
+  id: string;
+  name: string;
+  clubType: string;
+  logoUrl: string | null;
+  region: string | null;
+  proposedLatitude: number | null;
+  proposedLongitude: number | null;
+  proposedAddress: string | null;
+  proposedBy: string | null;
+  proposedAt: string | null;
+  proposerNickname: string | null;
+}
+
 export default function AdminMotoclubs() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [tab, setTab] = useState<"requests" | "clubs" | "user_creation">("requests");
+  const [tab, setTab] = useState<"requests" | "clubs" | "user_creation" | "sedi">("requests");
   const [search, setSearch] = useState("");
   const [rejectModal, setRejectModal] = useState<{ id: string; name: string } | null>(null);
   const [rejectNote, setRejectNote] = useState("");
@@ -81,6 +95,34 @@ export default function AdminMotoclubs() {
 
   const { data: clubs = [], isLoading: loadingClubs } = useQuery<Club[]>({
     queryKey: ["/api/admin/motoclubs"],
+  });
+
+  const { data: pendingLocations = [], isLoading: loadingLocations } = useQuery<PendingLocation[]>({
+    queryKey: ["/api/motoclubs/map/pending-locations"],
+    enabled: tab === "sedi",
+  });
+
+  const approveLocationMutation = useMutation({
+    mutationFn: async (clubId: string) => {
+      const res = await apiRequest("POST", `/api/motoclubs/${clubId}/approve-location`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/motoclubs/map/pending-locations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/motoclubs/map"] });
+    },
+    onError: () => Alert.alert("Errore", "Impossibile approvare la sede"),
+  });
+
+  const rejectLocationMutation = useMutation({
+    mutationFn: async (clubId: string) => {
+      const res = await apiRequest("POST", `/api/motoclubs/${clubId}/reject-location`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/motoclubs/map/pending-locations"] });
+    },
+    onError: () => Alert.alert("Errore", "Impossibile rifiutare la sede"),
   });
 
   const systemRequests = useMemo(() => requests.filter((r) => !r.requestedBy), [requests]);
@@ -286,6 +328,67 @@ export default function AdminMotoclubs() {
     );
   }
 
+  function renderLocation({ item }: { item: PendingLocation }) {
+    return (
+      <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: "#2979FF" }]}>
+        <View style={styles.cardIconWrap}>
+          <Ionicons name="location-outline" size={22} color="#2979FF" />
+        </View>
+        <View style={styles.cardBody}>
+          <View style={styles.cardRow}>
+            <Text style={[styles.cardName, { flex: 1 }]} numberOfLines={1}>{item.name}</Text>
+            <View style={[styles.typeBadge, { backgroundColor: "#2979FF22" }]}>
+              <Text style={[styles.typeBadgeText, { color: "#2979FF" }]}>{item.clubType}</Text>
+            </View>
+          </View>
+          {item.proposerNickname && (
+            <Text style={styles.cardSub}>Da: {item.proposerNickname}</Text>
+          )}
+          {item.proposedAddress && (
+            <Text style={styles.cardSub}>{item.proposedAddress}</Text>
+          )}
+          {item.proposedLatitude != null && item.proposedLongitude != null && (
+            <View style={styles.statChip}>
+              <Ionicons name="navigate" size={12} color={Colors.textSecondary} />
+              <Text style={styles.statChipText}>
+                {item.proposedLatitude.toFixed(4)}, {item.proposedLongitude.toFixed(4)}
+              </Text>
+            </View>
+          )}
+          {item.proposedAt && (
+            <Text style={styles.cardDate}>
+              {new Date(item.proposedAt).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}
+            </Text>
+          )}
+          <View style={styles.requestActions}>
+            <TouchableOpacity
+              style={[styles.actionPill, { backgroundColor: Colors.success }]}
+              onPress={() => Alert.alert("Approva sede", `Approvare la sede proposta per "${item.name}"?`, [
+                { text: "Annulla", style: "cancel" },
+                { text: "Approva", onPress: () => approveLocationMutation.mutate(item.id) },
+              ])}
+              disabled={approveLocationMutation.isPending}
+            >
+              <MaterialIcons name="check" size={14} color="#fff" />
+              <Text style={styles.actionPillText}>Approva</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionPill, { backgroundColor: Colors.error }]}
+              onPress={() => Alert.alert("Rifiuta sede", `Rifiutare la sede proposta per "${item.name}"?`, [
+                { text: "Annulla", style: "cancel" },
+                { text: "Rifiuta", style: "destructive", onPress: () => rejectLocationMutation.mutate(item.id) },
+              ])}
+              disabled={rejectLocationMutation.isPending}
+            >
+              <MaterialIcons name="close" size={14} color="#fff" />
+              <Text style={styles.actionPillText}>Rifiuta</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   function renderClub({ item }: { item: Club }) {
     return (
       <TouchableOpacity
@@ -392,6 +495,14 @@ export default function AdminMotoclubs() {
             Club ({clubs.length})
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabBtn, tab === "sedi" && styles.tabBtnActive]}
+          onPress={() => setTab("sedi")}
+        >
+          <Text style={[styles.tabBtnText, tab === "sedi" && styles.tabBtnTextActive]}>
+            Sedi{pendingLocations.length > 0 ? ` (${pendingLocations.length})` : ""}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Show all / only pending toggle (requests tabs only) */}
@@ -406,20 +517,32 @@ export default function AdminMotoclubs() {
 
       <FlatList
         key={tab}
-        data={(tab === "requests" ? displayedRequests : tab === "user_creation" ? displayedUserCreation : displayedClubs) as any[]}
+        data={(
+          tab === "requests" ? displayedRequests
+          : tab === "user_creation" ? displayedUserCreation
+          : tab === "sedi" ? pendingLocations
+          : displayedClubs
+        ) as any[]}
         keyExtractor={(item) => item.id}
-        renderItem={(tab === "requests" ? renderRequest : tab === "user_creation" ? renderUserCreation : renderClub) as any}
+        renderItem={(
+          tab === "requests" ? renderRequest
+          : tab === "user_creation" ? renderUserCreation
+          : tab === "sedi" ? renderLocation
+          : renderClub
+        ) as any}
         contentContainerStyle={{ padding: 14, paddingBottom: insets.bottom + 24 }}
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
             <Ionicons name="shield-outline" size={48} color={Colors.border} />
             <Text style={styles.emptyText}>
-              {(tab === "requests" || tab === "user_creation" ? loadingReqs : loadingClubs)
+              {(tab === "requests" || tab === "user_creation" ? loadingReqs : tab === "sedi" ? loadingLocations : loadingClubs)
                 ? "Caricamento..."
                 : tab === "requests"
                 ? "Nessuna richiesta"
                 : tab === "user_creation"
                 ? "Nessuna richiesta da utenti"
+                : tab === "sedi"
+                ? "Nessuna proposta di sede in attesa"
                 : "Nessun club attivo"}
             </Text>
           </View>

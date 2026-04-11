@@ -80,6 +80,13 @@ interface InteractiveMapProps {
   realMeMarker?: LatLng | null;
   fakeMeMarker?: LatLng | null;
   onEventPress?: (eventId: string) => void;
+  showEventPins?: boolean;
+  clubPins?: ClubMapPin[];
+  filterClubs?: boolean;
+  onToggleFilterClubs?: () => void;
+  filterEvents?: boolean;
+  onToggleFilterEvents?: () => void;
+  onClubPress?: (club: ClubMapPin) => void;
 }
 
 const ITALY_REGION: Region = {
@@ -127,6 +134,19 @@ interface EventMapPin {
   eventDate: string;
 }
 
+export interface ClubMapPin {
+  id: string;
+  name: string;
+  clubType: string;
+  logoUrl: string | null;
+  region: string | null;
+  country: string | null;
+  latitude: number;
+  longitude: number;
+  isFictitious: boolean;
+  memberCount: number;
+}
+
 export default function InteractiveMap({
   users = [],
   workshops = [],
@@ -149,6 +169,13 @@ export default function InteractiveMap({
   realMeMarker,
   fakeMeMarker,
   onEventPress,
+  showEventPins = true,
+  clubPins = [],
+  filterClubs = true,
+  onToggleFilterClubs,
+  filterEvents = true,
+  onToggleFilterEvents,
+  onClubPress,
 }: InteractiveMapProps) {
   const { enabled: mapsEnabled, resolvedProvider, userChoiceEnabled } = useMapConfig();
   const mapRef = useRef<MapView>(null);
@@ -334,7 +361,7 @@ export default function InteractiveMap({
           />
         ))}
 
-        {eventPins.map((ep) => (
+        {showEventPins && filterEvents && eventPins.map((ep) => (
           <Marker
             key={`event-${ep.id}`}
             coordinate={{ latitude: ep.latitude, longitude: ep.longitude }}
@@ -344,6 +371,25 @@ export default function InteractiveMap({
           >
             <View style={eventMarkerStyles.container}>
               <MaterialCommunityIcons name="calendar-star" size={18} color="#fff" />
+            </View>
+          </Marker>
+        ))}
+
+        {filterClubs && clubPins.map((club) => (
+          <Marker
+            key={`club-${club.id}`}
+            coordinate={{ latitude: club.latitude, longitude: club.longitude }}
+            title={club.name}
+            description={[
+              club.isFictitious ? "📍 Sede stimata (regione)" : null,
+              club.region ?? null,
+              club.memberCount > 0 ? `${club.memberCount} membri` : null,
+            ].filter(Boolean).join(" · ") || undefined}
+            onPress={() => onClubPress?.(club)}
+          >
+            <View style={clubMarkerStyles.container}>
+              <MaterialCommunityIcons name="shield-star" size={16} color="#fff" />
+              {club.isFictitious && <View style={clubMarkerStyles.fictitiousDot} />}
             </View>
           </Marker>
         ))}
@@ -468,6 +514,36 @@ export default function InteractiveMap({
           />
           <Text style={[styles.filterText, filterCoppia && styles.filterTextActive]}>Coppia</Text>
         </TouchableOpacity>
+
+        {onToggleFilterClubs != null && (
+          <TouchableOpacity
+            style={[styles.filterChip, filterClubs && { backgroundColor: "#2979FF" }]}
+            onPress={onToggleFilterClubs}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons
+              name="shield-star"
+              size={16}
+              color={filterClubs ? "#fff" : "#2979FF"}
+            />
+            <Text style={[styles.filterText, filterClubs && styles.filterTextActive]}>Club</Text>
+          </TouchableOpacity>
+        )}
+
+        {showEventPins && onToggleFilterEvents != null && (
+          <TouchableOpacity
+            style={[styles.filterChip, filterEvents && { backgroundColor: "#F57C00" }]}
+            onPress={onToggleFilterEvents}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons
+              name="calendar-star"
+              size={16}
+              color={filterEvents ? "#fff" : "#F57C00"}
+            />
+            <Text style={[styles.filterText, filterEvents && styles.filterTextActive]}>Raduni</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.controlsContainer}>
@@ -686,6 +762,35 @@ const eventMarkerStyles = StyleSheet.create({
       android: { elevation: 5 },
       web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.4)" },
     }),
+  },
+});
+
+const clubMarkerStyles = StyleSheet.create({
+  container: {
+    backgroundColor: "#2979FF",
+    borderRadius: 18,
+    width: 30,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.35, shadowRadius: 3 },
+      android: { elevation: 5 },
+      web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.4)" },
+    }),
+  },
+  fictitiousDot: {
+    position: "absolute" as const,
+    top: -3,
+    right: -3,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#FF9800",
+    borderWidth: 1.5,
+    borderColor: "#fff",
   },
 });
 

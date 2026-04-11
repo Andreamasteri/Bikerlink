@@ -25,7 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import { useSynecoVisible } from "@/lib/syneco-context";
 import { useSetting } from "@/lib/settings-context";
-import InteractiveMap from "@/components/InteractiveMap";
+import InteractiveMap, { type ClubMapPin } from "@/components/InteractiveMap";
 import { getRegionCoordinates } from "@/constants/regions";
 import { getCountryFlag, getCountryName, EUROPEAN_COUNTRIES } from "@/lib/countries-regions";
 import { useT, useLocale } from "@/lib/language-context";
@@ -64,6 +64,8 @@ export default function MapScreen() {
   const [filterBiker, setFilterBiker] = useState(true);
   const [filterZavorrina, setFilterZavorrina] = useState(true);
   const [filterCoppia, setFilterCoppia] = useState(true);
+  const [filterClubs, setFilterClubs] = useState(true);
+  const [filterEvents, setFilterEvents] = useState(true);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [selectedUserDetail, setSelectedUserDetail] = useState<any>(null);
   const [selectedMapPhoto, setSelectedMapPhoto] = useState<string | null>(null);
@@ -469,6 +471,12 @@ export default function MapScreen() {
     staleTime: 60000,
     enabled: isAuthenticated && nearbyLoaded,
   });
+
+  const clubPinsQuery = useQuery<ClubMapPin[]>({
+    queryKey: ["/api/motoclubs/map"],
+    staleTime: 120000,
+    enabled: isAuthenticated && mapFullscreen,
+  });
   const mySearchRadius = useMemo(() => {
     const myActive = (myProposalsQuery.data || []).filter(
       (p: any) => p.userId === user?.id && p.status === "active" && p.searchRadius
@@ -789,6 +797,12 @@ export default function MapScreen() {
             currentUserId={user?.id ?? null}
             realMeMarker={realMeMarker}
             fakeMeMarker={fakeMeMarker}
+            clubPins={clubPinsQuery.data ?? []}
+            filterClubs={filterClubs}
+            onToggleFilterClubs={() => setFilterClubs((p) => !p)}
+            filterEvents={filterEvents}
+            onToggleFilterEvents={() => setFilterEvents((p) => !p)}
+            onClubPress={(club) => { setMapFullscreen(false); router.push({ pathname: "/motoclub/[id]" as const, params: { id: club.id } }); }}
           />
           ) : (
             <View style={styles.mapPlaceholder}>
@@ -1191,6 +1205,29 @@ export default function MapScreen() {
 
                 {selectedUserDetail?.bio && (
                   <Text style={styles.detailBio}>{selectedUserDetail.bio}</Text>
+                )}
+
+                {(selectedUserDetail?.primaryClubName || selectedUserDetail?.topTrackName) && (
+                  <View style={styles.detailSection}>
+                    {selectedUserDetail?.primaryClubName && (
+                      <Pressable
+                        style={styles.detailMotoCard}
+                        onPress={() => { setSelectedUser(null); router.push({ pathname: "/motoclub/[id]" as const, params: { id: selectedUserDetail.primaryClubId } }); }}
+                      >
+                        <MaterialCommunityIcons name="shield-star" size={16} color="#2979FF" />
+                        <Text style={[styles.detailMotoText, { color: "#2979FF" }]}>{selectedUserDetail.primaryClubName}</Text>
+                      </Pressable>
+                    )}
+                    {selectedUserDetail?.topTrackName && (
+                      <View style={styles.detailMotoCard}>
+                        <MaterialCommunityIcons name="music-note" size={16} color={Colors.accent} />
+                        <Text style={styles.detailMotoText} numberOfLines={1}>
+                          {selectedUserDetail.topTrackName}
+                          {selectedUserDetail.topArtistName ? ` — ${selectedUserDetail.topArtistName}` : ""}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                 )}
 
                 {selectedUserDetail?.photos && selectedUserDetail.photos.length > 0 && (

@@ -6,6 +6,9 @@ import { storage } from "../storage";
 import { isProtectedUser } from "../constants";
 import { createRegionalClubInvite } from "./motoclubs";
 import type { InsertReport } from "@shared/schema";
+import { userLastfmSessions, userMusicTracks, motoClubMembers, motoClubs } from "@shared/schema";
+import { db } from "../db";
+import { eq, and, desc } from "drizzle-orm";
 import { uploadBuffer, downloadBuffer, deleteObject } from "../objectStorage";
 import { onlineTracker } from "../online-tracker";
 
@@ -509,6 +512,41 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const isOnline = !targetUser.ghostMode && targetUser.lastLoginAt != null && new Date(targetUser.lastLoginAt) >= fifteenMinutesAgo;
     const isBlockedByMe = await storage.hasBlockedUser(requesterId, userId);
+
+    const [lastfmSession] = await db
+      .select({ lastfmUsername: userLastfmSessions.lastfmUsername })
+      .from(userLastfmSessions)
+      .where(eq(userLastfmSessions.userId, userId))
+      .limit(1);
+
+    const [topTrack] = await db
+      .select({ trackName: userMusicTracks.trackName, artistName: userMusicTracks.artistName })
+      .from(userMusicTracks)
+      .where(eq(userMusicTracks.userId, userId))
+      .orderBy(desc(userMusicTracks.addedAt))
+      .limit(1);
+
+    const [primaryMembership] = await db
+      .select({ clubId: motoClubMembers.clubId })
+      .from(motoClubMembers)
+      .where(and(eq(motoClubMembers.userId, userId), eq(motoClubMembers.status, "active")))
+      .orderBy(motoClubMembers.joinedAt)
+      .limit(1);
+
+    let primaryClubName: string | null = null;
+    let primaryClubId: string | null = null;
+    if (primaryMembership) {
+      const [club] = await db
+        .select({ id: motoClubs.id, name: motoClubs.name })
+        .from(motoClubs)
+        .where(eq(motoClubs.id, primaryMembership.clubId))
+        .limit(1);
+      if (club) {
+        primaryClubName = club.name;
+        primaryClubId = club.id;
+      }
+    }
+
     return res.json({
       id: targetUser.id,
       nickname: targetUser.nickname,
@@ -526,6 +564,11 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
       isAvailable: (profile?.isAvailable || false) && !targetUser.ghostMode && isOnline,
       isBlockedByMe,
       lastLoginAt: targetUser.lastLoginAt ?? null,
+      lastfmUsername: lastfmSession?.lastfmUsername ?? null,
+      topTrackName: topTrack?.trackName ?? null,
+      topArtistName: topTrack?.artistName ?? null,
+      primaryClubName,
+      primaryClubId,
     });
   } catch (error) {
     console.error("Get public user profile error:", error);

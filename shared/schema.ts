@@ -835,6 +835,12 @@ export const motoClubs = pgTable("moto_clubs", {
   parentClubId: varchar("parent_club_id", { length: 36 }),
   latitude: doublePrecision("latitude"),
   longitude: doublePrecision("longitude"),
+  proposedLatitude: doublePrecision("proposed_latitude"),
+  proposedLongitude: doublePrecision("proposed_longitude"),
+  proposedAddress: text("proposed_address"),
+  proposedBy: varchar("proposed_by", { length: 36 })
+    .references(() => users.id, { onDelete: "set null" }),
+  proposedAt: timestamp("proposed_at"),
   createdBy: varchar("created_by", { length: 36 })
     .references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),

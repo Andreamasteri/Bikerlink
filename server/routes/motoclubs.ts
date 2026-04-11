@@ -1035,6 +1035,285 @@ router.get("/creation-request/status", requireAuth, async (req: Request, res: Re
   }
 });
 
+const REGION_CENTERS_SERVER: Record<string, { latitude: number; longitude: number }> = {
+  "Piemonte": { latitude: 45.0703, longitude: 7.6869 },
+  "Valle d'Aosta": { latitude: 45.7399, longitude: 7.4202 },
+  "Lombardia": { latitude: 45.4654, longitude: 9.1859 },
+  "Trentino-Alto Adige": { latitude: 46.0667, longitude: 11.1211 },
+  "Veneto": { latitude: 45.4347, longitude: 12.3380 },
+  "Friuli-Venezia Giulia": { latitude: 45.6495, longitude: 13.7768 },
+  "Liguria": { latitude: 44.4056, longitude: 8.9463 },
+  "Emilia-Romagna": { latitude: 44.4940, longitude: 11.3426 },
+  "Toscana": { latitude: 43.7711, longitude: 11.2486 },
+  "Umbria": { latitude: 43.1122, longitude: 12.3888 },
+  "Marche": { latitude: 43.6158, longitude: 13.5189 },
+  "Lazio": { latitude: 41.8955, longitude: 12.4823 },
+  "Abruzzo": { latitude: 42.3512, longitude: 13.3980 },
+  "Molise": { latitude: 41.5605, longitude: 14.6684 },
+  "Campania": { latitude: 40.8392, longitude: 14.2512 },
+  "Puglia": { latitude: 41.1259, longitude: 16.8694 },
+  "Basilicata": { latitude: 40.6393, longitude: 15.8052 },
+  "Calabria": { latitude: 38.9098, longitude: 16.5880 },
+  "Sicilia": { latitude: 37.5999, longitude: 14.0154 },
+  "Sardegna": { latitude: 39.2238, longitude: 9.1217 },
+};
+
+function getServerRegionCenter(region: string | null | undefined): { latitude: number; longitude: number } | null {
+  if (!region) return null;
+  const direct = REGION_CENTERS_SERVER[region];
+  if (direct) return direct;
+  const normalized = region.trim().toLowerCase();
+  for (const [key, coords] of Object.entries(REGION_CENTERS_SERVER)) {
+    if (key.toLowerCase() === normalized) return coords;
+  }
+  return null;
+}
+
+router.get("/map", requireAuth, async (_req: Request, res: Response) => {
+  try {
+    const clubs = await db.select({
+      id: motoClubs.id,
+      name: motoClubs.name,
+      clubType: motoClubs.clubType,
+      logoUrl: motoClubs.logoUrl,
+      region: motoClubs.region,
+      country: motoClubs.country,
+      latitude: motoClubs.latitude,
+      longitude: motoClubs.longitude,
+      memberCount: sql<number>`(select count(*) from moto_club_members m where m.club_id = moto_clubs.id and m.status = 'active')::int`,
+    })
+      .from(motoClubs)
+      .where(eq(motoClubs.isApproved, true));
+
+    const result: Array<{
+      id: string;
+      name: string;
+      clubType: string;
+      logoUrl: string | null;
+      region: string | null;
+      country: string | null;
+      latitude: number;
+      longitude: number;
+      isFictitious: boolean;
+      memberCount: number;
+    }> = [];
+
+    for (const c of clubs) {
+      if (c.latitude != null && c.longitude != null) {
+        result.push({
+          id: c.id,
+          name: c.name,
+          clubType: c.clubType,
+          logoUrl: c.logoUrl,
+          region: c.region,
+          country: c.country,
+          latitude: c.latitude,
+          longitude: c.longitude,
+          isFictitious: false,
+          memberCount: Number(c.memberCount),
+        });
+      } else if (c.clubType === "region") {
+        const center = getServerRegionCenter(c.region);
+        if (center) {
+          result.push({
+            id: c.id,
+            name: c.name,
+            clubType: c.clubType,
+            logoUrl: c.logoUrl,
+            region: c.region,
+            country: c.country,
+            latitude: center.latitude,
+            longitude: center.longitude,
+            isFictitious: true,
+            memberCount: Number(c.memberCount),
+          });
+        }
+      }
+    }
+
+    return res.json(result);
+  } catch (e) {
+    console.error("[GET /motoclubs/map]", e);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+router.get("/map/pending-locations", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const user = await storage.getUser(userId);
+    if (!user || (user.role !== "admin" && user.role !== "moderator" && user.role !== "moderatore")) {
+      return res.status(403).json({ message: "Accesso non autorizzato" });
+    }
+
+    const clubs = await db.select({
+      id: motoClubs.id,
+      name: motoClubs.name,
+      clubType: motoClubs.clubType,
+      logoUrl: motoClubs.logoUrl,
+      region: motoClubs.region,
+      proposedLatitude: motoClubs.proposedLatitude,
+      proposedLongitude: motoClubs.proposedLongitude,
+      proposedAddress: motoClubs.proposedAddress,
+      proposedBy: motoClubs.proposedBy,
+      proposedAt: motoClubs.proposedAt,
+    })
+      .from(motoClubs)
+      .where(and(
+        eq(motoClubs.isApproved, true),
+        sql`${motoClubs.proposedLatitude} IS NOT NULL`,
+      ))
+      .orderBy(desc(motoClubs.updatedAt));
+
+    const enriched = await Promise.all(clubs.map(async (c) => {
+      let proposerNickname: string | null = null;
+      if (c.proposedBy) {
+        const proposer = await storage.getUser(c.proposedBy);
+        proposerNickname = proposer?.nickname ?? null;
+      }
+      return { ...c, proposerNickname };
+    }));
+
+    return res.json(enriched);
+  } catch (e) {
+    console.error("[GET /motoclubs/map/pending-locations]", e);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+router.post("/:id/propose-location", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const clubId = req.params.id;
+    const { latitude, longitude, address } = req.body as { latitude?: number; longitude?: number; address?: string };
+
+    if (latitude == null || longitude == null) {
+      return res.status(400).json({ message: "Latitudine e longitudine obbligatorie" });
+    }
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+      return res.status(400).json({ message: "Latitudine non valida" });
+    }
+    if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      return res.status(400).json({ message: "Longitudine non valida" });
+    }
+
+    const [club] = await db.select().from(motoClubs).where(and(eq(motoClubs.id, clubId), eq(motoClubs.isApproved, true))).limit(1);
+    if (!club) return res.status(404).json({ message: "Club non trovato" });
+
+    const [membership] = await db.select()
+      .from(motoClubMembers)
+      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.userId, userId), eq(motoClubMembers.status, "active")))
+      .limit(1);
+    if (!membership) return res.status(403).json({ message: "Devi essere membro del club per proporre una sede" });
+
+    await db.update(motoClubs).set({
+      proposedLatitude: latitude,
+      proposedLongitude: longitude,
+      proposedAddress: address ? address.trim() || null : null,
+      proposedBy: userId,
+      proposedAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(motoClubs.id, clubId));
+
+    await storage.createNotification({
+      userId,
+      title: "Proposta sede inviata",
+      body: `La tua proposta di sede per "${club.name}" è in attesa di approvazione`,
+      notificationType: "motoclub_invite",
+      referenceType: "motoclub",
+      referenceId: clubId,
+    });
+
+    return res.json({ success: true });
+  } catch (e) {
+    console.error("[POST /motoclubs/:id/propose-location]", e);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+router.post("/:id/approve-location", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const clubId = req.params.id;
+    const adminUser = await storage.getUser(userId);
+    if (!adminUser || (adminUser.role !== "admin" && adminUser.role !== "moderator" && adminUser.role !== "moderatore")) {
+      return res.status(403).json({ message: "Accesso non autorizzato" });
+    }
+
+    const [club] = await db.select().from(motoClubs).where(eq(motoClubs.id, clubId)).limit(1);
+    if (!club) return res.status(404).json({ message: "Club non trovato" });
+    if (club.proposedLatitude == null) return res.status(400).json({ message: "Nessuna proposta in attesa" });
+
+    await db.update(motoClubs).set({
+      latitude: club.proposedLatitude,
+      longitude: club.proposedLongitude,
+      proposedLatitude: null,
+      proposedLongitude: null,
+      proposedAddress: null,
+      proposedBy: null,
+      proposedAt: null,
+      updatedAt: new Date(),
+    }).where(eq(motoClubs.id, clubId));
+
+    if (club.proposedBy) {
+      await storage.createNotification({
+        userId: club.proposedBy,
+        title: "Sede approvata!",
+        body: `La sede proposta per "${club.name}" è stata approvata`,
+        notificationType: "motoclub_invite",
+        referenceType: "motoclub",
+        referenceId: clubId,
+      });
+    }
+
+    return res.json({ success: true });
+  } catch (e) {
+    console.error("[POST /motoclubs/:id/approve-location]", e);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+router.post("/:id/reject-location", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const clubId = req.params.id;
+    const adminUser = await storage.getUser(userId);
+    if (!adminUser || (adminUser.role !== "admin" && adminUser.role !== "moderator" && adminUser.role !== "moderatore")) {
+      return res.status(403).json({ message: "Accesso non autorizzato" });
+    }
+
+    const [club] = await db.select().from(motoClubs).where(eq(motoClubs.id, clubId)).limit(1);
+    if (!club) return res.status(404).json({ message: "Club non trovato" });
+
+    const proposedByUserId = club.proposedBy;
+
+    await db.update(motoClubs).set({
+      proposedLatitude: null,
+      proposedLongitude: null,
+      proposedAddress: null,
+      proposedBy: null,
+      proposedAt: null,
+      updatedAt: new Date(),
+    }).where(eq(motoClubs.id, clubId));
+
+    if (proposedByUserId) {
+      await storage.createNotification({
+        userId: proposedByUserId,
+        title: "Proposta sede rifiutata",
+        body: `La sede proposta per "${club.name}" non è stata approvata`,
+        notificationType: "motoclub_invite",
+        referenceType: "motoclub",
+        referenceId: clubId,
+      });
+    }
+
+    return res.json({ success: true });
+  } catch (e) {
+    console.error("[POST /motoclubs/:id/reject-location]", e);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 router.post("/sync-garage", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
