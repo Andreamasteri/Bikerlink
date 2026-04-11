@@ -67,7 +67,16 @@
       "expo-web-browser",
       "expo-camera",
       "expo-image",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "BikerLink accede alla libreria musicale per riprodurre brani.",
+          "savePhotosPermission": "BikerLink salva brani nella libreria musicale.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
+      "expo-document-picker"
     ],
     "experiments": {
       "typedRoutes": true
