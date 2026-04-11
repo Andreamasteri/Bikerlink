@@ -140,8 +140,8 @@ export default function ProfileScreen() {
   const [isExportingData, setIsExportingData] = useState(false);
 
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-  // Ciclo 4.0.0 — APK v10 — OTA-9: fix spazio vuoto tab Brani (Musica), fix procedura OTA timeout EAS
-  const CURRENT_OTA_NUMBER = 9;
+  // Ciclo 4.0.0 — APK v10 — OTA-10: linea arancione tab Musica a contatto col testo (paddingBottom 0)
+  const CURRENT_OTA_NUMBER = 10;
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],

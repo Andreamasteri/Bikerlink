@@ -1262,5 +1262,28 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 10,
+    "version": "1.10.0",
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-10 rv4.0.0: linea arancione tab Musica a contatto col testo (paddingBottom 0)",
+    "note": "Task #522: tabItem paddingVertical:10 → paddingTop:10, paddingBottom:0. Linea arancione immediata sotto Brani/Match/Ricevute/Radio/Telefono. CURRENT_OTA_NUMBER=10.",
+    "releaseId": "db0cdda2-f2e0-4e21-b98a-fce5de045202",
+    "bundleUrl": "private/ota/ota-1.10.0-1775949449571.js",
+    "updateGroupId": "86cf4922-228e-48f6-91cb-c78fe272b1c6",
+    "androidUpdateId": "019d7ed6-b17e-74a1-9c15-7816326c8915",
+    "iosUpdateId": null,
+    "commitBase": "90aa8a462d8ececdb7368eda38361a538bc77d3f",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/86cf4922-228e-48f6-91cb-c78fe272b1c6",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "published"
   }
 ]
