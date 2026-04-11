@@ -28,6 +28,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { usePlayer, PlayerTrack, RadioStation } from "@/lib/player-context";
+import { FullPlayerModal } from "@/components/MiniPlayer";
 import { useAuth } from "@/lib/auth-context";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -641,10 +642,15 @@ const radioTabStyles = StyleSheet.create({
 
 function InlineMiniPlayer() {
   const { currentTrack, isPlaying, togglePlay, stop } = usePlayer();
+  const [showModal, setShowModal] = useState(false);
   if (!currentTrack) return null;
   return (
     <View style={inlineMiniPlayerStyles.container}>
-      <View style={inlineMiniPlayerStyles.info}>
+      <TouchableOpacity
+        style={inlineMiniPlayerStyles.info}
+        onPress={() => setShowModal(true)}
+        activeOpacity={0.7}
+      >
         <Ionicons name="musical-note" size={14} color={Colors.accent} style={{ marginRight: 6 }} />
         <Text style={inlineMiniPlayerStyles.title} numberOfLines={1}>
           {currentTrack.title}
@@ -654,22 +660,23 @@ function InlineMiniPlayer() {
             {" · "}{currentTrack.artist}
           </Text>
         ) : null}
-      </View>
+      </TouchableOpacity>
       <View style={inlineMiniPlayerStyles.controls}>
         <TouchableOpacity
-          onPress={togglePlay}
+          onPress={(e) => { e.stopPropagation(); togglePlay(); }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Ionicons name={isPlaying ? "pause" : "play"} size={22} color={Colors.accent} />
         </TouchableOpacity>
         <TouchableOpacity
-          onPress={stop}
+          onPress={(e) => { e.stopPropagation(); stop(); }}
           style={{ marginLeft: 12 }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Ionicons name="stop" size={22} color={Colors.textSecondary} />
         </TouchableOpacity>
       </View>
+      <FullPlayerModal visible={showModal} onClose={() => setShowModal(false)} />
     </View>
   );
 }
