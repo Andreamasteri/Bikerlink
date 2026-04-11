@@ -1042,7 +1042,7 @@
     ],
     "jsEngine": "hermes",
     "message": "APK v10 — Fix crash mappa (Google Maps API key corretta nel manifest)",
-    "note": "APK v9 crashava al login perché Google Maps API key era vuota in AndroidManifest.xml (buildato prima del commit cde3bb7). APK v10 include la chiave corretta (AIzaSyBy...). versionCode 10, commit 85e6279.",
+    "note": "APK v9 crashava al login perché Google Maps API key era vuota in AndroidManifest.xml (buildato prima del commit cde3bb7). APK v10 include la chiave Maps corretta nel manifest. versionCode 10, commit 85e6279.",
     "releaseId": null,
     "bundleUrl": null,
     "updateGroupId": null,
