@@ -595,8 +595,9 @@ router.get("/marketplace", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-router.get("/map", requireAuth, async (_req: Request, res: Response) => {
+router.get("/map", requireAuth, async (req: Request, res: Response) => {
   try {
+    const currentUserId = req.session.userId!;
     const clubs = await db.select({
       id: motoClubs.id,
       name: motoClubs.name,
@@ -607,6 +608,7 @@ router.get("/map", requireAuth, async (_req: Request, res: Response) => {
       latitude: motoClubs.latitude,
       longitude: motoClubs.longitude,
       memberCount: sql<number>`(select count(*) from moto_club_members m where m.club_id = moto_clubs.id and m.status = 'active')::int`,
+      currentUserIsMember: sql<boolean>`exists(select 1 from moto_club_members m2 where m2.club_id = moto_clubs.id and m2.user_id = ${currentUserId} and m2.status = 'active')`,
     })
       .from(motoClubs)
       .where(eq(motoClubs.isApproved, true));
@@ -622,6 +624,7 @@ router.get("/map", requireAuth, async (_req: Request, res: Response) => {
       longitude: number;
       isFictitious: boolean;
       memberCount: number;
+      currentUserIsMember: boolean;
     }> = [];
 
     for (const c of clubs) {
@@ -637,6 +640,7 @@ router.get("/map", requireAuth, async (_req: Request, res: Response) => {
           longitude: c.longitude,
           isFictitious: false,
           memberCount: Number(c.memberCount),
+          currentUserIsMember: Boolean(c.currentUserIsMember),
         });
       } else if (c.clubType === "region") {
         const center = getRegionCenter(c.region ?? "");
@@ -652,6 +656,7 @@ router.get("/map", requireAuth, async (_req: Request, res: Response) => {
             longitude: center.longitude,
             isFictitious: true,
             memberCount: Number(c.memberCount),
+            currentUserIsMember: Boolean(c.currentUserIsMember),
           });
         }
       }

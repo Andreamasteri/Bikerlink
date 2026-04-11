@@ -147,6 +147,7 @@ export interface ClubMapPin {
   longitude: number;
   isFictitious: boolean;
   memberCount: number;
+  currentUserIsMember?: boolean;
 }
 
 export default function InteractiveMap({
@@ -410,7 +411,7 @@ export default function InteractiveMap({
                   )}
                   <View style={clubCalloutStyles.actions}>
                     <Text style={clubCalloutStyles.actionOpen}>Apri club →</Text>
-                    {club.isFictitious && onProposeClubLocation != null && (
+                    {club.isFictitious && club.currentUserIsMember && onProposeClubLocation != null && (
                       <TouchableOpacity
                         onPress={(e) => { e.stopPropagation?.(); onProposeClubLocation(club); }}
                         hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
