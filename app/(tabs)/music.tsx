@@ -780,6 +780,8 @@ export default function MusicScreen() {
                   onPress={() => setSendModalVisible(true)}
                   style={{ marginLeft: 10 }}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityLabel="Invia la mia libreria"
+                  accessibilityRole="button"
                 >
                   <Ionicons name="paper-plane-outline" size={20} color={Colors.accent} />
                 </TouchableOpacity>
