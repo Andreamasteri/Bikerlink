@@ -1077,5 +1077,28 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 2,
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-11",
+    "runtimeVersion": "4.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-2 rv4.0.0: player musicale completo — bottone play sui brani, invia libreria, fix MiniPlayer, download anteprima 30s",
+    "note": "Task #496. Fix MiniPlayer zIndex (invisibile su Android), bottone play 30s preview su ogni brano libreria BikerLink, bottone Invia libreria via chat, fix placeholder album art, download 30s preview playlist ricevute. CURRENT_OTA_NUMBER=2.",
+    "releaseId": "3955688e-c88b-42f1-b267-60d3da82fad0",
+    "bundleUrl": "private/ota/ota-1.2.0-1775895158550.js",
+    "updateGroupId": "034f9824-5bd5-4b5f-ab1e-1d7753e86ecc",
+    "androidUpdateId": "019d7b9a-457c-76cb-83dd-8f4d4aa62e33",
+    "iosUpdateId": null,
+    "commitBase": "bb0821b2460d9fdb66a9bca68367ffdcae1cd18d",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/034f9824-5bd5-4b5f-ab1e-1d7753e86ecc",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "published"
   }
 ]
