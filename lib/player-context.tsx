@@ -217,7 +217,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       await soundRef.current?.stopAsync();
       await soundRef.current?.unloadAsync();
       soundRef.current = null;
-    } catch {}
+    } catch (err) { console.warn("[Player] stop error:", err); }
     setCurrentTrack(null);
     setQueue([]);
     queueRef.current = [];

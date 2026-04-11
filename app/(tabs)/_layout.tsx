@@ -168,7 +168,7 @@ export default function TabLayout() {
   };
 
   const miniPlayerBottom = tabBarHeight + 8;
-  const isMusicScreen = pathname === "/music" || pathname.includes("/music");
+  const isMusicScreen = pathname === "/music";
 
   return (
     <>
