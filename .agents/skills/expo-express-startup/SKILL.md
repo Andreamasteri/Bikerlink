@@ -778,6 +778,32 @@ echo "============================================"
 
 ---
 
+## OTA — Problemi ricorrenti e soluzioni
+
+### Problema: EAS timeout durante publish-ota.sh → utenti bloccati sulla OTA precedente
+
+**Sintomo**: `publish-ota.sh` completa la build del bundle custom e lo carica sul backend, ma il passo EAS (`npx eas-cli update`) va in timeout. Il messaggio di errore riporta `EAS_STATUS: TIMEOUT`.
+
+**Motivo**: `OtaStartupChecker` usa `checkForUpdateAsync()` di EAS (expo-updates), non il custom backend. Se EAS non riceve la nuova OTA (perché il comando è andato in timeout), gli utenti che aprono l'app ricevono ancora la versione precedente dalla CDN EAS — ad esempio restano bloccati su OTA-6 anche se il backend serve già OTA-7.
+
+**Soluzione: pubblicare una nuova OTA superseding con numero N+1**
+
+Non tentare di ripetere manualmente il comando EAS. La procedura corretta è:
+
+1. Incrementa `CURRENT_OTA_NUMBER` in `OtaStartupChecker` (es. da 7 a 8)
+2. Aggiorna `ota-updates.json` con il nuovo numero OTA e le note di release
+3. Esegui: `bash scripts/publish-ota.sh`
+
+La nuova OTA (N+1) supera quella fallita: EAS distribuirà la versione corretta e `OtaStartupChecker` aggiornerà il numero OTA nel backend al termine.
+
+**Regole critiche**:
+- **MAI** eseguire `npx eas-cli` direttamente — è una regola vietata nel progetto
+- Usa **sempre** `publish-ota.sh` per pubblicare OTA
+- Aggiorna sempre `CURRENT_OTA_NUMBER` e `ota-updates.json` **prima** dell'export, non dopo
+- Il bundle custom sul backend è già attivo dopo un timeout EAS — non è necessario ripubblicarlo, basta che EAS riceva la nuova versione tramite publish-ota.sh
+
+---
+
 ## Note importanti
 
 - **Non usare `npx expo start` direttamente in shell**: usa sempre i workflow Replit (`restart_workflow`) — i workflow iniettano le variabili d'ambiente corrette (`REPLIT_DEV_DOMAIN`, `PORT`, ecc.)

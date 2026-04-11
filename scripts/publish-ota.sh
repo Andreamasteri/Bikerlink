@@ -222,17 +222,22 @@ else
   if [ $EAS_EXIT -ne 0 ]; then
     # Rileva specificamente timeout vs altri errori EAS
     if grep -qiE "(timeout|timed out|ETIMEDOUT|ECONNRESET)" "$EAS_LOG" 2>/dev/null; then
-      echo "   ⚠️  EAS update andato in TIMEOUT (exit $EAS_EXIT) — il bundle custom è già attivo."
-      echo "   Il comando EAS ha impiegato troppo tempo e non ha completato."
-      echo "   Per completare la pubblicazione su EAS, eseguire manualmente:"
-      echo "     npx eas-cli@16 update --channel preview --message \"$RELEASE_NOTES\" --platform android"
-      EAS_STATUS="TIMEOUT — eseguire manualmente"
+      echo "   ⚠️  EAS update andato in TIMEOUT (exit $EAS_EXIT) — il bundle custom è già attivo sul backend."
+      echo "   EAS non ha ricevuto l'OTA: gli utenti su Expo Go potrebbero restare bloccati sull'OTA precedente."
+      echo "   PROCEDURA CORRETTA: pubblica una nuova OTA superseding con numero N+1:"
+      echo "     1. Aggiorna CURRENT_OTA_NUMBER in OtaStartupChecker e ota-updates.json al numero N+1"
+      echo "     2. Esegui: bash scripts/publish-ota.sh"
+      echo "   NON eseguire npx eas-cli direttamente — usa sempre publish-ota.sh."
+      EAS_STATUS="TIMEOUT — pubblicare nuova OTA superseding con publish-ota.sh"
     else
       echo "   ⚠️  EAS update fallito (exit $EAS_EXIT) — custom backend rimane attivo."
       echo "   Errore:"
       tail -10 "$EAS_LOG" | sed 's/^/     /'
-      echo "   Eseguire manualmente: npx eas-cli@16 update --channel preview --message \"$RELEASE_NOTES\" --platform android"
-      EAS_STATUS="FALLITO — eseguire manualmente"
+      echo "   PROCEDURA CORRETTA: pubblica una nuova OTA superseding con numero N+1:"
+      echo "     1. Aggiorna CURRENT_OTA_NUMBER in OtaStartupChecker e ota-updates.json al numero N+1"
+      echo "     2. Esegui: bash scripts/publish-ota.sh"
+      echo "   NON eseguire npx eas-cli direttamente — usa sempre publish-ota.sh."
+      EAS_STATUS="FALLITO — pubblicare nuova OTA superseding con publish-ota.sh"
     fi
   else
     set +e
