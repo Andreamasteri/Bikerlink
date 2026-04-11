@@ -24,7 +24,6 @@ const LANGUAGES: { code: AppLanguage; flag: string; label: string }[] = [
   { code: "de", flag: "🇩🇪", label: "Deutsch" },
   { code: "es", flag: "🇪🇸", label: "Español" },
   { code: "fr", flag: "🇫🇷", label: "Français" },
-  { code: "tr", flag: "🇹🇷", label: "Türkçe" },
 ];
 
 const loginBg = require("@/assets/images/splash-bg.jpg");

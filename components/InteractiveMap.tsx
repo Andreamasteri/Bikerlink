@@ -88,6 +88,7 @@ interface InteractiveMapProps {
   filterEvents?: boolean;
   onToggleFilterEvents?: () => void;
   onClubPress?: (club: ClubMapPin) => void;
+  onProposeClubLocation?: (club: ClubMapPin) => void;
 }
 
 const ITALY_REGION: Region = {
@@ -177,6 +178,7 @@ export default function InteractiveMap({
   filterEvents = true,
   onToggleFilterEvents,
   onClubPress,
+  onProposeClubLocation,
 }: InteractiveMapProps) {
   const { enabled: mapsEnabled, resolvedProvider, userChoiceEnabled } = useMapConfig();
   const mapRef = useRef<MapView>(null);
@@ -387,7 +389,7 @@ export default function InteractiveMap({
               <MaterialCommunityIcons name="shield-check" size={16} color="#fff" />
               {club.isFictitious && <View style={clubMarkerStyles.fictitiousDot} />}
             </View>
-            <Callout tooltip={false}>
+            <Callout tooltip={false} onPress={() => onClubPress?.(club)}>
               <View style={clubCalloutStyles.wrapper}>
                 {club.logoUrl ? (
                   <Image source={{ uri: club.logoUrl }} style={clubCalloutStyles.logo} resizeMode="cover" />
@@ -402,11 +404,21 @@ export default function InteractiveMap({
                     <Text style={clubCalloutStyles.meta}>{club.memberCount} membri</Text>
                   )}
                   {club.isFictitious ? (
-                    <Text style={clubCalloutStyles.disclaimer}>⚠ Posizione indicativa</Text>
+                    <Text style={clubCalloutStyles.disclaimer}>⚠ Posizione indicativa – centro regione</Text>
                   ) : (
                     <Text style={clubCalloutStyles.confirmed}>✓ Sede confermata</Text>
                   )}
-                  <Text style={clubCalloutStyles.hint}>Tocca per aprire il club</Text>
+                  <View style={clubCalloutStyles.actions}>
+                    <Text style={clubCalloutStyles.actionOpen}>Apri club →</Text>
+                    {club.isFictitious && onProposeClubLocation != null && (
+                      <TouchableOpacity
+                        onPress={(e) => { e.stopPropagation?.(); onProposeClubLocation(club); }}
+                        hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                      >
+                        <Text style={clubCalloutStyles.actionPropose}>+ Proponi sede</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
               </View>
             </Callout>
@@ -545,7 +557,7 @@ export default function InteractiveMap({
               size={16}
               color={filterClubs ? "#fff" : "#009688"}
             />
-            <Text style={[styles.filterText, filterClubs && styles.filterTextActive]}>Club</Text>
+            <Text style={[styles.filterText, filterClubs && styles.filterTextActive]}>Motoclub</Text>
           </TouchableOpacity>
         )}
 
@@ -560,7 +572,7 @@ export default function InteractiveMap({
               size={16}
               color={filterEvents ? "#fff" : "#F57C00"}
             />
-            <Text style={[styles.filterText, filterEvents && styles.filterTextActive]}>Raduni</Text>
+            <Text style={[styles.filterText, filterEvents && styles.filterTextActive]}>Eventi</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -835,10 +847,23 @@ const clubCalloutStyles = StyleSheet.create({
     color: "#009688",
     fontWeight: "600" as const,
   },
-  hint: {
+  actions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 4,
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+  actionOpen: {
     fontSize: 10,
-    color: "#888",
-    marginTop: 2,
+    color: "#2979FF",
+    fontWeight: "600" as const,
+  },
+  actionPropose: {
+    fontSize: 10,
+    color: "#009688",
+    fontWeight: "600" as const,
+    textDecorationLine: "underline" as const,
   },
 });
 

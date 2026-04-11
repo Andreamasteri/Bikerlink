@@ -825,6 +825,7 @@ export default function MapScreen() {
             filterEvents={filterEvents}
             onToggleFilterEvents={() => setFilterEvents((p) => !p)}
             onClubPress={(club) => { setMapFullscreen(false); router.push({ pathname: "/motoclub/[id]" as const, params: { id: club.id } }); }}
+            onProposeClubLocation={(club) => { setMapFullscreen(false); router.push({ pathname: "/motoclub/[id]" as const, params: { id: club.id } }); }}
           />
           ) : (
             <View style={styles.mapPlaceholder}>
