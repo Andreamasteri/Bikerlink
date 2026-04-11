@@ -28,6 +28,17 @@ function setupSignalHandlers() {
   process.on("SIGHUP", cleanup);
 }
 
+const PROJECT_ROOT = path.resolve(__dirname, "..");
+const STATIC_BUILD_ROOT = path.resolve(PROJECT_ROOT, "static-build");
+
+function safePath(baseDir, ...segments) {
+  const resolved = path.resolve(baseDir, ...segments);
+  if (!resolved.startsWith(baseDir + path.sep) && resolved !== baseDir) {
+    throw new Error(`Path traversal detected: ${resolved} is outside ${baseDir}`);
+  }
+  return resolved;
+}
+
 function stripProtocol(domain) {
   let urlString = domain.trim();
 
@@ -331,6 +342,9 @@ function extractAssets(timestamp) {
       }
 
       const decodedPath = decodeURIComponent(unstablePath);
+
+      safePath(STATIC_BUILD_ROOT, decodedPath);
+
       const key = path.posix.join(decodedPath, filename);
 
       if (!assetsMap.has(key)) {
@@ -375,22 +389,18 @@ async function downloadAssets(assets, timestamp) {
     }
 
     const decodedPath = decodeURIComponent(unstablePath);
+
+    safePath(STATIC_BUILD_ROOT, decodedPath);
+
     const metroUrl = new URL(
       `http://localhost:8081${path.posix.join("/assets", decodedPath, asset.filename)}`,
     );
     metroUrl.searchParams.set("platform", platform);
     metroUrl.searchParams.set("hash", asset.hash);
 
-    const outputDir = path.join(
-      "static-build",
-      timestamp,
-      "_expo",
-      "static",
-      "js",
-      asset.relativePath,
-    );
+    const outputDir = safePath(STATIC_BUILD_ROOT, timestamp, "_expo", "static", "js", asset.relativePath);
     fs.mkdirSync(outputDir, { recursive: true });
-    const output = path.join(outputDir, asset.filename);
+    const output = safePath(outputDir, asset.filename);
 
     try {
       await downloadFile(metroUrl.toString(), output);

@@ -31,9 +31,7 @@
       "versionCode": 10,
       "jsEngine": "hermes",
       "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyByoMiBm_D-e3_yG0u-BqwinhjkvbKe0dw"
-        }
+        "googleMaps": {}
       },
       "permissions": [
         "ACCESS_COARSE_LOCATION",

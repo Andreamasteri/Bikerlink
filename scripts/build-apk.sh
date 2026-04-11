@@ -82,7 +82,6 @@ set +e
 CI=1 \
 EAS_SKIP_AUTO_FINGERPRINT=1 \
 EXPO_PUBLIC_DOMAIN=biker-link.replit.app \
-EXPO_PUBLIC_SPOTIFY_CLIENT_ID=f5eba891d5a64cbebe458ff329eeb4eb \
 npx eas-cli@latest build \
   --platform android \
   --profile "$PROFILE" \
