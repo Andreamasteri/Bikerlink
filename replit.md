@@ -53,13 +53,13 @@ BikerLink utilizes a modern full-stack architecture.
 - **Advertisement System**: Targeted ad delivery.
 - **User Types**: Biker, Zavorrina/Zavorrino, Coppia with distinct functionalities.
 - **Multilingual Support**: IT, EN, DE, ES, FR.
-- **Player Musicale in-app** (SDK 55 cycle): `lib/player-context.tsx` (PlayerProvider con RNTP graceful degradation per Expo Go/web, sleep timer, preferiti AsyncStorage). `components/MiniPlayer.tsx` (barra persistente + modal fullscreen con griglia generi radio). Backend: `server/routes/radio.ts` — `/api/music/genres`, `/stations/:genre` (Radio Browser API), `/preview` + `/preview-playlist` (iTunes Search API), `/suggested-genres`. Pulsante anteprima 30s nelle SharedPlaylistCard in music.tsx. `react-native-track-player@4.1.2` + `expo-media-library`. UIBackgroundModes["audio"] e permessi READ_MEDIA_AUDIO/FOREGROUND_SERVICE in app.json.
+- **Player Musicale in-app** (SDK 55 cycle): `lib/player-context.tsx` (PlayerProvider con **expo-av** Audio.Sound, sleep timer, preferiti AsyncStorage). `components/MiniPlayer.tsx` (barra persistente + modal fullscreen con griglia generi radio). Backend: `server/routes/radio.ts` — `/api/music/genres`, `/stations/:genre` (Radio Browser API), `/preview` + `/preview-playlist` (iTunes Search API), `/suggested-genres`. Pulsante anteprima 30s nelle SharedPlaylistCard in music.tsx. **expo-av@16.0.8** + `expo-media-library`. UIBackgroundModes["audio"] e permessi READ_MEDIA_AUDIO/FOREGROUND_SERVICE in app.json. NOTA: RNTP rimosso (incompatibile New Arch RN 0.83.4).
 - **Spotify Music Integration** (Task #440/#441): OAuth connection to Spotify, syncs user's top tracks and recently played songs. Music Match feature finds bikers with common music taste. Playlist sharing via chat messages. Backend: `server/routes/spotify.ts` (9 endpoints: callback, disconnect, sync, status, my-tracks, share-playlist, shared-playlists, merge-playlist, match/music). DB tables: `user_spotify_tokens` (AES-256-CBC encrypted tokens), `user_music_tracks`, `shared_playlists`. messages table has new `playlist_id` column. Requires Secrets: `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`. Redirect URIs to register: `bikerlink://spotify-callback` and `https://biker-link.replit.app/api/spotify/callback`.
 
 **Deployment & Operations:**
 - Development workflow includes separate commands for frontend and backend, with watchdog scripts for automatic restarts and error monitoring.
 - EAS Build is used for cloud-based Android APK and AAB generation, supporting `preview` and `production` profiles.
-- Specific configurations for `react-native-reanimated` and `react-native-maps` are maintained for stability and Expo SDK compatibility.
+- **react-native-reanimated@~4.2.1** (versione corretta SDK 55, bundledNativeModules.json) e **react-native-maps@1.27.2** configurati per compatibilità EAS. NOTA: reanimated 3.x causava CMake build failure con NDK r27b (immagine EAS ubuntu-24.04-jdk-17-ndk-r27b-sdk-55). Android/ rimosso da git — EAS usa managed workflow (expo prebuild automatico).
 - OTA updates are managed via custom scripts for seamless deployment of new features.
 
 ## Utenti Seed
@@ -75,7 +75,8 @@ Il seed imposta `emailVerified: true` per tutti gli utenti creati.
 
 ## External Dependencies
 - **Expo SDK 55** (React Native 0.83.4): Core framework for React Native development.
-- **react-native-track-player@4.1.2**: Audio playback (radio streaming, MP3) con background playback.
+- **expo-av@16.0.8**: Audio playback (radio streaming, MP3, preview 30s) con background playback. Sostituisce RNTP (incompatibile New Architecture RN 0.83.4).
+- **react-native-reanimated@~4.2.1**: Versione corretta per SDK 55 (bundledNativeModules.json). Versioni 3.x causano CMake build failure con NDK r27b su EAS.
 - **expo-media-library**: Accesso alla libreria musicale del dispositivo.
 - **React Native**: Frontend UI framework.
 - **Express 5**: Backend web application framework.

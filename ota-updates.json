@@ -1010,24 +1010,24 @@
     "cycle": "4.x",
     "channel": "preview",
     "platform": "android",
-    "publishedAt": "2026-04-10",
+    "publishedAt": "2026-04-11",
     "runtimeVersion": "4.0.0",
     "platforms": [
       "android"
     ],
-    "jsEngine": "metro",
-    "message": "APK v9 — Ciclo OTA 4.0.0 — SDK 55 + Player Musicale (RNTP, radio, preview 30s, MiniPlayer)",
-    "note": "APK v9 build 4 (3c28d433). Fix: newArchEnabled=false per compatibilità RNTP 4.x con RN 0.83 (SDK55). I build 3-5 fallivano per EAS_BUILD_UNKNOWN_GRADLE_ERROR causato da New Architecture incompatibile con RNTP 4.x.",
+    "jsEngine": "hermes",
+    "message": "APK v9 — SDK 55 + expo-av Player + MiniPlayer + Radio Streaming",
+    "note": "Build 12 (cb76a959) — 11 build consecutive fallite con EAS_BUILD_UNKNOWN_GRADLE_ERROR. Causa radice: react-native-reanimated ~3.19.5 incompatibile con CMake 3.22.1 + NDK r27b usati dall'immagine EAS ubuntu-24.04-jdk-17-ndk-r27b-sdk-55. Fix: upgrade a ~4.2.1 (versione corretta per SDK 55 da bundledNativeModules.json). Altre fix applicate: RNTP→expo-av (New Arch), app.config.ts→app.json, android/ rimosso da git (managed workflow).",
     "releaseId": null,
     "bundleUrl": null,
     "updateGroupId": null,
     "androidUpdateId": null,
     "iosUpdateId": null,
-    "commitBase": "8c22e1e",
-    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/3c28d433-febf-4d5d-87fa-2d0a2efc205a",
-    "apkBuildId": "3c28d433-febf-4d5d-87fa-2d0a2efc205a",
+    "commitBase": "e6c717c",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/cb76a959-cc5e-4c43-b281-3e4f00058e22",
+    "apkBuildId": "cb76a959-cc5e-4c43-b281-3e4f00058e22",
     "apkVersionCode": 9,
-    "apkUrl": null,
-    "status": "building"
+    "apkUrl": "https://expo.dev/artifacts/eas/r8dXR1vnSMn8N5a2wWMxPY.apk",
+    "status": "available"
   }
 ]
