@@ -115,7 +115,7 @@ async function enrichEvent(evt: EventRow, requestingUserId: string | null) {
       participationStatus: eventParticipants.participationStatus,
       joinedAt: eventParticipants.joinedAt,
       nickname: users.nickname,
-      photoUrl: users.profilePhotoUrl,
+      photoUrl: users.avatarUrl,
     })
       .from(eventParticipants)
       .leftJoin(users, eq(users.id, eventParticipants.userId))
@@ -159,12 +159,15 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
 
 router.get("/images/:filename", async (req: Request, res: Response) => {
   try {
+    const userId = requireAuth(req, res);
+    if (!userId) return;
+
     const { downloadBuffer } = await import("../objectStorage");
     const buf = await downloadBuffer(`public/events/${req.params.filename}`);
     const ext = path.extname(req.params.filename).toLowerCase();
     const mime = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
     res.setHeader("Content-Type", mime);
-    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("Cache-Control", "private, max-age=86400");
     return res.send(buf);
   } catch {
     return res.status(404).json({ message: "Immagine non trovata" });
@@ -563,6 +566,11 @@ router.put("/:id", async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Non autorizzato" });
     }
 
+    // Creator can only edit events in pending or approved status
+    if (isOwner && !isPrivileged && existing.status !== "pending" && existing.status !== "approved") {
+      return res.status(403).json({ message: "Non puoi modificare un evento rifiutato o cancellato" });
+    }
+
     const {
       title, description, eventType, locationName, latitude, longitude,
       eventDate, eventTime, isRecurring, recurrenceInfo, maxParticipants,
@@ -589,12 +597,6 @@ router.put("/:id", async (req: Request, res: Response) => {
     if (autoInviteReason !== undefined) updates.autoInviteReason = autoInviteReason ? (autoInviteReason as string).trim() : null;
     if (autoInviteRegion !== undefined) updates.autoInviteRegion = autoInviteRegion ? (autoInviteRegion as string).trim() : null;
     if (autoInviteBrand !== undefined) updates.autoInviteBrand = autoInviteBrand ? (autoInviteBrand as string).trim() : null;
-
-    // Creator re-submitting a rejected event brings it back to pending
-    if (isOwner && !isPrivileged && existing.status === "rejected") {
-      updates.status = "pending";
-      updates.rejectionReason = null;
-    }
 
     const [updated] = await db.update(events).set(updates).where(eq(events.id, id)).returning();
     return res.json(updated);
@@ -751,13 +753,15 @@ router.delete("/:id/images/:imageId", async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Non autorizzato" });
     }
 
-    const [img] = await db.select().from(eventImages).where(eq(eventImages.id, imageId));
+    // Verify the image belongs to this specific event (prevent IDOR)
+    const [img] = await db.select().from(eventImages)
+      .where(and(eq(eventImages.id, imageId), eq(eventImages.eventId, id)));
     if (!img) return res.status(404).json({ message: "Immagine non trovata" });
 
     const filename = img.imageUrl.replace("/api/events/images/", "");
     try { await deleteObject(`public/events/${filename}`); } catch {}
 
-    await db.delete(eventImages).where(eq(eventImages.id, imageId));
+    await db.delete(eventImages).where(and(eq(eventImages.id, imageId), eq(eventImages.eventId, id)));
     return res.json({ message: "Immagine eliminata" });
   } catch (err) {
     console.error("[events] DELETE /:id/images/:imageId error:", err);
