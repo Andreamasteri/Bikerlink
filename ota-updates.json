@@ -1101,5 +1101,28 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 3,
+    "version": "1.3.0",
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-3 rv4.0.0: fix UI profilo — rimossa scritta Lingua, Documentazione sotto Stile Mappa, Pulsanti Taskbar centrato",
+    "note": "Task #498. Rimossa etichetta 'Lingua' sopra il selettore lingua (dropdown rimane invariato). Sezione 'Documentazione' spostata subito dopo 'Stile Mappa'. Titolo sezione taskbar rinominato in 'Pulsanti Taskbar' e centrato. CURRENT_OTA_NUMBER=3.",
+    "releaseId": "41515ca4-dbaf-4655-a112-986d974f6713",
+    "bundleUrl": "private/ota/ota-1.3.0-1775900422781.js",
+    "updateGroupId": "3a814851-021b-45bc-b361-00ab013f76a1",
+    "androidUpdateId": "019d7beb-0091-7433-a7ba-60a5a144a94f",
+    "iosUpdateId": null,
+    "commitBase": "e9d26418849ae4ffbae9f040df998908245ec439",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/3a814851-021b-45bc-b361-00ab013f76a1",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "published"
   }
 ]
