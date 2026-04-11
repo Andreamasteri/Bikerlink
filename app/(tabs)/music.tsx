@@ -39,6 +39,17 @@ const LASTFM_RED = "#D51007";
 
 type Tab = "brani" | "match" | "ricevute";
 
+interface PreviewResult {
+  trackId: string;
+  trackName: string;
+  artistName: string;
+  albumName: string | null;
+  previewUrl: string;
+  artworkUrl: string | null;
+  durationMs: number;
+  genre: string | null;
+}
+
 interface SearchTrack {
   spotifyTrackId: string;
   trackName: string;
@@ -166,7 +177,9 @@ export default function MusicScreen() {
           const body = await res.json();
           if (typeof body.message === "string") msg = body.message;
           if (body.needsSpotifyAuth === true) needsAuth = true;
-        } catch {}
+        } catch (e) {
+          console.warn("[music] search error body parse:", e);
+        }
         if (needsAuth) {
           setSearchNeedsReconnect(true);
         }
@@ -1086,23 +1099,24 @@ function SharedPlaylistCard({
       const url = new URL(`/api/music/preview-playlist?tracks=${tracksParam}`, getApiUrl());
       const resp = await fetch(url.toString());
       if (!resp.ok) throw new Error("Errore nel caricamento");
-      const previews = await resp.json();
+      const previews: PreviewResult[] = await resp.json();
       if (!previews || previews.length === 0) {
         Alert.alert("Nessuna anteprima", "Nessun brano di questa playlist ha un'anteprima disponibile.");
         return;
       }
-      const tracks: PlayerTrack[] = previews.map((p: any) => ({
+      const tracks: PlayerTrack[] = previews.map((p) => ({
         id: p.trackId,
         url: p.previewUrl,
         title: p.trackName,
         artist: p.artistName,
-        album: p.albumName,
-        artwork: p.artworkUrl,
+        album: p.albumName ?? undefined,
+        artwork: p.artworkUrl ?? undefined,
         duration: p.durationMs ? p.durationMs / 1000 : 30,
         source: "preview" as const,
       }));
       await playQueue(tracks, 0);
-    } catch {
+    } catch (err) {
+      console.warn("[music] preview load error:", err);
       Alert.alert("Errore", "Impossibile caricare le anteprime.");
     } finally {
       setPreviewLoading(false);

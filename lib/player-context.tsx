@@ -157,7 +157,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       if (v && mounted) {
         try {
           setFavoriteStationIds(JSON.parse(v));
-        } catch {}
+        } catch (err) {
+          console.warn("[Player] favorites parse error:", err);
+        }
       }
     });
 
@@ -169,34 +171,44 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isAvailable || !TrackPlayer || !Event) return;
 
-    let subs: any[] = [];
+    let subs: Array<{ remove?: () => void }> = [];
     try {
       subs = [
-        TrackPlayer.addEventListener(Event.PlaybackState, (data: any) => {
-          if (!State) return;
-          setIsPlaying(data.state === State.Playing);
-          setIsBuffering(data.state === State.Buffering || data.state === State.Loading);
-        }),
-        TrackPlayer.addEventListener(Event.PlaybackActiveTrackChanged, (data: any) => {
-          if (data.track) {
-            const t = data.track;
-            setCurrentTrack({
-              id: t.id || t.url,
-              url: t.url,
-              title: t.title || "Traccia sconosciuta",
-              artist: t.artist || "",
-              album: t.album,
-              artwork: t.artwork,
-              duration: t.duration,
-              source: (t.source as PlayerSource) || "radio",
-            });
+        TrackPlayer.addEventListener(
+          Event.PlaybackState,
+          (data: { state: unknown }) => {
+            if (!State) return;
+            setIsPlaying(data.state === State.Playing);
+            setIsBuffering(
+              data.state === State.Buffering || data.state === State.Loading
+            );
           }
-        }),
+        ),
+        TrackPlayer.addEventListener(
+          Event.PlaybackActiveTrackChanged,
+          (data: { track?: { id?: string; url: string; title?: string; artist?: string; album?: string; artwork?: string; duration?: number; source?: string } }) => {
+            if (data.track) {
+              const t = data.track;
+              setCurrentTrack({
+                id: t.id || t.url,
+                url: t.url,
+                title: t.title || "Traccia sconosciuta",
+                artist: t.artist || "",
+                album: t.album,
+                artwork: t.artwork,
+                duration: t.duration,
+                source: (t.source as PlayerSource) || "radio",
+              });
+            }
+          }
+        ),
         TrackPlayer.addEventListener(Event.PlaybackQueueEnded, () => {
           setIsPlaying(false);
         }),
       ];
-    } catch {}
+    } catch (err) {
+      console.warn("[Player] event listener setup error:", err);
+    }
 
     positionIntervalRef.current = setInterval(async () => {
       if (!TrackPlayer || !playerReady) return;
@@ -205,11 +217,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         const dur = await TrackPlayer.getDuration();
         setPosition(isNaN(pos) ? 0 : pos);
         setDuration(isNaN(dur) ? 0 : dur);
-      } catch {}
+      } catch (err) {
+        console.warn("[Player] position poll error:", err);
+      }
     }, 1000);
 
     return () => {
-      subs.forEach((s) => { try { s.remove?.(); } catch {} });
+      subs.forEach((s) => { try { s.remove?.(); } catch (err) { console.warn("[Player] sub remove error:", err); } });
       if (positionIntervalRef.current) clearInterval(positionIntervalRef.current);
     };
   }, [isAvailable]);
@@ -229,12 +243,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const play = useCallback(async () => {
     if (!TrackPlayer || !playerReady) return;
-    try { await TrackPlayer.play(); } catch {}
+    try { await TrackPlayer.play(); } catch (err) { console.warn("[Player] play error:", err); }
   }, []);
 
   const pause = useCallback(async () => {
     if (!TrackPlayer || !playerReady) return;
-    try { await TrackPlayer.pause(); } catch {}
+    try { await TrackPlayer.pause(); } catch (err) { console.warn("[Player] pause error:", err); }
   }, []);
 
   const togglePlay = useCallback(() => {
@@ -325,17 +339,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const next = useCallback(async () => {
     if (!TrackPlayer || !playerReady) return;
-    try { await TrackPlayer.skipToNext(); } catch {}
+    try { await TrackPlayer.skipToNext(); } catch (err) { console.warn("[Player] next error:", err); }
   }, []);
 
   const prev = useCallback(async () => {
     if (!TrackPlayer || !playerReady) return;
-    try { await TrackPlayer.skipToPrevious(); } catch {}
+    try { await TrackPlayer.skipToPrevious(); } catch (err) { console.warn("[Player] prev error:", err); }
   }, []);
 
   const seekTo = useCallback(async (pos: number) => {
     if (!TrackPlayer || !playerReady) return;
-    try { await TrackPlayer.seekTo(pos); } catch {}
+    try { await TrackPlayer.seekTo(pos); } catch (err) { console.warn("[Player] seekTo error:", err); }
   }, []);
 
   const setSleepTimer = useCallback((minutes: number | null) => {
@@ -345,7 +359,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     } else {
       setSleepTimerEnd(Date.now() + minutes * 60 * 1000);
     }
-    AsyncStorage.setItem(SLEEP_KEY, JSON.stringify(minutes)).catch(() => {});
+    AsyncStorage.setItem(SLEEP_KEY, JSON.stringify(minutes)).catch((err) => { console.warn("[Player] sleep timer persist error:", err); });
   }, []);
 
   const toggleFavorite = useCallback((stationId: string) => {
@@ -353,7 +367,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const next = prev.includes(stationId)
         ? prev.filter((id) => id !== stationId)
         : [...prev, stationId];
-      AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(next)).catch(() => {});
+      AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(next)).catch((err) => { console.warn("[Player] favorites persist error:", err); });
       return next;
     });
   }, []);
@@ -373,7 +387,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               ? RepeatModeRNTP.Queue
               : RepeatModeRNTP.Off;
           TrackPlayer.setRepeatMode(rnMode);
-        } catch {}
+        } catch (err) {
+          console.warn("[Player] setRepeatMode error:", err);
+        }
       }
       return next;
     });

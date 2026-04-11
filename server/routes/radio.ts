@@ -1,5 +1,4 @@
 import { Router, Request, Response } from "express";
-import fetch from "node-fetch";
 import { db } from "../db";
 import { userMusicTracks } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -7,7 +6,7 @@ import { eq } from "drizzle-orm";
 const router = Router();
 
 function requireAuth(req: Request, res: Response, next: () => void) {
-  if (!(req.session as any)?.userId) {
+  if (!req.session.userId) {
     return res.status(401).json({ message: "Non autenticato" });
   }
   next();
@@ -85,17 +84,48 @@ const RADIO_BROWSER_HOSTS = [
   "at1.api.radio-browser.info",
 ];
 
-async function fetchRadioBrowser(path: string): Promise<any> {
+interface RadioBrowserStation {
+  stationuuid: string;
+  name: string;
+  url_resolved: string;
+  favicon: string;
+  country: string;
+  votes: number;
+  bitrate: number;
+  tags: string;
+}
+
+interface PreviewApiItem {
+  trackId: number;
+  trackName: string;
+  artistName: string;
+  collectionName?: string;
+  previewUrl: string;
+  artworkUrl100?: string;
+  trackTimeMillis?: number;
+  primaryGenreName?: string;
+}
+
+const FETCH_TIMEOUT_MS = 8000;
+
+function buildFetchInit(opts: { userAgent?: string; timeoutMs?: number } = {}): RequestInit {
+  const { userAgent = "BikerLink/4.0.0", timeoutMs = FETCH_TIMEOUT_MS } = opts;
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), timeoutMs);
+  return {
+    headers: { "User-Agent": userAgent, "Accept": "application/json" },
+    signal: controller.signal,
+  };
+}
+
+async function fetchRadioBrowser(path: string): Promise<RadioBrowserStation[]> {
   let lastError: Error | null = null;
   for (const host of RADIO_BROWSER_HOSTS) {
     try {
       const url = `https://${host}/${path}`;
-      const resp = await fetch(url, {
-        headers: { "User-Agent": "BikerLink/4.0.0" },
-        signal: AbortSignal.timeout(8000),
-      } as any);
+      const resp = await fetch(url, buildFetchInit());
       if (!resp.ok) continue;
-      return await resp.json();
+      return (await resp.json()) as RadioBrowserStation[];
     } catch (err) {
       lastError = err as Error;
     }
@@ -108,7 +138,8 @@ router.get("/genres", (_req: Request, res: Response) => {
 });
 
 router.get("/stations/:genre", async (req: Request, res: Response) => {
-  const genre = req.params.genre as string;
+  const rawGenre = req.params.genre;
+  const genre = Array.isArray(rawGenre) ? rawGenre[0] : rawGenre;
   const limit = Math.min(Number(req.query.limit) || 20, 50);
 
   if (!genre) {
@@ -122,10 +153,10 @@ router.get("/stations/:genre", async (req: Request, res: Response) => {
       `json/stations/bytag/${encodeURIComponent(tag)}?limit=${limit}&order=votes&reverse=true&hidebroken=true`
     );
 
-    const mapped = (stations as any[])
-      .filter((s: any) => s.url_resolved)
+    const mapped = stations
+      .filter((s) => !!s.url_resolved)
       .slice(0, limit)
-      .map((s: any) => ({
+      .map((s) => ({
         id: s.stationuuid,
         name: s.name?.trim() || "Stazione senza nome",
         streamUrl: s.url_resolved,
@@ -154,27 +185,24 @@ router.get("/preview", async (req: Request, res: Response) => {
 
   try {
     const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=music&limit=10&country=IT`;
-    const resp = await fetch(url, {
-      signal: AbortSignal.timeout(8000),
-      headers: { "Accept": "application/json" },
-    } as any);
+    const resp = await fetch(url, buildFetchInit({ userAgent: "BikerLink/4.0.0" }));
 
     if (!resp.ok) {
       return res.status(502).json({ error: "iTunes API error" });
     }
 
-    const data = (await resp.json()) as { results?: any[] };
-    const results = (data.results || [])
-      .filter((r: any) => r.previewUrl)
-      .map((r: any) => ({
+    const data = (await resp.json()) as { results?: PreviewApiItem[] };
+    const results = (data.results ?? [])
+      .filter((r) => !!r.previewUrl)
+      .map((r) => ({
         trackId: String(r.trackId),
         trackName: r.trackName,
         artistName: r.artistName,
-        albumName: r.collectionName || null,
+        albumName: r.collectionName ?? null,
         previewUrl: r.previewUrl,
-        artworkUrl: r.artworkUrl100?.replace("100x100bb", "300x300bb") || null,
-        durationMs: r.trackTimeMillis || 30000,
-        genre: r.primaryGenreName || null,
+        artworkUrl: r.artworkUrl100?.replace("100x100bb", "300x300bb") ?? null,
+        durationMs: r.trackTimeMillis ?? 30000,
+        genre: r.primaryGenreName ?? null,
       }));
 
     return res.json(results);
@@ -183,6 +211,17 @@ router.get("/preview", async (req: Request, res: Response) => {
     return res.status(502).json({ error: "Impossibile caricare la preview" });
   }
 });
+
+interface PreviewResultItem {
+  trackId: string;
+  trackName: string;
+  artistName: string;
+  albumName: string | null;
+  previewUrl: string;
+  artworkUrl: string | null;
+  durationMs: number;
+  genre: string | null;
+}
 
 router.get("/preview-playlist", async (req: Request, res: Response) => {
   const { tracks } = req.query;
@@ -198,32 +237,30 @@ router.get("/preview-playlist", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "tracks must be valid JSON array" });
   }
 
-  const results: any[] = [];
+  const results: PreviewResultItem[] = [];
 
   for (const t of trackList.slice(0, 20)) {
     try {
       const term = [t.trackName, t.artistName].filter(Boolean).join(" ");
       const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=music&limit=1&country=IT`;
-      const resp = await fetch(url, {
-        signal: AbortSignal.timeout(6000),
-        headers: { "Accept": "application/json" },
-      } as any);
+      const resp = await fetch(url, buildFetchInit({ timeoutMs: 6000 }));
       if (!resp.ok) continue;
-      const data = (await resp.json()) as { results?: any[] };
-      const item = (data.results || []).find((r: any) => r.previewUrl);
+      const data = (await resp.json()) as { results?: PreviewApiItem[] };
+      const item = (data.results ?? []).find((r) => !!r.previewUrl);
       if (item) {
         results.push({
           trackId: String(item.trackId),
           trackName: item.trackName,
           artistName: item.artistName,
-          albumName: item.collectionName || null,
+          albumName: item.collectionName ?? null,
           previewUrl: item.previewUrl,
-          artworkUrl: item.artworkUrl100?.replace("100x100bb", "300x300bb") || null,
-          durationMs: item.trackTimeMillis || 30000,
-          genre: item.primaryGenreName || null,
+          artworkUrl: item.artworkUrl100?.replace("100x100bb", "300x300bb") ?? null,
+          durationMs: item.trackTimeMillis ?? 30000,
+          genre: item.primaryGenreName ?? null,
         });
       }
-    } catch {
+    } catch (err) {
+      console.warn("[radio] preview-playlist item error:", err);
     }
   }
 
@@ -231,7 +268,7 @@ router.get("/preview-playlist", async (req: Request, res: Response) => {
 });
 
 router.get("/suggested-genres", requireAuth, async (req: Request, res: Response) => {
-  const userId = (req.session as any).userId as string;
+  const userId = req.session.userId!;
 
   try {
     const tracks = await db

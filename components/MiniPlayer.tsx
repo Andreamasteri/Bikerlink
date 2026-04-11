@@ -622,7 +622,7 @@ function SleepTimerButton() {
     : null;
 
   const cycleTimer = () => {
-    const idx = OPTIONS.indexOf(sleepTimer as any);
+    const idx = OPTIONS.indexOf(sleepTimer as (typeof OPTIONS)[number]);
     const next = OPTIONS[(idx + 1) % OPTIONS.length];
     setSleepTimer(next);
   };
@@ -656,7 +656,9 @@ const controlStyles = StyleSheet.create({
   },
 });
 
-function repeatIcon(mode: RepeatMode): string {
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+
+function repeatIcon(mode: RepeatMode): IoniconName {
   if (mode === "track") return "repeat";
   if (mode === "queue") return "repeat";
   return "repeat-outline";
