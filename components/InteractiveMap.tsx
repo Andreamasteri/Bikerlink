@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   View,
   StyleSheet,
@@ -79,6 +79,7 @@ interface InteractiveMapProps {
   currentUserId?: string | null;
   realMeMarker?: LatLng | null;
   fakeMeMarker?: LatLng | null;
+  onEventPress?: (eventId: string) => void;
 }
 
 const ITALY_REGION: Region = {
@@ -118,6 +119,14 @@ function getUserMarkerIcon(userType: string): keyof typeof MaterialCommunityIcon
   return "account";
 }
 
+interface EventMapPin {
+  id: string;
+  title: string;
+  latitude: number;
+  longitude: number;
+  eventDate: string;
+}
+
 export default function InteractiveMap({
   users = [],
   workshops = [],
@@ -139,6 +148,7 @@ export default function InteractiveMap({
   currentUserId,
   realMeMarker,
   fakeMeMarker,
+  onEventPress,
 }: InteractiveMapProps) {
   const { enabled: mapsEnabled, resolvedProvider, userChoiceEnabled } = useMapConfig();
   const mapRef = useRef<MapView>(null);
@@ -146,6 +156,18 @@ export default function InteractiveMap({
   const [locationLoading, setLocationLoading] = useState(true);
   const region: Region = ITALY_REGION;
   const [mapIsReady, setMapIsReady] = useState(false);
+
+  const today = new Date().toISOString().substring(0, 10);
+  const { data: eventPinsRaw } = useQuery<EventMapPin[]>({
+    queryKey: ["/api/events/map"],
+    select: (d) => {
+      if (!d) return [];
+      return (d as EventMapPin[]).filter(
+        (e) => e.latitude != null && e.longitude != null && e.eventDate >= today
+      );
+    },
+  });
+  const eventPins = eventPinsRaw ?? [];
 
   const saveMapStyleMutation = useMutation({
     mutationFn: async (style: MapProvider) => {
@@ -310,6 +332,20 @@ export default function InteractiveMap({
             title={ws.name}
             pinColor="#FF6B00"
           />
+        ))}
+
+        {eventPins.map((ep) => (
+          <Marker
+            key={`event-${ep.id}`}
+            coordinate={{ latitude: ep.latitude, longitude: ep.longitude }}
+            title={ep.title}
+            description={ep.eventDate ? ep.eventDate.substring(0, 10) : undefined}
+            onPress={() => onEventPress?.(ep.id)}
+          >
+            <View style={eventMarkerStyles.container}>
+              <MaterialCommunityIcons name="calendar-star" size={18} color="#fff" />
+            </View>
+          </Marker>
         ))}
 
         {easterEggs.map((egg) => (
@@ -632,6 +668,24 @@ const sosMarkerStyles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800" as const,
     letterSpacing: 1,
+  },
+});
+
+const eventMarkerStyles = StyleSheet.create({
+  container: {
+    backgroundColor: "#FF8C00",
+    borderRadius: 18,
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 3 },
+      android: { elevation: 5 },
+      web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.4)" },
+    }),
   },
 });
 

@@ -28,6 +28,7 @@ export default function AdminLayout() {
       <Stack.Screen name="invite-codes" options={{ title: "Codici Invito" }} />
       <Stack.Screen name="backup" options={{ title: "Backup automatici" }} />
       <Stack.Screen name="system" options={{ title: "System Monitor" }} />
+      <Stack.Screen name="eventi" options={{ title: "Raduni — Moderazione" }} />
     </Stack>
   );
 }

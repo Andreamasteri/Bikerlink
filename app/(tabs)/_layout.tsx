@@ -116,7 +116,7 @@ export default function TabLayout() {
 
   const HIDDEN_TAB_NAMES = new Set(["tracking", "garage"]);
   if (isGpsGateActive) {
-    ["index", "proposals", "ready", "motoclub", "match", "music", "chat", "contest"].forEach(
+    ["index", "proposals", "ready", "motoclub", "match", "music", "chat", "contest", "eventi"].forEach(
       (n) => HIDDEN_TAB_NAMES.add(n)
     );
   }
@@ -284,6 +284,17 @@ export default function TabLayout() {
               <Ionicons name="musical-notes-outline" size={size} color={color} />
             ),
             headerTitle: "Musica",
+            href: gpsTabHref,
+          }}
+        />
+        <Tabs.Screen
+          name="eventi"
+          options={{
+            title: "Raduni",
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="calendar" size={size} color={color} />
+            ),
+            headerShown: false,
             href: gpsTabHref,
           }}
         />
