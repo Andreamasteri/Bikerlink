@@ -1292,6 +1292,27 @@ function BraniTab({
   const providerName = isLastfm ? "Last.fm" : "Spotify";
   const { playQueue, isAvailable: playerAvailable } = usePlayer();
   const [playAllLoading, setPlayAllLoading] = useState(false);
+  const [streamService, setStreamService] = useState<StreamService>("youtube");
+
+  useEffect(() => {
+    AsyncStorage.getItem("stream_service_pref").then((v) => {
+      if (v === "youtube" || v === "youtubemusic" || v === "google") setStreamService(v);
+    });
+  }, []);
+
+  const handleSelectService = useCallback((svc: StreamService) => {
+    setStreamService(svc);
+    AsyncStorage.setItem("stream_service_pref", svc);
+  }, []);
+
+  const handleOpenPlaylist = useCallback(() => {
+    if (library.length === 0) return;
+    const query = library
+      .slice(0, 20)
+      .map((t) => `${t.trackName} ${t.artistName}`)
+      .join(" + ");
+    Linking.openURL(buildSearchUrl(query, streamService));
+  }, [library, streamService]);
 
   const handlePlayAll = useCallback(async () => {
     if (!playerAvailable || library.length === 0) return;
@@ -1443,6 +1464,45 @@ function BraniTab({
             </TouchableOpacity>
           )}
         </View>
+
+        {library.length > 0 && (
+          <>
+            <View style={streamStyles.serviceSelector}>
+              {(["youtube", "youtubemusic", "google"] as StreamService[]).map((svc) => {
+                const label = svc === "youtube" ? "YouTube" : svc === "youtubemusic" ? "YouTube Music" : "Google";
+                const isActive = streamService === svc;
+                return (
+                  <TouchableOpacity
+                    key={svc}
+                    style={[streamStyles.serviceChip, isActive && streamStyles.serviceChipActive]}
+                    onPress={() => handleSelectService(svc)}
+                  >
+                    <Text style={[streamStyles.serviceChipText, isActive && streamStyles.serviceChipTextActive]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={streamStyles.playlistCard}>
+              <Ionicons name="musical-notes-outline" size={22} color={Colors.accent} />
+              <View style={{ flex: 1 }}>
+                <Text style={streamStyles.playlistCardTitle}>La mia playlist</Text>
+                <Text style={streamStyles.playlistCardSub}>{Math.min(library.length, 20)} brani</Text>
+              </View>
+              <TouchableOpacity
+                style={streamStyles.openBtn}
+                onPress={handleOpenPlaylist}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="open-outline" size={16} color={Colors.accent} />
+                <Text style={streamStyles.openBtnText}>Tutta la playlist</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
         {libraryLoading ? (
           <ActivityIndicator color={Colors.accent} style={{ marginVertical: 20 }} />
         ) : library.length === 0 ? (
@@ -1457,6 +1517,7 @@ function BraniTab({
               track={track}
               isRemoving={pendingRemoveId === track.spotifyTrackId}
               onRemove={onRemove}
+              streamService={streamService}
             />
           ))
         )}
@@ -1464,6 +1525,69 @@ function BraniTab({
     </ScrollView>
   );
 }
+
+const streamStyles = StyleSheet.create({
+  serviceSelector: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  serviceChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: "transparent",
+  },
+  serviceChipActive: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
+  serviceChipText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+  },
+  serviceChipTextActive: {
+    color: "#fff",
+  },
+  playlistCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    gap: 10,
+  },
+  playlistCardTitle: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
+  playlistCardSub: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  openBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: Colors.accent + "18",
+  },
+  openBtnText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.accent,
+  },
+});
 
 function SearchTrackRow({
   track,
@@ -1574,14 +1698,25 @@ function SearchTrackRow({
   );
 }
 
+type StreamService = "youtube" | "youtubemusic" | "google";
+
+function buildSearchUrl(query: string, service: StreamService): string {
+  const q = encodeURIComponent(query);
+  if (service === "youtube") return `https://www.youtube.com/results?search_query=${q}`;
+  if (service === "youtubemusic") return `https://music.youtube.com/search?q=${q}`;
+  return `https://www.google.com/search?q=${q}`;
+}
+
 function LibraryTrackRow({
   track,
   isRemoving,
   onRemove,
+  streamService,
 }: {
   track: LibraryTrack;
   isRemoving: boolean;
   onRemove: (id: string) => void;
+  streamService: StreamService;
 }) {
   const [imgError, setImgError] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -1634,6 +1769,11 @@ function LibraryTrackRow({
 
   const displayUrl = liveArtwork ?? track.imageUrl ?? null;
 
+  const handleOpenStream = useCallback(() => {
+    const query = `${track.trackName} ${track.artistName}`;
+    Linking.openURL(buildSearchUrl(query, streamService));
+  }, [track, streamService]);
+
   return (
     <View style={styles.trackRow}>
       {displayUrl && !imgError ? (
@@ -1665,6 +1805,13 @@ function LibraryTrackRow({
           )}
         </TouchableOpacity>
       )}
+      <TouchableOpacity
+        onPress={handleOpenStream}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        style={{ marginRight: 4 }}
+      >
+        <Ionicons name="open-outline" size={18} color={Colors.textSecondary} />
+      </TouchableOpacity>
       <TouchableOpacity
         style={styles.removeBtn}
         onPress={() => {
