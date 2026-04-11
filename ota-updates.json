@@ -1239,5 +1239,28 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 9,
+    "version": "1.9.0",
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-9 rv4.0.0: fix spazio vuoto tab Brani (Musica), fix procedura OTA timeout EAS",
+    "note": "Task #520: fix publish-ota.sh — istruzioni supersede al posto di npx eas-cli diretto. Task #521: paddingTop ScrollView Brani 20→4. CURRENT_OTA_NUMBER=9.",
+    "releaseId": "fc302c5a-4e70-47a7-9f44-cdaa0475d9f4",
+    "bundleUrl": "private/ota/ota-1.9.0-1775948458655.js",
+    "updateGroupId": "300a893b-7216-48d2-ba64-cdb60d4292e1",
+    "androidUpdateId": "019d7ec7-f401-7cce-8838-682f3cf4e70d",
+    "iosUpdateId": null,
+    "commitBase": "8aa1c7586f451862ccf3ed16a71ecf6953bda777",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/300a893b-7216-48d2-ba64-cdb60d4292e1",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "published"
   }
 ]
