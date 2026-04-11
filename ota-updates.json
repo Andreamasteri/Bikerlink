@@ -1124,5 +1124,28 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 4,
+    "version": "1.4.0",
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-4 rv4.0.0: Tab Telefono (MP3 locali), fix anteprime iTunes timeout 5s, indicatore sorgente MiniPlayer, apertura brani su YouTube/Google, banner avviso Last.fm",
+    "note": "Task #500-#502. Tab Telefono: playlist MP3 locali con artwork Android (MediaStore), ordinamento alfabetico, parsing artista da filename. Fix anteprime: AbortController 5s client + server timeout 5s iTunes. MiniPlayer: sourceLabel per file/radio/preview/library. Task #501: apertura brani su YouTube/YouTube Music/Google da BraniTab. Task #502: banner avviso autenticazione Last.fm. CURRENT_OTA_NUMBER=4.",
+    "releaseId": "25021447-f4d5-4969-b8e1-853e31d6d042",
+    "bundleUrl": "private/ota/ota-1.4.0-1775905407341.js",
+    "updateGroupId": "3288d8ab-9b68-4c63-a649-df3cb7382f2b",
+    "androidUpdateId": "019d7c36-ab19-7f24-8953-7326b95fc591",
+    "iosUpdateId": null,
+    "commitBase": "2a8687f8f8fb7e57250a1dc43361460e7be55a61",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/3288d8ab-9b68-4c63-a649-df3cb7382f2b",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "published"
   }
 ]
