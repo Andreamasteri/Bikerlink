@@ -1086,7 +1086,42 @@ export default function ProfileScreen() {
       )}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Stile Taskbar</Text>
+        <Pressable style={styles.accordionHeader} onPress={() => setDocsExpanded(v => !v)}>
+          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>{t("profile.documentation")}</Text>
+          <Ionicons name={docsExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+        </Pressable>
+        {docsExpanded && (
+          <>
+            <MenuItem
+              icon="document-text"
+              label={isDownloadingManual ? t("profile.downloading") : t("profile.downloadManual")}
+              onPress={handleDownloadManual}
+              color={Colors.accent}
+            />
+            <MenuItem
+              icon="shield-checkmark-outline"
+              label={isDownloadingEula ? t("profile.downloading") : t("profile.downloadEula")}
+              onPress={handleDownloadEula}
+              color={Colors.accent}
+            />
+            <MenuItem
+              icon="document-text-outline"
+              label={isDownloadingPrivacy ? t("profile.downloading") : t("profile.downloadPrivacyPolicy")}
+              onPress={handleDownloadPrivacyPolicy}
+              color={Colors.accent}
+            />
+            <MenuItem
+              icon="cloud-download-outline"
+              label={isExportingData ? t("profile.downloading") : t("profile.exportUserData")}
+              onPress={handleExportUserData}
+              color={Colors.accent}
+            />
+          </>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { textAlign: "center" }]}>Pulsanti Taskbar</Text>
         <View style={taskbarStyles.row}>
           {([
             { value: "tutti" as TaskbarStyle, label: "Tutti" },
@@ -1149,43 +1184,7 @@ export default function ProfileScreen() {
 
       </View>
 
-      <View style={styles.section}>
-        <Pressable style={styles.accordionHeader} onPress={() => setDocsExpanded(v => !v)}>
-          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>{t("profile.documentation")}</Text>
-          <Ionicons name={docsExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
-        </Pressable>
-        {docsExpanded && (
-          <>
-            <MenuItem
-              icon="document-text"
-              label={isDownloadingManual ? t("profile.downloading") : t("profile.downloadManual")}
-              onPress={handleDownloadManual}
-              color={Colors.accent}
-            />
-            <MenuItem
-              icon="shield-checkmark-outline"
-              label={isDownloadingEula ? t("profile.downloading") : t("profile.downloadEula")}
-              onPress={handleDownloadEula}
-              color={Colors.accent}
-            />
-            <MenuItem
-              icon="document-text-outline"
-              label={isDownloadingPrivacy ? t("profile.downloading") : t("profile.downloadPrivacyPolicy")}
-              onPress={handleDownloadPrivacyPolicy}
-              color={Colors.accent}
-            />
-            <MenuItem
-              icon="cloud-download-outline"
-              label={isExportingData ? t("profile.downloading") : t("profile.exportUserData")}
-              onPress={handleExportUserData}
-              color={Colors.accent}
-            />
-          </>
-        )}
-      </View>
-
       <View style={[styles.section, { marginTop: 16 }]}>
-        <Text style={styles.sectionTitle}>{t("language.title")}</Text>
         <Pressable
           style={styles.langDropdownTrigger}
           onPress={() => setShowLanguageDropdown(!showLanguageDropdown)}
