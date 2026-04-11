@@ -16,6 +16,7 @@ import {
   Linking,
   Switch,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
 import * as FileSystem from "expo-file-system/legacy";
 import * as MediaLibrary from "expo-media-library";
@@ -334,9 +335,35 @@ const teleStyles = StyleSheet.create({
   },
 });
 
+const LASTFM_SUGGEST_KEY = "radio_use_lastfm";
+
 function MusicRadioTab() {
-  const { playRadioStation, selectedGenre, setSelectedGenre, favoriteStationIds, toggleFavorite, currentTrack } = usePlayer();
+  const { playRadioStation, selectedGenre, setSelectedGenre, favoriteStationIds, toggleFavorite, currentTrack, isBuffering } = usePlayer();
   const [useLastFm, setUseLastFm] = useState(false);
+  const [loadingStationId, setLoadingStationId] = useState<string | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(LASTFM_SUGGEST_KEY).then((v) => {
+      if (v === "true") setUseLastFm(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (loadingStationId && currentTrack?.id === loadingStationId && !isBuffering) {
+      setLoadingStationId(null);
+    }
+  }, [currentTrack, isBuffering, loadingStationId]);
+
+  const handleToggle = useCallback((val: boolean) => {
+    setUseLastFm(val);
+    AsyncStorage.setItem(LASTFM_SUGGEST_KEY, String(val)).catch(() => {});
+  }, []);
+
+  const handleStationPress = useCallback((s: RadioStation) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setLoadingStationId(s.id);
+    playRadioStation(s, selectedGenre ?? undefined);
+  }, [playRadioStation, selectedGenre]);
 
   const { data: genres = [] } = useQuery<RadioGenre[]>({
     queryKey: ["/api/music/radio/genres"],
@@ -379,7 +406,7 @@ function MusicRadioTab() {
         </View>
         <Switch
           value={useLastFm}
-          onValueChange={setUseLastFm}
+          onValueChange={handleToggle}
           trackColor={{ false: Colors.border, true: Colors.accent + "66" }}
           thumbColor={useLastFm ? Colors.accent : Colors.textSecondary}
         />
@@ -427,11 +454,14 @@ function MusicRadioTab() {
             stations.map((s) => {
               const isFav = favoriteStationIds.includes(s.id);
               const isActive = currentTrack?.id === s.id;
+              const isLoading = loadingStationId === s.id;
               return (
                 <View key={s.id} style={radioTabStyles.stationRow}>
                   <TouchableOpacity
                     style={radioTabStyles.stationInfo}
-                    onPress={() => playRadioStation(s, selectedGenre)}
+                    onPress={() => handleStationPress(s)}
+                    disabled={isLoading}
+                    testID={`station-${s.id}`}
                   >
                     {s.favicon ? (
                       <Image
@@ -460,9 +490,11 @@ function MusicRadioTab() {
                           .join(" · ")}
                       </Text>
                     </View>
-                    {isActive && (
+                    {isLoading ? (
+                      <ActivityIndicator size="small" color={Colors.accent} />
+                    ) : isActive ? (
                       <Ionicons name="volume-high" size={16} color={Colors.accent} />
-                    )}
+                    ) : null}
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => toggleFavorite(s.id)} style={{ padding: 8 }}>
                     <Ionicons

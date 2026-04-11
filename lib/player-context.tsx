@@ -6,7 +6,7 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import { Platform } from "react-native";
+import { Platform, Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio, AVPlaybackStatus } from "expo-av";
 
@@ -197,6 +197,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setPosition(0);
     } catch (err) {
       console.warn("[Player] loadAndPlay error:", err);
+      Alert.alert("Riproduzione non riuscita", "Impossibile riprodurre questa stazione. Prova un'altra.");
     }
   }, [onPlaybackStatus]);
 
@@ -241,6 +242,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [loadAndPlay]);
 
   const playRadioStation = useCallback(async (station: RadioStation, genreId?: string) => {
+    if (!station.streamUrl) {
+      Alert.alert("Stazione non disponibile", "Questa stazione non ha un URL di streaming valido.");
+      return;
+    }
     const track: PlayerTrack = {
       id: station.id,
       url: station.streamUrl,
