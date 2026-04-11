@@ -32,7 +32,7 @@
       "jsEngine": "hermes",
       "config": {
         "googleMaps": {
-          "apiKey": ""
+          "apiKey": "AIzaSyByoMiBm_D-e3_yG0u-BqwinhjkvbKe0dw"
         }
       },
       "permissions": [
