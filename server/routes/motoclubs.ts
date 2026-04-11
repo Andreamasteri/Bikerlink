@@ -595,6 +595,118 @@ router.get("/marketplace", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+router.get("/map", requireAuth, async (_req: Request, res: Response) => {
+  try {
+    const clubs = await db.select({
+      id: motoClubs.id,
+      name: motoClubs.name,
+      clubType: motoClubs.clubType,
+      logoUrl: motoClubs.logoUrl,
+      region: motoClubs.region,
+      country: motoClubs.country,
+      latitude: motoClubs.latitude,
+      longitude: motoClubs.longitude,
+      memberCount: sql<number>`(select count(*) from moto_club_members m where m.club_id = moto_clubs.id and m.status = 'active')::int`,
+    })
+      .from(motoClubs)
+      .where(eq(motoClubs.isApproved, true));
+
+    const result: Array<{
+      id: string;
+      name: string;
+      clubType: string;
+      logoUrl: string | null;
+      region: string | null;
+      country: string | null;
+      latitude: number;
+      longitude: number;
+      isFictitious: boolean;
+      memberCount: number;
+    }> = [];
+
+    for (const c of clubs) {
+      if (c.latitude != null && c.longitude != null) {
+        result.push({
+          id: c.id,
+          name: c.name,
+          clubType: c.clubType,
+          logoUrl: c.logoUrl,
+          region: c.region,
+          country: c.country,
+          latitude: c.latitude,
+          longitude: c.longitude,
+          isFictitious: false,
+          memberCount: Number(c.memberCount),
+        });
+      } else if (c.clubType === "region") {
+        const center = getRegionCenter(c.region ?? "");
+        if (center) {
+          result.push({
+            id: c.id,
+            name: c.name,
+            clubType: c.clubType,
+            logoUrl: c.logoUrl,
+            region: c.region,
+            country: c.country,
+            latitude: center.latitude,
+            longitude: center.longitude,
+            isFictitious: true,
+            memberCount: Number(c.memberCount),
+          });
+        }
+      }
+    }
+
+    return res.json(result);
+  } catch (e) {
+    console.error("[GET /motoclubs/map]", e);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+router.get("/map/pending-locations", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const user = await storage.getUser(userId);
+    if (!user || (user.role !== "admin" && user.role !== "moderator" && user.role !== "moderatore")) {
+      return res.status(403).json({ message: "Accesso non autorizzato" });
+    }
+
+    const clubs = await db.select({
+      id: motoClubs.id,
+      name: motoClubs.name,
+      clubType: motoClubs.clubType,
+      logoUrl: motoClubs.logoUrl,
+      region: motoClubs.region,
+      proposedLatitude: motoClubs.proposedLatitude,
+      proposedLongitude: motoClubs.proposedLongitude,
+      proposedAddress: motoClubs.proposedAddress,
+      proposedBy: motoClubs.proposedBy,
+      proposedAt: motoClubs.proposedAt,
+    })
+      .from(motoClubs)
+      .where(and(
+        eq(motoClubs.isApproved, true),
+        sql`${motoClubs.proposedLatitude} IS NOT NULL`,
+      ))
+      .orderBy(desc(motoClubs.updatedAt));
+
+    const enriched = await Promise.all(clubs.map(async (c) => {
+      let proposerNickname: string | null = null;
+      if (c.proposedBy) {
+        const proposer = await storage.getUser(c.proposedBy);
+        proposerNickname = proposer?.nickname ?? null;
+      }
+      return { ...c, proposerNickname };
+    }));
+
+    return res.json(enriched);
+  } catch (e) {
+    console.error("[GET /motoclubs/map/pending-locations]", e);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 router.get("/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const clubId = req.params.id;
@@ -1032,119 +1144,6 @@ router.get("/creation-request/status", requireAuth, async (req: Request, res: Re
       reviewNote: request.reviewNote,
     });
   } catch (e) {
-    return res.status(500).json({ message: "Errore interno" });
-  }
-});
-
-
-router.get("/map", requireAuth, async (_req: Request, res: Response) => {
-  try {
-    const clubs = await db.select({
-      id: motoClubs.id,
-      name: motoClubs.name,
-      clubType: motoClubs.clubType,
-      logoUrl: motoClubs.logoUrl,
-      region: motoClubs.region,
-      country: motoClubs.country,
-      latitude: motoClubs.latitude,
-      longitude: motoClubs.longitude,
-      memberCount: sql<number>`(select count(*) from moto_club_members m where m.club_id = moto_clubs.id and m.status = 'active')::int`,
-    })
-      .from(motoClubs)
-      .where(eq(motoClubs.isApproved, true));
-
-    const result: Array<{
-      id: string;
-      name: string;
-      clubType: string;
-      logoUrl: string | null;
-      region: string | null;
-      country: string | null;
-      latitude: number;
-      longitude: number;
-      isFictitious: boolean;
-      memberCount: number;
-    }> = [];
-
-    for (const c of clubs) {
-      if (c.latitude != null && c.longitude != null) {
-        result.push({
-          id: c.id,
-          name: c.name,
-          clubType: c.clubType,
-          logoUrl: c.logoUrl,
-          region: c.region,
-          country: c.country,
-          latitude: c.latitude,
-          longitude: c.longitude,
-          isFictitious: false,
-          memberCount: Number(c.memberCount),
-        });
-      } else if (c.clubType === "region") {
-        const center = getRegionCenter(c.region ?? "");
-        if (center) {
-          result.push({
-            id: c.id,
-            name: c.name,
-            clubType: c.clubType,
-            logoUrl: c.logoUrl,
-            region: c.region,
-            country: c.country,
-            latitude: center.latitude,
-            longitude: center.longitude,
-            isFictitious: true,
-            memberCount: Number(c.memberCount),
-          });
-        }
-      }
-    }
-
-    return res.json(result);
-  } catch (e) {
-    console.error("[GET /motoclubs/map]", e);
-    return res.status(500).json({ message: "Errore interno" });
-  }
-});
-
-router.get("/map/pending-locations", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const userId = req.session.userId!;
-    const user = await storage.getUser(userId);
-    if (!user || (user.role !== "admin" && user.role !== "moderator" && user.role !== "moderatore")) {
-      return res.status(403).json({ message: "Accesso non autorizzato" });
-    }
-
-    const clubs = await db.select({
-      id: motoClubs.id,
-      name: motoClubs.name,
-      clubType: motoClubs.clubType,
-      logoUrl: motoClubs.logoUrl,
-      region: motoClubs.region,
-      proposedLatitude: motoClubs.proposedLatitude,
-      proposedLongitude: motoClubs.proposedLongitude,
-      proposedAddress: motoClubs.proposedAddress,
-      proposedBy: motoClubs.proposedBy,
-      proposedAt: motoClubs.proposedAt,
-    })
-      .from(motoClubs)
-      .where(and(
-        eq(motoClubs.isApproved, true),
-        sql`${motoClubs.proposedLatitude} IS NOT NULL`,
-      ))
-      .orderBy(desc(motoClubs.updatedAt));
-
-    const enriched = await Promise.all(clubs.map(async (c) => {
-      let proposerNickname: string | null = null;
-      if (c.proposedBy) {
-        const proposer = await storage.getUser(c.proposedBy);
-        proposerNickname = proposer?.nickname ?? null;
-      }
-      return { ...c, proposerNickname };
-    }));
-
-    return res.json(enriched);
-  } catch (e) {
-    console.error("[GET /motoclubs/map/pending-locations]", e);
     return res.status(500).json({ message: "Errore interno" });
   }
 });

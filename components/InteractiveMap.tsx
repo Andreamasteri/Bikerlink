@@ -8,7 +8,8 @@ import {
   Text,
   ActivityIndicator,
 } from "react-native";
-import MapView, { Marker, Circle, UrlTile, Region, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Marker, Callout, Circle, UrlTile, Region, PROVIDER_GOOGLE } from "react-native-maps";
+import { Image } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import Colors from "@/constants/colors";
@@ -380,19 +381,35 @@ export default function InteractiveMap({
           <Marker
             key={`club-${club.id}`}
             coordinate={{ latitude: club.latitude, longitude: club.longitude }}
-            title={club.name}
-            description={[
-              club.isFictitious ? "⚠ Posizione indicativa – centro regione" : "✓ Sede confermata",
-              club.region ?? null,
-              club.memberCount > 0 ? `${club.memberCount} membri` : null,
-              "Tocca per aprire",
-            ].filter(Boolean).join(" · ")}
             onCalloutPress={() => onClubPress?.(club)}
           >
             <View style={[clubMarkerStyles.container, club.isFictitious && clubMarkerStyles.containerFictitious]}>
               <MaterialCommunityIcons name="shield-check" size={16} color="#fff" />
               {club.isFictitious && <View style={clubMarkerStyles.fictitiousDot} />}
             </View>
+            <Callout tooltip={false}>
+              <View style={clubCalloutStyles.wrapper}>
+                {club.logoUrl ? (
+                  <Image source={{ uri: club.logoUrl }} style={clubCalloutStyles.logo} resizeMode="cover" />
+                ) : (
+                  <View style={clubCalloutStyles.logoPlaceholder}>
+                    <MaterialCommunityIcons name="shield-half-full" size={22} color={club.isFictitious ? "#607D8B" : "#009688"} />
+                  </View>
+                )}
+                <View style={clubCalloutStyles.info}>
+                  <Text style={clubCalloutStyles.name} numberOfLines={2}>{club.name}</Text>
+                  {club.memberCount > 0 && (
+                    <Text style={clubCalloutStyles.meta}>{club.memberCount} membri</Text>
+                  )}
+                  {club.isFictitious ? (
+                    <Text style={clubCalloutStyles.disclaimer}>⚠ Posizione indicativa</Text>
+                  ) : (
+                    <Text style={clubCalloutStyles.confirmed}>✓ Sede confermata</Text>
+                  )}
+                  <Text style={clubCalloutStyles.hint}>Tocca per aprire il club</Text>
+                </View>
+              </View>
+            </Callout>
           </Marker>
         ))}
 
@@ -764,6 +781,64 @@ const eventMarkerStyles = StyleSheet.create({
       android: { elevation: 5 },
       web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.4)" },
     }),
+  },
+});
+
+const clubCalloutStyles = StyleSheet.create({
+  wrapper: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    minWidth: 180,
+    maxWidth: 260,
+    padding: 4,
+  },
+  logo: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: "#009688",
+    flexShrink: 0,
+  },
+  logoPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: "#607D8B",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F5F5F5",
+    flexShrink: 0,
+  },
+  info: {
+    flex: 1,
+    gap: 2,
+  },
+  name: {
+    fontWeight: "700" as const,
+    fontSize: 13,
+    color: "#111",
+  },
+  meta: {
+    fontSize: 11,
+    color: "#555",
+  },
+  disclaimer: {
+    fontSize: 10,
+    color: "#F57C00",
+    fontWeight: "600" as const,
+  },
+  confirmed: {
+    fontSize: 10,
+    color: "#009688",
+    fontWeight: "600" as const,
+  },
+  hint: {
+    fontSize: 10,
+    color: "#888",
+    marginTop: 2,
   },
 });
 

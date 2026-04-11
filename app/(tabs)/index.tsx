@@ -492,6 +492,12 @@ export default function MapScreen() {
     },
   });
 
+  const targetUserEventIdsQuery = useQuery<string[]>({
+    queryKey: ["/api/events/user-events", selectedUser?.id],
+    enabled: !!selectedUser?.id && showInviteEventModal,
+    staleTime: 30000,
+  });
+
   const mySearchRadius = useMemo(() => {
     const myActive = (myProposalsQuery.data || []).filter(
       (p: any) => p.userId === user?.id && p.status === "active" && p.searchRadius
@@ -1356,7 +1362,9 @@ export default function MapScreen() {
               Scegli quale raduno vuoi invitare {selectedUser?.nickname ?? "l'utente"} ad unirsi:
             </Text>
             <FlatList
-              data={myOrganizedEventsQuery.data ?? []}
+              data={(myOrganizedEventsQuery.data ?? []).filter(
+                (ev: any) => !(targetUserEventIdsQuery.data ?? []).includes(ev.id)
+              )}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
                 <Pressable
@@ -1405,7 +1413,13 @@ export default function MapScreen() {
                   )}
                 </Pressable>
               )}
-              ListEmptyComponent={<Text style={{ textAlign: "center", color: Colors.textSecondary, paddingVertical: 16 }}>Nessun raduno futuro approvato</Text>}
+              ListEmptyComponent={
+                <Text style={{ textAlign: "center", color: Colors.textSecondary, paddingVertical: 16 }}>
+                  {(myOrganizedEventsQuery.data ?? []).length === 0
+                    ? "Nessun raduno futuro approvato"
+                    : `${selectedUser?.nickname ?? "L'utente"} partecipa già a tutti i tuoi raduni`}
+                </Text>
+              }
             />
             <Pressable style={[styles.homeMessageCloseBtn, { marginTop: 8 }]} onPress={() => setShowInviteEventModal(false)}>
               <Text style={styles.homeMessageCloseBtnText}>Annulla</Text>

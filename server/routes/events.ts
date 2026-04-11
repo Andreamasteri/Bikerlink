@@ -498,6 +498,23 @@ router.post("/", async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/events/user-events/:userId — IDs eventi dove l'utente partecipa (per pre-filtro invite)
+router.get("/user-events/:userId", async (req: Request, res: Response) => {
+  try {
+    const requesterId = requireAuth(req, res);
+    if (!requesterId) return;
+    const { userId } = req.params;
+    const rows = await db
+      .select({ eventId: eventParticipants.eventId })
+      .from(eventParticipants)
+      .where(eq(eventParticipants.userId, userId));
+    return res.json(rows.map((r) => r.eventId));
+  } catch (e) {
+    console.error("[GET /events/user-events/:userId]", e);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 // GET /api/events/:id — dettaglio evento
 router.get("/:id", async (req: Request, res: Response) => {
   try {

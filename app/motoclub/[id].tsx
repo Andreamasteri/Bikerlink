@@ -15,6 +15,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import MapView, { Marker } from "react-native-maps";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import * as Location from "expo-location";
@@ -109,8 +110,7 @@ export default function ClubDetailScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [showProposeModal, setShowProposeModal] = useState(false);
   const [proposeAddress, setProposeAddress] = useState("");
-  const [proposeLatitude, setProposeLatitude] = useState("");
-  const [proposeLongitude, setProposeLongitude] = useState("");
+  const [proposeCoords, setProposeCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [gettingLocation, setGettingLocation] = useState(false);
 
   useEffect(() => {
@@ -160,8 +160,7 @@ export default function ClubDetailScreen() {
       queryClient.invalidateQueries({ queryKey: [`/api/motoclubs/${id}/detail?limit=${PAGE_SIZE}&offset=0`] });
       setShowProposeModal(false);
       setProposeAddress("");
-      setProposeLatitude("");
-      setProposeLongitude("");
+      setProposeCoords(null);
       Alert.alert("Inviata!", "La proposta di sede è in attesa di approvazione dell'admin.");
     },
     onError: (e: Error) => Alert.alert("Errore", e.message),
@@ -176,8 +175,7 @@ export default function ClubDetailScreen() {
         return;
       }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      setProposeLatitude(pos.coords.latitude.toFixed(6));
-      setProposeLongitude(pos.coords.longitude.toFixed(6));
+      setProposeCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
     } catch {
       Alert.alert("Errore", "Impossibile ottenere la posizione GPS");
     } finally {
@@ -186,16 +184,11 @@ export default function ClubDetailScreen() {
   }
 
   function handleSubmitPropose() {
-    const lat = parseFloat(proposeLatitude);
-    const lng = parseFloat(proposeLongitude);
-    if (isNaN(lat) || lat < -90 || lat > 90) {
-      Alert.alert("Errore", "Latitudine non valida (deve essere tra -90 e 90)");
+    if (!proposeCoords) {
+      Alert.alert("Posizione mancante", "Sposta il pin sulla mappa o usa il GPS per indicare la sede.");
       return;
     }
-    if (isNaN(lng) || lng < -180 || lng > 180) {
-      Alert.alert("Errore", "Longitudine non valida (deve essere tra -180 e 180)");
-      return;
-    }
+    const { latitude: lat, longitude: lng } = proposeCoords;
     proposeLocationMutation.mutate({ latitude: lat, longitude: lng, address: proposeAddress });
   }
 
@@ -438,6 +431,40 @@ export default function ClubDetailScreen() {
             <Text style={styles.modalTitle}>Proponi sede fisica</Text>
             <Text style={styles.modalSub}>Indica la posizione della sede fisica di "{club.name}". L'admin approverà la proposta prima che appaia in mappa.</Text>
 
+            <View style={styles.mapPickerContainer}>
+              <MapView
+                style={styles.mapPicker}
+                initialRegion={{
+                  latitude: 41.9,
+                  longitude: 12.5,
+                  latitudeDelta: 8.0,
+                  longitudeDelta: 8.0,
+                }}
+                onPress={(e) => setProposeCoords(e.nativeEvent.coordinate)}
+              >
+                {proposeCoords && (
+                  <Marker
+                    coordinate={proposeCoords}
+                    draggable
+                    onDragEnd={(e) => setProposeCoords(e.nativeEvent.coordinate)}
+                    pinColor="#009688"
+                  />
+                )}
+              </MapView>
+              {!proposeCoords && (
+                <View style={styles.mapPickerHint}>
+                  <Text style={styles.mapPickerHintText}>Tocca sulla mappa per posizionare il pin</Text>
+                </View>
+              )}
+              {proposeCoords && (
+                <View style={styles.mapPickerCoords}>
+                  <Text style={styles.mapPickerCoordsText}>
+                    {proposeCoords.latitude.toFixed(5)}, {proposeCoords.longitude.toFixed(5)}
+                  </Text>
+                </View>
+              )}
+            </View>
+
             <TouchableOpacity style={styles.gpsBtn} onPress={handleGetGPS} disabled={gettingLocation}>
               {gettingLocation ? (
                 <ActivityIndicator size="small" color="#fff" />
@@ -448,26 +475,6 @@ export default function ClubDetailScreen() {
                 </>
               )}
             </TouchableOpacity>
-
-            <Text style={styles.inputLabel}>Latitudine</Text>
-            <TextInput
-              style={styles.coordInput}
-              value={proposeLatitude}
-              onChangeText={setProposeLatitude}
-              placeholder="es. 45.4654"
-              placeholderTextColor={Colors.textSecondary}
-              keyboardType="numeric"
-            />
-
-            <Text style={styles.inputLabel}>Longitudine</Text>
-            <TextInput
-              style={styles.coordInput}
-              value={proposeLongitude}
-              onChangeText={setProposeLongitude}
-              placeholder="es. 9.1859"
-              placeholderTextColor={Colors.textSecondary}
-              keyboardType="numeric"
-            />
 
             <Text style={styles.inputLabel}>Indirizzo (opzionale)</Text>
             <TextInput
@@ -698,6 +705,50 @@ const styles = StyleSheet.create({
   },
   gpsBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: "#fff" },
   inputLabel: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.text },
+  mapPickerContainer: {
+    height: 200,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 4,
+    position: "relative",
+  },
+  mapPicker: {
+    flex: 1,
+  },
+  mapPickerHint: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
+    right: 8,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    alignItems: "center",
+  },
+  mapPickerHintText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "#fff",
+  },
+  mapPickerCoords: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
+    right: 8,
+    backgroundColor: "rgba(0,150,136,0.85)",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    alignItems: "center",
+  },
+  mapPickerCoordsText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "#fff",
+  },
   coordInput: {
     backgroundColor: Colors.surface,
     borderRadius: 10,
