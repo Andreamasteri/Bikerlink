@@ -140,9 +140,11 @@ function TelefonoTrackRow({
   onPlay: (asset: MediaLibrary.Asset) => void;
 }) {
   const { currentTrack, isPlaying } = usePlayer();
+  const [artworkErr, setArtworkErr] = useState(false);
   const isActive = currentTrack?.id === asset.id;
   const { title, artist } = parseAudioFilename(asset.filename ?? "");
   const dur = asset.duration ?? 0;
+  const artworkUri = Platform.OS === "android" && !artworkErr ? `${asset.uri}/albumart` : null;
 
   return (
     <TouchableOpacity
@@ -150,13 +152,21 @@ function TelefonoTrackRow({
       onPress={() => onPlay(asset)}
       activeOpacity={0.7}
     >
-      <View style={[styles.albumArt, styles.albumArtPlaceholder]}>
-        <Ionicons
-          name={isActive && isPlaying ? "pause" : "musical-note"}
-          size={18}
-          color={isActive ? Colors.accent : Colors.textSecondary}
+      {artworkUri ? (
+        <Image
+          source={{ uri: artworkUri }}
+          style={styles.albumArt}
+          onError={() => setArtworkErr(true)}
         />
-      </View>
+      ) : (
+        <View style={[styles.albumArt, styles.albumArtPlaceholder]}>
+          <Ionicons
+            name={isActive && isPlaying ? "pause" : "musical-note"}
+            size={18}
+            color={isActive ? Colors.accent : Colors.textSecondary}
+          />
+        </View>
+      )}
       <View style={styles.trackInfo}>
         <Text style={[styles.trackName, isActive && { color: Colors.accent }]} numberOfLines={1}>
           {title}
@@ -190,9 +200,16 @@ function TelefonoTab() {
         mediaType: MediaLibrary.MediaType.audio,
         first: 50,
         after: cursor,
-        sortBy: MediaLibrary.SortBy.default,
+        sortBy: MediaLibrary.SortBy.creationTime,
       });
-      setAssets((prev) => (cursor ? [...prev, ...result.assets] : result.assets));
+      setAssets((prev) => {
+        const combined = cursor ? [...prev, ...result.assets] : result.assets;
+        return combined.slice().sort((a, b) => {
+          const ta = parseAudioFilename(a.filename ?? "").title.toLowerCase();
+          const tb = parseAudioFilename(b.filename ?? "").title.toLowerCase();
+          return ta.localeCompare(tb);
+        });
+      });
       setHasMore(result.hasNextPage);
       setEndCursor(result.endCursor);
     } catch (err) {
