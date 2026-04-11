@@ -1052,7 +1052,7 @@
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
     "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
     "apkVersionCode": 10,
-    "apkUrl": null,
-    "status": "building"
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "available"
   }
 ]
