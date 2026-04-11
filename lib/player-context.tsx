@@ -109,9 +109,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
           playsInSilentModeIOS: true,
           staysActiveInBackground: true,
           shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
         });
         if (mounted) setIsAvailable(true);
       } catch (err) {

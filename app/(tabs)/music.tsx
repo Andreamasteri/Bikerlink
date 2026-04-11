@@ -41,7 +41,7 @@ function getSpotifyRedirectUri(): string {
 const SPOTIFY_GREEN = "#1DB954";
 const LASTFM_RED = "#D51007";
 
-type Tab = "brani" | "match" | "ricevute" | "radio";
+type Tab = "brani" | "match" | "ricevute" | "radio" | "telefono";
 
 interface PreviewResult {
   trackId: string;
@@ -112,6 +112,202 @@ interface RadioGenre {
   label: string;
   icon: string;
 }
+
+function formatDurationSecs(secs: number): string {
+  if (!isFinite(secs) || secs < 0) return "";
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function TelefonoTrackRow({
+  asset,
+  onPlay,
+}: {
+  asset: MediaLibrary.Asset;
+  onPlay: (asset: MediaLibrary.Asset) => void;
+}) {
+  const { currentTrack, isPlaying } = usePlayer();
+  const isActive = currentTrack?.id === asset.id;
+  const title = (asset.filename ?? "").replace(/\.[^.]+$/, "") || "Brano";
+  const dur = asset.duration ?? 0;
+
+  return (
+    <TouchableOpacity
+      style={[styles.trackRow, isActive && { backgroundColor: Colors.accent + "11" }]}
+      onPress={() => onPlay(asset)}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.albumArt, styles.albumArtPlaceholder]}>
+        <Ionicons
+          name={isActive && isPlaying ? "pause" : "musical-note"}
+          size={18}
+          color={isActive ? Colors.accent : Colors.textSecondary}
+        />
+      </View>
+      <View style={styles.trackInfo}>
+        <Text style={[styles.trackName, isActive && { color: Colors.accent }]} numberOfLines={1}>
+          {title}
+        </Text>
+        <Text style={styles.trackArtist} numberOfLines={1}>
+          {dur > 0 ? formatDurationSecs(dur) : "File locale"}
+        </Text>
+      </View>
+      <Ionicons
+        name={isActive && isPlaying ? "pause-circle" : "play-circle-outline"}
+        size={26}
+        color={isActive ? Colors.accent : Colors.textSecondary}
+      />
+    </TouchableOpacity>
+  );
+}
+
+function TelefonoTab() {
+  const { playTrack, playQueue, isAvailable: playerAvailable } = usePlayer();
+  const [permission, requestPermission] = MediaLibrary.usePermissions();
+  const [assets, setAssets] = useState<MediaLibrary.Asset[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [endCursor, setEndCursor] = useState<string | undefined>(undefined);
+
+  const loadAssets = useCallback(async (cursor?: string) => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const result = await MediaLibrary.getAssetsAsync({
+        mediaType: MediaLibrary.MediaType.audio,
+        first: 50,
+        after: cursor,
+        sortBy: MediaLibrary.SortBy.default,
+      });
+      setAssets((prev) => (cursor ? [...prev, ...result.assets] : result.assets));
+      setHasMore(result.hasNextPage);
+      setEndCursor(result.endCursor);
+    } catch (err) {
+      console.warn("[TelefonoTab] loadAssets error:", err);
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+    }
+  }, [loading]);
+
+  const handlePermissionRequest = useCallback(async () => {
+    const result = await requestPermission();
+    if (result.granted) loadAssets();
+  }, [requestPermission, loadAssets]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" && permission?.granted) loadAssets();
+  }, [permission?.granted]);
+
+  const handlePlayTrack = useCallback((asset: MediaLibrary.Asset) => {
+    if (!playerAvailable) return;
+    const title = (asset.filename ?? "").replace(/\.[^.]+$/, "") || "Brano";
+    playTrack({
+      id: asset.id,
+      url: asset.uri,
+      title,
+      artist: "Telefono",
+      duration: asset.duration,
+      source: "file",
+    });
+  }, [playTrack, playerAvailable]);
+
+  const handlePlayAll = useCallback(async () => {
+    if (!playerAvailable || assets.length === 0) return;
+    const tracks: PlayerTrack[] = assets.map((a) => ({
+      id: a.id,
+      url: a.uri,
+      title: (a.filename ?? "").replace(/\.[^.]+$/, "") || "Brano",
+      artist: "Telefono",
+      duration: a.duration,
+      source: "file" as const,
+    }));
+    await playQueue(tracks, 0);
+  }, [assets, playQueue, playerAvailable]);
+
+  if (Platform.OS === "web") {
+    return (
+      <View style={styles.centered}>
+        <Ionicons name="phone-portrait-outline" size={48} color={Colors.textSecondary} />
+        <Text style={styles.emptyText}>La libreria locale non è disponibile sul web.</Text>
+      </View>
+    );
+  }
+
+  if (!permission) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator color={Colors.accent} />
+      </View>
+    );
+  }
+
+  if (!permission.granted) {
+    return (
+      <View style={styles.centered}>
+        <Ionicons name="musical-notes-outline" size={48} color={Colors.textSecondary} />
+        <Text style={styles.emptyText}>
+          {permission.canAskAgain
+            ? "Concedi l'accesso alla libreria musicale per ascoltare i tuoi MP3."
+            : "Accesso negato nelle impostazioni del dispositivo."}
+        </Text>
+        {permission.canAskAgain && (
+          <TouchableOpacity style={teleStyles.permBtn} onPress={handlePermissionRequest}>
+            <Text style={teleStyles.permBtnText}>Concedi accesso</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  }
+
+  if (assets.length === 0 && !loading) {
+    return (
+      <View style={styles.centered}>
+        <Ionicons name="musical-notes-outline" size={48} color={Colors.textSecondary} />
+        <Text style={styles.emptyText}>Nessun file audio trovato sul dispositivo.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={[styles.section, { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 10, paddingBottom: 6 }]}>
+        <Text style={styles.sectionTitle}>{loading && assets.length === 0 ? "Caricamento…" : `${assets.length} brani`}</Text>
+        <TouchableOpacity style={styles.playAllBtn} onPress={handlePlayAll} disabled={!playerAvailable || assets.length === 0}>
+          <Ionicons name="play-circle" size={14} color={Colors.accent} />
+          <Text style={styles.playAllBtnText}>Riproduci tutto</Text>
+        </TouchableOpacity>
+      </View>
+      <FlatList
+        data={assets}
+        keyExtractor={(item) => item.id}
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 110 }}
+        onEndReached={() => { if (hasMore && endCursor) loadAssets(endCursor); }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={loading ? <ActivityIndicator color={Colors.accent} style={{ padding: 12 }} /> : null}
+        renderItem={({ item }) => <TelefonoTrackRow asset={item} onPlay={handlePlayTrack} />}
+      />
+    </View>
+  );
+}
+
+const teleStyles = StyleSheet.create({
+  permBtn: {
+    backgroundColor: Colors.accent,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    marginTop: 8,
+  },
+  permBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: "#fff",
+  },
+});
 
 function MusicRadioTab() {
   const { playRadioStation, selectedGenre, setSelectedGenre, favoriteStationIds, toggleFavorite, currentTrack } = usePlayer();
@@ -393,7 +589,7 @@ export default function MusicScreen() {
   const queryClient = useQueryClient();
   const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
   const [activeTab, setActiveTab] = useState<Tab>(() => {
-    if (tabParam === "ricevute" || tabParam === "match" || tabParam === "brani" || tabParam === "radio") return tabParam;
+    if (tabParam === "ricevute" || tabParam === "match" || tabParam === "brani" || tabParam === "radio" || tabParam === "telefono") return tabParam;
     return "brani";
   });
 
@@ -468,7 +664,7 @@ export default function MusicScreen() {
   });
 
   useEffect(() => {
-    if (tabParam === "ricevute" || tabParam === "match" || tabParam === "brani") {
+    if (tabParam === "ricevute" || tabParam === "match" || tabParam === "brani" || tabParam === "telefono") {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
@@ -798,8 +994,8 @@ export default function MusicScreen() {
         </View>
       </View>
 
-      <View style={styles.tabBar}>
-        {(["brani", "match", "ricevute", "radio"] as Tab[]).map((tab) => (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBar} contentContainerStyle={styles.tabBarContent}>
+        {(["brani", "match", "ricevute", "radio", "telefono"] as Tab[]).map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[styles.tabItem, activeTab === tab && styles.tabItemActive]}
@@ -807,14 +1003,13 @@ export default function MusicScreen() {
           >
             {tab === "radio" ? (
               <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                <Ionicons
-                  name="radio-outline"
-                  size={13}
-                  color={activeTab === "radio" ? Colors.accent : Colors.textSecondary}
-                />
-                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                  Radio
-                </Text>
+                <Ionicons name="radio-outline" size={12} color={activeTab === "radio" ? Colors.accent : Colors.textSecondary} />
+                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>Radio</Text>
+              </View>
+            ) : tab === "telefono" ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <Ionicons name="phone-portrait-outline" size={12} color={activeTab === "telefono" ? Colors.accent : Colors.textSecondary} />
+                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>Telefono</Text>
               </View>
             ) : (
               <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
@@ -823,7 +1018,7 @@ export default function MusicScreen() {
             )}
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       {activeTab === "brani" && (
         <BraniTab
@@ -872,6 +1067,7 @@ export default function MusicScreen() {
         />
       )}
       {activeTab === "radio" && <MusicRadioTab />}
+      {activeTab === "telefono" && <TelefonoTab />}
 
       <Modal
         visible={lastfmModalVisible}
@@ -1897,22 +2093,24 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   tabBar: {
-    flexDirection: "row",
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+  },
+  tabBarContent: {
+    flexDirection: "row" as const,
     paddingHorizontal: 8,
   },
   tabItem: {
-    flex: 1,
     paddingVertical: 10,
-    alignItems: "center",
+    paddingHorizontal: 12,
+    alignItems: "center" as const,
   },
   tabItemActive: {
     borderBottomWidth: 2,
     borderBottomColor: Colors.accent,
   },
   tabText: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
   },

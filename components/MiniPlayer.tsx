@@ -1002,11 +1002,23 @@ const modalStyles = StyleSheet.create({
   tabContent: { flex: 1 },
 });
 
+function sourceLabel(source: string): string {
+  switch (source) {
+    case "file": return "📱 Telefono";
+    case "radio": return "📻 Radio";
+    case "preview": return "🎵 Anteprima 30s";
+    case "library": return "🎵 Libreria";
+    default: return "";
+  }
+}
+
 export function MiniPlayer({ bottomOffset = 0 }: { bottomOffset?: number }) {
-  const { currentTrack, isPlaying, isBuffering, togglePlay, next, isAvailable } = usePlayer();
+  const { currentTrack, isPlaying, isBuffering, togglePlay, next, isAvailable, source } = usePlayer();
   const [showModal, setShowModal] = useState(false);
 
   if (!currentTrack) return null;
+
+  const srcLabel = sourceLabel(source);
 
   return (
     <>
@@ -1022,6 +1034,11 @@ export function MiniPlayer({ bottomOffset = 0 }: { bottomOffset?: number }) {
           <Text style={miniStyles.artist} numberOfLines={1}>
             {currentTrack.artist}
           </Text>
+          {srcLabel ? (
+            <Text style={miniStyles.sourceLabel} numberOfLines={1}>
+              {srcLabel}
+            </Text>
+          ) : null}
         </View>
         <TouchableOpacity
           style={miniStyles.actionBtn}
@@ -1094,6 +1111,13 @@ const miniStyles = StyleSheet.create({
     minWidth: 34,
     alignItems: "center",
     justifyContent: "center",
+  },
+  sourceLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 9,
+    color: Colors.textSecondary,
+    marginTop: 1,
+    opacity: 0.8,
   },
 });
 
