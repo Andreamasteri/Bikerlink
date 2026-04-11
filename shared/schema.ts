@@ -1149,3 +1149,105 @@ export const sharedPlaylists = pgTable("shared_playlists", {
 
 export type SharedPlaylist = typeof sharedPlaylists.$inferSelect;
 export type InsertSharedPlaylist = typeof sharedPlaylists.$inferInsert;
+
+// ── RADUNI / EVENTI ──────────────────────────────────────────────────────────
+
+export const events = pgTable("events", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  eventType: varchar("event_type", { length: 30 }).notNull().default("raduno"),
+  // "raduno" | "uscita_gruppo" | "festa" | "gara" | "altro"
+
+  creatorId: varchar("creator_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+
+  locationName: varchar("location_name", { length: 300 }),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
+
+  eventDate: timestamp("event_date").notNull(),
+  eventTime: varchar("event_time", { length: 5 }),  // "HH:MM" opzionale
+
+  isRecurring: boolean("is_recurring").notNull().default(false),
+  recurrenceInfo: text("recurrence_info"),
+
+  maxParticipants: integer("max_participants"),       // null = illimitato
+  websiteUrl: varchar("website_url", { length: 500 }),
+
+  autoInviteReason: text("auto_invite_reason"),
+  autoInviteRegion: varchar("auto_invite_region", { length: 100 }),
+  autoInviteBrand: varchar("auto_invite_brand", { length: 100 }),
+
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  // "pending" | "approved" | "rejected" | "cancelled"
+
+  rejectionReason: text("rejection_reason"),
+  approvedBy: varchar("approved_by", { length: 36 })
+    .references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("events_status_idx").on(table.status),
+  index("events_date_idx").on(table.eventDate),
+  index("events_creator_idx").on(table.creatorId),
+]);
+
+export type Event = typeof events.$inferSelect;
+export type InsertEvent = typeof events.$inferInsert;
+
+export const eventImages = pgTable("event_images", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id", { length: 36 })
+    .notNull()
+    .references(() => events.id, { onDelete: "cascade" }),
+  imageUrl: varchar("image_url", { length: 1000 }).notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+});
+
+export type EventImage = typeof eventImages.$inferSelect;
+export type InsertEventImage = typeof eventImages.$inferInsert;
+
+export const eventParticipants = pgTable("event_participants", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id", { length: 36 })
+    .notNull()
+    .references(() => events.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  participationStatus: varchar("participation_status", { length: 20 }).notNull().default("going"),
+  // "going" | "interested"
+  joinedAt: timestamp("joined_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("event_participants_unique_idx").on(table.eventId, table.userId),
+  index("event_participants_event_idx").on(table.eventId),
+]);
+
+export type EventParticipant = typeof eventParticipants.$inferSelect;
+export type InsertEventParticipant = typeof eventParticipants.$inferInsert;
+
+export const eventClubInvites = pgTable("event_club_invites", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id", { length: 36 })
+    .notNull()
+    .references(() => events.id, { onDelete: "cascade" }),
+  clubId: varchar("club_id", { length: 36 })
+    .notNull()
+    .references(() => motoClubs.id, { onDelete: "cascade" }),
+  invitedAt: timestamp("invited_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("event_club_invites_unique_idx").on(table.eventId, table.clubId),
+]);

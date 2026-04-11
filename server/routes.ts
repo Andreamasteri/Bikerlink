@@ -32,6 +32,7 @@ import friendsRoutes from "./routes/friends";
 import spotifyRoutes, { handleMusicMatch } from "./routes/spotify";
 import lastfmRoutes from "./routes/lastfm";
 import radioRoutes from "./routes/radio";
+import eventsRoutes from "./routes/events";
 import { triggerMatchingRun, triggerMatchingForUser } from "./matching-engine";
 import { db } from "./db";
 import { users } from "@shared/schema";
@@ -130,6 +131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/spotify", spotifyRoutes);
   app.use("/api/lastfm", lastfmRoutes);
   app.use("/api/music/radio", radioRoutes);
+  app.use("/api/events", eventsRoutes);
 
   app.get("/api/settings/music-provider", async (_req: Request, res: Response) => {
     try {
