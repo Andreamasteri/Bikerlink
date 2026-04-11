@@ -30,6 +30,12 @@
       "package": "com.bikerlink.app",
       "versionCode": 9,
       "newArchEnabled": false,
+      "jsEngine": "hermes",
+      "config": {
+        "googleMaps": {
+          "apiKey": ""
+        }
+      },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
