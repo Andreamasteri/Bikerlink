@@ -187,10 +187,11 @@ export default function InteractiveMap({
   const today = new Date().toISOString().substring(0, 10);
   const { data: eventPinsRaw } = useQuery<EventMapPin[]>({
     queryKey: ["/api/events/map"],
+    enabled: showEventPins,
     select: (d) => {
       if (!d) return [];
       return (d as EventMapPin[]).filter(
-        (e) => e.latitude != null && e.longitude != null && e.eventDate >= today
+        (e) => e.latitude != null && e.longitude != null && (e.eventDate ?? "").substring(0, 10) >= today
       );
     },
   });
@@ -381,14 +382,14 @@ export default function InteractiveMap({
             coordinate={{ latitude: club.latitude, longitude: club.longitude }}
             title={club.name}
             description={[
-              club.isFictitious ? "📍 Sede stimata (regione)" : null,
+              club.isFictitious ? "Posizione indicativa – centro regione" : null,
               club.region ?? null,
               club.memberCount > 0 ? `${club.memberCount} membri` : null,
             ].filter(Boolean).join(" · ") || undefined}
             onPress={() => onClubPress?.(club)}
           >
-            <View style={clubMarkerStyles.container}>
-              <MaterialCommunityIcons name="shield-star" size={16} color="#fff" />
+            <View style={[clubMarkerStyles.container, club.isFictitious && clubMarkerStyles.containerFictitious]}>
+              <MaterialCommunityIcons name="shield-check" size={16} color="#fff" />
               {club.isFictitious && <View style={clubMarkerStyles.fictitiousDot} />}
             </View>
           </Marker>
@@ -517,14 +518,14 @@ export default function InteractiveMap({
 
         {onToggleFilterClubs != null && (
           <TouchableOpacity
-            style={[styles.filterChip, filterClubs && { backgroundColor: "#2979FF" }]}
+            style={[styles.filterChip, filterClubs && { backgroundColor: "#009688" }]}
             onPress={onToggleFilterClubs}
             activeOpacity={0.7}
           >
             <MaterialCommunityIcons
-              name="shield-star"
+              name="shield-check"
               size={16}
-              color={filterClubs ? "#fff" : "#2979FF"}
+              color={filterClubs ? "#fff" : "#009688"}
             />
             <Text style={[styles.filterText, filterClubs && styles.filterTextActive]}>Club</Text>
           </TouchableOpacity>
@@ -767,7 +768,7 @@ const eventMarkerStyles = StyleSheet.create({
 
 const clubMarkerStyles = StyleSheet.create({
   container: {
-    backgroundColor: "#2979FF",
+    backgroundColor: "#009688",
     borderRadius: 18,
     width: 30,
     height: 30,
@@ -780,6 +781,9 @@ const clubMarkerStyles = StyleSheet.create({
       android: { elevation: 5 },
       web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.4)" },
     }),
+  },
+  containerFictitious: {
+    backgroundColor: "#607D8B",
   },
   fictitiousDot: {
     position: "absolute" as const,

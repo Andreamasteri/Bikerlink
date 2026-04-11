@@ -90,6 +90,8 @@ export default function MapScreen() {
   const [showAreaModal, setShowAreaModal] = useState(false);
   const [countriesLoaded, setCountriesLoaded] = useState(false);
   const [showHomeMessage, setShowHomeMessage] = useState(false);
+  const [showInviteEventModal, setShowInviteEventModal] = useState(false);
+  const [inviteSending, setInviteSending] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -477,6 +479,19 @@ export default function MapScreen() {
     staleTime: 120000,
     enabled: isAuthenticated && mapFullscreen,
   });
+
+  const myOrganizedEventsQuery = useQuery<any[]>({
+    queryKey: ["/api/events/my"],
+    enabled: isAuthenticated,
+    staleTime: 60000,
+    select: (data: any[]) => {
+      const todayStr = new Date().toISOString().substring(0, 10);
+      return (data || []).filter(
+        (ev: any) => ev.status === "approved" && (ev.eventDate ?? "").substring(0, 10) >= todayStr
+      );
+    },
+  });
+
   const mySearchRadius = useMemo(() => {
     const myActive = (myProposalsQuery.data || []).filter(
       (p: any) => p.userId === user?.id && p.status === "active" && p.searchRadius
@@ -1150,7 +1165,7 @@ export default function MapScreen() {
         </Pressable>
       </Modal>
 
-      <Modal visible={!!selectedUser} transparent animationType="slide" onRequestClose={() => setSelectedUser(null)}>
+      <Modal visible={!!selectedUser} transparent animationType="slide" onRequestClose={() => { setSelectedUser(null); setShowInviteEventModal(false); }}>
         <Pressable style={styles.detailOverlay} onPress={() => setSelectedUser(null)}>
           <Pressable style={[styles.detailSheet, { paddingBottom: (insets.bottom || 16) }]} onPress={(e) => e.stopPropagation()}>
             <View style={styles.detailHandle} />
@@ -1307,6 +1322,15 @@ export default function MapScreen() {
                     <Ionicons name="chatbubble" size={20} color={Colors.background} />
                     <Text style={styles.detailChatBtnText}>Messaggio</Text>
                   </Pressable>
+                  {(myOrganizedEventsQuery.data ?? []).length > 0 && (
+                    <Pressable
+                      style={[styles.detailProfileBtn, { backgroundColor: "#F57C00" }]}
+                      onPress={() => setShowInviteEventModal(true)}
+                    >
+                      <MaterialCommunityIcons name="calendar-star" size={16} color="#fff" />
+                      <Text style={[styles.detailProfileBtnText, { color: "#fff" }]}>Invita</Text>
+                    </Pressable>
+                  )}
                   <Pressable
                     style={styles.detailProfileBtn}
                     onPress={() => { setSelectedUser(null); router.push(`/profile/${selectedUser?.id}` as any); }}
@@ -1316,6 +1340,75 @@ export default function MapScreen() {
                 </View>
               </ScrollView>
             )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={showInviteEventModal} transparent animationType="slide" onRequestClose={() => setShowInviteEventModal(false)}>
+        <Pressable style={styles.detailOverlay} onPress={() => setShowInviteEventModal(false)}>
+          <Pressable style={[styles.homeMessageSheet, { maxHeight: "70%" }]} onPress={(e) => e.stopPropagation()}>
+            <View style={[styles.homeMessageHeader, { marginBottom: 4 }]}>
+              <MaterialCommunityIcons name="calendar-star" size={24} color="#F57C00" />
+              <Text style={styles.homeMessageTitle}>Invita a un raduno</Text>
+            </View>
+            <Text style={[styles.homeMessageText, { fontSize: 13, marginBottom: 8 }]}>
+              Scegli quale raduno vuoi invitare {selectedUser?.nickname ?? "l'utente"} ad unirsi:
+            </Text>
+            <FlatList
+              data={myOrganizedEventsQuery.data ?? []}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingVertical: 12,
+                    paddingHorizontal: 4,
+                    borderBottomWidth: 1,
+                    borderBottomColor: Colors.border,
+                    gap: 10,
+                    opacity: inviteSending ? 0.6 : 1,
+                  }}
+                  disabled={inviteSending}
+                  onPress={async () => {
+                    if (!selectedUser?.id) return;
+                    setInviteSending(true);
+                    try {
+                      const res = await apiRequest("POST", `/api/events/${item.id}/invite-user`, { userId: selectedUser.id });
+                      if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        Alert.alert("Errore", (err as any).message || "Impossibile inviare l'invito");
+                      } else {
+                        Alert.alert("Inviato!", `${selectedUser.nickname} ha ricevuto l'invito per "${item.title}".`);
+                        setShowInviteEventModal(false);
+                      }
+                    } catch {
+                      Alert.alert("Errore", "Impossibile inviare l'invito");
+                    } finally {
+                      setInviteSending(false);
+                    }
+                  }}
+                >
+                  <MaterialCommunityIcons name="flag-checkered" size={20} color="#F57C00" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text }} numberOfLines={1}>{item.title}</Text>
+                    <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary }}>
+                      {item.eventDate ? new Date(item.eventDate).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" }) : ""}
+                      {item.locationName ? `  ·  ${item.locationName}` : ""}
+                    </Text>
+                  </View>
+                  {inviteSending ? (
+                    <ActivityIndicator size="small" color="#F57C00" />
+                  ) : (
+                    <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
+                  )}
+                </Pressable>
+              )}
+              ListEmptyComponent={<Text style={{ textAlign: "center", color: Colors.textSecondary, paddingVertical: 16 }}>Nessun raduno futuro approvato</Text>}
+            />
+            <Pressable style={[styles.homeMessageCloseBtn, { marginTop: 8 }]} onPress={() => setShowInviteEventModal(false)}>
+              <Text style={styles.homeMessageCloseBtnText}>Annulla</Text>
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>

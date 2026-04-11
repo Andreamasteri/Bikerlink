@@ -906,9 +906,10 @@ async function sendClubInvites(evt: Event, approvedEventId: string): Promise<voi
   }
 }
 
-router.post("/:id/invite-user", requireAuth, async (req: Request, res: Response) => {
+router.post("/:id/invite-user", async (req: Request, res: Response) => {
   try {
-    const requesterId = req.session.userId!;
+    const requesterId = requireAuth(req, res);
+    if (!requesterId) return;
     const eventId = req.params.id;
     const { userId: targetUserId } = req.body as { userId?: string };
     if (!targetUserId) return res.status(400).json({ message: "userId obbligatorio" });
