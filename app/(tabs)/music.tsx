@@ -1499,7 +1499,7 @@ function BraniTab({
   }
 
   return (
-    <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingTop: 20, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingTop: 4, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
