@@ -197,7 +197,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setPosition(0);
     } catch (err) {
       console.warn("[Player] loadAndPlay error:", err);
-      Alert.alert("Riproduzione non riuscita", "Impossibile riprodurre questa stazione. Prova un'altra.");
+      const msg = track.source === "radio"
+        ? "Impossibile riprodurre questa stazione. Prova un'altra."
+        : "Impossibile riprodurre questo brano.";
+      Alert.alert("Riproduzione non riuscita", msg);
     }
   }, [onPlaybackStatus]);
 
