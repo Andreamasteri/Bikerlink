@@ -135,7 +135,7 @@ async function enrichEvent(evt: EventRow, requestingUserId: string | null) {
     participantCount: goingCount,
     interestedCount,
     userParticipation,
-    participants: participants.slice(0, 10).map(p => ({
+    participants: participants.map(p => ({
       userId: p.userId,
       nickname: p.nickname,
       photoUrl: p.photoUrl,
@@ -162,9 +162,15 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
+    // Sanitize filename: reject path traversal and directory separators
+    const { filename } = req.params;
+    if (!filename || /[/\\.]\./.test(filename) || filename.includes("..")) {
+      return res.status(400).json({ message: "Nome file non valido" });
+    }
+
     const { downloadBuffer } = await import("../objectStorage");
-    const buf = await downloadBuffer(`public/events/${req.params.filename}`);
-    const ext = path.extname(req.params.filename).toLowerCase();
+    const buf = await downloadBuffer(`public/events/${filename}`);
+    const ext = path.extname(filename).toLowerCase();
     const mime = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
     res.setHeader("Content-Type", mime);
     res.setHeader("Cache-Control", "private, max-age=86400");
@@ -820,6 +826,10 @@ router.post("/:id/reject", async (req: Request, res: Response) => {
 
     const { id } = req.params;
     const { reason } = req.body as { reason?: string };
+
+    if (!reason?.trim()) {
+      return res.status(400).json({ message: "Il motivo del rifiuto è obbligatorio" });
+    }
 
     const [evt] = await db.select().from(events).where(eq(events.id, id));
     if (!evt) return res.status(404).json({ message: "Evento non trovato" });
