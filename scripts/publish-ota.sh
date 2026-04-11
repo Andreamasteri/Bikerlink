@@ -124,8 +124,7 @@ grep -E "(✓|✗|Bundle|Error)" "$EXPO_LOG" | tail -5 || true
 rm -f "$EXPO_LOG"
 echo "   Esportazione completata"
 
-# Step 3: Find bundle file — prefer entry (index) bundle, fallback to largest file
-# SDK 55+ con jsEngine hermes genera file .hbc (Hermes Bytecode) invece di .js
+# Step 3: Find bundle file — prefer entry (index) bundle, fallback to largest JS file
 echo "[3/7] Ricerca bundle principale..."
 ANDROID_DIR="$DIST_DIR/_expo/static/js/android"
 if [ ! -d "$ANDROID_DIR" ]; then
@@ -134,18 +133,17 @@ if [ ! -d "$ANDROID_DIR" ]; then
   exit 1
 fi
 
-# Prefer file with "index" or "entry" in the name (Expo entry bundle naming convention)
-# Support both .js (Metro/classic) and .hbc (Hermes Bytecode, SDK 55+)
-BUNDLE_FILE=$(find "$ANDROID_DIR" \( -name "index*.hbc" -o -name "index*.js" -o -name "entry*.hbc" -o -name "entry*.js" \) ! -name "*.map" 2>/dev/null | head -1)
+# Prefer file with "index" in the name (Expo entry bundle naming convention)
+BUNDLE_FILE=$(find "$ANDROID_DIR" -name "index*.js" ! -name "*.map" 2>/dev/null | head -1)
 
-# Fallback: pick the largest non-map file (entry bundle is typically the biggest)
+# Fallback: pick the largest JS file (entry bundle is typically the biggest)
 if [ -z "$BUNDLE_FILE" ]; then
-  BUNDLE_FILE=$(find "$ANDROID_DIR" ! -name "*.map" -type f 2>/dev/null \
+  BUNDLE_FILE=$(find "$ANDROID_DIR" -name "*.js" ! -name "*.map" 2>/dev/null \
     -exec wc -c {} + 2>/dev/null | sort -n | tail -2 | head -1 | awk '{print $2}')
 fi
 
 if [ -z "$BUNDLE_FILE" ] || [ ! -f "$BUNDLE_FILE" ]; then
-  echo "   ERRORE: bundle non trovato in $ANDROID_DIR"
+  echo "   ERRORE: bundle JS non trovato in $ANDROID_DIR"
   find "$DIST_DIR" -type f 2>/dev/null | head -20
   exit 1
 fi
