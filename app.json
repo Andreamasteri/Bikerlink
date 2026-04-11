@@ -29,7 +29,6 @@
     "android": {
       "package": "com.bikerlink.app",
       "versionCode": 9,
-      "newArchEnabled": false,
       "jsEngine": "hermes",
       "config": {
         "googleMaps": {
