@@ -1017,7 +1017,7 @@
     ],
     "jsEngine": "hermes",
     "message": "APK v9 — SDK 55 + expo-av Player + MiniPlayer + Radio Streaming",
-    "note": "Build 12 (cb76a959) — 11 build consecutive fallite con EAS_BUILD_UNKNOWN_GRADLE_ERROR. Causa radice: react-native-reanimated ~3.19.5 incompatibile con CMake 3.22.1 + NDK r27b usati dall'immagine EAS ubuntu-24.04-jdk-17-ndk-r27b-sdk-55. Fix: upgrade a ~4.2.1 (versione corretta per SDK 55 da bundledNativeModules.json). Altre fix applicate: RNTP→expo-av (New Arch), app.config.ts→app.json, android/ rimosso da git (managed workflow).",
+    "note": "Build 12 (cb76a959) — 11 build consecutive fallite con EAS_BUILD_UNKNOWN_GRADLE_ERROR. Causa radice: react-native-reanimated ~3.19.5 incompatibile con CMake 3.22.1 + NDK r27b usati dall'immagine EAS ubuntu-24.04-jdk-17-ndk-r27b-sdk-55. Fix: upgrade a ~4.2.1 (versione corretta per SDK 55 da bundledNativeModules.json). Altre fix applicate: RNTP→expo-av (New Arch), app.config.ts→app.json, android/ rimosso da git (managed workflow). APK v9 CRASHAVA: Google Maps API key vuota nel manifest (fix applicato in commit cde3bb7, DOPO la build). Sostituito da APK v10.",
     "releaseId": null,
     "bundleUrl": null,
     "updateGroupId": null,
@@ -1028,6 +1028,31 @@
     "apkBuildId": "cb76a959-cc5e-4c43-b281-3e4f00058e22",
     "apkVersionCode": 9,
     "apkUrl": "https://expo.dev/artifacts/eas/r8dXR1vnSMn8N5a2wWMxPY.apk",
-    "status": "available"
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 0,
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-11",
+    "runtimeVersion": "4.0.0",
+    "platforms": [
+      "android"
+    ],
+    "jsEngine": "hermes",
+    "message": "APK v10 — Fix crash mappa (Google Maps API key corretta nel manifest)",
+    "note": "APK v9 crashava al login perché Google Maps API key era vuota in AndroidManifest.xml (buildato prima del commit cde3bb7). APK v10 include la chiave corretta (AIzaSyBy...). versionCode 10, commit 85e6279.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "85e6279",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": null,
+    "status": "building"
   }
 ]
