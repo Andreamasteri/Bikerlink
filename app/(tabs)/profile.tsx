@@ -135,8 +135,8 @@ export default function ProfileScreen() {
   const [isExportingData, setIsExportingData] = useState(false);
 
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-  // Ciclo 4.0.0 — APK v9 — nessuna OTA pubblicata ancora
-  const CURRENT_OTA_NUMBER = 0;
+  // Ciclo 4.0.0 — APK v10 — OTA-1: tab Radio nella schermata Musica
+  const CURRENT_OTA_NUMBER = 1;
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],

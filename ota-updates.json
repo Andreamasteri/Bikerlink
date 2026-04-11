@@ -1054,5 +1054,28 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "available"
+  },
+  {
+    "updateNumber": 1,
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "publishedAt": "2026-04-11",
+    "runtimeVersion": "4.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-1 rv4.0.0: tab Radio nella schermata Musica",
+    "note": "Task #492+#493. Aggiunta 4ª tab 'Radio' (icona radio-outline) in music.tsx con griglia generi da /api/music/radio/genres, lista stazioni da /api/music/radio/stations?genre=X, play via PlayerContext.playRadioStation(). Funziona senza connessione Last.fm/Spotify. Toggle opzionale Suggerisci da Last.fm. CURRENT_OTA_NUMBER=1.",
+    "releaseId": "a38d220f-05a8-4e6e-98ad-6509900fdffe",
+    "bundleUrl": "private/ota/ota-1.1.0-1775891437108.js",
+    "updateGroupId": "757c14d2-11c1-4557-9457-368d549c4d88",
+    "androidUpdateId": "019d7b61-f977-7af7-84b3-e8b02129d477",
+    "iosUpdateId": null,
+    "commitBase": "24540a8f3c0c6a624028fbe93ae02cb79f1ab768",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/757c14d2-11c1-4557-9457-368d549c4d88",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "published"
   }
 ]
