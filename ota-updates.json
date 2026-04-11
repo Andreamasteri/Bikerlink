@@ -1170,5 +1170,28 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 6,
+    "version": "1.6.0",
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-6 rv4.0.0: layout Music (libreria in cima, MiniPlayer inline top, stop player), radio fix (toggle Last.fm persistente, stazioni cliccabili con haptic+spinner)",
+    "note": "Task #505+#506. #505: BraniTab libreria in cima; InlineMiniPlayer sopra header Musica con play/pause/stop; spazio ridotto (marginTop 4); MiniPlayer globale nascosto su /music. stop() aggiunto a PlayerContext. #506: toggle Last.fm persistente AsyncStorage; stazioni: haptic, spinner, guard URL, alert errore audio. CURRENT_OTA_NUMBER=6.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": null,
+    "easDashboard": null,
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "pending"
   }
 ]
