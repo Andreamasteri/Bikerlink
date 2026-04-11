@@ -272,6 +272,92 @@ router.get("/preview-playlist", async (req: Request, res: Response) => {
   return res.json(results);
 });
 
+router.get("/stream", async (req: Request, res: Response) => {
+  const rawUrl = req.query.url;
+  const streamUrl = typeof rawUrl === "string" ? rawUrl : Array.isArray(rawUrl) ? rawUrl[0] : undefined;
+
+  if (!streamUrl) {
+    return res.status(400).json({ error: "url is required" });
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(streamUrl);
+  } catch {
+    return res.status(400).json({ error: "url is not valid" });
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return res.status(400).json({ error: "url must be http or https" });
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+  const BLOCKED_HOSTS = /^(localhost|127\.|0\.0\.0\.0|::1|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|fc00:|fd|fe80:)/;
+  if (BLOCKED_HOSTS.test(hostname)) {
+    return res.status(400).json({ error: "url host is not allowed" });
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const upstream = await fetch(streamUrl, {
+      headers: {
+        "User-Agent": "BikerLink/4.0.0",
+        "Icy-MetaData": "1",
+      },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timer);
+
+    if (!upstream.ok) {
+      return res.status(502).json({ error: `Upstream error: ${upstream.status}` });
+    }
+
+    const contentType = upstream.headers.get("Content-Type") || "audio/mpeg";
+    const transferEncoding = upstream.headers.get("Transfer-Encoding");
+
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "no-cache, no-store");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    if (transferEncoding) {
+      res.setHeader("Transfer-Encoding", transferEncoding);
+    }
+
+    if (!upstream.body) {
+      return res.status(502).json({ error: "No response body from upstream" });
+    }
+
+    req.on("close", () => {
+      controller.abort();
+    });
+
+    const reader = upstream.body.getReader();
+    const pump = async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (!res.writable) break;
+          res.write(Buffer.from(value));
+        }
+      } catch {
+      } finally {
+        res.end();
+      }
+    };
+    pump();
+  } catch (err) {
+    clearTimeout(timer);
+    const isTimeout = err instanceof Error && err.name === "AbortError";
+    console.error(`[radio] stream proxy error${isTimeout ? " (timeout)" : ""}:`, err);
+    if (!res.headersSent) {
+      return res.status(isTimeout ? 504 : 502).json({ error: isTimeout ? "Stream timeout" : "Cannot connect to stream" });
+    }
+  }
+});
+
 router.get("/suggested-genres", requireAuth, async (req: Request, res: Response) => {
   const userId = req.session.userId!;
 

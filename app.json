@@ -23,7 +23,10 @@
         "NSCameraUsageDescription": "BikerLink accede alla fotocamera per scattare foto del profilo e delle moto.",
         "NSMusicUsageDescription": "BikerLink accede alla tua libreria musicale per riprodurre brani in-app.",
         "NSAppleMusicUsageDescription": "BikerLink accede ad Apple Music per mostrare e riprodurre brani.",
-        "UIBackgroundModes": ["audio", "fetch"]
+        "UIBackgroundModes": ["audio", "fetch"],
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
       }
     },
     "android": {

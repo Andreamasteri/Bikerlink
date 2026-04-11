@@ -9,6 +9,7 @@ import React, {
 import { Platform, Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio, AVPlaybackStatus } from "expo-av";
+import { getApiUrl } from "@/lib/query-client";
 
 export type PlayerSource = "radio" | "library" | "file" | "preview";
 export type RepeatMode = "off" | "track" | "queue";
@@ -244,6 +245,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     await loadAndPlay(tracks[startIndex], startIndex);
   }, [loadAndPlay]);
 
+  const toProxyUrl = useCallback((streamUrl: string): string => {
+    const base = getApiUrl();
+    return `${base}/api/music/radio/stream?url=${encodeURIComponent(streamUrl)}`;
+  }, []);
+
   const playRadioStation = useCallback(async (station: RadioStation, genreId?: string) => {
     if (!station.streamUrl) {
       Alert.alert("Stazione non disponibile", "Questa stazione non ha un URL di streaming valido.");
@@ -251,7 +257,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
     const track: PlayerTrack = {
       id: station.id,
-      url: station.streamUrl,
+      url: toProxyUrl(station.streamUrl),
       title: station.name,
       artist: station.country || "Radio",
       artwork: station.favicon || undefined,
@@ -261,7 +267,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     queueRef.current = [track];
     await loadAndPlay(track, 0);
     if (genreId) setSelectedGenre(genreId);
-  }, [loadAndPlay]);
+  }, [loadAndPlay, toProxyUrl]);
 
   const next = useCallback(async () => {
     const q = queueRef.current;
