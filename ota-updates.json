@@ -1193,5 +1193,28 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 7,
+    "version": "1.7.0",
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-7 rv4.0.0: Raduni/Eventi, Mappa Europea fix, Traduzioni+Turco, Brand Theme Switcher, fix Radio/Player",
+    "note": "Task #509-#516. #509: fix Radio proxy stream lato server. #510: ripristino apertura FullPlayerModal da InlineMiniPlayer. #511-#512: Raduni/Eventi (schema DB + API + frontend completo). #513: sistema traduzioni Google Sheet + admin panel. #514: lingua turca. #515: Audit & Fix Mappa Europea (callout custom logo+member count, proponi-sede drag-to-place, membro-aware, route fix). #516: Brand Theme Switcher 4 temi (Attuale/Asfalto/Velocità/Rotta), policy admin + scelta utente profilo. CURRENT_OTA_NUMBER=7.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "5c294441c78212b147552128be6c7d9dc62ff592",
+    "easDashboard": null,
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "pending"
   }
 ]
