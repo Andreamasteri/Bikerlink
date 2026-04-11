@@ -1268,7 +1268,9 @@ function SearchTrackRow({
       );
       const resp = await fetch(url.toString());
       if (!resp.ok) throw new Error("No preview");
-      const preview: PreviewResult = await resp.json();
+      const results: PreviewResult[] = await resp.json();
+      const preview = results[0];
+      if (!preview?.previewUrl) throw new Error("No preview available");
       if (preview.artworkUrl) setLiveArtwork(preview.artworkUrl);
       await playTrack({
         id: preview.trackId,
@@ -1365,7 +1367,9 @@ function LibraryTrackRow({
       );
       const resp = await fetch(url.toString());
       if (!resp.ok) throw new Error("No preview");
-      const preview: PreviewResult = await resp.json();
+      const results: PreviewResult[] = await resp.json();
+      const preview = results[0];
+      if (!preview?.previewUrl) throw new Error("No preview available");
       if (preview.artworkUrl) setLiveArtwork(preview.artworkUrl);
       await playTrack({
         id: preview.trackId,
@@ -1673,7 +1677,9 @@ function SharedPlaylistCard({
       );
       const resp = await fetch(url.toString());
       if (!resp.ok) throw new Error("No preview");
-      const preview: PreviewResult = await resp.json();
+      const results: PreviewResult[] = await resp.json();
+      const preview = results[0];
+      if (!preview?.previewUrl) throw new Error("No preview available");
       const safeName = `${track.trackName} - ${track.artistName}`.replace(/[^a-zA-Z0-9_\- ]/g, "_");
       const destUri = FileSystem.documentDirectory + safeName + ".m4a";
       const downloadRes = await FileSystem.downloadAsync(preview.previewUrl, destUri);
