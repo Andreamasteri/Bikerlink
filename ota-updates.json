@@ -1080,6 +1080,7 @@
   },
   {
     "updateNumber": 2,
+    "version": "1.2.0",
     "cycle": "4.x",
     "channel": "preview",
     "platform": "android",
