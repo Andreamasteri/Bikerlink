@@ -338,7 +338,7 @@ const teleStyles = StyleSheet.create({
 const LASTFM_SUGGEST_KEY = "radio_use_lastfm";
 
 function MusicRadioTab() {
-  const { playRadioStation, selectedGenre, setSelectedGenre, favoriteStationIds, toggleFavorite, currentTrack, isBuffering } = usePlayer();
+  const { playRadioStation, selectedGenre, setSelectedGenre, favoriteStationIds, toggleFavorite, currentTrack } = usePlayer();
   const [useLastFm, setUseLastFm] = useState(false);
   const [loadingStationId, setLoadingStationId] = useState<string | null>(null);
 
@@ -348,21 +348,19 @@ function MusicRadioTab() {
     });
   }, []);
 
-  useEffect(() => {
-    if (loadingStationId && currentTrack?.id === loadingStationId && !isBuffering) {
-      setLoadingStationId(null);
-    }
-  }, [currentTrack, isBuffering, loadingStationId]);
-
   const handleToggle = useCallback((val: boolean) => {
     setUseLastFm(val);
     AsyncStorage.setItem(LASTFM_SUGGEST_KEY, String(val)).catch(() => {});
   }, []);
 
-  const handleStationPress = useCallback((s: RadioStation) => {
+  const handleStationPress = useCallback(async (s: RadioStation) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setLoadingStationId(s.id);
-    playRadioStation(s, selectedGenre ?? undefined);
+    try {
+      await playRadioStation(s, selectedGenre ?? undefined);
+    } finally {
+      setLoadingStationId(null);
+    }
   }, [playRadioStation, selectedGenre]);
 
   const { data: genres = [] } = useQuery<RadioGenre[]>({
