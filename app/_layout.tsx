@@ -310,7 +310,6 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <MapSettingsProvider>
-              <ThemeProvider>
               <TaskbarStyleProvider>
               <LocationProvider>
                 <PlayerProvider>
@@ -325,7 +324,6 @@ export default function RootLayout() {
                 </PlayerProvider>
               </LocationProvider>
               </TaskbarStyleProvider>
-              </ThemeProvider>
             </MapSettingsProvider>
           </AuthProvider>
         </QueryClientProvider>

@@ -1285,5 +1285,28 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 11,
+    "version": "1.11.0",
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-11 rv4.0.0: fix crash Impostazioni admin (theme.colors → theme), rimozione ThemeProvider duplicato, fix tab Musica header + indicatore",
+    "note": "Fix crash in admin/settings.tsx: accesso theme.colors.background/accent/surface/text sostituito con theme.background/accent/surface/text (THEMES[key] è già ThemeColors, senza sub-property .colors). theme.label/description → THEME_META[key].label/description. Rimosso ThemeProvider duplicato da _layout.tsx (era annidato dentro MapSettingsProvider e faceva doppia chiamata API /api/settings/theme). Task #523: headerShown:false per tab Musica, rimossa doppia linea grigia+arancione, borderBottomColor transparent per altezza costante. CURRENT_OTA_NUMBER=11.",
+    "releaseId": "7788aa4f-53f8-4bfa-bae7-56cb68797e23",
+    "bundleUrl": "private/ota/ota-1.11.0-1775951198760.js",
+    "updateGroupId": "c5d2b1a5-d27e-4f11-b62c-4135b5f48293",
+    "androidUpdateId": "019d7ef1-5f42-72b1-8953-81a900f0c7ce",
+    "iosUpdateId": null,
+    "commitBase": "ab00503204f419ab22b8a353eb7169992a48c926",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/c5d2b1a5-d27e-4f11-b62c-4135b5f48293",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "published"
   }
 ]

@@ -2186,16 +2186,16 @@ export default function AdminSettings() {
                 onPress={() => setTheme(key)}
                 activeOpacity={0.75}
               >
-                <View style={[brandThemeStyles.swatch, { backgroundColor: theme.colors.background }]}>
-                  <View style={[brandThemeStyles.swatchAccent, { backgroundColor: theme.colors.accent }]} />
-                  <View style={[brandThemeStyles.swatchSurface, { backgroundColor: theme.colors.surface }]} />
-                  <View style={[brandThemeStyles.swatchText, { backgroundColor: theme.colors.text + "33" }]} />
+                <View style={[brandThemeStyles.swatch, { backgroundColor: theme.background }]}>
+                  <View style={[brandThemeStyles.swatchAccent, { backgroundColor: theme.accent }]} />
+                  <View style={[brandThemeStyles.swatchSurface, { backgroundColor: theme.surface }]} />
+                  <View style={[brandThemeStyles.swatchText, { backgroundColor: theme.text + "33" }]} />
                 </View>
                 <View style={brandThemeStyles.cardBody}>
                   <Text style={[brandThemeStyles.cardLabel, isSelected && { color: Colors.accent }]}>
-                    {theme.label}
+                    {THEME_META[key].label}
                   </Text>
-                  <Text style={brandThemeStyles.cardDesc}>{theme.description}</Text>
+                  <Text style={brandThemeStyles.cardDesc}>{THEME_META[key].description}</Text>
                 </View>
                 {isSelected && (
                   <Ionicons name="checkmark-circle" size={20} color={Colors.accent} style={{ marginLeft: "auto" }} />
