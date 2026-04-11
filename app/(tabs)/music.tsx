@@ -746,9 +746,22 @@ export default function MusicScreen() {
             style={[styles.tabItem, activeTab === tab && styles.tabItemActive]}
             onPress={() => setActiveTab(tab)}
           >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab === "brani" ? "Brani" : tab === "match" ? "Match" : tab === "ricevute" ? "Ricevute" : "Radio"}
-            </Text>
+            {tab === "radio" ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <Ionicons
+                  name="radio-outline"
+                  size={13}
+                  color={activeTab === "radio" ? Colors.accent : Colors.textSecondary}
+                />
+                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                  Radio
+                </Text>
+              </View>
+            ) : (
+              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                {tab === "brani" ? "Brani" : tab === "match" ? "Match" : "Ricevute"}
+              </Text>
+            )}
           </TouchableOpacity>
         ))}
       </View>
