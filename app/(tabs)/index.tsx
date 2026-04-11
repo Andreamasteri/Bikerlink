@@ -777,6 +777,7 @@ export default function MapScreen() {
             currentUserId={user?.id ?? null}
             realMeMarker={realMeMarker}
             fakeMeMarker={fakeMeMarker}
+            showEventPins={false}
           />
         ) : (
           <View style={styles.mapPlaceholder}>

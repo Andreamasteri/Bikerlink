@@ -382,11 +382,12 @@ export default function InteractiveMap({
             coordinate={{ latitude: club.latitude, longitude: club.longitude }}
             title={club.name}
             description={[
-              club.isFictitious ? "Posizione indicativa – centro regione" : null,
+              club.isFictitious ? "⚠ Posizione indicativa – centro regione" : "✓ Sede confermata",
               club.region ?? null,
               club.memberCount > 0 ? `${club.memberCount} membri` : null,
-            ].filter(Boolean).join(" · ") || undefined}
-            onPress={() => onClubPress?.(club)}
+              "Tocca per aprire",
+            ].filter(Boolean).join(" · ")}
+            onCalloutPress={() => onClubPress?.(club)}
           >
             <View style={[clubMarkerStyles.container, club.isFictitious && clubMarkerStyles.containerFictitious]}>
               <MaterialCommunityIcons name="shield-check" size={16} color="#fff" />

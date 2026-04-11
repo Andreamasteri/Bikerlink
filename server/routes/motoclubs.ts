@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
+import { getRegionCenter } from "../../constants/regionCenters";
 import {
   motoClubs,
   motoClubMembers,
@@ -1035,39 +1036,6 @@ router.get("/creation-request/status", requireAuth, async (req: Request, res: Re
   }
 });
 
-const REGION_CENTERS_SERVER: Record<string, { latitude: number; longitude: number }> = {
-  "Piemonte": { latitude: 45.0703, longitude: 7.6869 },
-  "Valle d'Aosta": { latitude: 45.7399, longitude: 7.4202 },
-  "Lombardia": { latitude: 45.4654, longitude: 9.1859 },
-  "Trentino-Alto Adige": { latitude: 46.0667, longitude: 11.1211 },
-  "Veneto": { latitude: 45.4347, longitude: 12.3380 },
-  "Friuli-Venezia Giulia": { latitude: 45.6495, longitude: 13.7768 },
-  "Liguria": { latitude: 44.4056, longitude: 8.9463 },
-  "Emilia-Romagna": { latitude: 44.4940, longitude: 11.3426 },
-  "Toscana": { latitude: 43.7711, longitude: 11.2486 },
-  "Umbria": { latitude: 43.1122, longitude: 12.3888 },
-  "Marche": { latitude: 43.6158, longitude: 13.5189 },
-  "Lazio": { latitude: 41.8955, longitude: 12.4823 },
-  "Abruzzo": { latitude: 42.3512, longitude: 13.3980 },
-  "Molise": { latitude: 41.5605, longitude: 14.6684 },
-  "Campania": { latitude: 40.8392, longitude: 14.2512 },
-  "Puglia": { latitude: 41.1259, longitude: 16.8694 },
-  "Basilicata": { latitude: 40.6393, longitude: 15.8052 },
-  "Calabria": { latitude: 38.9098, longitude: 16.5880 },
-  "Sicilia": { latitude: 37.5999, longitude: 14.0154 },
-  "Sardegna": { latitude: 39.2238, longitude: 9.1217 },
-};
-
-function getServerRegionCenter(region: string | null | undefined): { latitude: number; longitude: number } | null {
-  if (!region) return null;
-  const direct = REGION_CENTERS_SERVER[region];
-  if (direct) return direct;
-  const normalized = region.trim().toLowerCase();
-  for (const [key, coords] of Object.entries(REGION_CENTERS_SERVER)) {
-    if (key.toLowerCase() === normalized) return coords;
-  }
-  return null;
-}
 
 router.get("/map", requireAuth, async (_req: Request, res: Response) => {
   try {
@@ -1113,7 +1081,7 @@ router.get("/map", requireAuth, async (_req: Request, res: Response) => {
           memberCount: Number(c.memberCount),
         });
       } else if (c.clubType === "region") {
-        const center = getServerRegionCenter(c.region);
+        const center = getRegionCenter(c.region ?? "");
         if (center) {
           result.push({
             id: c.id,
