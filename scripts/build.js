@@ -116,6 +116,10 @@ async function startMetro(expoPublicDomain) {
   const env = {
     ...process.env,
     EXPO_PUBLIC_DOMAIN: expoPublicDomain,
+    // Disable React Native DevTools inspector proxy — avoids libglib-2.0.so.0 requirement
+    // in Replit deployment environment where that system library is unavailable
+    EXPO_NO_INSPECTOR_PROXY: "1",
+    REACT_NATIVE_DEVTOOLS_DISABLE: "1",
   };
   metroProcess = spawn("npm", ["run", "expo:start:static:build"], {
     stdio: ["ignore", "pipe", "pipe"],
@@ -590,6 +594,8 @@ function buildWebExport(domain) {
     const env = {
       ...process.env,
       EXPO_PUBLIC_DOMAIN: domain,
+      EXPO_NO_INSPECTOR_PROXY: "1",
+      REACT_NATIVE_DEVTOOLS_DISABLE: "1",
     };
     const child = spawn("npx", ["expo", "export", "--platform", "web", "--output-dir", "static-build/web"], {
       stdio: ["ignore", "pipe", "pipe"],
