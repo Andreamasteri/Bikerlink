@@ -55,3 +55,4 @@ dist-ota/
 # Compiled server
 server_dist/
 server_dist/index.js
+android/
