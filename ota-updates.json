@@ -1182,16 +1182,16 @@
     "jsEngine": "hermes",
     "message": "OTA-6 rv4.0.0: layout Music (libreria in cima, MiniPlayer inline top, stop player), radio fix (toggle Last.fm persistente, stazioni cliccabili con haptic+spinner)",
     "note": "Task #505+#506. #505: BraniTab libreria in cima; InlineMiniPlayer sopra header Musica con play/pause/stop; spazio ridotto (marginTop 4); MiniPlayer globale nascosto su /music. stop() aggiunto a PlayerContext. #506: toggle Last.fm persistente AsyncStorage; stazioni: haptic, spinner, guard URL, alert errore audio. CURRENT_OTA_NUMBER=6.",
-    "releaseId": null,
-    "bundleUrl": null,
-    "updateGroupId": null,
-    "androidUpdateId": null,
+    "releaseId": "6b75be0c-f978-4ed2-bd43-165f9bab1c84",
+    "bundleUrl": "private/ota/ota-1.6.0-1775911993493.js",
+    "updateGroupId": "9cb37650-3824-4cbb-a662-0696a6be7b92",
+    "androidUpdateId": "019d7c9b-24b4-7cf4-b87d-074ff13a2f5b",
     "iosUpdateId": null,
-    "commitBase": "535623c45d4002f3995fe0812eca7000528424fd",
-    "easDashboard": null,
+    "commitBase": "23d8ec44fab0ca66d4634a7ff89d81c044fd9328",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/9cb37650-3824-4cbb-a662-0696a6be7b92",
     "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
-    "status": "pending"
+    "status": "published"
   }
 ]
