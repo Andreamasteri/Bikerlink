@@ -8,6 +8,13 @@ import React, {
 } from "react";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type RNTrackPlayer from "react-native-track-player";
+import type {
+  Capability as CapabilityType,
+  State as StateType,
+  Event as EventType,
+  RepeatMode as RepeatModeType,
+} from "react-native-track-player";
 
 export type PlayerSource = "radio" | "library" | "file" | "preview";
 export type RepeatMode = "off" | "track" | "queue";
@@ -74,11 +81,11 @@ const PlayerContext = createContext<PlayerContextType | null>(null);
 const FAVORITES_KEY = "player_favorite_stations";
 const SLEEP_KEY = "player_sleep_timer";
 
-let TrackPlayer: any = null;
-let Capability: any = null;
-let State: any = null;
-let Event: any = null;
-let RepeatModeRNTP: any = null;
+let TrackPlayer: typeof RNTrackPlayer | null = null;
+let Capability: typeof CapabilityType | null = null;
+let State: typeof StateType | null = null;
+let Event: typeof EventType | null = null;
+let RepeatModeRNTP: typeof RepeatModeType | null = null;
 let playerReady = false;
 
 async function initTrackPlayer(): Promise<boolean> {
@@ -115,12 +122,13 @@ async function initTrackPlayer(): Promise<boolean> {
         Capability.SkipToNext,
         Capability.SkipToPrevious,
       ],
-      progressUpdateEventThrottle: 1000,
+      progressUpdateEventInterval: 1000,
     });
 
     playerReady = true;
     return true;
-  } catch {
+  } catch (err) {
+    console.warn("[Player] initTrackPlayer error:", err);
     return false;
   }
 }

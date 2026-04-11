@@ -1096,7 +1096,7 @@ function SharedPlaylistCard({
       const tracksParam = encodeURIComponent(
         JSON.stringify(item.tracks.map((t) => ({ trackName: t.trackName, artistName: t.artistName })))
       );
-      const url = new URL(`/api/music/preview-playlist?tracks=${tracksParam}`, getApiUrl());
+      const url = new URL(`/api/music/radio/preview-playlist?tracks=${tracksParam}`, getApiUrl());
       const resp = await fetch(url.toString());
       if (!resp.ok) throw new Error("Errore nel caricamento");
       const previews: PreviewResult[] = await resp.json();

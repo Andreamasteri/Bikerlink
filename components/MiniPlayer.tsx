@@ -164,16 +164,16 @@ function RadioTab({
   const [useLastFm, setUseLastFm] = useState(false);
 
   const { data: genres = [] } = useQuery<Genre[]>({
-    queryKey: ["/api/music/genres"],
+    queryKey: ["/api/music/radio/genres"],
   });
 
   const { data: suggestedGenreIds = [] } = useQuery<string[]>({
-    queryKey: ["/api/music/suggested-genres"],
+    queryKey: ["/api/music/radio/suggested-genres"],
     enabled: useLastFm,
   });
 
   const { data: stations = [], isLoading: loadingStations } = useQuery<RadioStation[]>({
-    queryKey: ["/api/music/stations", selectedGenre],
+    queryKey: [selectedGenre ? `/api/music/radio/stations?genre=${selectedGenre}` : "/api/music/radio/stations"],
     enabled: !!selectedGenre,
   });
 
@@ -320,7 +320,8 @@ function LibraryTab({
         setAssets((prev) => (cursor ? [...prev, ...result.assets] : result.assets));
         setHasMore(result.hasNextPage);
         setEndCursor(result.endCursor);
-      } catch {
+      } catch (err) {
+        console.warn("[MiniPlayer] loadAssets error:", err);
         setHasMore(false);
       } finally {
         setLoading(false);
@@ -359,7 +360,8 @@ function LibraryTab({
           source: "file",
         });
       }
-    } catch {
+    } catch (err) {
+      console.warn("[MiniPlayer] pickFile error:", err);
       Alert.alert("Errore", "Impossibile aprire il file audio.");
     }
   }, [onPlayTrack]);

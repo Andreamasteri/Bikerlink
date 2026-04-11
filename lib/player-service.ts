@@ -53,7 +53,7 @@ export const PlaybackService = async function () {
         }
       }
     );
-  } catch {
-    // Graceful degradation: RNTP non disponibile (Expo Go, web)
+  } catch (err) {
+    console.warn("[PlaybackService] RNTP non disponibile (Expo Go / web):", err);
   }
 };

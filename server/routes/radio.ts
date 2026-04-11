@@ -137,9 +137,13 @@ router.get("/genres", (_req: Request, res: Response) => {
   res.json(CURATED_GENRES);
 });
 
-router.get("/stations/:genre", async (req: Request, res: Response) => {
-  const rawGenre = req.params.genre;
-  const genre = Array.isArray(rawGenre) ? rawGenre[0] : rawGenre;
+router.get("/stations", async (req: Request, res: Response) => {
+  const rawGenre = req.query.genre;
+  const genre = typeof rawGenre === "string"
+    ? rawGenre
+    : Array.isArray(rawGenre) && typeof rawGenre[0] === "string"
+    ? rawGenre[0]
+    : undefined;
   const limit = Math.min(Number(req.query.limit) || 20, 50);
 
   if (!genre) {

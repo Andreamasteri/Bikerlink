@@ -129,7 +129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/friends", friendsRoutes);
   app.use("/api/spotify", spotifyRoutes);
   app.use("/api/lastfm", lastfmRoutes);
-  app.use("/api/music", radioRoutes);
+  app.use("/api/music/radio", radioRoutes);
 
   app.get("/api/settings/music-provider", async (_req: Request, res: Response) => {
     try {
