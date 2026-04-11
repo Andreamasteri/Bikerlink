@@ -189,7 +189,7 @@ router.get("/preview", async (req: Request, res: Response) => {
 
   try {
     const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=music&limit=10&country=IT`;
-    const resp = await fetch(url, buildFetchInit({ userAgent: "BikerLink/4.0.0" }));
+    const resp = await fetch(url, buildFetchInit({ userAgent: "BikerLink/4.0.0", timeoutMs: 5000 }));
 
     if (!resp.ok) {
       return res.status(502).json({ error: "iTunes API error" });
@@ -211,8 +211,9 @@ router.get("/preview", async (req: Request, res: Response) => {
 
     return res.json(results);
   } catch (err) {
-    console.error("[radio] preview error:", err);
-    return res.status(502).json({ error: "Impossibile caricare la preview" });
+    const isTimeout = err instanceof Error && err.name === "AbortError";
+    console.error(`[radio] preview error${isTimeout ? " (timeout)" : ""}:`, err);
+    return res.status(504).json({ error: isTimeout ? "iTunes timeout" : "Impossibile caricare la preview" });
   }
 });
 

@@ -120,6 +120,18 @@ function formatDurationSecs(secs: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+function parseAudioFilename(filename: string): { title: string; artist: string } {
+  const base = (filename ?? "").replace(/\.[^.]+$/, "").trim();
+  const sep = " - ";
+  const idx = base.indexOf(sep);
+  if (idx > 0) {
+    const artist = base.substring(0, idx).trim();
+    const title = base.substring(idx + sep.length).trim();
+    if (artist && title) return { artist, title };
+  }
+  return { artist: "Locale", title: base || "Brano" };
+}
+
 function TelefonoTrackRow({
   asset,
   onPlay,
@@ -129,7 +141,7 @@ function TelefonoTrackRow({
 }) {
   const { currentTrack, isPlaying } = usePlayer();
   const isActive = currentTrack?.id === asset.id;
-  const title = (asset.filename ?? "").replace(/\.[^.]+$/, "") || "Brano";
+  const { title, artist } = parseAudioFilename(asset.filename ?? "");
   const dur = asset.duration ?? 0;
 
   return (
@@ -150,7 +162,7 @@ function TelefonoTrackRow({
           {title}
         </Text>
         <Text style={styles.trackArtist} numberOfLines={1}>
-          {dur > 0 ? formatDurationSecs(dur) : "File locale"}
+          {artist}{dur > 0 ? ` · ${formatDurationSecs(dur)}` : ""}
         </Text>
       </View>
       <Ionicons
@@ -202,12 +214,12 @@ function TelefonoTab() {
 
   const handlePlayTrack = useCallback((asset: MediaLibrary.Asset) => {
     if (!playerAvailable) return;
-    const title = (asset.filename ?? "").replace(/\.[^.]+$/, "") || "Brano";
+    const { title, artist } = parseAudioFilename(asset.filename ?? "");
     playTrack({
       id: asset.id,
       url: asset.uri,
       title,
-      artist: "Telefono",
+      artist,
       duration: asset.duration,
       source: "file",
     });
@@ -215,14 +227,10 @@ function TelefonoTab() {
 
   const handlePlayAll = useCallback(async () => {
     if (!playerAvailable || assets.length === 0) return;
-    const tracks: PlayerTrack[] = assets.map((a) => ({
-      id: a.id,
-      url: a.uri,
-      title: (a.filename ?? "").replace(/\.[^.]+$/, "") || "Brano",
-      artist: "Telefono",
-      duration: a.duration,
-      source: "file" as const,
-    }));
+    const tracks: PlayerTrack[] = assets.map((a) => {
+      const { title, artist } = parseAudioFilename(a.filename ?? "");
+      return { id: a.id, url: a.uri, title, artist, duration: a.duration, source: "file" as const };
+    });
     await playQueue(tracks, 0);
   }, [assets, playQueue, playerAvailable]);
 
@@ -1459,12 +1467,15 @@ function SearchTrackRow({
   const handlePlay = useCallback(async () => {
     if (!playerAvailable) return;
     setLoadingPreview(true);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
     try {
       const url = new URL(
         `/api/music/radio/preview?track=${encodeURIComponent(track.trackName)}&artist=${encodeURIComponent(track.artistName)}`,
         getApiUrl()
       );
-      const resp = await fetch(url.toString());
+      const resp = await fetch(url.toString(), { signal: controller.signal });
+      clearTimeout(timeout);
       if (!resp.ok) throw new Error("No preview");
       const results: PreviewResult[] = await resp.json();
       const preview = results[0];
@@ -1480,8 +1491,13 @@ function SearchTrackRow({
         duration: preview.durationMs ? preview.durationMs / 1000 : 30,
         source: "preview" as const,
       });
-    } catch {
-      Alert.alert("Anteprima non disponibile", "Questo brano non ha un'anteprima disponibile su iTunes.");
+    } catch (err: unknown) {
+      clearTimeout(timeout);
+      if (err instanceof Error && err.name === "AbortError") {
+        Alert.alert("Timeout", "L'anteprima non risponde. Controlla la connessione e riprova.");
+      } else {
+        Alert.alert("Anteprima non disponibile", "Questo brano non ha un'anteprima disponibile su iTunes.");
+      }
     } finally {
       setLoadingPreview(false);
     }
@@ -1558,12 +1574,15 @@ function LibraryTrackRow({
   const handlePlay = useCallback(async () => {
     if (!playerAvailable) return;
     setLoadingPreview(true);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
     try {
       const url = new URL(
         `/api/music/radio/preview?track=${encodeURIComponent(track.trackName)}&artist=${encodeURIComponent(track.artistName)}`,
         getApiUrl()
       );
-      const resp = await fetch(url.toString());
+      const resp = await fetch(url.toString(), { signal: controller.signal });
+      clearTimeout(timeout);
       if (!resp.ok) throw new Error("No preview");
       const results: PreviewResult[] = await resp.json();
       const preview = results[0];
@@ -1579,8 +1598,13 @@ function LibraryTrackRow({
         duration: preview.durationMs ? preview.durationMs / 1000 : 30,
         source: "preview" as const,
       });
-    } catch {
-      Alert.alert("Anteprima non disponibile", "Questo brano non ha un'anteprima disponibile su iTunes.");
+    } catch (err: unknown) {
+      clearTimeout(timeout);
+      if (err instanceof Error && err.name === "AbortError") {
+        Alert.alert("Timeout", "L'anteprima non risponde. Controlla la connessione e riprova.");
+      } else {
+        Alert.alert("Anteprima non disponibile", "Questo brano non ha un'anteprima disponibile su iTunes.");
+      }
     } finally {
       setLoadingPreview(false);
     }
