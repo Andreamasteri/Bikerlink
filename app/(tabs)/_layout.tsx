@@ -266,6 +266,17 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="eventi"
+          options={{
+            title: "Raduni",
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="calendar" size={size} color={color} />
+            ),
+            headerShown: false,
+            href: gpsTabHref,
+          }}
+        />
+        <Tabs.Screen
           name="match"
           options={{
             title: "Match",
@@ -284,17 +295,6 @@ export default function TabLayout() {
               <Ionicons name="musical-notes-outline" size={size} color={color} />
             ),
             headerTitle: "Musica",
-            href: gpsTabHref,
-          }}
-        />
-        <Tabs.Screen
-          name="eventi"
-          options={{
-            title: "Raduni",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="calendar" size={size} color={color} />
-            ),
-            headerShown: false,
             href: gpsTabHref,
           }}
         />

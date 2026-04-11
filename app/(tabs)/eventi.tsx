@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -11,13 +11,21 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
+import { getApiUrl } from "@/lib/query-client";
 import EventCard from "@/components/eventi/EventCard";
 import EventForm from "@/components/eventi/EventForm";
 import type { EventDTO, EventType } from "@/shared/event-types";
+
+interface EventsPage {
+  events: EventDTO[];
+  total: number;
+  page: number;
+  limit: number;
+}
 
 type FilterType = "tutti" | EventType;
 
@@ -36,16 +44,37 @@ export default function EventiScreen() {
   const [filter, setFilter] = useState<FilterType>("tutti");
   const [showForm, setShowForm] = useState(false);
 
-  const { data, isLoading, isRefetching, refetch } = useQuery<EventDTO[]>({
-    queryKey: ["/api/events"],
-    select: (d: unknown) => {
-      const raw = d as { events?: EventDTO[] } | EventDTO[];
-      const list = Array.isArray(raw) ? raw : (raw?.events ?? []);
-      return list.filter((e) => filter === "tutti" || e.eventType === filter);
+  const {
+    data,
+    isLoading,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage,
+    refetch,
+    isRefetching,
+  } = useInfiniteQuery<EventsPage>({
+    queryKey: ["/api/events", filter],
+    queryFn: async ({ pageParam = 1 }) => {
+      const url = new URL("/api/events", getApiUrl());
+      url.searchParams.set("page", String(pageParam));
+      url.searchParams.set("limit", "20");
+      if (filter !== "tutti") url.searchParams.set("type", filter);
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) throw new Error("Errore nel caricamento degli eventi");
+      return res.json();
     },
+    getNextPageParam: (last) => {
+      if (!last) return undefined;
+      const loaded = last.page * last.limit;
+      return loaded < last.total ? last.page + 1 : undefined;
+    },
+    initialPageParam: 1,
   });
 
-  const events = data ?? [];
+  const events = useMemo(
+    () => data?.pages.flatMap((p) => p.events) ?? [],
+    [data]
+  );
 
   const handleEventPress = useCallback(
     (id: string) => {
@@ -53,6 +82,10 @@ export default function EventiScreen() {
     },
     [router]
   );
+
+  const handleLoadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
@@ -103,10 +136,21 @@ export default function EventiScreen() {
           ]}
           refreshControl={
             <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={refetch}
+              refreshing={isRefetching && !isFetchingNextPage}
+              onRefresh={() => refetch()}
               tintColor={Colors.accent}
             />
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <ActivityIndicator
+                size="small"
+                color={Colors.accent}
+                style={{ marginVertical: 16 }}
+              />
+            ) : null
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>

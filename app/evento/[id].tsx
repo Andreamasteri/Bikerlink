@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -99,7 +100,8 @@ export default function EventoDetail() {
     enabled: !!id,
   });
 
-  const isAdmin = (user as any)?.role === "admin" || (user as any)?.role === "moderator";
+  const userRole = (user as { role?: string } | null)?.role;
+  const isAdmin = userRole === "admin" || userRole === "moderator";
   const isOwner = event?.creatorId === user?.id;
   const canManage = isOwner || isAdmin;
 
@@ -293,6 +295,35 @@ export default function EventoDetail() {
                 {(event.latitude && event.longitude) && (
                   <Ionicons name="open-outline" size={14} color={Colors.textSecondary} />
                 )}
+              </Pressable>
+            )}
+
+            {event.latitude != null && event.longitude != null && (
+              <Pressable style={styles.miniMapWrapper} onPress={handleOpenMap}>
+                <MapView
+                  provider={PROVIDER_DEFAULT}
+                  style={styles.miniMap}
+                  initialRegion={{
+                    latitude: event.latitude,
+                    longitude: event.longitude,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                  }}
+                  scrollEnabled={false}
+                  zoomEnabled={false}
+                  pitchEnabled={false}
+                  rotateEnabled={false}
+                  pointerEvents="none"
+                >
+                  <Marker
+                    coordinate={{ latitude: event.latitude, longitude: event.longitude }}
+                    pinColor={Colors.accent}
+                  />
+                </MapView>
+                <View style={styles.miniMapOverlay}>
+                  <Ionicons name="expand-outline" size={16} color="#fff" />
+                  <Text style={styles.miniMapOverlayText}>Apri mappa</Text>
+                </View>
               </Pressable>
             )}
 
@@ -622,5 +653,33 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
     color: Colors.text,
+  },
+  miniMapWrapper: {
+    marginTop: 8,
+    borderRadius: 12,
+    overflow: "hidden",
+    height: 160,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
+  },
+  miniMap: {
+    flex: 1,
+  },
+  miniMapOverlay: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  miniMapOverlayText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: "#fff",
   },
 });

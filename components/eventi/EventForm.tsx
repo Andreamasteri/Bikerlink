@@ -37,6 +37,8 @@ interface FormState {
   eventDate: string;
   eventTime: string;
   locationName: string;
+  latitude: string;
+  longitude: string;
   isRecurring: boolean;
   recurrenceInfo: string;
   maxParticipants: string;
@@ -53,6 +55,8 @@ const EMPTY_FORM: FormState = {
   eventDate: "",
   eventTime: "",
   locationName: "",
+  latitude: "",
+  longitude: "",
   isRecurring: false,
   recurrenceInfo: "",
   maxParticipants: "",
@@ -70,6 +74,8 @@ function toFormState(evt: EventDTO): FormState {
     eventDate: evt.eventDate ? evt.eventDate.substring(0, 10) : "",
     eventTime: evt.eventTime ?? "",
     locationName: evt.locationName ?? "",
+    latitude: evt.latitude != null ? String(evt.latitude) : "",
+    longitude: evt.longitude != null ? String(evt.longitude) : "",
     isRecurring: evt.isRecurring,
     recurrenceInfo: evt.recurrenceInfo ?? "",
     maxParticipants: evt.maxParticipants ? String(evt.maxParticipants) : "",
@@ -112,6 +118,8 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
         eventDate: form.eventDate,
         eventTime: form.eventTime.trim() || undefined,
         locationName: form.locationName.trim() || undefined,
+        latitude: form.latitude ? parseFloat(form.latitude) : undefined,
+        longitude: form.longitude ? parseFloat(form.longitude) : undefined,
         isRecurring: form.isRecurring,
         recurrenceInfo: form.isRecurring ? form.recurrenceInfo.trim() || undefined : undefined,
         maxParticipants: maxP && maxP > 0 ? maxP : undefined,
@@ -137,12 +145,17 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
           const formData = new FormData();
           const filename = uri.split("/").pop() ?? "image.jpg";
           formData.append("image", { uri, name: filename, type: "image/jpeg" } as unknown as Blob);
-          await fetch(`${getApiUrl()}/api/events/${evt.id}/images`, {
+          const imgRes = await fetch(`${getApiUrl()}/api/events/${evt.id}/images`, {
             method: "POST",
             body: formData,
             credentials: "include",
           });
-        } catch {}
+          if (!imgRes.ok) {
+            console.warn("[EventForm] Upload immagine fallito:", imgRes.status);
+          }
+        } catch (imgErr) {
+          console.error("[EventForm] Errore upload immagine:", imgErr);
+        }
       }
 
       return evt;
@@ -327,6 +340,26 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
             placeholder="Nome del luogo o indirizzo"
             placeholderTextColor={Colors.textSecondary}
           />
+
+          <Text style={styles.label}>Coordinate (opzionale)</Text>
+          <View style={styles.coordRow}>
+            <TextInput
+              style={[styles.input, styles.coordInput]}
+              value={form.latitude}
+              onChangeText={(v) => set("latitude", v)}
+              placeholder="Latitudine (es. 45.4642)"
+              placeholderTextColor={Colors.textSecondary}
+              keyboardType="decimal-pad"
+            />
+            <TextInput
+              style={[styles.input, styles.coordInput]}
+              value={form.longitude}
+              onChangeText={(v) => set("longitude", v)}
+              placeholder="Longitudine (es. 9.1900)"
+              placeholderTextColor={Colors.textSecondary}
+              keyboardType="decimal-pad"
+            />
+          </View>
 
           <Text style={styles.sectionTitle}>Dettagli evento</Text>
 
@@ -668,5 +701,12 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 16,
     color: "#000",
+  },
+  coordRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  coordInput: {
+    flex: 1,
   },
 });
