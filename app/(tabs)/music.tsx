@@ -1255,6 +1255,7 @@ function SearchTrackRow({
 }) {
   const [imgError, setImgError] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [liveArtwork, setLiveArtwork] = useState<string | null>(null);
   const { playTrack, isAvailable: playerAvailable, currentTrack, isPlaying } = usePlayer();
 
   const handlePlay = useCallback(async () => {
@@ -1268,6 +1269,7 @@ function SearchTrackRow({
       const resp = await fetch(url.toString());
       if (!resp.ok) throw new Error("No preview");
       const preview: PreviewResult = await resp.json();
+      if (preview.artworkUrl) setLiveArtwork(preview.artworkUrl);
       await playTrack({
         id: preview.trackId,
         url: preview.previewUrl,
@@ -1290,10 +1292,12 @@ function SearchTrackRow({
     currentTrack?.artist === track.artistName &&
     isPlaying;
 
+  const displayUrl = liveArtwork ?? track.imageUrl ?? null;
+
   return (
     <View style={styles.trackRow}>
-      {track.imageUrl && !imgError ? (
-        <Image source={{ uri: track.imageUrl }} style={styles.albumArt} onError={() => setImgError(true)} />
+      {displayUrl && !imgError ? (
+        <Image source={{ uri: displayUrl }} style={styles.albumArt} onError={() => setImgError(true)} />
       ) : (
         <View style={[styles.albumArt, styles.albumArtPlaceholder]}>
           <Ionicons name="musical-notes" size={16} color={Colors.accent} />
@@ -1348,6 +1352,7 @@ function LibraryTrackRow({
 }) {
   const [imgError, setImgError] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [liveArtwork, setLiveArtwork] = useState<string | null>(null);
   const { playTrack, isAvailable: playerAvailable, currentTrack, isPlaying } = usePlayer();
 
   const handlePlay = useCallback(async () => {
@@ -1361,6 +1366,7 @@ function LibraryTrackRow({
       const resp = await fetch(url.toString());
       if (!resp.ok) throw new Error("No preview");
       const preview: PreviewResult = await resp.json();
+      if (preview.artworkUrl) setLiveArtwork(preview.artworkUrl);
       await playTrack({
         id: preview.trackId,
         url: preview.previewUrl,
@@ -1383,10 +1389,12 @@ function LibraryTrackRow({
     currentTrack?.artist === track.artistName &&
     isPlaying;
 
+  const displayUrl = liveArtwork ?? track.imageUrl ?? null;
+
   return (
     <View style={styles.trackRow}>
-      {track.imageUrl && !imgError ? (
-        <Image source={{ uri: track.imageUrl }} style={styles.albumArt} onError={() => setImgError(true)} />
+      {displayUrl && !imgError ? (
+        <Image source={{ uri: displayUrl }} style={styles.albumArt} onError={() => setImgError(true)} />
       ) : (
         <View style={[styles.albumArt, styles.albumArtPlaceholder]}>
           <Ionicons name="musical-notes" size={16} color={Colors.accent} />
