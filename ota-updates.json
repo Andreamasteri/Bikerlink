@@ -1187,7 +1187,7 @@
     "updateGroupId": null,
     "androidUpdateId": null,
     "iosUpdateId": null,
-    "commitBase": null,
+    "commitBase": "d10bd54b4eef2bb9336cca3a641326e9986d6415",
     "easDashboard": null,
     "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
     "apkVersionCode": 10,
