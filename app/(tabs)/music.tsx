@@ -491,7 +491,7 @@ function MusicRadioTab() {
 const radioTabStyles = StyleSheet.create({
   content: {
     paddingHorizontal: 16,
-    paddingBottom: 32,
+    paddingBottom: 16,
   },
   lastFmRow: {
     flexDirection: "row" as const,
@@ -606,6 +606,64 @@ const radioTabStyles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "center" as const,
     paddingHorizontal: 24,
+  },
+});
+
+function InlineMiniPlayer() {
+  const { currentTrack, isPlaying, togglePlay } = usePlayer();
+  if (!currentTrack) return null;
+  return (
+    <View style={inlineMiniPlayerStyles.container}>
+      <View style={inlineMiniPlayerStyles.info}>
+        <Ionicons name="musical-note" size={14} color={Colors.accent} style={{ marginRight: 6 }} />
+        <Text style={inlineMiniPlayerStyles.title} numberOfLines={1}>
+          {currentTrack.title}
+        </Text>
+        {currentTrack.artist ? (
+          <Text style={inlineMiniPlayerStyles.artist} numberOfLines={1}>
+            {" · "}{currentTrack.artist}
+          </Text>
+        ) : null}
+      </View>
+      <TouchableOpacity
+        onPress={togglePlay}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Ionicons name={isPlaying ? "pause-circle" : "play-circle"} size={28} color={Colors.accent} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const inlineMiniPlayerStyles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  info: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    overflow: "hidden",
+    marginRight: 8,
+  },
+  title: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+    flexShrink: 1,
+  },
+  artist: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    flexShrink: 1,
   },
 });
 
@@ -985,6 +1043,7 @@ export default function MusicScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: topPadding }]}>
+      <InlineMiniPlayer />
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Ionicons name="musical-notes" size={24} color={providerColor} />
@@ -1391,65 +1450,6 @@ function BraniTab({
 
   return (
     <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-      <View style={styles.searchBarWrapper}>
-        <Ionicons name="search" size={18} color={Colors.textSecondary} style={{ marginRight: 8 }} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder={isLastfm ? "Cerca brani su Last.fm…" : "Cerca brani su Spotify…"}
-          placeholderTextColor={Colors.textSecondary}
-          value={searchInput}
-          onChangeText={onSearchChange}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-          autoCorrect={false}
-          autoCapitalize="none"
-        />
-        {searchInput.length > 0 && Platform.OS !== "ios" && (
-          <TouchableOpacity onPress={() => onSearchChange("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {debouncedQuery.length >= 2 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Risultati di ricerca</Text>
-          {searchLoading ? (
-            <ActivityIndicator color={Colors.accent} style={{ marginVertical: 20 }} />
-          ) : searchNeedsReconnect ? (
-            <View style={styles.reconnectBox}>
-              <Ionicons name={isLastfm ? "radio" : "musical-notes"} size={32} color={providerColor} style={{ marginBottom: 8 }} />
-              <Text style={styles.reconnectText}>La sessione {providerName} è scaduta.</Text>
-              <TouchableOpacity
-                style={[styles.connectBtn, { backgroundColor: providerColor, marginTop: 12 }]}
-                onPress={onConnect}
-                disabled={isConnecting}
-              >
-                {isConnecting ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.connectBtnText}>Riconnetti {providerName}</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          ) : searchError !== null ? (
-            <Text style={styles.emptyText}>{searchError}</Text>
-          ) : searchResults.length === 0 ? (
-            <Text style={styles.emptyText}>Nessun risultato per "{debouncedQuery}"</Text>
-          ) : (
-            searchResults.map((track) => (
-              <SearchTrackRow
-                key={track.spotifyTrackId}
-                track={track}
-                isAdded={savedIds.has(track.spotifyTrackId)}
-                isAdding={pendingAddId === track.spotifyTrackId}
-                onAdd={onAdd}
-              />
-            ))
-          )}
-        </View>
-      )}
-
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
@@ -1531,6 +1531,65 @@ function BraniTab({
           ))
         )}
       </View>
+
+      <View style={styles.searchBarWrapper}>
+        <Ionicons name="search" size={18} color={Colors.textSecondary} style={{ marginRight: 8 }} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder={isLastfm ? "Cerca brani su Last.fm…" : "Cerca brani su Spotify…"}
+          placeholderTextColor={Colors.textSecondary}
+          value={searchInput}
+          onChangeText={onSearchChange}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+          autoCorrect={false}
+          autoCapitalize="none"
+        />
+        {searchInput.length > 0 && Platform.OS !== "ios" && (
+          <TouchableOpacity onPress={() => onSearchChange("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {debouncedQuery.length >= 2 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Risultati di ricerca</Text>
+          {searchLoading ? (
+            <ActivityIndicator color={Colors.accent} style={{ marginVertical: 20 }} />
+          ) : searchNeedsReconnect ? (
+            <View style={styles.reconnectBox}>
+              <Ionicons name={isLastfm ? "radio" : "musical-notes"} size={32} color={providerColor} style={{ marginBottom: 8 }} />
+              <Text style={styles.reconnectText}>La sessione {providerName} è scaduta.</Text>
+              <TouchableOpacity
+                style={[styles.connectBtn, { backgroundColor: providerColor, marginTop: 12 }]}
+                onPress={onConnect}
+                disabled={isConnecting}
+              >
+                {isConnecting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.connectBtnText}>Riconnetti {providerName}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : searchError !== null ? (
+            <Text style={styles.emptyText}>{searchError}</Text>
+          ) : searchResults.length === 0 ? (
+            <Text style={styles.emptyText}>Nessun risultato per "{debouncedQuery}"</Text>
+          ) : (
+            searchResults.map((track) => (
+              <SearchTrackRow
+                key={track.spotifyTrackId}
+                track={track}
+                isAdded={savedIds.has(track.spotifyTrackId)}
+                isAdding={pendingAddId === track.spotifyTrackId}
+                onAdd={onAdd}
+              />
+            ))
+          )}
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -2322,7 +2381,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginHorizontal: 16,
-    marginTop: 14,
+    marginTop: 4,
     marginBottom: 4,
     backgroundColor: Colors.surface,
     borderRadius: 12,
@@ -2340,7 +2399,7 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: 16,
-    marginTop: 16,
+    marginTop: 4,
   },
   sectionHeader: {
     flexDirection: "row",

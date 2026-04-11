@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Tabs, useRouter, type Href } from "expo-router";
+import { Tabs, useRouter, usePathname, type Href } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { Platform, View, Pressable, Text, StyleSheet, Linking, Modal } from "react-native";
@@ -15,6 +15,7 @@ import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const pathname = usePathname();
   const { user, isLoading } = useAuth();
   const { isGpsGateActive, requestPermission } = useLocationGate();
   const { taskbarStyle } = useTaskbarStyle();
@@ -167,10 +168,11 @@ export default function TabLayout() {
   };
 
   const miniPlayerBottom = tabBarHeight + 8;
+  const isMusicScreen = pathname === "/music" || pathname.includes("/music");
 
   return (
     <>
-      <MiniPlayer bottomOffset={miniPlayerBottom} />
+      {!isMusicScreen && <MiniPlayer bottomOffset={miniPlayerBottom} />}
       {isGpsGateActive && (
         <View style={[gpsBannerStyles.banner, { paddingTop: Platform.OS === "web" ? 67 + 12 : insets.top + 12 }]}>
           <Ionicons name="navigate-outline" size={28} color="#fff" />
