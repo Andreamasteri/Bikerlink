@@ -56,6 +56,7 @@ interface PlayerState {
 interface PlayerContextType extends PlayerState {
   play: () => void;
   pause: () => void;
+  stop: () => void;
   togglePlay: () => void;
   playTrack: (track: PlayerTrack) => void;
   playQueue: (tracks: PlayerTrack[], startIndex?: number) => void;
@@ -211,6 +212,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (isPlayingRef.current) pause(); else play();
   }, [play, pause]);
 
+  const stop = useCallback(async () => {
+    try {
+      await soundRef.current?.stopAsync();
+      await soundRef.current?.unloadAsync();
+      soundRef.current = null;
+    } catch {}
+    setCurrentTrack(null);
+    setQueue([]);
+    queueRef.current = [];
+    setIsPlaying(false);
+    isPlayingRef.current = false;
+    setPosition(0);
+    setDuration(0);
+  }, []);
+
   const playTrack = useCallback(async (track: PlayerTrack) => {
     setQueue([track]);
     queueRef.current = [track];
@@ -317,6 +333,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     repeatMode,
     play,
     pause,
+    stop,
     togglePlay,
     playTrack,
     playQueue,

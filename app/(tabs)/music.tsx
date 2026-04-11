@@ -610,7 +610,7 @@ const radioTabStyles = StyleSheet.create({
 });
 
 function InlineMiniPlayer() {
-  const { currentTrack, isPlaying, togglePlay } = usePlayer();
+  const { currentTrack, isPlaying, togglePlay, stop } = usePlayer();
   if (!currentTrack) return null;
   return (
     <View style={inlineMiniPlayerStyles.container}>
@@ -625,12 +625,21 @@ function InlineMiniPlayer() {
           </Text>
         ) : null}
       </View>
-      <TouchableOpacity
-        onPress={togglePlay}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Ionicons name={isPlaying ? "pause-circle" : "play-circle"} size={28} color={Colors.accent} />
-      </TouchableOpacity>
+      <View style={inlineMiniPlayerStyles.controls}>
+        <TouchableOpacity
+          onPress={togglePlay}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name={isPlaying ? "pause" : "play"} size={22} color={Colors.accent} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={stop}
+          style={{ marginLeft: 12 }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="stop" size={22} color={Colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -664,6 +673,10 @@ const inlineMiniPlayerStyles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     flexShrink: 1,
+  },
+  controls: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
   },
 });
 
