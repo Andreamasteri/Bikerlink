@@ -1045,6 +1045,15 @@ export default function MusicScreen() {
         ))}
       </ScrollView>
 
+      {musicProvider === "lastfm" && statusQuery.data?.connected === false && (
+        <View style={lastfmBannerStyles.banner}>
+          <Ionicons name="warning-outline" size={18} color="#92400e" style={{ marginRight: 8, flexShrink: 0 }} />
+          <Text style={lastfmBannerStyles.text}>
+            Attenzione! La prima autenticazione su Last.fm richiede qualche manciata di secondi... portate pazienza, la finestra del browser si chiuderà da sola quando avrà terminato.
+          </Text>
+        </View>
+      )}
+
       {activeTab === "brani" && (
         <BraniTab
           provider={musicProvider}
@@ -2852,5 +2861,27 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_500Medium",
     color: Colors.text,
+  },
+});
+
+const lastfmBannerStyles = StyleSheet.create({
+  banner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#fef3c7",
+    borderLeftWidth: 4,
+    borderLeftColor: "#f59e0b",
+    marginHorizontal: 12,
+    marginVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 6,
+  },
+  text: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "#92400e",
+    lineHeight: 18,
   },
 });
