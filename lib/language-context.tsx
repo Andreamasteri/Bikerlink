@@ -4,7 +4,7 @@ import { type AppLanguage, setAppLanguage, getAppLanguage, tWithLang, langToLoca
 
 const STORAGE_KEY = "@bikerlink_language";
 
-const VALID_LANGS: AppLanguage[] = ["it", "en", "de", "es", "fr"];
+const VALID_LANGS: AppLanguage[] = ["it", "en", "de", "es", "fr", "tr"];
 
 interface LanguageContextType {
   language: AppLanguage;
