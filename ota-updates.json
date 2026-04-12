@@ -1423,5 +1423,28 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 17,
+    "version": "1.17.0",
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-17 rv4.0.0: Music BraniTab 5 fix UI + Trip InlineMiniPlayer in cima (#544-#545)",
+    "note": "Task #544: rimosso 'Tutta la playlist', tasto inoltro nella card, tasto uscita a dx di Google (+15%), tab bar -10px, nota 30'' fix wrap+font+15%. Task #545: InlineMiniPlayer posizione assoluta in cima al tab Trip (top:0 zIndex:10, ScrollView paddingTop 16→56). CURRENT_OTA_NUMBER=17.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "PENDING",
+    "easDashboard": null,
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "pending"
   }
 ]
