@@ -3258,8 +3258,8 @@ router.post("/translations/export", async (req: Request, res: Response) => {
 
     const spreadsheetTitle = `BikerLink Traduzioni ${new Date().toISOString().slice(0, 10)}`;
 
-    const headers = ["Chiave", "Posizione nell'app", "IT (fonte)", ...langs.map((l) => `${l.toUpperCase()}`)];
-    const rows = Object.entries(keyMap).map(([key, val]) => {
+    const csvHeaders = ["Chiave", "Posizione nell'app", "IT (fonte)", ...langs.map((l) => l.toUpperCase())];
+    const csvRows = Object.entries(keyMap).map(([key, val]) => {
       const row: string[] = [key, val.position, val.it];
       for (const _ of langs) {
         row.push("");
@@ -3267,52 +3267,54 @@ router.post("/translations/export", async (req: Request, res: Response) => {
       return row;
     });
 
-    const createBody = {
-      properties: { title: spreadsheetTitle },
-      sheets: [
-        {
-          properties: { title: "Traduzioni", sheetId: 0 },
-          data: [
-            {
-              startRow: 0,
-              startColumn: 0,
-              rowData: [
-                {
-                  values: headers.map((h) => ({
-                    userEnteredValue: { stringValue: h },
-                    userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.2, green: 0.6, blue: 0.9 } },
-                  })),
-                },
-                ...rows.map((row) => ({
-                  values: row.map((cell) => ({ userEnteredValue: { stringValue: cell } })),
-                })),
-              ],
-            },
-          ],
-        },
-      ],
-    };
+    function csvEscape(value: string): string {
+      if (value.includes(",") || value.includes('"') || value.includes("\n") || value.includes("\r")) {
+        return '"' + value.replace(/"/g, '""') + '"';
+      }
+      return value;
+    }
 
-    const createResp = await connectors.proxy("google-drive", "/v4/spreadsheets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(createBody),
-    });
+    const csvLines = [csvHeaders, ...csvRows]
+      .map((row) => row.map(csvEscape).join(","))
+      .join("\r\n");
+
+    const boundary = `drive_boundary_${Date.now()}`;
+    const multipartBody = [
+      `--${boundary}`,
+      "Content-Type: application/json; charset=UTF-8",
+      "",
+      JSON.stringify({ name: spreadsheetTitle, mimeType: "application/vnd.google-apps.spreadsheet" }),
+      `--${boundary}`,
+      "Content-Type: text/csv; charset=UTF-8",
+      "",
+      csvLines,
+      `--${boundary}--`,
+    ].join("\r\n");
+
+    const createResp = await connectors.proxy(
+      "google-drive",
+      "/upload/drive/v3/files?uploadType=multipart",
+      {
+        method: "POST",
+        headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
+        body: multipartBody,
+      }
+    );
 
     if (!createResp.ok) {
       const errText = await createResp.text();
-      console.error("[translations/export] Sheets create error:", errText);
+      console.error("[translations/export] Drive create error:", errText);
       return res.status(500).json({ message: "Errore nella creazione del Google Sheet" });
     }
 
-    const sheet = await createResp.json() as { spreadsheetId: string; spreadsheetUrl: string };
+    const driveFile = await createResp.json() as { id: string; name: string };
 
-    TRANSLATIONS_STAGING.exportedFileId = sheet.spreadsheetId;
+    TRANSLATIONS_STAGING.exportedFileId = driveFile.id;
     TRANSLATIONS_STAGING.exportedLangs = langs;
 
     return res.json({
-      fileId: sheet.spreadsheetId,
-      fileUrl: `https://docs.google.com/spreadsheets/d/${sheet.spreadsheetId}/edit`,
+      fileId: driveFile.id,
+      fileUrl: `https://docs.google.com/spreadsheets/d/${driveFile.id}/edit`,
       langs,
       message: `Sheet creato con ${Object.keys(keyMap).length} stringhe e colonne: ${langs.join(", ")}`,
     });
@@ -3361,20 +3363,75 @@ router.post("/translations/import", async (req: Request, res: Response) => {
     const { ReplitConnectors } = await import("@replit/connectors-sdk");
     const connectors = new ReplitConnectors();
 
-    const rangeResp = await connectors.proxy(
+    const exportResp = await connectors.proxy(
       "google-drive",
-      `/v4/spreadsheets/${exportedFileId}/values/Traduzioni`,
+      `/drive/v3/files/${exportedFileId}/export?mimeType=text/csv`,
       { method: "GET" }
     );
 
-    if (!rangeResp.ok) {
-      const errText = await rangeResp.text();
+    if (!exportResp.ok) {
+      const errText = await exportResp.text();
       console.error("[translations/import] read error:", errText);
       return res.status(500).json({ message: "Errore nella lettura del Google Sheet" });
     }
 
-    const sheetData = await rangeResp.json() as { values?: string[][] };
-    const allRows = sheetData.values || [];
+    const csvText = await exportResp.text();
+
+    function parseCsv(text: string): string[][] {
+      const rows: string[][] = [];
+      let row: string[] = [];
+      let field = "";
+      let inQuotes = false;
+      let i = 0;
+      while (i < text.length) {
+        const ch = text[i];
+        if (inQuotes) {
+          if (ch === '"') {
+            if (text[i + 1] === '"') {
+              field += '"';
+              i += 2;
+            } else {
+              inQuotes = false;
+              i++;
+            }
+          } else {
+            field += ch;
+            i++;
+          }
+        } else {
+          if (ch === '"') {
+            inQuotes = true;
+            i++;
+          } else if (ch === ',') {
+            row.push(field);
+            field = "";
+            i++;
+          } else if (ch === '\r' && text[i + 1] === '\n') {
+            row.push(field);
+            field = "";
+            if (row.some((f) => f !== "")) rows.push(row);
+            row = [];
+            i += 2;
+          } else if (ch === '\n') {
+            row.push(field);
+            field = "";
+            if (row.some((f) => f !== "")) rows.push(row);
+            row = [];
+            i++;
+          } else {
+            field += ch;
+            i++;
+          }
+        }
+      }
+      if (field !== "" || row.length > 0) {
+        row.push(field);
+        if (row.some((f) => f !== "")) rows.push(row);
+      }
+      return rows;
+    }
+
+    const allRows = parseCsv(csvText);
 
     if (allRows.length < 2) {
       return res.status(400).json({ message: "Il foglio è vuoto o mancano le righe" });
