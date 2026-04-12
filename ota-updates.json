@@ -1502,16 +1502,16 @@
     "jsEngine": "hermes",
     "message": "OTA-20 rv4.0.0: InlineMiniPlayer in cima a tutti i tab rimanenti, floating MiniPlayer rimosso (#548)",
     "note": "InlineMiniPlayer aggiunto in cima a: Ride (ready.tsx), Club (motoclub.tsx), Raduni (eventi.tsx), Match (match.tsx), Chat (chat.tsx), Pic (contest.tsx), Profilo (profile.tsx). Floating MiniPlayer rimosso da _layout.tsx (import + rendering). CURRENT_OTA_NUMBER=20.",
-    "releaseId": null,
-    "bundleUrl": null,
-    "updateGroupId": null,
-    "androidUpdateId": null,
+    "releaseId": "13bd03a5-f0af-45f3-a5b8-a2af9831720e",
+    "bundleUrl": "private/ota/ota-1.20.0-1776004728883.js",
+    "updateGroupId": "1fb82670-109f-4326-a1bf-f729edc00e32",
+    "androidUpdateId": "019d8222-912f-7dbe-b717-3850a4114db1",
     "iosUpdateId": null,
     "commitBase": "d674b0c",
-    "easDashboard": null,
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/1fb82670-109f-4326-a1bf-f729edc00e32",
     "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
-    "status": "pending"
+    "status": "published"
   }
 ]
