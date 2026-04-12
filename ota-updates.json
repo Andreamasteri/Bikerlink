@@ -1377,5 +1377,28 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 15,
+    "version": "1.15.0",
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-15 rv4.0.0: Fix MiniPlayer sopra tab bar, Music Tab espandi libreria Last.fm (#537-#538)",
+    "note": "Task #537: floating MiniPlayer usa sempre tabBarHeight+8 come offset su tutte le schermate (eccetto mappa e music). Task #538: tab music compatto quando Last.fm connesso, libreria espansa, nessun gap vuoto. CURRENT_OTA_NUMBER=15.",
+    "releaseId": "c7c8bc31-7df3-4622-b8f5-ea74e289c192",
+    "bundleUrl": "private/ota/ota-1.15.0-1775984949304.js",
+    "updateGroupId": "004c7cd5-d71a-43ca-b846-0fd9491ed364",
+    "androidUpdateId": "019d80f4-c5bb-7396-b205-c2c87fb4d7cb",
+    "iosUpdateId": null,
+    "commitBase": "f2a6f3f7c17afce5a1cb5f53b2ef707ed3764d47",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/004c7cd5-d71a-43ca-b846-0fd9491ed364",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "published"
   }
 ]
