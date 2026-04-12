@@ -576,12 +576,14 @@ export default function TrackingScreen() {
 
   return (
     <View style={styles.container}>
-      <InlineMiniPlayer />
+      <View style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 10 }}>
+        <InlineMiniPlayer />
+      </View>
       <ScrollView
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: 16,
+            paddingTop: 56,
             paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16,
           },
         ]}
