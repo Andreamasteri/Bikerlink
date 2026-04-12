@@ -1127,6 +1127,17 @@ export const userLastfmSessions = pgTable("user_lastfm_sessions", {
 export type UserLastfmSession = typeof userLastfmSessions.$inferSelect;
 export type InsertUserLastfmSession = typeof userLastfmSessions.$inferInsert;
 
+export const userPlaylistSnapshots = pgTable("user_playlist_snapshots", {
+  userId: varchar("user_id", { length: 36 })
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tracksJson: jsonb("tracks_json").notNull(),
+  savedAt: timestamp("saved_at").notNull().defaultNow(),
+});
+
+export type UserPlaylistSnapshot = typeof userPlaylistSnapshots.$inferSelect;
+export type InsertUserPlaylistSnapshot = typeof userPlaylistSnapshots.$inferInsert;
+
 export const sharedPlaylists = pgTable("shared_playlists", {
   id: serial("id").primaryKey(),
   fromUserId: varchar("from_user_id", { length: 36 })

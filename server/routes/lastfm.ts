@@ -5,6 +5,7 @@ import { storage } from "../storage";
 import {
   userLastfmSessions,
   userMusicTracks,
+  userPlaylistSnapshots,
   sharedPlaylists,
   messages,
   conversationParticipants,
@@ -127,6 +128,54 @@ async function syncLastfmTracks(userId: string, sessionKey: string, username: st
     }
   }
 
+  if (synced === 0) {
+    try {
+      const [snapshot] = await db
+        .select()
+        .from(userPlaylistSnapshots)
+        .where(eq(userPlaylistSnapshots.userId, userId))
+        .limit(1);
+
+      if (snapshot && Array.isArray(snapshot.tracksJson) && (snapshot.tracksJson as unknown[]).length > 0) {
+        const snapshotTracks = snapshot.tracksJson as Array<{
+          spotifyTrackId: string;
+          trackName: string;
+          artistId: string;
+          artistName: string;
+          albumName?: string | null;
+          imageUrl?: string | null;
+          genres?: string[];
+          popularity?: number;
+          provider?: string;
+        }>;
+        for (const st of snapshotTracks) {
+          try {
+            await db
+              .insert(userMusicTracks)
+              .values({
+                userId,
+                spotifyTrackId: st.spotifyTrackId,
+                trackName: st.trackName,
+                artistId: st.artistId,
+                artistName: st.artistName,
+                albumName: st.albumName ?? null,
+                imageUrl: st.imageUrl ?? null,
+                genres: st.genres ?? [],
+                popularity: st.popularity ?? 0,
+                provider: st.provider ?? "lastfm",
+              })
+              .onConflictDoNothing();
+            synced++;
+          } catch {
+          }
+        }
+        console.log(`[Last.fm] syncLastfmTracks: 0 from API, restored ${synced} tracks from snapshot for user ${userId}`);
+      }
+    } catch (e) {
+      console.warn("[Last.fm] syncLastfmTracks snapshot restore error:", e);
+    }
+  }
+
   return synced;
 }
 
@@ -208,9 +257,6 @@ router.post("/disconnect", requireAuth, async (req: Request, res: Response) => {
   const userId = req.session.userId!;
   try {
     await db.delete(userLastfmSessions).where(eq(userLastfmSessions.userId, userId));
-    await db
-      .delete(userMusicTracks)
-      .where(and(eq(userMusicTracks.userId, userId), eq(userMusicTracks.provider, "lastfm")));
     return res.json({ disconnected: true });
   } catch (err) {
     console.error("[Last.fm disconnect]", err);

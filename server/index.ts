@@ -707,6 +707,18 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] user_lastfm_sessions:", e);
         }
 
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS user_playlist_snapshots (
+              user_id VARCHAR(36) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+              tracks_json JSONB NOT NULL,
+              saved_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+          `);
+        } catch (e) {
+          console.warn("[MIGRATION] user_playlist_snapshots:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 
@@ -820,6 +832,54 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[INIT] initMissingClubConversations deferred error:", e);
         }
         console.log("[INIT] Phase 6 club conversation sync done");
+
+        // Phase 7: start 6h playlist snapshot job
+        const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+        const runPlaylistSnapshot = async () => {
+          try {
+            const { db: dbSnap } = await import("./db");
+            const { userMusicTracks: umt, userPlaylistSnapshots } = await import("@shared/schema");
+            const { sql: sqlSnap, eq: eqSnap } = await import("drizzle-orm");
+
+            const usersWithTracks = await dbSnap.execute(
+              sqlSnap`SELECT DISTINCT user_id FROM user_music_tracks`
+            );
+            let saved = 0;
+            for (const row of usersWithTracks.rows as Array<{ user_id: string }>) {
+              try {
+                const tracks = await dbSnap.select().from(umt).where(eqSnap(umt.userId, row.user_id));
+                if (tracks.length === 0) continue;
+                const tracksJson = tracks.map((t) => ({
+                  spotifyTrackId: t.spotifyTrackId,
+                  trackName: t.trackName,
+                  artistId: t.artistId,
+                  artistName: t.artistName,
+                  albumName: t.albumName,
+                  imageUrl: t.imageUrl,
+                  genres: t.genres,
+                  popularity: t.popularity,
+                  provider: t.provider,
+                }));
+                await dbSnap
+                  .insert(userPlaylistSnapshots)
+                  .values({ userId: row.user_id, tracksJson, savedAt: new Date() })
+                  .onConflictDoUpdate({
+                    target: [userPlaylistSnapshots.userId],
+                    set: { tracksJson, savedAt: new Date() },
+                  });
+                saved++;
+              } catch (userErr) {
+                console.warn(`[SNAPSHOT] error for user ${row.user_id}:`, userErr);
+              }
+            }
+            console.log(`[SNAPSHOT] Playlist snapshot saved for ${saved} users`);
+          } catch (e) {
+            console.warn("[SNAPSHOT] runPlaylistSnapshot error:", e);
+          }
+        };
+        await runPlaylistSnapshot();
+        setInterval(runPlaylistSnapshot, SIX_HOURS_MS);
+        console.log("[INIT] Phase 7 playlist snapshot job started (every 6h)");
       })().catch((err) => {
         console.error("[INIT] Startup phase chain error:", err);
         initState.initializing = false;

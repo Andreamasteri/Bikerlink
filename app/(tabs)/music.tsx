@@ -683,15 +683,15 @@ export default function MusicScreen() {
     if (!otherUser) return;
     setSendingToConv(conv.id);
     try {
-      const res = await apiRequest("POST", "/api/spotify/share-playlist", {
+      const res = await apiRequest("POST", "/api/lastfm/share-playlist", {
         toUserId: otherUser.id,
         conversationId: conv.id,
       });
       const body = await res.json();
       if (!res.ok) {
         const msg = (body as { message?: string }).message ?? "Errore";
-        if (msg.toLowerCase().includes("nessuna traccia")) {
-          Alert.alert("Libreria vuota", "Connetti prima Spotify e sincronizza i tuoi brani per poterli condividere.");
+        if (msg.toLowerCase().includes("nessuna traccia") || msg.toLowerCase().includes("nessun brano")) {
+          Alert.alert("Libreria vuota", "Connetti prima Last.fm e sincronizza i tuoi brani per poterli condividere.");
         } else {
           Alert.alert("Errore", msg);
         }
