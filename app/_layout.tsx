@@ -75,8 +75,13 @@ async function sendLocationUpdate() {
     } else {
       const { status } = await Location.getForegroundPermissionsAsync();
       if (status === "granted") {
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+        const loc = await Promise.race([
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 10000)),
+        ]);
+        if (loc) {
+          coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+        }
       }
     }
     if (coords) {

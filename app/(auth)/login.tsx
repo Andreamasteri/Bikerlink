@@ -27,6 +27,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogin = async () => {
     setError("");
@@ -34,15 +35,21 @@ export default function LoginScreen() {
       setError("Inserisci email/nickname e password");
       return;
     }
+    setIsSubmitting(true);
     let gpsCoords: { latitude: number; longitude: number } | undefined;
     if (Platform.OS !== "web") {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === "granted") {
-          const pos = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-          gpsCoords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+          const pos = await Promise.race([
+            Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            }),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+          ]);
+          if (pos) {
+            gpsCoords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+          }
         }
       } catch {}
     }
@@ -50,9 +57,11 @@ export default function LoginScreen() {
       { identifier: identifier.trim(), password, ...gpsCoords },
       {
         onSuccess: () => {
+          setIsSubmitting(false);
           router.replace("/(tabs)");
         },
         onError: (err: any) => {
+          setIsSubmitting(false);
           const msg = err?.message || "Errore durante il login";
           const cleaned = msg.replace(/^\d+:\s*/, "");
           try {
@@ -140,12 +149,12 @@ export default function LoginScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.loginButton, loginMutation.isPending && styles.loginButtonDisabled]}
+            style={[styles.loginButton, (isSubmitting || loginMutation.isPending) && styles.loginButtonDisabled]}
             onPress={handleLogin}
-            disabled={loginMutation.isPending}
+            disabled={isSubmitting || loginMutation.isPending}
             testID="login-submit"
           >
-            {loginMutation.isPending ? (
+            {(isSubmitting || loginMutation.isPending) ? (
               <ActivityIndicator color={Colors.background} />
             ) : (
               <Text style={styles.loginButtonText}>{t("auth.login")}</Text>

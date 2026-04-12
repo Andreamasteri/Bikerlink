@@ -23,7 +23,12 @@ function useLoginMutation() {
     },
     onSuccess: (user: SafeUser) => {
       queryClient.setQueryData(["/api/auth/me"], user);
-      queryClient.invalidateQueries();
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0] as string;
+          return key !== "/api/auth/me";
+        },
+      });
       (async () => {
         try {
           await queryClient.fetchQuery({ queryKey: ["/api/settings/maps"] });
@@ -103,13 +108,8 @@ function useLogoutMutation() {
     },
     onSuccess: async () => {
       try {
-        await queryClient.cancelQueries();
-        queryClient.removeQueries({
-          predicate: (query) => {
-            const key = query.queryKey[0] as string;
-            return key !== "/api/auth/me";
-          },
-        });
+        queryClient.cancelQueries();
+        queryClient.clear();
         queryClient.setQueryData(["/api/auth/me"], null);
       } finally {
         setLoggingOut(false);

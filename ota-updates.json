@@ -1513,5 +1513,26 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 21,
+    "version": "1.21.0",
+    "runtimeVersion": "4.0.0",
+    "date": "2026-04-12",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-21 rv4.0.0: fix login dopo logout su Android (#546)",
+    "note": "Task #546. Fix login bloccato dopo logout: (1) GPS timeout 5s in login.tsx con Promise.race (prima era senza timeout, poteva bloccarsi indefinitamente su Android). (2) isSubmitting state per mostrare spinner durante fetch GPS+login. (3) queryClient.clear() in logout (pulizia completa cache). (4) Login onSuccess non invalida più /api/auth/me (evita race condition refetch→null). (5) Logout naviga con while(canGoBack)+replace per pulire stack Android. (6) sendLocationUpdate in _layout.tsx con timeout 10s. CURRENT_OTA_NUMBER=21.",
+    "releaseId": "06f87e52-be88-4561-8e2f-c86c208dc0e2",
+    "bundleUrl": "private/ota/ota-1.21.0-1776024645955.js",
+    "updateGroupId": "797759e2-cb4e-4d46-8bc3-2d2d188db7b4",
+    "androidUpdateId": "019d8352-841f-7406-9e9d-8df64a1e9d57",
+    "iosUpdateId": null,
+    "commitBase": "72efa20",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/797759e2-cb4e-4d46-8bc3-2d2d188db7b4",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "published"
   }
 ]
