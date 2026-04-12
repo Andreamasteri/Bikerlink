@@ -2360,6 +2360,7 @@ const styles = StyleSheet.create({
     height: 36,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    marginTop: 40,
   },
   compactActions: {
     flexDirection: "row",
@@ -2388,6 +2389,7 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     height: 40,
+    marginTop: 40,
   },
   tabBarContent: {
     flexDirection: "row" as const,
@@ -2407,7 +2409,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.accent,
   },
   tabText: {
-    fontSize: 12,
+    fontSize: 15,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
   },
