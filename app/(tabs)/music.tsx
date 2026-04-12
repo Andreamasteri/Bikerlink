@@ -2399,16 +2399,19 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   tabBar: {
+    height: 40,
   },
   tabBarContent: {
     flexDirection: "row" as const,
     paddingHorizontal: 8,
+    alignItems: "center" as const,
+    height: 40,
   },
   tabItem: {
-    paddingTop: 10,
-    paddingBottom: 2,
+    paddingVertical: 6,
     paddingHorizontal: 12,
     alignItems: "center" as const,
+    justifyContent: "center" as const,
     borderBottomWidth: 2,
     borderBottomColor: "transparent",
   },
