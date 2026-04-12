@@ -1400,5 +1400,28 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 16,
+    "version": "1.16.0",
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-16 rv4.0.0: Music tab bar -40px, font +25%, MiniPlayer fix, ricerca brani, playlist fix, nota 30'' (#539-#543)",
+    "note": "Task #539: tabBar+compactHeader marginTop:40, tabText fontSize 12→15. Task #540: MiniPlayer rimosso da TelefonoTab, InlineMiniPlayer in cima a music+tracking, nascosto su /. Task #541: searchBar spostata tra chip YouTube/Google e card playlist in BraniTab. Task #542: playlist snapshot 6h + fix condivisione + fix logout. Task #543: nota avvertimento 30'' sotto searchBar in BraniTab + marginRight open-outline 4→20 in LibraryTrackRow. CURRENT_OTA_NUMBER=16.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "f1b2ac2908a6046dd6c45581446a1f472a75470f",
+    "easDashboard": null,
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "pending"
   }
 ]
