@@ -2760,6 +2760,72 @@ const styles = StyleSheet.create({
   },
 });
 
+const brandThemeStyles = StyleSheet.create({
+  container: {
+    marginBottom: 20,
+  },
+  subtitle: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginBottom: 14,
+  },
+  grid: {
+    gap: 10,
+  },
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    gap: 12,
+  },
+  cardSelected: {
+    borderColor: Colors.accent,
+  },
+  swatch: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    overflow: "hidden" as const,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    justifyContent: "flex-end" as const,
+    padding: 5,
+    gap: 3,
+  },
+  swatchAccent: {
+    height: 7,
+    borderRadius: 3,
+  },
+  swatchSurface: {
+    height: 7,
+    borderRadius: 3,
+  },
+  swatchText: {
+    height: 7,
+    borderRadius: 3,
+  },
+  cardBody: {
+    flex: 1,
+  },
+  cardLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.text,
+    marginBottom: 2,
+  },
+  cardDesc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 16,
+  },
+});
+
 const themeStyles = StyleSheet.create({
   switchRow: {
     flexDirection: "row",

@@ -1,4 +1,4 @@
-export type AppLanguage = "it" | "en" | "de" | "es" | "fr";
+export type AppLanguage = "it" | "en" | "de" | "es" | "fr" | "tr";
 
 let currentLanguage: AppLanguage = "it";
 
@@ -12,6 +12,7 @@ function loadTranslations(lang: AppLanguage): Record<string, string> {
     case "de": cache.de = require("./i18n/de").default; return cache.de!;
     case "es": cache.es = require("./i18n/es").default; return cache.es!;
     case "fr": cache.fr = require("./i18n/fr").default; return cache.fr!;
+    case "tr": cache.tr = require("./i18n/tr").default; return cache.tr!;
     default:   cache.it = require("./i18n/it").default; return cache.it!;
   }
 }
@@ -32,6 +33,7 @@ export function langToLocale(lang: AppLanguage): string {
     case "de": return "de-DE";
     case "es": return "es-ES";
     case "fr": return "fr-FR";
+    case "tr": return "tr-TR";
     default:   return "it-IT";
   }
 }
