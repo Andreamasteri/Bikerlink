@@ -1308,5 +1308,28 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 12,
+    "version": "1.12.0",
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-12 rv4.0.0: fix crash Impostazioni admin (brandThemeStyles), lingua turca, fix login dopo logout, foto contest Object Storage, Giappone",
+    "note": "Task #525: fix spazio nero tab Musica (già in OTA-11). Task #526: brandThemeStyles StyleSheet mancante in admin/settings.tsx, traduzione turca completa (lib/i18n/tr.ts), Turkish in splash. Task #527: fix login bloccato dopo logout. Task #528+#529: foto contest su Object Storage persistente, aggiunta Giappone (JP) nei paesi selezionabili. CURRENT_OTA_NUMBER=12.",
+    "releaseId": "4dd1104e-8ca4-4450-ab58-d1912edf1318",
+    "bundleUrl": "private/ota/ota-1.12.0-1775953643495.js",
+    "updateGroupId": "597d0258-9c3f-4a74-803c-b216d22cb254",
+    "androidUpdateId": "019d7f16-b21f-71a9-80cd-5602e14a17e5",
+    "iosUpdateId": null,
+    "commitBase": "01a29f58ffdb52ac62baf8f12013c18f8a632b51",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/597d0258-9c3f-4a74-803c-b216d22cb254",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "published"
   }
 ]
