@@ -93,12 +93,16 @@ function useRegisterMutation() {
 function useLogoutMutation() {
   return useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/auth/logout");
-    },
-    onSuccess: async () => {
       setLoggingOut(true);
       try {
-        queryClient.setQueryData(["/api/auth/me"], null);
+        await apiRequest("POST", "/api/auth/logout");
+      } catch (err) {
+        setLoggingOut(false);
+        throw err;
+      }
+    },
+    onSuccess: async () => {
+      try {
         await queryClient.cancelQueries();
         queryClient.removeQueries({
           predicate: (query) => {
@@ -106,9 +110,13 @@ function useLogoutMutation() {
             return key !== "/api/auth/me";
           },
         });
+        queryClient.setQueryData(["/api/auth/me"], null);
       } finally {
         setLoggingOut(false);
       }
+    },
+    onError: () => {
+      setLoggingOut(false);
     },
   });
 }

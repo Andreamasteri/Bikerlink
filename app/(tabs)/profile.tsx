@@ -239,7 +239,11 @@ export default function ProfileScreen() {
     },
     onSuccess: () => {
       Alert.alert(t("profile.accountScheduledDeletion"));
-      logoutMutation.mutate();
+      logoutMutation.mutate(undefined, {
+        onSuccess: () => {
+          router.replace("/welcome");
+        },
+      });
     },
   });
 
@@ -360,7 +364,11 @@ export default function ProfileScreen() {
   }, []);
 
   const doLogout = async () => {
-    logoutMutation.mutate();
+    logoutMutation.mutate(undefined, {
+      onSuccess: () => {
+        router.replace("/welcome");
+      },
+    });
   };
 
   const handleClearCache = useCallback(() => {
