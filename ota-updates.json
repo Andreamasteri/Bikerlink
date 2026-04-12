@@ -1481,16 +1481,16 @@
     "jsEngine": "hermes",
     "message": "OTA-19 rv4.0.0: InlineMiniPlayer in cima al tab Trip (proposals) (#547)",
     "note": "Tab Trip = proposals.tsx (non tracking.tsx). Aggiunto InlineMiniPlayer inline in cima prima dei filtri. Floating MiniPlayer nascosto su /proposals (aggiunto isProposalsScreen a _layout.tsx). CURRENT_OTA_NUMBER=19.",
-    "releaseId": null,
-    "bundleUrl": null,
-    "updateGroupId": null,
-    "androidUpdateId": null,
+    "releaseId": "73610fc3-48e5-4f1b-9d40-7a23391ce754",
+    "bundleUrl": "private/ota/ota-1.19.0-1776002994660.js",
+    "updateGroupId": "a0168ae5-ac33-4f93-905e-e75433196056",
+    "androidUpdateId": "019d8207-bd5f-7316-aead-4265a3f13a02",
     "iosUpdateId": null,
-    "commitBase": "PENDING",
-    "easDashboard": null,
+    "commitBase": "32ec5dc987798705e82b659f9d0ec9266952b4cf",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/a0168ae5-ac33-4f93-905e-e75433196056",
     "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
-    "status": "pending"
+    "status": "published"
   }
 ]
