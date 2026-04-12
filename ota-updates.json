@@ -1331,5 +1331,28 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 13,
+    "version": "1.13.0",
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-13 rv4.0.0: fix export Sheets traduzioni, Mini Player floating, Musica padding fix (#524-#531)",
+    "note": "Task #524: fix export Google Sheets traduzioni (Drive API CSV upload/export). Task #530: Mini Player floating su home/match/chat/contest (overlay sopra tab bar), fisso su musica/mappa/profilo. Task #531: paddingBottom corretto in MatchTab/RadioTab/SharedPlaylists/Telefono (120px). CURRENT_OTA_NUMBER=13.",
+    "releaseId": "4b3f3f77-9743-4865-afaa-1a6668148851",
+    "bundleUrl": "private/ota/ota-1.13.0-1775954768136.js",
+    "updateGroupId": "a872b7e3-271a-4b07-859d-d3dbeaa796b9",
+    "androidUpdateId": "019d7f27-ddd8-70d4-9db7-f1eb211d39fa",
+    "iosUpdateId": null,
+    "commitBase": "829d982f60ea0985a25828bb0d79e549191e7022",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/a872b7e3-271a-4b07-859d-d3dbeaa796b9",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "published"
   }
 ]
