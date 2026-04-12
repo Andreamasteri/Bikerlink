@@ -311,7 +311,7 @@ function TelefonoTab() {
         keyExtractor={(item) => item.id}
         style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 110 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }}
         onEndReached={() => { if (hasMore && endCursor) loadAssets(endCursor); }}
         onEndReachedThreshold={0.5}
         ListFooterComponent={loading ? <ActivityIndicator color={Colors.accent} style={{ padding: 12 }} /> : null}
@@ -522,7 +522,7 @@ function MusicRadioTab() {
 const radioTabStyles = StyleSheet.create({
   content: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 120,
   },
   lastFmRow: {
     flexDirection: "row" as const,
@@ -1987,7 +1987,7 @@ function MatchTab({
 
   return (
     <View style={styles.tabContent}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
         <View style={styles.filterBox}>
           <Text style={styles.filterLabel}>Criteri</Text>
           <View style={styles.filterRow}>
@@ -2350,7 +2350,7 @@ function SharedPlaylistsTab({
       data={playlists}
       keyExtractor={(item) => String(item.id)}
       style={{ flex: 1 }}
-      contentContainerStyle={{ paddingBottom: 100, paddingTop: 10 }}
+      contentContainerStyle={{ paddingBottom: 120, paddingTop: 10 }}
       renderItem={({ item }) => (
         <SharedPlaylistCard item={item} onMerge={onMerge} isMerging={isMerging} />
       )}
@@ -2375,7 +2375,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
