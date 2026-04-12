@@ -1446,5 +1446,28 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 18,
+    "version": "1.18.0",
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-18 rv4.0.0: fix crash tab Musica — handleDisconnect non in scope BraniTab (#546)",
+    "note": "Bug introdotto in task #544: il tasto log-out spostato dentro BraniTab usava handleDisconnect (definita in MusicScreen) senza passarla come prop. ReferenceError causava crash immediato all'apertura del tab Musica con libreria non vuota. Fix: aggiunta prop onDisconnect a BraniTab, passata da MusicScreen. CURRENT_OTA_NUMBER=18.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "PENDING",
+    "easDashboard": null,
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "pending"
   }
 ]

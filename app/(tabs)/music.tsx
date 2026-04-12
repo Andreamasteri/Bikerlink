@@ -1107,6 +1107,7 @@ export default function MusicScreen() {
           onRemove={(id) => removeTrackMutation.mutate(id)}
           pendingAddId={pendingAddId}
           pendingRemoveId={pendingRemoveId}
+          onDisconnect={handleDisconnect}
         />
       )}
       {activeTab === "match" && (
@@ -1314,6 +1315,7 @@ function BraniTab({
   onRemove,
   pendingAddId,
   pendingRemoveId,
+  onDisconnect,
 }: {
   provider: "lastfm" | "spotify";
   isConnected: boolean | null;
@@ -1333,6 +1335,7 @@ function BraniTab({
   onRemove: (id: string) => void;
   pendingAddId: string | null;
   pendingRemoveId: string | null;
+  onDisconnect: () => void;
 }) {
   const isLastfm = provider === "lastfm";
   const providerColor = isLastfm ? LASTFM_RED : SPOTIFY_GREEN;
@@ -1471,7 +1474,7 @@ function BraniTab({
               );
             })}
             <TouchableOpacity
-              onPress={handleDisconnect}
+              onPress={onDisconnect}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={{ marginLeft: 8 }}
             >
