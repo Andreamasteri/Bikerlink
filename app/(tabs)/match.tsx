@@ -471,6 +471,11 @@ export default function MatchScreen() {
   const [musicLogic, setMusicLogic] = useState<string>("almeno_uno");
   const [musicMinSongs, setMusicMinSongs] = useState<number>(5);
 
+  const { data: myProfile } = useQuery<{ latitude?: number | null; longitude?: number | null }>({
+    queryKey: ["/api/users/profile"],
+    enabled: !!user,
+  });
+
   useFocusEffect(
     useCallback(() => {
       AsyncStorage.multiGet(["match_distance_mode", "match_distance_km"]).then(pairs => {
@@ -566,8 +571,8 @@ export default function MatchScreen() {
     return 0;
   };
 
-  const myLat = user?.firstLoginLat != null ? parseFloat(String(user.firstLoginLat)) : null;
-  const myLng = user?.firstLoginLng != null ? parseFloat(String(user.firstLoginLng)) : null;
+  const myLat = myProfile?.latitude != null ? parseFloat(String(myProfile.latitude)) : (user?.firstLoginLat != null ? parseFloat(String(user.firstLoginLat)) : null);
+  const myLng = myProfile?.longitude != null ? parseFloat(String(myProfile.longitude)) : (user?.firstLoginLng != null ? parseFloat(String(user.firstLoginLng)) : null);
   const parsedKm = parseFloat(distanceKm);
   const kmLimit = Number.isFinite(parsedKm) && parsedKm > 0 ? parsedKm : 50;
 

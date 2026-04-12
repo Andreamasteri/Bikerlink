@@ -143,12 +143,16 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
           return null;
         }
 
-        let otherLat = otherUser?.firstLoginLat ?? null;
-        let otherLng = otherUser?.firstLoginLng ?? null;
-        if ((otherLat == null || otherLng == null) && otherUser?.id) {
+        let otherLat: number | null = null;
+        let otherLng: number | null = null;
+        if (otherUser?.id) {
           const profile = await storage.getUserProfile(otherUser.id);
           otherLat = profile?.latitude ?? null;
           otherLng = profile?.longitude ?? null;
+        }
+        if (otherLat == null || otherLng == null) {
+          otherLat = otherUser?.firstLoginLat ?? null;
+          otherLng = otherUser?.firstLoginLng ?? null;
         }
 
         return {
@@ -367,12 +371,16 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
           return null;
         }
 
-        let otherLat = otherBiker?.firstLoginLat ?? null;
-        let otherLng = otherBiker?.firstLoginLng ?? null;
-        if ((otherLat == null || otherLng == null) && otherBiker?.id) {
+        let otherLat: number | null = null;
+        let otherLng: number | null = null;
+        if (otherBiker?.id) {
           const profile = await storage.getUserProfile(otherBiker.id);
           otherLat = profile?.latitude ?? null;
           otherLng = profile?.longitude ?? null;
+        }
+        if (otherLat == null || otherLng == null) {
+          otherLat = otherBiker?.firstLoginLat ?? null;
+          otherLng = otherBiker?.firstLoginLng ?? null;
         }
 
         return {

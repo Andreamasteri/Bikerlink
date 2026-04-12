@@ -1534,5 +1534,26 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 22,
+    "version": "1.22.0",
+    "runtimeVersion": "4.0.0",
+    "date": "2026-04-12",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-22 rv4.0.0: fix distanze errate — usa profile.latitude/longitude (#547)",
+    "note": "Task #547. Fix distanze errate tra utenti: (1) proposals.ts biker-matches e garage-matches ora usano profile.latitude/longitude come fonte primaria, firstLoginLat come fallback. (2) match.tsx myLat/myLng legge da /api/users/profile (GPS aggiornato ogni 5min) con fallback a firstLoginLat. (3) spotify.ts music-match già corretto (usa profile coords). (4) chat.tsx già corretto (usa GPS live). CURRENT_OTA_NUMBER=22.",
+    "releaseId": "97a3788b-7b11-4428-86e5-dedc55653ea0",
+    "bundleUrl": "private/ota/ota-1.22.0-1776025008447.js",
+    "updateGroupId": "3cac0d33-d9f5-4ab4-8cf9-2fe6aa6c9c4b",
+    "androidUpdateId": "019d8357-9f64-747d-885f-bf58c200a0da",
+    "iosUpdateId": null,
+    "commitBase": "ed647c3",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/3cac0d33-d9f5-4ab4-8cf9-2fe6aa6c9c4b",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "published"
   }
 ]
