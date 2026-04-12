@@ -53,6 +53,13 @@ export async function objectExists(objectPath: string): Promise<boolean> {
   return result.ok && result.value === true;
 }
 
+export async function getPublicUrl(objectPath: string): Promise<string> {
+  const client = getClient();
+  const bucket = await client.getBucket();
+  const file = bucket.file(objectPath);
+  return file.publicUrl();
+}
+
 export async function listObjects(prefix: string): Promise<StorageFile[]> {
   const client = getClient();
   const result = await client.list({ prefix });

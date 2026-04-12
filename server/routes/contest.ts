@@ -1,29 +1,13 @@
 import { Router, type Request, type Response } from "express";
 import path from "path";
-import fs from "fs";
 import multer from "multer";
 import { storage } from "../storage";
+import { uploadBuffer, getPublicUrl } from "../objectStorage";
 
 const router = Router();
 
-const uploadsDir = path.join(process.cwd(), "uploads", "contest");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const contestStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname) || ".jpg";
-    const uniqueName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}${ext}`;
-    cb(null, uniqueName);
-  },
-});
-
 const upload = multer({
-  storage: contestStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith("image/")) {
@@ -61,7 +45,13 @@ router.post("/entries", upload.single("photo"), async (req: Request, res: Respon
     let photoUrl: string | null = null;
 
     if (req.file) {
-      photoUrl = `/uploads/contest/${req.file.filename}`;
+      const ext = path.extname(req.file.originalname).toLowerCase() || ".jpg";
+      const filename = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}${ext}`;
+      const objectPath = `public/contest/${filename}`;
+
+      await uploadBuffer(objectPath, req.file.buffer, req.file.mimetype);
+
+      photoUrl = await getPublicUrl(objectPath);
     } else if (req.body.photoUrl) {
       photoUrl = req.body.photoUrl;
     }
