@@ -32,6 +32,7 @@ import { useLanguage, useT, useLocale } from "@/lib/language-context";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
+import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMapConfig } from "@/lib/map-context";
 import { MAP_PROVIDER_LABELS, MAP_PROVIDER_DESCRIPTIONS, type MapProvider } from "@/lib/map-tiles";
@@ -141,7 +142,7 @@ export default function ProfileScreen() {
 
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
   // Ciclo 4.0.0 — APK v10 — OTA-10: linea arancione tab Musica a contatto col testo (paddingBottom 0)
-  const CURRENT_OTA_NUMBER = 19;
+  const CURRENT_OTA_NUMBER = 20;
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -634,19 +635,21 @@ export default function ProfileScreen() {
   );
 
   return (
-    <ScrollView
-      style={[
-        styles.container,
-        { paddingTop: Platform.OS === "web" ? 67 : insets.top, backgroundColor: colors.background },
-      ]}
-      contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16 }}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={profileQuery.isRefetching}
-          onRefresh={() => profileQuery.refetch()}
-          tintColor={colors.accent}
-        />
+    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: Platform.OS === "web" ? 67 : insets.top }}>
+      <InlineMiniPlayer />
+      <ScrollView
+        style={[
+          styles.container,
+          { backgroundColor: colors.background },
+        ]}
+        contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={profileQuery.isRefetching}
+            onRefresh={() => profileQuery.refetch()}
+            tintColor={colors.accent}
+          />
       }
     >
       <View style={styles.profileHeader}>
@@ -1405,6 +1408,7 @@ export default function ProfileScreen() {
       </View>
       <View style={{ height: 40 }} />
     </ScrollView>
+    </View>
   );
 }
 

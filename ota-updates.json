@@ -1492,5 +1492,26 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 20,
+    "version": "1.20.0",
+    "runtimeVersion": "4.0.0",
+    "date": "2026-04-12",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-20 rv4.0.0: InlineMiniPlayer in cima a tutti i tab rimanenti, floating MiniPlayer rimosso (#548)",
+    "note": "InlineMiniPlayer aggiunto in cima a: Ride (ready.tsx), Club (motoclub.tsx), Raduni (eventi.tsx), Match (match.tsx), Chat (chat.tsx), Pic (contest.tsx), Profilo (profile.tsx). Floating MiniPlayer rimosso da _layout.tsx (import + rendering). CURRENT_OTA_NUMBER=20.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "96d1fe9303b97d00428cddfa6ca3fbaf3b9ccc54",
+    "easDashboard": null,
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "pending"
   }
 ]

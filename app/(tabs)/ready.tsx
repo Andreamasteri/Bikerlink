@@ -16,6 +16,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
+import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -187,16 +188,18 @@ export default function ReadyToRideScreen() {
   }
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={[
-        styles.scrollContent,
-        {
-          paddingTop: Platform.OS === "web" ? 67 : 0,
-          paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16,
-        },
-      ]}
-    >
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <InlineMiniPlayer />
+      <ScrollView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: Platform.OS === "web" ? 67 : 0,
+            paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16,
+          },
+        ]}
+      >
       <View style={styles.content}>
         <Ionicons
           name="bicycle"
@@ -400,7 +403,8 @@ export default function ReadyToRideScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 

@@ -16,6 +16,7 @@ import {
 import { KeyboardAvoidingView } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
+import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
@@ -330,6 +331,7 @@ export default function ContestScreen() {
   return (
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
       <View style={styles.container}>
+        <InlineMiniPlayer />
         <View style={styles.policyBar}>
         <Ionicons name="information-circle" size={16} color={Colors.warning} />
         <Text style={styles.policyText} numberOfLines={2}>

@@ -19,6 +19,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { useColors } from "@/hooks/useColors";
 import { queryClient, getApiUrl, apiRequest } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
@@ -1152,6 +1153,7 @@ export default function MatchScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: Platform.OS === "web" ? insets.top + 67 : insets.top, backgroundColor: colors.background }, Platform.OS === "web" && { paddingBottom: 34 }]}>
+      <InlineMiniPlayer />
       <View style={styles.inlineHeader}>
         <Text style={styles.inlineTitle}>{t("match.title")}</Text>
       </View>

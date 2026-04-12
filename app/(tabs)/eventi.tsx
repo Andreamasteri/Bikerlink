@@ -15,6 +15,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
+import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { getApiUrl } from "@/lib/query-client";
 import EventCard from "@/components/eventi/EventCard";
 import EventForm from "@/components/eventi/EventForm";
@@ -91,6 +92,7 @@ export default function EventiScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: topInset }]}>
+      <InlineMiniPlayer />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Raduni</Text>
         <Pressable style={styles.addBtn} onPress={() => setShowForm(true)}>

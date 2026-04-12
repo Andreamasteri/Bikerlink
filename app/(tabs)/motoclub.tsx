@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { apiRequest } from "@/lib/query-client";
 import Colors from "@/constants/colors";
+import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { getCurrentLocale } from "@/lib/i18n";
 
 type Club = {
@@ -455,6 +456,7 @@ export default function MotoclubScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: topInset }]}>
+      <InlineMiniPlayer />
       <View style={styles.topBar}>
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>

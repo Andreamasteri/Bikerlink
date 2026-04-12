@@ -20,6 +20,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth-context";
 import { useT } from "@/lib/language-context";
@@ -347,6 +348,7 @@ export default function ChatScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: webTopInset, backgroundColor: colors.background }]}>
+      <InlineMiniPlayer />
       <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 16 : insets.top + 4, backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <View style={styles.emailNotifRow}>
           <Ionicons name="mail-outline" size={15} color={colors.textSecondary} style={{ marginRight: 6 }} />
