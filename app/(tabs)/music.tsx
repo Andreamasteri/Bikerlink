@@ -1058,24 +1058,6 @@ export default function MusicScreen() {
                 <Text style={styles.headerCount}>
                   {tracksQuery.data ? `${tracksQuery.data.tracks.length} brani` : ""}
                 </Text>
-                {(tracksQuery.data?.tracks.length ?? 0) > 0 && (
-                  <TouchableOpacity
-                    onPress={() => setSendModalVisible(true)}
-                    style={{ marginLeft: 10 }}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel="Invia la mia libreria"
-                    accessibilityRole="button"
-                  >
-                    <Ionicons name="paper-plane-outline" size={20} color={Colors.accent} />
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  onPress={handleDisconnect}
-                  style={{ marginLeft: 10 }}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons name="log-out-outline" size={20} color={Colors.textSecondary} />
-                </TouchableOpacity>
               </>
             )}
           </View>
@@ -1087,24 +1069,6 @@ export default function MusicScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.tabBarContent}>
             {tabItems}
           </ScrollView>
-          <View style={styles.compactActions}>
-            {(tracksQuery.data?.tracks.length ?? 0) > 0 && (
-              <TouchableOpacity
-                onPress={() => setSendModalVisible(true)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityLabel="Invia la mia libreria"
-                accessibilityRole="button"
-              >
-                <Ionicons name="paper-plane-outline" size={18} color={Colors.accent} />
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              onPress={handleDisconnect}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="log-out-outline" size={18} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
         </View>
       ) : (
         <>
@@ -1506,6 +1470,13 @@ function BraniTab({
                 </TouchableOpacity>
               );
             })}
+            <TouchableOpacity
+              onPress={handleDisconnect}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={{ marginLeft: 8 }}
+            >
+              <Ionicons name="log-out-outline" size={23} color={Colors.textSecondary} />
+            </TouchableOpacity>
           </View>
         )}
 
@@ -1530,13 +1501,15 @@ function BraniTab({
         </View>
 
         <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", paddingHorizontal: 12, paddingVertical: 6 }}>
-          <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic" }}>
+          <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic" }}>
             {"Attenzione! Verranno riprodotti solo i primi 30\u2033 dei brani. Per la versione intera, cercali con "}
           </Text>
-          <Ionicons name="open-outline" size={11} color={Colors.textSecondary} />
-          <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic" }}>
-            {" dopo aver selezionato il motore di ricerca (YouTube, YouTube Music, Google)."}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Ionicons name="open-outline" size={13} color={Colors.textSecondary} />
+            <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic" }}>
+              {" dopo aver selezionato il motore di ricerca (YouTube, YouTube Music, Google)."}
+            </Text>
+          </View>
         </View>
 
         {library.length > 0 && (
@@ -1547,12 +1520,12 @@ function BraniTab({
               <Text style={streamStyles.playlistCardSub}>{Math.min(library.length, 20)} brani</Text>
             </View>
             <TouchableOpacity
-              style={streamStyles.openBtn}
-              onPress={handleOpenPlaylist}
+              onPress={() => setSendModalVisible(true)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Invia la mia libreria"
+              accessibilityRole="button"
             >
-              <Ionicons name="open-outline" size={16} color={Colors.accent} />
-              <Text style={streamStyles.openBtnText}>Tutta la playlist</Text>
+              <Ionicons name="paper-plane-outline" size={20} color={Colors.accent} />
             </TouchableOpacity>
           </View>
         )}
@@ -2360,7 +2333,7 @@ const styles = StyleSheet.create({
     height: 36,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    marginTop: 40,
+    marginTop: 30,
   },
   compactActions: {
     flexDirection: "row",
@@ -2389,7 +2362,7 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     height: 40,
-    marginTop: 40,
+    marginTop: 30,
   },
   tabBarContent: {
     flexDirection: "row" as const,
