@@ -1121,4 +1121,81 @@ const miniStyles = StyleSheet.create({
   },
 });
 
+export function InlineMiniPlayer() {
+  const { currentTrack, isPlaying, togglePlay, stop } = usePlayer();
+  const [showModal, setShowModal] = useState(false);
+  if (!currentTrack) return null;
+  return (
+    <View style={inlineMiniStyles.container}>
+      <TouchableOpacity
+        style={inlineMiniStyles.info}
+        onPress={() => setShowModal(true)}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="musical-note" size={14} color={Colors.accent} style={{ marginRight: 6 }} />
+        <Text style={inlineMiniStyles.title} numberOfLines={1}>
+          {currentTrack.title}
+        </Text>
+        {currentTrack.artist ? (
+          <Text style={inlineMiniStyles.artist} numberOfLines={1}>
+            {" · "}{currentTrack.artist}
+          </Text>
+        ) : null}
+      </TouchableOpacity>
+      <View style={inlineMiniStyles.controls}>
+        <TouchableOpacity
+          onPress={(e) => { e.stopPropagation(); togglePlay(); }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name={isPlaying ? "pause" : "play"} size={22} color={Colors.accent} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={(e) => { e.stopPropagation(); stop(); }}
+          style={{ marginLeft: 12 }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="stop" size={22} color={Colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
+      <FullPlayerModal visible={showModal} onClose={() => setShowModal(false)} />
+    </View>
+  );
+}
+
+const inlineMiniStyles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  info: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    overflow: "hidden",
+    marginRight: 8,
+  },
+  title: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+    flexShrink: 1,
+  },
+  artist: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    flexShrink: 1,
+  },
+  controls: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+  },
+});
+
 export const MINI_PLAYER_HEIGHT = MINI_HEIGHT;

@@ -169,6 +169,7 @@ export default function TabLayout() {
   };
 
   const isMusicScreen = pathname === "/music";
+  const isHomeScreen = pathname === "/";
   const isTrackingScreen = pathname === "/tracking";
   const isProfileScreen = pathname === "/profile";
   const useTabBarOffset = isTrackingScreen || isProfileScreen;
@@ -176,7 +177,7 @@ export default function TabLayout() {
 
   return (
     <>
-      {!isMusicScreen && <MiniPlayer bottomOffset={miniPlayerBottom} />}
+      {!isMusicScreen && !isHomeScreen && <MiniPlayer bottomOffset={miniPlayerBottom} />}
       {isGpsGateActive && (
         <View style={[gpsBannerStyles.banner, { paddingTop: Platform.OS === "web" ? 67 + 12 : insets.top + 12 }]}>
           <Ionicons name="navigate-outline" size={28} color="#fff" />

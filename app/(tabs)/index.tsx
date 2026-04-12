@@ -32,6 +32,7 @@ import { getCountryFlag, getCountryName, EUROPEAN_COUNTRIES } from "@/lib/countr
 import { useT, useLocale } from "@/lib/language-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { User } from "@shared/schema";
+import { InlineMiniPlayer } from "@/components/MiniPlayer";
 
 type UserWithProfileCoords = Omit<User, "password"> & {
   profileLatitude?: number | null;
@@ -1107,6 +1108,8 @@ export default function MapScreen() {
           </Pressable>
         </View>
       )}
+
+      <InlineMiniPlayer />
 
       {(activeSosQuery.data || []).length > 0 && (
         <Pressable style={styles.sosFloatingIndicator} onPress={() => setShowSosDetail(true)}>

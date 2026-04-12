@@ -28,7 +28,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { usePlayer, PlayerTrack, RadioStation } from "@/lib/player-context";
-import { FullPlayerModal } from "@/components/MiniPlayer";
+import { FullPlayerModal, InlineMiniPlayer } from "@/components/MiniPlayer";
 import { useAuth } from "@/lib/auth-context";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -299,6 +299,7 @@ function TelefonoTab() {
 
   return (
     <View style={{ flex: 1 }}>
+      <InlineMiniPlayer />
       <View style={[styles.section, { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 10, paddingBottom: 6 }]}>
         <Text style={styles.sectionTitle}>{loading && assets.length === 0 ? "Caricamento…" : `${assets.length} brani`}</Text>
         <TouchableOpacity style={styles.playAllBtn} onPress={handlePlayAll} disabled={!playerAvailable || assets.length === 0}>
@@ -637,83 +638,6 @@ const radioTabStyles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "center" as const,
     paddingHorizontal: 24,
-  },
-});
-
-function InlineMiniPlayer() {
-  const { currentTrack, isPlaying, togglePlay, stop } = usePlayer();
-  const [showModal, setShowModal] = useState(false);
-  if (!currentTrack) return null;
-  return (
-    <View style={inlineMiniPlayerStyles.container}>
-      <TouchableOpacity
-        style={inlineMiniPlayerStyles.info}
-        onPress={() => setShowModal(true)}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="musical-note" size={14} color={Colors.accent} style={{ marginRight: 6 }} />
-        <Text style={inlineMiniPlayerStyles.title} numberOfLines={1}>
-          {currentTrack.title}
-        </Text>
-        {currentTrack.artist ? (
-          <Text style={inlineMiniPlayerStyles.artist} numberOfLines={1}>
-            {" · "}{currentTrack.artist}
-          </Text>
-        ) : null}
-      </TouchableOpacity>
-      <View style={inlineMiniPlayerStyles.controls}>
-        <TouchableOpacity
-          onPress={(e) => { e.stopPropagation(); togglePlay(); }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name={isPlaying ? "pause" : "play"} size={22} color={Colors.accent} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={(e) => { e.stopPropagation(); stop(); }}
-          style={{ marginLeft: 12 }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="stop" size={22} color={Colors.textSecondary} />
-        </TouchableOpacity>
-      </View>
-      <FullPlayerModal visible={showModal} onClose={() => setShowModal(false)} />
-    </View>
-  );
-}
-
-const inlineMiniPlayerStyles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  info: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    overflow: "hidden",
-    marginRight: 8,
-  },
-  title: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
-    flexShrink: 1,
-  },
-  artist: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    flexShrink: 1,
-  },
-  controls: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
   },
 });
 
