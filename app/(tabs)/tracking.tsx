@@ -22,6 +22,7 @@ import { queryClient } from "@/lib/query-client";
 import * as Location from "expo-location";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getCurrentLocale } from "@/lib/i18n";
+import { InlineMiniPlayer } from "@/components/MiniPlayer";
 
 interface RouteRecord {
   id: string;
@@ -574,16 +575,17 @@ export default function TrackingScreen() {
   const batteryColor = getBatteryColor(batteryImpact);
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={[
-        styles.content,
-        {
-          paddingTop: Platform.OS === "web" ? 67 : insets.top + 16,
-          paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16,
-        },
-      ]}
-    >
+    <View style={styles.container}>
+      <InlineMiniPlayer />
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: 16,
+            paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16,
+          },
+        ]}
+      >
       <Ionicons name="speedometer" size={48} color={Colors.accent} style={styles.headerIcon} />
       <Text style={styles.title}>Performance Counter</Text>
       <Text style={styles.subtitle}>Registra le tue prestazioni in moto</Text>
@@ -744,7 +746,8 @@ export default function TrackingScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 

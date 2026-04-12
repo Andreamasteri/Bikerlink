@@ -299,7 +299,6 @@ function TelefonoTab() {
 
   return (
     <View style={{ flex: 1 }}>
-      <InlineMiniPlayer />
       <View style={[styles.section, { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 10, paddingBottom: 6 }]}>
         <Text style={styles.sectionTitle}>{loading && assets.length === 0 ? "Caricamento…" : `${assets.length} brani`}</Text>
         <TouchableOpacity style={styles.playAllBtn} onPress={handlePlayAll} disabled={!playerAvailable || assets.length === 0}>
