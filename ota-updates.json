@@ -1412,16 +1412,16 @@
     "jsEngine": "hermes",
     "message": "OTA-16 rv4.0.0: Music tab bar -40px, font +25%, MiniPlayer fix, ricerca brani, playlist fix, nota 30'' (#539-#543)",
     "note": "Task #539: tabBar+compactHeader marginTop:40, tabText fontSize 12→15. Task #540: MiniPlayer rimosso da TelefonoTab, InlineMiniPlayer in cima a music+tracking, nascosto su /. Task #541: searchBar spostata tra chip YouTube/Google e card playlist in BraniTab. Task #542: playlist snapshot 6h + fix condivisione + fix logout. Task #543: nota avvertimento 30'' sotto searchBar in BraniTab + marginRight open-outline 4→20 in LibraryTrackRow. CURRENT_OTA_NUMBER=16.",
-    "releaseId": null,
-    "bundleUrl": null,
-    "updateGroupId": null,
-    "androidUpdateId": null,
+    "releaseId": "c886cde9-27cb-4f81-8eb2-428d46e70e8e",
+    "bundleUrl": "private/ota/ota-1.16.0-1775990528105.js",
+    "updateGroupId": "ecb174ac-afbb-4c9b-b32d-6091944ce961",
+    "androidUpdateId": "019d8149-e572-7665-a763-2e1c57880c0c",
     "iosUpdateId": null,
-    "commitBase": "f1b2ac2908a6046dd6c45581446a1f472a75470f",
-    "easDashboard": null,
+    "commitBase": "1f2e4a25e689b4d0ea6345036cc675770ba5a0f8",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/ecb174ac-afbb-4c9b-b32d-6091944ce961",
     "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
-    "status": "pending"
+    "status": "published"
   }
 ]
