@@ -1490,41 +1490,61 @@ function BraniTab({
         </View>
 
         {library.length > 0 && (
-          <>
-            <View style={streamStyles.serviceSelector}>
-              {(["youtube", "youtubemusic", "google"] as StreamService[]).map((svc) => {
-                const label = svc === "youtube" ? "YouTube" : svc === "youtubemusic" ? "YouTube Music" : "Google";
-                const isActive = streamService === svc;
-                return (
-                  <TouchableOpacity
-                    key={svc}
-                    style={[streamStyles.serviceChip, isActive && streamStyles.serviceChipActive]}
-                    onPress={() => handleSelectService(svc)}
-                  >
-                    <Text style={[streamStyles.serviceChipText, isActive && streamStyles.serviceChipTextActive]}>
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+          <View style={streamStyles.serviceSelector}>
+            {(["youtube", "youtubemusic", "google"] as StreamService[]).map((svc) => {
+              const label = svc === "youtube" ? "YouTube" : svc === "youtubemusic" ? "YouTube Music" : "Google";
+              const isActive = streamService === svc;
+              return (
+                <TouchableOpacity
+                  key={svc}
+                  style={[streamStyles.serviceChip, isActive && streamStyles.serviceChipActive]}
+                  onPress={() => handleSelectService(svc)}
+                >
+                  <Text style={[streamStyles.serviceChipText, isActive && streamStyles.serviceChipTextActive]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
 
-            <View style={streamStyles.playlistCard}>
-              <Ionicons name="musical-notes-outline" size={22} color={Colors.accent} />
-              <View style={{ flex: 1 }}>
-                <Text style={streamStyles.playlistCardTitle}>La mia playlist</Text>
-                <Text style={streamStyles.playlistCardSub}>{Math.min(library.length, 20)} brani</Text>
-              </View>
-              <TouchableOpacity
-                style={streamStyles.openBtn}
-                onPress={handleOpenPlaylist}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons name="open-outline" size={16} color={Colors.accent} />
-                <Text style={streamStyles.openBtnText}>Tutta la playlist</Text>
-              </TouchableOpacity>
+        <View style={styles.searchBarWrapper}>
+          <Ionicons name="search" size={18} color={Colors.textSecondary} style={{ marginRight: 8 }} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={isLastfm ? "Cerca brani su Last.fm…" : "Cerca brani su Spotify…"}
+            placeholderTextColor={Colors.textSecondary}
+            value={searchInput}
+            onChangeText={onSearchChange}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {searchInput.length > 0 && Platform.OS !== "ios" && (
+            <TouchableOpacity onPress={() => onSearchChange("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {library.length > 0 && (
+          <View style={streamStyles.playlistCard}>
+            <Ionicons name="musical-notes-outline" size={22} color={Colors.accent} />
+            <View style={{ flex: 1 }}>
+              <Text style={streamStyles.playlistCardTitle}>La mia playlist</Text>
+              <Text style={streamStyles.playlistCardSub}>{Math.min(library.length, 20)} brani</Text>
             </View>
-          </>
+            <TouchableOpacity
+              style={streamStyles.openBtn}
+              onPress={handleOpenPlaylist}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="open-outline" size={16} color={Colors.accent} />
+              <Text style={streamStyles.openBtnText}>Tutta la playlist</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         {libraryLoading ? (
@@ -1544,26 +1564,6 @@ function BraniTab({
               streamService={streamService}
             />
           ))
-        )}
-      </View>
-
-      <View style={styles.searchBarWrapper}>
-        <Ionicons name="search" size={18} color={Colors.textSecondary} style={{ marginRight: 8 }} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder={isLastfm ? "Cerca brani su Last.fm…" : "Cerca brani su Spotify…"}
-          placeholderTextColor={Colors.textSecondary}
-          value={searchInput}
-          onChangeText={onSearchChange}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-          autoCorrect={false}
-          autoCapitalize="none"
-        />
-        {searchInput.length > 0 && Platform.OS !== "ios" && (
-          <TouchableOpacity onPress={() => onSearchChange("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
-          </TouchableOpacity>
         )}
       </View>
 
