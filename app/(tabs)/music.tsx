@@ -1529,6 +1529,16 @@ function BraniTab({
           )}
         </View>
 
+        <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", paddingHorizontal: 12, paddingVertical: 6 }}>
+          <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic" }}>
+            {"Attenzione! Verranno riprodotti solo i primi 30\u2033 dei brani. Per la versione intera, cercali con "}
+          </Text>
+          <Ionicons name="open-outline" size={11} color={Colors.textSecondary} />
+          <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic" }}>
+            {" dopo aver selezionato il motore di ricerca (YouTube, YouTube Music, Google)."}
+          </Text>
+        </View>
+
         {library.length > 0 && (
           <View style={streamStyles.playlistCard}>
             <Ionicons name="musical-notes-outline" size={22} color={Colors.accent} />
@@ -1891,7 +1901,7 @@ function LibraryTrackRow({
       <TouchableOpacity
         onPress={handleOpenStream}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        style={{ marginRight: 4 }}
+        style={{ marginRight: 20 }}
       >
         <Ionicons name="open-outline" size={18} color={Colors.textSecondary} />
       </TouchableOpacity>
