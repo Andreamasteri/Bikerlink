@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo, ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
+import { queryClient, apiRequest, getQueryFn, getApiUrl, setLoggingOut, setLoggingIn } from "@/lib/query-client";
 import type { User } from "@shared/schema";
 
 type SafeUser = Omit<User, "password">;
@@ -17,6 +17,7 @@ interface AuthContextValue {
 function useLoginMutation() {
   return useMutation({
     mutationFn: async (data: { identifier: string; password: string; latitude?: number; longitude?: number }) => {
+      setLoggingIn(true);
       const res = await apiRequest("POST", "/api/auth/login", data);
       return await res.json();
     },
@@ -57,6 +58,9 @@ function useLoginMutation() {
         apiRequest("POST", "/api/matching/trigger").catch(() => {});
       })();
     },
+    onSettled: () => {
+      setLoggingIn(false);
+    },
   });
 }
 
@@ -91,9 +95,20 @@ function useLogoutMutation() {
     mutationFn: async () => {
       await apiRequest("POST", "/api/auth/logout");
     },
-    onSuccess: () => {
-      queryClient.clear();
-      queryClient.setQueryData(["/api/auth/me"], null);
+    onSuccess: async () => {
+      setLoggingOut(true);
+      try {
+        queryClient.setQueryData(["/api/auth/me"], null);
+        await queryClient.cancelQueries();
+        queryClient.removeQueries({
+          predicate: (query) => {
+            const key = query.queryKey[0] as string;
+            return key !== "/api/auth/me";
+          },
+        });
+      } finally {
+        setLoggingOut(false);
+      }
     },
   });
 }

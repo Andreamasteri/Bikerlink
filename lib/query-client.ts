@@ -9,11 +9,24 @@ export function getApiUrl(): string {
 
   let url = new URL(`https://${host}`);
 
-  // Strip trailing slash so string concatenation like `${getApiUrl()}${path}` works correctly.
   return url.href.replace(/\/$/, "");
 }
 
+let _isLoggingOut = false;
+let _isLoggingIn = false;
+
+export function setLoggingOut(val: boolean) {
+  _isLoggingOut = val;
+}
+
+export function setLoggingIn(val: boolean) {
+  _isLoggingIn = val;
+}
+
 function handleUnauthorized() {
+  if (_isLoggingIn || _isLoggingOut) {
+    return;
+  }
   queryClient.setQueryData(["/api/auth/me"], null);
 }
 
@@ -64,12 +77,13 @@ export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
+  async ({ queryKey, signal }) => {
     const baseUrl = getApiUrl();
     const url = new URL(queryKey.join("/") as string, baseUrl);
 
     const res = await fetch(url.toString(), {
       credentials: "include",
+      signal,
     });
 
     if (res.status === 401) {
