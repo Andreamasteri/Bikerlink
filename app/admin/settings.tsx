@@ -409,7 +409,8 @@ export default function AdminSettings() {
       if (!res.ok) throw new Error("Errore aggiornamento tema default");
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      setTheme(variables);
       queryClient.invalidateQueries({ queryKey: ["/api/settings/theme"] });
     },
     onError: (e: Error) => Alert.alert("Errore", e.message),
