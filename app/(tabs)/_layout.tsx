@@ -168,8 +168,11 @@ export default function TabLayout() {
     );
   };
 
-  const miniPlayerBottom = tabBarHeight + 8;
   const isMusicScreen = pathname === "/music";
+  const isTrackingScreen = pathname === "/tracking";
+  const isProfileScreen = pathname === "/profile";
+  const useTabBarOffset = isTrackingScreen || isProfileScreen;
+  const miniPlayerBottom = useTabBarOffset ? tabBarHeight + 8 : insets.bottom + 8;
 
   return (
     <>
