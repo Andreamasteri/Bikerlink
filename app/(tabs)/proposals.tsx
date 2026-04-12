@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useT, useLocale } from "@/lib/language-context";
+import { InlineMiniPlayer } from "@/components/MiniPlayer";
 
 interface ProposalItem {
   id: string;
@@ -215,6 +216,7 @@ export default function ProposalsScreen() {
 
   return (
     <View style={styles.container}>
+      <InlineMiniPlayer />
       <View style={styles.filterRow}>
         {FILTER_KEYS.map((f) => (
           <Pressable

@@ -171,11 +171,12 @@ export default function TabLayout() {
   const isMusicScreen = pathname === "/music";
   const isHomeScreen = pathname === "/";
   const isTrackingScreen = pathname === "/tracking";
+  const isProposalsScreen = pathname === "/proposals";
   const miniPlayerBottom = tabBarHeight + 8;
 
   return (
     <>
-      {!isMusicScreen && !isHomeScreen && !isTrackingScreen && <MiniPlayer bottomOffset={miniPlayerBottom} />}
+      {!isMusicScreen && !isHomeScreen && !isTrackingScreen && !isProposalsScreen && <MiniPlayer bottomOffset={miniPlayerBottom} />}
       {isGpsGateActive && (
         <View style={[gpsBannerStyles.banner, { paddingTop: Platform.OS === "web" ? 67 + 12 : insets.top + 12 }]}>
           <Ionicons name="navigate-outline" size={28} color="#fff" />

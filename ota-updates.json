@@ -1469,5 +1469,28 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 19,
+    "version": "1.19.0",
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-19 rv4.0.0: InlineMiniPlayer in cima al tab Trip (proposals) (#547)",
+    "note": "Tab Trip = proposals.tsx (non tracking.tsx). Aggiunto InlineMiniPlayer inline in cima prima dei filtri. Floating MiniPlayer nascosto su /proposals (aggiunto isProposalsScreen a _layout.tsx). CURRENT_OTA_NUMBER=19.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "PENDING",
+    "easDashboard": null,
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "pending"
   }
 ]
