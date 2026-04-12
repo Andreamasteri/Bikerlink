@@ -1015,82 +1015,119 @@ export default function MusicScreen() {
   const topPadding = insets.top + (Platform.OS === "web" ? 67 : 0);
   const providerColor = musicProvider === "lastfm" ? LASTFM_RED : SPOTIFY_GREEN;
 
+  const isConnected = statusQuery.isLoading ? null : (statusQuery.data?.connected ?? false);
+  const isLastfmConnected = musicProvider === "lastfm" && isConnected === true;
+
+  const tabItems = (["brani", "match", "ricevute", "radio", "telefono"] as Tab[]).map((tab) => (
+    <TouchableOpacity
+      key={tab}
+      style={[styles.tabItem, activeTab === tab && styles.tabItemActive]}
+      onPress={() => setActiveTab(tab)}
+    >
+      {tab === "radio" ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Ionicons name="radio-outline" size={12} color={activeTab === "radio" ? Colors.accent : Colors.textSecondary} />
+          <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>Radio</Text>
+        </View>
+      ) : tab === "telefono" ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Ionicons name="phone-portrait-outline" size={12} color={activeTab === "telefono" ? Colors.accent : Colors.textSecondary} />
+          <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>Telefono</Text>
+        </View>
+      ) : (
+        <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+          {tab === "brani" ? "Brani" : tab === "match" ? "Match" : "Ricevute"}
+        </Text>
+      )}
+    </TouchableOpacity>
+  ));
+
   return (
+    <>
     <View style={[styles.container, { paddingTop: topPadding }]}>
       <InlineMiniPlayer />
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Ionicons name="musical-notes" size={24} color={providerColor} />
-          <Text style={styles.headerTitle}>Musica</Text>
-        </View>
-        <View style={styles.headerRight}>
-          {statusQuery.data?.connected && (
-            <>
-              <Text style={styles.headerCount}>
-                {tracksQuery.data ? `${tracksQuery.data.tracks.length} brani` : ""}
-              </Text>
-              {(tracksQuery.data?.tracks.length ?? 0) > 0 && (
+
+      {!isLastfmConnected && (
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Ionicons name="musical-notes" size={24} color={providerColor} />
+            <Text style={styles.headerTitle}>Musica</Text>
+          </View>
+          <View style={styles.headerRight}>
+            {statusQuery.data?.connected && (
+              <>
+                <Text style={styles.headerCount}>
+                  {tracksQuery.data ? `${tracksQuery.data.tracks.length} brani` : ""}
+                </Text>
+                {(tracksQuery.data?.tracks.length ?? 0) > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setSendModalVisible(true)}
+                    style={{ marginLeft: 10 }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel="Invia la mia libreria"
+                    accessibilityRole="button"
+                  >
+                    <Ionicons name="paper-plane-outline" size={20} color={Colors.accent} />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
-                  onPress={() => setSendModalVisible(true)}
+                  onPress={handleDisconnect}
                   style={{ marginLeft: 10 }}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  accessibilityLabel="Invia la mia libreria"
-                  accessibilityRole="button"
                 >
-                  <Ionicons name="paper-plane-outline" size={20} color={Colors.accent} />
+                  <Ionicons name="log-out-outline" size={20} color={Colors.textSecondary} />
                 </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                onPress={handleDisconnect}
-                style={{ marginLeft: 10 }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons name="log-out-outline" size={20} color={Colors.textSecondary} />
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </View>
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBar} contentContainerStyle={styles.tabBarContent}>
-        {(["brani", "match", "ricevute", "radio", "telefono"] as Tab[]).map((tab) => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tabItem, activeTab === tab && styles.tabItemActive]}
-            onPress={() => setActiveTab(tab)}
-          >
-            {tab === "radio" ? (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                <Ionicons name="radio-outline" size={12} color={activeTab === "radio" ? Colors.accent : Colors.textSecondary} />
-                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>Radio</Text>
-              </View>
-            ) : tab === "telefono" ? (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                <Ionicons name="phone-portrait-outline" size={12} color={activeTab === "telefono" ? Colors.accent : Colors.textSecondary} />
-                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>Telefono</Text>
-              </View>
-            ) : (
-              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                {tab === "brani" ? "Brani" : tab === "match" ? "Match" : "Ricevute"}
-              </Text>
+              </>
             )}
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {musicProvider === "lastfm" && statusQuery.data?.connected === false && (
-        <View style={lastfmBannerStyles.banner}>
-          <Ionicons name="warning-outline" size={18} color="#92400e" style={{ marginRight: 8, flexShrink: 0 }} />
-          <Text style={lastfmBannerStyles.text}>
-            Attenzione! La prima autenticazione su Last.fm richiede qualche manciata di secondi... portate pazienza, la finestra del browser si chiuderà da sola quando avrà terminato.
-          </Text>
+          </View>
         </View>
+      )}
+
+      {isLastfmConnected ? (
+        <View style={styles.compactHeader}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.tabBarContent}>
+            {tabItems}
+          </ScrollView>
+          <View style={styles.compactActions}>
+            {(tracksQuery.data?.tracks.length ?? 0) > 0 && (
+              <TouchableOpacity
+                onPress={() => setSendModalVisible(true)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel="Invia la mia libreria"
+                accessibilityRole="button"
+              >
+                <Ionicons name="paper-plane-outline" size={18} color={Colors.accent} />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={handleDisconnect}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="log-out-outline" size={18} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBar} contentContainerStyle={styles.tabBarContent}>
+            {tabItems}
+          </ScrollView>
+
+          {musicProvider === "lastfm" && isConnected === false && (
+            <View style={lastfmBannerStyles.banner}>
+              <Ionicons name="warning-outline" size={18} color="#92400e" style={{ marginRight: 8, flexShrink: 0 }} />
+              <Text style={lastfmBannerStyles.text}>
+                Attenzione! La prima autenticazione su Last.fm richiede qualche manciata di secondi... portate pazienza, la finestra del browser si chiuderà da sola quando avrà terminato.
+              </Text>
+            </View>
+          )}
+        </>
       )}
 
       {activeTab === "brani" && (
         <BraniTab
           provider={musicProvider}
-          isConnected={statusQuery.isLoading ? null : (statusQuery.data?.connected ?? false)}
+          isConnected={isConnected}
           isConnecting={isConnecting}
           onConnect={handleConnect}
           searchNeedsReconnect={searchNeedsReconnect}
@@ -1135,7 +1172,9 @@ export default function MusicScreen() {
       )}
       {activeTab === "radio" && <MusicRadioTab />}
       {activeTab === "telefono" && <TelefonoTab />}
+    </View>
 
+      {lastfmModalVisible && (
       <Modal
         visible={lastfmModalVisible}
         transparent
@@ -1221,7 +1260,9 @@ export default function MusicScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      )}
 
+      {sendModalVisible && (
       <Modal
         visible={sendModalVisible}
         transparent
@@ -1286,7 +1327,8 @@ export default function MusicScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+      )}
+    </>
   );
 }
 
@@ -1391,8 +1433,8 @@ function BraniTab({
 
   if (isConnected === null) {
     return (
-      <View style={styles.connectContainer}>
-        <ActivityIndicator color={providerColor} size="large" />
+      <View style={styles.tabContent}>
+        <ActivityIndicator color={providerColor} size="large" style={{ marginTop: 40 }} />
       </View>
     );
   }
@@ -1911,7 +1953,7 @@ function MatchTab({
 
   return (
     <View style={styles.tabContent}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
         <View style={styles.filterBox}>
           <Text style={styles.filterLabel}>Criteri</Text>
           <View style={styles.filterRow}>
@@ -2302,6 +2344,19 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+  },
+  compactHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 36,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  compactActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingRight: 12,
   },
   headerLeft: {
     flexDirection: "row",
