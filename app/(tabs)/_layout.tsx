@@ -9,7 +9,7 @@ import { useLocationGate } from "@/lib/location-context";
 import { useQuery } from "@tanstack/react-query";
 import { useTaskbarStyle } from "@/lib/taskbar-style-context";
 import CustomTabBar, { type TabItem } from "@/components/CustomTabBar";
-import { InlineMiniPlayer } from "@/components/MiniPlayer";
+import { MiniPlayer } from "@/components/MiniPlayer";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
 export default function TabLayout() {
@@ -170,14 +170,11 @@ export default function TabLayout() {
 
   const isMusicScreen = pathname === "/music";
   const isHomeScreen = pathname === "/";
+  const miniPlayerBottom = tabBarHeight + 8;
 
   return (
     <>
-      {!isMusicScreen && !isHomeScreen && (
-        <View style={{ position: "absolute", top: insets.top, left: 0, right: 0, zIndex: 100 }}>
-          <InlineMiniPlayer />
-        </View>
-      )}
+      {!isMusicScreen && !isHomeScreen && <MiniPlayer bottomOffset={miniPlayerBottom} />}
       {isGpsGateActive && (
         <View style={[gpsBannerStyles.banner, { paddingTop: Platform.OS === "web" ? 67 + 12 : insets.top + 12 }]}>
           <Ionicons name="navigate-outline" size={28} color="#fff" />
