@@ -148,7 +148,7 @@ const MOTORCYCLE_DATA: Record<string, string[]> = {
     "GP800", "Runner", "Fuoco 500ie", "Nexus 500",
   ],
   "Harley-Davidson": [
-    "Sportster", "Sportster S", "Nightster", "Iron 883", "Forty-Eight",
+    "Sportster",
     "Street Bob", "Fat Boy", "Heritage Classic",
     "Fat Bob", "Dyna Super Glide",
     "Low Rider S", "Low Rider ST",
