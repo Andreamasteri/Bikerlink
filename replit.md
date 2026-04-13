@@ -114,3 +114,25 @@ Lo script blocca l'esecuzione se `.local/apk-build-authorized` non esiste, logga
 - **SDK 55**: Il campo `jsEngine` è stato rimosso da `app.json` (la configurazione è ora automatica).
 - **Build EAS** (preview/production): `eas.json` → `android.jsEngine: "hermes"` — le APK/AAB usano Hermes.
 - **Expo Go**: Metro gestisce automaticamente il bundling senza bisogno di configurazione esplicita jsEngine.
+
+## Ciclo APK corrente — v11 (rv 5.0.0)
+
+| Campo | Valore |
+|---|---|
+| versionCode | 11 |
+| version | 1.2.0 |
+| runtimeVersion | 5.0.0 |
+| EAS Build ID | `6ea14cd7-6eb4-405c-b7e8-45698408d742` |
+| EAS Dashboard | https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/6ea14cd7-6eb4-405c-b7e8-45698408d742 |
+| Avviata il | 2026-04-13 |
+| Profilo | preview (APK) |
+| Cache | --clear-cache |
+| Primo OTA del ciclo | OTA-41 (aggiornare CURRENT_OTA_NUMBER = 41 quando si pubblica) |
+
+**Note ciclo 5.x:**
+- CURRENT_OTA_NUMBER = 0 in profile.tsx finché non viene pubblicata la prima OTA
+- Il registro ota-updates.json resta vuoto per rv=5.0.0 fino alla prima OTA-41
+- validate-ota.sh gestisce il ciclo vuoto con la path NEW_CYCLE (exit 0)
+- apkBuildId + apkUrl compariranno nella prima entry OTA del ciclo 5.x
+
+**Ciclo precedente:** APK v10 / rv 4.0.0 / OTA-40 (ultima) — apkBuildId `7a08598a-3a00-4169-aed1-b1d4ab6e8e7c`

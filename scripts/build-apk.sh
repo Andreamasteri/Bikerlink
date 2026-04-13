@@ -85,6 +85,7 @@ EXPO_PUBLIC_DOMAIN=biker-link.replit.app \
 npx eas-cli@latest build \
   --platform android \
   --profile "$PROFILE" \
+  --clear-cache \
   --non-interactive
 BUILD_EXIT=$?
 set -e
