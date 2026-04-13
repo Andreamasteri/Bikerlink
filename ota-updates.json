@@ -1950,7 +1950,7 @@
     "updateGroupId": null,
     "androidUpdateId": null,
     "iosUpdateId": null,
-    "commitBase": null,
+    "commitBase": "36c12d95",
     "easDashboard": null,
     "apkBuildId": "6ea14cd7",
     "apkVersionCode": 11,
