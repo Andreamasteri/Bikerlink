@@ -396,6 +396,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/profile-refetch-interval", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("profile_refetch_interval");
+      const seconds = setting?.value ? parseInt(setting.value, 10) : 30;
+      res.json({ seconds: isNaN(seconds) || seconds < 5 ? 30 : seconds });
+    } catch {
+      res.json({ seconds: 30 });
+    }
+  });
+
   app.get("/api/settings/theme", async (_req, res) => {
     try {
       const [switchingSetting, defaultSetting] = await Promise.all([

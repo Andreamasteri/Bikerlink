@@ -471,9 +471,15 @@ export default function MatchScreen() {
   const [musicLogic, setMusicLogic] = useState<string>("almeno_uno");
   const [musicMinSongs, setMusicMinSongs] = useState<number>(5);
 
+  const { data: refetchIntervalData } = useQuery<{ seconds: number }>({
+    queryKey: ["/api/settings/profile-refetch-interval"],
+  });
+  const profileRefetchMs = (refetchIntervalData?.seconds ?? 30) * 1000;
+
   const { data: myProfile } = useQuery<{ latitude?: number | null; longitude?: number | null }>({
     queryKey: ["/api/users/profile"],
     enabled: !!user,
+    refetchInterval: profileRefetchMs,
   });
 
   useFocusEffect(

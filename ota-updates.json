@@ -1555,5 +1555,26 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 23,
+    "version": "1.23.0",
+    "runtimeVersion": "4.0.0",
+    "date": "2026-04-13",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-23 rv4.0.0: fix distanze asimmetriche — refresh coordinate configurabile (#548)",
+    "note": "Task #548. Fix distanze asimmetriche tra utenti in movimento: match.tsx ora ha refetchInterval su /api/users/profile, letto da impostazione admin profile_refetch_interval (default 30s). Pannello admin: campo testo 'Refresh Coordinate (sec)' nella sezione Matching Engine. Backend: GET /api/settings/profile-refetch-interval. CURRENT_OTA_NUMBER=23.",
+    "releaseId": "474f9dc8-8949-4340-847d-0d3cf82f9166",
+    "bundleUrl": "private/ota/ota-1.23.0-1776059567780.js",
+    "updateGroupId": "9c223ef5-64fc-4c7c-91af-c21de0eb2e2b",
+    "androidUpdateId": "019d8567-1d01-7ac9-9b5d-87ba7ddf4183",
+    "iosUpdateId": null,
+    "commitBase": "4378377",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/9c223ef5-64fc-4c7c-91af-c21de0eb2e2b",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "published"
   }
 ]

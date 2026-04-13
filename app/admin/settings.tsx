@@ -331,6 +331,16 @@ export default function AdminSettings() {
   });
   const autoMatchEnabled = autoMatchData?.enabled !== false;
 
+  const { data: refetchIntervalData } = useQuery<{ seconds: number }>({
+    queryKey: ["/api/settings/profile-refetch-interval"],
+  });
+  const [refetchIntervalInput, setRefetchIntervalInput] = useState("");
+  useEffect(() => {
+    if (refetchIntervalData?.seconds != null && refetchIntervalInput === "") {
+      setRefetchIntervalInput(String(refetchIntervalData.seconds));
+    }
+  }, [refetchIntervalData]);
+
   const { data: primalData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/primal-user"],
   });
@@ -721,6 +731,25 @@ export default function AdminSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/auto-matching"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const refetchIntervalMutation = useMutation({
+    mutationFn: async (seconds: string) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/profile_refetch_interval", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: seconds }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/profile-refetch-interval"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
   });
@@ -1354,6 +1383,34 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {showSearchPrefEnabled ? "La sezione 'Ricerca Match con...' è visibile nel profilo utente" : "La sezione 'Ricerca Match con...' è nascosta dal profilo utente"}
+        </Text>
+      </View>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="refresh" size={20} color={Colors.warning} />
+            <Text style={styles.synecoLabel}>Refresh Coordinate (sec)</Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <TextInput
+              style={{ borderWidth: 1, borderColor: Colors.border, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, width: 70, color: Colors.text, fontSize: 14, textAlign: "center", backgroundColor: Colors.surface }}
+              keyboardType="numeric"
+              value={refetchIntervalInput}
+              onChangeText={setRefetchIntervalInput}
+              onEndEditing={() => {
+                const val = parseInt(refetchIntervalInput, 10);
+                if (!isNaN(val) && val >= 5) {
+                  refetchIntervalMutation.mutate(String(val));
+                } else {
+                  setRefetchIntervalInput(String(refetchIntervalData?.seconds ?? 30));
+                }
+              }}
+            />
+          </View>
+        </View>
+        <Text style={styles.synecoDesc}>
+          Ogni quanti secondi i client aggiornano le proprie coordinate nella tab Match (min 5s, default 30s)
         </Text>
       </View>
 
