@@ -17,7 +17,7 @@ const STORAGE_KEY_API_URL = "api_base_url";
 
 let lastSentTime = 0;
 
-TaskManager.defineTask(BG_LOCATION_TASK, async ({ data, error }: any) => {
+try { TaskManager.defineTask(BG_LOCATION_TASK, async ({ data, error }: any) => {
   if (error) {
     console.warn("[BgLocation] task error:", error.message);
     return;
@@ -108,7 +108,7 @@ TaskManager.defineTask(BG_LOCATION_TASK, async ({ data, error }: any) => {
   } catch (err) {
     console.warn("[BgLocation] send error:", err);
   }
-});
+}); } catch (e) { console.warn("[BgLocation] defineTask non supportato su questa build:", e); }
 
 export interface BgLocationConfig {
   enabled: boolean;

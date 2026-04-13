@@ -1829,6 +1829,27 @@
     "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 36,
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-36 rv4.0.0: hotfix crash avvio — rimosso Background Location dal bundle (rimandato APK v11)",
+    "note": "Task #568: OTA-35 includeva per errore il codice di Task #564 (Background Location) che richiedeva permessi nativi non presenti in APK v10. Fix: rimossi BgLocationManager e BgLocationRevokedBanner da _layout.tsx; TaskManager.defineTask protetto con try-catch in background-location-task.ts. Il codice BgLocation resta nel repo per APK v11. CURRENT_OTA_NUMBER=36.",
+    "releaseId": "17591f02-189c-451f-9fff-931031592aab",
+    "bundleUrl": "private/ota/ota-1.36.0-1776096090349.js",
+    "updateGroupId": "daca5418-e699-44d7-93ae-ff5b539bb9b9",
+    "androidUpdateId": "019d8794-aa47-7a90-ad24-7c41c87b5c90",
+    "iosUpdateId": null,
+    "commitBase": "79d34e29",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/daca5418-e699-44d7-93ae-ff5b539bb9b9",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
   }
 ]
