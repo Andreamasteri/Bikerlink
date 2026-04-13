@@ -99,6 +99,8 @@ function useLogoutMutation() {
   return useMutation({
     mutationFn: async () => {
       apiRequest("POST", "/api/auth/logout").catch(() => {});
+    },
+    onSuccess: () => {
       queryClient.cancelQueries();
       queryClient.clear();
       queryClient.setQueryData(["/api/auth/me"], null);

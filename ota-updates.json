@@ -1787,6 +1787,27 @@
     "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 34,
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-34 rv4.0.0: fix congelamento logout (corrected) + music libreria 12px",
+    "note": "Task #563 (corrected). OTA-33 superseded: queryClient.clear() era nella mutationFn e poteva bloccare il callback onSuccess di profile.tsx. Fix: mutationFn fa solo fire-and-forget dell'API call; queryClient.cancelQueries/clear/setQueryData spostati in onSuccess della mutation stessa — la mutation si conclude normalmente, poi profile.tsx onSuccess naviga a /welcome. Incluso Task #562 (music marginTop:12). CURRENT_OTA_NUMBER=34.",
+    "releaseId": "3cffea12-566d-40eb-a0ba-c44a91017ecc",
+    "bundleUrl": "private/ota/ota-1.34.0-1776088788129.js",
+    "updateGroupId": "63036eff-b7d4-4d27-a2a1-3cbca5d04075",
+    "androidUpdateId": "019d8724-d85c-7ee2-9988-1afa8e0eff7c",
+    "iosUpdateId": null,
+    "commitBase": "b747ed0",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/63036eff-b7d4-4d27-a2a1-3cbca5d04075",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
   }
 ]
