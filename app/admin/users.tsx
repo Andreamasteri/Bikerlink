@@ -15,6 +15,7 @@ interface AdminUser {
   role: string;
   status: string;
   createdAt: string;
+  lastLoginAt?: string | null;
   isFake?: boolean;
   isPrimal?: boolean;
 }
@@ -292,6 +293,11 @@ export default function AdminUsers() {
               <Text style={[styles.badgeText, { color: Colors.textSecondary }]}>{item.userType}</Text>
             </View>
           </View>
+          <Text style={styles.lastLogin}>
+            {item.lastLoginAt
+              ? `Ultimo accesso: ${new Date(item.lastLoginAt).toLocaleString("it-IT", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}`
+              : "Mai connesso"}
+          </Text>
         </View>
         <View style={styles.actions}>
           <TouchableOpacity onPress={() => openEditModal(item)} style={styles.actionBtn}>
@@ -807,6 +813,7 @@ const styles = StyleSheet.create({
   badges: { flexDirection: "row", gap: 6, marginTop: 8, flexWrap: "wrap" },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   badgeText: { fontFamily: "Inter_500Medium", fontSize: 11 },
+  lastLogin: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 6 },
   actions: { flexDirection: "column", gap: 10 },
   actionBtn: { padding: 4 },
   loadingText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", marginTop: 40 },
