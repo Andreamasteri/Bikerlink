@@ -1913,6 +1913,27 @@
     "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 40,
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-40 rv4.0.0: formato data GG.MM.AAAA nel form evento + fix logout congelato",
+    "note": "Task #574: campo data nel form Nuovo Evento aggiornato a formato GG.MM.AAAA (label, placeholder, validazione, conversione automatica a AAAA-MM-GG prima dell'invio al backend). Task #575: fix logout che congelava la schermata — rimossi cancelQueries/clear, rimosso loop canGoBack, redirect unificato a /welcome tramite auth guard in (tabs)/_layout.tsx. CURRENT_OTA_NUMBER=40.",
+    "releaseId": "f3c5170d-9cf0-4f70-807d-e53c84d5d890",
+    "bundleUrl": "private/ota/ota-1.40.0-1776107187161.js",
+    "updateGroupId": "a3ef5d3b-eb46-4fa3-a775-2c202f787d33",
+    "androidUpdateId": "019d883d-8e2a-73c9-bdda-3e4e258fc390",
+    "iosUpdateId": null,
+    "commitBase": "09e385c9a0bd45bd0a8431ea1c55ff7fbe96860c",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/a3ef5d3b-eb46-4fa3-a775-2c202f787d33",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
   }
 ]

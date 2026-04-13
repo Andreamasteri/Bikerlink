@@ -138,7 +138,7 @@ export default function ProfileScreen() {
 
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
   // Ciclo 4.0.0 — APK v10 — OTA-38: fix Pic! resolvePhotoUrl per URL GCS storici nel DB
-  const CURRENT_OTA_NUMBER = 39;
+  const CURRENT_OTA_NUMBER = 40;
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
