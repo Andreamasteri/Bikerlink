@@ -21,6 +21,7 @@ import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
+import FavoriteStar from "@/components/FavoriteStar";
 
 function formatLastSeen(dateStr: string | null): string {
   if (!dateStr) return "";
@@ -280,7 +281,10 @@ export default function PublicProfileScreen() {
               />
             )}
           </View>
-          <Text style={[styles.nickname, { color }]}>{profile.nickname}</Text>
+          <View style={styles.nicknameRow}>
+            <Text style={[styles.nickname, { color }]}>{profile.nickname}</Text>
+            {!isSelf && <FavoriteStar targetUserId={id} size={22} />}
+          </View>
           <View style={styles.statusRow}>
             <View style={[styles.statusBadge, { backgroundColor: profile.isOnline ? "#4CAF5022" : "#66666622" }]}>
               <View style={[styles.statusDot, { backgroundColor: profile.isOnline ? "#4CAF50" : "#888" }]} />
@@ -526,6 +530,7 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 16, color: Colors.textSecondary, fontFamily: "Inter_400Regular", marginTop: 12 },
   avatarSection: { alignItems: "center", paddingTop: 24, paddingBottom: 16 },
   avatar: { width: 96, height: 96, borderRadius: 48, justifyContent: "center", alignItems: "center", marginBottom: 12 },
+  nicknameRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 0 },
   nickname: { fontSize: 24, fontFamily: "Inter_700Bold" },
   statusRow: { flexDirection: "row" as const, gap: 6, marginTop: 8, marginBottom: 2 },
   statusBadge: { flexDirection: "row" as const, alignItems: "center" as const, gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
