@@ -1433,7 +1433,7 @@ function BraniTab({
   return (
     <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingTop: 0, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
+        <View style={[styles.sectionHeader, { marginTop: 12 }]}>
           <Text style={styles.sectionTitle}>
             La mia libreria{library.length > 0 ? ` (${library.length})` : ""}
           </Text>
