@@ -3600,8 +3600,18 @@ router.get("/coordinate-history/stats", async (_req: Request, res: Response) => 
 
 router.get("/coordinate-history/users", async (_req: Request, res: Response) => {
   try {
-    const users = await storage.getCoordinateHistoryUsers();
-    return res.json(users);
+    const [modeSetting, usersSetting] = await Promise.all([
+      storage.getAppSetting("coordinate_history_mode"),
+      storage.getAppSetting("coordinate_history_users"),
+    ]);
+    const mode = modeSetting?.value || "all";
+    const selectedUserIds: string[] = usersSetting?.value ? JSON.parse(usersSetting.value) : [];
+    const recordStats = await storage.getCoordinateHistoryUsers();
+    return res.json({
+      mode,
+      selectedUserIds,
+      usersWithRecords: recordStats,
+    });
   } catch (error) {
     console.error("Admin coordinate-history users error:", error);
     return res.status(500).json({ message: "Errore interno del server" });

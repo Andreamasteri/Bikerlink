@@ -398,20 +398,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/settings/coordinate-history", async (_req, res) => {
     try {
-      const [enabled, interval, maxRecords, mode] = await Promise.all([
+      const [enabled, interval, maxRecords, mode, selectedUsers] = await Promise.all([
         storage.getAppSetting("coordinate_history_enabled"),
         storage.getAppSetting("coordinate_history_interval"),
         storage.getAppSetting("coordinate_history_max_records"),
         storage.getAppSetting("coordinate_history_mode"),
+        storage.getAppSetting("coordinate_history_users"),
       ]);
       res.json({
         enabled: enabled?.value === "true",
         interval: interval?.value ? parseInt(interval.value, 10) : 30,
         maxRecords: maxRecords?.value ? parseInt(maxRecords.value, 10) : 60,
         mode: mode?.value || "all",
+        selectedUsers: selectedUsers?.value ? JSON.parse(selectedUsers.value) : [],
       });
     } catch {
-      res.json({ enabled: false, interval: 30, maxRecords: 60, mode: "all" });
+      res.json({ enabled: false, interval: 30, maxRecords: 60, mode: "all", selectedUsers: [] });
     }
   });
 

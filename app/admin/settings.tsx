@@ -392,9 +392,10 @@ export default function AdminSettings() {
     onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
-  const { data: onlineUsersForCoordHistory } = useQuery<Array<{ id: string; nickname: string }>>({
-    queryKey: ["/api/users/search", ""],
-    enabled: coordHistoryExpanded && coordHistorySettings?.mode === "selected",
+  const [chUserSearch, setChUserSearch] = useState("");
+  const { data: chSearchResults } = useQuery<Array<{ id: string; nickname: string; userType: string }>>({
+    queryKey: ["/api/users/search", chUserSearch],
+    enabled: coordHistoryExpanded && coordHistorySettings?.mode === "selected" && chUserSearch.length >= 2,
   });
 
   const { data: primalData } = useQuery<{ enabled: boolean }>({
@@ -1836,7 +1837,7 @@ export default function AdminSettings() {
                 <View style={styles.synecoHeader}>
                   <View style={styles.synecoInfo}>
                     <Ionicons name="person-add" size={20} color={Colors.accent} />
-                    <Text style={styles.synecoLabel}>Utenti Selezionati</Text>
+                    <Text style={styles.synecoLabel}>Utenti Selezionati ({coordHistorySettings?.selectedUsers?.length ?? 0})</Text>
                   </View>
                 </View>
                 {(coordHistorySettings?.selectedUsers?.length ?? 0) > 0 && (
@@ -1848,7 +1849,7 @@ export default function AdminSettings() {
                           const updated = coordHistorySettings!.selectedUsers.filter((u) => u !== uid);
                           coordHistoryMutation.mutate({ selectedUsers: updated });
                         }}
-                        style={[styles.countryChipSelected, { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: Colors.accent }]}
+                        style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, backgroundColor: Colors.accent }}
                       >
                         <Text style={{ color: "#fff", fontSize: 12 }}>{uid.slice(0, 8)}...</Text>
                         <Ionicons name="close-circle" size={14} color="#fff" />
@@ -1856,9 +1857,39 @@ export default function AdminSettings() {
                     ))}
                   </View>
                 )}
-                <Text style={[styles.synecoDesc, { marginTop: 6 }]}>
-                  Per aggiungere utenti, usa l'endpoint API PUT /api/admin/coordinate-history/settings con il campo selectedUsers
-                </Text>
+                <TextInput
+                  style={{ borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, color: Colors.text, fontSize: 14, backgroundColor: Colors.surface, marginTop: 10 }}
+                  placeholder="Cerca utente per nickname..."
+                  placeholderTextColor={Colors.textSecondary}
+                  value={chUserSearch}
+                  onChangeText={setChUserSearch}
+                />
+                {chSearchResults && chSearchResults.length > 0 && (
+                  <View style={{ marginTop: 6, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, backgroundColor: Colors.surface, maxHeight: 180 }}>
+                    <ScrollView nestedScrollEnabled>
+                      {chSearchResults
+                        .filter((u) => !(coordHistorySettings?.selectedUsers ?? []).includes(u.id))
+                        .map((u) => (
+                          <TouchableOpacity
+                            key={u.id}
+                            onPress={() => {
+                              const current = coordHistorySettings?.selectedUsers ?? [];
+                              coordHistoryMutation.mutate({ selectedUsers: [...current, u.id] });
+                              setChUserSearch("");
+                            }}
+                            style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border }}
+                          >
+                            <Ionicons name="add-circle" size={18} color={Colors.accent} />
+                            <Text style={{ color: Colors.text, fontSize: 14, flex: 1 }}>{u.nickname}</Text>
+                            <Text style={{ color: Colors.textSecondary, fontSize: 11 }}>{u.userType}</Text>
+                          </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                  </View>
+                )}
+                {chUserSearch.length >= 2 && chSearchResults && chSearchResults.filter((u) => !(coordHistorySettings?.selectedUsers ?? []).includes(u.id)).length === 0 && (
+                  <Text style={[styles.synecoDesc, { marginTop: 6 }]}>Nessun utente trovato</Text>
+                )}
               </View>
             )}
 
