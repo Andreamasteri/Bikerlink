@@ -66,7 +66,6 @@ export default function MapScreen() {
   const [mapFullscreenReady, setMapFullscreenReady] = useState(false);
   const [filterBiker, setFilterBiker] = useState(true);
   const [filterZavorrina, setFilterZavorrina] = useState(true);
-  const [filterCoppia, setFilterCoppia] = useState(true);
   const [filterClubs, setFilterClubs] = useState(true);
   const [filterEvents, setFilterEvents] = useState(true);
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -775,10 +774,8 @@ export default function MapScreen() {
             searchRadiusKm={mySearchRadius}
             filterBiker={filterBiker}
             filterZavorrina={filterZavorrina}
-            filterCoppia={filterCoppia}
             onToggleFilterBiker={() => setFilterBiker((p) => !p)}
             onToggleFilterZavorrina={() => setFilterZavorrina((p) => !p)}
-            onToggleFilterCoppia={() => setFilterCoppia((p) => !p)}
             onUserPress={handleUserPress}
             onEasterEggPress={handleEasterEggPress}
             onEventPress={(id) => router.push({ pathname: "/evento/[id]" as const, params: { id } })}
@@ -811,11 +808,9 @@ export default function MapScreen() {
             searchRadiusKm={mySearchRadius}
             filterBiker={filterBiker}
             filterZavorrina={filterZavorrina}
-            filterCoppia={filterCoppia}
             filterBarTopOffset={Platform.OS === "web" ? 67 : insets.top}
             onToggleFilterBiker={() => setFilterBiker((p) => !p)}
             onToggleFilterZavorrina={() => setFilterZavorrina((p) => !p)}
-            onToggleFilterCoppia={() => setFilterCoppia((p) => !p)}
             onUserPress={handleUserPress}
             onEasterEggPress={handleEasterEggPress}
             onEventPress={(id) => { setMapFullscreen(false); router.push({ pathname: "/evento/[id]" as const, params: { id } }); }}

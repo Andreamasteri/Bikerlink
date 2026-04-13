@@ -69,11 +69,9 @@ interface InteractiveMapProps {
   searchRadiusKm?: number;
   filterBiker: boolean;
   filterZavorrina: boolean;
-  filterCoppia: boolean;
   filterBarTopOffset?: number;
   onToggleFilterBiker: () => void;
   onToggleFilterZavorrina: () => void;
-  onToggleFilterCoppia: () => void;
   onUserPress?: (user: MapUser) => void;
   onEasterEggPress?: (egg: MapEasterEgg) => void;
   onReady?: () => void;
@@ -160,11 +158,9 @@ export default function InteractiveMap({
   searchRadiusKm,
   filterBiker,
   filterZavorrina,
-  filterCoppia,
   filterBarTopOffset,
   onToggleFilterBiker,
   onToggleFilterZavorrina,
-  onToggleFilterCoppia,
   onUserPress,
   onEasterEggPress,
   onReady,
@@ -266,7 +262,6 @@ export default function InteractiveMap({
     if (currentUserId != null && u.id === currentUserId) return true;
     if (u.userType === "biker" && !filterBiker) return false;
     if (u.userType === "zavorrina" && !filterZavorrina) return false;
-    if (u.userType === "coppia" && !filterCoppia) return false;
     return true;
   });
 
@@ -532,19 +527,6 @@ export default function InteractiveMap({
             color={filterZavorrina ? "#fff" : Colors.femaleIcon}
           />
           <Text style={[styles.filterText, filterZavorrina && styles.filterTextActive]}>Zavorrina</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.filterChip, filterCoppia && { backgroundColor: Colors.accent }]}
-          onPress={onToggleFilterCoppia}
-          activeOpacity={0.7}
-        >
-          <MaterialCommunityIcons
-            name="account-group"
-            size={16}
-            color={filterCoppia ? "#fff" : Colors.accent}
-          />
-          <Text style={[styles.filterText, filterCoppia && styles.filterTextActive]}>Coppia</Text>
         </TouchableOpacity>
 
         {onToggleFilterClubs != null && (

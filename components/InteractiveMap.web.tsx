@@ -42,10 +42,8 @@ interface InteractiveMapProps {
   isAvailable: boolean;
   filterBiker: boolean;
   filterZavorrina: boolean;
-  filterCoppia: boolean;
   onToggleFilterBiker: () => void;
   onToggleFilterZavorrina: () => void;
-  onToggleFilterCoppia: () => void;
   onUserPress?: (user: MapUser) => void;
   onEasterEggPress?: (egg: MapEasterEgg) => void;
 }
@@ -83,17 +81,14 @@ export default function InteractiveMap({
   isAvailable,
   filterBiker,
   filterZavorrina,
-  filterCoppia,
   onToggleFilterBiker,
   onToggleFilterZavorrina,
-  onToggleFilterCoppia,
   onUserPress,
   onEasterEggPress,
 }: InteractiveMapProps) {
   const filteredUsers = users.filter((u) => {
     if (u.userType === "biker" && !filterBiker) return false;
     if (u.userType === "zavorrina" && !filterZavorrina) return false;
-    if (u.userType === "coppia" && !filterCoppia) return false;
     return true;
   });
 
@@ -113,13 +108,6 @@ export default function InteractiveMap({
         >
           <MaterialCommunityIcons name="seat-passenger" size={16} color="#fff" />
           <Text style={styles.filterText}>Zavorrine</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.filterChip, filterCoppia && { backgroundColor: Colors.accent }]}
-          onPress={onToggleFilterCoppia}
-        >
-          <MaterialCommunityIcons name="heart-multiple" size={16} color="#fff" />
-          <Text style={styles.filterText}>Coppie</Text>
         </TouchableOpacity>
       </View>
 
