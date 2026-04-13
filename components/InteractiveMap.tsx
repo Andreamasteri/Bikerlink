@@ -299,17 +299,18 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   }, [userLocation]);
 
   useEffect(() => {
-    if (!userLocation || !mapIsReady || !mapRef.current) return;
+    if (!mapIsReady || !mapRef.current) return;
     if (initialCenterDoneRef.current) return;
-    initialCenterDoneRef.current = true;
     if (initialCenterOverride) {
+      initialCenterDoneRef.current = true;
       mapRef.current.animateToRegion({
         latitude: initialCenterOverride.latitude,
         longitude: initialCenterOverride.longitude,
         latitudeDelta: 0.05,
         longitudeDelta: 0.05,
       }, 500);
-    } else {
+    } else if (userLocation) {
+      initialCenterDoneRef.current = true;
       mapRef.current.animateToRegion(
         { ...userLocation, latitudeDelta: 0.1, longitudeDelta: 0.1 },
         500
