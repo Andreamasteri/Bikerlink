@@ -1558,9 +1558,11 @@ function BraniTab({
           </View>
         )}
 
-        <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic", paddingHorizontal: 12, paddingVertical: 4 }}>
-          {`Last.fm fornisce anteprime di 30\u2033; per le versioni intere, aprili con YouTube / Google`}
-        </Text>
+        {isLastfm && (
+          <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic", paddingHorizontal: 12, paddingVertical: 4 }}>
+            {`Last.fm fornisce anteprime di 30\u2033; per le versioni intere, aprili con YouTube / Google`}
+          </Text>
+        )}
 
         {libraryLoading ? (
           <ActivityIndicator color={Colors.accent} style={{ marginVertical: 20 }} />
