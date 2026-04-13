@@ -1809,5 +1809,26 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 35,
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-35 rv4.0.0: admin ultimo accesso utenti + rimozione Spotify dal pannello Music",
+    "note": "Task #565: aggiunto 'Ultimo accesso' (data/ora formattata it-IT) in ogni card utente nella lista admin — campo lastLoginAt già presente nel backend, ora esposto in frontend. Task #566: rimossi tutti i riferimenti Spotify dalla sezione Music System del pannello admin (selettore provider, toggle Spotify coming soon, testi). CURRENT_OTA_NUMBER=35.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "86ca936",
+    "easDashboard": null,
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "pending"
   }
 ]
