@@ -264,7 +264,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       });
     }
     if (typeof loginLat === "number" && typeof loginLng === "number") {
-      storage.upsertUserProfile(user.id, { latitude: loginLat, longitude: loginLng }).catch(() => {});
+      storage.upsertUserProfile(user.id, { latitude: loginLat, longitude: loginLng, coordinatesUpdatedAt: new Date() } as any).catch(() => {});
     }
 
     req.session.userId = user.id;

@@ -185,10 +185,15 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
         let distanceKm: number | null = null;
         let distanceFlag: "ok" | "old_psn" | "no_psn" = "no_psn";
         if (myLat != null && myLng != null && otherLat != null && otherLng != null) {
-          distanceKm = Math.round(haversineKm(myLat, myLng, otherLat, otherLng) * 10) / 10;
           const myOld = isCoordOld(myCoordUpdatedAt, maxAgeSec);
           const otherOld = isCoordOld(otherCoordUpdatedAt, maxAgeSec);
-          distanceFlag = (myOld || otherOld) ? "old_psn" : "ok";
+          if (myOld || otherOld) {
+            distanceFlag = "old_psn";
+            distanceKm = null;
+          } else {
+            distanceKm = Math.round(haversineKm(myLat, myLng, otherLat, otherLng) * 10) / 10;
+            distanceFlag = "ok";
+          }
         }
 
         return {
@@ -204,6 +209,8 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
           otherLng,
           distanceKm,
           distanceFlag,
+          myLat,
+          myLng,
         };
       })
     );
@@ -432,10 +439,15 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
         let distanceKm: number | null = null;
         let distanceFlag: "ok" | "old_psn" | "no_psn" = "no_psn";
         if (myLat != null && myLng != null && otherLat != null && otherLng != null) {
-          distanceKm = Math.round(haversineKm(myLat, myLng, otherLat, otherLng) * 10) / 10;
           const myOld = isCoordOld(myCoordUpdatedAt, maxAgeSec);
           const otherOld = isCoordOld(otherCoordUpdatedAt, maxAgeSec);
-          distanceFlag = (myOld || otherOld) ? "old_psn" : "ok";
+          if (myOld || otherOld) {
+            distanceFlag = "old_psn";
+            distanceKm = null;
+          } else {
+            distanceKm = Math.round(haversineKm(myLat, myLng, otherLat, otherLng) * 10) / 10;
+            distanceFlag = "ok";
+          }
         }
 
         return {
@@ -447,6 +459,8 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
           otherLng,
           distanceKm,
           distanceFlag,
+          myLat,
+          myLng,
         };
       })
     );

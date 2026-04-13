@@ -124,14 +124,17 @@ function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress
               {t(`userType.${otherType}`)}
             </Text>
           </View>
-          {match.distanceKm != null && (
+          {match.distanceFlag === "old_psn" ? (
             <View style={styles.distanceBadge}>
-              <Ionicons name="location" size={12} color={match.distanceFlag === "old_psn" ? Colors.warning : Colors.textSecondary} />
-              <Text style={[styles.distanceBadgeText, match.distanceFlag === "old_psn" && { color: Colors.warning }]}>
-                {match.distanceFlag === "old_psn" ? `~${match.distanceKm} km ⚠` : `${match.distanceKm} km`}
-              </Text>
+              <Ionicons name="location" size={12} color={Colors.warning} />
+              <Text style={[styles.distanceBadgeText, { color: Colors.warning }]}>Old Psn</Text>
             </View>
-          )}
+          ) : match.distanceKm != null ? (
+            <View style={styles.distanceBadge}>
+              <Ionicons name="location" size={12} color={Colors.textSecondary} />
+              <Text style={styles.distanceBadgeText}>{match.distanceKm} km</Text>
+            </View>
+          ) : null}
           <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
         </View>
       </TouchableOpacity>
@@ -254,14 +257,17 @@ function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, onBlock
             <Text style={[styles.matchNickname, { color: Colors.maleIcon }]}>{otherNickname}</Text>
             <Text style={styles.matchUserType}>{t("userType.biker")}</Text>
           </View>
-          {match.distanceKm != null && (
+          {match.distanceFlag === "old_psn" ? (
             <View style={styles.distanceBadge}>
-              <Ionicons name="location" size={12} color={match.distanceFlag === "old_psn" ? Colors.warning : Colors.textSecondary} />
-              <Text style={[styles.distanceBadgeText, match.distanceFlag === "old_psn" && { color: Colors.warning }]}>
-                {match.distanceFlag === "old_psn" ? `~${match.distanceKm} km ⚠` : `${match.distanceKm} km`}
-              </Text>
+              <Ionicons name="location" size={12} color={Colors.warning} />
+              <Text style={[styles.distanceBadgeText, { color: Colors.warning }]}>Old Psn</Text>
             </View>
-          )}
+          ) : match.distanceKm != null ? (
+            <View style={styles.distanceBadge}>
+              <Ionicons name="location" size={12} color={Colors.textSecondary} />
+              <Text style={styles.distanceBadgeText}>{match.distanceKm} km</Text>
+            </View>
+          ) : null}
           <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
         </View>
       </TouchableOpacity>
@@ -601,7 +607,8 @@ export default function MatchScreen() {
   const passesDistanceFilter = (match: any): boolean => {
     if (match.status !== "new") return true;
     if (distanceMode !== "km") return true;
-    if (match.distanceKm != null) return match.distanceKm <= kmLimit;
+    if (match.distanceFlag === "ok" && match.distanceKm != null) return match.distanceKm <= kmLimit;
+    if (match.distanceFlag === "old_psn") return true;
     if (!Number.isFinite(myLat) || !Number.isFinite(myLng)) return true;
     const lat2 = parseFloat(String(match.otherLat));
     const lng2 = parseFloat(String(match.otherLng));
