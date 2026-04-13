@@ -23,9 +23,9 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 }
 
 async function getCoordinatesMaxAgeSec(): Promise<number> {
-  const setting = await storage.getAppSetting("coordinates_max_age_sec");
+  const setting = await storage.getAppSetting("coordinates_max_age_seconds");
   const val = setting?.value ? parseInt(setting.value, 10) : NaN;
-  return isNaN(val) ? 600 : val;
+  return isNaN(val) ? 300 : val;
 }
 
 function isCoordOld(updatedAt: Date | null | undefined, maxAgeSec: number): boolean {

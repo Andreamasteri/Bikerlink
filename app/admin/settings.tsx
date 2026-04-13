@@ -342,7 +342,7 @@ export default function AdminSettings() {
   }, [refetchIntervalData]);
 
   const { data: coordMaxAgeData } = useQuery<{ value: number }>({
-    queryKey: ["/api/admin/settings/coordinates_max_age_sec"],
+    queryKey: ["/api/admin/settings/coordinates_max_age_seconds"],
   });
   const [coordMaxAgeInput, setCoordMaxAgeInput] = useState("");
   useEffect(() => {
@@ -767,7 +767,7 @@ export default function AdminSettings() {
   const coordMaxAgeMutation = useMutation({
     mutationFn: async (seconds: string) => {
       const baseUrl = getApiUrl();
-      const url = new URL("/api/admin/settings/coordinates_max_age_sec", baseUrl);
+      const url = new URL("/api/admin/settings/coordinates_max_age_seconds", baseUrl);
       const res = await globalThis.fetch(url.toString(), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -778,7 +778,7 @@ export default function AdminSettings() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/coordinates_max_age_sec"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/coordinates_max_age_seconds"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
   });
@@ -1460,14 +1460,14 @@ export default function AdminSettings() {
                 if (!isNaN(val) && val >= 10) {
                   coordMaxAgeMutation.mutate(String(val));
                 } else {
-                  setCoordMaxAgeInput(String(coordMaxAgeData?.value ?? 600));
+                  setCoordMaxAgeInput(String(coordMaxAgeData?.value ?? 300));
                 }
               }}
             />
           </View>
         </View>
         <Text style={styles.synecoDesc}>
-          Se le coordinate di un utente sono più vecchie di questa soglia, la distanza mostra "Old Psn" (min 10s, default 600s)
+          Se le coordinate di un utente sono più vecchie di questa soglia, la distanza mostra "Old Psn" (min 10s, default 300s)
         </Text>
       </View>
 

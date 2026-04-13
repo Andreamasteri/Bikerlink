@@ -396,6 +396,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/coordinates-max-age", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("coordinates_max_age_seconds");
+      const seconds = setting?.value ? parseInt(setting.value, 10) : 300;
+      res.json({ seconds: isNaN(seconds) || seconds < 10 ? 300 : seconds });
+    } catch {
+      res.json({ seconds: 300 });
+    }
+  });
+
   app.get("/api/settings/profile-refetch-interval", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("profile_refetch_interval");
