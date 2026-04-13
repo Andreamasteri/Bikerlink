@@ -1693,16 +1693,16 @@
     "jsEngine": "hermes",
     "message": "OTA-29 rv4.0.0: fix layout Profilo (miniplayer più su) e Ride! (rimuovi header)",
     "note": "Task #556. Profilo: rimosso paddingTop: insets.top dalla View esterna (l'header di navigazione già gestisce la safe area — il doppio padding abbassava inutilmente il miniplayer). Ride!: aggiunto headerShown:false al Tabs.Screen ready in _layout.tsx (elimina la barra 'Ride!' in alto), aggiunto paddingTop:insets.top alla View esterna di ready.tsx, rimosso paddingTop:67 dal contentContainerStyle dello ScrollView. CURRENT_OTA_NUMBER=29.",
-    "releaseId": null,
-    "bundleUrl": null,
-    "updateGroupId": null,
-    "androidUpdateId": null,
+    "releaseId": "ed14746b-fd28-4c90-8fa2-7dbae2caea25",
+    "bundleUrl": "private/ota/ota-1.29.0-1776081081920.js",
+    "updateGroupId": "dc6b5165-0a61-4bc8-9446-3a685ec132a5",
+    "androidUpdateId": "019d86af-446d-76dc-a403-4bdfc219bef8",
     "iosUpdateId": null,
     "commitBase": "d1f09e4",
-    "easDashboard": null,
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/dc6b5165-0a61-4bc8-9446-3a685ec132a5",
     "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
-    "status": "pending"
+    "status": "published"
   }
 ]
