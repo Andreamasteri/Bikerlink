@@ -1850,6 +1850,27 @@
     "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 37,
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-37 rv4.0.0: fix Pic! immagini nere — foto contest ora servite via proxy Express",
+    "note": "Task #569: le foto caricate in Pic! apparivano nere perché erano salvate con URL GCS diretto (getPublicUrl). Fix: aggiunta route GET /api/contest/photos/:filename in contest.ts (scarica da object storage e serve con Content-Type corretto). Nuove foto salvate come /api/contest/photos/filename (stesso pattern di user photos e event images). Foto vecchie con URL GCS assoluto continuano a funzionare tramite resolvePhotoUrl nel frontend. CURRENT_OTA_NUMBER=37.",
+    "releaseId": "1ca6e2f5-33d5-4c7f-8c1a-617075799c6f",
+    "bundleUrl": "private/ota/ota-1.37.0-1776097317409.js",
+    "updateGroupId": "40c49cc8-2828-4d61-b64f-e210212959c0",
+    "androidUpdateId": "019d87a6-ff40-7214-8832-282ae0526fc5",
+    "iosUpdateId": null,
+    "commitBase": "9854e049",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/40c49cc8-2828-4d61-b64f-e210212959c0",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
   }
 ]

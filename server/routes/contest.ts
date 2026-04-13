@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import path from "path";
 import multer from "multer";
 import { storage } from "../storage";
-import { uploadBuffer, getPublicUrl } from "../objectStorage";
+import { uploadBuffer, downloadBuffer } from "../objectStorage";
 
 const router = Router();
 
@@ -51,7 +51,7 @@ router.post("/entries", upload.single("photo"), async (req: Request, res: Respon
 
       await uploadBuffer(objectPath, req.file.buffer, req.file.mimetype);
 
-      photoUrl = await getPublicUrl(objectPath);
+      photoUrl = `/api/contest/photos/${filename}`;
     } else if (req.body.photoUrl) {
       photoUrl = req.body.photoUrl;
     }
@@ -195,6 +195,27 @@ router.delete("/entries/:id", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Contest delete entry error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/photos/:filename", async (req: Request, res: Response) => {
+  try {
+    const filename = req.params.filename;
+    const objectPath = `public/contest/${filename}`;
+    const buffer = await downloadBuffer(objectPath);
+    const ext = path.extname(filename).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".png": "image/png",
+      ".webp": "image/webp",
+    };
+    const contentType = mimeTypes[ext] ?? "image/jpeg";
+    res.set("Content-Type", contentType);
+    res.set("Cache-Control", "public, max-age=31536000, immutable");
+    return res.send(buffer);
+  } catch {
+    return res.status(404).json({ message: "Foto non trovata" });
   }
 });
 
