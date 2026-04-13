@@ -1746,5 +1746,26 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 32,
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-32 rv4.0.0: tasto 'localizza su mappa' nelle liste Biker e Zavorrine disponibili",
+    "note": "Task #560. Backend: server/routes/users.ts — aggiunto latitude/longitude al mapped object di /biker-available-list e /zavorrine-available-list. Frontend: app/(tabs)/index.tsx — aggiunto locateButton (icona navigate, Colors.accent) nelle liste Biker disponibili e Zavorrine disponibili, con stesso comportamento della lista Online (setShowBikerList/setShowZavorrinaList false, setLastSmallMapCenter, focusOnCoordinate + handleUserPress dopo 300ms). Visibile solo se l'utente ha coordinate valide e non è l'utente stesso. CURRENT_OTA_NUMBER=32.",
+    "releaseId": "8f1f8008-2182-46c5-94ed-71190e768500",
+    "bundleUrl": "private/ota/ota-1.32.0-1776085092676.js",
+    "updateGroupId": "d436858e-97be-4e3d-8ade-d331b9c201cb",
+    "androidUpdateId": "019d86ec-8393-7af2-88d2-135945f85077",
+    "iosUpdateId": null,
+    "commitBase": "60ad91d",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/d436858e-97be-4e3d-8ade-d331b9c201cb",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "published"
   }
 ]

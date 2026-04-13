@@ -1063,6 +1063,23 @@ export default function MapScreen() {
                       {!!u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
                       {!!u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
                     </View>
+                    {u.latitude != null && u.longitude != null && u.id !== user?.id && (
+                      <Pressable
+                        style={styles.locateButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          setShowBikerList(false);
+                          setLastSmallMapCenter({ latitude: u.latitude, longitude: u.longitude });
+                          const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
+                          setTimeout(() => {
+                            activeRef.current?.focusOnCoordinate({ latitude: u.latitude, longitude: u.longitude });
+                            handleUserPress({ id: u.id, nickname: u.nickname, userType: u.userType, latitude: u.latitude, longitude: u.longitude });
+                          }, 300);
+                        }}
+                      >
+                        <Ionicons name="navigate" size={18} color={Colors.accent} />
+                      </Pressable>
+                    )}
                     {u.distance != null && u.id !== user?.id && (
                       <View style={styles.userListDistance}>
                         <Text style={styles.distanceText}>{u.distance} km</Text>
@@ -1111,6 +1128,23 @@ export default function MapScreen() {
                       {!!u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
                       {!!u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
                     </View>
+                    {u.latitude != null && u.longitude != null && u.id !== user?.id && (
+                      <Pressable
+                        style={styles.locateButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          setShowZavorrinaList(false);
+                          setLastSmallMapCenter({ latitude: u.latitude, longitude: u.longitude });
+                          const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
+                          setTimeout(() => {
+                            activeRef.current?.focusOnCoordinate({ latitude: u.latitude, longitude: u.longitude });
+                            handleUserPress({ id: u.id, nickname: u.nickname, userType: u.userType, latitude: u.latitude, longitude: u.longitude });
+                          }, 300);
+                        }}
+                      >
+                        <Ionicons name="navigate" size={18} color={Colors.accent} />
+                      </Pressable>
+                    )}
                     {u.distance != null && u.id !== user?.id && (
                       <View style={styles.userListDistance}>
                         <Text style={styles.distanceText}>{u.distance} km</Text>
