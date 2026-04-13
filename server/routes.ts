@@ -625,6 +625,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/bg-location", async (_req, res) => {
+    try {
+      const [enabled, trigger, interval, notificationText, ghostModeContinue] = await Promise.all([
+        storage.getAppSetting("bg_location_enabled"),
+        storage.getAppSetting("bg_location_trigger"),
+        storage.getAppSetting("bg_location_interval_seconds"),
+        storage.getAppSetting("bg_location_notification_text"),
+        storage.getAppSetting("bg_location_ghost_mode_continue"),
+      ]);
+      res.json({
+        enabled: enabled?.value !== "false",
+        trigger: trigger?.value || "always",
+        intervalSeconds: interval?.value ? parseInt(interval.value, 10) : 30,
+        notificationText: notificationText?.value || "BikerLink: {motivo} — posizione attiva in background",
+        ghostModeContinue: ghostModeContinue?.value === "true",
+      });
+    } catch {
+      res.json({
+        enabled: true,
+        trigger: "always",
+        intervalSeconds: 30,
+        notificationText: "BikerLink: {motivo} — posizione attiva in background",
+        ghostModeContinue: false,
+      });
+    }
+  });
+
+  app.post("/api/location/bg-update", async (req: any, res) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Non autenticato" });
+      }
+      const userId: string = req.session.userId;
+      const { latitude, longitude, altitude, accuracy, timestamp, activeRouteId, isSosActive, isGhostMode } = req.body;
+      if (typeof latitude !== "number" || typeof longitude !== "number") {
+        return res.status(400).json({ message: "Coordinate non valide" });
+      }
+      try {
+        const profileUpdate: any = { latitude, longitude, coordinatesUpdatedAt: new Date() };
+        const existing = await storage.getUserProfile(userId);
+        if (existing) {
+          await storage.updateUserProfile(userId, profileUpdate);
+        }
+        storage.saveCoordinateHistory(userId, latitude, longitude).catch(() => {});
+      } catch {}
+
+      if (activeRouteId && typeof activeRouteId === "string") {
+        try {
+          const route = await storage.getRoute(activeRouteId);
+          if (route && route.userId === userId && route.status === "active") {
+            const point: any = {
+              routeId: activeRouteId,
+              latitude,
+              longitude,
+              altitude: typeof altitude === "number" ? altitude : null,
+              speedKmh: null,
+              timestamp: timestamp ? new Date(timestamp) : new Date(),
+            };
+            await storage.createRoutePoints([point]);
+          }
+        } catch {}
+      }
+
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error("BG location update error:", error);
+      return res.status(500).json({ message: "Errore interno del server" });
+    }
+  });
+
   app.get("/api/settings/all", async (_req, res) => {
     try {
       const [syneco, emailVerification, chatbot, autoMatching, customRoutes, paypal, sosEnabled, mapsEnabled, mapsProvider] = await Promise.all([

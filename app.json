@@ -17,13 +17,14 @@
       "buildNumber": "1",
       "bundleIdentifier": "com.bikerlink.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "BikerLink usa la tua posizione per mostrare i motociclisti vicini e registrare i tuoi giri.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "BikerLink usa la posizione in background per registrare il percorso anche a schermo spento.",
+        "NSLocationWhenInUseUsageDescription": "BikerLink usa la tua posizione GPS per mostrare i motociclisti vicini, registrare i tuoi percorsi in moto e ricevere avvisi SOS dalla community.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "BikerLink ha bisogno di accedere alla posizione anche in background per tre motivi: (1) registrare il percorso in moto senza interruzioni anche quando l'app è minimizzata, (2) inviare la tua posizione al server durante un'emergenza SOS anche con lo schermo spento, (3) ricevere e inviare avvisi SOS alla community in tempo reale. Senza questo permesso il tracciamento si interromperà ogni volta che passi ad un'altra app.",
+        "NSLocationAlwaysUsageDescription": "BikerLink usa la posizione in background per il tracciamento percorsi in moto, la funzione SOS d'emergenza e la sicurezza della community.",
         "NSPhotoLibraryUsageDescription": "BikerLink accede alle tue foto per caricare immagini del profilo e delle moto.",
         "NSCameraUsageDescription": "BikerLink accede alla fotocamera per scattare foto del profilo e delle moto.",
         "NSMusicUsageDescription": "BikerLink accede alla tua libreria musicale per riprodurre brani in-app.",
         "NSAppleMusicUsageDescription": "BikerLink accede ad Apple Music per mostrare e riprodurre brani.",
-        "UIBackgroundModes": ["audio", "fetch"],
+        "UIBackgroundModes": ["location", "fetch", "audio"],
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         }
@@ -34,7 +35,9 @@
       "versionCode": 10,
       "jsEngine": "hermes",
       "config": {
-        "googleMaps": {}
+        "googleMaps": {
+          "apiKey": ""
+        }
       },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
@@ -44,6 +47,7 @@
         "READ_MEDIA_AUDIO",
         "CAMERA",
         "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
         "FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
       "adaptiveIcon": {

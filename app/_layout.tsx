@@ -10,9 +10,14 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
 import { getApiUrl } from "@/lib/query-client";
-import { Platform, AppState, ActivityIndicator, View, StyleSheet } from "react-native";
+import { Platform, AppState, ActivityIndicator, View, StyleSheet, Text, TouchableOpacity } from "react-native";
 import * as Location from "expo-location";
 import * as Updates from "expo-updates";
+import { useLocationGate } from "@/lib/location-context";
+import Colors from "@/constants/colors";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { startBgLocationTask, stopBgLocationTask } from "@/lib/background-location-task";
 
 if (Platform.OS === "web" && typeof window !== "undefined") {
   const link = document.createElement("link");
@@ -237,6 +242,97 @@ function OtaStartupChecker() {
   return null;
 }
 
+function BgLocationManager() {
+  const { user } = useAuth();
+  const { hasBackgroundPermission } = useLocationGate();
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    if (!user || !hasBackgroundPermission) {
+      stopBgLocationTask().catch(() => {});
+      return;
+    }
+
+    const apiBase = getApiUrl();
+    AsyncStorage.setItem("api_base_url", apiBase).catch(() => {});
+
+    (async () => {
+      const [settingsRes, profileRes] = await Promise.allSettled([
+        fetch(new URL("/api/settings/bg-location", apiBase).toString(), { credentials: "include" }),
+        fetch(new URL("/api/users/profile", apiBase).toString(), { credentials: "include" }),
+      ]);
+
+      let enabled = true;
+      let trigger = "always";
+      let intervalSeconds = 30;
+      let notificationText = "BikerLink: {motivo} — posizione attiva in background";
+      let ghostModeContinue = false;
+
+      if (settingsRes.status === "fulfilled" && settingsRes.value.ok) {
+        try {
+          const data = await settingsRes.value.json();
+          enabled = data.enabled !== false;
+          trigger = data.trigger || "always";
+          intervalSeconds = data.intervalSeconds || 30;
+          notificationText = data.notificationText || notificationText;
+          ghostModeContinue = data.ghostModeContinue === true;
+        } catch {}
+      }
+
+      if (profileRes.status === "fulfilled" && profileRes.value.ok) {
+        try {
+          const profileData = await profileRes.value.json();
+          const isGhostMode = profileData?.ghostMode === true;
+          await AsyncStorage.setItem("user_ghost_mode", isGhostMode ? "true" : "false");
+        } catch {}
+      }
+
+      if (enabled) {
+        startBgLocationTask({
+          enabled,
+          trigger,
+          intervalSeconds,
+          notificationText,
+          ghostModeContinue,
+        }).catch(() => {});
+      }
+    })();
+  }, [user?.id, hasBackgroundPermission]);
+
+  return null;
+}
+
+function BgLocationRevokedBanner() {
+  const { bgPermissionRevoked, dismissBgRevokedBanner } = useLocationGate();
+  const insets = useSafeAreaInsets();
+
+  if (!bgPermissionRevoked || Platform.OS === "web") return null;
+
+  const openSettings = () => {
+    const { Linking } = require("react-native");
+    if (Platform.OS === "ios") {
+      Linking.openURL("app-settings:");
+    } else {
+      Linking.openSettings();
+    }
+  };
+
+  return (
+    <View style={[bannerStyles.container, { top: insets.top + 4 }]}>
+      <Ionicons name="location-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+      <Text style={bannerStyles.text} numberOfLines={2}>
+        Permesso posizione background revocato. Riabilita in Impostazioni per continuare il tracciamento.
+      </Text>
+      <TouchableOpacity onPress={openSettings} style={bannerStyles.settingsBtn}>
+        <Text style={bannerStyles.settingsBtnText}>Apri</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={dismissBgRevokedBanner} style={bannerStyles.closeBtn}>
+        <Ionicons name="close" size={16} color="#fff" />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 function AdminUptimeOverlay() {
   const { user } = useAuth();
   const [enabled, setEnabled] = useState<boolean>(false);
@@ -350,6 +446,8 @@ export default function RootLayout() {
                   <MapReadyGate>
                     <AppStateHandler />
                     <AdminUptimeOverlay />
+                    <BgLocationManager />
+                    <BgLocationRevokedBanner />
                     <LanguageKeyedRoot />
                   </MapReadyGate>
                 </StartupGate>
@@ -370,5 +468,47 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+});
+
+const bannerStyles = StyleSheet.create({
+  container: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    backgroundColor: "#E63946",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    zIndex: 9999,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  text: {
+    flex: 1,
+    color: "#fff",
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  settingsBtn: {
+    backgroundColor: "rgba(255,255,255,0.25)",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginLeft: 8,
+  },
+  settingsBtnText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  closeBtn: {
+    marginLeft: 8,
+    padding: 2,
   },
 });

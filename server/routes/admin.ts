@@ -3683,5 +3683,70 @@ router.post("/translations/restart", async (_req: Request, res: Response) => {
   }
 });
 
+router.get("/settings/bg-location", async (_req: Request, res: Response) => {
+  try {
+    const [enabled, trigger, interval, notificationText, ghostModeContinue] = await Promise.all([
+      storage.getAppSetting("bg_location_enabled"),
+      storage.getAppSetting("bg_location_trigger"),
+      storage.getAppSetting("bg_location_interval_seconds"),
+      storage.getAppSetting("bg_location_notification_text"),
+      storage.getAppSetting("bg_location_ghost_mode_continue"),
+    ]);
+    return res.json({
+      enabled: enabled?.value !== "false",
+      trigger: trigger?.value || "always",
+      intervalSeconds: interval?.value ? parseInt(interval.value, 10) : 30,
+      notificationText: notificationText?.value || "BikerLink: {motivo} — posizione attiva in background",
+      ghostModeContinue: ghostModeContinue?.value === "true",
+    });
+  } catch (error) {
+    console.error("Get bg-location settings error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.patch("/settings/bg-location", async (req: Request, res: Response) => {
+  try {
+    const { enabled, trigger, intervalSeconds, notificationText, ghostModeContinue } = req.body;
+    const validTriggers = ["always", "tracking", "sos", "tracking_or_sos"];
+
+    if (enabled !== undefined) {
+      await storage.upsertAppSetting("bg_location_enabled", enabled ? "true" : "false");
+    }
+    if (trigger !== undefined) {
+      if (!validTriggers.includes(trigger)) {
+        return res.status(400).json({ message: "Modalità trigger non valida" });
+      }
+      await storage.upsertAppSetting("bg_location_trigger", trigger);
+    }
+    if (intervalSeconds !== undefined) {
+      const val = parseInt(intervalSeconds, 10);
+      if (isNaN(val) || val < 10 || val > 300) {
+        return res.status(400).json({ message: "Intervallo deve essere tra 10 e 300 secondi" });
+      }
+      await storage.upsertAppSetting("bg_location_interval_seconds", String(val));
+    }
+    if (notificationText !== undefined) {
+      await storage.upsertAppSetting("bg_location_notification_text", String(notificationText).substring(0, 200));
+    }
+    if (ghostModeContinue !== undefined) {
+      await storage.upsertAppSetting("bg_location_ghost_mode_continue", ghostModeContinue ? "true" : "false");
+    }
+
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_setting",
+      targetType: "setting",
+      targetId: "bg_location",
+      details: "Impostazioni background location aggiornate",
+    });
+
+    return res.json({ message: "Impostazioni background location aggiornate" });
+  } catch (error) {
+    console.error("Update bg-location settings error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 export default router;
 

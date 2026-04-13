@@ -23,6 +23,8 @@ import * as Location from "expo-location";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getCurrentLocale } from "@/lib/i18n";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
+import { setBgActiveRoute, updateBgTaskNotification } from "@/lib/background-location-task";
+import { useLocationGate } from "@/lib/location-context";
 
 interface RouteRecord {
   id: string;
@@ -96,6 +98,7 @@ function getBatteryIcon(impact: BatteryImpact): string {
 
 export default function TrackingScreen() {
   const insets = useSafeAreaInsets();
+  const { requestBackgroundPermission, hasBackgroundPermission } = useLocationGate();
 
   const [isTracking, setIsTracking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -402,12 +405,11 @@ export default function TrackingScreen() {
           return;
         }
 
-        try {
-          const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
-          if (bgStatus === "granted") {
-            // background available — can be used for future background task
-          }
-        } catch {}
+        if (!hasBackgroundPermission) {
+          try {
+            await requestBackgroundPermission();
+          } catch {}
+        }
       } else {
         const perm = await new Promise<boolean>((resolve) => {
           if (!navigator.geolocation) {
@@ -440,6 +442,11 @@ export default function TrackingScreen() {
 
       const data = await res.json();
       routeIdRef.current = data.id;
+
+      if (Platform.OS !== "web") {
+        await setBgActiveRoute(data.id);
+        updateBgTaskNotification("BikerLink: {motivo} — posizione attiva in background", true, false).catch(() => {});
+      }
 
       setTotalTime(0);
       setIdleTime(0);
@@ -532,6 +539,11 @@ export default function TrackingScreen() {
 
     const routeId = routeIdRef.current;
     if (!routeId) return;
+
+    if (Platform.OS !== "web") {
+      await setBgActiveRoute(null);
+      updateBgTaskNotification("BikerLink: {motivo} — posizione attiva in background", false, false).catch(() => {});
+    }
 
     setLoading(true);
     try {

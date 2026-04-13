@@ -296,6 +296,7 @@ export default function AdminSettings() {
   const [musicSystemExpanded, setMusicSystemExpanded] = useState(false);
   const [mapsExpanded, setMapsExpanded] = useState(false);
   const [docsExpanded, setDocsExpanded] = useState(false);
+  const [bgLocationExpanded, setBgLocationExpanded] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem("uptime_widget_enabled").then((val) => {
@@ -396,6 +397,48 @@ export default function AdminSettings() {
   const { data: chSearchResults } = useQuery<Array<{ id: string; nickname: string; userType: string }>>({
     queryKey: ["/api/users/search", chUserSearch],
     enabled: coordHistoryExpanded && coordHistorySettings?.mode === "selected" && chUserSearch.length >= 2,
+  });
+
+  const { data: bgLocationSettings, refetch: refetchBgLocation } = useQuery<{
+    enabled: boolean;
+    trigger: string;
+    intervalSeconds: number;
+    notificationText: string;
+    ghostModeContinue: boolean;
+  }>({
+    queryKey: ["/api/admin/settings/bg-location"],
+  });
+  const [bgIntervalInput, setBgIntervalInput] = useState("");
+  const [bgNotificationTextInput, setBgNotificationTextInput] = useState("");
+  useEffect(() => {
+    if (bgLocationSettings?.intervalSeconds != null && bgIntervalInput === "") {
+      setBgIntervalInput(String(bgLocationSettings.intervalSeconds));
+    }
+    if (bgLocationSettings?.notificationText != null && bgNotificationTextInput === "") {
+      setBgNotificationTextInput(bgLocationSettings.notificationText);
+    }
+  }, [bgLocationSettings]);
+
+  const bgLocationMutation = useMutation({
+    mutationFn: async (body: Record<string, any>) => {
+      const url = new URL("/api/admin/settings/bg-location", getApiUrl());
+      const res = await fetch(url.toString(), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Errore" }));
+        throw new Error(err.message);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchBgLocation();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/bg-location"] });
+    },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const { data: primalData } = useQuery<{ enabled: boolean }>({
@@ -1930,6 +1973,157 @@ export default function AdminSettings() {
         )}
       </View>
 
+      <View style={styles.accordionPanel}>
+        <Pressable style={styles.accordionPanelHeader} onPress={() => setBgLocationExpanded((v) => !v)}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="location" size={20} color={Colors.accent} />
+            <Text style={styles.accordionPanelTitle}>Background Location</Text>
+          </View>
+          <Ionicons name={bgLocationExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+        </Pressable>
+        {bgLocationExpanded && (
+          <View style={styles.accordionPanelContent}>
+            <View style={styles.paidCard}>
+              <View style={styles.synecoHeader}>
+                <View style={styles.synecoInfo}>
+                  <Ionicons name="power" size={20} color={Colors.accent} />
+                  <Text style={styles.synecoLabel}>Attivo Globalmente</Text>
+                </View>
+                <Switch
+                  value={bgLocationSettings?.enabled !== false}
+                  onValueChange={(val) => bgLocationMutation.mutate({ enabled: val })}
+                  trackColor={{ false: Colors.border, true: Colors.accent }}
+                  thumbColor={bgLocationSettings?.enabled !== false ? Colors.text : Colors.textSecondary}
+                  disabled={bgLocationMutation.isPending}
+                />
+              </View>
+              <Text style={styles.synecoDesc}>
+                {bgLocationSettings?.enabled !== false
+                  ? "Il tracciamento in background è abilitato"
+                  : "Il tracciamento in background è disabilitato per tutti"}
+              </Text>
+            </View>
+
+            <View style={styles.paidCard}>
+              <View style={styles.synecoHeader}>
+                <View style={styles.synecoInfo}>
+                  <Ionicons name="git-branch" size={20} color={Colors.accent} />
+                  <Text style={styles.synecoLabel}>Modalità Trigger</Text>
+                </View>
+              </View>
+              <Text style={styles.synecoDesc}>Quando inviare la posizione in background:</Text>
+              {[
+                { value: "always", label: "Sempre", desc: "Invia la posizione indipendentemente dallo stato" },
+                { value: "tracking", label: "Solo tracking attivo", desc: "Solo durante la registrazione di un percorso" },
+                { value: "sos", label: "Solo SOS attivo", desc: "Solo durante un'emergenza SOS" },
+                { value: "tracking_or_sos", label: "Tracking O SOS", desc: "Se è attivo il tracking o una SOS" },
+              ].map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  onPress={() => bgLocationMutation.mutate({ trigger: opt.value })}
+                  style={[
+                    bgLocationStyles.triggerOption,
+                    bgLocationSettings?.trigger === opt.value && bgLocationStyles.triggerOptionActive,
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[bgLocationStyles.triggerLabel, bgLocationSettings?.trigger === opt.value && bgLocationStyles.triggerLabelActive]}>
+                      {opt.label}
+                    </Text>
+                    <Text style={styles.synecoDesc}>{opt.desc}</Text>
+                  </View>
+                  {bgLocationSettings?.trigger === opt.value && (
+                    <Ionicons name="checkmark-circle" size={20} color={Colors.accent} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.paidCard}>
+              <View style={styles.synecoHeader}>
+                <View style={styles.synecoInfo}>
+                  <Ionicons name="timer" size={20} color={Colors.accent} />
+                  <Text style={styles.synecoLabel}>Intervallo (secondi)</Text>
+                </View>
+              </View>
+              <Text style={styles.synecoDesc}>Frequenza di invio posizione (min 10s, max 300s):</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10 }}>
+                <TextInput
+                  style={{ flex: 1, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, color: Colors.text, fontSize: 14, backgroundColor: Colors.surface }}
+                  value={bgIntervalInput}
+                  onChangeText={setBgIntervalInput}
+                  keyboardType="number-pad"
+                  placeholder="30"
+                  placeholderTextColor={Colors.textSecondary}
+                />
+                <TouchableOpacity
+                  style={styles.saveBtn}
+                  onPress={() => {
+                    const val = parseInt(bgIntervalInput, 10);
+                    if (isNaN(val) || val < 10 || val > 300) {
+                      Alert.alert("Errore", "Inserisci un valore tra 10 e 300 secondi");
+                      return;
+                    }
+                    bgLocationMutation.mutate({ intervalSeconds: val });
+                  }}
+                  disabled={bgLocationMutation.isPending}
+                >
+                  <Text style={styles.saveBtnText}>Salva</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.paidCard}>
+              <View style={styles.synecoHeader}>
+                <View style={styles.synecoInfo}>
+                  <Ionicons name="notifications" size={20} color={Colors.accent} />
+                  <Text style={styles.synecoLabel}>Testo Notifica Persistente</Text>
+                </View>
+              </View>
+              <Text style={styles.synecoDesc}>
+                Usa {"{motivo}"} come placeholder dinamico (es. "tracking percorso", "SOS attivo", "monitoraggio generale"):
+              </Text>
+              <TextInput
+                style={{ borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, color: Colors.text, fontSize: 14, backgroundColor: Colors.surface, marginTop: 10, height: 70, textAlignVertical: "top" }}
+                value={bgNotificationTextInput}
+                onChangeText={setBgNotificationTextInput}
+                multiline
+                placeholder="BikerLink: {motivo} — posizione attiva in background"
+                placeholderTextColor={Colors.textSecondary}
+              />
+              <TouchableOpacity
+                style={[styles.saveBtn, { alignSelf: "flex-end", marginTop: 8 }]}
+                onPress={() => bgLocationMutation.mutate({ notificationText: bgNotificationTextInput })}
+                disabled={bgLocationMutation.isPending}
+              >
+                <Text style={styles.saveBtnText}>Salva Testo</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.paidCard}>
+              <View style={styles.synecoHeader}>
+                <View style={styles.synecoInfo}>
+                  <Ionicons name="eye-off" size={20} color={Colors.accent} />
+                  <Text style={styles.synecoLabel}>Continua con Ghost Mode</Text>
+                </View>
+                <Switch
+                  value={bgLocationSettings?.ghostModeContinue === true}
+                  onValueChange={(val) => bgLocationMutation.mutate({ ghostModeContinue: val })}
+                  trackColor={{ false: Colors.border, true: Colors.accent }}
+                  thumbColor={bgLocationSettings?.ghostModeContinue ? Colors.text : Colors.textSecondary}
+                  disabled={bgLocationMutation.isPending}
+                />
+              </View>
+              <Text style={styles.synecoDesc}>
+                {bgLocationSettings?.ghostModeContinue
+                  ? "La posizione viene inviata in background anche quando Ghost Mode è attivo"
+                  : "Il background location si interrompe quando l'utente attiva Ghost Mode"}
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
+
       <View style={styles.synecoCard}>
         <View style={styles.synecoHeader}>
           <View style={styles.synecoInfo}>
@@ -3279,5 +3473,33 @@ const themeStyles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     lineHeight: 15,
+  },
+});
+
+const bgLocationStyles = StyleSheet.create({
+  triggerOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.background,
+    marginTop: 8,
+    gap: 10,
+  },
+  triggerOptionActive: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent + "15",
+  },
+  triggerLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginBottom: 2,
+  },
+  triggerLabelActive: {
+    color: Colors.accent,
   },
 });
