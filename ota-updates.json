@@ -1725,5 +1725,26 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 31,
+    "version": "1.31.0",
+    "runtimeVersion": "4.0.0",
+    "date": "2026-04-13",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-31 rv4.0.0: ampliamento lista moto (brand storici/moderni) + nota Piaggio",
+    "note": "Task #558. motorcycle-data.ts: lista moto completamente rivista — brand esistenti razionalizzati (es. CB unica voce, Z naked unica voce, Ninja ZX unica voce, Duke unica voce, Monster unica voce, Tiger unica voce, ecc.) + nuovi modelli aggiunti per ogni brand. Aggiunti 25 nuovi brand: storici (AJS, Ariel, Brough Superior, Douglas, FN, Francis-Barnett, Henderson, Laverda, Matchless, Nimbus, Panther, Puch, Scott, Sunbeam, Velocette, Vincent) e moderni (Cleveland CycleWerks, Daelim, Derbi, FB Mondial, Husaberg, Hyosung, Italjet, Keeway, Montesa, MZ/MuZ, Ossa, Peugeot Motocycles, QJMotor, TM Racing, Zündapp). Aggiunto export BRAND_NOTES con nota Piaggio. garage.tsx: mostra riquadro avviso giallo sotto il picker brand se il brand selezionato ha una nota in BRAND_NOTES — applicato sia al form moto biker (GarageContent) sia al form wishlist (WishlistScreen/zavorrine). CURRENT_OTA_NUMBER=31.",
+    "releaseId": "d2e38b55-ccc8-4be5-a53d-eaa371e35ad1",
+    "bundleUrl": "private/ota/ota-1.31.0-1776084281520.js",
+    "updateGroupId": "a597a415-4a02-44bc-b253-e413e180174a",
+    "androidUpdateId": "019d86e0-2c66-7740-9742-6e05bbca572d",
+    "iosUpdateId": null,
+    "commitBase": "31fa870",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/a597a415-4a02-44bc-b253-e413e180174a",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "published"
   }
 ]

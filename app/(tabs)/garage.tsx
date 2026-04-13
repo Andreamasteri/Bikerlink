@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Switch } from "react-native";
 import { useT } from "@/lib/language-context";
 import MotoPicker from "@/components/MotoPicker";
-import { MOTORCYCLE_BRANDS, getModelsForBrand } from "@/lib/motorcycle-data";
+import { MOTORCYCLE_BRANDS, getModelsForBrand, BRAND_NOTES } from "@/lib/motorcycle-data";
 import { useRouter } from "expo-router";
 
 const MOTO_TYPES = [
@@ -296,6 +296,11 @@ function WishlistScreen() {
                 items={MOTORCYCLE_BRANDS}
                 label={t("garage.brand")}
               />
+              {BRAND_NOTES[motoForm.brand] ? (
+                <View style={styles.brandNoteBox}>
+                  <Text style={styles.brandNoteText}>{BRAND_NOTES[motoForm.brand]}</Text>
+                </View>
+              ) : null}
 
               <Text style={styles.label}>{t("garage.model")}</Text>
               <MotoPicker
@@ -615,6 +620,11 @@ function GarageContent() {
                 items={MOTORCYCLE_BRANDS}
                 label={t("garage.brand")}
               />
+              {BRAND_NOTES[form.brand] ? (
+                <View style={styles.brandNoteBox}>
+                  <Text style={styles.brandNoteText}>{BRAND_NOTES[form.brand]}</Text>
+                </View>
+              ) : null}
 
               <Text style={styles.label}>{t("garage.model")} *</Text>
               <MotoPicker
@@ -798,6 +808,15 @@ const styles = StyleSheet.create({
   defaultLabel: { fontSize: 15, fontFamily: "Inter_400Regular", color: Colors.text },
   saveBtn: { backgroundColor: Colors.accent, paddingVertical: 16, borderRadius: 10, alignItems: "center", marginTop: 20 },
   saveBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.background },
+  brandNoteBox: {
+    backgroundColor: Colors.warning + "15",
+    borderWidth: 1,
+    borderColor: Colors.warning + "40",
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 8,
+  },
+  brandNoteText: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.warning },
 });
 
 const sessionExpiredBtn = {
