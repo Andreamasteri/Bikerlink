@@ -71,7 +71,7 @@ function toFormState(evt: EventDTO): FormState {
     title: evt.title,
     eventType: evt.eventType,
     description: evt.description ?? "",
-    eventDate: evt.eventDate ? evt.eventDate.substring(0, 10) : "",
+    eventDate: evt.eventDate ? evt.eventDate.substring(0, 10).split("-").reverse().join(".") : "",
     eventTime: evt.eventTime ?? "",
     locationName: evt.locationName ?? "",
     latitude: evt.latitude != null ? String(evt.latitude) : "",
@@ -115,7 +115,7 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
         title: form.title.trim(),
         eventType: form.eventType,
         description: form.description.trim() || undefined,
-        eventDate: form.eventDate,
+        eventDate: form.eventDate.split(".").reverse().join("-"),
         eventTime: form.eventTime.trim() || undefined,
         locationName: form.locationName.trim() || undefined,
         latitude: form.latitude ? parseFloat(form.latitude) : undefined,
@@ -179,11 +179,11 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
       return;
     }
     if (!form.eventDate) {
-      Alert.alert("Attenzione", "La data è obbligatoria (formato AAAA-MM-GG)");
+      Alert.alert("Attenzione", "La data è obbligatoria (formato GG.MM.AAAA)");
       return;
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(form.eventDate)) {
-      Alert.alert("Attenzione", "Formato data non valido. Usa AAAA-MM-GG (es. 2025-07-12)");
+    if (!/^\d{2}\.\d{2}\.\d{4}$/.test(form.eventDate)) {
+      Alert.alert("Attenzione", "Formato data non valido. Usa GG.MM.AAAA (es. 12.07.2025)");
       return;
     }
     if (form.websiteUrl && !/^https?:\/\/.+/.test(form.websiteUrl)) {
@@ -310,12 +310,12 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
 
           <Text style={styles.sectionTitle}>Data e luogo</Text>
 
-          <Text style={styles.label}>Data * (AAAA-MM-GG)</Text>
+          <Text style={styles.label}>Data * (GG.MM.AAAA)</Text>
           <TextInput
             style={styles.input}
             value={form.eventDate}
             onChangeText={(v) => set("eventDate", v)}
-            placeholder="es. 2025-07-12"
+            placeholder="es. 12.07.2025"
             placeholderTextColor={Colors.textSecondary}
             keyboardType="numeric"
             maxLength={10}
