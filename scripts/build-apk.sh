@@ -82,7 +82,7 @@ set +e
 CI=1 \
 EAS_SKIP_AUTO_FINGERPRINT=1 \
 EXPO_PUBLIC_DOMAIN=biker-link.replit.app \
-npx eas-cli@latest build \
+npx eas-cli@16 build \
   --platform android \
   --profile "$PROFILE" \
   --clear-cache \
