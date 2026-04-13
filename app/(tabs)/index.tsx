@@ -33,6 +33,7 @@ import { useT, useLocale } from "@/lib/language-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { User } from "@shared/schema";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
+import FavoriteStar from "@/components/FavoriteStar";
 
 type UserWithProfileCoords = Omit<User, "password"> & {
   profileLatitude?: number | null;
@@ -753,7 +754,10 @@ export default function MapScreen() {
                   <TouchableOpacity key={u.id} style={styles.searchResultItem} onPress={() => handleSearchResultPress(u)}>
                     <Ionicons name={getUserIcon(u)} size={22} color={getUserColor(u)} style={{ marginRight: 10 }} />
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.searchResultName}>{u.nickname}</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Text style={styles.searchResultName}>{u.nickname}</Text>
+                        {u.id !== user?.id && <FavoriteStar targetUserId={u.id} size={14} />}
+                      </View>
                       <Text style={styles.searchResultDetail}>{getUserTypeLabel(u)}{u.country ? ` · ${getCountryFlag(u.country)} ${getCountryName(u.country)}` : ""}{u.region ? ` · ${u.region}` : ""}{!u.latitude ? ` · ${t("home.locationUnavailable")}` : ""}</Text>
                     </View>
                   </TouchableOpacity>
@@ -892,7 +896,10 @@ export default function MapScreen() {
                       <TouchableOpacity key={u.id} style={styles.searchResultItem} onPress={() => { setMapFullscreen(false); handleSearchResultPress(u); }}>
                         <Ionicons name={getUserIcon(u)} size={22} color={getUserColor(u)} style={{ marginRight: 10 }} />
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.searchResultName}>{u.nickname}</Text>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                            <Text style={styles.searchResultName}>{u.nickname}</Text>
+                            {u.id !== user?.id && <FavoriteStar targetUserId={u.id} size={14} />}
+                          </View>
                           <Text style={styles.searchResultDetail}>{getUserTypeLabel(u)}{u.country ? ` · ${getCountryFlag(u.country)} ${getCountryName(u.country)}` : ""}{u.region ? ` · ${u.region}` : ""}{!u.latitude ? ` · ${t("home.locationUnavailable")}` : ""}</Text>
                         </View>
                       </TouchableOpacity>
@@ -976,7 +983,10 @@ export default function MapScreen() {
                       {u.isAvailable ? <View style={styles.availableDot} /> : showOfflineOnline ? <View style={[styles.availableDot, { backgroundColor: "#666" }]} /> : null}
                     </View>
                     <View style={styles.userListInfo}>
-                      <Text style={styles.userListName}>{u.nickname}</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Text style={styles.userListName}>{u.nickname}</Text>
+                        {u.id !== user?.id && <FavoriteStar targetUserId={u.id} size={14} />}
+                      </View>
                       <Text style={styles.userListDetail}>{getUserTypeLabel(u)}{u.sex ? ` · ${u.sex === "M" ? "M" : "F"}` : ""}{u.country ? ` · ${getCountryFlag(u.country)} ${getCountryName(u.country)}` : ""}{u.region ? ` · ${u.region}` : ""}</Text>
                       {!!u.moto && <Text style={styles.userListDetail}>{u.moto}{u.ridingStyle ? ` · ${u.ridingStyle}` : ""}</Text>}
                       {!!u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
@@ -1038,7 +1048,10 @@ export default function MapScreen() {
                       {u.isAvailable ? <View style={styles.availableDot} /> : null}
                     </View>
                     <View style={styles.userListInfo}>
-                      <Text style={styles.userListName}>{u.nickname}</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Text style={styles.userListName}>{u.nickname}</Text>
+                        {u.id !== user?.id && <FavoriteStar targetUserId={u.id} size={14} />}
+                      </View>
                       <Text style={styles.userListDetail}>{getUserTypeLabel(u)}{u.sex ? ` · ${u.sex === "M" ? "M" : "F"}` : ""}{u.country ? ` · ${getCountryFlag(u.country)} ${getCountryName(u.country)}` : ""}{u.region ? ` · ${u.region}` : ""}</Text>
                       {!!u.moto && <Text style={styles.userListDetail}>{u.moto}{u.ridingStyle ? ` · ${u.ridingStyle}` : ""}</Text>}
                       {!!u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
@@ -1084,7 +1097,10 @@ export default function MapScreen() {
                       {u.isAvailable ? <View style={styles.availableDot} /> : null}
                     </View>
                     <View style={styles.userListInfo}>
-                      <Text style={styles.userListName}>{u.nickname}</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Text style={styles.userListName}>{u.nickname}</Text>
+                        {u.id !== user?.id && <FavoriteStar targetUserId={u.id} size={14} />}
+                      </View>
                       <Text style={styles.userListDetail}>{getUserTypeLabel(u)}{u.sex ? ` · ${u.sex === "M" ? "M" : "F"}` : ""}{u.country ? ` · ${getCountryFlag(u.country)} ${getCountryName(u.country)}` : ""}{u.region ? ` · ${u.region}` : ""}</Text>
                       {!!u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
                       {!!u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}

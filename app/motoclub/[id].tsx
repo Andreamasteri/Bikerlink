@@ -19,6 +19,8 @@ import MapView, { Marker } from "react-native-maps";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import * as Location from "expo-location";
+import FavoriteStar from "@/components/FavoriteStar";
+import { useAuth } from "@/lib/auth-context";
 
 const PAGE_SIZE = 30;
 const INITIAL_VISIBLE = 5;
@@ -101,6 +103,7 @@ export default function ClubDetailScreen() {
   const { id, conversationId: convParam } = useLocalSearchParams<{ id: string; conversationId?: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user: currentUser } = useAuth();
 
   const conversationId = convParam ?? null;
 
@@ -314,6 +317,7 @@ export default function ClubDetailScreen() {
             <View style={styles.memberInfo}>
               <View style={styles.memberRow}>
                 <Text style={styles.memberName}>@{item.nickname}</Text>
+                {item.profileId !== currentUser?.id && <FavoriteStar targetUserId={item.profileId} size={14} />}
                 {item.role === "admin" && (
                   <View style={[styles.rolePill, { backgroundColor: Colors.accent + "22" }]}>
                     <Text style={[styles.rolePillText, { color: Colors.accent }]}>admin</Text>

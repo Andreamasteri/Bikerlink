@@ -277,7 +277,7 @@ export default function AdminUsers() {
             <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#FF00FF" }}>FAKE</Text>
           )}
           {item.isPrimal === true && (
-            <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#FFD700" }}>PRIMAL</Text>
+            <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#FF3B30" }}>PRIMAL</Text>
           )}
           <Text style={styles.nickname}>{item.nickname}</Text>
           <Text style={styles.email}>{item.email}</Text>
@@ -312,7 +312,7 @@ export default function AdminUsers() {
             onPress={() => primalMutation.mutate({ id: item.id, isPrimal: !item.isPrimal })}
             style={styles.actionBtn}
           >
-            <Ionicons name="star" size={22} color={item.isPrimal ? "#FFD700" : Colors.border} />
+            <Ionicons name="star" size={22} color={item.isPrimal ? "#FF3B30" : Colors.border} />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>

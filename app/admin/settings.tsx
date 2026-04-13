@@ -2360,13 +2360,13 @@ export default function AdminSettings() {
       <View style={styles.emailVerifCard}>
         <View style={styles.synecoHeader}>
           <View style={styles.synecoInfo}>
-            <Ionicons name="star" size={20} color="#FFD700" />
-            <Text style={styles.synecoLabel}>Primal User</Text>
+            <Ionicons name="star" size={20} color="#FF3B30" />
+            <Text style={[styles.synecoLabel, { color: "#FF3B30" }]}>Primal User</Text>
           </View>
           <Switch
             value={primalEnabled}
             onValueChange={(val) => primalMutation.mutate(val)}
-            trackColor={{ false: Colors.border, true: "#FFD700" }}
+            trackColor={{ false: Colors.border, true: "#FF3B30" }}
             thumbColor={primalEnabled ? Colors.text : Colors.textSecondary}
             disabled={primalMutation.isPending}
           />

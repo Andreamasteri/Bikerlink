@@ -53,6 +53,7 @@ BikerLink utilizes a modern full-stack architecture.
 - **Collectible Easter Eggs**: Geolocation-based hidden items.
 - **Admin & Moderation Panels**: Comprehensive tools for platform management.
 - **Automatic Matching**: Connects users based on profiles and preferences.
+- **User Favorites**: Users can mark other users as favorites via a star icon next to nicknames. Favorites are persisted in `user_favorites` table. FavoriteStar component (`components/FavoriteStar.tsx`) shown in all user lists. Primal star is red (#FF3B30), favorite star is yellow (#FFD700) when active, white outline when inactive.
 - **Custom Routes**: Allows users to create and share personalized routes.
 - **Advertisement System**: Targeted ad delivery.
 - **User Types**: Biker, Zavorrina/Zavorrino, Coppia with distinct functionalities.

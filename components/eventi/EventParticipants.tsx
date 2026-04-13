@@ -4,6 +4,8 @@ import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import type { EventParticipantDTO } from "@/shared/event-types";
+import FavoriteStar from "@/components/FavoriteStar";
+import { useAuth } from "@/lib/auth-context";
 
 interface EventParticipantsProps {
   participants: EventParticipantDTO[];
@@ -20,6 +22,8 @@ export default function EventParticipants({
   interestedCount,
   onPress,
 }: EventParticipantsProps) {
+  const { user } = useAuth();
+  const currentUserId = user?.id;
   const going = participants.filter((p) => p.participationStatus === "going");
   const interested = participants.filter((p) => p.participationStatus === "interested");
   const displayAvatars = going.slice(0, MAX_AVATARS);
@@ -101,6 +105,7 @@ export default function EventParticipants({
                 </View>
               )}
               <Text style={styles.participantName}>{p.nickname ?? "Utente"}</Text>
+              {p.userId !== currentUserId && <FavoriteStar targetUserId={p.userId} size={14} />}
               <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
             </Pressable>
           ))}
@@ -124,6 +129,7 @@ export default function EventParticipants({
                 </View>
               )}
               <Text style={styles.participantName}>{p.nickname ?? "Utente"}</Text>
+              {p.userId !== currentUserId && <FavoriteStar targetUserId={p.userId} size={14} />}
               <Ionicons name="help-circle" size={14} color={Colors.warning} />
             </Pressable>
           ))}

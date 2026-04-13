@@ -1273,6 +1273,23 @@ export const coordinateHistory = pgTable("coordinate_history", {
 export type CoordinateHistory = typeof coordinateHistory.$inferSelect;
 export type InsertCoordinateHistory = typeof coordinateHistory.$inferInsert;
 
+export const userFavorites = pgTable("user_favorites", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  favoriteUserId: varchar("favorite_user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("user_favorites_unique_idx").on(table.userId, table.favoriteUserId),
+  index("user_favorites_user_id_idx").on(table.userId),
+]);
+
+
 export const eventClubInvites = pgTable("event_club_invites", {
   id: varchar("id", { length: 36 })
     .primaryKey()

@@ -21,6 +21,7 @@ import Colors from "@/constants/colors";
 import { t, getCurrentLocale } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
+import FavoriteStar from "@/components/FavoriteStar";
 
 interface MessageSender {
   id: string;
@@ -603,6 +604,7 @@ export default function ChatConversationScreen() {
                     <Text style={styles.memberNickname}>{item.nickname}</Text>
                     <Text style={styles.memberUserType}>{item.userType}</Text>
                   </View>
+                  {item.id !== userId && <FavoriteStar targetUserId={item.id} size={14} />}
                 </View>
               )}
               ItemSeparatorComponent={() => <View style={styles.memberSeparator} />}

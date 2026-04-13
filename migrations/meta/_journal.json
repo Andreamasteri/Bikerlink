@@ -22,6 +22,13 @@
       "when": 1742553600000,
       "tag": "0002_gdpr_consent_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1776067401647,
+      "tag": "0004_user_favorites",
+      "breakpoints": true
     }
   ]
 }

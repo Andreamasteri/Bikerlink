@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useT } from "@/lib/language-context";
 import { getCurrentLocale } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/query-client";
+import FavoriteStar from "@/components/FavoriteStar";
 
 interface FriendItem {
   id: string;
@@ -143,6 +144,9 @@ function ConversationRow({ item, userId, onPress, onDelete, t }: { item: Convers
           <Text style={[styles.conversationTitle, item.unreadCount > 0 && styles.unreadTitle]} numberOfLines={1}>
             {title}
           </Text>
+          {item.conversationType === "private" && other && other.id !== userId && (
+            <FavoriteStar targetUserId={other.id} size={14} />
+          )}
           <Text style={styles.timeText}>{time}</Text>
         </View>
         <View style={styles.conversationFooter}>
@@ -386,7 +390,10 @@ export default function ChatScreen() {
                 <View style={[styles.friendAvatar, { backgroundColor: getUserTypeColor(item.userType, item.gender) }]}>
                   <Ionicons name="person" size={20} color="#fff" />
                 </View>
-                <Text style={styles.friendNickname} numberOfLines={1}>{item.nickname}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+                  <Text style={styles.friendNickname} numberOfLines={1}>{item.nickname}</Text>
+                  {item.id !== userId && <FavoriteStar targetUserId={item.id} size={12} />}
+                </View>
               </TouchableOpacity>
             )}
           />
@@ -472,6 +479,7 @@ export default function ChatScreen() {
                     <Ionicons name="person" size={18} color="#fff" />
                   </View>
                   <Text style={styles.userNickname}>{item.nickname}</Text>
+                  {item.id !== userId && <FavoriteStar targetUserId={item.id} size={14} />}
                   {sortOrder === "distance" && (
                     <Text style={styles.userDistance}>
                       {item.distance != null ? `${item.distance} km` : "–"}

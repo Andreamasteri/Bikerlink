@@ -35,8 +35,8 @@ import radioRoutes from "./routes/radio";
 import eventsRoutes from "./routes/events";
 import { triggerMatchingRun, triggerMatchingForUser } from "./matching-engine";
 import { db } from "./db";
-import { users } from "@shared/schema";
-import { ilike } from "drizzle-orm";
+import { users, userFavorites } from "@shared/schema";
+import { ilike, eq, and } from "drizzle-orm";
 import { onlineTracker } from "./online-tracker";
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
@@ -132,6 +132,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/lastfm", lastfmRoutes);
   app.use("/api/music/radio", radioRoutes);
   app.use("/api/events", eventsRoutes);
+
+  app.get("/api/favorites", async (req: Request, res: Response) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Non autenticato" });
+    try {
+      const rows = await db
+        .select({ favoriteUserId: userFavorites.favoriteUserId })
+        .from(userFavorites)
+        .where(eq(userFavorites.userId, req.session.userId));
+      return res.json(rows.map((r) => r.favoriteUserId));
+    } catch (error) {
+      console.error("Get favorites error:", error);
+      return res.status(500).json({ message: "Errore interno del server" });
+    }
+  });
+
+  app.post("/api/favorites/:userId", async (req: Request, res: Response) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Non autenticato" });
+    try {
+      const currentUserId = req.session.userId;
+      const targetUserId = req.params.userId as string;
+      if (currentUserId === targetUserId) {
+        return res.status(400).json({ message: "Non puoi aggiungere te stesso ai preferiti" });
+      }
+      const targetUser = await storage.getUser(targetUserId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "Utente non trovato" });
+      }
+      const existing = await db
+        .select({ id: userFavorites.id })
+        .from(userFavorites)
+        .where(and(eq(userFavorites.userId, currentUserId), eq(userFavorites.favoriteUserId, targetUserId)));
+      if (existing.length > 0) {
+        await db.delete(userFavorites).where(and(eq(userFavorites.userId, currentUserId), eq(userFavorites.favoriteUserId, targetUserId)));
+        return res.json({ favorited: false });
+      } else {
+        await db.insert(userFavorites).values({ userId: currentUserId, favoriteUserId: targetUserId });
+        return res.json({ favorited: true });
+      }
+    } catch (error) {
+      console.error("Toggle favorite error:", error);
+      return res.status(500).json({ message: "Errore interno del server" });
+    }
+  });
 
   app.get("/api/settings/music-provider", async (_req: Request, res: Response) => {
     try {
