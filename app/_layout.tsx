@@ -140,8 +140,9 @@ function AppStateHandler() {
         if (Platform.OS === "web") {
           sendWebLocation();
         } else {
-          stopNativeWatcher();
-          startNativeWatcher();
+          if (!locationWatcherRef.current) {
+            startNativeWatcher();
+          }
         }
       }
 
