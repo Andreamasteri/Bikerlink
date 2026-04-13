@@ -23,7 +23,7 @@ export default function TabLayout() {
 
   useEffect(() => {
     if (!isLoading && user === null) {
-      router.replace("/(auth)/login");
+      router.replace("/welcome");
     }
   }, [user, isLoading]);
 

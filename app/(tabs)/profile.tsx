@@ -346,15 +346,8 @@ export default function ProfileScreen() {
     ]);
   }, []);
 
-  const doLogout = async () => {
-    logoutMutation.mutate(undefined, {
-      onSuccess: () => {
-        while (router.canGoBack()) {
-          router.back();
-        }
-        router.replace("/welcome");
-      },
-    });
+  const doLogout = () => {
+    logoutMutation.mutate(undefined);
   };
 
   const handleClearCache = useCallback(() => {
