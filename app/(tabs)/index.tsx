@@ -229,14 +229,16 @@ export default function MapScreen() {
         if (user?.region) {
           if (!cancelled) setLocation(getRegionCoordinates(user.region, user.country));
           if (!cancelled) setLocationLoading(false);
-          await fetchGPSLocation();
+          const gps = await fetchGPSLocation();
+          if (gps && !cancelled) setLocation(gps);
           return;
         }
 
         if (profileLat != null && profileLng != null && !isNaN(Number(profileLat)) && !isNaN(Number(profileLng))) {
           if (!cancelled) setLocation({ latitude: Number(profileLat), longitude: Number(profileLng) });
           if (!cancelled) setLocationLoading(false);
-          await fetchGPSLocation();
+          const gps = await fetchGPSLocation();
+          if (gps && !cancelled) setLocation(gps);
           return;
         }
 
