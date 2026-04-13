@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo, ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest, getQueryFn, getApiUrl, setLoggingOut, setLoggingIn } from "@/lib/query-client";
+import { queryClient, apiRequest, getQueryFn, getApiUrl, setLoggingIn } from "@/lib/query-client";
 import type { User } from "@shared/schema";
 
 type SafeUser = Omit<User, "password">;
@@ -98,26 +98,12 @@ function useRegisterMutation() {
 function useLogoutMutation() {
   return useMutation({
     mutationFn: async () => {
-      setLoggingOut(true);
-      try {
-        await apiRequest("POST", "/api/auth/logout");
-      } catch (err) {
-        setLoggingOut(false);
-        throw err;
-      }
+      apiRequest("POST", "/api/auth/logout").catch(() => {});
+      queryClient.cancelQueries();
+      queryClient.clear();
+      queryClient.setQueryData(["/api/auth/me"], null);
     },
-    onSuccess: async () => {
-      try {
-        queryClient.cancelQueries();
-        queryClient.clear();
-        queryClient.setQueryData(["/api/auth/me"], null);
-      } finally {
-        setLoggingOut(false);
-      }
-    },
-    onError: () => {
-      setLoggingOut(false);
-    },
+    onError: () => {},
   });
 }
 

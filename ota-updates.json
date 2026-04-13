@@ -1767,5 +1767,26 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 33,
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-33 rv4.0.0: fix congelamento app al logout + 'La mia libreria' abbassata 12px",
+    "note": "Task #563. Fix logout freeze: lib/auth-context.tsx — useLogoutMutation ora fa fire-and-forget della chiamata POST /api/auth/logout (niente await), pulisce immediatamente la cache e completa la mutation in modo sincrono. Niente più congelamento dell'UI attendendo la risposta del backend. Incluso anche il fix di Task #562 (music.tsx: marginTop:12 su sectionHeader 'La mia libreria'). CURRENT_OTA_NUMBER=33.",
+    "releaseId": "d5497bd5-d34c-4a88-b946-bb5a2a6bd27b",
+    "bundleUrl": "private/ota/ota-1.33.0-1776088478216.js",
+    "updateGroupId": "2aab49d6-563a-4f6a-838c-bc8ce119d4d9",
+    "androidUpdateId": "019d8720-8d26-75a8-9d3d-993124cffef4",
+    "iosUpdateId": null,
+    "commitBase": "ef09466",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/2aab49d6-563a-4f6a-838c-bc8ce119d4d9",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "published"
   }
 ]
