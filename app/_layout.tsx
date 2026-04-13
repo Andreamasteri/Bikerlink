@@ -51,44 +51,24 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 SplashScreen.preventAutoHideAsync();
 
 const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000;
-const DEFAULT_LOCATION_UPDATE_INTERVAL_MS = 30 * 1000;
-
 async function sendHeartbeat() {
   try {
     await apiRequest("POST", "/api/auth/heartbeat");
   } catch {}
 }
 
-async function sendLocationUpdate() {
+async function sendWebLocation() {
+  if (typeof navigator === "undefined" || !navigator.geolocation) return;
   try {
-    let coords: { latitude: number; longitude: number } | null = null;
-    if (Platform.OS === "web") {
-      if (typeof navigator !== "undefined" && navigator.geolocation) {
-        coords = await new Promise((resolve) => {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-            () => resolve(null),
-            { timeout: 5000, maximumAge: 60000 }
-          );
-        });
-      }
-    } else {
-      const { status } = await Location.getForegroundPermissionsAsync();
-      if (status === "granted") {
-        const loc = await Promise.race([
-          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 10000)),
-        ]);
-        if (loc) {
-          coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
-        }
-      }
-    }
+    const coords = await new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+        () => resolve(null),
+        { timeout: 5000, maximumAge: 60000 }
+      );
+    });
     if (coords) {
-      await apiRequest("PUT", "/api/users/location", {
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-      });
+      await apiRequest("PUT", "/api/users/location", coords);
     }
   } catch {}
 }
@@ -97,44 +77,59 @@ function AppStateHandler() {
   const { user } = useAuth();
   const appStateRef = useRef(AppState.currentState);
   const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const locationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const locationIntervalMsRef = useRef<number>(DEFAULT_LOCATION_UPDATE_INTERVAL_MS);
+  const webLocationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const locationWatcherRef = useRef<Location.LocationSubscription | null>(null);
 
   useEffect(() => {
     if (!user) return;
 
     let cancelled = false;
 
-    async function fetchLocationInterval() {
+    async function startNativeWatcher() {
+      if (locationWatcherRef.current) return;
       try {
-        const url = new URL("/api/settings/profile-refetch-interval", getApiUrl());
-        const resp = await fetch(url.toString());
-        if (resp.ok) {
-          const data = await resp.json();
-          const seconds = typeof data.seconds === "number" && data.seconds >= 5 ? data.seconds : 30;
-          locationIntervalMsRef.current = seconds * 1000;
-        }
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status !== "granted" || cancelled) return;
+        locationWatcherRef.current = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            timeInterval: 30000,
+            distanceInterval: 20,
+          },
+          async (loc) => {
+            try {
+              await apiRequest("PUT", "/api/users/location", {
+                latitude: loc.coords.latitude,
+                longitude: loc.coords.longitude,
+              });
+            } catch {}
+          }
+        );
       } catch {}
     }
 
-    async function startTimers() {
-      await fetchLocationInterval();
-      if (cancelled) return;
-
-      sendHeartbeat();
-      sendLocationUpdate();
-      heartbeatTimerRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
-      locationTimerRef.current = setInterval(sendLocationUpdate, locationIntervalMsRef.current);
+    function stopNativeWatcher() {
+      if (locationWatcherRef.current) {
+        locationWatcherRef.current.remove();
+        locationWatcherRef.current = null;
+      }
     }
 
-    startTimers();
+    sendHeartbeat();
+    heartbeatTimerRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+
+    if (Platform.OS === "web") {
+      sendWebLocation();
+      webLocationTimerRef.current = setInterval(sendWebLocation, 30000);
+    } else {
+      startNativeWatcher();
+    }
 
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       const prev = appStateRef.current;
 
       if (prev.match(/inactive|background/) && nextAppState === "active") {
         sendHeartbeat();
-        sendLocationUpdate();
         queryClient.invalidateQueries({ queryKey: ["/api/users/profile"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users/online-count"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-count"] });
@@ -142,11 +137,12 @@ function AppStateHandler() {
         queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-list"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-list"] });
 
-        fetchLocationInterval().then(() => {
-          if (cancelled) return;
-          if (locationTimerRef.current) clearInterval(locationTimerRef.current);
-          locationTimerRef.current = setInterval(sendLocationUpdate, locationIntervalMsRef.current);
-        });
+        if (Platform.OS === "web") {
+          sendWebLocation();
+        } else {
+          stopNativeWatcher();
+          startNativeWatcher();
+        }
       }
 
       appStateRef.current = nextAppState;
@@ -156,7 +152,8 @@ function AppStateHandler() {
       cancelled = true;
       subscription.remove();
       if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
-      if (locationTimerRef.current) clearInterval(locationTimerRef.current);
+      if (webLocationTimerRef.current) clearInterval(webLocationTimerRef.current);
+      stopNativeWatcher();
     };
   }, [user]);
 

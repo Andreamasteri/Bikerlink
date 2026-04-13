@@ -1662,5 +1662,26 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 28,
+    "version": "1.28.0",
+    "runtimeVersion": "4.0.0",
+    "date": "2026-04-13",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-28 rv4.0.0: GPS watchPosition — più efficiente, meno batteria",
+    "note": "Task #555. Sostituito polling GPS (getCurrentPositionAsync + setInterval 30s) con Location.watchPositionAsync(accuracy:Balanced, timeInterval:30s, distanceInterval:20m). L'OS notifica l'app solo quando la posizione cambia — nessuna richiesta GPS a vuoto quando fermi. Su web rimane setInterval+getCurrentPosition. Al ritorno in foreground (AppState active) il watcher viene fermato e riavviato. Rimossi: DEFAULT_LOCATION_UPDATE_INTERVAL_MS, sendLocationUpdate(), locationTimerRef, locationIntervalMsRef, fetchLocationInterval(). Aggiunto: startNativeWatcher(), stopNativeWatcher(), locationWatcherRef, sendWebLocation(). CURRENT_OTA_NUMBER=28.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": null,
+    "easDashboard": null,
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "pending"
   }
 ]
