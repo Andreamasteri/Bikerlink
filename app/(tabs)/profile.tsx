@@ -137,7 +137,7 @@ export default function ProfileScreen() {
   const [isExportingData, setIsExportingData] = useState(false);
 
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-  // Ciclo 4.0.0 — APK v10 — OTA-38: fix Pic! resolvePhotoUrl per URL GCS storici nel DB
+  // Ciclo 4.0.0 — APK v10 — aggiornare ad ogni nuova OTA pubblicata
   const CURRENT_OTA_NUMBER = 40;
 
   const profileQuery = useQuery<ProfileData>({
