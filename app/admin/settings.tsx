@@ -592,11 +592,6 @@ export default function AdminSettings() {
   });
   const sosEnabled = sosData?.enabled !== false;
 
-  const { data: spotifyComingSoonData } = useQuery<{ enabled: boolean }>({
-    queryKey: ["/api/settings/spotify-coming-soon"],
-  });
-  const spotifyComingSoon = spotifyComingSoonData?.enabled === true;
-
   const { data: musicMatchData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/music-match"],
   });
@@ -683,26 +678,6 @@ export default function AdminSettings() {
     },
   });
 
-  const spotifyComingSoonMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const baseUrl = getApiUrl();
-      const url = new URL("/api/admin/settings/spotify_coming_soon", baseUrl);
-      const res = await globalThis.fetch(url.toString(), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value: enabled ? "true" : "false" }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/spotify-coming-soon"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-    },
-  });
-
   const musicMatchMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       const baseUrl = getApiUrl();
@@ -761,7 +736,7 @@ export default function AdminSettings() {
   });
 
   const musicProviderMutation = useMutation({
-    mutationFn: async (provider: "lastfm" | "spotify") => {
+    mutationFn: async (provider: "lastfm") => {
       const baseUrl = getApiUrl();
       const url = new URL("/api/admin/settings/music_provider", baseUrl);
       const res = await globalThis.fetch(url.toString(), {
@@ -2153,36 +2128,6 @@ export default function AdminSettings() {
         </Pressable>
         {musicSystemExpanded && (
           <View style={styles.accordionPanelContent}>
-            <Text style={[styles.synecoLabel, { marginBottom: 8, marginTop: 4 }]}>Provider Musicale</Text>
-            <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
-              {([
-                { value: "lastfm", label: "Last.fm", color: "#D51007", icon: "radio" as const },
-                { value: "spotify", label: "Spotify", color: "#1DB954", icon: "logo-spotify" as const },
-              ] as const).map((opt) => (
-                <TouchableOpacity
-                  key={opt.value}
-                  style={[
-                    styles.providerOption,
-                    { flex: 1 },
-                    musicProvider === opt.value && styles.providerOptionActive,
-                    musicProvider === opt.value && { borderColor: opt.color },
-                  ]}
-                  onPress={() => musicProviderMutation.mutate(opt.value)}
-                  disabled={musicProviderMutation.isPending}
-                >
-                  <Ionicons name={opt.icon} size={18} color={musicProvider === opt.value ? opt.color : Colors.textSecondary} />
-                  <Text style={[styles.providerLabel, musicProvider === opt.value && { color: opt.color, fontFamily: "Inter_600SemiBold" }]}>
-                    {opt.label}
-                  </Text>
-                  {musicProvider === opt.value && (
-                    <Ionicons name="checkmark-circle" size={16} color={opt.color} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-            <Text style={[styles.synecoDesc, { marginBottom: 12 }]}>
-              {musicProvider === "lastfm" ? "Last.fm attivo — gratuito, no Premium" : "Spotify attivo — richiede Premium developer"}
-            </Text>
             <View style={styles.synecoHeader}>
               <View style={styles.synecoInfo}>
                 <Ionicons name="share-outline" size={20} color="#1DB954" />
@@ -2214,22 +2159,6 @@ export default function AdminSettings() {
             </View>
             <Text style={styles.synecoDesc}>
               {musicImportEnabled ? "Gli utenti possono importare playlist" : "Import playlist disabilitato"}
-            </Text>
-            <View style={[styles.synecoHeader, { marginTop: 12 }]}>
-              <View style={styles.synecoInfo}>
-                <Ionicons name="logo-spotify" size={20} color="#1DB954" />
-                <Text style={styles.synecoLabel}>Spotify</Text>
-              </View>
-              <Switch
-                value={!spotifyComingSoon}
-                onValueChange={(val) => spotifyComingSoonMutation.mutate(!val)}
-                trackColor={{ false: Colors.border, true: "#1DB954" }}
-                thumbColor={!spotifyComingSoon ? Colors.text : Colors.textSecondary}
-                disabled={spotifyComingSoonMutation.isPending}
-              />
-            </View>
-            <Text style={styles.synecoDesc}>
-              {!spotifyComingSoon ? "Spotify attivo per gli utenti" : "Spotify in arrivo (Extended Quota Mode in attesa)"}
             </Text>
           </View>
         )}
