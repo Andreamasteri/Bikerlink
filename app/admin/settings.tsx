@@ -1390,7 +1390,7 @@ export default function AdminSettings() {
         <View style={styles.synecoHeader}>
           <View style={styles.synecoInfo}>
             <Ionicons name="refresh" size={20} color={Colors.warning} />
-            <Text style={styles.synecoLabel}>Refresh Coordinate (sec)</Text>
+            <Text style={styles.synecoLabel}>Aggiorna Coordinate (sec)</Text>
           </View>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <TextInput
