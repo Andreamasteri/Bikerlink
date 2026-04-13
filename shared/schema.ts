@@ -1255,6 +1255,24 @@ export const eventParticipants = pgTable("event_participants", {
 export type EventParticipant = typeof eventParticipants.$inferSelect;
 export type InsertEventParticipant = typeof eventParticipants.$inferInsert;
 
+export const coordinateHistory = pgTable("coordinate_history", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  latitude: doublePrecision("latitude").notNull(),
+  longitude: doublePrecision("longitude").notNull(),
+  slot: integer("slot").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("coordinate_history_user_created_idx").on(table.userId, table.createdAt),
+]);
+
+export type CoordinateHistory = typeof coordinateHistory.$inferSelect;
+export type InsertCoordinateHistory = typeof coordinateHistory.$inferInsert;
+
 export const eventClubInvites = pgTable("event_club_invites", {
   id: varchar("id", { length: 36 })
     .primaryKey()

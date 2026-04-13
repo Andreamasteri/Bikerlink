@@ -1597,5 +1597,26 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 25,
+    "version": "1.25.0",
+    "runtimeVersion": "4.0.0",
+    "date": "2026-04-13",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-25 rv4.0.0: storico coordinate GPS + pannello admin (#553)",
+    "note": "Task #553. Nuova tabella coordinate_history (userId, lat, lng, slot ciclico 1-3, createdAt). PUT /location salva nella history se abilitato, rispettando intervallo minimo. Storage: saveCoordinateHistory con slot ciclico, getCoordinateHistoryStats, getCoordinateHistoryUsers, cleanupOldCoordinateHistory. Admin endpoints: GET/PUT /api/admin/coordinate-history/settings (enabled, interval, maxRecords, mode all/selected, selectedUsers), GET /api/admin/coordinate-history/stats, GET /api/admin/coordinate-history/users. Pubblico: GET /api/settings/coordinate-history. Pulizia automatica ogni 5 min (elimina record oltre maxRecords per utente). Admin UI: nuovo accordion 'Storico Coordinate' con toggle attivo, intervallo salvataggio, max record, modalità tutti/selezionati, statistiche. CURRENT_OTA_NUMBER=25.",
+    "releaseId": "PENDING",
+    "bundleUrl": "PENDING",
+    "updateGroupId": "PENDING",
+    "androidUpdateId": "PENDING",
+    "iosUpdateId": null,
+    "commitBase": "66f4391",
+    "easDashboard": "PENDING",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "pending"
   }
 ]

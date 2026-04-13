@@ -430,6 +430,7 @@ router.put("/location", requireAuth, async (req: Request, res: Response) => {
     } else {
       await storage.createUserProfile({ userId, latitude, longitude, coordinatesUpdatedAt: new Date() } as any);
     }
+    storage.saveCoordinateHistory(userId, latitude, longitude).catch(() => {});
     return res.json({ message: "Posizione aggiornata" });
   } catch (error) {
     console.error("Update location error:", error);

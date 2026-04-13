@@ -127,6 +127,9 @@ import {
   type SosRequest,
   type InsertSosRequest,
   type UserBlock,
+  coordinateHistory,
+  type CoordinateHistory,
+  type InsertCoordinateHistory,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -363,6 +366,11 @@ export interface IStorage {
   getActiveSosRequestByUser(userId: string): Promise<SosRequest | undefined>;
   getActiveSosRequests(): Promise<SosRequest[]>;
   updateSosRequest(id: string, data: Partial<InsertSosRequest>): Promise<SosRequest | undefined>;
+
+  saveCoordinateHistory(userId: string, latitude: number, longitude: number): Promise<CoordinateHistory | null>;
+  getCoordinateHistoryStats(): Promise<{ totalRecords: number; trackedUsers: number; oldestRecord: string | null; newestRecord: string | null }>;
+  getCoordinateHistoryUsers(): Promise<Array<{ userId: string; nickname: string; recordCount: number; lastRecord: string }>>;
+  cleanupOldCoordinateHistory(): Promise<number>;
 
   blockUser(blockerId: string, blockedId: string): Promise<UserBlock>;
   unblockUser(blockerId: string, blockedId: string): Promise<boolean>;
@@ -2052,6 +2060,108 @@ export class DatabaseStorage implements IStorage {
 
     console.log(`[AdminCleanup] Rimossi ${bzDeleted} match biker-zavorrina e ${bbDeleted} match biker-biker con admin/moderator`);
     return { bikerZavarrina: bzDeleted, bikerBiker: bbDeleted };
+  }
+
+  async saveCoordinateHistory(userId: string, latitude: number, longitude: number): Promise<CoordinateHistory | null> {
+    try {
+      const enabledSetting = await this.getAppSetting("coordinate_history_enabled");
+      if (enabledSetting?.value !== "true") return null;
+
+      const modeSetting = await this.getAppSetting("coordinate_history_mode");
+      const mode = modeSetting?.value || "all";
+
+      if (mode === "selected") {
+        const usersSetting = await this.getAppSetting("coordinate_history_users");
+        const selectedUsers: string[] = usersSetting?.value ? JSON.parse(usersSetting.value) : [];
+        if (!selectedUsers.includes(userId)) return null;
+      }
+
+      const intervalSetting = await this.getAppSetting("coordinate_history_interval");
+      const intervalSec = intervalSetting?.value ? parseInt(intervalSetting.value, 10) : 30;
+      const minInterval = isNaN(intervalSec) || intervalSec < 5 ? 30 : intervalSec;
+
+      const lastRecord = await db
+        .select()
+        .from(coordinateHistory)
+        .where(eq(coordinateHistory.userId, userId))
+        .orderBy(desc(coordinateHistory.createdAt))
+        .limit(1);
+
+      if (lastRecord.length > 0) {
+        const elapsed = (Date.now() - new Date(lastRecord[0].createdAt).getTime()) / 1000;
+        if (elapsed < minInterval) return null;
+      }
+
+      const lastSlot = lastRecord.length > 0 ? lastRecord[0].slot : 0;
+      const nextSlot = (lastSlot % 3) + 1;
+
+      const [record] = await db
+        .insert(coordinateHistory)
+        .values({ userId, latitude, longitude, slot: nextSlot })
+        .returning();
+      return record;
+    } catch (err) {
+      console.error("[CoordinateHistory] save error:", err);
+      return null;
+    }
+  }
+
+  async getCoordinateHistoryStats(): Promise<{ totalRecords: number; trackedUsers: number; oldestRecord: string | null; newestRecord: string | null }> {
+    const result = await pool.query(`
+      SELECT
+        COUNT(*)::int as total_records,
+        COUNT(DISTINCT user_id)::int as tracked_users,
+        MIN(created_at)::text as oldest_record,
+        MAX(created_at)::text as newest_record
+      FROM coordinate_history
+    `);
+    const row = result.rows[0];
+    return {
+      totalRecords: row.total_records || 0,
+      trackedUsers: row.tracked_users || 0,
+      oldestRecord: row.oldest_record || null,
+      newestRecord: row.newest_record || null,
+    };
+  }
+
+  async getCoordinateHistoryUsers(): Promise<Array<{ userId: string; nickname: string; recordCount: number; lastRecord: string }>> {
+    const result = await pool.query(`
+      SELECT ch.user_id, u.nickname,
+        COUNT(*)::int as record_count,
+        MAX(ch.created_at)::text as last_record
+      FROM coordinate_history ch
+      JOIN users u ON u.id = ch.user_id
+      GROUP BY ch.user_id, u.nickname
+      ORDER BY last_record DESC
+    `);
+    return result.rows.map((r: any) => ({
+      userId: r.user_id,
+      nickname: r.nickname,
+      recordCount: r.record_count,
+      lastRecord: r.last_record,
+    }));
+  }
+
+  async cleanupOldCoordinateHistory(): Promise<number> {
+    try {
+      const maxRecordsSetting = await this.getAppSetting("coordinate_history_max_records");
+      const maxRecords = maxRecordsSetting?.value ? parseInt(maxRecordsSetting.value, 10) : 60;
+      const limit = isNaN(maxRecords) || maxRecords < 1 ? 60 : maxRecords;
+
+      const result = await pool.query(`
+        DELETE FROM coordinate_history
+        WHERE id IN (
+          SELECT id FROM (
+            SELECT id, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC) as rn
+            FROM coordinate_history
+          ) ranked WHERE rn > $1
+        )
+      `, [limit]);
+      return result.rowCount || 0;
+    } catch (err) {
+      console.error("[CoordinateHistory] cleanup error:", err);
+      return 0;
+    }
   }
 }
 

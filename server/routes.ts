@@ -396,6 +396,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/coordinate-history", async (_req, res) => {
+    try {
+      const [enabled, interval, maxRecords, mode] = await Promise.all([
+        storage.getAppSetting("coordinate_history_enabled"),
+        storage.getAppSetting("coordinate_history_interval"),
+        storage.getAppSetting("coordinate_history_max_records"),
+        storage.getAppSetting("coordinate_history_mode"),
+      ]);
+      res.json({
+        enabled: enabled?.value === "true",
+        interval: interval?.value ? parseInt(interval.value, 10) : 30,
+        maxRecords: maxRecords?.value ? parseInt(maxRecords.value, 10) : 60,
+        mode: mode?.value || "all",
+      });
+    } catch {
+      res.json({ enabled: false, interval: 30, maxRecords: 60, mode: "all" });
+    }
+  });
+
   app.get("/api/settings/coordinates-max-age", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("coordinates_max_age_seconds");
@@ -961,6 +980,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       })),
     });
   });
+
+  setInterval(async () => {
+    try {
+      const deleted = await storage.cleanupOldCoordinateHistory();
+      if (deleted > 0) {
+        console.log(`[CoordinateHistory] Pulizia: rimossi ${deleted} record`);
+      }
+    } catch (err) {
+      console.error("[CoordinateHistory] Cleanup error:", err);
+    }
+  }, 5 * 60 * 1000);
 
   const httpServer = createServer(app);
 

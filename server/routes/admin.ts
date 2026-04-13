@@ -3588,6 +3588,79 @@ router.post("/translations/apply", async (_req: Request, res: Response) => {
   }
 });
 
+router.get("/coordinate-history/stats", async (_req: Request, res: Response) => {
+  try {
+    const stats = await storage.getCoordinateHistoryStats();
+    return res.json(stats);
+  } catch (error) {
+    console.error("Admin coordinate-history stats error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/coordinate-history/users", async (_req: Request, res: Response) => {
+  try {
+    const users = await storage.getCoordinateHistoryUsers();
+    return res.json(users);
+  } catch (error) {
+    console.error("Admin coordinate-history users error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/coordinate-history/settings", async (_req: Request, res: Response) => {
+  try {
+    const [enabled, interval, maxRecords, mode, selectedUsers] = await Promise.all([
+      storage.getAppSetting("coordinate_history_enabled"),
+      storage.getAppSetting("coordinate_history_interval"),
+      storage.getAppSetting("coordinate_history_max_records"),
+      storage.getAppSetting("coordinate_history_mode"),
+      storage.getAppSetting("coordinate_history_users"),
+    ]);
+    return res.json({
+      enabled: enabled?.value === "true",
+      interval: interval?.value ? parseInt(interval.value, 10) : 30,
+      maxRecords: maxRecords?.value ? parseInt(maxRecords.value, 10) : 60,
+      mode: mode?.value || "all",
+      selectedUsers: selectedUsers?.value ? JSON.parse(selectedUsers.value) : [],
+    });
+  } catch (error) {
+    console.error("Admin coordinate-history settings error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.put("/coordinate-history/settings", async (req: Request, res: Response) => {
+  try {
+    const { enabled, interval, maxRecords, mode, selectedUsers } = req.body;
+    if (enabled !== undefined) {
+      await storage.upsertAppSetting("coordinate_history_enabled", enabled ? "true" : "false");
+    }
+    if (interval !== undefined) {
+      const val = parseInt(interval, 10);
+      if (!isNaN(val) && val >= 5) {
+        await storage.upsertAppSetting("coordinate_history_interval", String(val));
+      }
+    }
+    if (maxRecords !== undefined) {
+      const val = parseInt(maxRecords, 10);
+      if (!isNaN(val) && val >= 1) {
+        await storage.upsertAppSetting("coordinate_history_max_records", String(val));
+      }
+    }
+    if (mode !== undefined && (mode === "all" || mode === "selected")) {
+      await storage.upsertAppSetting("coordinate_history_mode", mode);
+    }
+    if (selectedUsers !== undefined && Array.isArray(selectedUsers)) {
+      await storage.upsertAppSetting("coordinate_history_users", JSON.stringify(selectedUsers));
+    }
+    return res.json({ message: "Impostazioni storico coordinate aggiornate" });
+  } catch (error) {
+    console.error("Admin coordinate-history settings update error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.post("/translations/restart", async (_req: Request, res: Response) => {
   try {
     res.json({ ok: true, message: "Backend in riavvio..." });

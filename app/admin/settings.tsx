@@ -292,6 +292,7 @@ export default function AdminSettings() {
   const [clubInviteFeedback, setClubInviteFeedback] = useState<string | null>(null);
   const [uptimeWidgetEnabled, setUptimeWidgetEnabled] = useState<boolean>(true);
   const [matchingEngineExpanded, setMatchingEngineExpanded] = useState(false);
+  const [coordHistoryExpanded, setCoordHistoryExpanded] = useState(false);
   const [musicSystemExpanded, setMusicSystemExpanded] = useState(false);
   const [mapsExpanded, setMapsExpanded] = useState(false);
   const [docsExpanded, setDocsExpanded] = useState(false);
@@ -350,6 +351,51 @@ export default function AdminSettings() {
       setCoordMaxAgeInput(String(coordMaxAgeData.value));
     }
   }, [coordMaxAgeData]);
+
+  const { data: coordHistorySettings, refetch: refetchCoordHistory } = useQuery<{
+    enabled: boolean; interval: number; maxRecords: number; mode: string; selectedUsers: string[];
+  }>({
+    queryKey: ["/api/admin/coordinate-history/settings"],
+  });
+  const { data: coordHistoryStats } = useQuery<{
+    totalRecords: number; trackedUsers: number; oldestRecord: string | null; newestRecord: string | null;
+  }>({
+    queryKey: ["/api/admin/coordinate-history/stats"],
+  });
+  const [chIntervalInput, setChIntervalInput] = useState("");
+  const [chMaxRecordsInput, setChMaxRecordsInput] = useState("");
+  useEffect(() => {
+    if (coordHistorySettings?.interval != null && chIntervalInput === "") {
+      setChIntervalInput(String(coordHistorySettings.interval));
+    }
+    if (coordHistorySettings?.maxRecords != null && chMaxRecordsInput === "") {
+      setChMaxRecordsInput(String(coordHistorySettings.maxRecords));
+    }
+  }, [coordHistorySettings]);
+
+  const coordHistoryMutation = useMutation({
+    mutationFn: async (body: Record<string, any>) => {
+      const url = new URL("/api/admin/coordinate-history/settings", getApiUrl());
+      const res = await fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Errore aggiornamento impostazioni storico coordinate");
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchCoordHistory();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/coordinate-history/stats"] });
+    },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
+  });
+
+  const { data: onlineUsersForCoordHistory } = useQuery<Array<{ id: string; nickname: string }>>({
+    queryKey: ["/api/users/search", ""],
+    enabled: coordHistoryExpanded && coordHistorySettings?.mode === "selected",
+  });
 
   const { data: primalData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/primal-user"],
@@ -1663,6 +1709,192 @@ export default function AdminSettings() {
           {musicMatchEnabled ? "Il matching musicale tra biker è attivo" : "Il matching musicale è disattivato"}
         </Text>
       </View>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.accordionPanel}>
+        <Pressable style={styles.accordionPanelHeader} onPress={() => setCoordHistoryExpanded((v) => !v)}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="navigate" size={20} color={Colors.accent} />
+            <Text style={styles.accordionPanelTitle}>Storico Coordinate</Text>
+          </View>
+          <Ionicons name={coordHistoryExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+        </Pressable>
+        {coordHistoryExpanded && (
+          <View style={styles.accordionPanelContent}>
+            <View style={styles.paidCard}>
+              <View style={styles.synecoHeader}>
+                <View style={styles.synecoInfo}>
+                  <Ionicons name="power" size={20} color={Colors.accent} />
+                  <Text style={styles.synecoLabel}>Tracciamento Attivo</Text>
+                </View>
+                <Switch
+                  value={coordHistorySettings?.enabled === true}
+                  onValueChange={(val) => coordHistoryMutation.mutate({ enabled: val })}
+                  trackColor={{ false: Colors.border, true: Colors.accent }}
+                  thumbColor={coordHistorySettings?.enabled ? Colors.text : Colors.textSecondary}
+                  disabled={coordHistoryMutation.isPending}
+                />
+              </View>
+              <Text style={styles.synecoDesc}>
+                {coordHistorySettings?.enabled ? "Le coordinate vengono salvate nello storico" : "Lo storico coordinate è disattivato"}
+              </Text>
+            </View>
+
+            <View style={styles.paidCard}>
+              <View style={styles.synecoHeader}>
+                <View style={styles.synecoInfo}>
+                  <Ionicons name="timer" size={20} color={Colors.accent} />
+                  <Text style={styles.synecoLabel}>Intervallo Salvataggio (sec)</Text>
+                </View>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <TextInput
+                    style={{ borderWidth: 1, borderColor: Colors.border, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, width: 70, color: Colors.text, fontSize: 14, textAlign: "center", backgroundColor: Colors.surface }}
+                    keyboardType="numeric"
+                    value={chIntervalInput}
+                    onChangeText={setChIntervalInput}
+                    onEndEditing={() => {
+                      const val = parseInt(chIntervalInput, 10);
+                      if (!isNaN(val) && val >= 5) {
+                        coordHistoryMutation.mutate({ interval: val });
+                      } else {
+                        setChIntervalInput(String(coordHistorySettings?.interval ?? 30));
+                      }
+                    }}
+                  />
+                </View>
+              </View>
+              <Text style={styles.synecoDesc}>
+                Ogni quanti secondi salvare le coordinate nella history (min 5s, default 30s)
+              </Text>
+            </View>
+
+            <View style={styles.paidCard}>
+              <View style={styles.synecoHeader}>
+                <View style={styles.synecoInfo}>
+                  <Ionicons name="albums" size={20} color={Colors.accent} />
+                  <Text style={styles.synecoLabel}>Max Record per Utente</Text>
+                </View>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <TextInput
+                    style={{ borderWidth: 1, borderColor: Colors.border, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, width: 70, color: Colors.text, fontSize: 14, textAlign: "center", backgroundColor: Colors.surface }}
+                    keyboardType="numeric"
+                    value={chMaxRecordsInput}
+                    onChangeText={setChMaxRecordsInput}
+                    onEndEditing={() => {
+                      const val = parseInt(chMaxRecordsInput, 10);
+                      if (!isNaN(val) && val >= 1) {
+                        coordHistoryMutation.mutate({ maxRecords: val });
+                      } else {
+                        setChMaxRecordsInput(String(coordHistorySettings?.maxRecords ?? 60));
+                      }
+                    }}
+                  />
+                </View>
+              </View>
+              <Text style={styles.synecoDesc}>
+                Quanti record mantenere per utente. Record più vecchi vengono eliminati automaticamente (default 60)
+              </Text>
+            </View>
+
+            <View style={styles.paidCard}>
+              <View style={styles.synecoHeader}>
+                <View style={styles.synecoInfo}>
+                  <Ionicons name="people" size={20} color={Colors.accent} />
+                  <Text style={styles.synecoLabel}>Modalità</Text>
+                </View>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {(["all", "selected"] as const).map((m) => (
+                    <TouchableOpacity
+                      key={m}
+                      onPress={() => coordHistoryMutation.mutate({ mode: m })}
+                      style={[
+                        styles.countryChip,
+                        coordHistorySettings?.mode === m && styles.countryChipSelected,
+                      ]}
+                    >
+                      <Text style={[
+                        styles.countryChipText,
+                        coordHistorySettings?.mode === m && styles.countryChipTextSelected,
+                      ]}>
+                        {m === "all" ? "Tutti" : "Selezionati"}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              <Text style={styles.synecoDesc}>
+                {coordHistorySettings?.mode === "selected"
+                  ? `Tracciamento attivo solo per ${coordHistorySettings?.selectedUsers?.length ?? 0} utenti selezionati`
+                  : "Tracciamento attivo per tutti gli utenti"}
+              </Text>
+            </View>
+
+            {coordHistorySettings?.mode === "selected" && (
+              <View style={styles.paidCard}>
+                <View style={styles.synecoHeader}>
+                  <View style={styles.synecoInfo}>
+                    <Ionicons name="person-add" size={20} color={Colors.accent} />
+                    <Text style={styles.synecoLabel}>Utenti Selezionati</Text>
+                  </View>
+                </View>
+                {(coordHistorySettings?.selectedUsers?.length ?? 0) > 0 && (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                    {coordHistorySettings!.selectedUsers.map((uid) => (
+                      <TouchableOpacity
+                        key={uid}
+                        onPress={() => {
+                          const updated = coordHistorySettings!.selectedUsers.filter((u) => u !== uid);
+                          coordHistoryMutation.mutate({ selectedUsers: updated });
+                        }}
+                        style={[styles.countryChipSelected, { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: Colors.accent }]}
+                      >
+                        <Text style={{ color: "#fff", fontSize: 12 }}>{uid.slice(0, 8)}...</Text>
+                        <Ionicons name="close-circle" size={14} color="#fff" />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+                <Text style={[styles.synecoDesc, { marginTop: 6 }]}>
+                  Per aggiungere utenti, usa l'endpoint API PUT /api/admin/coordinate-history/settings con il campo selectedUsers
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.paidCard}>
+              <View style={styles.synecoHeader}>
+                <View style={styles.synecoInfo}>
+                  <Ionicons name="stats-chart" size={20} color={Colors.accent} />
+                  <Text style={styles.synecoLabel}>Statistiche</Text>
+                </View>
+              </View>
+              <View style={styles.matchingStatsRow}>
+                <View style={styles.matchingStatItem}>
+                  <Text style={styles.matchingStatValue}>{coordHistoryStats?.totalRecords ?? "—"}</Text>
+                  <Text style={styles.matchingStatLabel}>Record Totali</Text>
+                </View>
+                <View style={styles.matchingStatDivider} />
+                <View style={styles.matchingStatItem}>
+                  <Text style={styles.matchingStatValue}>{coordHistoryStats?.trackedUsers ?? "—"}</Text>
+                  <Text style={styles.matchingStatLabel}>Utenti Tracciati</Text>
+                </View>
+              </View>
+              {(coordHistoryStats?.oldestRecord || coordHistoryStats?.newestRecord) && (
+                <View style={styles.lastCycleBox}>
+                  {coordHistoryStats.oldestRecord && (
+                    <Text style={styles.lastCycleText}>
+                      Primo: {new Date(coordHistoryStats.oldestRecord).toLocaleString("it-IT")}
+                    </Text>
+                  )}
+                  {coordHistoryStats.newestRecord && (
+                    <Text style={styles.lastCycleText}>
+                      Ultimo: {new Date(coordHistoryStats.newestRecord).toLocaleString("it-IT")}
+                    </Text>
+                  )}
+                </View>
+              )}
+            </View>
           </View>
         )}
       </View>
