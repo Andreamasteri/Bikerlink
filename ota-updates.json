@@ -1892,6 +1892,27 @@
     "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 39,
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-39 rv4.0.0: Profilo — Turco + riorganizzazione voci",
+    "note": "Task #573: (1) Lingua Turca aggiunta al selettore lingua (🇹🇷 Türkçe) con EULA e Privacy Policy in turco; (2) 'Modifica Profilo' spostato tra Documentazione e Pulsanti Taskbar; (3) Selettore lingua, 'Revoca consenso' e 'Elimina account' spostati in Modifica Profilo (edit.tsx). CURRENT_OTA_NUMBER=39.",
+    "releaseId": "4a1015da-1cec-48a3-9096-76b4abc70d00",
+    "bundleUrl": "private/ota/ota-1.39.0-1776106346645.js",
+    "updateGroupId": "1474db53-656f-4bcd-b2ac-f06fcf7faffb",
+    "androidUpdateId": "019d8830-c2af-72f5-a733-57efe2b0dc1d",
+    "iosUpdateId": null,
+    "commitBase": "a2a93322bff7107bb6f85561e17bcd53b6b0f7c5",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/1474db53-656f-4bcd-b2ac-f06fcf7faffb",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
   }
 ]

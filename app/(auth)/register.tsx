@@ -261,6 +261,44 @@ BikerLink se réserve le droit de modifier les présentes conditions à tout mom
 
 9. CONTACT
 Pour toute question ou signalement : support@bikerlink.app`,
+
+  tr: `KULLANIM KOŞULLARI - BikerLink
+
+1. KOŞULLARIN KABULÜ
+BikerLink uygulamasını kullanarak bu kullanım koşullarını tam olarak kabul etmiş sayılırsınız.
+
+2. HİZMET TANIMI
+BikerLink, motosikletçileri (biker) ve yolcuları (zavorrina) motosiklet seyahat deneyimlerini paylaşmak için bir araya getiren bir platformdur.
+
+3. KAYIT VE HESAP
+- Kullanıcı, kayıt sırasında doğru bilgi sağlamalıdır
+- Hesap bilgilerinizin güvenliğinden siz sorumlusunuz
+- Hizmeti kullanmak için en az 18 yaşında olmanız gerekmektedir
+
+4. KULLANICI DAVRANIŞI
+- Hakaret edici, taciz edici veya ayrımcı davranışlar yasaktır
+- Uygunsuz içerik paylaşımı yasaktır
+- Kullanıcılar trafik kurallarına uymak zorundadır
+
+5. GİZLİLİK VE KİŞİSEL VERİLER
+- Kişisel veriler GDPR'a uygun olarak işlenmektedir
+- GPS konumu yalnızca uygulama özellikleri için kullanılmaktadır
+- Yüklenen fotoğraflar moderasyona tabidir
+
+6. SORUMLULUK
+- BikerLink, sürüşler sırasında meydana gelen kazalardan sorumlu değildir
+- Her kullanıcı kendi güvenliğinden sorumludur
+- Kask ve koruyucu ekipman kullanımı zorunludur
+
+7. SPONSORLAR VE REKLAMCILIK
+- Uygulama, Syneco Lubrificanti tarafından desteklenen içerikler barındırmaktadır
+- Reklam içerikleri açıkça belirtilmektedir
+
+8. KOŞULLARDA DEĞİŞİKLİK
+BikerLink, bu koşulları istediği zaman değiştirme hakkını saklı tutar.
+
+9. İLETİŞİM
+Sorular veya bildirimler için: support@bikerlink.app`,
 };
 
 export default function RegisterScreen() {

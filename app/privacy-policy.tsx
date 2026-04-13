@@ -381,6 +381,79 @@ L'application BikerLink utilise des cookies techniques et de session nécessaire
 BikerLink se réserve le droit de modifier la présente politique de confidentialité à tout moment. Les modifications seront communiquées aux utilisateurs par notification dans l'application ou par publication de la version mise à jour. L'utilisation continue de l'application après la publication des modifications vaut acceptation de celles-ci.
 
 Pour toute question ou précision, n'hésitez pas à nous contacter à l'adresse : privacy@bikerlink.app`,
+
+  tr: `GİZLİLİK POLİTİKASI
+
+Son güncelleme: 20/03/2026
+
+1. VERİ SORUMLUSU
+
+Kişisel verilerin işlenmesinden sorumlu taraf BikerLink'tir. Kişisel verilerinizin işlenmesiyle ilgili sorularınız için şu adrese ulaşabilirsiniz: privacy@bikerlink.app
+
+2. TOPLANAN VERİLER
+
+BikerLink uygulamasını kullandığınızda aşağıdaki kişisel veri kategorileri toplanmaktadır:
+
+- E-posta adresi
+- Telefon numarası
+- Takma ad (kullanıcı adı)
+- Doğum yılı
+- İkamet ülkesi
+- İkamet bölgesi
+- Kullanıcı tipi (biker, zavorrina, çift)
+- Kullanıcı tarafından yüklenen fotoğraflar
+- GPS konumu (konum verileri)
+
+3. İŞLEME AMAÇLARI
+
+Toplanan kişisel veriler aşağıdaki amaçlarla işlenmektedir:
+
+- Uygulama işleyişi: uygulamanın özelliklerinin doğru çalışmasını sağlamak.
+- Eşleştirme: benzer ilgi alanlarına sahip kullanıcılar arasında bağlantı kurulmasını sağlamak.
+- Sohbet: kullanıcılar arasında uygulama içi iletişim sağlamak.
+- Yarışma: uygulama üzerinden düzenlenen yarışma ve etkinliklere katılımı yönetmek.
+
+4. İŞLEMENİN HUKUKİ DAYANAĞI
+
+Kişisel verilerinizin işlenmesinin hukuki dayanağı, kayıt sırasında ve uygulamanın kullanımı sürecinde kullanıcı tarafından verilen rızadır (AB 2016/679 Tüzüğü (GDPR) Madde 6(1)(a) uyarınca).
+
+5. VERİ SAKLAMA SÜRESİ
+
+Kişisel veriler, toplandıkları amaçların yerine getirilmesi için zorunlu olan süre boyunca saklanacaktır. Hesap silinmesi durumunda, kişisel veriler 30 gün içinde silinecektir; yasal yükümlülükler daha uzun bir saklama süresi gerektirmedikçe.
+
+6. ÜÇÜNCÜ TARAFLARLA PAYLAŞIM
+
+Kişisel verileriniz şu taraflarla paylaşılabilir:
+
+- Syneco, uygulamanın sponsoru olarak, BikerLink aracılığıyla sunulan hizmetlere ilişkin promosyon ve pazarlama amaçlarıyla.
+
+Veriler, Avrupa Ekonomik Alanı dışında bulunabilecek bulut altyapısında işlenebilir. Bu gibi durumlarda transfer, Avrupa Komisyonu tarafından GDPR Madde 46 kapsamında onaylanan Standart Sözleşme Hükümleri çerçevesinde gerçekleştirilir.
+
+7. HAKLARINIZ
+
+GDPR kapsamında aşağıdaki haklara sahipsiniz:
+
+- Erişim: kendinizle ilgili kişisel verilerin işlenip işlenmediğini öğrenme ve bu verilere erişme.
+- Düzeltme: kendinizle ilgili yanlış kişisel verilerin düzeltilmesini talep etme.
+- Silme: kendinizle ilgili kişisel verilerin silinmesini talep etme ("unutulma hakkı").
+- Taşınabilirlik: kendinizle ilgili kişisel verileri yapılandırılmış, yaygın kullanılan ve makine tarafından okunabilir bir formatta alma.
+- İtiraz: kendinizle ilgili kişisel verilerin işlenmesine her zaman itiraz etme.
+
+8. HAKLARINIZI KULLANMA
+
+Yukarıda belirtilen hakları kullanmak için şu adrese talep gönderebilirsiniz: privacy@bikerlink.app
+
+Talebinize alındığından itibaren 30 gün içinde yanıt vereceğiz.
+
+9. ÇEREZLER VE OTURUMLAR
+
+BikerLink uygulaması, uygulamanın doğru çalışması için gerekli teknik ve oturum çerezleri kullanmaktadır. Bu çerezler profilleme veya pazarlama amacıyla kullanılmamaktadır. Oturum çerezleri, uygulama kapatıldığında otomatik olarak silinmektedir.
+
+10. POLİTİKA DEĞİŞİKLİKLERİ
+
+BikerLink, bu gizlilik politikasını istediği zaman değiştirme hakkını saklı tutar. Değişiklikler, uygulama içi bildirim veya güncellenmiş sürümün yayımlanması yoluyla kullanıcılara iletilecektir. Değişikliklerin yayımlanmasından sonra uygulamayı kullanmaya devam etmek bu değişikliklerin kabulü anlamına gelir.
+
+Sorularınız veya açıklamalar için lütfen şu adrese ulaşın: privacy@bikerlink.app`,
 };
 
 export default function PrivacyPolicyScreen() {

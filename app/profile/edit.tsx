@@ -11,14 +11,17 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Image,
+  Pressable,
+  Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
-import { t } from "@/lib/i18n";
+import { t, type AppLanguage } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
+import { useLanguage } from "@/lib/language-context";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import { EUROPEAN_COUNTRIES, getRegionsForCountry, findCountryByRegion } from "@/lib/countries-regions";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
@@ -68,7 +71,8 @@ export default function EditProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { user } = useAuth();
+  const { user, logoutMutation } = useAuth();
+  const { language, setLanguage } = useLanguage();
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -99,6 +103,8 @@ export default function EditProfileScreen() {
   const [motoDisplacement, setMotoDisplacement] = useState("");
   const [motoType, setMotoType] = useState("");
   const [ridingStyle, setRidingStyle] = useState("");
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [showRevokeConsentModal, setShowRevokeConsentModal] = useState(false);
 
   const [replacingSlot, setReplacingSlot] = useState<string | null>(null);
 
@@ -203,6 +209,41 @@ export default function EditProfileScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
     },
   });
+
+  const requestDeletionMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/users/me/request-deletion");
+    },
+    onSuccess: () => {
+      Alert.alert(t("profile.accountScheduledDeletion"));
+      logoutMutation.mutate(undefined, {
+        onSuccess: () => {
+          router.replace("/welcome");
+        },
+      });
+    },
+  });
+
+  const handleRequestDeletion = useCallback(() => {
+    requestDeletionMutation.mutate();
+  }, []);
+
+  const handleDeleteAccount = useCallback(() => {
+    if (Platform.OS === "web") {
+      if (confirm(t("profile.deleteAccountDesc"))) {
+        handleRequestDeletion();
+      }
+    } else {
+      Alert.alert(
+        t("profile.deleteAccount"),
+        t("profile.deleteAccountDesc"),
+        [
+          { text: t("common.cancel"), style: "cancel" },
+          { text: t("common.delete"), style: "destructive", onPress: handleRequestDeletion },
+        ]
+      );
+    }
+  }, []);
 
   const pickImageForSlot = useCallback((existingPhotoId?: string) => {
     showImagePickerMenu(
@@ -716,8 +757,93 @@ export default function EditProfileScreen() {
           </View>
         )}
 
+          <View style={{ height: 24 }} />
+
+          <View style={styles.langSection}>
+            <Pressable
+              style={styles.langDropdownTrigger}
+              onPress={() => setShowLanguageDropdown(!showLanguageDropdown)}
+            >
+              <Text style={styles.langDropdownFlag}>
+                {({ it: "🇮🇹", en: "🇬🇧", de: "🇩🇪", es: "🇪🇸", fr: "🇫🇷", tr: "🇹🇷" } as Record<string, string>)[language] ?? "🌐"}
+              </Text>
+              <Text style={styles.langDropdownLabel}>
+                {({ it: "Italiano", en: "English", de: "Deutsch", es: "Español", fr: "Français", tr: "Türkçe" } as Record<string, string>)[language] ?? language}
+              </Text>
+              <Ionicons
+                name={showLanguageDropdown ? "chevron-up" : "chevron-down"}
+                size={20}
+                color={Colors.textSecondary}
+              />
+            </Pressable>
+            {showLanguageDropdown && (
+              <View style={styles.langDropdownList}>
+                {([
+                  { code: "it" as AppLanguage, flag: "🇮🇹", label: "Italiano" },
+                  { code: "en" as AppLanguage, flag: "🇬🇧", label: "English" },
+                  { code: "de" as AppLanguage, flag: "🇩🇪", label: "Deutsch" },
+                  { code: "es" as AppLanguage, flag: "🇪🇸", label: "Español" },
+                  { code: "fr" as AppLanguage, flag: "🇫🇷", label: "Français" },
+                  { code: "tr" as AppLanguage, flag: "🇹🇷", label: "Türkçe" },
+                ]).map((lang) => {
+                  const isActive = language === lang.code;
+                  return (
+                    <Pressable
+                      key={lang.code}
+                      style={[styles.langDropdownItem, isActive && styles.langDropdownItemActive]}
+                      onPress={() => {
+                        setLanguage(lang.code);
+                        setShowLanguageDropdown(false);
+                      }}
+                    >
+                      <Text style={styles.langDropdownItemFlag}>{lang.flag}</Text>
+                      <Text style={[styles.langDropdownItemLabel, isActive && styles.langDropdownItemLabelActive]}>
+                        {lang.label}
+                      </Text>
+                      {isActive && (
+                        <Ionicons name="checkmark" size={20} color={Colors.accent} />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+
+          <View style={{ height: 16 }} />
+
+          <Pressable style={styles.dangerMenuItem} onPress={() => setShowRevokeConsentModal(true)}>
+            <Ionicons name="shield-checkmark-outline" size={22} color={Colors.accentRed} />
+            <Text style={styles.dangerMenuLabel}>{t("profile.revokeConsent")}</Text>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
+          </Pressable>
+
+          <Pressable style={[styles.dangerMenuItem, { marginTop: 8 }]} onPress={handleDeleteAccount}>
+            <Ionicons name="trash-outline" size={22} color={Colors.accentRed} />
+            <Text style={styles.dangerMenuLabel}>{t("profile.deleteAccount")}</Text>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
+          </Pressable>
+
         <View style={{ height: 60 }} />
       </ScrollView>
+
+      <Modal visible={showRevokeConsentModal} transparent animationType="fade" onRequestClose={() => setShowRevokeConsentModal(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setShowRevokeConsentModal(false)}>
+          <View style={[styles.modalContent, { maxHeight: "80%" }]}>
+            <Ionicons name="shield-checkmark-outline" size={32} color={Colors.accentRed} />
+            <Text style={[styles.modalTitle, { fontSize: 16, fontWeight: "700", marginBottom: 8 }]}>{t("profile.revokeConsentTitle")}</Text>
+            <Text style={[styles.modalTitle, { fontSize: 13, fontWeight: "400", lineHeight: 20, textAlign: "left" }]}>{t("profile.revokeConsentDesc")}</Text>
+            <View style={styles.modalButtons}>
+              <Pressable style={styles.modalBtnCancel} onPress={() => setShowRevokeConsentModal(false)}>
+                <Text style={styles.modalBtnCancelText}>{t("common.cancel")}</Text>
+              </Pressable>
+              <Pressable style={styles.modalBtnConfirm} onPress={() => { setShowRevokeConsentModal(false); handleRequestDeletion(); }}>
+                <Text style={styles.modalBtnConfirmText}>{t("common.confirm")}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -1014,5 +1140,119 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#FFFFFF",
     fontWeight: "600" as const,
+  },
+  langSection: {
+    marginBottom: 4,
+  },
+  langDropdownTrigger: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    gap: 10,
+  },
+  langDropdownFlag: {
+    fontSize: 22,
+  },
+  langDropdownLabel: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "500" as const,
+    color: Colors.text,
+  },
+  langDropdownList: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    marginTop: 4,
+    overflow: "hidden" as const,
+  },
+  langDropdownItem: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border + "44",
+  },
+  langDropdownItemActive: {
+    backgroundColor: Colors.accent + "12",
+  },
+  langDropdownItemFlag: {
+    fontSize: 20,
+  },
+  langDropdownItemLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "500" as const,
+    color: Colors.text,
+  },
+  langDropdownItemLabelActive: {
+    color: Colors.accent,
+    fontWeight: "600" as const,
+  },
+  dangerMenuItem: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 14,
+  },
+  dangerMenuLabel: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "500" as const,
+    color: Colors.accentRed,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  modalContent: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: "center" as const,
+    width: 300,
+    gap: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600" as const,
+    color: Colors.text,
+    textAlign: "center" as const,
+  },
+  modalButtons: {
+    flexDirection: "row" as const,
+    gap: 12,
+    width: "100%" as any,
+  },
+  modalBtnCancel: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    borderRadius: 10,
+    padding: 12,
+    alignItems: "center" as const,
+  },
+  modalBtnCancelText: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: Colors.textSecondary,
+  },
+  modalBtnConfirm: {
+    flex: 1,
+    backgroundColor: Colors.accentRed,
+    borderRadius: 10,
+    padding: 12,
+    alignItems: "center" as const,
+  },
+  modalBtnConfirmText: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: "#fff",
   },
 });

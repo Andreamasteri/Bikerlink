@@ -26,9 +26,8 @@ import Colors from "@/constants/colors";
 import { THEMES, THEME_META, ThemeName } from "@/constants/colors";
 import { useColors } from "@/hooks/useColors";
 import { useTheme } from "@/lib/theme-context";
-import { type AppLanguage } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
-import { useLanguage, useT, useLocale } from "@/lib/language-context";
+import { useT, useLocale } from "@/lib/language-context";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
@@ -126,15 +125,12 @@ export default function ProfileScreen() {
   const colors = useColors();
   const { user, logoutMutation } = useAuth();
   const router = useRouter();
-  const { language, setLanguage } = useLanguage();
   const t = useT();
   const locale = useLocale();
   const { enabled: mapsEnabled, userChoiceEnabled } = useMapConfig();
   const { currentTheme, setTheme, userSwitchingEnabled } = useTheme();
   const { taskbarStyle, setTaskbarStyle } = useTaskbarStyle();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [showRevokeConsentModal, setShowRevokeConsentModal] = useState(false);
-  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [isDownloadingManual, setIsDownloadingManual] = useState(false);
   const [isDownloadingEula, setIsDownloadingEula] = useState(false);
   const [isDownloadingPrivacy, setIsDownloadingPrivacy] = useState(false);
@@ -142,7 +138,7 @@ export default function ProfileScreen() {
 
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
   // Ciclo 4.0.0 — APK v10 — OTA-38: fix Pic! resolvePhotoUrl per URL GCS storici nel DB
-  const CURRENT_OTA_NUMBER = 38;
+  const CURRENT_OTA_NUMBER = 39;
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -231,20 +227,6 @@ export default function ProfileScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
-    },
-  });
-
-  const requestDeletionMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("POST", "/api/users/me/request-deletion");
-    },
-    onSuccess: () => {
-      Alert.alert(t("profile.accountScheduledDeletion"));
-      logoutMutation.mutate(undefined, {
-        onSuccess: () => {
-          router.replace("/welcome");
-        },
-      });
     },
   });
 
@@ -400,10 +382,6 @@ export default function ProfileScreen() {
     }
   }, []);
 
-  const handleRequestDeletion = useCallback(() => {
-    requestDeletionMutation.mutate();
-  }, []);
-
   const handleDownloadManual = useCallback(async () => {
     if (isDownloadingManual) return;
     setIsDownloadingManual(true);
@@ -531,27 +509,6 @@ export default function ProfileScreen() {
       setIsExportingData(false);
     }
   }, [isExportingData, t, profile?.nickname]);
-
-  const handleDeleteAccount = useCallback(() => {
-    if (Platform.OS === "web") {
-      if (confirm(t("profile.deleteAccountDesc"))) {
-        handleRequestDeletion();
-      }
-    } else {
-      Alert.alert(
-        t("profile.deleteAccount"),
-        t("profile.deleteAccountDesc"),
-        [
-          { text: t("common.cancel"), style: "cancel" },
-          {
-            text: t("common.delete"),
-            style: "destructive",
-            onPress: handleRequestDeletion,
-          },
-        ]
-      );
-    }
-  }, []);
 
   const handleLogout = useCallback(() => {
     if (Platform.OS === "web") {
@@ -1180,6 +1137,10 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
+        <MenuItem icon="create" label="Modifica Profilo" onPress={() => router.push("/profile/edit" as any)} />
+      </View>
+
+      <View style={styles.section}>
         <Text style={[styles.sectionTitle, { textAlign: "center" }]}>Pulsanti Taskbar</Text>
         <View style={taskbarStyles.row}>
           {([
@@ -1230,7 +1191,6 @@ export default function ProfileScreen() {
       )}
 
       <View style={styles.section}>
-        <MenuItem icon="create" label="Modifica Profilo" onPress={() => router.push("/profile/edit" as any)} />
         <MenuItem icon="bug" label="Segnala un Bug" onPress={() => router.push("/feedback/bug" as any)} color={Colors.accentRed} />
         <MenuItem icon="bulb" label="Richiedi Funzione" onPress={() => router.push("/feedback/feature" as any)} color={Colors.accent} />
 
@@ -1241,61 +1201,6 @@ export default function ProfileScreen() {
           <MenuItem icon="eye" label="Pannello Moderatore" onPress={() => router.push("/moderator" as any)} color={Colors.warning} />
         )}
 
-      </View>
-
-      <View style={[styles.section, { marginTop: 16 }]}>
-        <Pressable
-          style={styles.langDropdownTrigger}
-          onPress={() => setShowLanguageDropdown(!showLanguageDropdown)}
-        >
-          <Text style={styles.langDropdownFlag}>
-            {({ it: "🇮🇹", en: "🇬🇧", de: "🇩🇪", es: "🇪🇸", fr: "🇫🇷" } as Record<string, string>)[language]}
-          </Text>
-          <Text style={styles.langDropdownLabel}>
-            {({ it: "Italiano", en: "English", de: "Deutsch", es: "Español", fr: "Français" } as Record<string, string>)[language]}
-          </Text>
-          <Ionicons
-            name={showLanguageDropdown ? "chevron-up" : "chevron-down"}
-            size={20}
-            color={Colors.textSecondary}
-          />
-        </Pressable>
-        {showLanguageDropdown && (
-          <View style={styles.langDropdownList}>
-            {([
-              { code: "it" as AppLanguage, flag: "🇮🇹", label: "Italiano" },
-              { code: "en" as AppLanguage, flag: "🇬🇧", label: "English" },
-              { code: "de" as AppLanguage, flag: "🇩🇪", label: "Deutsch" },
-              { code: "es" as AppLanguage, flag: "🇪🇸", label: "Español" },
-              { code: "fr" as AppLanguage, flag: "🇫🇷", label: "Français" },
-            ]).map((lang) => {
-              const isActive = language === lang.code;
-              return (
-                <Pressable
-                  key={lang.code}
-                  style={[styles.langDropdownItem, isActive && styles.langDropdownItemActive]}
-                  onPress={() => {
-                    setLanguage(lang.code);
-                    setShowLanguageDropdown(false);
-                  }}
-                >
-                  <Text style={styles.langDropdownItemFlag}>{lang.flag}</Text>
-                  <Text style={[styles.langDropdownItemLabel, isActive && styles.langDropdownItemLabelActive]}>
-                    {lang.label}
-                  </Text>
-                  {isActive && (
-                    <Ionicons name="checkmark" size={20} color={Colors.accent} />
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <MenuItem icon="shield-checkmark-outline" label={t("profile.revokeConsent")} onPress={() => setShowRevokeConsentModal(true)} color={Colors.accentRed} />
-        <MenuItem icon="trash-outline" label={t("profile.deleteAccount")} onPress={handleDeleteAccount} color={Colors.accentRed} />
       </View>
 
       <View style={[styles.section, { marginTop: 32, gap: 10 }]}>
@@ -1320,24 +1225,6 @@ export default function ProfileScreen() {
               </Pressable>
               <Pressable style={styles.modalBtnConfirm} onPress={() => { setShowLogoutModal(false); doLogout(); }}>
                 <Text style={styles.modalBtnConfirmText}>{t("profile.logout")}</Text>
-              </Pressable>
-            </View>
-          </View>
-        </Pressable>
-      </Modal>
-
-      <Modal visible={showRevokeConsentModal} transparent animationType="fade" onRequestClose={() => setShowRevokeConsentModal(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setShowRevokeConsentModal(false)}>
-          <View style={[styles.modalContent, { maxHeight: "80%" }]}>
-            <Ionicons name="shield-checkmark-outline" size={32} color={Colors.accentRed} />
-            <Text style={[styles.modalTitle, { fontSize: 16, fontWeight: "700", marginBottom: 8 }]}>{t("profile.revokeConsentTitle")}</Text>
-            <Text style={[styles.modalTitle, { fontSize: 13, fontWeight: "400", lineHeight: 20, textAlign: "left" }]}>{t("profile.revokeConsentDesc")}</Text>
-            <View style={styles.modalButtons}>
-              <Pressable style={styles.modalBtnCancel} onPress={() => setShowRevokeConsentModal(false)}>
-                <Text style={styles.modalBtnCancelText}>{t("common.cancel")}</Text>
-              </Pressable>
-              <Pressable style={styles.modalBtnConfirm} onPress={() => { setShowRevokeConsentModal(false); handleRequestDeletion(); }}>
-                <Text style={styles.modalBtnConfirmText}>{t("common.confirm")}</Text>
               </Pressable>
             </View>
           </View>
