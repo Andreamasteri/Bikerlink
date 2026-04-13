@@ -124,6 +124,14 @@ function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress
               {t(`userType.${otherType}`)}
             </Text>
           </View>
+          {match.distanceKm != null && (
+            <View style={styles.distanceBadge}>
+              <Ionicons name="location" size={12} color={match.distanceFlag === "old_psn" ? Colors.warning : Colors.textSecondary} />
+              <Text style={[styles.distanceBadgeText, match.distanceFlag === "old_psn" && { color: Colors.warning }]}>
+                {match.distanceFlag === "old_psn" ? `~${match.distanceKm} km ⚠` : `${match.distanceKm} km`}
+              </Text>
+            </View>
+          )}
           <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
         </View>
       </TouchableOpacity>
@@ -246,6 +254,14 @@ function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, onBlock
             <Text style={[styles.matchNickname, { color: Colors.maleIcon }]}>{otherNickname}</Text>
             <Text style={styles.matchUserType}>{t("userType.biker")}</Text>
           </View>
+          {match.distanceKm != null && (
+            <View style={styles.distanceBadge}>
+              <Ionicons name="location" size={12} color={match.distanceFlag === "old_psn" ? Colors.warning : Colors.textSecondary} />
+              <Text style={[styles.distanceBadgeText, match.distanceFlag === "old_psn" && { color: Colors.warning }]}>
+                {match.distanceFlag === "old_psn" ? `~${match.distanceKm} km ⚠` : `${match.distanceKm} km`}
+              </Text>
+            </View>
+          )}
           <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
         </View>
       </TouchableOpacity>
@@ -582,21 +598,22 @@ export default function MatchScreen() {
   const parsedKm = parseFloat(distanceKm);
   const kmLimit = Number.isFinite(parsedKm) && parsedKm > 0 ? parsedKm : 50;
 
-  const passesDistanceFilter = (otherLat: any, otherLng: any, status: string): boolean => {
-    if (status !== "new") return true;
+  const passesDistanceFilter = (match: any): boolean => {
+    if (match.status !== "new") return true;
     if (distanceMode !== "km") return true;
+    if (match.distanceKm != null) return match.distanceKm <= kmLimit;
     if (!Number.isFinite(myLat) || !Number.isFinite(myLng)) return true;
-    const lat2 = parseFloat(String(otherLat));
-    const lng2 = parseFloat(String(otherLng));
+    const lat2 = parseFloat(String(match.otherLat));
+    const lng2 = parseFloat(String(match.otherLng));
     if (!Number.isFinite(lat2) || !Number.isFinite(lng2)) return false;
     return haversineKm(myLat!, myLng!, lat2, lng2) <= kmLimit;
   };
 
   const visibleGarageMatches = allGarageMatches
-    .filter((m: any) => m.status !== "rejected" && m.status !== "accepted" && passesDistanceFilter(m.otherLat, m.otherLng, m.status))
+    .filter((m: any) => m.status !== "rejected" && m.status !== "accepted" && passesDistanceFilter(m))
     .sort((a: any, b: any) => matchSortScore(b) - matchSortScore(a));
   const visibleBikerMatches = allBikerMatches
-    .filter((m: any) => m.status !== "rejected" && m.status !== "accepted" && passesDistanceFilter(m.otherLat, m.otherLng, m.status))
+    .filter((m: any) => m.status !== "rejected" && m.status !== "accepted" && passesDistanceFilter(m))
     .sort((a: any, b: any) => {
       const scoreDiff = matchSortScore(b) - matchSortScore(a);
       if (scoreDiff !== 0) return scoreDiff;
@@ -1757,5 +1774,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",
     color: Colors.accent,
+  },
+  distanceBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: Colors.surface,
+    marginRight: 4,
+  },
+  distanceBadgeText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
   },
 });

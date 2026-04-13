@@ -14,6 +14,25 @@ function requireAuth(req: Request, res: Response, next: () => void) {
   next();
 }
 
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+async function getCoordinatesMaxAgeSec(): Promise<number> {
+  const setting = await storage.getAppSetting("coordinates_max_age_sec");
+  const val = setting?.value ? parseInt(setting.value, 10) : NaN;
+  return isNaN(val) ? 600 : val;
+}
+
+function isCoordOld(updatedAt: Date | null | undefined, maxAgeSec: number): boolean {
+  if (!updatedAt) return true;
+  return (Date.now() - new Date(updatedAt).getTime()) > maxAgeSec * 1000;
+}
+
 const BIKER_SEARCH_TYPES = ["find_a_friend", "find_a_guest", "hitcher", "hitchhiker"];
 const ZAVORRINA_SEARCH_TYPES = ["find_a_biker", "hitchhiker"];
 
@@ -124,6 +143,12 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
     let allowedCountries: string[] = [];
     try { allowedCountries = countrySetting?.value ? JSON.parse(countrySetting.value) : []; } catch { allowedCountries = []; }
 
+    const myProfile = await storage.getUserProfile(userId);
+    const myLat = myProfile?.latitude ?? null;
+    const myLng = myProfile?.longitude ?? null;
+    const myCoordUpdatedAt = myProfile?.coordinatesUpdatedAt ?? null;
+    const maxAgeSec = await getCoordinatesMaxAgeSec();
+
     const filteredMatches = garageMatches.filter((match) => {
       const otherId = match.bikerId === userId ? match.zavarrinaId : match.bikerId;
       return !blockedIds.has(otherId);
@@ -145,14 +170,25 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
 
         let otherLat: number | null = null;
         let otherLng: number | null = null;
+        let otherCoordUpdatedAt: Date | null = null;
         if (otherUser?.id) {
           const profile = await storage.getUserProfile(otherUser.id);
           otherLat = profile?.latitude ?? null;
           otherLng = profile?.longitude ?? null;
+          otherCoordUpdatedAt = profile?.coordinatesUpdatedAt ?? null;
         }
         if (otherLat == null || otherLng == null) {
           otherLat = otherUser?.firstLoginLat ?? null;
           otherLng = otherUser?.firstLoginLng ?? null;
+        }
+
+        let distanceKm: number | null = null;
+        let distanceFlag: "ok" | "old_psn" | "no_psn" = "no_psn";
+        if (myLat != null && myLng != null && otherLat != null && otherLng != null) {
+          distanceKm = Math.round(haversineKm(myLat, myLng, otherLat, otherLng) * 10) / 10;
+          const myOld = isCoordOld(myCoordUpdatedAt, maxAgeSec);
+          const otherOld = isCoordOld(otherCoordUpdatedAt, maxAgeSec);
+          distanceFlag = (myOld || otherOld) ? "old_psn" : "ok";
         }
 
         return {
@@ -166,6 +202,8 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
           wishlistMoto: wishlistMoto ? { brand: wishlistMoto.brand, model: wishlistMoto.model, motorcycleType: wishlistMoto.motorcycleType } : null,
           otherLat,
           otherLng,
+          distanceKm,
+          distanceFlag,
         };
       })
     );
@@ -354,6 +392,12 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
     let allowedCountries: string[] = [];
     try { allowedCountries = countrySetting?.value ? JSON.parse(countrySetting.value) : []; } catch { allowedCountries = []; }
 
+    const myProfile = await storage.getUserProfile(userId);
+    const myLat = myProfile?.latitude ?? null;
+    const myLng = myProfile?.longitude ?? null;
+    const myCoordUpdatedAt = myProfile?.coordinatesUpdatedAt ?? null;
+    const maxAgeSec = await getCoordinatesMaxAgeSec();
+
     const filteredMatches = bikerMatchesList.filter((match) => {
       const otherId = match.biker1Id === userId ? match.biker2Id : match.biker1Id;
       return !blockedIds.has(otherId);
@@ -373,14 +417,25 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
 
         let otherLat: number | null = null;
         let otherLng: number | null = null;
+        let otherCoordUpdatedAt: Date | null = null;
         if (otherBiker?.id) {
           const profile = await storage.getUserProfile(otherBiker.id);
           otherLat = profile?.latitude ?? null;
           otherLng = profile?.longitude ?? null;
+          otherCoordUpdatedAt = profile?.coordinatesUpdatedAt ?? null;
         }
         if (otherLat == null || otherLng == null) {
           otherLat = otherBiker?.firstLoginLat ?? null;
           otherLng = otherBiker?.firstLoginLng ?? null;
+        }
+
+        let distanceKm: number | null = null;
+        let distanceFlag: "ok" | "old_psn" | "no_psn" = "no_psn";
+        if (myLat != null && myLng != null && otherLat != null && otherLng != null) {
+          distanceKm = Math.round(haversineKm(myLat, myLng, otherLat, otherLng) * 10) / 10;
+          const myOld = isCoordOld(myCoordUpdatedAt, maxAgeSec);
+          const otherOld = isCoordOld(otherCoordUpdatedAt, maxAgeSec);
+          distanceFlag = (myOld || otherOld) ? "old_psn" : "ok";
         }
 
         return {
@@ -390,6 +445,8 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
           biker2Nickname: biker2?.nickname,
           otherLat,
           otherLng,
+          distanceKm,
+          distanceFlag,
         };
       })
     );

@@ -283,6 +283,7 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
       }
       if (latitude !== undefined) updateData.latitude = fLat;
       if (longitude !== undefined) updateData.longitude = fLng;
+      if (latitude != null && longitude != null) updateData.coordinatesUpdatedAt = new Date();
     }
     if (searchPreference !== undefined) updateData.searchPreference = searchPreference;
     const validMapStyles = ["carto_light", "carto_dark", "esri_gray"];
@@ -425,9 +426,9 @@ router.put("/location", requireAuth, async (req: Request, res: Response) => {
       longitude = fuzzed.lng;
     }
     if (existingProfile) {
-      await storage.updateUserProfile(userId, { latitude, longitude } as any);
+      await storage.updateUserProfile(userId, { latitude, longitude, coordinatesUpdatedAt: new Date() } as any);
     } else {
-      await storage.createUserProfile({ userId, latitude, longitude } as any);
+      await storage.createUserProfile({ userId, latitude, longitude, coordinatesUpdatedAt: new Date() } as any);
     }
     return res.json({ message: "Posizione aggiornata" });
   } catch (error) {
@@ -463,6 +464,7 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
     }
     if (latitude !== undefined) updateData.latitude = fuzzedLat;
     if (longitude !== undefined) updateData.longitude = fuzzedLng;
+    if (latitude != null && longitude != null) updateData.coordinatesUpdatedAt = new Date();
 
     if (isAvailable === true) {
       await captureFirstAvailabilityLocation(userId, latitude, longitude, existingProfile?.latitude, existingProfile?.longitude);

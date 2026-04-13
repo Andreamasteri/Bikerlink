@@ -341,6 +341,16 @@ export default function AdminSettings() {
     }
   }, [refetchIntervalData]);
 
+  const { data: coordMaxAgeData } = useQuery<{ value: number }>({
+    queryKey: ["/api/admin/settings/coordinates_max_age_sec"],
+  });
+  const [coordMaxAgeInput, setCoordMaxAgeInput] = useState("");
+  useEffect(() => {
+    if (coordMaxAgeData?.value != null && coordMaxAgeInput === "") {
+      setCoordMaxAgeInput(String(coordMaxAgeData.value));
+    }
+  }, [coordMaxAgeData]);
+
   const { data: primalData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/primal-user"],
   });
@@ -750,6 +760,25 @@ export default function AdminSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/profile-refetch-interval"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const coordMaxAgeMutation = useMutation({
+    mutationFn: async (seconds: string) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/coordinates_max_age_sec", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: seconds }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/coordinates_max_age_sec"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
   });
@@ -1411,6 +1440,34 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           Ogni quanti secondi i client aggiornano le proprie coordinate nella tab Match (min 5s, default 30s)
+        </Text>
+      </View>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="time" size={20} color={Colors.warning} />
+            <Text style={styles.synecoLabel}>Età Max Coordinate (sec)</Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <TextInput
+              style={{ borderWidth: 1, borderColor: Colors.border, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, width: 70, color: Colors.text, fontSize: 14, textAlign: "center", backgroundColor: Colors.surface }}
+              keyboardType="numeric"
+              value={coordMaxAgeInput}
+              onChangeText={setCoordMaxAgeInput}
+              onEndEditing={() => {
+                const val = parseInt(coordMaxAgeInput, 10);
+                if (!isNaN(val) && val >= 10) {
+                  coordMaxAgeMutation.mutate(String(val));
+                } else {
+                  setCoordMaxAgeInput(String(coordMaxAgeData?.value ?? 600));
+                }
+              }}
+            />
+          </View>
+        </View>
+        <Text style={styles.synecoDesc}>
+          Se le coordinate di un utente sono più vecchie di questa soglia, la distanza mostra "Old Psn" (min 10s, default 600s)
         </Text>
       </View>
 

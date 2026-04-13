@@ -1170,6 +1170,39 @@ router.put("/settings/matching_countries", async (req: Request, res: Response) =
   }
 });
 
+router.get("/settings/coordinates_max_age_sec", async (_req: Request, res: Response) => {
+  try {
+    const setting = await storage.getAppSetting("coordinates_max_age_sec");
+    const value = setting?.value ? parseInt(setting.value, 10) : 600;
+    return res.json({ value: isNaN(value) ? 600 : value });
+  } catch (error) {
+    console.error("Admin get coordinates_max_age_sec error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.put("/settings/coordinates_max_age_sec", async (req: Request, res: Response) => {
+  try {
+    const { value } = req.body;
+    const numVal = parseInt(value, 10);
+    if (isNaN(numVal) || numVal < 10) {
+      return res.status(400).json({ message: "Valore deve essere >= 10 secondi" });
+    }
+    const setting = await storage.upsertAppSetting("coordinates_max_age_sec", String(numVal));
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_setting",
+      targetType: "app_setting",
+      targetId: "coordinates_max_age_sec",
+      details: `Età max coordinate aggiornata: ${numVal} sec`,
+    });
+    return res.json(setting);
+  } catch (error) {
+    console.error("Admin update coordinates_max_age_sec error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/settings/:key", async (req: Request, res: Response) => {
   try {
     const key = req.params.key as string;
