@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db";
-import { userMusicTracks } from "@shared/schema";
+import { userLastfmSessions } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const router = Router();
@@ -362,18 +362,33 @@ router.get("/suggested-genres", requireAuth, async (req: Request, res: Response)
   const userId = req.session.userId!;
 
   try {
-    const tracks = await db
-      .select({ genres: userMusicTracks.genres })
-      .from(userMusicTracks)
-      .where(eq(userMusicTracks.userId, userId));
+    const [session] = await db
+      .select({ lastfmUsername: userLastfmSessions.lastfmUsername })
+      .from(userLastfmSessions)
+      .where(eq(userLastfmSessions.userId, userId))
+      .limit(1);
 
+    if (!session?.lastfmUsername || !process.env.LASTFM_API_KEY) {
+      return res.json([]);
+    }
+
+    const url = new URL("https://ws.audioscrobbler.com/2.0/");
+    url.searchParams.set("method", "user.getTopTags");
+    url.searchParams.set("user", session.lastfmUsername);
+    url.searchParams.set("api_key", process.env.LASTFM_API_KEY);
+    url.searchParams.set("format", "json");
+
+    const resp = await fetch(url.toString());
+    if (!resp.ok) throw new Error(`Last.fm API error ${resp.status}`);
+    const data = await resp.json() as { toptags?: { tag?: Array<{ name?: string; count?: string }> } };
+
+    const tags = data?.toptags?.tag ?? [];
     const genreCount: Record<string, number> = {};
-    for (const row of tracks) {
-      for (const g of row.genres ?? []) {
-        const mapped = LASTFM_TO_GENRE[g.toLowerCase()];
-        if (mapped) {
-          genreCount[mapped] = (genreCount[mapped] ?? 0) + 1;
-        }
+    for (const tag of tags as Array<{ name?: string; count?: string }>) {
+      const tagName = (tag.name ?? "").toLowerCase();
+      const mapped = LASTFM_TO_GENRE[tagName];
+      if (mapped) {
+        genreCount[mapped] = (genreCount[mapped] ?? 0) + Number(tag.count ?? 1);
       }
     }
 

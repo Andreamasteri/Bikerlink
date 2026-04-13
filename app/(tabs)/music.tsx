@@ -373,6 +373,12 @@ function MusicRadioTab() {
     enabled: useLastFm,
   });
 
+  useEffect(() => {
+    if (useLastFm && suggestedGenreIds.length > 0 && !selectedGenre) {
+      setSelectedGenre(suggestedGenreIds[0]);
+    }
+  }, [useLastFm, suggestedGenreIds, selectedGenre, setSelectedGenre]);
+
   const { data: stations = [], isLoading: loadingStations } = useQuery<RadioStation[]>({
     queryKey: selectedGenre
       ? [`/api/music/radio/stations?genre=${selectedGenre}`]
@@ -1439,6 +1445,16 @@ function BraniTab({
           </Text>
           {library.length > 0 && (
             <TouchableOpacity
+              onPress={() => setSendModalVisible(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Invia la mia libreria"
+              accessibilityRole="button"
+            >
+              <Ionicons name="paper-plane-outline" size={20} color={Colors.accent} />
+            </TouchableOpacity>
+          )}
+          {library.length > 0 && (
+            <TouchableOpacity
               style={styles.playAllBtn}
               onPress={handlePlayAll}
               disabled={playAllLoading}
@@ -1476,7 +1492,7 @@ function BraniTab({
             <TouchableOpacity
               onPress={onDisconnect}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={{ marginLeft: 8 }}
+              style={{ marginLeft: 14, marginTop: 1 }}
             >
               <Ionicons name="log-out-outline" size={23} color={Colors.textSecondary} />
             </TouchableOpacity>
@@ -1487,7 +1503,7 @@ function BraniTab({
           <Ionicons name="search" size={18} color={Colors.textSecondary} style={{ marginRight: 8 }} />
           <TextInput
             style={styles.searchInput}
-            placeholder={isLastfm ? "Cerca brani su Last.fm…" : "Cerca brani su Spotify…"}
+            placeholder={isLastfm ? "Ricerca Brani su Lastfm" : "Ricerca Brani su Spotify"}
             placeholderTextColor={Colors.textSecondary}
             value={searchInput}
             onChangeText={onSearchChange}
@@ -1503,35 +1519,48 @@ function BraniTab({
           )}
         </View>
 
-        <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", paddingHorizontal: 12, paddingVertical: 6 }}>
-          <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic" }}>
-            {"Attenzione! Verranno riprodotti solo i primi 30\u2033 dei brani. Per la versione intera, cercali con "}
-          </Text>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Ionicons name="open-outline" size={13} color={Colors.textSecondary} />
-            <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic" }}>
-              {" dopo aver selezionato il motore di ricerca (YouTube, YouTube Music, Google)."}
-            </Text>
-          </View>
-        </View>
-
-        {library.length > 0 && (
-          <View style={streamStyles.playlistCard}>
-            <Ionicons name="musical-notes-outline" size={22} color={Colors.accent} />
-            <View style={{ flex: 1 }}>
-              <Text style={streamStyles.playlistCardTitle}>La mia playlist</Text>
-              <Text style={streamStyles.playlistCardSub}>{Math.min(library.length, 20)} brani</Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => setSendModalVisible(true)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityLabel="Invia la mia libreria"
-              accessibilityRole="button"
-            >
-              <Ionicons name="paper-plane-outline" size={20} color={Colors.accent} />
-            </TouchableOpacity>
+        {debouncedQuery.length >= 2 && (
+          <View style={[styles.section, { marginTop: 8 }]}>
+            <Text style={styles.sectionTitle}>Risultati di ricerca</Text>
+            {searchLoading ? (
+              <ActivityIndicator color={Colors.accent} style={{ marginVertical: 20 }} />
+            ) : searchNeedsReconnect ? (
+              <View style={styles.reconnectBox}>
+                <Ionicons name={isLastfm ? "radio" : "musical-notes"} size={32} color={providerColor} style={{ marginBottom: 8 }} />
+                <Text style={styles.reconnectText}>La sessione {providerName} è scaduta.</Text>
+                <TouchableOpacity
+                  style={[styles.connectBtn, { backgroundColor: providerColor, marginTop: 12 }]}
+                  onPress={onConnect}
+                  disabled={isConnecting}
+                >
+                  {isConnecting ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.connectBtnText}>Riconnetti {providerName}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : searchError !== null ? (
+              <Text style={styles.emptyText}>{searchError}</Text>
+            ) : searchResults.length === 0 ? (
+              <Text style={styles.emptyText}>Nessun risultato per "{debouncedQuery}"</Text>
+            ) : (
+              searchResults.map((track) => (
+                <SearchTrackRow
+                  key={track.spotifyTrackId}
+                  track={track}
+                  isAdded={savedIds.has(track.spotifyTrackId)}
+                  isAdding={pendingAddId === track.spotifyTrackId}
+                  onAdd={onAdd}
+                />
+              ))
+            )}
           </View>
         )}
+
+        <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic", paddingHorizontal: 12, paddingVertical: 4 }}>
+          {`Last.fm fornisce anteprime di 30\u2033; per le versioni intere, aprili con YouTube / Google`}
+        </Text>
 
         {libraryLoading ? (
           <ActivityIndicator color={Colors.accent} style={{ marginVertical: 20 }} />
@@ -1552,45 +1581,6 @@ function BraniTab({
           ))
         )}
       </View>
-
-      {debouncedQuery.length >= 2 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Risultati di ricerca</Text>
-          {searchLoading ? (
-            <ActivityIndicator color={Colors.accent} style={{ marginVertical: 20 }} />
-          ) : searchNeedsReconnect ? (
-            <View style={styles.reconnectBox}>
-              <Ionicons name={isLastfm ? "radio" : "musical-notes"} size={32} color={providerColor} style={{ marginBottom: 8 }} />
-              <Text style={styles.reconnectText}>La sessione {providerName} è scaduta.</Text>
-              <TouchableOpacity
-                style={[styles.connectBtn, { backgroundColor: providerColor, marginTop: 12 }]}
-                onPress={onConnect}
-                disabled={isConnecting}
-              >
-                {isConnecting ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.connectBtnText}>Riconnetti {providerName}</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          ) : searchError !== null ? (
-            <Text style={styles.emptyText}>{searchError}</Text>
-          ) : searchResults.length === 0 ? (
-            <Text style={styles.emptyText}>Nessun risultato per "{debouncedQuery}"</Text>
-          ) : (
-            searchResults.map((track) => (
-              <SearchTrackRow
-                key={track.spotifyTrackId}
-                track={track}
-                isAdded={savedIds.has(track.spotifyTrackId)}
-                isAdding={pendingAddId === track.spotifyTrackId}
-                onAdd={onAdd}
-              />
-            ))
-          )}
-        </View>
-      )}
     </ScrollView>
   );
 }
