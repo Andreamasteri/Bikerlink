@@ -33,7 +33,6 @@
     "android": {
       "package": "com.bikerlink.app",
       "versionCode": 10,
-      "jsEngine": "hermes",
       "config": {
         "googleMaps": {
           "apiKey": ""
