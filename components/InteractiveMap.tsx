@@ -87,6 +87,8 @@ interface InteractiveMapProps {
   onToggleFilterEvents?: () => void;
   onClubPress?: (club: ClubMapPin) => void;
   onProposeClubLocation?: (club: ClubMapPin) => void;
+  initialCenterOverride?: { latitude: number; longitude: number } | null;
+  onRegionChangeComplete?: (center: { latitude: number; longitude: number }) => void;
 }
 
 export interface InteractiveMapHandle {
@@ -180,9 +182,12 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   onToggleFilterEvents,
   onClubPress,
   onProposeClubLocation,
+  initialCenterOverride,
+  onRegionChangeComplete,
 }: InteractiveMapProps, ref) {
   const { enabled: mapsEnabled, resolvedProvider, userChoiceEnabled } = useMapConfig();
   const mapRef = useRef<MapView>(null);
+  const initialCenterDoneRef = useRef(false);
 
   useImperativeHandle(ref, () => ({
     focusOnCoordinate: (coords: { latitude: number; longitude: number }) => {
@@ -294,13 +299,23 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   }, [userLocation]);
 
   useEffect(() => {
-    if (userLocation && mapIsReady && mapRef.current) {
+    if (!userLocation || !mapIsReady || !mapRef.current) return;
+    if (initialCenterDoneRef.current) return;
+    initialCenterDoneRef.current = true;
+    if (initialCenterOverride) {
+      mapRef.current.animateToRegion({
+        latitude: initialCenterOverride.latitude,
+        longitude: initialCenterOverride.longitude,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      }, 500);
+    } else {
       mapRef.current.animateToRegion(
         { ...userLocation, latitudeDelta: 0.1, longitudeDelta: 0.1 },
         500
       );
     }
-  }, [userLocation, mapIsReady]);
+  }, [userLocation, mapIsReady, initialCenterOverride]);
 
   const handleMapReady = useCallback(() => {
     onReady?.();
@@ -320,6 +335,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
         showsUserLocation={!!userLocation}
         showsMyLocationButton={false}
         onMapReady={handleMapReady}
+        onRegionChangeComplete={(region) => onRegionChangeComplete?.({ latitude: region.latitude, longitude: region.longitude })}
       >
         {tileConfig ? (
           <UrlTile

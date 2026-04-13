@@ -1704,5 +1704,26 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 30,
+    "version": "1.30.0",
+    "runtimeVersion": "4.0.0",
+    "date": "2026-04-13",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-30 rv4.0.0: fix mappa fullscreen mantiene il centro della mappa ridotta",
+    "note": "Task #561. InteractiveMap.tsx: aggiunto prop initialCenterOverride (salta l'auto-center su userLocation se fornito) e onRegionChangeComplete (callback che aggiorna il parent con il centro attuale). Introdotto initialCenterDoneRef (useRef) per garantire che il primo-centro venga impostato una sola volta per istanza. index.tsx: aggiunto stato lastSmallMapCenter, aggiornato dal piccolo InteractiveMap tramite onRegionChangeComplete; passato come initialCenterOverride al fullscreen InteractiveMap; anche il click 'navigate' nella lista Online aggiorna lastSmallMapCenter prima di aprire la mappa. Risultato: espandere la mappa mantiene sempre il centro che si vedeva nella mappa ridotta. CURRENT_OTA_NUMBER=30.",
+    "releaseId": "533523de-91af-4ee4-a8d3-3ec1b37b6b47",
+    "bundleUrl": "private/ota/ota-1.30.0-1776083775006.js",
+    "updateGroupId": "10e77fbd-b98e-4f6a-8a0c-bba03f582470",
+    "androidUpdateId": "019d86d8-6706-76aa-92ed-0c7fecb084df",
+    "iosUpdateId": null,
+    "commitBase": "c22b337",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/10e77fbd-b98e-4f6a-8a0c-bba03f582470",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "published"
   }
 ]

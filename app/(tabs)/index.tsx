@@ -97,6 +97,7 @@ export default function MapScreen() {
   const [showHomeMessage, setShowHomeMessage] = useState(false);
   const [showInviteEventModal, setShowInviteEventModal] = useState(false);
   const [inviteSending, setInviteSending] = useState(false);
+  const [lastSmallMapCenter, setLastSmallMapCenter] = useState<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -793,6 +794,7 @@ export default function MapScreen() {
             realMeMarker={realMeMarker}
             fakeMeMarker={fakeMeMarker}
             showEventPins={false}
+            onRegionChangeComplete={(center) => setLastSmallMapCenter(center)}
           />
         ) : (
           <View style={styles.mapPlaceholder}>
@@ -834,6 +836,7 @@ export default function MapScreen() {
             onToggleFilterEvents={() => setFilterEvents((p) => !p)}
             onClubPress={(club) => { setMapFullscreen(false); router.push({ pathname: "/motoclub/[id]" as const, params: { id: club.id } }); }}
             onProposeClubLocation={(club) => { setMapFullscreen(false); router.push({ pathname: "/motoclub/[id]" as const, params: { id: club.id } }); }}
+            initialCenterOverride={lastSmallMapCenter}
           />
           ) : (
             <View style={styles.mapPlaceholder}>
@@ -1000,6 +1003,7 @@ export default function MapScreen() {
                         onPress={(e) => {
                           e.stopPropagation();
                           setShowOnlineList(false);
+                          setLastSmallMapCenter({ latitude: u.latitude, longitude: u.longitude });
                           const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
                           setTimeout(() => {
                             activeRef.current?.focusOnCoordinate({ latitude: u.latitude, longitude: u.longitude });
