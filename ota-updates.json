@@ -1651,16 +1651,16 @@
     "jsEngine": "hermes",
     "message": "OTA-27 rv4.0.0: fix distanza lista Biker Disponibili (location state GPS reale)",
     "note": "Bug: index.tsx in initMapLocation, quando user.region era impostato, setLocation veniva fissato al centro della regione (es. Veneto: 45.4398, 12.3319) e il risultato di fetchGPSLocation() veniva scartato. Le query biker-available-list, online-list, nearby inviavano al server il centro regione invece del GPS reale → distanze errate (~10.5 km invece di 0). Fix: cattura il valore di ritorno di fetchGPSLocation() in entrambi i rami (region e profileLat) e aggiorna setLocation con il GPS reale. CURRENT_OTA_NUMBER=27.",
-    "releaseId": null,
-    "bundleUrl": null,
-    "updateGroupId": null,
-    "androidUpdateId": null,
+    "releaseId": "7bc9c904-86cc-442b-b767-2f3aa427d924",
+    "bundleUrl": "private/ota/ota-1.27.0-1776078258637.js",
+    "updateGroupId": "8f33d60f-86fe-462b-902e-cd8946471414",
+    "androidUpdateId": "019d8684-96a1-77a2-8a9d-5bedc02fc717",
     "iosUpdateId": null,
-    "commitBase": "1e3943f",
-    "easDashboard": null,
+    "commitBase": "6857dea",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/8f33d60f-86fe-462b-902e-cd8946471414",
     "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
-    "status": "pending"
+    "status": "published"
   }
 ]
