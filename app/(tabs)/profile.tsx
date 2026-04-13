@@ -141,7 +141,7 @@ export default function ProfileScreen() {
   const [isExportingData, setIsExportingData] = useState(false);
 
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-  // Ciclo 4.0.0 — APK v10 — OTA-10: linea arancione tab Musica a contatto col testo (paddingBottom 0)
+  // Ciclo 4.0.0 — APK v10 — OTA-37: fix Pic! immagini nere (proxy Express per foto contest)
   const CURRENT_OTA_NUMBER = 37;
 
   const profileQuery = useQuery<ProfileData>({
