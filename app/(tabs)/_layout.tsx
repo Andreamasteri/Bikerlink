@@ -316,7 +316,7 @@ export default function TabLayout() {
                 )}
               </View>
             ),
-            headerTitle: "Chat",
+            headerShown: false,
             href: gpsTabHref,
           }}
         />
