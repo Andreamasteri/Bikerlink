@@ -177,11 +177,6 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
           otherLng = profile?.longitude ?? null;
           otherCoordUpdatedAt = profile?.coordinatesUpdatedAt ?? null;
         }
-        if (otherLat == null || otherLng == null) {
-          otherLat = otherUser?.firstLoginLat ?? null;
-          otherLng = otherUser?.firstLoginLng ?? null;
-        }
-
         let distanceKm: number | null = null;
         let distanceFlag: "ok" | "old_psn" | "no_psn" = "no_psn";
         if (myLat != null && myLng != null && otherLat != null && otherLng != null) {
@@ -431,11 +426,6 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
           otherLng = profile?.longitude ?? null;
           otherCoordUpdatedAt = profile?.coordinatesUpdatedAt ?? null;
         }
-        if (otherLat == null || otherLng == null) {
-          otherLat = otherBiker?.firstLoginLat ?? null;
-          otherLng = otherBiker?.firstLoginLng ?? null;
-        }
-
         let distanceKm: number | null = null;
         let distanceFlag: "ok" | "old_psn" | "no_psn" = "no_psn";
         if (myLat != null && myLng != null && otherLat != null && otherLng != null) {

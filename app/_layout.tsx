@@ -51,7 +51,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 SplashScreen.preventAutoHideAsync();
 
 const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000;
-const LOCATION_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
+const DEFAULT_LOCATION_UPDATE_INTERVAL_MS = 30 * 1000;
 
 async function sendHeartbeat() {
   try {
@@ -98,14 +98,36 @@ function AppStateHandler() {
   const appStateRef = useRef(AppState.currentState);
   const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const locationIntervalMsRef = useRef<number>(DEFAULT_LOCATION_UPDATE_INTERVAL_MS);
 
   useEffect(() => {
     if (!user) return;
 
-    sendHeartbeat();
-    sendLocationUpdate();
-    heartbeatTimerRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
-    locationTimerRef.current = setInterval(sendLocationUpdate, LOCATION_UPDATE_INTERVAL_MS);
+    let cancelled = false;
+
+    async function fetchLocationInterval() {
+      try {
+        const url = new URL("/api/settings/profile-refetch-interval", getApiUrl());
+        const resp = await fetch(url.toString());
+        if (resp.ok) {
+          const data = await resp.json();
+          const seconds = typeof data.seconds === "number" && data.seconds >= 5 ? data.seconds : 30;
+          locationIntervalMsRef.current = seconds * 1000;
+        }
+      } catch {}
+    }
+
+    async function startTimers() {
+      await fetchLocationInterval();
+      if (cancelled) return;
+
+      sendHeartbeat();
+      sendLocationUpdate();
+      heartbeatTimerRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+      locationTimerRef.current = setInterval(sendLocationUpdate, locationIntervalMsRef.current);
+    }
+
+    startTimers();
 
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       const prev = appStateRef.current;
@@ -119,12 +141,19 @@ function AppStateHandler() {
         queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-count"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-list"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-list"] });
+
+        fetchLocationInterval().then(() => {
+          if (cancelled) return;
+          if (locationTimerRef.current) clearInterval(locationTimerRef.current);
+          locationTimerRef.current = setInterval(sendLocationUpdate, locationIntervalMsRef.current);
+        });
       }
 
       appStateRef.current = nextAppState;
     });
 
     return () => {
+      cancelled = true;
       subscription.remove();
       if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
       if (locationTimerRef.current) clearInterval(locationTimerRef.current);

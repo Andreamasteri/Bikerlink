@@ -1618,5 +1618,26 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "pending"
+  },
+  {
+    "updateNumber": 26,
+    "version": "1.26.0",
+    "runtimeVersion": "4.0.0",
+    "date": "2026-04-13",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "message": "OTA-26 rv4.0.0: fix distanza fallback firstLoginLat + coordinate configurabili (#554)",
+    "note": "Task #554. Rimosso fallback a firstLoginLat/Lng in proposals.ts (garage-matches e biker-matches): se coordinate profilo null, distanceFlag='no_psn' invece di usare coordinate primo login (che potevano essere a km di distanza dalla posizione attuale). Client _layout.tsx: intervallo invio coordinate ora letto da /api/settings/profile-refetch-interval (default 30s, era hardcoded 5min). Intervallo aggiornato anche al ritorno in foreground. Coordinate inviate sia per utenti disponibili che non disponibili. CURRENT_OTA_NUMBER=26.",
+    "releaseId": "PENDING",
+    "bundleUrl": "PENDING",
+    "updateGroupId": "PENDING",
+    "androidUpdateId": "PENDING",
+    "iosUpdateId": null,
+    "commitBase": "PENDING",
+    "easDashboard": "PENDING",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "pending"
   }
 ]
