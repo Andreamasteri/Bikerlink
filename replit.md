@@ -124,7 +124,7 @@ Lo script blocca l'esecuzione se `.local/apk-build-authorized` non esiste, logga
 | runtimeVersion | 5.0.0 |
 | EAS Build ID | `6ea14cd7-6eb4-405c-b7e8-45698408d742` |
 | EAS Dashboard | https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/6ea14cd7-6eb4-405c-b7e8-45698408d742 |
-| apkUrl | ⏳ BUILD IN CORSO — disponibile su EAS dopo completamento (10-20 min). Recuperare da: `npx eas-cli@latest build:view 6ea14cd7-6eb4-405c-b7e8-45698408d742` |
+| apkUrl | https://expo.dev/artifacts/eas/eEkRqCLJGNDSrAmCtZVecY.apk |
 | Avviata il | 2026-04-13 |
 | Profilo | preview (APK Android) |
 | Cache | --clear-cache (Gradle remota) |
