@@ -188,14 +188,13 @@ export default function ReadyToRideScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: Platform.OS === "web" ? 67 : insets.top }}>
       <InlineMiniPlayer />
       <ScrollView
         style={[styles.container, { backgroundColor: colors.background }]}
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: Platform.OS === "web" ? 67 : 0,
             paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16,
           },
         ]}

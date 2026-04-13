@@ -246,7 +246,7 @@ export default function TabLayout() {
                 color={isAvailable ? colors.success : colors.accentRed}
               />
             ),
-            headerTitle: "Ride!",
+            headerShown: false,
             href: gpsTabHref,
           }}
         />

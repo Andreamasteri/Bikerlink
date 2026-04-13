@@ -142,7 +142,7 @@ export default function ProfileScreen() {
 
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
   // Ciclo 4.0.0 — APK v10 — OTA-10: linea arancione tab Musica a contatto col testo (paddingBottom 0)
-  const CURRENT_OTA_NUMBER = 28;
+  const CURRENT_OTA_NUMBER = 29;
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -638,7 +638,7 @@ export default function ProfileScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: Platform.OS === "web" ? 67 : insets.top }}>
+    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: Platform.OS === "web" ? 67 : 0 }}>
       <InlineMiniPlayer />
       <ScrollView
         style={[
