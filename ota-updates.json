@@ -1672,16 +1672,16 @@
     "jsEngine": "hermes",
     "message": "OTA-28 rv4.0.0: GPS watchPosition — più efficiente, meno batteria",
     "note": "Task #555. Sostituito polling GPS (getCurrentPositionAsync + setInterval 30s) con Location.watchPositionAsync(accuracy:Balanced, timeInterval:30s, distanceInterval:20m). L'OS notifica l'app solo quando la posizione cambia — nessuna richiesta GPS a vuoto quando fermi. Su web rimane setInterval+getCurrentPosition. Al ritorno in foreground (AppState active) il watcher viene fermato e riavviato. Rimossi: DEFAULT_LOCATION_UPDATE_INTERVAL_MS, sendLocationUpdate(), locationTimerRef, locationIntervalMsRef, fetchLocationInterval(). Aggiunto: startNativeWatcher(), stopNativeWatcher(), locationWatcherRef, sendWebLocation(). CURRENT_OTA_NUMBER=28.",
-    "releaseId": null,
-    "bundleUrl": null,
-    "updateGroupId": null,
-    "androidUpdateId": null,
+    "releaseId": "90796d50-0134-4d36-af20-5be285e04512",
+    "bundleUrl": "private/ota/ota-1.28.0-1776079697845.js",
+    "updateGroupId": "47bf745e-847b-4856-a6ab-4d4013832ad8",
+    "androidUpdateId": "019d869a-2699-7f54-8c2d-7936a2183363",
     "iosUpdateId": null,
     "commitBase": "5f9bc09",
-    "easDashboard": null,
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/47bf745e-847b-4856-a6ab-4d4013832ad8",
     "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
-    "status": "pending"
+    "status": "published"
   }
 ]
