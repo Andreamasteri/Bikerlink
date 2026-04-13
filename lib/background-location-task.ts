@@ -108,7 +108,10 @@ try { TaskManager.defineTask(BG_LOCATION_TASK, async ({ data, error }: any) => {
   } catch (err) {
     console.warn("[BgLocation] send error:", err);
   }
-}); } catch (e) { console.warn("[BgLocation] defineTask non supportato su questa build:", e); }
+});
+} catch (e) {
+  console.warn("[BgLocation] defineTask non supportato su questa build:", e);
+}
 
 export interface BgLocationConfig {
   enabled: boolean;
