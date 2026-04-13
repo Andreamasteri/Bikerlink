@@ -295,6 +295,23 @@ function RootLayoutNav() {
   );
 }
 
+function reportClientError(error: Error, componentStack: string) {
+  try {
+    const url = getApiUrl() + "/api/admin/client-error";
+    fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: error?.message || "unknown",
+        stack: (error?.stack || "").substring(0, 2000),
+        componentStack: (componentStack || "").substring(0, 1000),
+        platform: Platform.OS,
+        appVersion: `rv${Updates.runtimeVersion || "?"}`,
+      }),
+    }).catch(() => {});
+  } catch {}
+}
+
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts(
     Platform.OS === "web"
@@ -337,7 +354,7 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <ErrorBoundary>
+    <ErrorBoundary onError={reportClientError}>
       <ThemeProvider>
       <LanguageProvider>
         <QueryClientProvider client={queryClient}>

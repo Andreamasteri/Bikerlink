@@ -1,15 +1,18 @@
 #!/bin/bash
 set -e
 
-echo "=== [1/3] Build server TypeScript ==="
+echo "=== [1/4] Sync database schema ==="
+npx drizzle-kit push --force 2>&1 || echo "WARNING: db:push failed, continuing..."
+
+echo "=== [2/4] Build server TypeScript ==="
 node scripts/server-build.js
 
-echo "=== [2/3] Export Expo web app ==="
+echo "=== [3/4] Export Expo web app ==="
 EXPO_NO_INSPECTOR_PROXY=1 \
 REACT_NATIVE_DEVTOOLS_DISABLE=1 \
 npx expo export --platform web --output-dir static-build/web
 
-echo "=== [3/3] Create SPA index marker ==="
+echo "=== [4/4] Create SPA index marker ==="
 if [ -f "static-build/web/index.html" ]; then
   cp static-build/web/index.html static-build/index.html
   echo "static-build/index.html creato (da web export)"

@@ -1935,5 +1935,26 @@
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 41,
+    "cycle": "5.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "5.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-41 rv5.0.0: error reporting client→server + db:push nel deploy + fix user_favorites produzione",
+    "note": "Prima OTA del ciclo 5.x (APK v11). (1) ErrorBoundary ora invia errori JS al backend via POST /api/admin/client-error per diagnosi crash schermo nero. (2) deploy-build.sh aggiornato con drizzle-kit push automatico per sincronizzare schema DB in produzione. (3) Endpoint /api/admin/client-error aggiunto al server. CURRENT_OTA_NUMBER=41.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": null,
+    "easDashboard": null,
+    "apkBuildId": "6ea14cd7",
+    "apkVersionCode": 11,
+    "apkUrl": "https://expo.dev/artifacts/eas/eEkRqCLJGNDSrAmCtZVecY.apk",
+    "status": "pending"
   }
 ]

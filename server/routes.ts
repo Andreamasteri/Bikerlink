@@ -1107,6 +1107,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }, 5 * 60 * 1000);
 
+  app.post("/api/admin/client-error", async (req, res) => {
+    try {
+      const { message, stack, componentStack, platform, appVersion } = req.body || {};
+      console.error("[CLIENT-ERROR]", JSON.stringify({
+        message: message || "unknown",
+        stack: (stack || "").substring(0, 2000),
+        componentStack: (componentStack || "").substring(0, 1000),
+        platform: platform || "unknown",
+        appVersion: appVersion || "unknown",
+        timestamp: new Date().toISOString(),
+        ip: req.ip,
+      }));
+      res.json({ received: true });
+    } catch {
+      res.status(200).json({ received: true });
+    }
+  });
+
   const httpServer = createServer(app);
 
   import("./backup-service").then(({ startScheduler }) => {
