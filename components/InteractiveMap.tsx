@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   View,
@@ -89,6 +89,10 @@ interface InteractiveMapProps {
   onProposeClubLocation?: (club: ClubMapPin) => void;
 }
 
+export interface InteractiveMapHandle {
+  focusOnCoordinate: (coords: { latitude: number; longitude: number }) => void;
+}
+
 const ITALY_REGION: Region = {
   latitude: 41.9028,
   longitude: 12.4964,
@@ -148,7 +152,7 @@ export interface ClubMapPin {
   currentUserIsMember?: boolean;
 }
 
-export default function InteractiveMap({
+const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(function InteractiveMap({
   users = [],
   workshops = [],
   easterEggs = [],
@@ -176,9 +180,23 @@ export default function InteractiveMap({
   onToggleFilterEvents,
   onClubPress,
   onProposeClubLocation,
-}: InteractiveMapProps) {
+}: InteractiveMapProps, ref) {
   const { enabled: mapsEnabled, resolvedProvider, userChoiceEnabled } = useMapConfig();
   const mapRef = useRef<MapView>(null);
+
+  useImperativeHandle(ref, () => ({
+    focusOnCoordinate: (coords: { latitude: number; longitude: number }) => {
+      if (mapRef.current) {
+        mapRef.current.animateToRegion({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        }, 800);
+      }
+    },
+  }), []);
+
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
   const region: Region = ITALY_REGION;
@@ -603,7 +621,9 @@ export default function InteractiveMap({
       </View>
     </View>
   );
-}
+});
+
+export default InteractiveMap;
 
 const styles = StyleSheet.create({
   container: {

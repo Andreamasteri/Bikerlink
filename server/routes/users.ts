@@ -646,6 +646,8 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
           bio: item.profile?.bio || null,
           moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
           ridingStyle: firstMoto?.ridingStyle || null,
+          latitude: item.profile?.latitude ?? null,
+          longitude: item.profile?.longitude ?? null,
           distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
           isAvailable: (item.profile?.isAvailable || false) && onlineIdSet.has(item.user.id),
           isOnline: onlineIdSet.has(item.user.id),

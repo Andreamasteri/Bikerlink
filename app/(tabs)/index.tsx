@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -26,7 +26,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import { useSynecoVisible } from "@/lib/syneco-context";
 import { useSetting } from "@/lib/settings-context";
-import InteractiveMap, { type ClubMapPin } from "@/components/InteractiveMap";
+import InteractiveMap, { type ClubMapPin, type InteractiveMapHandle } from "@/components/InteractiveMap";
 import { getRegionCoordinates } from "@/constants/regions";
 import { getCountryFlag, getCountryName, EUROPEAN_COUNTRIES } from "@/lib/countries-regions";
 import { useT, useLocale } from "@/lib/language-context";
@@ -88,6 +88,8 @@ export default function MapScreen() {
   const [offlineCountdown, setOfflineCountdown] = useState<{ online: number }>({ online: 0 });
   const sosEnabled = useSetting("sosEnabled");
   const [mapReady, setMapReady] = useState(false);
+  const mapRef = useRef<InteractiveMapHandle>(null);
+  const fullscreenMapRef = useRef<InteractiveMapHandle>(null);
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [showAreaModal, setShowAreaModal] = useState(false);
   const [countriesLoaded, setCountriesLoaded] = useState(false);
@@ -765,6 +767,7 @@ export default function MapScreen() {
       <Pressable style={styles.mapContainer} onPress={() => setMapFullscreen(true)}>
         {!mapFullscreen ? (
           <InteractiveMap
+            ref={mapRef}
             users={usersWithSelf.filter((u: any) => u.latitude != null && u.longitude != null && !isNaN(u.latitude) && !isNaN(u.longitude))}
             workshops={(workshopsQuery.data ?? []).filter((w: any) => w.latitude != null && w.longitude != null && !isNaN(w.latitude) && !isNaN(w.longitude))}
             easterEggs={[]}
@@ -799,6 +802,7 @@ export default function MapScreen() {
         <View style={styles.fullscreenContainer}>
           {mapFullscreenReady ? (
           <InteractiveMap
+            ref={fullscreenMapRef}
             users={usersWithSelf.filter((u: any) => u.latitude != null && u.longitude != null && !isNaN(u.latitude) && !isNaN(u.longitude))}
             workshops={(workshopsQuery.data ?? []).filter((w: any) => w.latitude != null && w.longitude != null && !isNaN(w.latitude) && !isNaN(w.longitude))}
             easterEggs={(easterEggsQuery.data ?? []).filter((e: any) => e.latitude != null && e.longitude != null && !isNaN(e.latitude) && !isNaN(e.longitude))}
@@ -978,6 +982,22 @@ export default function MapScreen() {
                       {!!u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
                       {!!u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
                     </View>
+                    {u.latitude != null && u.longitude != null && u.id !== user?.id && (
+                      <Pressable
+                        style={styles.locateButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          setShowOnlineList(false);
+                          const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
+                          setTimeout(() => {
+                            activeRef.current?.focusOnCoordinate({ latitude: u.latitude, longitude: u.longitude });
+                            handleUserPress({ id: u.id, nickname: u.nickname, userType: u.userType, latitude: u.latitude, longitude: u.longitude });
+                          }, 300);
+                        }}
+                      >
+                        <Ionicons name="navigate" size={18} color={Colors.accent} />
+                      </Pressable>
+                    )}
                     {u.distance != null && u.id !== user?.id && (
                       <View style={styles.userListDistance}>
                         <Text style={styles.distanceText}>{u.distance} km</Text>
@@ -1775,6 +1795,11 @@ const styles = StyleSheet.create({
   userListName: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.text },
   userListDetail: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
   userListBio: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic" as const },
+  locateButton: {
+    padding: 8,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
   userListDistance: {
     backgroundColor: Colors.accent + "20",
     paddingHorizontal: 8,
