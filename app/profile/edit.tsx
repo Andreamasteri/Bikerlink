@@ -1229,7 +1229,7 @@ const styles = StyleSheet.create({
   modalButtons: {
     flexDirection: "row" as const,
     gap: 12,
-    width: "100%" as any,
+    width: "100%",
   },
   modalBtnCancel: {
     flex: 1,
