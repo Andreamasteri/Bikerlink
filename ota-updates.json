@@ -1871,6 +1871,27 @@
     "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
     "apkVersionCode": 10,
     "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 38,
+    "cycle": "4.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "4.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-38 rv4.0.0: fix Pic! foto nere — resolvePhotoUrl gestisce URL GCS storici nel DB",
+    "note": "Task #570: le foto nel DB salvate con URL GCS diretto (https://storage.googleapis.com/...) o percorsi legacy (/uploads/contest/) apparivano nere. Fix: resolvePhotoUrl in contest.tsx ora (1) converte URL GCS → /api/contest/photos/filename, (2) converte /uploads/contest/filename → /api/contest/photos/filename, (3) restituisce null per file:/// (mostra placeholder). CURRENT_OTA_NUMBER=38.",
+    "releaseId": "ec21eecf-1bb0-48a5-8199-c030775c9be2",
+    "bundleUrl": "private/ota/ota-1.38.0-1776102965229.js",
+    "updateGroupId": "b794a113-0a58-4363-8ebd-4a7dae493887",
+    "androidUpdateId": "019d87fd-82cb-7441-88ef-70e7b7e5581a",
+    "iosUpdateId": null,
+    "commitBase": "ae501f48",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/b794a113-0a58-4363-8ebd-4a7dae493887",
+    "apkBuildId": "7a08598a-3a00-4169-aed1-b1d4ab6e8e7c",
+    "apkVersionCode": 10,
+    "apkUrl": "https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk",
     "status": "published"
   }
 ]

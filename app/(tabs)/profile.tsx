@@ -141,8 +141,8 @@ export default function ProfileScreen() {
   const [isExportingData, setIsExportingData] = useState(false);
 
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-  // Ciclo 4.0.0 — APK v10 — OTA-37: fix Pic! immagini nere (proxy Express per foto contest)
-  const CURRENT_OTA_NUMBER = 37;
+  // Ciclo 4.0.0 — APK v10 — OTA-38: fix Pic! resolvePhotoUrl per URL GCS storici nel DB
+  const CURRENT_OTA_NUMBER = 38;
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],

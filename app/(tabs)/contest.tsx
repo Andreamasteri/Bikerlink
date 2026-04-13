@@ -110,8 +110,24 @@ function PerformanceCard({ data }: { data: PerformanceData }) {
 
 function resolvePhotoUrl(photoUrl: string | null): string | null {
   if (!photoUrl) return null;
-  if (photoUrl.startsWith("http://") || photoUrl.startsWith("https://")) return photoUrl;
   const base = getApiUrl().replace(/\/$/, "");
+
+  if (photoUrl.startsWith("file:///")) return null;
+
+  if (photoUrl.startsWith("https://storage.googleapis.com/")) {
+    const decoded = decodeURIComponent(photoUrl);
+    const filename = decoded.split("/").pop();
+    if (!filename) return null;
+    return `${base}/api/contest/photos/${filename}`;
+  }
+
+  if (photoUrl.startsWith("/uploads/contest/")) {
+    const filename = photoUrl.replace("/uploads/contest/", "");
+    return `${base}/api/contest/photos/${filename}`;
+  }
+
+  if (photoUrl.startsWith("http://") || photoUrl.startsWith("https://")) return photoUrl;
+
   return `${base}${photoUrl.startsWith("/") ? "" : "/"}${photoUrl}`;
 }
 
