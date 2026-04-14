@@ -1964,19 +1964,19 @@
     "platform": "android",
     "runtimeVersion": "6.0.0",
     "jsEngine": "hermes",
-    "message": "OTA-42 rv6.0.0: APK v12 baseline — rimosso plugin expo-location (fix crash schermo nero)",
-    "note": "Prima OTA del ciclo 6.x (APK v12). Rimosso plugin nativo expo-location da app.json (causa del crash schermo nero post-login su APK v11). expo-location resta installato come pacchetto JS per le chiamate foreground. versionCode 12, runtimeVersion 6.0.0. Include tutto il codice di OTA-41 (error reporting, db:push nel deploy). CURRENT_OTA_NUMBER=42.",
-    "releaseId": null,
-    "bundleUrl": null,
-    "updateGroupId": null,
-    "androidUpdateId": null,
+    "message": "OTA-42 rv6.0.0: fix crash post-login — rimossa logica background permission da LocationProvider",
+    "note": "Fix root cause crash APK v12: LocationProvider chiamava Location.getBackgroundPermissionsAsync() all'avvio senza plugin nativo expo-location installato. Rimossa tutta la logica background permission (checkBgPermission, BgPermissionExplainerModal, hasBgPermission, bgPermissionRevoked). Interfaccia LocationContextType mantenuta compatibile con tracking.tsx (stub values: false/no-op). Aggiunto server reporting fire-and-forget nel global error handler di _layout.tsx (POST /api/admin/client-error). CURRENT_OTA_NUMBER=42.",
+    "releaseId": "8fca33aa-4a31-4de8-a611-8d53f4a49ce4",
+    "bundleUrl": "private/ota/ota-1.42.0-1776149730604.js",
+    "updateGroupId": "f45fa056-c280-43e5-832e-b31069666a95",
+    "androidUpdateId": "019d8ac7-22a6-7dac-b272-177ea16ace22",
     "iosUpdateId": null,
-    "commitBase": "3c273b4e0205a204f69b538b4acbf7cd0cee29e3",
-    "easDashboard": null,
+    "commitBase": "e410c0e92617c1fcd14650fa121f6457f53800dc",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/f45fa056-c280-43e5-832e-b31069666a95",
     "apkBuildId": "3ceb697e-ce05-4068-97ce-0718b9b0b717",
     "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/3ceb697e-ce05-4068-97ce-0718b9b0b717",
     "apkVersionCode": 12,
     "apkUrl": null,
-    "status": "building"
+    "status": "published"
   }
 ]

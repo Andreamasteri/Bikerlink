@@ -348,6 +348,20 @@ export default function RootLayout() {
     const prev = errorUtils.getGlobalHandler?.();
     errorUtils.setGlobalHandler?.((error: Error, isFatal?: boolean) => {
       console.error("[GlobalError]", error?.message, "isFatal:", isFatal, error?.stack);
+      try {
+        fetch(new URL("/api/admin/client-error", getApiUrl()).toString(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: error?.message || "unknown",
+            stack: (error?.stack || "").substring(0, 2000),
+            componentStack: "",
+            platform: Platform.OS,
+            appVersion: `rv${Updates.runtimeVersion || "?"}`,
+            isFatal: !!isFatal,
+          }),
+        }).catch(() => {});
+      } catch {}
       if (prev) prev(error, isFatal);
     });
     return () => { if (prev) errorUtils.setGlobalHandler?.(prev); };
