@@ -60,7 +60,10 @@ export default function LoginScreen() {
         onSuccess: async () => {
           setIsSubmitting(false);
           try {
-            const res = await fetch(new URL("/api/settings/ota-gate-enabled", getApiUrl()).toString());
+            const ctrl = new AbortController();
+            const timeout = setTimeout(() => ctrl.abort(), 3000);
+            const res = await fetch(new URL("/api/settings/ota-gate-enabled", getApiUrl()).toString(), { signal: ctrl.signal });
+            clearTimeout(timeout);
             const data = await res.json();
             if (data?.enabled === true) {
               router.replace("/ota-gate");

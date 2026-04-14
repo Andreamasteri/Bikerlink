@@ -3003,25 +3003,24 @@ export default function AdminSettings() {
             ? "Schermata attesa OTA attiva — nuovi login vedranno la gate screen"
             : "Gate OTA disattivata — login normale per tutti gli utenti"}
         </Text>
-        {otaGateEnabled && (
-          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 10, gap: 8 }}>
-            <Text style={[styles.synecoDesc, { flex: 1 }]}>Secondi attesa:</Text>
-            <TextInput
-              style={[styles.synecoDesc, { borderWidth: 1, borderColor: Colors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, color: Colors.text, minWidth: 60, textAlign: "center" }]}
-              value={otaWaitInput}
-              onChangeText={setOtaWaitInput}
-              keyboardType="numeric"
-              maxLength={4}
-            />
-            <TouchableOpacity
-              style={[styles.saveBtn, { paddingHorizontal: 12, paddingVertical: 6 }]}
-              onPress={() => otaWaitMutation.mutate(otaWaitInput)}
-              disabled={otaWaitMutation.isPending}
-            >
-              <Text style={styles.saveBtnText}>Salva</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 10, gap: 8, opacity: otaGateEnabled ? 1 : 0.4 }}>
+          <Text style={[styles.synecoDesc, { flex: 1 }]}>Secondi attesa:</Text>
+          <TextInput
+            style={[styles.synecoDesc, { borderWidth: 1, borderColor: Colors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, color: Colors.text, minWidth: 60, textAlign: "center" }]}
+            value={otaWaitInput}
+            onChangeText={setOtaWaitInput}
+            keyboardType="numeric"
+            maxLength={4}
+            editable={otaGateEnabled}
+          />
+          <TouchableOpacity
+            style={[styles.saveBtn, { paddingHorizontal: 12, paddingVertical: 6 }]}
+            onPress={() => otaWaitMutation.mutate(otaWaitInput)}
+            disabled={otaWaitMutation.isPending || !otaGateEnabled}
+          >
+            <Text style={styles.saveBtnText}>Salva</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.sectionHeaderRow}>
