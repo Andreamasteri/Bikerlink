@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { Platform, AppState, AppStateStatus, Modal, View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import * as Location from "expo-location";
 import { useQuery } from "@tanstack/react-query";
-import Colors from "@/constants/colors";
+import { useColors } from "@/hooks/useColors";
 
 interface LocationContextType {
   hasLocationPermission: boolean;
@@ -52,41 +52,128 @@ function BgPermissionExplainerModal({
   onConfirm: () => void;
   onDismiss: () => void;
 }) {
+  const colors = useColors();
+  const s = StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.6)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 24,
+    },
+    card: {
+      backgroundColor: colors.background,
+      borderRadius: 16,
+      padding: 24,
+      width: "100%",
+      maxWidth: 400,
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: "700" as const,
+      color: colors.text,
+      marginBottom: 12,
+      textAlign: "center",
+    },
+    body: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginBottom: 16,
+      lineHeight: 20,
+    },
+    reasonRow: {
+      flexDirection: "row" as const,
+      alignItems: "flex-start" as const,
+      marginBottom: 12,
+      gap: 8,
+    },
+    bullet: {
+      fontSize: 18,
+      lineHeight: 22,
+    },
+    reasonText: {
+      flex: 1,
+      fontSize: 14,
+      color: colors.textSecondary,
+      lineHeight: 20,
+    },
+    bold: {
+      fontWeight: "700" as const,
+      color: colors.text,
+    },
+    hint: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      fontStyle: "italic" as const,
+      marginTop: 8,
+      marginBottom: 20,
+      textAlign: "center" as const,
+    },
+    actions: {
+      flexDirection: "row" as const,
+      justifyContent: "flex-end" as const,
+      gap: 12,
+    },
+    dismissBtn: {
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    dismissText: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      fontWeight: "500" as const,
+    },
+    confirmBtn: {
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      borderRadius: 8,
+      backgroundColor: colors.primary,
+    },
+    confirmText: {
+      fontSize: 15,
+      color: "#FFFFFF",
+      fontWeight: "600" as const,
+    },
+  });
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
-      <View style={explainerStyles.overlay}>
-        <View style={explainerStyles.card}>
-          <Text style={explainerStyles.title}>Posizione in Background</Text>
-          <Text style={explainerStyles.body}>
+      <View style={s.overlay}>
+        <View style={s.card}>
+          <Text style={s.title}>Posizione in Background</Text>
+          <Text style={s.body}>
             BikerLink ha bisogno di accedere alla tua posizione anche quando l'app è in background per tre motivi:
           </Text>
-          <View style={explainerStyles.reasonRow}>
-            <Text style={explainerStyles.bullet}>🏍️</Text>
-            <Text style={explainerStyles.reasonText}>
-              <Text style={explainerStyles.bold}>Tracciamento percorsi</Text> — il tracciato non si interrompe se passi ad un'altra app o spegni lo schermo.
+          <View style={s.reasonRow}>
+            <Text style={s.bullet}>🏍️</Text>
+            <Text style={s.reasonText}>
+              <Text style={s.bold}>Tracciamento percorsi</Text> — il tracciato non si interrompe se passi ad un'altra app o spegni lo schermo.
             </Text>
           </View>
-          <View style={explainerStyles.reasonRow}>
-            <Text style={explainerStyles.bullet}>🆘</Text>
-            <Text style={explainerStyles.reasonText}>
-              <Text style={explainerStyles.bold}>Emergenza SOS</Text> — il server conosce la tua posizione anche a schermo spento per inviare soccorsi.
+          <View style={s.reasonRow}>
+            <Text style={s.bullet}>🆘</Text>
+            <Text style={s.reasonText}>
+              <Text style={s.bold}>Emergenza SOS</Text> — il server conosce la tua posizione anche a schermo spento per inviare soccorsi.
             </Text>
           </View>
-          <View style={explainerStyles.reasonRow}>
-            <Text style={explainerStyles.bullet}>🛡️</Text>
-            <Text style={explainerStyles.reasonText}>
-              <Text style={explainerStyles.bold}>Sicurezza community</Text> — ricevi avvisi SOS dai biker vicini in tempo reale.
+          <View style={s.reasonRow}>
+            <Text style={s.bullet}>🛡️</Text>
+            <Text style={s.reasonText}>
+              <Text style={s.bold}>Sicurezza community</Text> — ricevi avvisi SOS dai biker vicini in tempo reale.
             </Text>
           </View>
-          <Text style={explainerStyles.hint}>
+          <Text style={s.hint}>
             Nella schermata successiva scegli "Consenti sempre" per abilitare questa funzione.
           </Text>
-          <View style={explainerStyles.actions}>
-            <TouchableOpacity style={explainerStyles.dismissBtn} onPress={onDismiss}>
-              <Text style={explainerStyles.dismissText}>Non ora</Text>
+          <View style={s.actions}>
+            <TouchableOpacity style={s.dismissBtn} onPress={onDismiss}>
+              <Text style={s.dismissText}>Non ora</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={explainerStyles.confirmBtn} onPress={onConfirm}>
-              <Text style={explainerStyles.confirmText}>Continua</Text>
+            <TouchableOpacity style={s.confirmBtn} onPress={onConfirm}>
+              <Text style={s.confirmText}>Continua</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -258,89 +345,3 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     </LocationContext.Provider>
   );
 }
-
-const explainerStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  card: {
-    backgroundColor: Colors.dark.background,
-    borderRadius: 16,
-    padding: 24,
-    width: "100%",
-    maxWidth: 400,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "700" as const,
-    color: Colors.dark.text,
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  body: {
-    fontSize: 14,
-    color: Colors.dark.textSecondary,
-    marginBottom: 16,
-    lineHeight: 20,
-  },
-  reasonRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 12,
-    gap: 8,
-  },
-  bullet: {
-    fontSize: 18,
-    lineHeight: 22,
-  },
-  reasonText: {
-    flex: 1,
-    fontSize: 14,
-    color: Colors.dark.textSecondary,
-    lineHeight: 20,
-  },
-  bold: {
-    fontWeight: "700" as const,
-    color: Colors.dark.text,
-  },
-  hint: {
-    fontSize: 12,
-    color: Colors.dark.textSecondary,
-    fontStyle: "italic",
-    marginTop: 8,
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  actions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 12,
-  },
-  dismissBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  dismissText: {
-    fontSize: 15,
-    color: Colors.dark.textSecondary,
-    fontWeight: "500" as const,
-  },
-  confirmBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    backgroundColor: Colors.dark.primary,
-  },
-  confirmText: {
-    fontSize: 15,
-    color: "#FFFFFF",
-    fontWeight: "600" as const,
-  },
-});
