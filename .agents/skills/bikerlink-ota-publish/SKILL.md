@@ -120,7 +120,7 @@ Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare 
 | OTA | Script version |
 |-----|---------------|
 | 43  | 1.43.0        |
-| 44  | 1.44.0        |
+| 44  | 1.44.0        | ← pubblicata
 | 45  | 1.45.0        |
 
 ## Cicli precedenti (storico)

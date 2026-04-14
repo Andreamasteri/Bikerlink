@@ -20,9 +20,10 @@ export default function OtaGateScreen() {
     queryKey: ["/api/settings/ota-wait-seconds"],
   });
 
-  const { data: gateData } = useQuery<{ enabled: boolean }>({
+  const { data: gateData, error: gateError } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/ota-gate-enabled"],
     refetchInterval: 3000,
+    retry: 1,
   });
 
   useEffect(() => {
@@ -41,11 +42,12 @@ export default function OtaGateScreen() {
     if (navigated.current) return;
     const countdownDone = secondsLeft <= 0;
     const adminDisabled = gateData?.enabled === false;
-    if (countdownDone || adminDisabled) {
+    const endpointUnavailable = !!gateError;
+    if (countdownDone || adminDisabled || endpointUnavailable) {
       navigated.current = true;
       router.replace("/(tabs)");
     }
-  }, [secondsLeft, gateData?.enabled]);
+  }, [secondsLeft, gateData?.enabled, gateError]);
 
   useEffect(() => {
     const pulse = Animated.loop(

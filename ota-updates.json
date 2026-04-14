@@ -2020,5 +2020,26 @@
     "apkVersionCode": 12,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 44,
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-44 rv7.0.0: fix ota-gate su backend outdated + BgPermissionExplainerModal",
+    "note": "Prima OTA ciclo 7.x (APK v13). Fix: ota-gate.tsx naviga immediatamente se /api/settings/ota-gate-enabled ritorna errore (endpoint non ancora deployato in produzione) invece di aspettare 10s. BgPermissionExplainerModal ripristinata in location-context.tsx con useColors() corretto. requestBackgroundPermission() short-circuit se permesso già concesso. CURRENT_OTA_NUMBER=44.",
+    "releaseId": "c5e4611b-8d6a-4617-b494-8b0623d87f3c",
+    "bundleUrl": "private/ota/ota-1.44.0-1776156889656.js",
+    "updateGroupId": "343ee678-1877-4d59-a2e4-02d7ac9cc6ce",
+    "androidUpdateId": "019d8b34-63e8-7dbf-9ceb-3e4eeda2386b",
+    "iosUpdateId": null,
+    "commitBase": "3d30742482ea7d894c7575eb7c65958558dce555",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/343ee678-1877-4d59-a2e4-02d7ac9cc6ce",
+    "apkBuildId": null,
+    "apkVersionCode": 13,
+    "apkUrl": null,
+    "status": "published"
   }
 ]
