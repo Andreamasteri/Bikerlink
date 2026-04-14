@@ -44,8 +44,12 @@ function isWebPermissionsAvailable(): boolean {
 
 export function LocationProvider({ children }: { children: React.ReactNode }) {
   const [hasPermission, setHasPermission] = useState(true);
+  const [hasBgPermission, setHasBgPermission] = useState(false);
+  const [bgPermissionRevoked, setBgPermissionRevoked] = useState(false);
+  const [bgRevokedDismissed, setBgRevokedDismissed] = useState(false);
   const appState = useRef(AppState.currentState);
   const permissionStatusRef = useRef<PermissionStatus | null>(null);
+  const bgWasGranted = useRef(false);
 
   const { data: gpsData } = useQuery<{ required: boolean }>({
     queryKey: ["/api/settings/gps-required"],
@@ -72,6 +76,18 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const checkBgPermissionIfGranted = useCallback(async () => {
+    if (Platform.OS === "web") return;
+    if (!bgWasGranted.current) return;
+    try {
+      const { status } = await Location.getBackgroundPermissionsAsync();
+      const granted = status === "granted";
+      setHasBgPermission(granted);
+      if (!granted && !bgRevokedDismissed) {
+        setBgPermissionRevoked(true);
+      }
+    } catch {}
+  }, [bgRevokedDismissed]);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
     try {
@@ -100,10 +116,25 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const requestBackgroundPermission = useCallback(async (): Promise<boolean> => {
-    return false;
+    if (Platform.OS === "web") return false;
+    try {
+      const { status } = await Location.requestBackgroundPermissionsAsync();
+      const granted = status === "granted";
+      setHasBgPermission(granted);
+      if (granted) {
+        bgWasGranted.current = true;
+        setBgPermissionRevoked(false);
+      }
+      return granted;
+    } catch {
+      return false;
+    }
   }, []);
 
-  const dismissBgRevokedBanner = useCallback(() => {}, []);
+  const dismissBgRevokedBanner = useCallback(() => {
+    setBgPermissionRevoked(false);
+    setBgRevokedDismissed(true);
+  }, []);
 
   useEffect(() => {
     checkPermission();
@@ -123,11 +154,12 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
       if (appState.current.match(/inactive|background/) && nextState === "active") {
         checkPermission();
+        checkBgPermissionIfGranted();
       }
       appState.current = nextState;
     });
     return () => subscription.remove();
-  }, [checkPermission]);
+  }, [checkPermission, checkBgPermissionIfGranted]);
 
   useEffect(() => {
     if (!isWebPermissionsAvailable()) return;
@@ -157,10 +189,10 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   return (
     <LocationContext.Provider value={{
       hasLocationPermission: hasPermission,
-      hasBackgroundPermission: false,
+      hasBackgroundPermission: hasBgPermission,
       gpsRequired,
       isGpsGateActive,
-      bgPermissionRevoked: false,
+      bgPermissionRevoked,
       requestPermission,
       requestBackgroundPermission,
       dismissBgRevokedBanner,

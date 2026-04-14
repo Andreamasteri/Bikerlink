@@ -1980,6 +1980,27 @@
     "status": "superseded"
   },
   {
+    "updateNumber": "v13-apk",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "APK v13 — background location nativo + runtimeVersion 7.0.0",
+    "note": "Build APK versionCode 13 rv 7.0.0. Reintroduzione plugin expo-location con architettura corretta (NESSUNA chiamata getBackgroundPermissionsAsync all'avvio). requestBackgroundPermission() solo on-demand. Nuovo ciclo OTA 7.x. Build EAS ID: 42d6f96e-3f8a-4eea-91cd-5b291eb5f386.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "df458f9373702d8fa8b3ac8d2416f91ea5ff0bf0",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/42d6f96e-3f8a-4eea-91cd-5b291eb5f386",
+    "apkBuildId": "42d6f96e-3f8a-4eea-91cd-5b291eb5f386",
+    "apkVersionCode": 13,
+    "apkUrl": "https://expo.dev/artifacts/eas/9fHiqyw2aGaDokjsFAT4jf.apk",
+    "status": "published"
+  },
+  {
     "updateNumber": 43,
     "cycle": "6.x",
     "channel": "preview",

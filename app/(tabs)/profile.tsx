@@ -137,7 +137,7 @@ export default function ProfileScreen() {
   const [isExportingData, setIsExportingData] = useState(false);
 
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-  // Ciclo 6.0.0 — APK v12 — aggiornare ad ogni nuova OTA pubblicata
+  // Ciclo 7.0.0 — APK v13 — aggiornare ad ogni nuova OTA pubblicata
   const CURRENT_OTA_NUMBER = 43;
 
   const profileQuery = useQuery<ProfileData>({

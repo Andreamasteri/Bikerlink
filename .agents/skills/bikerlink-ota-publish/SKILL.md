@@ -8,8 +8,8 @@ description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
 - **Canale EAS**: `preview`
-- **Runtime Version**: `6.0.0` (ciclo corrente, APK v12)
-- **APK corrente**: versionCode 12 — URL da aggiornare dopo build
+- **Runtime Version**: `7.0.0` (ciclo corrente, APK v13)
+- **APK corrente**: versionCode 13 — https://expo.dev/artifacts/eas/9fHiqyw2aGaDokjsFAT4jf.apk
 - **Utenti**: su Android fisico via APK — NON usano il dev server
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
@@ -28,9 +28,9 @@ description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink
 ## Procedura completa
 
 ### PASSO 1 — Determinare il numero OTA
-Leggere l'ultima entry del ciclo 6.x in `ota-updates.json` e prendere `updateNumber + 1`.
+Leggere l'ultima entry del ciclo 7.x in `ota-updates.json` e prendere `updateNumber + 1`.
 ```bash
-# Esempio: se l'ultima è 42, la nuova sarà 43
+# Esempio: se l'ultima è 43, la nuova sarà 44
 ```
 
 ### PASSO 2 — Ottenere l'hash git corrente
@@ -46,22 +46,22 @@ const CURRENT_OTA_NUMBER = <VECCHIO>;  // → <NUOVO>
 Il commento sopra va tenuto generico:
 ```typescript
 // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-// Ciclo 6.0.0 — APK v12 — aggiornare ad ogni nuova OTA pubblicata
-const CURRENT_OTA_NUMBER = 43;
+// Ciclo 7.0.0 — APK v13 — aggiornare ad ogni nuova OTA pubblicata
+const CURRENT_OTA_NUMBER = 44;
 ```
 
 ### PASSO 4 — Aggiungere entry in `ota-updates.json`
 Marcare la entry precedente come `"status": "superseded"`, poi aggiungere in fondo:
 ```json
 {
-  "updateNumber": 43,
-  "cycle": "6.x",
+  "updateNumber": 44,
+  "cycle": "7.x",
   "channel": "preview",
   "platform": "android",
-  "runtimeVersion": "6.0.0",
+  "runtimeVersion": "7.0.0",
   "jsEngine": "hermes",
-  "message": "OTA-43 rv6.0.0: <descrizione breve>",
-  "note": "<note dettagliate sui task inclusi. CURRENT_OTA_NUMBER=43.>",
+  "message": "OTA-44 rv7.0.0: <descrizione breve>",
+  "note": "<note dettagliate sui task inclusi. CURRENT_OTA_NUMBER=44.>",
   "releaseId": null,
   "bundleUrl": null,
   "updateGroupId": null,
@@ -70,7 +70,7 @@ Marcare la entry precedente come `"status": "superseded"`, poi aggiungere in fon
   "commitBase": "<hash git completo da passo 2>",
   "easDashboard": null,
   "apkBuildId": null,
-  "apkVersionCode": 12,
+  "apkVersionCode": 13,
   "apkUrl": null,
   "status": "pending"
 }
@@ -81,7 +81,7 @@ Marcare la entry precedente come `"status": "superseded"`, poi aggiungere in fon
 ```bash
 BIKERLINK_ADMIN_EMAIL="admin@bikerlink.it" \
 BIKERLINK_ADMIN_PASSWORD="$BIKERLINK_ADMIN_PASSWORD" \
-bash scripts/publish-ota.sh "1.43.0" "OTA-43: <messaggio di release>"
+bash scripts/publish-ota.sh "1.44.0" "OTA-44: <messaggio di release>"
 ```
 Il versioning segue `1.<numero OTA>.0`.
 
@@ -111,7 +111,7 @@ L'output dello script mostra tutti gli ID. Sostituire i `null` con i valori real
 ```bash
 bash scripts/validate-ota.sh
 ```
-Tutti i check devono essere ✔. Il warning sui cicli multipli (2.0.0, 3.0.0, 4.0.0, 5.0.0, 6.0.0) è **normale** per il registro storico.
+Tutti i check devono essere ✔. Il warning sui cicli multipli (2.0.0, 3.0.0, 4.0.0, 5.0.0, 6.0.0, 7.0.0) è **normale** per il registro storico.
 
 ## Cosa fare se EAS va in timeout
 Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare una nuova OTA con numero N+1 alla prossima occasione — **non** eseguire `eas-cli` manualmente.
@@ -119,26 +119,27 @@ Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare 
 ## Numerazione versioni
 | OTA | Script version |
 |-----|---------------|
-| 42  | 1.42.0        |
 | 43  | 1.43.0        |
 | 44  | 1.44.0        |
+| 45  | 1.45.0        |
 
 ## Cicli precedenti (storico)
 - Ciclo 2.x: OTA 1–21, 23 (APK versionCode 4–6, rv 2.0.0)
 - Ciclo 3.x: OTA 24–36 (APK versionCode 8–9, rv 3.0.0)
 - Ciclo 4.x: OTA 37–40 (APK versionCode 10, rv 4.0.0)
 - Ciclo 5.x: OTA 41 (APK versionCode 11, rv 5.0.0) — DEPRECATO (crash expo-location plugin)
-- Ciclo 6.x: OTA 42+ (APK versionCode 12, rv 6.0.0) ← CORRENTE
+- Ciclo 6.x: OTA 42–43 (APK versionCode 12, rv 6.0.0) — OBSOLETO (utenti devono aggiornare APK)
+- Ciclo 7.x: OTA 44+ (APK versionCode 13, rv 7.0.0) ← CORRENTE
 
-## Output di riferimento (OTA-40 — esempio reale)
+## Output di riferimento (OTA-43 — esempio reale)
 ```
-✅ Release OTA v1.40.0 pubblicata con successo!
-Commit hash      : 09e385c9a0bd45bd0a8431ea1c55ff7fbe96860c
-Release ID       : f3c5170d-9cf0-4f70-807d-e53c84d5d890
-Bundle URL       : private/ota/ota-1.40.0-1776107187161.js
-Versione att.    : 1.40.0
+✅ Release OTA v1.43.0 pubblicata con successo!
+Commit hash      : 450497bba166b168f7e0e0997ed752d7d4c1df51
+Release ID       : 7749c083-95a4-4b65-bedf-e725eb7dcc64
+Bundle URL       : private/ota/ota-1.43.0-1776151386751.js
+Versione att.    : 1.43.0
 EAS Status       : pubblicato
-EAS Update Group : a3ef5d3b-eb46-4fa3-a775-2c202f787d33
-EAS Android ID   : 019d883d-8e2a-73c9-bdda-3e4e258fc390
-EAS Dashboard    : https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/a3ef5d3b-eb46-4fa3-a775-2c202f787d33
+EAS Update Group : bea3463e-a8dd-4d9f-b170-e445d40787f1
+EAS Android ID   : 019d8ae0-0438-71af-a978-22f784f042f1
+EAS Dashboard    : https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/bea3463e-a8dd-4d9f-b170-e445d40787f1
 ```
