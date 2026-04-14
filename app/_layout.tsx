@@ -290,6 +290,7 @@ function RootLayoutNav() {
       <Stack.Screen name="moderator" options={{ headerShown: false }} />
       <Stack.Screen name="contest" options={{ headerShown: false }} />
       <Stack.Screen name="privacy-policy" options={{ headerShown: false }} />
+      <Stack.Screen name="ota-gate" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="feedback/index" options={{ headerShown: true, headerTitle: "Feedback", headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text }} />
     </Stack>
   );

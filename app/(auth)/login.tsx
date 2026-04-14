@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
+import { getApiUrl } from "@/lib/query-client";
 import * as Location from "expo-location";
 
 export default function LoginScreen() {
@@ -56,8 +57,16 @@ export default function LoginScreen() {
     loginMutation.mutate(
       { identifier: identifier.trim(), password, ...gpsCoords },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           setIsSubmitting(false);
+          try {
+            const res = await fetch(new URL("/api/settings/ota-gate-enabled", getApiUrl()).toString());
+            const data = await res.json();
+            if (data?.enabled === true) {
+              router.replace("/ota-gate");
+              return;
+            }
+          } catch {}
           router.replace("/(tabs)");
         },
         onError: (err: any) => {

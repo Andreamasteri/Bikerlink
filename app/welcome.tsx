@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
+import { getApiUrl } from "@/lib/query-client";
 import { useSynecoVisible } from "@/lib/syneco-context";
 import Colors from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -54,7 +55,17 @@ export default function WelcomeScreen() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace("/(tabs)");
+      (async () => {
+        try {
+          const res = await fetch(new URL("/api/settings/ota-gate-enabled", getApiUrl()).toString());
+          const data = await res.json();
+          if (data?.enabled === true) {
+            router.replace("/ota-gate");
+            return;
+          }
+        } catch {}
+        router.replace("/(tabs)");
+      })();
       return;
     }
 

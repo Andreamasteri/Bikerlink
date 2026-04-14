@@ -530,6 +530,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/ota-gate-enabled", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("ota_gate_enabled");
+      res.json({ enabled: setting?.value === "true" });
+    } catch {
+      res.json({ enabled: false });
+    }
+  });
+
+  app.get("/api/settings/ota-wait-seconds", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("ota_wait_seconds");
+      const seconds = parseInt(setting?.value || "10", 10);
+      res.json({ seconds: isNaN(seconds) ? 10 : Math.max(0, seconds) });
+    } catch {
+      res.json({ seconds: 10 });
+    }
+  });
+
   app.get("/api/settings/home-message", async (_req, res) => {
     try {
       const [enabledSetting, textSetting] = await Promise.all([

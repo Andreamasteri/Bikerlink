@@ -1977,6 +1977,27 @@
     "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/3ceb697e-ce05-4068-97ce-0718b9b0b717",
     "apkVersionCode": 12,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 43,
+    "cycle": "6.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "6.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-43 rv6.0.0: ota-gate recovery screen + admin panel toggle",
+    "note": "Task #580 — Implementazione OTA Recovery Gate: schermata transitoria post-login configurabile da admin per forzare attesa OTA. Due endpoint pubblici GET /api/settings/ota-gate-enabled (default false) e GET /api/settings/ota-wait-seconds (default 10s). Nuova route /ota-gate con timer countdown + polling gate ogni 3s. Navigazione condizionale in login.tsx e welcome.tsx. Admin panel sezione Sistema con Switch OTA Recovery Gate + campo secondi. Nessun impatto su utenti normali (default OFF). CURRENT_OTA_NUMBER=43.",
+    "releaseId": "7749c083-95a4-4b65-bedf-e725eb7dcc64",
+    "bundleUrl": "private/ota/ota-1.43.0-1776151386751.js",
+    "updateGroupId": "bea3463e-a8dd-4d9f-b170-e445d40787f1",
+    "androidUpdateId": "019d8ae0-0438-71af-a978-22f784f042f1",
+    "iosUpdateId": null,
+    "commitBase": "450497bba166b168f7e0e0997ed752d7d4c1df51",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/bea3463e-a8dd-4d9f-b170-e445d40787f1",
+    "apkBuildId": null,
+    "apkVersionCode": 12,
+    "apkUrl": null,
     "status": "published"
   }
 ]

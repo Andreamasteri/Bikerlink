@@ -1096,6 +1096,41 @@ export default function AdminSettings() {
   });
   const marketplaceEnabled = marketplaceData?.enabled !== false;
 
+  const { data: otaGateData, refetch: refetchOtaGate } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/ota-gate-enabled"],
+  });
+  const otaGateEnabled = otaGateData?.enabled === true;
+
+  const { data: otaWaitData, refetch: refetchOtaWait } = useQuery<{ seconds: number }>({
+    queryKey: ["/api/settings/ota-wait-seconds"],
+  });
+  const [otaWaitInput, setOtaWaitInput] = useState("10");
+  useEffect(() => {
+    if (otaWaitData?.seconds !== undefined) {
+      setOtaWaitInput(String(otaWaitData.seconds));
+    }
+  }, [otaWaitData?.seconds]);
+
+  const otaGateMutation = useMutation({
+    mutationFn: async (val: boolean) => {
+      await apiRequest("PUT", "/api/admin/settings/ota_gate_enabled", { value: val ? "true" : "false" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/ota-gate-enabled"] });
+      refetchOtaGate();
+    },
+  });
+
+  const otaWaitMutation = useMutation({
+    mutationFn: async (val: string) => {
+      await apiRequest("PUT", "/api/admin/settings/ota_wait_seconds", { value: val });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/ota-wait-seconds"] });
+      refetchOtaWait();
+    },
+  });
+
   const [emailConfigModalVisible, setEmailConfigModalVisible] = useState(false);
   const [emailConfigAdminPass, setEmailConfigAdminPass] = useState("");
   const [emailConfigGmail, setEmailConfigGmail] = useState("");
@@ -2947,6 +2982,46 @@ export default function AdminSettings() {
             ? "Pannello fluttuante uptime attivo — visibile solo agli admin"
             : "Pannello fluttuante uptime nascosto"}
         </Text>
+      </View>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="cloud-download-outline" size={20} color="#ff6b35" />
+            <Text style={styles.synecoLabel}>OTA Recovery Gate</Text>
+          </View>
+          <Switch
+            value={otaGateEnabled}
+            onValueChange={(val) => otaGateMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: "#ff6b35" }}
+            thumbColor={otaGateEnabled ? Colors.text : Colors.textSecondary}
+            disabled={otaGateMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {otaGateEnabled
+            ? "Schermata attesa OTA attiva — nuovi login vedranno la gate screen"
+            : "Gate OTA disattivata — login normale per tutti gli utenti"}
+        </Text>
+        {otaGateEnabled && (
+          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 10, gap: 8 }}>
+            <Text style={[styles.synecoDesc, { flex: 1 }]}>Secondi attesa:</Text>
+            <TextInput
+              style={[styles.synecoDesc, { borderWidth: 1, borderColor: Colors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, color: Colors.text, minWidth: 60, textAlign: "center" }]}
+              value={otaWaitInput}
+              onChangeText={setOtaWaitInput}
+              keyboardType="numeric"
+              maxLength={4}
+            />
+            <TouchableOpacity
+              style={[styles.saveBtn, { paddingHorizontal: 12, paddingVertical: 6 }]}
+              onPress={() => otaWaitMutation.mutate(otaWaitInput)}
+              disabled={otaWaitMutation.isPending}
+            >
+              <Text style={styles.saveBtnText}>Salva</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       <View style={styles.sectionHeaderRow}>
