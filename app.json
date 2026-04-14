@@ -32,7 +32,7 @@
     },
     "android": {
       "package": "com.bikerlink.app",
-      "versionCode": 18,
+      "versionCode": 19,
       "config": {
         "googleMaps": {
           "apiKey": ""
@@ -86,8 +86,7 @@
           "isAccessMediaLocationEnabled": true
         }
       ],
-      "expo-document-picker",
-      "expo-location"
+      "expo-document-picker"
     ],
     "experiments": {
       "typedRoutes": true

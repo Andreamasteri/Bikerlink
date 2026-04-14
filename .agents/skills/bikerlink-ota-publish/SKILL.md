@@ -8,8 +8,8 @@ description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
 - **Canale EAS**: `preview`
-- **Runtime Version**: `7.0.0` (ciclo corrente, APK v14)
-- **APK corrente**: versionCode 14 — IN BUILD (v13 fallback: https://expo.dev/artifacts/eas/9fHiqyw2aGaDokjsFAT4jf.apk)
+- **Runtime Version**: `7.0.0` (ciclo corrente, APK v19)
+- **APK corrente**: versionCode 19 — IN BUILD (v10 ultima stabile: https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk)
 - **Utenti**: su Android fisico via APK — NON usano il dev server
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
@@ -135,24 +135,31 @@ Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare 
   - APK v14: FAILED (newArchEnabled=true + react-native-maps 1.18.0 → incompatibili, fix in app.json ignorato)
   - APK v15: FAILED (fix newArchEnabled=false in app.json → ignorato, bare workflow usa gradle.properties)
   - APK v16: FAILED (newArchEnabled=false + react-native-reanimated 4.2.3 → crash, Reanimated v4 richiede New Arch)
-  - APK v17: FAILED (New Architecture causa crash — decisione finale: Old Arch per sempre)
-  - APK v18: IN BUILD (build ID: c4ff4d58-54b5-4504-8e6b-808e81f8d39f)
-    newArchEnabled=false DEFINITIVO. Reanimated 4.2.3→3.19.5. maps 1.27.2→1.18.0. versionCode 18.
+  - APK v17: FAILED (status: failed — causa esatta sconosciuta, ma expo-location plugin presente)
+  - APK v18: FAILED (build ID: c4ff4d58) — react-native-reanimated 3.19.5 non compila con RN 0.83.4:
+    hermes-engine::libhermes non trovato in CMake (struttura Hermes cambiata in RN 0.76+, Reanimated 3.x non aggiornato)
+  - APK v19: IN BUILD — config identica a v10: maps 1.27.2, reanimated 4.2.1, newArchEnabled=true, no expo-location plugin
 
-## ⚠️ REGOLA ASSOLUTA — NEW ARCHITECTURE PROIBITA
-newArchEnabled=false SEMPRE. Mai cambiarlo a true. Causa crash confermato su v14, v16, v17.
-Qualunque libreria che richieda New Architecture è INCOMPATIBILE con BikerLink.
+## ⚠️ ANALISI ARCHITETTURA (DEFINITIVA)
+React Native 0.82+ ha rimosso il supporto Old Architecture. Il flag newArchEnabled=false
+genera solo un WARNING e viene IGNORATO (hardcoded IS_NEW_ARCHITECTURE_ENABLED=true in CMake).
+APK v10 (ultima stabile) funzionava CON newArchEnabled=true — la New Architecture era già attiva.
+I crash erano causati da librerie incompatibili, NON dalla New Architecture stessa:
+- react-native-maps 1.18.0: incompatibile con New Arch (causa crash runtime)
+- react-native-reanimated 3.x: incompatibile con RN 0.83.4 (CMake build fail)
+- expo-location plugin in app.json: causa crash all'avvio (background location aggressivo)
 
 ## REGOLA CRITICA — BARE WORKFLOW
-Il progetto ha `android/` committato → bare workflow. Le impostazioni di `app.json` per native config (newArchEnabled, ecc.) vengono **IGNORATE** da EAS. Modificare SEMPRE i file Android direttamente:
-- **New Architecture**: `android/gradle.properties` → `newArchEnabled` (SEMPRE false)
+Il progetto ha `android/` committato → bare workflow. Modificare SEMPRE i file Android direttamente:
+- **Architecture**: `android/gradle.properties` → `newArchEnabled=true` (default EAS, come v10)
 - **versionCode**: `android/app/build.gradle` → `versionCode` (E anche app.json per consistenza)
 
-## VERSIONI LIBRERIE CERTIFICATE (Old Architecture)
-- react-native-maps: **1.18.0** (PINNATO — unica versione Old Arch + Expo Go compatibile)
-- react-native-reanimated: **~3.19.5** (ultima v3 stabile, supporta Old Arch)
-- NON usare react-native-maps > 1.20.x → richiede New Architecture
-- NON usare react-native-reanimated >= 4.x → richiede New Architecture
+## VERSIONI LIBRERIE CERTIFICATE (v19, identico a v10)
+- react-native-maps: **1.27.2** (CERTIFICATA — compatibile RN 0.83.4 + New Arch, usata in v10)
+- react-native-reanimated: **~4.2.1** (CERTIFICATA — compila con RN 0.83.4 via CMake, usata in v10)
+- NON usare react-native-maps < 1.27.x → incompatibile con New Architecture (sempre attiva in RN 0.82+)
+- NON usare react-native-reanimated < 4.x → non compila con RN 0.83.4 (CMake hermes-engine non trovato)
+- NON aggiungere "expo-location" ai plugins di app.json → causa crash all'avvio (background location)
 - NON aggiungere react-native-maps ai plugins di app.json → crash garantito
 
 ## Output di riferimento (OTA-43 — esempio reale)
