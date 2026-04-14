@@ -130,10 +130,16 @@ Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare 
 - Ciclo 4.x: OTA 37–40 (APK versionCode 10, rv 4.0.0)
 - Ciclo 5.x: OTA 41 (APK versionCode 11, rv 5.0.0) — DEPRECATO (crash expo-location plugin)
 - Ciclo 6.x: OTA 42–43 (APK versionCode 12, rv 6.0.0) — OBSOLETO (utenti devono aggiornare APK)
-- Ciclo 7.x: OTA 44–45+ (APK versionCode 13→15, rv 7.0.0) ← CORRENTE
+- Ciclo 7.x: OTA 44–45+ (APK versionCode 13→16, rv 7.0.0) ← CORRENTE
   - APK v13: crash (react-native-maps 1.27.2 incompatibile con SDK 55)
-  - APK v14: crash (newArchEnabled=true incompatibile con react-native-maps 1.18.0)
-  - APK v15: fix (newArchEnabled=false + react-native-maps 1.18.0) — IN BUILD
+  - APK v14: FAILED (newArchEnabled=true incompatibile con react-native-maps 1.18.0 — fix in app.json IGNORATO perché progetto bare workflow)
+  - APK v15: FAILED (fix newArchEnabled=false messo in app.json → ignorato! bare workflow usa android/gradle.properties direttamente)
+  - APK v16: IN BUILD (build ID: 47b597f1-d4ef-483b-99ff-e8329e55860a) — FIX DEFINITIVO: newArchEnabled=false in android/gradle.properties, versionCode 16 in android/app/build.gradle
+
+## REGOLA CRITICA — BARE WORKFLOW
+Il progetto ha `android/` committato → bare workflow. Le impostazioni di `app.json` per native config (newArchEnabled, ecc.) vengono **IGNORATE** da EAS. Modificare SEMPRE i file Android direttamente:
+- **New Architecture**: `android/gradle.properties` → `newArchEnabled`
+- **versionCode**: `android/app/build.gradle` → `versionCode` (E anche app.json per consistenza)
 
 ## Output di riferimento (OTA-43 — esempio reale)
 ```

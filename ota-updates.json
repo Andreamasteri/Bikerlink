@@ -2154,7 +2154,7 @@
     "runtimeVersion": "7.0.0",
     "jsEngine": "hermes",
     "message": "APK v15 — fix crash avvio (newArchEnabled=false)",
-    "note": "Build APK versionCode 15 rv 7.0.0. Fix crash splash screen: New Architecture (React Native 0.83.4) incompatibile con react-native-maps 1.18.0. Aggiunto newArchEnabled=false in app.json per usare Old Architecture. react-native-maps 1.18.0 mantiene compatibilità Expo Go. Commit base: 3a560cfbf55dd8364397d2377c1f0cb802a4faa7",
+    "note": "Build APK versionCode 15 rv 7.0.0. Fix crash splash screen: New Architecture (React Native 0.83.4) incompatibile con react-native-maps 1.18.0. Aggiunto newArchEnabled=false in app.json per usare Old Architecture. react-native-maps 1.18.0 mantiene compatibilità Expo Go. Commit base: 3a560cfbf55dd8364397d2377c1f0cb802a4faa7 FAIL: app.json newArchEnabled=false ignorato — progetto bare workflow usa android/gradle.properties (ancora newArchEnabled=true). Risolto in APK v16 modificando android/gradle.properties direttamente.",
     "releaseId": null,
     "bundleUrl": null,
     "updateGroupId": null,
@@ -2165,6 +2165,27 @@
     "apkBuildId": "356fa553-6a7b-45ea-80e9-bf146af39880",
     "apkVersionCode": 15,
     "apkUrl": null,
-    "status": "pending"
+    "status": "failed"
+  },
+  {
+    "updateNumber": "v16-apk",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "APK v16 — fix definitivo crash avvio (newArchEnabled=false in gradle.properties)",
+    "note": "Build APK versionCode 16 rv 7.0.0. Fix DEFINITIVO crash splash screen: progetto bare workflow — android/gradle.properties aveva newArchEnabled=true. Modificato direttamente android/gradle.properties: newArchEnabled=false. react-native-maps 1.18.0 compatibile con Old Architecture. versionCode aggiornato a 16 in android/app/build.gradle e app.json. Commit base: a61d8ca3365c7b4ff9e15ba2a92aab505fc2e535",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "a61d8ca3365c7b4ff9e15ba2a92aab505fc2e535",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/47b597f1-d4ef-483b-99ff-e8329e55860a",
+    "apkBuildId": "47b597f1-d4ef-483b-99ff-e8329e55860a",
+    "apkVersionCode": 16,
+    "apkUrl": null,
+    "status": "building"
   }
 ]
