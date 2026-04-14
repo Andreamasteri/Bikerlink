@@ -8,8 +8,8 @@ description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
 - **Canale EAS**: `preview`
-- **Runtime Version**: `7.0.0` (ciclo corrente, APK v13)
-- **APK corrente**: versionCode 13 — https://expo.dev/artifacts/eas/9fHiqyw2aGaDokjsFAT4jf.apk
+- **Runtime Version**: `7.0.0` (ciclo corrente, APK v14)
+- **APK corrente**: versionCode 14 — IN BUILD (v13 fallback: https://expo.dev/artifacts/eas/9fHiqyw2aGaDokjsFAT4jf.apk)
 - **Utenti**: su Android fisico via APK — NON usano il dev server
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
@@ -129,7 +129,7 @@ Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare 
 - Ciclo 4.x: OTA 37–40 (APK versionCode 10, rv 4.0.0)
 - Ciclo 5.x: OTA 41 (APK versionCode 11, rv 5.0.0) — DEPRECATO (crash expo-location plugin)
 - Ciclo 6.x: OTA 42–43 (APK versionCode 12, rv 6.0.0) — OBSOLETO (utenti devono aggiornare APK)
-- Ciclo 7.x: OTA 44+ (APK versionCode 13, rv 7.0.0) ← CORRENTE
+- Ciclo 7.x: OTA 44+ (APK versionCode 14, rv 7.0.0) ← CORRENTE
 
 ## Output di riferimento (OTA-43 — esempio reale)
 ```

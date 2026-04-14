@@ -2022,6 +2022,27 @@
     "status": "published"
   },
   {
+    "updateNumber": "v14-apk",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "APK v14 — fix crash mappa (react-native-maps 1.18.0)",
+    "note": "Build APK versionCode 14 rv 7.0.0. Fix crash alla schermata mappe: downgrade react-native-maps da ^1.27.2 a 1.18.0 (unica versione compatibile con Expo Go / Expo SDK 55). Lo stesso ciclo OTA 7.x rimane invariato. Commit base: 3c032f33b3327b11be2ae27a4f0c50c047a9a643.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "3c032f33b3327b11be2ae27a4f0c50c047a9a643",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 14,
+    "apkUrl": null,
+    "status": "pending"
+  },
+  {
     "updateNumber": 44,
     "cycle": "7.x",
     "channel": "preview",
