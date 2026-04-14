@@ -244,6 +244,13 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
   const requestBackgroundPermission = useCallback(async (): Promise<boolean> => {
     if (Platform.OS === "web") return false;
+    try {
+      const { status } = await Location.getBackgroundPermissionsAsync();
+      if (status === "granted") {
+        setHasBgPermission(true);
+        return true;
+      }
+    } catch {}
     return new Promise<boolean>((resolve) => {
       bgExplainerResolve.current = resolve;
       setShowBgExplainer(true);
