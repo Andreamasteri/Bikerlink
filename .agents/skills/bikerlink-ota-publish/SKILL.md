@@ -8,8 +8,8 @@ description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
 - **Canale EAS**: `preview`
-- **Runtime Version**: `7.0.0` (ciclo corrente, APK v19)
-- **APK corrente**: versionCode 19 — IN BUILD (v10 ultima stabile: https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk)
+- **Runtime Version**: `7.0.0` (ciclo corrente, APK v20)
+- **APK corrente**: versionCode 20 — IN BUILD (v10 ultima stabile: https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk)
 - **Utenti**: su Android fisico via APK — NON usano il dev server
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
@@ -138,7 +138,8 @@ Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare 
   - APK v17: FAILED (status: failed — causa esatta sconosciuta, ma expo-location plugin presente)
   - APK v18: FAILED (build ID: c4ff4d58) — react-native-reanimated 3.19.5 non compila con RN 0.83.4:
     hermes-engine::libhermes non trovato in CMake (struttura Hermes cambiata in RN 0.76+, Reanimated 3.x non aggiornato)
-  - APK v19: IN BUILD — config identica a v10: maps 1.27.2, reanimated 4.2.1, newArchEnabled=true, no expo-location plugin
+  - APK v19: FAILED — CRASH avvio: strings.xml expo_runtime_version=4.0.0 (doveva essere 7.0.0) + ACCESS_BACKGROUND_LOCATION in manifest
+  - APK v20: IN BUILD — fix strings.xml runtimeVersion 7.0.0 + rimozione ACCESS_BACKGROUND_LOCATION + rollback completo Task #564
 
 ## ⚠️ ANALISI ARCHITETTURA (DEFINITIVA)
 React Native 0.82+ ha rimosso il supporto Old Architecture. Il flag newArchEnabled=false
@@ -153,6 +154,8 @@ I crash erano causati da librerie incompatibili, NON dalla New Architecture stes
 Il progetto ha `android/` committato → bare workflow. Modificare SEMPRE i file Android direttamente:
 - **Architecture**: `android/gradle.properties` → `newArchEnabled=true` (default EAS, come v10)
 - **versionCode**: `android/app/build.gradle` → `versionCode` (E anche app.json per consistenza)
+- **⚠️ CRITICO — runtimeVersion**: `android/app/src/main/res/values/strings.xml` → `expo_runtime_version` DEVE essere uguale a `runtimeVersion` in app.json (attuale: "7.0.0"). EAS NON aggiorna questo file automaticamente in bare workflow. Se non corrisponde → CRASH all'avvio garantito.
+- **⚠️ CRITICO — AndroidManifest**: NON includere `ACCESS_BACKGROUND_LOCATION` in `android/app/src/main/AndroidManifest.xml` a meno che il background location sia implementato completamente e correttamente. Causa crash su Android 12+.
 
 ## VERSIONI LIBRERIE CERTIFICATE (v19, identico a v10)
 - react-native-maps: **1.27.2** (CERTIFICATA — compatibile RN 0.83.4 + New Arch, usata in v10)

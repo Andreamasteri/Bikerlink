@@ -23,7 +23,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSetting } from "@/lib/settings-context";
-import { setBgSosActive, updateBgTaskNotification } from "@/lib/background-location-task";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useT } from "@/lib/language-context";
 import * as Location from "expo-location";
@@ -164,8 +163,6 @@ export default function ReadyToRideScreen() {
       setSosReason("");
       setSosRadiusKm(10);
       setCustomRadius("");
-      setBgSosActive(true).catch(() => {});
-      updateBgTaskNotification("BikerLink: {motivo} — posizione attiva in background", false, true).catch(() => {});
     },
     onError: (error: Error) => {
       Alert.alert("Errore", error.message);
@@ -180,8 +177,6 @@ export default function ReadyToRideScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sos/my"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sos/active"] });
-      setBgSosActive(false).catch(() => {});
-      updateBgTaskNotification("BikerLink: {motivo} — posizione attiva in background", false, false).catch(() => {});
     },
     onError: (error: Error) => {
       Alert.alert("Errore", error.message);
