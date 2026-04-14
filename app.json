@@ -32,7 +32,7 @@
     },
     "android": {
       "package": "com.bikerlink.app",
-      "versionCode": 11,
+      "versionCode": 12,
       "config": {
         "googleMaps": {
           "apiKey": ""
@@ -86,8 +86,7 @@
           "isAccessMediaLocationEnabled": true
         }
       ],
-      "expo-document-picker",
-      "expo-location"
+      "expo-document-picker"
     ],
     "experiments": {
       "typedRoutes": true
@@ -98,7 +97,7 @@
       "fallbackToCacheTimeout": 0,
       "checkAutomatically": "ON_ERROR_RECOVERY"
     },
-    "runtimeVersion": "5.0.0",
+    "runtimeVersion": "6.0.0",
     "extra": {
       "router": {
         "origin": "https://replit.com/"

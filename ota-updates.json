@@ -1956,5 +1956,27 @@
     "apkVersionCode": 11,
     "apkUrl": "https://expo.dev/artifacts/eas/eEkRqCLJGNDSrAmCtZVecY.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 42,
+    "cycle": "6.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "6.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-42 rv6.0.0: APK v12 baseline — rimosso plugin expo-location (fix crash schermo nero)",
+    "note": "Prima OTA del ciclo 6.x (APK v12). Rimosso plugin nativo expo-location da app.json (causa del crash schermo nero post-login su APK v11). expo-location resta installato come pacchetto JS per le chiamate foreground. versionCode 12, runtimeVersion 6.0.0. Include tutto il codice di OTA-41 (error reporting, db:push nel deploy). CURRENT_OTA_NUMBER=42.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "3c273b4e0205a204f69b538b4acbf7cd0cee29e3",
+    "easDashboard": null,
+    "apkBuildId": "3ceb697e-ce05-4068-97ce-0718b9b0b717",
+    "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/3ceb697e-ce05-4068-97ce-0718b9b0b717",
+    "apkVersionCode": 12,
+    "apkUrl": null,
+    "status": "building"
   }
 ]
