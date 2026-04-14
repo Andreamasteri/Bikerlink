@@ -3,49 +3,49 @@ import { View, Text, StyleSheet, ActivityIndicator, Animated, Platform } from "r
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
-import Colors from "@/constants/colors";
+import { useColors } from "@/hooks/useColors";
 import { Ionicons } from "@expo/vector-icons";
+
+const DEFAULT_WAIT_SECONDS = 10;
 
 export default function OtaGateScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
-  const [done, setDone] = useState(false);
+  const colors = useColors();
+  const [secondsLeft, setSecondsLeft] = useState<number>(DEFAULT_WAIT_SECONDS);
+  const navigated = useRef(false);
   const dotAnim = useRef(new Animated.Value(0)).current;
 
   const { data: waitData } = useQuery<{ seconds: number }>({
     queryKey: ["/api/settings/ota-wait-seconds"],
   });
 
-  const { data: gateData, refetch: refetchGate } = useQuery<{ enabled: boolean }>({
+  const { data: gateData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/ota-gate-enabled"],
     refetchInterval: 3000,
   });
 
   useEffect(() => {
-    if (waitData?.seconds !== undefined && secondsLeft === null) {
-      setSecondsLeft(waitData.seconds);
+    if (waitData?.seconds !== undefined) {
+      setSecondsLeft(Math.max(0, waitData.seconds));
     }
   }, [waitData?.seconds]);
 
   useEffect(() => {
-    if (secondsLeft === null || secondsLeft <= 0) return;
-    const timer = setTimeout(() => setSecondsLeft((s) => (s !== null ? s - 1 : 0)), 1000);
+    if (secondsLeft <= 0) return;
+    const timer = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
     return () => clearTimeout(timer);
   }, [secondsLeft]);
 
   useEffect(() => {
-    if (secondsLeft !== null && secondsLeft <= 0 && !done) {
-      setDone(true);
-    }
-  }, [secondsLeft]);
-
-  useEffect(() => {
-    if (!done) return;
-    if (gateData?.enabled === false) {
+    if (navigated.current) return;
+    const countdownDone = secondsLeft <= 0;
+    const adminDisabled = gateData?.enabled === false;
+    if (countdownDone || adminDisabled) {
+      navigated.current = true;
       router.replace("/(tabs)");
     }
-  }, [done, gateData?.enabled]);
+  }, [secondsLeft, gateData?.enabled]);
 
   useEffect(() => {
     const pulse = Animated.loop(
@@ -62,22 +62,18 @@ export default function OtaGateScreen() {
   const botPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   return (
-    <View style={[styles.container, { paddingTop: topPad, paddingBottom: botPad }]}>
+    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: topPad, paddingBottom: botPad }]}>
       <Animated.View style={[styles.iconWrap, { opacity: dotAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }]}>
-        <Ionicons name="cloud-download-outline" size={64} color={Colors.accent} />
+        <Ionicons name="cloud-download-outline" size={64} color={colors.accent} />
       </Animated.View>
-      <Text style={styles.title}>Aggiornamento in corso</Text>
-      <Text style={styles.subtitle}>
-        {done
-          ? "In attesa che l'aggiornamento sia pronto..."
-          : secondsLeft !== null
-          ? `Attendere ${secondsLeft}s...`
-          : "Caricamento..."}
+      <Text style={[styles.title, { color: colors.text }]}>Controllo aggiornamenti...</Text>
+      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+        {secondsLeft > 0 ? `Attendere ${secondsLeft}s` : "Applicazione aggiornamento..."}
       </Text>
-      <ActivityIndicator size="large" color={Colors.accent} style={{ marginTop: 24 }} />
-      {done && (
-        <Text style={styles.hint}>L'app si aggiornerà automaticamente</Text>
-      )}
+      <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 24 }} />
+      <Text style={[styles.hint, { color: colors.textSecondary }]}>
+        L'app si aggiornerà automaticamente
+      </Text>
     </View>
   );
 }
@@ -85,7 +81,6 @@ export default function OtaGateScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
     alignItems: "center",
     justifyContent: "center",
     gap: 12,
@@ -96,17 +91,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: "700",
-    color: Colors.text,
     textAlign: "center",
   },
   subtitle: {
     fontSize: 16,
-    color: Colors.textSecondary,
     textAlign: "center",
   },
   hint: {
     fontSize: 13,
-    color: Colors.textSecondary,
     marginTop: 16,
     textAlign: "center",
   },
