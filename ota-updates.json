@@ -2160,9 +2160,9 @@
     "updateGroupId": null,
     "androidUpdateId": null,
     "iosUpdateId": null,
-    "commitBase": "3a560cfbf55dd8364397d2377c1f0cb802a4faa7",
-    "easDashboard": null,
-    "apkBuildId": null,
+    "commitBase": "5133584358dfa559744965aa41345ded31e9e696",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/356fa553-6a7b-45ea-80e9-bf146af39880",
+    "apkBuildId": "356fa553-6a7b-45ea-80e9-bf146af39880",
     "apkVersionCode": 15,
     "apkUrl": null,
     "status": "pending"

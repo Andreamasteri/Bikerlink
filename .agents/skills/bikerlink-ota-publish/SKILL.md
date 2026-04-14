@@ -130,7 +130,10 @@ Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare 
 - Ciclo 4.x: OTA 37–40 (APK versionCode 10, rv 4.0.0)
 - Ciclo 5.x: OTA 41 (APK versionCode 11, rv 5.0.0) — DEPRECATO (crash expo-location plugin)
 - Ciclo 6.x: OTA 42–43 (APK versionCode 12, rv 6.0.0) — OBSOLETO (utenti devono aggiornare APK)
-- Ciclo 7.x: OTA 44–45+ (APK versionCode 13→14, rv 7.0.0) ← CORRENTE
+- Ciclo 7.x: OTA 44–45+ (APK versionCode 13→15, rv 7.0.0) ← CORRENTE
+  - APK v13: crash (react-native-maps 1.27.2 incompatibile con SDK 55)
+  - APK v14: crash (newArchEnabled=true incompatibile con react-native-maps 1.18.0)
+  - APK v15: fix (newArchEnabled=false + react-native-maps 1.18.0) — IN BUILD
 
 ## Output di riferimento (OTA-43 — esempio reale)
 ```
