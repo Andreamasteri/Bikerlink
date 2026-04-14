@@ -1062,7 +1062,9 @@
     "platform": "android",
     "publishedAt": "2026-04-11",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-1 rv4.0.0: tab Radio nella schermata Musica",
     "note": "Task #492+#493. Aggiunta 4ª tab 'Radio' (icona radio-outline) in music.tsx con griglia generi da /api/music/radio/genres, lista stazioni da /api/music/radio/stations?genre=X, play via PlayerContext.playRadioStation(). Funziona senza connessione Last.fm/Spotify. Toggle opzionale Suggerisci da Last.fm. CURRENT_OTA_NUMBER=1.",
@@ -1086,7 +1088,9 @@
     "platform": "android",
     "publishedAt": "2026-04-11",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-2 rv4.0.0: player musicale completo — bottone play sui brani, invia libreria, fix MiniPlayer, download anteprima 30s",
     "note": "Task #496. Fix MiniPlayer zIndex (invisibile su Android), bottone play 30s preview su ogni brano libreria BikerLink, bottone Invia libreria via chat, fix placeholder album art, download 30s preview playlist ricevute. CURRENT_OTA_NUMBER=2.",
@@ -1109,7 +1113,9 @@
     "channel": "preview",
     "platform": "android",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-3 rv4.0.0: fix UI profilo — rimossa scritta Lingua, Documentazione sotto Stile Mappa, Pulsanti Taskbar centrato",
     "note": "Task #498. Rimossa etichetta 'Lingua' sopra il selettore lingua (dropdown rimane invariato). Sezione 'Documentazione' spostata subito dopo 'Stile Mappa'. Titolo sezione taskbar rinominato in 'Pulsanti Taskbar' e centrato. CURRENT_OTA_NUMBER=3.",
@@ -1132,7 +1138,9 @@
     "channel": "preview",
     "platform": "android",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-4 rv4.0.0: Tab Telefono (MP3 locali), fix anteprime iTunes timeout 5s, indicatore sorgente MiniPlayer, apertura brani su YouTube/Google, banner avviso Last.fm",
     "note": "Task #500-#502. Tab Telefono: playlist MP3 locali con artwork Android (MediaStore), ordinamento alfabetico, parsing artista da filename. Fix anteprime: AbortController 5s client + server timeout 5s iTunes. MiniPlayer: sourceLabel per file/radio/preview/library. Task #501: apertura brani su YouTube/YouTube Music/Google da BraniTab. Task #502: banner avviso autenticazione Last.fm. CURRENT_OTA_NUMBER=4.",
@@ -1155,7 +1163,9 @@
     "channel": "preview",
     "platform": "android",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-5 rv4.0.0: chat pulsante libreria Last.fm/Spotify unificato, feedback posizione GPS reale, fix CURRENT_OTA_NUMBER",
     "note": "Task #507. Chat: pulsante nota musicale ora supporta Last.fm (non solo Spotify) — usa provider connesso, nuovo endpoint /api/lastfm/share-playlist. Pulsante posizione: accuracy High, alert su permesso negato/errore GPS. CURRENT_OTA_NUMBER corretto a 5 nel bundle.",
@@ -1178,7 +1188,9 @@
     "channel": "preview",
     "platform": "android",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-6 rv4.0.0: layout Music (libreria in cima, MiniPlayer inline top, stop player), radio fix (toggle Last.fm persistente, stazioni cliccabili con haptic+spinner)",
     "note": "Task #505+#506. #505: BraniTab libreria in cima; InlineMiniPlayer sopra header Musica con play/pause/stop; spazio ridotto (marginTop 4); MiniPlayer globale nascosto su /music. stop() aggiunto a PlayerContext. #506: toggle Last.fm persistente AsyncStorage; stazioni: haptic, spinner, guard URL, alert errore audio. CURRENT_OTA_NUMBER=6.",
@@ -1201,7 +1213,9 @@
     "channel": "preview",
     "platform": "android",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-7 rv4.0.0: Raduni/Eventi, Mappa Europea fix, Traduzioni+Turco, Brand Theme Switcher, fix Radio/Player",
     "note": "Task #509-#516. #509: fix Radio proxy stream lato server. #510: ripristino apertura FullPlayerModal da InlineMiniPlayer. #511-#512: Raduni/Eventi (schema DB + API + frontend completo). #513: sistema traduzioni Google Sheet + admin panel. #514: lingua turca. #515: Audit & Fix Mappa Europea (callout custom logo+member count, proponi-sede drag-to-place, membro-aware, route fix). #516: Brand Theme Switcher 4 temi (Attuale/Asfalto/Velocità/Rotta), policy admin + scelta utente profilo. CURRENT_OTA_NUMBER=7.",
@@ -1224,7 +1238,9 @@
     "channel": "preview",
     "platform": "android",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-8 rv4.0.0: fix distribuzione EAS — contenuto identico OTA-7 (Raduni/Eventi, Mappa Europea, Traduzioni+Turco, Brand Theme Switcher, fix Radio/Player)",
     "note": "OTA-7 non era arrivata agli utenti perché il passo EAS aveva fatto timeout. OTA-8 ripubblica lo stesso contenuto assicurando il completamento EAS. Tasks #509-#516. CURRENT_OTA_NUMBER=8.",
@@ -1247,7 +1263,9 @@
     "channel": "preview",
     "platform": "android",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-9 rv4.0.0: fix spazio vuoto tab Brani (Musica), fix procedura OTA timeout EAS",
     "note": "Task #520: fix publish-ota.sh — istruzioni supersede al posto di npx eas-cli diretto. Task #521: paddingTop ScrollView Brani 20→4. CURRENT_OTA_NUMBER=9.",
@@ -1270,7 +1288,9 @@
     "channel": "preview",
     "platform": "android",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-10 rv4.0.0: linea arancione tab Musica a contatto col testo (paddingBottom 0)",
     "note": "Task #522: tabItem paddingVertical:10 → paddingTop:10, paddingBottom:0. Linea arancione immediata sotto Brani/Match/Ricevute/Radio/Telefono. CURRENT_OTA_NUMBER=10.",
@@ -1293,7 +1313,9 @@
     "channel": "preview",
     "platform": "android",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-11 rv4.0.0: fix crash Impostazioni admin (theme.colors → theme), rimozione ThemeProvider duplicato, fix tab Musica header + indicatore",
     "note": "Fix crash in admin/settings.tsx: accesso theme.colors.background/accent/surface/text sostituito con theme.background/accent/surface/text (THEMES[key] è già ThemeColors, senza sub-property .colors). theme.label/description → THEME_META[key].label/description. Rimosso ThemeProvider duplicato da _layout.tsx (era annidato dentro MapSettingsProvider e faceva doppia chiamata API /api/settings/theme). Task #523: headerShown:false per tab Musica, rimossa doppia linea grigia+arancione, borderBottomColor transparent per altezza costante. CURRENT_OTA_NUMBER=11.",
@@ -1316,7 +1338,9 @@
     "channel": "preview",
     "platform": "android",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-12 rv4.0.0: fix crash Impostazioni admin (brandThemeStyles), lingua turca, fix login dopo logout, foto contest Object Storage, Giappone",
     "note": "Task #525: fix spazio nero tab Musica (già in OTA-11). Task #526: brandThemeStyles StyleSheet mancante in admin/settings.tsx, traduzione turca completa (lib/i18n/tr.ts), Turkish in splash. Task #527: fix login bloccato dopo logout. Task #528+#529: foto contest su Object Storage persistente, aggiunta Giappone (JP) nei paesi selezionabili. CURRENT_OTA_NUMBER=12.",
@@ -1339,7 +1363,9 @@
     "channel": "preview",
     "platform": "android",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-13 rv4.0.0: fix export Sheets traduzioni, Mini Player floating, Musica padding fix (#524-#531)",
     "note": "Task #524: fix export Google Sheets traduzioni (Drive API CSV upload/export). Task #530: Mini Player floating su home/match/chat/contest (overlay sopra tab bar), fisso su musica/mappa/profilo. Task #531: paddingBottom corretto in MatchTab/RadioTab/SharedPlaylists/Telefono (120px). CURRENT_OTA_NUMBER=13.",
@@ -1362,7 +1388,9 @@
     "channel": "preview",
     "platform": "android",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-14 rv4.0.0: Mini Player mappa/Telefono, fix BraniTab, fix turco+logout, fix tema admin (#533-#536)",
     "note": "Task #533: InlineMiniPlayer inline sotto campagne nella mappa, floating nascosto su home, InlineMiniPlayer in cima al tab Telefono. Task #534: paddingTop 4→0 BraniTab connected. Task #535: turco in welcome.tsx, fix logout/login race condition + router.replace. Task #536: themeDefaultMutation.onSuccess chiama setTheme(variables). CURRENT_OTA_NUMBER=14.",
@@ -1385,7 +1413,9 @@
     "channel": "preview",
     "platform": "android",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-15 rv4.0.0: Fix MiniPlayer sopra tab bar, Music Tab espandi libreria Last.fm (#537-#538)",
     "note": "Task #537: floating MiniPlayer usa sempre tabBarHeight+8 come offset su tutte le schermate (eccetto mappa e music). Task #538: tab music compatto quando Last.fm connesso, libreria espansa, nessun gap vuoto. CURRENT_OTA_NUMBER=15.",
@@ -1408,7 +1438,9 @@
     "channel": "preview",
     "platform": "android",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-16 rv4.0.0: Music tab bar -40px, font +25%, MiniPlayer fix, ricerca brani, playlist fix, nota 30'' (#539-#543)",
     "note": "Task #539: tabBar+compactHeader marginTop:40, tabText fontSize 12→15. Task #540: MiniPlayer rimosso da TelefonoTab, InlineMiniPlayer in cima a music+tracking, nascosto su /. Task #541: searchBar spostata tra chip YouTube/Google e card playlist in BraniTab. Task #542: playlist snapshot 6h + fix condivisione + fix logout. Task #543: nota avvertimento 30'' sotto searchBar in BraniTab + marginRight open-outline 4→20 in LibraryTrackRow. CURRENT_OTA_NUMBER=16.",
@@ -1431,7 +1463,9 @@
     "channel": "preview",
     "platform": "android",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-17 rv4.0.0: Music BraniTab 5 fix UI + Trip InlineMiniPlayer in cima (#544-#545)",
     "note": "Task #544: rimosso 'Tutta la playlist', tasto inoltro nella card, tasto uscita a dx di Google (+15%), tab bar -10px, nota 30'' fix wrap+font+15%. Task #545: InlineMiniPlayer posizione assoluta in cima al tab Trip (top:0 zIndex:10, ScrollView paddingTop 16→56). CURRENT_OTA_NUMBER=17.",
@@ -1454,7 +1488,9 @@
     "channel": "preview",
     "platform": "android",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-18 rv4.0.0: fix crash tab Musica — handleDisconnect non in scope BraniTab (#546)",
     "note": "Bug introdotto in task #544: il tasto log-out spostato dentro BraniTab usava handleDisconnect (definita in MusicScreen) senza passarla come prop. ReferenceError causava crash immediato all'apertura del tab Musica con libreria non vuota. Fix: aggiunta prop onDisconnect a BraniTab, passata da MusicScreen. CURRENT_OTA_NUMBER=18.",
@@ -1477,7 +1513,9 @@
     "channel": "preview",
     "platform": "android",
     "runtimeVersion": "4.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-19 rv4.0.0: InlineMiniPlayer in cima al tab Trip (proposals) (#547)",
     "note": "Tab Trip = proposals.tsx (non tracking.tsx). Aggiunto InlineMiniPlayer inline in cima prima dei filtri. Floating MiniPlayer nascosto su /proposals (aggiunto isProposalsScreen a _layout.tsx). CURRENT_OTA_NUMBER=19.",
@@ -1498,7 +1536,9 @@
     "version": "1.20.0",
     "runtimeVersion": "4.0.0",
     "date": "2026-04-12",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-20 rv4.0.0: InlineMiniPlayer in cima a tutti i tab rimanenti, floating MiniPlayer rimosso (#548)",
     "note": "InlineMiniPlayer aggiunto in cima a: Ride (ready.tsx), Club (motoclub.tsx), Raduni (eventi.tsx), Match (match.tsx), Chat (chat.tsx), Pic (contest.tsx), Profilo (profile.tsx). Floating MiniPlayer rimosso da _layout.tsx (import + rendering). CURRENT_OTA_NUMBER=20.",
@@ -1519,7 +1559,9 @@
     "version": "1.21.0",
     "runtimeVersion": "4.0.0",
     "date": "2026-04-12",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-21 rv4.0.0: fix login dopo logout su Android (#546)",
     "note": "Task #546. Fix login bloccato dopo logout: (1) GPS timeout 5s in login.tsx con Promise.race (prima era senza timeout, poteva bloccarsi indefinitamente su Android). (2) isSubmitting state per mostrare spinner durante fetch GPS+login. (3) queryClient.clear() in logout (pulizia completa cache). (4) Login onSuccess non invalida più /api/auth/me (evita race condition refetch→null). (5) Logout naviga con while(canGoBack)+replace per pulire stack Android. (6) sendLocationUpdate in _layout.tsx con timeout 10s. CURRENT_OTA_NUMBER=21.",
@@ -1540,7 +1582,9 @@
     "version": "1.22.0",
     "runtimeVersion": "4.0.0",
     "date": "2026-04-12",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-22 rv4.0.0: fix distanze errate — usa profile.latitude/longitude (#547)",
     "note": "Task #547. Fix distanze errate tra utenti: (1) proposals.ts biker-matches e garage-matches ora usano profile.latitude/longitude come fonte primaria, firstLoginLat come fallback. (2) match.tsx myLat/myLng legge da /api/users/profile (GPS aggiornato ogni 5min) con fallback a firstLoginLat. (3) spotify.ts music-match già corretto (usa profile coords). (4) chat.tsx già corretto (usa GPS live). CURRENT_OTA_NUMBER=22.",
@@ -1561,7 +1605,9 @@
     "version": "1.23.0",
     "runtimeVersion": "4.0.0",
     "date": "2026-04-13",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-23 rv4.0.0: fix distanze asimmetriche — refresh coordinate configurabile (#548)",
     "note": "Task #548. Fix distanze asimmetriche tra utenti in movimento: match.tsx ora ha refetchInterval su /api/users/profile, letto da impostazione admin profile_refetch_interval (default 30s). Pannello admin: campo testo 'Refresh Coordinate (sec)' nella sezione Matching Engine. Backend: GET /api/settings/profile-refetch-interval. CURRENT_OTA_NUMBER=23.",
@@ -1582,7 +1628,9 @@
     "version": "1.24.0",
     "runtimeVersion": "4.0.0",
     "date": "2026-04-13",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-24 rv4.0.0: distanza server-side + Old Psn (#552)",
     "note": "Task #552. Distanza calcolata server-side con haversine in proposals.ts (garage-matches + biker-matches). Nuovo campo coordinatesUpdatedAt in user_profiles, aggiornato in PUT /location, /profile/dynamic, /me/availability. Server restituisce distanceKm e distanceFlag (ok/old_psn/no_psn). Match cards mostrano badge distanza con icona location; se coordinate vecchie mostra '~X km ⚠'. passesDistanceFilter ora usa distanceKm dal server (fallback haversine locale). Admin: campo 'Età Max Coordinate (sec)' nel Matching Engine (default 300s). CURRENT_OTA_NUMBER=24.",
@@ -1603,7 +1651,9 @@
     "version": "1.25.0",
     "runtimeVersion": "4.0.0",
     "date": "2026-04-13",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-25 rv4.0.0: storico coordinate GPS + pannello admin (#553)",
     "note": "Task #553. Nuova tabella coordinate_history (userId, lat, lng, slot ciclico 1-3, createdAt). PUT /location salva nella history se abilitato, rispettando intervallo minimo. Storage: saveCoordinateHistory con slot ciclico, getCoordinateHistoryStats, getCoordinateHistoryUsers, cleanupOldCoordinateHistory. Admin endpoints: GET/PUT /api/admin/coordinate-history/settings (enabled, interval, maxRecords, mode all/selected, selectedUsers), GET /api/admin/coordinate-history/stats, GET /api/admin/coordinate-history/users. Pubblico: GET /api/settings/coordinate-history. Pulizia automatica ogni 5 min (elimina record oltre maxRecords per utente). Admin UI: nuovo accordion 'Storico Coordinate' con toggle attivo, intervallo salvataggio, max record, modalità tutti/selezionati, statistiche. CURRENT_OTA_NUMBER=25.",
@@ -1626,7 +1676,9 @@
     "version": "1.26.0",
     "runtimeVersion": "4.0.0",
     "date": "2026-04-13",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-26 rv4.0.0: storico coordinate (#553) + fix distanza fallback + coordinate configurabili (#554)",
     "note": "Task #553+#554. Storico coordinate GPS con pannello admin (tabella coordinate_history, slot ciclico, cleanup automatico). Rimosso fallback a firstLoginLat/Lng in proposals.ts (garage-matches e biker-matches): se coordinate profilo null, distanceFlag='no_psn'. Client _layout.tsx: intervallo invio coordinate ora letto da /api/settings/profile-refetch-interval (default 30s, era hardcoded 5min). CURRENT_OTA_NUMBER=26.",
@@ -1647,7 +1699,9 @@
     "version": "1.27.0",
     "runtimeVersion": "4.0.0",
     "date": "2026-04-13",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-27 rv4.0.0: fix distanza lista Biker Disponibili (location state GPS reale)",
     "note": "Bug: index.tsx in initMapLocation, quando user.region era impostato, setLocation veniva fissato al centro della regione (es. Veneto: 45.4398, 12.3319) e il risultato di fetchGPSLocation() veniva scartato. Le query biker-available-list, online-list, nearby inviavano al server il centro regione invece del GPS reale → distanze errate (~10.5 km invece di 0). Fix: cattura il valore di ritorno di fetchGPSLocation() in entrambi i rami (region e profileLat) e aggiorna setLocation con il GPS reale. CURRENT_OTA_NUMBER=27.",
@@ -1668,7 +1722,9 @@
     "version": "1.28.0",
     "runtimeVersion": "4.0.0",
     "date": "2026-04-13",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-28 rv4.0.0: GPS watchPosition — più efficiente, meno batteria",
     "note": "Task #555. Sostituito polling GPS (getCurrentPositionAsync + setInterval 30s) con Location.watchPositionAsync(accuracy:Balanced, timeInterval:30s, distanceInterval:20m). L'OS notifica l'app solo quando la posizione cambia — nessuna richiesta GPS a vuoto quando fermi. Su web rimane setInterval+getCurrentPosition. Al ritorno in foreground (AppState active) il watcher viene fermato e riavviato. Rimossi: DEFAULT_LOCATION_UPDATE_INTERVAL_MS, sendLocationUpdate(), locationTimerRef, locationIntervalMsRef, fetchLocationInterval(). Aggiunto: startNativeWatcher(), stopNativeWatcher(), locationWatcherRef, sendWebLocation(). CURRENT_OTA_NUMBER=28.",
@@ -1689,7 +1745,9 @@
     "version": "1.29.0",
     "runtimeVersion": "4.0.0",
     "date": "2026-04-13",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-29 rv4.0.0: fix layout Profilo (miniplayer più su) e Ride! (rimuovi header)",
     "note": "Task #556. Profilo: rimosso paddingTop: insets.top dalla View esterna (l'header di navigazione già gestisce la safe area — il doppio padding abbassava inutilmente il miniplayer). Ride!: aggiunto headerShown:false al Tabs.Screen ready in _layout.tsx (elimina la barra 'Ride!' in alto), aggiunto paddingTop:insets.top alla View esterna di ready.tsx, rimosso paddingTop:67 dal contentContainerStyle dello ScrollView. CURRENT_OTA_NUMBER=29.",
@@ -1710,7 +1768,9 @@
     "version": "1.30.0",
     "runtimeVersion": "4.0.0",
     "date": "2026-04-13",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-30 rv4.0.0: fix mappa fullscreen mantiene il centro della mappa ridotta",
     "note": "Task #561. InteractiveMap.tsx: aggiunto prop initialCenterOverride (salta l'auto-center su userLocation se fornito) e onRegionChangeComplete (callback che aggiorna il parent con il centro attuale). Introdotto initialCenterDoneRef (useRef) per garantire che il primo-centro venga impostato una sola volta per istanza. index.tsx: aggiunto stato lastSmallMapCenter, aggiornato dal piccolo InteractiveMap tramite onRegionChangeComplete; passato come initialCenterOverride al fullscreen InteractiveMap; anche il click 'navigate' nella lista Online aggiorna lastSmallMapCenter prima di aprire la mappa. Risultato: espandere la mappa mantiene sempre il centro che si vedeva nella mappa ridotta. CURRENT_OTA_NUMBER=30.",
@@ -1731,7 +1791,9 @@
     "version": "1.31.0",
     "runtimeVersion": "4.0.0",
     "date": "2026-04-13",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "message": "OTA-31 rv4.0.0: ampliamento lista moto (brand storici/moderni) + nota Piaggio",
     "note": "Task #558. motorcycle-data.ts: lista moto completamente rivista — brand esistenti razionalizzati (es. CB unica voce, Z naked unica voce, Ninja ZX unica voce, Duke unica voce, Monster unica voce, Tiger unica voce, ecc.) + nuovi modelli aggiunti per ogni brand. Aggiunti 25 nuovi brand: storici (AJS, Ariel, Brough Superior, Douglas, FN, Francis-Barnett, Henderson, Laverda, Matchless, Nimbus, Panther, Puch, Scott, Sunbeam, Velocette, Vincent) e moderni (Cleveland CycleWerks, Daelim, Derbi, FB Mondial, Husaberg, Hyosung, Italjet, Keeway, Montesa, MZ/MuZ, Ossa, Peugeot Motocycles, QJMotor, TM Racing, Zündapp). Aggiunto export BRAND_NOTES con nota Piaggio. garage.tsx: mostra riquadro avviso giallo sotto il picker brand se il brand selezionato ha una nota in BRAND_NOTES — applicato sia al form moto biker (GarageContent) sia al form wishlist (WishlistScreen/zavorrine). CURRENT_OTA_NUMBER=31.",
@@ -2029,7 +2091,7 @@
     "runtimeVersion": "7.0.0",
     "jsEngine": "hermes",
     "message": "APK v14 — fix crash mappa (react-native-maps 1.18.0)",
-    "note": "Build APK versionCode 14 rv 7.0.0. Fix crash alla schermata mappe: downgrade react-native-maps da ^1.27.2 a 1.18.0 (unica versione compatibile con Expo Go / Expo SDK 55). Lo stesso ciclo OTA 7.x rimane invariato. Commit base: 3c032f33b3327b11be2ae27a4f0c50c047a9a643.",
+    "note": "Build APK versionCode 14 rv 7.0.0. Fix crash alla schermata mappe: downgrade react-native-maps da ^1.27.2 a 1.18.0 (unica versione compatibile con Expo Go / Expo SDK 55). Lo stesso ciclo OTA 7.x rimane invariato. Commit base: 3c032f33b3327b11be2ae27a4f0c50c047a9a643. CRASH: New Architecture (newArchEnabled=true) incompatibile con react-native-maps 1.18.0. Risolto in APK v15 con newArchEnabled=false.",
     "releaseId": null,
     "bundleUrl": null,
     "updateGroupId": null,
@@ -2040,7 +2102,7 @@
     "apkBuildId": null,
     "apkVersionCode": 14,
     "apkUrl": null,
-    "status": "pending"
+    "status": "failed"
   },
   {
     "updateNumber": 44,
@@ -2083,5 +2145,26 @@
     "apkVersionCode": 14,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": "v15-apk",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "APK v15 — fix crash avvio (newArchEnabled=false)",
+    "note": "Build APK versionCode 15 rv 7.0.0. Fix crash splash screen: New Architecture (React Native 0.83.4) incompatibile con react-native-maps 1.18.0. Aggiunto newArchEnabled=false in app.json per usare Old Architecture. react-native-maps 1.18.0 mantiene compatibilità Expo Go. Commit base: 3a560cfbf55dd8364397d2377c1f0cb802a4faa7",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "3a560cfbf55dd8364397d2377c1f0cb802a4faa7",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 15,
+    "apkUrl": null,
+    "status": "pending"
   }
 ]

@@ -32,7 +32,7 @@
     },
     "android": {
       "package": "com.bikerlink.app",
-      "versionCode": 14,
+      "versionCode": 15,
       "config": {
         "googleMaps": {
           "apiKey": ""
@@ -89,6 +89,7 @@
       "expo-document-picker",
       "expo-location"
     ],
+    "newArchEnabled": false,
     "experiments": {
       "typedRoutes": true
     },
