@@ -2061,6 +2061,27 @@
     "apkBuildId": null,
     "apkVersionCode": 13,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 45,
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-45 rv7.0.0: manutenzione ciclo 7.x (APK v14 base)",
+    "note": "Seconda OTA ciclo 7.x (APK v14). Sincronizzazione bundle JS con codebase corrente: react-native-maps pinned a 1.18.0 (fix crash mappa APK v13), versionCode aggiornato a 14. Bundle base per utenti APK v14. CURRENT_OTA_NUMBER=45.",
+    "releaseId": "bf31ac44-5d00-4bb2-b881-5d155446cedc",
+    "bundleUrl": "private/ota/ota-1.45.0-1776159314897.js",
+    "updateGroupId": "b43d3903-98e9-4194-a41f-e68b7bda445c",
+    "androidUpdateId": "019d8b59-006d-7db1-ae3d-954762409b08",
+    "iosUpdateId": null,
+    "commitBase": "0ede61d83eb1c9dcc789efad382d560a09bde5d0",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/b43d3903-98e9-4194-a41f-e68b7bda445c",
+    "apkBuildId": null,
+    "apkVersionCode": 14,
+    "apkUrl": null,
     "status": "published"
   }
 ]
