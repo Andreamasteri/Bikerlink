@@ -89,7 +89,6 @@
       "expo-document-picker",
       "expo-location"
     ],
-    "newArchEnabled": false,
     "experiments": {
       "typedRoutes": true
     },
