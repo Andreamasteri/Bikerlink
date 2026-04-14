@@ -130,16 +130,27 @@ Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare 
 - Ciclo 4.x: OTA 37–40 (APK versionCode 10, rv 4.0.0)
 - Ciclo 5.x: OTA 41 (APK versionCode 11, rv 5.0.0) — DEPRECATO (crash expo-location plugin)
 - Ciclo 6.x: OTA 42–43 (APK versionCode 12, rv 6.0.0) — OBSOLETO (utenti devono aggiornare APK)
-- Ciclo 7.x: OTA 44–45+ (APK versionCode 13→16, rv 7.0.0) ← CORRENTE
-  - APK v13: crash (react-native-maps 1.27.2 incompatibile con SDK 55)
-  - APK v14: FAILED (newArchEnabled=true incompatibile con react-native-maps 1.18.0 — fix in app.json IGNORATO perché progetto bare workflow)
-  - APK v15: FAILED (fix newArchEnabled=false messo in app.json → ignorato! bare workflow usa android/gradle.properties direttamente)
-  - APK v16: IN BUILD (build ID: 47b597f1-d4ef-483b-99ff-e8329e55860a) — FIX DEFINITIVO: newArchEnabled=false in android/gradle.properties, versionCode 16 in android/app/build.gradle
+- Ciclo 7.x: OTA 44–45+ (APK versionCode 13→17, rv 7.0.0) ← CORRENTE
+  - APK v13: FAILED (react-native-maps 1.27.2 — causa esatta sconosciuta, diagnosi errata al momento)
+  - APK v14: FAILED (newArchEnabled=true + react-native-maps 1.18.0 → incompatibili, fix in app.json ignorato)
+  - APK v15: FAILED (fix newArchEnabled=false in app.json → ignorato, bare workflow usa gradle.properties)
+  - APK v16: FAILED (newArchEnabled=false + react-native-reanimated 4.2.3 → crash, Reanimated v4 richiede New Arch)
+  - APK v17: IN BUILD (build ID: 44e2dc26-dcf3-426b-bf45-fa05a8886905) — FIX DEFINITIVO:
+    upgrade react-native-maps 1.18.0 → 1.27.2 (supporta Fabric/New Architecture con RN>=0.81.1)
+    newArchEnabled=true ripristinato. versionCode 17.
 
 ## REGOLA CRITICA — BARE WORKFLOW
 Il progetto ha `android/` committato → bare workflow. Le impostazioni di `app.json` per native config (newArchEnabled, ecc.) vengono **IGNORATE** da EAS. Modificare SEMPRE i file Android direttamente:
 - **New Architecture**: `android/gradle.properties` → `newArchEnabled`
 - **versionCode**: `android/app/build.gradle` → `versionCode` (E anche app.json per consistenza)
+
+## COMPATIBILITÀ LIBRERIE (lezione appresa da APK v13-v16)
+- react-native-maps 1.18.0 → Old Architecture ONLY (non usare con newArchEnabled=true)
+- react-native-maps 1.26.1+ → Fabric (New Architecture), richiede RN >= 0.81.1
+- react-native-reanimated 4.x → New Architecture ONLY
+- react-native-reanimated 3.x → Old Architecture + New Architecture
+- REGOLA: con Expo SDK 55 (RN 0.83.4) + Reanimated 4.x → usare react-native-maps >= 1.26.1
+- NON aggiungere react-native-maps ai plugins di app.json → crash garantito
 
 ## Output di riferimento (OTA-43 — esempio reale)
 ```
