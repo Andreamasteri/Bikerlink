@@ -9,16 +9,16 @@ import {
   Text,
   ActivityIndicator,
 } from "react-native";
-import MapView, { Marker, Callout, Circle, UrlTile, Region } from "react-native-maps";
-import { Image } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import WebView from "react-native-webview";
+import type { WebViewMessageEvent } from "react-native-webview";
 import * as Location from "expo-location";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
-import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 import { useMapConfig } from "@/lib/map-context";
 import { getTileConfig, type MapProvider } from "@/lib/map-tiles";
 import { apiRequest, queryClient } from "@/lib/query-client";
+import { LEAFLET_MAP_HTML } from "@/lib/leaflet-map-html";
 
 interface MapUser {
   id: string;
@@ -60,6 +60,28 @@ interface LatLng {
   longitude: number;
 }
 
+interface EventMapPin {
+  id: string;
+  title: string;
+  latitude: number;
+  longitude: number;
+  eventDate: string;
+}
+
+export interface ClubMapPin {
+  id: string;
+  name: string;
+  clubType: string;
+  logoUrl: string | null;
+  region: string | null;
+  country: string | null;
+  latitude: number;
+  longitude: number;
+  isFictitious: boolean;
+  memberCount: number;
+  currentUserIsMember?: boolean;
+}
+
 interface InteractiveMapProps {
   users?: MapUser[];
   workshops?: MapWorkshop[];
@@ -96,65 +118,6 @@ export interface InteractiveMapHandle {
   focusOnCoordinate: (coords: { latitude: number; longitude: number }) => void;
 }
 
-const ITALY_REGION: Region = {
-  latitude: 41.9028,
-  longitude: 12.4964,
-  latitudeDelta: 8,
-  longitudeDelta: 8,
-};
-
-const DEFAULT_MAP_STYLE = [
-  { elementType: "geometry", stylers: [{ color: "#2D2D2D" }] },
-  { elementType: "labels.icon", stylers: [{ visibility: "on" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#aaaaaa" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#2D2D2D" }] },
-  { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#757575" }] },
-  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#333333" }] },
-  { featureType: "road", elementType: "geometry.fill", stylers: [{ color: "#4a4a4a" }] },
-  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#2D2D2D" }] },
-  { featureType: "road.highway", elementType: "geometry.fill", stylers: [{ color: "#5a5a5a" }] },
-  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#1a3a5c" }] },
-];
-
-function getUserMarkerColor(userType: string, sex?: string | null): string {
-  if (userType === "coppia") return Colors.accent;
-  if (sex === "F") return Colors.femaleIcon;
-  if (sex === "M") return Colors.maleIcon;
-  if (userType?.startsWith("zavorrina")) return Colors.femaleIcon;
-  if (userType?.startsWith("biker")) return Colors.maleIcon;
-  return Colors.accent;
-}
-
-function getUserMarkerIcon(userType: string): keyof typeof MaterialCommunityIcons.glyphMap {
-  if (userType?.startsWith("biker")) return "motorbike";
-  if (userType?.startsWith("zavorrina")) return "seat-passenger";
-  if (userType === "coppia") return "account-group";
-  return "account";
-}
-
-interface EventMapPin {
-  id: string;
-  title: string;
-  latitude: number;
-  longitude: number;
-  eventDate: string;
-}
-
-export interface ClubMapPin {
-  id: string;
-  name: string;
-  clubType: string;
-  logoUrl: string | null;
-  region: string | null;
-  country: string | null;
-  latitude: number;
-  longitude: number;
-  isFictitious: boolean;
-  memberCount: number;
-  currentUserIsMember?: boolean;
-}
-
 const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(function InteractiveMap({
   users = [],
   workshops = [],
@@ -187,26 +150,15 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   onRegionChangeComplete,
 }: InteractiveMapProps, ref) {
   const { enabled: mapsEnabled, resolvedProvider, userChoiceEnabled } = useMapConfig();
-  const mapRef = useRef<MapView>(null);
-  const initialCenterDoneRef = useRef(false);
-
-  useImperativeHandle(ref, () => ({
-    focusOnCoordinate: (coords: { latitude: number; longitude: number }) => {
-      if (mapRef.current) {
-        mapRef.current.animateToRegion({
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        }, 800);
-      }
-    },
-  }), []);
-
+  const webViewRef = useRef<WebView>(null);
+  const [mapReady, setMapReady] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
-  const region: Region = ITALY_REGION;
-  const [mapIsReady, setMapIsReady] = useState(false);
+  const initialCenterDoneRef = useRef(false);
+
+  useEffect(() => {
+    sendStartupBeacon("interactive_map_mount");
+  }, []);
 
   const today = new Date().toISOString().substring(0, 10);
   const { data: eventPinsRaw } = useQuery<EventMapPin[]>({
@@ -239,10 +191,6 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     (resolvedProvider === "carto_light" || resolvedProvider === "carto_dark");
 
   useEffect(() => {
-    sendStartupBeacon("interactive_map_mount");
-  }, []);
-
-  useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
@@ -251,11 +199,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
             navigator.geolocation.getCurrentPosition(
               (position) => {
                 if (cancelled) return;
-                const loc = {
-                  latitude: position.coords.latitude,
-                  longitude: position.coords.longitude,
-                };
-                setUserLocation(loc);
+                setUserLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude });
                 setLocationLoading(false);
               },
               () => { if (!cancelled) setLocationLoading(false); }
@@ -267,15 +211,9 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           const { status } = await Location.requestForegroundPermissionsAsync();
           if (cancelled) return;
           if (status === "granted") {
-            const loc = await Location.getCurrentPositionAsync({
-              accuracy: Location.Accuracy.Balanced,
-            });
+            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
             if (cancelled) return;
-            const coords = {
-              latitude: loc.coords.latitude,
-              longitude: loc.coords.longitude,
-            };
-            setUserLocation(coords);
+            setUserLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
           }
           if (!cancelled) setLocationLoading(false);
         }
@@ -293,249 +231,146 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     return true;
   });
 
-  const centerOnUser = useCallback(() => {
-    if (userLocation && mapRef.current) {
-      mapRef.current.animateToRegion({
-        ...userLocation,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      });
-    }
-  }, [userLocation]);
+  const inject = useCallback((js: string) => {
+    webViewRef.current?.injectJavaScript(js + ";true;");
+  }, []);
+
+  const buildAndPushState = useCallback(() => {
+    if (!mapReady) return;
+    const tileConfig = mapsEnabled ? getTileConfig(resolvedProvider) : getTileConfig("carto_dark");
+    const state = {
+      tileUrl: tileConfig.urlTemplate,
+      tileMaxZoom: tileConfig.maximumZ,
+      userLocation: userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : null,
+      searchRadius: isAvailable && userLocation && searchRadiusKm && searchRadiusKm > 0
+        ? { lat: userLocation.latitude, lng: userLocation.longitude, km: searchRadiusKm }
+        : null,
+      markers: {
+        users: filteredUsers.map((u) => ({
+          id: u.id,
+          lat: u.latitude,
+          lng: u.longitude,
+          userType: u.userType,
+          sex: u.sex ?? null,
+          nickname: u.nickname,
+          isCurrentUser: currentUserId != null && u.id === currentUserId,
+        })),
+        workshops: workshops.map((ws) => ({
+          id: ws.id, lat: ws.latitude, lng: ws.longitude, name: ws.name,
+        })),
+        events: showEventPins && filterEvents ? eventPins.map((ep) => ({
+          id: ep.id, lat: ep.latitude, lng: ep.longitude, title: ep.title,
+        })) : [],
+        clubs: filterClubs ? clubPins.map((c) => ({
+          id: c.id, lat: c.latitude, lng: c.longitude, name: c.name,
+          isFictitious: c.isFictitious, memberCount: c.memberCount,
+        })) : [],
+        easterEggs: easterEggs.map((e) => ({
+          id: e.id, lat: e.latitude, lng: e.longitude, name: e.name,
+        })),
+        sos: activeSosRequests.map((s) => ({
+          id: s.id, lat: s.latitude, lng: s.longitude,
+          radiusKm: s.radiusKm, reason: s.reason, nickname: s.requesterNickname ?? null,
+        })),
+        realMe: realMeMarker ? { lat: realMeMarker.latitude, lng: realMeMarker.longitude } : null,
+        fakeMe: fakeMeMarker ? { lat: fakeMeMarker.latitude, lng: fakeMeMarker.longitude } : null,
+      },
+    };
+    const encoded = JSON.stringify(JSON.stringify(state));
+    inject("window.leafletBridge && window.leafletBridge.updateState(" + encoded + ")");
+  }, [
+    mapReady, mapsEnabled, resolvedProvider, userLocation, isAvailable, searchRadiusKm,
+    filteredUsers, workshops, eventPins, showEventPins, filterEvents,
+    clubPins, filterClubs, easterEggs, activeSosRequests,
+    realMeMarker, fakeMeMarker, currentUserId, inject,
+  ]);
 
   useEffect(() => {
-    if (!mapIsReady || !mapRef.current) return;
-    if (initialCenterDoneRef.current) return;
+    buildAndPushState();
+  }, [buildAndPushState]);
+
+  useEffect(() => {
+    if (!mapReady || initialCenterDoneRef.current) return;
     if (initialCenterOverride) {
       initialCenterDoneRef.current = true;
-      mapRef.current.animateToRegion({
-        latitude: initialCenterOverride.latitude,
-        longitude: initialCenterOverride.longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      }, 500);
+      inject(
+        "window.leafletBridge && window.leafletBridge.focusOn(" +
+        initialCenterOverride.latitude + "," +
+        initialCenterOverride.longitude + ",14)"
+      );
     } else if (userLocation) {
       initialCenterDoneRef.current = true;
-      mapRef.current.animateToRegion(
-        { ...userLocation, latitudeDelta: 0.1, longitudeDelta: 0.1 },
-        500
+      inject(
+        "window.leafletBridge && window.leafletBridge.focusOn(" +
+        userLocation.latitude + "," +
+        userLocation.longitude + ",13)"
       );
     }
-  }, [userLocation, mapIsReady, initialCenterOverride]);
+  }, [mapReady, userLocation, initialCenterOverride, inject]);
 
-  const handleMapReady = useCallback(() => {
-    sendStartupBeacon("mapview_ready");
-    onReady?.();
-    setMapIsReady(true);
-  }, [onReady]);
+  const handleMessage = useCallback((event: WebViewMessageEvent) => {
+    try {
+      const msg = JSON.parse(event.nativeEvent.data) as { type: string; lat?: number; lng?: number; markerType?: string; id?: string };
+      if (msg.type === "mapReady") {
+        sendStartupBeacon("mapview_ready");
+        onReady?.();
+        setMapReady(true);
+      } else if (msg.type === "regionChange" && msg.lat != null && msg.lng != null) {
+        onRegionChangeComplete?.({ latitude: msg.lat, longitude: msg.lng });
+      } else if (msg.type === "markerPress") {
+        if (msg.markerType === "user") {
+          const u = users.find((x) => x.id === msg.id);
+          if (u) onUserPress?.(u);
+        } else if (msg.markerType === "club") {
+          const c = clubPins.find((x) => x.id === msg.id);
+          if (c) onClubPress?.(c);
+        } else if (msg.markerType === "event") {
+          if (msg.id) onEventPress?.(msg.id);
+        } else if (msg.markerType === "egg") {
+          const e = easterEggs.find((x) => x.id === msg.id);
+          if (e) onEasterEggPress?.(e);
+        }
+      }
+    } catch {}
+  }, [users, clubPins, easterEggs, onUserPress, onClubPress, onEventPress, onEasterEggPress, onReady, onRegionChangeComplete]);
 
-  const tileConfig = mapsEnabled ? getTileConfig(resolvedProvider) : null;
+  useImperativeHandle(ref, () => ({
+    focusOnCoordinate: (coords: { latitude: number; longitude: number }) => {
+      inject(
+        "window.leafletBridge && window.leafletBridge.focusOn(" +
+        coords.latitude + "," + coords.longitude + ",15)"
+      );
+    },
+  }), [inject]);
+
+  const centerOnUser = useCallback(() => {
+    if (userLocation) {
+      inject(
+        "window.leafletBridge && window.leafletBridge.centerOnUser(" +
+        userLocation.latitude + "," + userLocation.longitude + ")"
+      );
+    }
+  }, [userLocation, inject]);
 
   return (
     <View style={styles.container}>
-      <MapView
-        ref={mapRef}
+      <WebView
+        ref={webViewRef}
+        source={{ html: LEAFLET_MAP_HTML, baseUrl: "" }}
         style={styles.map}
-        initialRegion={region}
-        provider={undefined}
-        customMapStyle={tileConfig ? undefined : DEFAULT_MAP_STYLE}
-        showsUserLocation={!!userLocation}
-        showsMyLocationButton={false}
-        onMapReady={handleMapReady}
-        onRegionChangeComplete={(region) => onRegionChangeComplete?.({ latitude: region.latitude, longitude: region.longitude })}
-      >
-        {tileConfig ? (
-          <UrlTile
-            key={resolvedProvider}
-            urlTemplate={tileConfig.urlTemplate}
-            maximumZ={tileConfig.maximumZ}
-            flipY={false}
-            shouldReplaceMapContent={tileConfig.shouldReplaceMapContent}
-          />
-        ) : null}
-
-        {filteredUsers.map((u) => {
-          const isCurrentUser = currentUserId != null && u.id === currentUserId;
-          const markerColor = getUserMarkerColor(u.userType, u.sex);
-          if (isCurrentUser) {
-            return (
-              <Marker
-                key={`user-${u.id}`}
-                coordinate={{ latitude: u.latitude, longitude: u.longitude }}
-                title={u.nickname}
-                description={u.country ? `${getCountryFlag(u.country)} ${getCountryName(u.country)}${u.region ? ` · ${u.region}` : ""}` : u.region || undefined}
-                onPress={() => onUserPress?.(u)}
-              >
-                <View style={currentUserMarkerStyles.wrapper}>
-                  <View style={[currentUserMarkerStyles.labelBadge, { backgroundColor: markerColor }]}>
-                    <Text style={currentUserMarkerStyles.labelText}>Tu</Text>
-                  </View>
-                  <View style={[currentUserMarkerStyles.pin, { backgroundColor: markerColor }]}>
-                    <MaterialCommunityIcons
-                      name={getUserMarkerIcon(u.userType)}
-                      size={18}
-                      color="#fff"
-                    />
-                  </View>
-                </View>
-              </Marker>
-            );
-          }
-          return (
-            <Marker
-              key={`user-${u.id}`}
-              coordinate={{ latitude: u.latitude, longitude: u.longitude }}
-              title={u.nickname}
-              description={u.country ? `${getCountryFlag(u.country)} ${getCountryName(u.country)}${u.region ? ` · ${u.region}` : ""}` : u.region || undefined}
-              pinColor={markerColor}
-              onPress={() => onUserPress?.(u)}
-            />
-          );
-        })}
-
-        {workshops.map((ws) => (
-          <Marker
-            key={`ws-${ws.id}`}
-            coordinate={{ latitude: ws.latitude, longitude: ws.longitude }}
-            title={ws.name}
-            pinColor="#FF6B00"
-          />
-        ))}
-
-        {showEventPins && filterEvents && eventPins.map((ep) => (
-          <Marker
-            key={`event-${ep.id}`}
-            coordinate={{ latitude: ep.latitude, longitude: ep.longitude }}
-            title={ep.title}
-            description={ep.eventDate ? ep.eventDate.substring(0, 10) : undefined}
-            onPress={() => onEventPress?.(ep.id)}
-          >
-            <View style={eventMarkerStyles.container}>
-              <MaterialCommunityIcons name="calendar-star" size={18} color="#fff" />
-            </View>
-          </Marker>
-        ))}
-
-        {filterClubs && clubPins.map((club) => (
-          <Marker
-            key={`club-${club.id}`}
-            coordinate={{ latitude: club.latitude, longitude: club.longitude }}
-            onCalloutPress={() => onClubPress?.(club)}
-          >
-            <View style={[clubMarkerStyles.container, club.isFictitious && clubMarkerStyles.containerFictitious]}>
-              <MaterialCommunityIcons name="shield-check" size={16} color="#fff" />
-              {club.isFictitious && <View style={clubMarkerStyles.fictitiousDot} />}
-            </View>
-            <Callout tooltip={false} onPress={() => onClubPress?.(club)}>
-              <View style={clubCalloutStyles.wrapper}>
-                {club.logoUrl ? (
-                  <Image source={{ uri: club.logoUrl }} style={clubCalloutStyles.logo} resizeMode="cover" />
-                ) : (
-                  <View style={clubCalloutStyles.logoPlaceholder}>
-                    <MaterialCommunityIcons name="shield-half-full" size={22} color={club.isFictitious ? "#607D8B" : "#009688"} />
-                  </View>
-                )}
-                <View style={clubCalloutStyles.info}>
-                  <Text style={clubCalloutStyles.name} numberOfLines={2}>{club.name}</Text>
-                  {club.memberCount > 0 && (
-                    <Text style={clubCalloutStyles.meta}>{club.memberCount} membri</Text>
-                  )}
-                  {club.isFictitious ? (
-                    <Text style={clubCalloutStyles.disclaimer}>⚠ Posizione indicativa – centro regione</Text>
-                  ) : (
-                    <Text style={clubCalloutStyles.confirmed}>✓ Sede confermata</Text>
-                  )}
-                  <View style={clubCalloutStyles.actions}>
-                    <Text style={clubCalloutStyles.actionOpen}>Apri club →</Text>
-                    {club.isFictitious && club.currentUserIsMember && onProposeClubLocation != null && (
-                      <TouchableOpacity
-                        onPress={(e) => { e.stopPropagation?.(); onProposeClubLocation(club); }}
-                        hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-                      >
-                        <Text style={clubCalloutStyles.actionPropose}>+ Proponi sede</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-              </View>
-            </Callout>
-          </Marker>
-        ))}
-
-        {easterEggs.map((egg) => (
-          <Marker
-            key={`egg-${egg.id}`}
-            coordinate={{ latitude: egg.latitude, longitude: egg.longitude }}
-            title={egg.name}
-            pinColor="#FFD700"
-            onPress={() => onEasterEggPress?.(egg)}
-          />
-        ))}
-
-        {isAvailable && !!userLocation && searchRadiusKm != null && searchRadiusKm > 0 && (
-          <Circle
-            center={userLocation}
-            radius={searchRadiusKm * 1000}
-            fillColor="rgba(255, 179, 0, 0.12)"
-            strokeColor="rgba(255, 179, 0, 0.5)"
-            strokeWidth={2}
-          />
-        )}
-
-        {activeSosRequests.map((sos) => (
-          <React.Fragment key={`sos-${sos.id}`}>
-            <Circle
-              center={{ latitude: sos.latitude, longitude: sos.longitude }}
-              radius={(sos.radiusKm || 10) * 1000}
-              fillColor="rgba(255, 0, 0, 0.30)"
-              strokeColor="rgba(255, 0, 0, 1)"
-              strokeWidth={4}
-            />
-            <Marker
-              coordinate={{ latitude: sos.latitude, longitude: sos.longitude }}
-              title={`SOS: ${sos.requesterNickname || "Utente"}`}
-              description={sos.reason}
-            >
-              <View style={sosMarkerStyles.container}>
-                <MaterialCommunityIcons name="alert" size={22} color="#fff" />
-                <Text style={sosMarkerStyles.label}>SOS</Text>
-              </View>
-            </Marker>
-          </React.Fragment>
-        ))}
-
-        {realMeMarker != null && (
-          <Marker
-            key="real-me-marker"
-            coordinate={{ latitude: realMeMarker.latitude, longitude: realMeMarker.longitude }}
-            title="RealMe"
-            description="La tua posizione GPS reale"
-          >
-            <View style={privacyMarkerStyles.wrapper}>
-              <View style={[privacyMarkerStyles.badge, { backgroundColor: "#2E7D32" }]}>
-                <Text style={privacyMarkerStyles.badgeText}>RealMe</Text>
-              </View>
-              <View style={[privacyMarkerStyles.dot, { backgroundColor: "#2E7D32" }]} />
-            </View>
-          </Marker>
-        )}
-
-        {fakeMeMarker != null && (
-          <Marker
-            key="fake-me-marker"
-            coordinate={{ latitude: fakeMeMarker.latitude, longitude: fakeMeMarker.longitude }}
-            title="FakeMe"
-            description="La tua posizione fittizia visibile agli altri"
-          >
-            <View style={privacyMarkerStyles.wrapper}>
-              <View style={[privacyMarkerStyles.badge, { backgroundColor: "#E65100" }]}>
-                <Text style={privacyMarkerStyles.badgeText}>FakeMe</Text>
-              </View>
-              <View style={[privacyMarkerStyles.dot, { backgroundColor: "#E65100" }]} />
-            </View>
-          </Marker>
-        )}
-      </MapView>
+        javaScriptEnabled={true}
+        domStorageEnabled={true}
+        originWhitelist={["*"]}
+        mixedContentMode="always"
+        onMessage={handleMessage}
+        scrollEnabled={false}
+        bounces={false}
+        overScrollMode="never"
+        allowFileAccess={true}
+        allowUniversalAccessFromFileURLs={true}
+        cacheEnabled={true}
+        startInLoadingState={false}
+      />
 
       {locationLoading && (
         <View style={styles.loadingOverlay}>
@@ -549,11 +384,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           onPress={onToggleFilterBiker}
           activeOpacity={0.7}
         >
-          <MaterialCommunityIcons
-            name="motorbike"
-            size={16}
-            color={filterBiker ? "#fff" : Colors.maleIcon}
-          />
+          <MaterialCommunityIcons name="motorbike" size={16} color={filterBiker ? "#fff" : Colors.maleIcon} />
           <Text style={[styles.filterText, filterBiker && styles.filterTextActive]}>Biker</Text>
         </TouchableOpacity>
 
@@ -562,11 +393,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           onPress={onToggleFilterZavorrina}
           activeOpacity={0.7}
         >
-          <MaterialCommunityIcons
-            name="seat-passenger"
-            size={16}
-            color={filterZavorrina ? "#fff" : Colors.femaleIcon}
-          />
+          <MaterialCommunityIcons name="seat-passenger" size={16} color={filterZavorrina ? "#fff" : Colors.femaleIcon} />
           <Text style={[styles.filterText, filterZavorrina && styles.filterTextActive]}>Zavorrina</Text>
         </TouchableOpacity>
 
@@ -576,11 +403,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
             onPress={onToggleFilterClubs}
             activeOpacity={0.7}
           >
-            <MaterialCommunityIcons
-              name="shield-check"
-              size={16}
-              color={filterClubs ? "#fff" : "#009688"}
-            />
+            <MaterialCommunityIcons name="shield-check" size={16} color={filterClubs ? "#fff" : "#009688"} />
             <Text style={[styles.filterText, filterClubs && styles.filterTextActive]}>Motoclub</Text>
           </TouchableOpacity>
         )}
@@ -591,22 +414,14 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
             onPress={onToggleFilterEvents}
             activeOpacity={0.7}
           >
-            <MaterialCommunityIcons
-              name="calendar-star"
-              size={16}
-              color={filterEvents ? "#fff" : "#F57C00"}
-            />
+            <MaterialCommunityIcons name="calendar-star" size={16} color={filterEvents ? "#fff" : "#F57C00"} />
             <Text style={[styles.filterText, filterEvents && styles.filterTextActive]}>Eventi</Text>
           </TouchableOpacity>
         )}
       </View>
 
       <View style={styles.controlsContainer}>
-        <TouchableOpacity
-          style={styles.locationButton}
-          onPress={centerOnUser}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity style={styles.locationButton} onPress={centerOnUser} activeOpacity={0.7}>
           <MaterialCommunityIcons name="crosshairs-gps" size={22} color={Colors.accent} />
         </TouchableOpacity>
 
@@ -654,6 +469,7 @@ const styles = StyleSheet.create({
   },
   map: {
     ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#1a1a1a",
   },
   loadingOverlay: {
     position: "absolute",
@@ -738,226 +554,5 @@ const styles = StyleSheet.create({
   availabilityText: {
     fontSize: 12,
     fontWeight: "600" as const,
-  },
-});
-
-const currentUserMarkerStyles = StyleSheet.create({
-  wrapper: {
-    alignItems: "center",
-  },
-  labelBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginBottom: 3,
-    ...Platform.select({
-      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.3, shadowRadius: 2 },
-      android: { elevation: 3 },
-      web: { boxShadow: "0px 1px 3px rgba(0,0,0,0.3)" },
-    }),
-  },
-  labelText: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "700" as const,
-    letterSpacing: 0.5,
-  },
-  pin: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#fff",
-    ...Platform.select({
-      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 3 },
-      android: { elevation: 5 },
-      web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.4)" },
-    }),
-  },
-});
-
-const sosMarkerStyles = StyleSheet.create({
-  container: {
-    backgroundColor: "#FF0000",
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    borderWidth: 2,
-    borderColor: "#fff",
-    elevation: 6,
-    ...Platform.select({
-      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 4 },
-      android: {},
-      web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.4)" },
-    }),
-  },
-  label: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "800" as const,
-    letterSpacing: 1,
-  },
-});
-
-const eventMarkerStyles = StyleSheet.create({
-  container: {
-    backgroundColor: "#FF8C00",
-    borderRadius: 18,
-    width: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#fff",
-    ...Platform.select({
-      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 3 },
-      android: { elevation: 5 },
-      web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.4)" },
-    }),
-  },
-});
-
-const clubCalloutStyles = StyleSheet.create({
-  wrapper: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    minWidth: 180,
-    maxWidth: 260,
-    padding: 4,
-  },
-  logo: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: "#009688",
-    flexShrink: 0,
-  },
-  logoPlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: "#607D8B",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F5F5F5",
-    flexShrink: 0,
-  },
-  info: {
-    flex: 1,
-    gap: 2,
-  },
-  name: {
-    fontWeight: "700" as const,
-    fontSize: 13,
-    color: "#111",
-  },
-  meta: {
-    fontSize: 11,
-    color: "#555",
-  },
-  disclaimer: {
-    fontSize: 10,
-    color: "#F57C00",
-    fontWeight: "600" as const,
-  },
-  confirmed: {
-    fontSize: 10,
-    color: "#009688",
-    fontWeight: "600" as const,
-  },
-  actions: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 4,
-    alignItems: "center",
-    flexWrap: "wrap",
-  },
-  actionOpen: {
-    fontSize: 10,
-    color: "#2979FF",
-    fontWeight: "600" as const,
-  },
-  actionPropose: {
-    fontSize: 10,
-    color: "#009688",
-    fontWeight: "600" as const,
-    textDecorationLine: "underline" as const,
-  },
-});
-
-const clubMarkerStyles = StyleSheet.create({
-  container: {
-    backgroundColor: "#009688",
-    borderRadius: 18,
-    width: 30,
-    height: 30,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#fff",
-    ...Platform.select({
-      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.35, shadowRadius: 3 },
-      android: { elevation: 5 },
-      web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.4)" },
-    }),
-  },
-  containerFictitious: {
-    backgroundColor: "#607D8B",
-  },
-  fictitiousDot: {
-    position: "absolute" as const,
-    top: -3,
-    right: -3,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#FF9800",
-    borderWidth: 1.5,
-    borderColor: "#fff",
-  },
-});
-
-const privacyMarkerStyles = StyleSheet.create({
-  wrapper: {
-    alignItems: "center",
-  },
-  badge: {
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 8,
-    marginBottom: 4,
-    borderWidth: 1.5,
-    borderColor: "#fff",
-    ...Platform.select({
-      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 2 },
-      android: { elevation: 4 },
-      web: { boxShadow: "0px 1px 3px rgba(0,0,0,0.35)" },
-    }),
-  },
-  badgeText: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "700" as const,
-    letterSpacing: 0.5,
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    borderWidth: 2,
-    borderColor: "#fff",
-    ...Platform.select({
-      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.3, shadowRadius: 2 },
-      android: { elevation: 3 },
-      web: { boxShadow: "0px 1px 2px rgba(0,0,0,0.3)" },
-    }),
   },
 });
