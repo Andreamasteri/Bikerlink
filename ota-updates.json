@@ -2291,6 +2291,27 @@
     "apkBuildId": null,
     "apkVersionCode": 23,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 47,
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-47 rv7.0.0: Music improvements — Last.fm prefetch, 4 nuovi generi, feedback suggerimenti",
+    "note": "Task #594: Last.fm auto-connessione all'avvio (prefetch cache in _layout.tsx), 4 nuovi generi radio (Epic Metal ⚔️, Anni 90 💿, Anime 🎌, Eurobeat 🏎️), LASTFM_TO_GENRE arricchito con ~25 nuovi sottogeneri, feedback 'Nessun genere trovato' in music.tsx e MiniPlayer.tsx. CURRENT_OTA_NUMBER=47.",
+    "releaseId": "7427ac78-9a77-414e-9b1d-9c5fabe5e013",
+    "bundleUrl": "private/ota/ota-1.47.0-1776273674218.js",
+    "updateGroupId": "3edfec0d-47e4-47a5-9b1e-3954ed949082",
+    "androidUpdateId": "019d922a-6f1e-7acd-b600-3c8123280206",
+    "iosUpdateId": null,
+    "commitBase": "6dc265ebcb4199d4af7857644940304f8bd7a4bb",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/3edfec0d-47e4-47a5-9b1e-3954ed949082",
+    "apkBuildId": null,
+    "apkVersionCode": 26,
+    "apkUrl": null,
     "status": "published"
   }
 ]
