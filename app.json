@@ -2,7 +2,7 @@
   "expo": {
     "name": "BikerLink",
     "slug": "bikerlink",
-    "version": "1.7.0",
+    "version": "1.8.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "bikerlink",
@@ -32,7 +32,7 @@
     },
     "android": {
       "package": "com.bikerlink.app",
-      "versionCode": 21,
+      "versionCode": 22,
       "config": {
         "googleMaps": {
           "apiKey": ""
