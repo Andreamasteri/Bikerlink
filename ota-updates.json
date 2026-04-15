@@ -2312,6 +2312,27 @@
     "apkBuildId": null,
     "apkVersionCode": 26,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 48,
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-48 rv7.0.0: Pallino flottante draggable - chat/notifiche overlay",
+    "note": "Task #598: FloatingWidget draggable 48pt, menu chat+notifiche, badge aggregato, persistenza posizione AsyncStorage, toggle admin + toggle per-utente in profilo. CURRENT_OTA_NUMBER=48.",
+    "releaseId": "84a07198-0b9c-45f6-ba4e-ca508cca0102",
+    "bundleUrl": "private/ota/ota-1.48.0-1776284645448.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "006610006c86b299a516b5e8456e98e9b88df565",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 26,
+    "apkUrl": null,
     "status": "published"
   }
 ]
