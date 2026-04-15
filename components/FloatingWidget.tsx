@@ -83,6 +83,11 @@ export default function FloatingWidget() {
   useEffect(() => {
     if (Platform.OS !== "android" || !isVisible || !hasOverlayPermission) return;
 
+    if (AppState.currentState === "active" && overlayActiveRef.current) {
+      OverlayNative.hideOverlay();
+      overlayActiveRef.current = false;
+    }
+
     const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
       const prevState = appStateRef.current;
       appStateRef.current = nextState;
