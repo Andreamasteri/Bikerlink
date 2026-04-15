@@ -36,7 +36,7 @@ const CURATED_GENRES = [
 const GENRE_TAG_MAP: Record<string, string> = {
   rock: "rock",
   metal: "metal",
-  "epic-metal": "symphonic metal",
+  "epic-metal": "epic metal",
   jazz: "jazz",
   electronic: "electronic",
   blues: "blues",
