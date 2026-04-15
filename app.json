@@ -32,7 +32,7 @@
     },
     "android": {
       "package": "com.bikerlink.app",
-      "versionCode": 23,
+      "versionCode": 24,
       "config": {
         "googleMaps": {
           "apiKey": ""
