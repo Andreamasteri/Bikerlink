@@ -51,6 +51,31 @@ fi
 echo "  ✔  Autorizzazione trovata — file eliminato (token monouso)"
 rm -f "$AUTH_FILE"
 
+# ── 2a. Sync versionCode: app.json → android/app/build.gradle ───────────────
+if command -v jq &>/dev/null && [ -f "app.json" ] && [ -f "android/app/build.gradle" ]; then
+  VERSION_CODE=$(jq -r '.expo.android.versionCode' app.json)
+  if [[ "$VERSION_CODE" =~ ^[0-9]+$ ]]; then
+    sed -i "s/versionCode [0-9][0-9]*/versionCode $VERSION_CODE/" android/app/build.gradle
+    ACTUAL=$(grep 'versionCode ' android/app/build.gradle | grep -oP '\d+' | head -1)
+    echo "  ✔  versionCode sincronizzato: $VERSION_CODE (app.json → build.gradle, verificato: $ACTUAL)"
+  else
+    echo "  ⚠  versionCode non trovato o non numerico in app.json — skip sync"
+  fi
+else
+  echo "  ⚠  jq o file mancanti — skip sync versionCode"
+fi
+
+# ── 2b. Guardia migrazioni DB ────────────────────────────────────────────────
+echo "  Avvio verifica schema DB vs migrazioni Phase 1..."
+if bash scripts/db-migration-guard.sh; then
+  echo "  ✔  Guardia migrazioni DB superata"
+else
+  echo ""
+  echo "  ✖  BUILD BLOCCATA — problemi rilevati dalla guardia migrazioni DB."
+  echo "  Correggere i problemi sopra prima di avviare la build."
+  exit 1
+fi
+
 # ── 3. Validazione profilo ──────────────────────────────────────────────────
 if [[ "$PROFILE" != "preview" && "$PROFILE" != "production" ]]; then
   echo "  ✖  Profilo non valido: '$PROFILE'"
