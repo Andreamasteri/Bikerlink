@@ -192,18 +192,22 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
 
   useEffect(() => {
     let cancelled = false;
+    let watchSub: Location.LocationSubscription | null = null;
+
     (async () => {
       try {
         if (Platform.OS === "web") {
           if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
+            const watchId = navigator.geolocation.watchPosition(
               (position) => {
                 if (cancelled) return;
                 setUserLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude });
                 setLocationLoading(false);
               },
-              () => { if (!cancelled) setLocationLoading(false); }
+              () => { if (!cancelled) setLocationLoading(false); },
+              { enableHighAccuracy: false, maximumAge: 30000, timeout: 10000 }
             );
+            return () => { navigator.geolocation.clearWatch(watchId); };
           } else {
             if (!cancelled) setLocationLoading(false);
           }
@@ -211,17 +215,27 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           const { status } = await Location.requestForegroundPermissionsAsync();
           if (cancelled) return;
           if (status === "granted") {
-            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-            if (cancelled) return;
-            setUserLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+            watchSub = await Location.watchPositionAsync(
+              { accuracy: Location.Accuracy.Balanced, timeInterval: 5000, distanceInterval: 10 },
+              (loc) => {
+                if (cancelled) return;
+                setUserLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+                setLocationLoading(false);
+              }
+            );
+          } else {
+            if (!cancelled) setLocationLoading(false);
           }
-          if (!cancelled) setLocationLoading(false);
         }
       } catch {
         if (!cancelled) setLocationLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+      watchSub?.remove();
+    };
   }, []);
 
   const filteredUsers = users.filter((u) => {
