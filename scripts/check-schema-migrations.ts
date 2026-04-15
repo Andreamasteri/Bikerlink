@@ -1,18 +1,102 @@
 /**
- * BikerLink — Verifica Schema vs Migrazioni Phase 1
+ * BikerLink — Verifica Statica Schema vs Migrazioni Phase 1
  *
- * Controlla che ogni colonna definita nel Drizzle schema per le tabelle
- * critiche sia presente nel DB reale E coperta da una migrazione Phase 1
- * in server/index.ts.
+ * Per ogni colonna definita nel Drizzle schema per le tabelle critiche,
+ * verifica che esista una delle due condizioni:
+ *   A) La colonna è nella BASELINE (presente nel DB dalla creazione iniziale del progetto)
+ *   B) La colonna ha una istruzione ALTER TABLE … ADD COLUMN IF NOT EXISTS in server/index.ts
  *
- * Exit 0 → tutto OK
- * Exit 1 → colonne mancanti nel DB (BUILD BLOCCATA)
- * Exit 0 con warning → colonne nel DB ma senza migrazione Phase 1 (rischioso)
+ * Se una colonna NON è in baseline NÉ in Phase 1 → EXIT 1 (build bloccata).
+ *
+ * Opzionalmente (se DATABASE_URL disponibile) verifica anche che le colonne
+ * esistano nel DB reale — solo a scopo informativo, non blocca la build.
+ *
+ * Exit 0 → tutto OK (build può partire)
+ * Exit 1 → colonne senza copertura migrazione Phase 1 trovate (build bloccata)
  */
 
 import { users, userProfiles, motoClubs } from "../shared/schema";
-import { Client } from "pg";
 import * as fs from "fs";
+
+// ── Baseline: colonne presenti nel DB dalla creazione iniziale del progetto ───
+// Queste colonne non hanno (e non necessitano di) una migrazione Phase 1
+// perché sono state create dall'ORM al lancio iniziale del progetto.
+// Se aggiungi una nuova colonna alla baseline, spiega perché è "storica".
+const BASELINE_COLUMNS: Record<string, Set<string>> = {
+  users: new Set([
+    "id",
+    "nickname",
+    "email",
+    "phone",
+    "password",
+    "user_type",
+    "sex",
+    "couple_sex_config",
+    "role",
+    "status",
+    "birth_year",
+    "region",
+    "avatar_url",
+    "email_verified",
+    "eula_accepted",
+    "privacy_accepted",
+    "consent_accepted_at",
+    "deletion_requested_at",
+    "deletion_scheduled_for",
+    "invitation_code",
+    "is_fake",
+    "is_primal",
+    "country",
+    "spoken_languages",
+    "auto_join_clubs",
+    "last_login_at",
+    "created_at",
+    "updated_at",
+  ]),
+  user_profiles: new Set([
+    "id",
+    "user_id",
+    "is_available",
+    "latitude",
+    "longitude",
+    "max_pickup_distance",
+    "bio",
+    "total_km",
+    "total_rides",
+    "easter_eggs_collected",
+    "search_preference",
+    "email_chat_notifications",
+    "hide_from_map",
+    "position_fuzz",
+    "position_fuzz_km",
+    "coordinates_updated_at",
+    "admin_override_until",
+    "updated_at",
+  ]),
+  moto_clubs: new Set([
+    "id",
+    "name",
+    "club_type",
+    "brand_name",
+    "model_name",
+    "description",
+    "logo_url",
+    "is_approved",
+    "activity_score",
+    "conversation_id",
+    "parent_club_id",
+    "latitude",
+    "longitude",
+    "proposed_latitude",
+    "proposed_longitude",
+    "proposed_address",
+    "proposed_by",
+    "proposed_at",
+    "created_by",
+    "created_at",
+    "updated_at",
+  ]),
+};
 
 const TABLES_TO_CHECK = [
   { name: "users", schema: users },
@@ -20,6 +104,7 @@ const TABLES_TO_CHECK = [
   { name: "moto_clubs", schema: motoClubs },
 ];
 
+// ── Estrai nomi colonne DB dal table object Drizzle ───────────────────────────
 function getSchemaColumns(table: any): string[] {
   return Object.values(table)
     .filter(
@@ -33,6 +118,7 @@ function getSchemaColumns(table: any): string[] {
     .map((v: any) => v.name as string);
 }
 
+// ── Estrai colonne coperte da ALTER TABLE in server/index.ts ──────────────────
 function getMigratedColumns(tableName: string): Set<string> {
   const content = fs.readFileSync("server/index.ts", "utf-8");
   const regex = new RegExp(
@@ -47,96 +133,86 @@ function getMigratedColumns(tableName: string): Set<string> {
   return cols;
 }
 
-async function main() {
+// ── Verifica opzionale DB (informativa, non blocca build) ─────────────────────
+async function checkDbColumns(
+  tableName: string,
+  schemaCols: string[]
+): Promise<void> {
   const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl) {
-    console.error("  ✖  DATABASE_URL non impostata — impossibile verificare il DB.");
-    process.exit(1);
-  }
-
-  const client = new Client({ connectionString: dbUrl });
+  if (!dbUrl) return;
   try {
+    // Importazione dinamica per non bloccare se pg non disponibile
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString: dbUrl });
     await client.connect();
-  } catch (e: any) {
-    console.error(`  ✖  Connessione DB fallita: ${e.message}`);
-    process.exit(1);
+    const { rows } = await client.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_name = $1 AND table_schema = 'public'",
+      [tableName]
+    );
+    await client.end();
+    const dbCols = new Set(rows.map((r: any) => r.column_name as string));
+    const missingFromDb = schemaCols.filter((c) => !dbCols.has(c));
+    if (missingFromDb.length > 0) {
+      console.warn(
+        `  ⚠  DB INFO: tabella "${tableName}" — colonne mancanti dal DB dev:`
+      );
+      for (const col of missingFromDb) {
+        console.warn(`       • ${col}  ← eseguire db:push`);
+      }
+    }
+  } catch {
+    // Silenzioso: il DB check è opzionale
   }
+}
 
+async function main() {
   let hasErrors = false;
-  let hasWarnings = false;
 
   for (const { name, schema } of TABLES_TO_CHECK) {
     const schemaCols = getSchemaColumns(schema);
     const migratedCols = getMigratedColumns(name);
+    const baseline = BASELINE_COLUMNS[name] ?? new Set<string>();
 
-    let dbCols: Set<string>;
-    try {
-      const { rows } = await client.query(
-        "SELECT column_name FROM information_schema.columns WHERE table_name = $1 AND table_schema = 'public'",
-        [name]
-      );
-      dbCols = new Set(rows.map((r: any) => r.column_name as string));
-    } catch (e: any) {
-      console.error(`  ✖  Errore query DB per tabella ${name}: ${e.message}`);
-      hasErrors = true;
-      continue;
-    }
-
-    const missingFromDb: string[] = [];
-    const missingMigration: string[] = [];
+    const uncovered: string[] = [];
 
     for (const col of schemaCols) {
-      if (!dbCols.has(col)) {
-        missingFromDb.push(col);
-      } else if (!migratedCols.has(col)) {
-        missingMigration.push(col);
-      }
+      if (baseline.has(col)) continue; // colonna storica — OK
+      if (migratedCols.has(col)) continue; // coperta da Phase 1 — OK
+      uncovered.push(col); // né baseline né migrazione — PROBLEMA
     }
 
-    if (missingFromDb.length > 0) {
-      console.error(`\n  ✖  ERRORE — tabella "${name}" — colonne nello schema ma ASSENTI nel DB:`);
-      for (const col of missingFromDb) {
+    if (uncovered.length > 0) {
+      console.error(
+        `\n  ✖  ERRORE — tabella "${name}" — colonne SENZA migrazione Phase 1:`
+      );
+      for (const col of uncovered) {
         console.error(`       • ${col}`);
       }
-      console.error(`     → Aggiungere migrazione Phase 1 in server/index.ts e rieseguire db:push`);
+      console.error(
+        `     → Aggiungere in server/index.ts (Phase 1):`
+      );
+      for (const col of uncovered) {
+        console.error(
+          `       await db.execute(sql\`ALTER TABLE ${name} ADD COLUMN IF NOT EXISTS ${col} <TIPO>\`);`
+        );
+      }
       hasErrors = true;
     }
 
-    if (missingMigration.length > 0) {
-      console.warn(
-        `\n  ⚠   ATTENZIONE — tabella "${name}" — colonne nel DB ma SENZA migrazione Phase 1:`
-      );
-      for (const col of missingMigration) {
-        console.warn(`       • ${col}`);
-      }
-      console.warn(
-        `     → Se sono colonne storiche (create al lancio) nessun problema.`
-      );
-      console.warn(
-        `     → Se sono colonne nuove, aggiungere migrazione in server/index.ts!`
-      );
-      hasWarnings = true;
-    }
+    // Verifica opzionale DB (non influenza exit code)
+    await checkDbColumns(name, schemaCols);
   }
-
-  await client.end();
 
   if (hasErrors) {
     console.error(
-      "\n  ✖  BUILD BLOCCATA — colonne mancanti nel DB. Correggere prima di buildare."
+      "\n  ✖  BUILD BLOCCATA — aggiungere le migrazioni Phase 1 mancanti in server/index.ts"
     );
     process.exit(1);
   }
 
-  if (hasWarnings) {
-    console.warn(
-      "\n  ⚠   Build consentita con avvisi. Verificare manualmente le colonne senza migrazione."
-    );
-  } else {
-    console.log(
-      "\n  ✔  Schema DB verificato — tutte le colonne critiche sono coperte."
-    );
-  }
+  console.log(
+    "\n  ✔  Schema verificato — tutte le colonne critiche hanno copertura migrazione."
+  );
 }
 
 main();

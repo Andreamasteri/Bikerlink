@@ -52,18 +52,28 @@ echo "  ✔  Autorizzazione trovata — file eliminato (token monouso)"
 rm -f "$AUTH_FILE"
 
 # ── 2a. Sync versionCode: app.json → android/app/build.gradle ───────────────
-if command -v jq &>/dev/null && [ -f "app.json" ] && [ -f "android/app/build.gradle" ]; then
-  VERSION_CODE=$(jq -r '.expo.android.versionCode' app.json)
-  if [[ "$VERSION_CODE" =~ ^[0-9]+$ ]]; then
-    sed -i "s/versionCode [0-9][0-9]*/versionCode $VERSION_CODE/" android/app/build.gradle
-    ACTUAL=$(grep 'versionCode ' android/app/build.gradle | grep -oP '\d+' | head -1)
-    echo "  ✔  versionCode sincronizzato: $VERSION_CODE (app.json → build.gradle, verificato: $ACTUAL)"
-  else
-    echo "  ⚠  versionCode non trovato o non numerico in app.json — skip sync"
-  fi
-else
-  echo "  ⚠  jq o file mancanti — skip sync versionCode"
+if ! command -v jq &>/dev/null; then
+  echo "  ✖  jq non trovato — impossibile sincronizzare versionCode."
+  echo "  Installare jq prima di eseguire build-apk.sh"
+  exit 1
 fi
+if [ ! -f "app.json" ]; then
+  echo "  ✖  app.json non trovato — impossibile leggere versionCode."
+  exit 1
+fi
+if [ ! -f "android/app/build.gradle" ]; then
+  echo "  ✖  android/app/build.gradle non trovato — eseguire prima 'git add -f android/'."
+  exit 1
+fi
+VERSION_CODE=$(jq -r '.expo.android.versionCode' app.json)
+if ! [[ "$VERSION_CODE" =~ ^[0-9]+$ ]]; then
+  echo "  ✖  versionCode in app.json non è un numero valido: '$VERSION_CODE'"
+  echo "  Verificare app.json → android.versionCode"
+  exit 1
+fi
+sed -i "s/versionCode [0-9][0-9]*/versionCode $VERSION_CODE/" android/app/build.gradle
+ACTUAL=$(grep 'versionCode ' android/app/build.gradle | grep -oP '\d+' | head -1)
+echo "  ✔  versionCode sincronizzato: $VERSION_CODE (app.json → build.gradle, verificato: $ACTUAL)"
 
 # ── 2b. Guardia migrazioni DB ────────────────────────────────────────────────
 echo "  Avvio verifica schema DB vs migrazioni Phase 1..."
