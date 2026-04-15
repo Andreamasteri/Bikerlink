@@ -150,3 +150,7 @@ NODE_ENV = "production"
 [userenv.shared]
 BIKERLINK_ADMIN_EMAIL = "admin@bikerlink.it"
 BIKERLINK_BACKEND_URL = "https://biker-link.replit.app"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
