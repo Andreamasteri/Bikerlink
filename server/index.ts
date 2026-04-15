@@ -719,6 +719,12 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] user_playlist_snapshots:", e);
         }
 
+        try {
+          await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS floating_widget_enabled BOOLEAN NOT NULL DEFAULT true`);
+        } catch (e) {
+          console.warn("[MIGRATION] users.floating_widget_enabled:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 
