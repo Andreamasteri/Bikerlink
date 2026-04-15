@@ -84,7 +84,12 @@ if ! [[ "$VERSION_CODE" =~ ^[0-9]+$ ]]; then
 fi
 sed -i "s/versionCode [0-9][0-9]*/versionCode $VERSION_CODE/" android/app/build.gradle
 ACTUAL=$(grep 'versionCode ' android/app/build.gradle | grep -oP '\d+' | head -1)
-echo "  ✔  versionCode sincronizzato: $VERSION_CODE (app.json → build.gradle, verificato: $ACTUAL)"
+if [ "$ACTUAL" != "$VERSION_CODE" ]; then
+  echo "  ✖  Sync versionCode FALLITO: atteso $VERSION_CODE, trovato '$ACTUAL' in build.gradle"
+  echo "  Il formato di build.gradle potrebbe essere cambiato — verificare la riga versionCode."
+  exit 1
+fi
+echo "  ✔  versionCode sincronizzato e verificato: $VERSION_CODE (app.json → build.gradle)"
 
 # ── 3. Validazione profilo ──────────────────────────────────────────────────
 if [[ "$PROFILE" != "preview" && "$PROFILE" != "production" ]]; then
