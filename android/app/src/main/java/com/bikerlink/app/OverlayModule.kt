@@ -26,13 +26,19 @@ class OverlayModule(private val reactContext: ReactApplicationContext) :
     @ReactMethod
     fun requestPermission() {
         val intent = Intent(
-            Settings.ACTION_MANAGE_OVERLAY_PERMISSION
+            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            android.net.Uri.parse("package:${reactContext.packageName}")
         ).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         try {
             reactContext.startActivity(intent)
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+            val fallback = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            try { reactContext.startActivity(fallback) } catch (_: Exception) {}
+        }
     }
 
     @ReactMethod

@@ -207,7 +207,7 @@ class OverlayService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "BikerLink Widget",
+                "BikerLink Overlay",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 setSound(null, null)

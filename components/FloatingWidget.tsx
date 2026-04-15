@@ -47,6 +47,11 @@ export default function FloatingWidget() {
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const overlayActiveRef = useRef(false);
 
+  const unreadChatRef = useRef(unreadChat);
+  const unreadNotifRef = useRef(unreadNotifications);
+  useEffect(() => { unreadChatRef.current = unreadChat; }, [unreadChat]);
+  useEffect(() => { unreadNotifRef.current = unreadNotifications; }, [unreadNotifications]);
+
   const openMenu = useCallback(() => {
     menuOpenRef.current = true;
     setMenuOpen(true);
@@ -83,10 +88,10 @@ export default function FloatingWidget() {
       appStateRef.current = nextState;
 
       if (
-        (prevState === "active") &&
+        prevState === "active" &&
         (nextState === "background" || nextState === "inactive")
       ) {
-        OverlayNative.showOverlay(unreadChat, unreadNotifications);
+        OverlayNative.showOverlay(unreadChatRef.current, unreadNotifRef.current);
         overlayActiveRef.current = true;
       } else if (nextState === "active" && overlayActiveRef.current) {
         OverlayNative.hideOverlay();
@@ -101,7 +106,7 @@ export default function FloatingWidget() {
         overlayActiveRef.current = false;
       }
     };
-  }, [isVisible, hasOverlayPermission, unreadChat, unreadNotifications]);
+  }, [isVisible, hasOverlayPermission]);
 
   useEffect(() => {
     if (Platform.OS !== "android" || !overlayActiveRef.current) return;
