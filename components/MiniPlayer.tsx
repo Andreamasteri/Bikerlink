@@ -167,7 +167,7 @@ function RadioTab({
     queryKey: ["/api/music/radio/genres"],
   });
 
-  const { data: suggestedGenreIds = [] } = useQuery<string[]>({
+  const { data: suggestedGenreIds = [], isFetched: suggestedFetched } = useQuery<string[]>({
     queryKey: ["/api/music/radio/suggested-genres"],
     enabled: useLastFm,
   });
@@ -202,6 +202,11 @@ function RadioTab({
           thumbColor={useLastFm ? Colors.accent : Colors.textSecondary}
         />
       </View>
+      {useLastFm && suggestedFetched && suggestedGenreIds.length === 0 && (
+        <Text style={radioStyles.lastFmEmpty}>
+          Nessun genere trovato. Ascolta più musica su Last.fm!
+        </Text>
+      )}
 
       <Text style={radioStyles.sectionTitle}>Generi</Text>
       <View style={radioStyles.genreGrid}>
@@ -546,6 +551,15 @@ const radioStyles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  lastFmEmpty: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontStyle: "italic" as const,
+    textAlign: "center" as const,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
   },
   sectionTitle: {
     fontFamily: "Inter_600SemiBold",
