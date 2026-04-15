@@ -2333,6 +2333,27 @@
     "apkBuildId": null,
     "apkVersionCode": 26,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 49,
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-49 rv7.0.0: Pallino flottante draggable + Music improvements (EAS fix OTA-48)",
+    "note": "Retry di OTA-48 (EAS era in timeout). Contenuto: Task #598 FloatingWidget draggable 48pt + Task #594 Music improvements. CURRENT_OTA_NUMBER=49.",
+    "releaseId": "b1558b29-19df-4596-ba65-3967ac7e4bdf",
+    "bundleUrl": "private/ota/ota-1.49.0-1776285546745.js",
+    "updateGroupId": "e644309f-8a32-476a-9978-a2c157e01e51",
+    "androidUpdateId": "019d92df-222c-73a9-9e42-b30bcb78dcff",
+    "iosUpdateId": null,
+    "commitBase": "9363fdb3ff8f0655fed1ae0fd850a1e6aec5dbb8",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/e644309f-8a32-476a-9978-a2c157e01e51",
+    "apkBuildId": null,
+    "apkVersionCode": 26,
+    "apkUrl": null,
     "status": "published"
   }
 ]
