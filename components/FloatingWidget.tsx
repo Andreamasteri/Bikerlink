@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Pressable,
   Dimensions,
   Platform,
+  AppState,
+  AppStateStatus,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,13 +18,14 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFloatingWidget } from "@/lib/floating-widget-context";
 import { useTheme } from "@/lib/theme-context";
+import { OverlayNative } from "@/lib/overlay-native";
 
 const WIDGET_SIZE = 48;
 const POSITION_KEY = "floating_widget_position";
 const TAP_THRESHOLD = 5;
 
 export default function FloatingWidget() {
-  const { isVisible, unreadChat, unreadNotifications } = useFloatingWidget();
+  const { isVisible, unreadChat, unreadNotifications, hasOverlayPermission } = useFloatingWidget();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -40,6 +43,9 @@ export default function FloatingWidget() {
   const [isTouching, setIsTouching] = useState(false);
   const dragDistanceRef = useRef(0);
   const menuOpacity = useRef(new Animated.Value(0)).current;
+
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const overlayActiveRef = useRef(false);
 
   const openMenu = useCallback(() => {
     menuOpenRef.current = true;
@@ -68,6 +74,39 @@ export default function FloatingWidget() {
       setPositionLoaded(true);
     });
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== "android" || !isVisible || !hasOverlayPermission) return;
+
+    const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
+      const prevState = appStateRef.current;
+      appStateRef.current = nextState;
+
+      if (
+        (prevState === "active") &&
+        (nextState === "background" || nextState === "inactive")
+      ) {
+        OverlayNative.showOverlay(unreadChat, unreadNotifications);
+        overlayActiveRef.current = true;
+      } else if (nextState === "active" && overlayActiveRef.current) {
+        OverlayNative.hideOverlay();
+        overlayActiveRef.current = false;
+      }
+    });
+
+    return () => {
+      subscription.remove();
+      if (overlayActiveRef.current) {
+        OverlayNative.hideOverlay();
+        overlayActiveRef.current = false;
+      }
+    };
+  }, [isVisible, hasOverlayPermission, unreadChat, unreadNotifications]);
+
+  useEffect(() => {
+    if (Platform.OS !== "android" || !overlayActiveRef.current) return;
+    OverlayNative.updateBadges(unreadChat, unreadNotifications);
+  }, [unreadChat, unreadNotifications]);
 
   const panResponder = useRef(
     PanResponder.create({

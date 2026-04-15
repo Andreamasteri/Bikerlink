@@ -1,18 +1,23 @@
-import React, { createContext, useContext, useMemo } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
+import { OverlayNative } from "@/lib/overlay-native";
 
 interface FloatingWidgetContextType {
   isVisible: boolean;
   unreadChat: number;
   unreadNotifications: number;
+  hasOverlayPermission: boolean;
+  requestOverlayPermission: () => void;
 }
 
 const FloatingWidgetContext = createContext<FloatingWidgetContextType>({
   isVisible: false,
   unreadChat: 0,
   unreadNotifications: 0,
+  hasOverlayPermission: false,
+  requestOverlayPermission: () => {},
 });
 
 export function useFloatingWidget() {
@@ -52,8 +57,40 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
     return notificationsData.filter((n) => !n.isRead).length;
   }, [notificationsData]);
 
+  const [hasOverlayPermission, setHasOverlayPermission] = useState(false);
+  const permissionRequestedRef = useRef(false);
+
+  useEffect(() => {
+    if (Platform.OS !== "android" || !isVisible) return;
+    OverlayNative.checkPermission().then(setHasOverlayPermission);
+  }, [isVisible]);
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    if (!isVisible || hasOverlayPermission || permissionRequestedRef.current) return;
+    permissionRequestedRef.current = true;
+    OverlayNative.requestPermission();
+    const timer = setTimeout(() => {
+      OverlayNative.checkPermission().then(setHasOverlayPermission);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [isVisible, hasOverlayPermission]);
+
+  const requestOverlayPermission = () => {
+    OverlayNative.requestPermission();
+    setTimeout(() => {
+      OverlayNative.checkPermission().then(setHasOverlayPermission);
+    }, 2000);
+  };
+
   return (
-    <FloatingWidgetContext.Provider value={{ isVisible, unreadChat, unreadNotifications }}>
+    <FloatingWidgetContext.Provider value={{
+      isVisible,
+      unreadChat,
+      unreadNotifications,
+      hasOverlayPermission,
+      requestOverlayPermission,
+    }}>
       {children}
     </FloatingWidgetContext.Provider>
   );
