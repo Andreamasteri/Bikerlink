@@ -2,15 +2,23 @@
 # ═══════════════════════════════════════════════════════════════════════════
 #  BikerLink — DB Migration Guard
 #
-#  Verifica che tutte le colonne definite nello schema Drizzle per le
-#  tabelle critiche (users, user_profiles, moto_clubs) siano:
-#    1. Presenti nel database reale (dev) → EXIT 1 se mancanti
-#    2. Coperte da una migrazione Phase 1 in server/index.ts → AVVISO
+#  Verifica STATICA che tutte le colonne definite nello schema Drizzle per
+#  le tabelle critiche (users, user_profiles, moto_clubs) siano coperte da:
+#    A) la lista baseline (colonne storiche, presenti dalla creazione del DB)
+#    B) una istruzione ALTER TABLE … ADD COLUMN IF NOT EXISTS in server/index.ts
+#
+#  Comportamento:
+#    EXIT 1 → colonne nel schema NON in baseline NÉ in Phase 1 (build bloccata)
+#    EXIT 0 → tutte le colonne sono coperte (build può procedere)
+#
+#  Il controllo DB (via information_schema) è puramente informativo:
+#  mostra avvisi se colonne mancano nel DB dev, ma NON influenza l'exit code.
 #
 #  Uso diretto:
 #    bash scripts/db-migration-guard.sh
 #
-#  Viene chiamato automaticamente da build-apk.sh prima di avviare la build.
+#  Viene chiamato automaticamente da build-apk.sh dopo il controllo del token
+#  di autorizzazione, prima del sync versionCode e della build EAS.
 # ═══════════════════════════════════════════════════════════════════════════
 
 set -euo pipefail
@@ -21,13 +29,11 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 echo ""
 echo "  ┌─ Guardia Migrazioni DB ───────────────────────────────────────────"
 
-# Verifica che tsx sia disponibile
 if ! command -v npx &>/dev/null; then
   echo "  ✖  npx non trovato — impossibile eseguire la guardia."
   exit 1
 fi
 
-# Esegui lo script TypeScript di verifica
 cd "$PROJECT_ROOT"
 npx tsx scripts/check-schema-migrations.ts
 EXIT_CODE=$?

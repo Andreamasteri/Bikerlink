@@ -51,7 +51,18 @@ fi
 echo "  ✔  Autorizzazione trovata — file eliminato (token monouso)"
 rm -f "$AUTH_FILE"
 
-# ── 2a. Sync versionCode: app.json → android/app/build.gradle ───────────────
+# ── 2a. Guardia migrazioni DB (primo step post-auth) ────────────────────────
+echo "  Avvio verifica schema DB vs migrazioni Phase 1..."
+if bash scripts/db-migration-guard.sh; then
+  echo "  ✔  Guardia migrazioni DB superata"
+else
+  echo ""
+  echo "  ✖  BUILD BLOCCATA — problemi rilevati dalla guardia migrazioni DB."
+  echo "  Correggere i problemi sopra prima di avviare la build."
+  exit 1
+fi
+
+# ── 2b. Sync versionCode: app.json → android/app/build.gradle ───────────────
 if ! command -v jq &>/dev/null; then
   echo "  ✖  jq non trovato — impossibile sincronizzare versionCode."
   echo "  Installare jq prima di eseguire build-apk.sh"
@@ -74,17 +85,6 @@ fi
 sed -i "s/versionCode [0-9][0-9]*/versionCode $VERSION_CODE/" android/app/build.gradle
 ACTUAL=$(grep 'versionCode ' android/app/build.gradle | grep -oP '\d+' | head -1)
 echo "  ✔  versionCode sincronizzato: $VERSION_CODE (app.json → build.gradle, verificato: $ACTUAL)"
-
-# ── 2b. Guardia migrazioni DB ────────────────────────────────────────────────
-echo "  Avvio verifica schema DB vs migrazioni Phase 1..."
-if bash scripts/db-migration-guard.sh; then
-  echo "  ✔  Guardia migrazioni DB superata"
-else
-  echo ""
-  echo "  ✖  BUILD BLOCCATA — problemi rilevati dalla guardia migrazioni DB."
-  echo "  Correggere i problemi sopra prima di avviare la build."
-  exit 1
-fi
 
 # ── 3. Validazione profilo ──────────────────────────────────────────────────
 if [[ "$PROFILE" != "preview" && "$PROFILE" != "production" ]]; then
