@@ -6,16 +6,6 @@ const BEACON_LAST_KEY = "last_startup_beacon";
 const BEACON_SENT_KEY = "last_startup_beacon_sent";
 const API_PATH = "/api/admin/startup-beacon";
 
-function postBeacon(payload: Record<string, unknown>): void {
-  try {
-    fetch(new URL(API_PATH, getApiUrl()).toString(), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    }).catch(() => {});
-  } catch {}
-}
-
 export function sendStartupBeacon(step: string, data?: Record<string, unknown>): void {
   const ts = Date.now();
   const payload: Record<string, unknown> = {
@@ -47,8 +37,17 @@ export async function recoverLastBeacon(): Promise<void> {
       AsyncStorage.getItem(BEACON_SENT_KEY),
     ]);
     if (!last || last === sent) return;
-    await AsyncStorage.setItem(BEACON_SENT_KEY, last);
     const payload = JSON.parse(last) as Record<string, unknown>;
-    postBeacon({ ...payload, recovered: true });
+    try {
+      fetch(new URL(API_PATH, getApiUrl()).toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, recovered: true }),
+      })
+        .then(() => {
+          AsyncStorage.setItem(BEACON_SENT_KEY, last).catch(() => {});
+        })
+        .catch(() => {});
+    } catch {}
   } catch {}
 }
