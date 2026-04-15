@@ -37,7 +37,7 @@ interface StartupBeaconEntry {
   receivedAt: string;
 }
 const startupBeacons: StartupBeaconEntry[] = [];
-const BEACONS_MAX = 100;
+const BEACONS_MAX = 50;
 
 interface ClubAssignStats {
   assigned: number;

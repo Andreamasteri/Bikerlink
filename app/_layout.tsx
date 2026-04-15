@@ -331,8 +331,10 @@ export default function RootLayout() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    sendStartupBeacon("layout_mount");
-    recoverLastBeacon();
+    (async () => {
+      await recoverLastBeacon();
+      sendStartupBeacon("layout_mount");
+    })();
   }, []);
 
   useEffect(() => {

@@ -2,8 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import { getApiUrl } from "@/lib/query-client";
 
-const BEACON_LAST_KEY = "sb_last";
-const BEACON_SENT_KEY = "sb_sent";
+const BEACON_LAST_KEY = "last_startup_beacon";
+const BEACON_SENT_KEY = "last_startup_beacon_sent";
 const API_PATH = "/api/admin/startup-beacon";
 
 function postBeacon(payload: Record<string, unknown>): void {
@@ -27,7 +27,17 @@ export function sendStartupBeacon(step: string, data?: Record<string, unknown>):
   };
   const payloadStr = JSON.stringify(payload);
   AsyncStorage.setItem(BEACON_LAST_KEY, payloadStr).catch(() => {});
-  postBeacon(payload);
+  try {
+    fetch(new URL(API_PATH, getApiUrl()).toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then(() => {
+        AsyncStorage.setItem(BEACON_SENT_KEY, payloadStr).catch(() => {});
+      })
+      .catch(() => {});
+  } catch {}
 }
 
 export async function recoverLastBeacon(): Promise<void> {
@@ -37,9 +47,8 @@ export async function recoverLastBeacon(): Promise<void> {
       AsyncStorage.getItem(BEACON_SENT_KEY),
     ]);
     if (!last || last === sent) return;
+    await AsyncStorage.setItem(BEACON_SENT_KEY, last);
     const payload = JSON.parse(last) as Record<string, unknown>;
-    const recovered = { ...payload, recovered: true };
-    postBeacon(recovered);
-    AsyncStorage.setItem(BEACON_SENT_KEY, last).catch(() => {});
+    postBeacon({ ...payload, recovered: true });
   } catch {}
 }
