@@ -48,6 +48,7 @@ import { ThemeProvider, useTheme } from "@/lib/theme-context";
 import { PlayerProvider } from "@/lib/player-context";
 import UptimeWidget from "@/components/UptimeWidget";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { sendStartupBeacon, recoverLastBeacon } from "@/lib/startup-beacon";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -89,8 +90,11 @@ function AppStateHandler() {
     async function startNativeWatcher() {
       if (locationWatcherRef.current) return;
       try {
+        sendStartupBeacon("gps_check_start");
         const { status } = await Location.getForegroundPermissionsAsync();
         if (status !== "granted" || cancelled) return;
+        sendStartupBeacon("watch_position_start");
+        let cbFired = false;
         locationWatcherRef.current = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.Balanced,
@@ -98,6 +102,10 @@ function AppStateHandler() {
             distanceInterval: 20,
           },
           async (loc) => {
+            if (!cbFired) {
+              cbFired = true;
+              sendStartupBeacon("watch_position_callback");
+            }
             try {
               await apiRequest("PUT", "/api/users/location", {
                 latitude: loc.coords.latitude,
@@ -119,6 +127,7 @@ function AppStateHandler() {
     sendHeartbeat();
     heartbeatTimerRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
 
+    sendStartupBeacon("app_state_handler_mount");
     if (Platform.OS === "web") {
       sendWebLocation();
       webLocationTimerRef.current = setInterval(sendWebLocation, 30000);
@@ -322,6 +331,11 @@ export default function RootLayout() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    sendStartupBeacon("layout_mount");
+    recoverLastBeacon();
+  }, []);
+
+  useEffect(() => {
     const forceReady = () => {
       setReady(true);
       SplashScreen.hideAsync().catch(() => {});
@@ -330,6 +344,7 @@ export default function RootLayout() {
     const timeout = setTimeout(forceReady, 5000);
 
     if (fontsLoaded || fontError) {
+      sendStartupBeacon("fonts_ready");
       clearTimeout(timeout);
       forceReady();
     }

@@ -27,6 +27,18 @@ interface OtaErrorEntry {
 const otaErrors: OtaErrorEntry[] = [];
 const OTA_ERRORS_MAX = 50;
 
+interface StartupBeaconEntry {
+  step: string;
+  ts: number;
+  isoTime: string;
+  recovered: boolean;
+  platform?: string;
+  data?: Record<string, unknown>;
+  receivedAt: string;
+}
+const startupBeacons: StartupBeaconEntry[] = [];
+const BEACONS_MAX = 100;
+
 interface ClubAssignStats {
   assigned: number;
   skipped: number;
@@ -105,7 +117,43 @@ router.post("/ota-error", (req: Request, res: Response) => {
   }
 });
 
+router.post("/startup-beacon", (req: Request, res: Response) => {
+  try {
+    const { step, ts, recovered, platform, ...rest } = req.body as {
+      step?: string;
+      ts?: number;
+      recovered?: boolean;
+      platform?: string;
+      [key: string]: unknown;
+    };
+    if (!step) return res.status(400).json({ message: "step is required" });
+    const tsNum = typeof ts === "number" ? ts : Date.now();
+    const entry: StartupBeaconEntry = {
+      step: String(step).substring(0, 100),
+      ts: tsNum,
+      isoTime: new Date(tsNum).toISOString(),
+      recovered: !!recovered,
+      platform: platform ? String(platform).substring(0, 16) : undefined,
+      data: Object.keys(rest).length > 0 ? rest as Record<string, unknown> : undefined,
+      receivedAt: new Date().toISOString(),
+    };
+    startupBeacons.push(entry);
+    if (startupBeacons.length > BEACONS_MAX) startupBeacons.splice(0, startupBeacons.length - BEACONS_MAX);
+    console.log(`[BEACON]${entry.recovered ? " RECOVERED" : ""} step=${entry.step} platform=${entry.platform ?? "?"} t=${entry.isoTime}${entry.data ? " data=" + JSON.stringify(entry.data) : ""}`);
+    return res.json({ ok: true });
+  } catch {
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 router.use(requireAdmin);
+
+router.get("/startup-beacon", (_req: Request, res: Response) => {
+  return res.json({
+    count: startupBeacons.length,
+    beacons: [...startupBeacons].reverse(),
+  });
+});
 
 router.post("/verify-password", async (req: Request, res: Response) => {
   try {

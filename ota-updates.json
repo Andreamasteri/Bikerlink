@@ -2271,5 +2271,26 @@
     "apkVersionCode": 20,
     "apkUrl": null,
     "status": "building"
+  },
+  {
+    "updateNumber": 46,
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-46 beacon diagnostico crash nativo",
+    "note": "Sistema beacon di avvio: ogni step critico (layout_mount, fonts_ready, location_provider_mount, gps_check_start, watch_position_start, interactive_map_mount, mapview_ready, fetch_gps_start, gps_permission_result) invia beacon al backend. AsyncStorage preserva lultimo beacon in caso di crash nativo. CURRENT_OTA_NUMBER=46.",
+    "releaseId": "d883d098-8a05-4897-acbe-4caea34ae988",
+    "bundleUrl": "private/ota/ota-1.46.0-1776250473888.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "2c0fb104f731b61cd14825b93b111a5acd23beba",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 23,
+    "apkUrl": null,
+    "status": "published"
   }
 ]

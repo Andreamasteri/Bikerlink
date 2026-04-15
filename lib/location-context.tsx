@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { Platform, AppState, AppStateStatus } from "react-native";
 import * as Location from "expo-location";
 import { useQuery } from "@tanstack/react-query";
+import { sendStartupBeacon } from "@/lib/startup-beacon";
 
 interface LocationContextType {
   hasLocationPermission: boolean;
@@ -88,6 +89,10 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       setHasPermission(true);
       return true;
     }
+  }, []);
+
+  useEffect(() => {
+    sendStartupBeacon("location_provider_mount");
   }, []);
 
   useEffect(() => {

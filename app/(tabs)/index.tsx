@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { sendStartupBeacon } from "@/lib/startup-beacon";
 import {
   View,
   Text,
@@ -200,6 +201,7 @@ export default function MapScreen() {
         });
       } else {
         const { status } = await Location.requestForegroundPermissionsAsync();
+        sendStartupBeacon("gps_permission_result", { status });
         if (status !== "granted") return null;
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
@@ -227,6 +229,7 @@ export default function MapScreen() {
     let cancelled = false;
     async function initMapLocation() {
       try {
+        sendStartupBeacon("fetch_gps_start");
         if (user?.region) {
           if (!cancelled) setLocation(getRegionCoordinates(user.region, user.country));
           if (!cancelled) setLocationLoading(false);

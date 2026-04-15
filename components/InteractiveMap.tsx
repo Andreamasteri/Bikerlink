@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
+import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   View,
@@ -238,6 +239,10 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     (resolvedProvider === "carto_light" || resolvedProvider === "carto_dark");
 
   useEffect(() => {
+    sendStartupBeacon("interactive_map_mount");
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
@@ -319,6 +324,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   }, [userLocation, mapIsReady, initialCenterOverride]);
 
   const handleMapReady = useCallback(() => {
+    sendStartupBeacon("mapview_ready");
     onReady?.();
     setMapIsReady(true);
   }, [onReady]);

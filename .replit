@@ -9,10 +9,6 @@ deploymentTarget = "autoscale"
 build = ["bash", "scripts/deploy-build.sh"]
 run = ["node", "server_dist/index.js"]
 
-[[ports]]
-localPort = 5000
-externalPort = 80
-
 [env]
 PORT = "5000"
 
