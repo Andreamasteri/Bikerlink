@@ -714,6 +714,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/floating-widget", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("floating_widget_enabled");
+      res.json({ enabled: setting?.value !== "false" });
+    } catch {
+      res.json({ enabled: true });
+    }
+  });
+
   app.get("/api/settings/all", async (_req, res) => {
     try {
       const [syneco, emailVerification, chatbot, autoMatching, customRoutes, paypal, sosEnabled, mapsEnabled, mapsProvider] = await Promise.all([

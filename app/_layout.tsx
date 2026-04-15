@@ -46,6 +46,8 @@ import { MapSettingsProvider, useMapConfig } from "@/lib/map-context";
 import { TaskbarStyleProvider } from "@/lib/taskbar-style-context";
 import { ThemeProvider, useTheme } from "@/lib/theme-context";
 import { PlayerProvider } from "@/lib/player-context";
+import { FloatingWidgetProvider } from "@/lib/floating-widget-context";
+import FloatingWidget from "@/components/FloatingWidget";
 import UptimeWidget from "@/components/UptimeWidget";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { sendStartupBeacon, recoverLastBeacon } from "@/lib/startup-beacon";
@@ -274,9 +276,9 @@ function AdminUptimeOverlay() {
 function LanguageKeyedRoot() {
   const { renderKey } = useLanguage();
   return (
-    <GestureHandlerRootView style={{ flex: 1 }} key={renderKey}>
+    <View style={{ flex: 1 }} key={renderKey}>
       <RootLayoutNav />
-    </GestureHandlerRootView>
+    </View>
   );
 }
 
@@ -398,6 +400,8 @@ export default function RootLayout() {
               <TaskbarStyleProvider>
               <LocationProvider>
                 <PlayerProvider>
+                <FloatingWidgetProvider>
+                <GestureHandlerRootView style={{ flex: 1 }}>
                 <StartupGate ready={ready}>
                   <OtaStartupChecker />
                   <MapReadyGate>
@@ -406,6 +410,9 @@ export default function RootLayout() {
                     <LanguageKeyedRoot />
                   </MapReadyGate>
                 </StartupGate>
+                <FloatingWidget />
+                </GestureHandlerRootView>
+                </FloatingWidgetProvider>
                 </PlayerProvider>
               </LocationProvider>
               </TaskbarStyleProvider>

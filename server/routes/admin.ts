@@ -946,7 +946,7 @@ router.put("/settings/disable-feature", async (req: Request, res: Response) => {
 router.put("/settings/toggle-protected", async (req: Request, res: Response) => {
   try {
     const { key, value, adminPassword } = req.body;
-    const allowedKeys = ["email_verification_enabled", "ads_enabled", "syneco_branding_visible", "donation_enabled", "donation_text", "gps_required", "marketplace_enabled", "fake_users_enabled", "ghost_mode_enabled", "phone_field_enabled", "user_available_on_login"];
+    const allowedKeys = ["email_verification_enabled", "ads_enabled", "syneco_branding_visible", "donation_enabled", "donation_text", "gps_required", "marketplace_enabled", "fake_users_enabled", "ghost_mode_enabled", "phone_field_enabled", "user_available_on_login", "floating_widget_enabled"];
 
     if (!allowedKeys.includes(key)) {
       return res.status(400).json({ message: "Chiave non valida" });
@@ -3792,6 +3792,37 @@ router.patch("/settings/bg-location", async (req: Request, res: Response) => {
     return res.json({ message: "Impostazioni background location aggiornate" });
   } catch (error) {
     console.error("Update bg-location settings error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/settings/floating-widget", async (_req: Request, res: Response) => {
+  try {
+    const setting = await storage.getAppSetting("floating_widget_enabled");
+    return res.json({ enabled: setting?.value !== "false" });
+  } catch (error) {
+    console.error("Get floating-widget setting error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.patch("/settings/floating-widget", async (req: Request, res: Response) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== "boolean") {
+      return res.status(400).json({ message: "enabled deve essere un booleano" });
+    }
+    await storage.upsertAppSetting("floating_widget_enabled", enabled ? "true" : "false");
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_setting",
+      targetType: "setting",
+      targetId: "floating_widget_enabled",
+      details: `Widget flottante ${enabled ? "abilitato" : "disabilitato"}`,
+    });
+    return res.json({ enabled });
+  } catch (error) {
+    console.error("Update floating-widget setting error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

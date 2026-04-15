@@ -181,6 +181,7 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
     if (b.region !== undefined) userUpdate.region = b.region;
     if (b.country !== undefined) userUpdate.country = b.country;
     if (b.avatarUrl !== undefined) userUpdate.avatarUrl = b.avatarUrl;
+    if (b.floatingWidgetEnabled !== undefined) userUpdate.floatingWidgetEnabled = !!b.floatingWidgetEnabled;
 
     if (Object.keys(userUpdate).length > 0) {
       if (userUpdate.nickname) {

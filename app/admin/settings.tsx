@@ -297,6 +297,7 @@ export default function AdminSettings() {
   const [mapsExpanded, setMapsExpanded] = useState(false);
   const [docsExpanded, setDocsExpanded] = useState(false);
   const [bgLocationExpanded, setBgLocationExpanded] = useState(false);
+  const [floatingWidgetExpanded, setFloatingWidgetExpanded] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem("uptime_widget_enabled").then((val) => {
@@ -578,6 +579,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/ghost-mode-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/phone-field-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/user-available-on-login"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/floating-widget"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
       setProtectedToggle(null);
       setProtectedPassword("");
@@ -828,6 +830,12 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
   });
+
+  const { data: floatingWidgetData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/floating-widget"],
+    staleTime: 30_000,
+  });
+  const floatingWidgetEnabled = floatingWidgetData?.enabled !== false;
 
   const coordMaxAgeMutation = useMutation({
     mutationFn: async (seconds: string) => {
@@ -2698,6 +2706,38 @@ export default function AdminSettings() {
               downloadEndpoint="/api/privacy-policy/download"
               uploadEndpoint="/api/admin/privacy-policy/upload"
             />
+          </View>
+        )}
+      </View>
+
+      <View style={styles.accordionPanel}>
+        <Pressable style={styles.accordionPanelHeader} onPress={() => setFloatingWidgetExpanded((v) => !v)}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="radio-button-on" size={20} color={Colors.accent} />
+            <Text style={styles.accordionPanelTitle}>Widget Flottante</Text>
+          </View>
+          <Ionicons name={floatingWidgetExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+        </Pressable>
+        {floatingWidgetExpanded && (
+          <View style={styles.accordionPanelContent}>
+            <View style={styles.paidCard}>
+              <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 14, lineHeight: 18 }}>
+                Il widget flottante è un pallino draggabile visibile sopra ogni schermata (solo su app nativa). Mostra badge con messaggi e notifiche non letti e permette accesso rapido a Chat e Notifiche. Se disabilitato qui, nessun utente lo vedrà indipendentemente dalla propria preferenza.
+              </Text>
+              <View style={styles.synecoHeader}>
+                <View style={styles.synecoInfo}>
+                  <Ionicons name="radio-button-on" size={20} color={Colors.accent} />
+                  <Text style={styles.synecoLabel}>Widget abilitato globalmente</Text>
+                </View>
+                <Switch
+                  value={floatingWidgetEnabled}
+                  onValueChange={(val) => setProtectedToggle({ key: "floating_widget_enabled", value: val, label: "Widget Flottante" })}
+                  trackColor={{ false: Colors.border, true: Colors.accent }}
+                  thumbColor="#fff"
+                  disabled={protectedToggleMutation.isPending}
+                />
+              </View>
+            </View>
           </View>
         )}
       </View>
