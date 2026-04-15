@@ -193,12 +193,13 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   useEffect(() => {
     let cancelled = false;
     let watchSub: Location.LocationSubscription | null = null;
+    let webWatchId: number | null = null;
 
     (async () => {
       try {
         if (Platform.OS === "web") {
           if (navigator.geolocation) {
-            const watchId = navigator.geolocation.watchPosition(
+            webWatchId = navigator.geolocation.watchPosition(
               (position) => {
                 if (cancelled) return;
                 setUserLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude });
@@ -207,7 +208,6 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
               () => { if (!cancelled) setLocationLoading(false); },
               { enableHighAccuracy: false, maximumAge: 30000, timeout: 10000 }
             );
-            return () => { navigator.geolocation.clearWatch(watchId); };
           } else {
             if (!cancelled) setLocationLoading(false);
           }
@@ -235,6 +235,9 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     return () => {
       cancelled = true;
       watchSub?.remove();
+      if (webWatchId != null && typeof navigator !== "undefined" && navigator.geolocation) {
+        navigator.geolocation.clearWatch(webWatchId);
+      }
     };
   }, []);
 
@@ -374,14 +377,11 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
         style={styles.map}
         javaScriptEnabled={true}
         domStorageEnabled={true}
-        originWhitelist={["*"]}
-        mixedContentMode="always"
+        originWhitelist={["https://*", "http://*", "about:*"]}
         onMessage={handleMessage}
         scrollEnabled={false}
         bounces={false}
         overScrollMode="never"
-        allowFileAccess={true}
-        allowUniversalAccessFromFileURLs={true}
         cacheEnabled={true}
         startInLoadingState={false}
       />
