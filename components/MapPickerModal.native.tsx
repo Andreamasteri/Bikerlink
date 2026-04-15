@@ -1,6 +1,6 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from "react-native";
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import MapView, { Marker, Polyline } from "react-native-maps";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
@@ -58,7 +58,7 @@ export default function MapPickerContent({ coord, onCoordChange, onConfirm, onCl
         key={`map-${region.latitude}-${region.longitude}`}
         style={{ flex: 1 }}
         initialRegion={region}
-        provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
+        provider={undefined}
         onPress={(e: any) => onCoordChange(e.nativeEvent.coordinate)}
       >
         {existingPolyline.length > 1 && (

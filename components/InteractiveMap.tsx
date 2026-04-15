@@ -8,7 +8,7 @@ import {
   Text,
   ActivityIndicator,
 } from "react-native";
-import MapView, { Marker, Callout, Circle, UrlTile, Region, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Marker, Callout, Circle, UrlTile, Region } from "react-native-maps";
 import { Image } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
@@ -331,7 +331,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
         ref={mapRef}
         style={styles.map}
         initialRegion={region}
-        provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
+        provider={undefined}
         customMapStyle={tileConfig ? undefined : DEFAULT_MAP_STYLE}
         showsUserLocation={!!userLocation}
         showsMyLocationButton={false}
