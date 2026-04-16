@@ -138,6 +138,7 @@ export default function FloatingWidget() {
   }, [closeMenu, router]);
 
 
+  console.log("[FloatingWidget] isVisible:", isVisible, "positionLoaded:", positionLoaded, "Platform:", Platform.OS);
   if (!isVisible || !positionLoaded) return null;
   if (Platform.OS === "web") return null;
 

@@ -2635,7 +2635,29 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-16T15:20:32.688Z"
+  },
+  {
+    "updateNumber": 63,
+    "version": "1.63.0",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-63 rv7.0.0: Fix pallino (rimozione query instabile) + Fix giochi arcade (delta time, safe area, score caps)",
+    "note": "Fix FloatingWidget: rimossa query adminSetting verso URL inesistente (/api/settings/floating-widget), isVisible ora dipende solo da isLoggedIn+userEnabled+!isWeb+!suppressed. Aggiunto console.log diagnostico. Fix giochi (Task #624): delta time per velocità uniforme a 120Hz, safe area insets, SCORE_CAPS alzati. CURRENT_OTA_NUMBER=63.",
+    "releaseId": "2b3e4fb4-0fbb-4173-91c8-090a3fb16cc1",
+    "bundleUrl": "private/ota/ota-1.63.0-1776366711331.js",
+    "updateGroupId": "26b898e2-9b65-46e5-9912-03957acf4abc",
+    "androidUpdateId": "019d97b5-fe99-7941-b2b8-2947237c6744",
+    "iosUpdateId": null,
+    "commitBase": "96430ec4efadbdd93a8002323e1671257bba7450",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/26b898e2-9b65-46e5-9912-03957acf4abc",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-16T19:11:54.246Z"
   }
 ]

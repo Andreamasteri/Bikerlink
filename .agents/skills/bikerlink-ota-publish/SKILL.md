@@ -148,7 +148,7 @@ Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare 
   - APK v20: FAILED — fix strings.xml runtimeVersion 7.0.0 + rimozione ACCESS_BACKGROUND_LOCATION + rollback completo Task #564
   - APK v21–v27: build successive fino alla versione stabile
   - APK v28: STABILE — background location tracking (Task #607) + OTA 53–62
-  - APK v29: STABILE — expo-notifications nativo + versionCode 29 + versionName 1.9.4 (EAS: 2680c671, APK: https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk)
+  - APK v29: STABILE — expo-notifications nativo + versionCode 29 + versionName 1.9.4 (EAS: 2680c671, APK: https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk) + OTA 63–
 
 ## ⚠️ ANALISI ARCHITETTURA (DEFINITIVA)
 React Native 0.82+ ha rimosso il supporto Old Architecture. Il flag newArchEnabled=false
