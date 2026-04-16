@@ -2440,5 +2440,26 @@
     "apkVersionCode": 28,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 54,
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-54 rv7.0.0: Fix code review — BackgroundPermissionPrompter, revocation banner, stop-on-revoke, no any",
+    "note": "Task #607 fix code-review: (1) BackgroundPermissionPrompter — chiede permesso Always una volta sola (AsyncStorage guard + check admin enabled) dopo 5s dal login con fg permission granted. (2) BackgroundRevocationBanner — banner assoluto con useSafeAreaInsets, colore accent, testo guida; stopBackgroundLocationTask() immediato su revoca. (3) AppStateHandler — stop task se !hasBackgroundPermission (non solo return). (4) Fix any in TaskManager.defineTask — tipo esplicito { data: { locations: Location.LocationObject[] }; error: TaskManager.TaskManagerError | null }. (5) Rimosso ACCESS_BACKGROUND_LOCATION da app.json.permissions — rimane solo in AndroidManifest.xml nativo. CURRENT_OTA_NUMBER=54.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": null,
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 28,
+    "apkUrl": null,
+    "status": "pending"
   }
 ]

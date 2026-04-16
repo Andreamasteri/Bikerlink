@@ -104,13 +104,21 @@ async function fetchAndCacheSettings(domain: string): Promise<{
   return defaults;
 }
 
-TaskManager.defineTask(BACKGROUND_LOCATION_TASK_NAME, async ({ data, error }: any) => {
+TaskManager.defineTask(
+  BACKGROUND_LOCATION_TASK_NAME,
+  async ({
+    data,
+    error,
+  }: {
+    data: { locations: Location.LocationObject[] };
+    error: TaskManager.TaskManagerError | null;
+  }) => {
   if (error) {
     return;
   }
 
   try {
-    const { locations } = data as { locations: Location.LocationObject[] };
+    const { locations } = data;
     if (!locations || locations.length === 0) return;
 
     const location = locations[locations.length - 1];

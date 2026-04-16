@@ -10,10 +10,11 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
 import { getApiUrl } from "@/lib/query-client";
-import { Platform, AppState, ActivityIndicator, View, StyleSheet } from "react-native";
+import { Platform, AppState, ActivityIndicator, View, Text, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import * as Updates from "expo-updates";
-import Colors from "@/constants/colors";
+
 
 if (Platform.OS === "web" && typeof window !== "undefined") {
   const link = document.createElement("link");
@@ -182,11 +183,10 @@ function AppStateHandler() {
 
   useEffect(() => {
     if (Platform.OS === "web") return;
-    if (!user) {
+    if (!user || !hasBackgroundPermission) {
       stopBackgroundLocationTask().catch(() => {});
       return;
     }
-    if (!hasBackgroundPermission) return;
 
     async function maybeStartBgTask() {
       try {
@@ -217,6 +217,84 @@ function AppStateHandler() {
   }, [user, hasBackgroundPermission]);
 
   return null;
+}
+
+function BackgroundPermissionPrompter() {
+  const { user } = useAuth();
+  const {
+    hasLocationPermission,
+    hasBackgroundPermission,
+    backgroundPermissionRevoked,
+    requestBackgroundPermission,
+  } = useLocationGate();
+  const promptedRef = useRef(false);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    if (!user) return;
+    if (!hasLocationPermission) return;
+    if (hasBackgroundPermission) return;
+    if (backgroundPermissionRevoked) return;
+    if (promptedRef.current) return;
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      if (cancelled) return;
+      try {
+        const alreadyPrompted = await AsyncStorage.getItem("@bikerlink/bg_location_prompted");
+        if (alreadyPrompted === "true" || cancelled) return;
+        promptedRef.current = true;
+
+        const domain = process.env.EXPO_PUBLIC_DOMAIN || "biker-link.replit.app";
+        try {
+          const res = await fetch(`https://${domain}/api/admin/settings/bg-location`, {
+            credentials: "include",
+          });
+          if (res.ok) {
+            const s = await res.json();
+            if (s.enabled === false) return;
+          }
+        } catch {}
+
+        await AsyncStorage.setItem("@bikerlink/bg_location_prompted", "true");
+        requestBackgroundPermission().catch(() => {});
+      } catch {}
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [user, hasLocationPermission, hasBackgroundPermission, backgroundPermissionRevoked, requestBackgroundPermission]);
+
+  return null;
+}
+
+function BackgroundRevocationBanner() {
+  const { backgroundPermissionRevoked } = useLocationGate();
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    if (backgroundPermissionRevoked) {
+      stopBackgroundLocationTask().catch(() => {});
+    }
+  }, [backgroundPermissionRevoked]);
+
+  if (!backgroundPermissionRevoked || Platform.OS === "web") return null;
+
+  return (
+    <View
+      style={[
+        revocationBannerStyles.banner,
+        { top: insets.top, backgroundColor: colors.accent },
+      ]}
+    >
+      <Text style={revocationBannerStyles.text}>
+        Posizione in background disattivata — vai in Impostazioni {">"} Permessi {">"} Sempre
+      </Text>
+    </View>
+  );
 }
 
 function StartupGate({ ready, children }: { ready: boolean; children: React.ReactNode }) {
@@ -449,6 +527,8 @@ export default function RootLayout() {
                   <OtaStartupChecker />
                   <MapReadyGate>
                     <AppStateHandler />
+                    <BackgroundPermissionPrompter />
+                    <BackgroundRevocationBanner />
                     <AdminUptimeOverlay />
                     <LanguageKeyedRoot />
                   </MapReadyGate>
@@ -473,6 +553,22 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+});
+
+const revocationBannerStyles = StyleSheet.create({
+  banner: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    zIndex: 9999,
+  },
+  text: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    textAlign: "center",
   },
 });
 
