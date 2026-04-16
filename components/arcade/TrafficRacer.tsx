@@ -52,12 +52,31 @@ export default function TrafficRacer({ onGameOver }: Props) {
     });
   }, []);
 
+  const laneSwitchedRef = useRef(false);
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onPanResponderRelease: (_, gs) => {
-        if (gs.dx > 30) moveLane(1);
-        else if (gs.dx < -30) moveLane(-1);
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        laneSwitchedRef.current = false;
+      },
+      onPanResponderMove: (_, gs) => {
+        if (!laneSwitchedRef.current) {
+          if (gs.dx > 30) {
+            laneSwitchedRef.current = true;
+            moveLane(1);
+          } else if (gs.dx < -30) {
+            laneSwitchedRef.current = true;
+            moveLane(-1);
+          }
+        }
+      },
+      onPanResponderRelease: () => {
+        laneSwitchedRef.current = false;
+      },
+      onPanResponderTerminate: () => {
+        laneSwitchedRef.current = false;
       },
     })
   ).current;

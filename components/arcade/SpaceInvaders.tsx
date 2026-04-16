@@ -78,18 +78,32 @@ export default function SpaceInvaders({ onGameOver }: Props) {
   }, []);
 
   const gestureStartX = useRef(W / 2 - SHIP_W / 2);
+  const hasMoved = useRef(false);
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
         gestureStartX.current = shipXRef.current;
-        shoot();
+        hasMoved.current = false;
       },
       onPanResponderMove: (_, gs) => {
+        if (Math.abs(gs.dx) > 10) {
+          hasMoved.current = true;
+        }
         const next = Math.max(0, Math.min(W - SHIP_W, gestureStartX.current + gs.dx));
         shipXRef.current = next;
         setShipX(next);
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (!hasMoved.current && Math.abs(gs.dx) < 10) {
+          shoot();
+        }
+        hasMoved.current = false;
+      },
+      onPanResponderTerminate: () => {
+        hasMoved.current = false;
       },
     })
   ).current;

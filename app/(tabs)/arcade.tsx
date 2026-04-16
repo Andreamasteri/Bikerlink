@@ -16,9 +16,10 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useNavigation } from "expo-router";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import Colors from "@/constants/colors";
+import { useFloatingWidget } from "@/lib/floating-widget-context";
 
 import EndlessBiker from "@/components/arcade/EndlessBiker";
 import TrafficRacer from "@/components/arcade/TrafficRacer";
@@ -250,6 +251,8 @@ function HallOfFameView() {
 export default function ArcadeScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ tab?: string; game?: string }>();
+  const { suppressWidget } = useFloatingWidget();
+  const navigation = useNavigation();
   const [hubTab, setHubTab] = useState<HubTab>(
     params.tab === "leaderboard" ? "leaderboard" : params.tab === "hof" ? "hof" : "games"
   );
@@ -261,6 +264,17 @@ export default function ArcadeScreen() {
   );
   const [gameKey, setGameKey] = useState(0);
   const [gameOver, setGameOver] = useState<{ score: number; prevBest: number } | null>(null);
+
+  useEffect(() => {
+    suppressWidget(!!activeGame);
+    return () => { suppressWidget(false); };
+  }, [activeGame, suppressWidget]);
+
+  useEffect(() => {
+    navigation.setOptions({
+      tabBarStyle: activeGame ? { display: "none" } : undefined,
+    });
+  }, [activeGame, navigation]);
 
   useEffect(() => {
     if (params.tab === "leaderboard") {

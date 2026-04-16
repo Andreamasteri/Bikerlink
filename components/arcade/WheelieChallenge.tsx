@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Dimensions,
   Pressable,
+  Animated,
 } from "react-native";
 import Colors from "@/constants/colors";
 
@@ -25,6 +26,7 @@ export default function WheelieChallenge({ onGameOver }: Props) {
   const [wheelieTime, setWheelieTime] = useState(0);
   const [inZone, setInZone] = useState(false);
   const [zoneHalf, setZoneHalf] = useState(ZONE_HALF_START);
+  const tapScaleAnim = useRef(new Animated.Value(1)).current;
 
   const angleRef = useRef(0.5);
   const velRef = useRef(0);
@@ -39,7 +41,11 @@ export default function WheelieChallenge({ onGameOver }: Props) {
   const tap = useCallback(() => {
     if (!runningRef.current) return;
     velRef.current -= TAP_FORCE;
-  }, []);
+    Animated.sequence([
+      Animated.timing(tapScaleAnim, { toValue: 0.88, duration: 80, useNativeDriver: true }),
+      Animated.timing(tapScaleAnim, { toValue: 1, duration: 120, useNativeDriver: true }),
+    ]).start();
+  }, [tapScaleAnim]);
 
   useEffect(() => {
     const loop = (ts: number) => {
@@ -111,9 +117,11 @@ export default function WheelieChallenge({ onGameOver }: Props) {
 
       <Text style={styles.angleLabel}>{Math.round(angle * 100)}°</Text>
 
-      <Pressable style={[styles.tapBtn, inZone && styles.tapBtnActive]} onPress={tap}>
-        <Text style={styles.tapBtnText}>TAP 🖐️</Text>
-      </Pressable>
+      <Animated.View style={{ transform: [{ scale: tapScaleAnim }] }}>
+        <Pressable style={[styles.tapBtn, inZone && styles.tapBtnActive]} onPress={tap}>
+          <Text style={styles.tapBtnText}>TAP 🖐️</Text>
+        </Pressable>
+      </Animated.View>
 
       <Text style={styles.hint}>Tappa per alzare la ruota anteriore</Text>
     </View>
@@ -169,12 +177,16 @@ const styles = StyleSheet.create({
   angleLabel: { fontSize: 14, color: "rgba(255,255,255,0.4)", fontFamily: "Inter_400Regular", marginBottom: 32 },
   tapBtn: {
     backgroundColor: "#1e3a5f",
-    paddingVertical: 24,
-    paddingHorizontal: 60,
+    minWidth: 160,
+    minHeight: 80,
+    paddingVertical: 20,
+    paddingHorizontal: 48,
     borderRadius: 20,
     borderWidth: 2,
     borderColor: "#2962b8",
     marginBottom: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
   tapBtnActive: { backgroundColor: "#2962b8", borderColor: "#4CAF50" },
   tapBtnText: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#fff" },

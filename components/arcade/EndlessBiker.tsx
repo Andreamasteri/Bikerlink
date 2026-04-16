@@ -134,17 +134,31 @@ export default function EndlessBiker({ onGameOver }: Props) {
     return () => cancelAnimationFrame(frameRef.current);
   }, []);
 
+  const isDuckGestureRef = useRef(false);
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: (_, gs) => {
-        jump();
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        isDuckGestureRef.current = false;
       },
       onPanResponderMove: (_, gs) => {
-        if (gs.dy > 30) duck(true);
+        if (!isDuckGestureRef.current && gs.dy > 30) {
+          isDuckGestureRef.current = true;
+          duck(true);
+        }
       },
-      onPanResponderRelease: () => {
+      onPanResponderRelease: (_, gs) => {
+        if (!isDuckGestureRef.current && Math.abs(gs.dy) < 30) {
+          jump();
+        }
         duck(false);
+        isDuckGestureRef.current = false;
+      },
+      onPanResponderTerminate: () => {
+        duck(false);
+        isDuckGestureRef.current = false;
       },
     })
   ).current;

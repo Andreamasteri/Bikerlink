@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
@@ -10,6 +10,7 @@ interface FloatingWidgetContextType {
   unreadNotifications: number;
   hasOverlayPermission: boolean;
   requestOverlayPermission: () => void;
+  suppressWidget: (suppress: boolean) => void;
 }
 
 const FloatingWidgetContext = createContext<FloatingWidgetContextType>({
@@ -18,6 +19,7 @@ const FloatingWidgetContext = createContext<FloatingWidgetContextType>({
   unreadNotifications: 0,
   hasOverlayPermission: false,
   requestOverlayPermission: () => {},
+  suppressWidget: () => {},
 });
 
 export function useFloatingWidget() {
@@ -26,6 +28,7 @@ export function useFloatingWidget() {
 
 export function FloatingWidgetProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const [suppressed, setSuppressed] = useState(false);
 
   const { data: adminSetting } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/floating-widget"],
@@ -37,7 +40,7 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
   const isLoggedIn = !!user;
   const isWeb = Platform.OS === "web";
 
-  const isVisible = isLoggedIn && adminEnabled && userEnabled && !isWeb;
+  const isVisible = isLoggedIn && adminEnabled && userEnabled && !isWeb && !suppressed;
 
   const { data: unreadChatData } = useQuery<{ count: number }>({
     queryKey: ["/api/chat/unread-total"],
@@ -78,6 +81,10 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
     OverlayNative.requestPermission();
   };
 
+  const suppressWidget = useCallback((suppress: boolean) => {
+    setSuppressed(suppress);
+  }, []);
+
   return (
     <FloatingWidgetContext.Provider value={{
       isVisible,
@@ -85,6 +92,7 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
       unreadNotifications,
       hasOverlayPermission,
       requestOverlayPermission,
+      suppressWidget,
     }}>
       {children}
     </FloatingWidgetContext.Provider>
