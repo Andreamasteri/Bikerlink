@@ -14,8 +14,8 @@ description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
 - **Canale EAS**: `preview`
-- **Runtime Version**: `7.0.0` (ciclo corrente, APK v28)
-- **APK corrente**: versionCode 28 (ultima stabile con background location)
+- **Runtime Version**: `7.0.0` (ciclo corrente, APK v29)
+- **APK corrente**: versionCode **29** (expo-notifications nativo, build EAS: 2680c671-a1d5-494b-943b-7d0bccc96725)
 - **Utenti**: su Android fisico via APK — NON usano il dev server
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
@@ -52,7 +52,7 @@ const CURRENT_OTA_NUMBER = <VECCHIO>;  // → <NUOVO>
 Il commento sopra va tenuto generico:
 ```typescript
 // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-// Ciclo 7.0.0 — APK v28 — aggiornare ad ogni nuova OTA pubblicata
+// Ciclo 7.0.0 — APK v29 — aggiornare ad ogni nuova OTA pubblicata
 const CURRENT_OTA_NUMBER = 56;
 ```
 
@@ -147,7 +147,8 @@ Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare 
   - APK v19: FAILED — CRASH avvio: strings.xml expo_runtime_version=4.0.0 (doveva essere 7.0.0) + ACCESS_BACKGROUND_LOCATION in manifest
   - APK v20: FAILED — fix strings.xml runtimeVersion 7.0.0 + rimozione ACCESS_BACKGROUND_LOCATION + rollback completo Task #564
   - APK v21–v27: build successive fino alla versione stabile
-  - APK v28: STABILE (corrente) — background location tracking (Task #607) + OTA 53–55
+  - APK v28: STABILE — background location tracking (Task #607) + OTA 53–62
+  - APK v29: IN BUILD (EAS: 2680c671) — expo-notifications nativo + versionCode 29 + versionName 1.9.4
 
 ## ⚠️ ANALISI ARCHITETTURA (DEFINITIVA)
 React Native 0.82+ ha rimosso il supporto Old Architecture. Il flag newArchEnabled=false
