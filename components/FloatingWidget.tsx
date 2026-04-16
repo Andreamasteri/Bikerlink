@@ -11,6 +11,7 @@ import {
   Platform,
   AppState,
   AppStateStatus,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -186,6 +187,17 @@ export default function FloatingWidget() {
     router.push("/(tabs)/music");
   }, [closeMenu, router]);
 
+  const handlePermissionBannerPress = useCallback(() => {
+    Alert.alert(
+      "Permesso necessario",
+      'Per mostrare il pallino quando esci dall\'app, concedi il permesso "Mostra sopra le altre app".\n\n📱 Dove trovarlo:\nInfo App → Avanzate → "Mostra sopra le altre app"\n\n⚠️ Non è in Permessi → Posizione. Cerca specificamente "Mostra sopra le altre app".',
+      [
+        { text: "Annulla", style: "cancel" },
+        { text: "Apri Impostazioni", onPress: requestOverlayPermission },
+      ]
+    );
+  }, [requestOverlayPermission]);
+
   if (!isVisible || !positionLoaded) return null;
   if (Platform.OS === "web") return null;
 
@@ -283,16 +295,24 @@ export default function FloatingWidget() {
               borderColor: colors.border,
             },
           ]}
-          onPress={requestOverlayPermission}
+          onPress={handlePermissionBannerPress}
         >
-          <Ionicons name="notifications-outline" size={16} color={colors.accent} />
-          <Text
-            style={[styles.permissionBannerText, { color: colors.textSecondary ?? colors.text }]}
-            numberOfLines={1}
-          >
-            Attiva widget in background
-          </Text>
-          <Text style={[styles.permissionBannerCta, { color: colors.accent }]}>Attiva</Text>
+          <Ionicons name="layers-outline" size={18} color={colors.accent} />
+          <View style={styles.permissionBannerContent}>
+            <Text
+              style={[styles.permissionBannerText, { color: colors.text }]}
+              numberOfLines={1}
+            >
+              Attiva widget in background
+            </Text>
+            <Text
+              style={[styles.permissionBannerSub, { color: colors.textSecondary ?? colors.text }]}
+              numberOfLines={1}
+            >
+              Cerca "Mostra sopra le altre app"
+            </Text>
+          </View>
+          <Text style={[styles.permissionBannerCta, { color: colors.accent }]}>Attiva →</Text>
         </Pressable>
       )}
     </>
@@ -403,10 +423,18 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
-  permissionBannerText: {
+  permissionBannerContent: {
     flex: 1,
+    gap: 2,
+  },
+  permissionBannerText: {
     fontSize: 13,
-    fontWeight: "500" as const,
+    fontWeight: "600" as const,
+  },
+  permissionBannerSub: {
+    fontSize: 11,
+    fontWeight: "400" as const,
+    opacity: 0.75,
   },
   permissionBannerCta: {
     fontSize: 13,

@@ -1,8 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
-import { OverlayNative } from "@/lib/overlay-native";
+import { OverlayNative, overlayNativeSupported } from "@/lib/overlay-native";
+
+const OVERLAY_PROMPTED_KEY = "overlay_permission_prompted";
 
 interface FloatingWidgetContextType {
   isVisible: boolean;
@@ -69,17 +72,27 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
 
   useEffect(() => {
     if (Platform.OS !== "android") return;
-    const sub = AppState.addEventListener("change", (state: AppStateStatus) => {
+    const sub = AppState.addEventListener("change", async (state: AppStateStatus) => {
       if (state === "active") {
-        OverlayNative.checkPermission().then(setHasOverlayPermission);
+        const hasPermission = await OverlayNative.checkPermission();
+        if (!hasPermission && !overlayNativeSupported) {
+          const wasPrompted = await AsyncStorage.getItem(OVERLAY_PROMPTED_KEY);
+          if (wasPrompted === "true") {
+            await AsyncStorage.removeItem(OVERLAY_PROMPTED_KEY);
+            setHasOverlayPermission(true);
+            return;
+          }
+        }
+        setHasOverlayPermission(hasPermission);
       }
     });
     return () => sub.remove();
   }, []);
 
-  const requestOverlayPermission = () => {
+  const requestOverlayPermission = useCallback(async () => {
+    await AsyncStorage.setItem(OVERLAY_PROMPTED_KEY, "true");
     OverlayNative.requestPermission();
-  };
+  }, []);
 
   const suppressWidget = useCallback((suppress: boolean) => {
     setSuppressed(suppress);

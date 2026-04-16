@@ -5,6 +5,8 @@ const { BikerLinkOverlay } = NativeModules;
 
 const isSupported = Platform.OS === "android" && !!BikerLinkOverlay;
 
+export const overlayNativeSupported = isSupported;
+
 export const OverlayNative = {
   checkPermission: (): Promise<boolean> => {
     if (!isSupported) return Promise.resolve(false);
