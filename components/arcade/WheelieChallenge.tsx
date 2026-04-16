@@ -7,6 +7,7 @@ import {
   Pressable,
   Animated,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 
 const { width: W } = Dimensions.get("window");
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export default function WheelieChallenge({ onGameOver }: Props) {
+  const insets = useSafeAreaInsets();
   const [angle, setAngle] = useState(0.5);
   const [wheelieTime, setWheelieTime] = useState(0);
   const [inZone, setInZone] = useState(false);
@@ -54,12 +56,14 @@ export default function WheelieChallenge({ onGameOver }: Props) {
       lastTime.current = ts;
       if (dt > 200) { frameRef.current = requestAnimationFrame(loop); return; }
 
-      velRef.current += GRAVITY_FORCE;
-      const dir = angleRef.current > 0.5 ? 1 : -1;
-      velRef.current += dir * OSCILLATOR_FORCE * (Math.random() * 2 - 1);
-      velRef.current *= 0.97;
+      const k = dt / 16.67;
 
-      angleRef.current = Math.max(0, Math.min(1, angleRef.current + velRef.current));
+      velRef.current += GRAVITY_FORCE * k;
+      const dir = angleRef.current > 0.5 ? 1 : -1;
+      velRef.current += dir * OSCILLATOR_FORCE * k * (Math.random() * 2 - 1);
+      velRef.current *= Math.pow(0.97, k);
+
+      angleRef.current = Math.max(0, Math.min(1, angleRef.current + velRef.current * k));
 
       const now = Date.now();
 
@@ -104,7 +108,7 @@ export default function WheelieChallenge({ onGameOver }: Props) {
   const zoneRight = (ZONE_CENTER + zoneHalf) * (W - 40) + 20;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <Text style={styles.title}>🏍️ Wheelie Challenge</Text>
       <Text style={styles.score}>{wheelieTime}s</Text>
       <Text style={styles.label}>Mantieni l'impennata nella zona verde!</Text>

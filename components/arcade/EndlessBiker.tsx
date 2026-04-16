@@ -7,6 +7,7 @@ import {
   PanResponder,
   Animated,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 
 const { width: W, height: H } = Dimensions.get("window");
@@ -33,6 +34,7 @@ interface Props {
 }
 
 export default function EndlessBiker({ onGameOver }: Props) {
+  const insets = useSafeAreaInsets();
   const [running, setRunning] = useState(true);
   const [score, setScore] = useState(0);
   const [isDucking, setIsDucking] = useState(false);
@@ -43,13 +45,17 @@ export default function EndlessBiker({ onGameOver }: Props) {
   const ducking = useRef(false);
   const obstacles = useRef<Obstacle[]>([]);
   const frameRef = useRef<number>(0);
-  const frameCount = useRef(0);
+  const elapsedMs = useRef(0);
   const scoreRef = useRef(0);
   const runningRef = useRef(true);
   const lastTime = useRef(0);
+  const lastObsMs = useRef(0);
 
   const bikerAnim = useRef(new Animated.Value(GROUND_Y - BIKER_H)).current;
   const [, forceUpdate] = useState(0);
+
+  const insetsRef = useRef(insets);
+  useEffect(() => { insetsRef.current = insets; }, [insets]);
 
   const spawnObstacle = () => {
     const types: Obstacle["type"][] = ["cone", "car", "hole"];
@@ -71,20 +77,19 @@ export default function EndlessBiker({ onGameOver }: Props) {
   }, []);
 
   useEffect(() => {
-    let lastObs = 0;
-
     const loop = (ts: number) => {
       if (!runningRef.current) return;
       const dt = ts - lastTime.current;
       lastTime.current = ts;
       if (dt > 200) { frameRef.current = requestAnimationFrame(loop); return; }
 
-      frameCount.current++;
-      scoreRef.current = Math.floor(frameCount.current / 6);
-      const speed = SPEED_BASE + scoreRef.current * 0.003;
+      const k = dt / 16.67;
+      elapsedMs.current += dt;
+      scoreRef.current = Math.floor(elapsedMs.current / 100);
+      const speed = (SPEED_BASE + scoreRef.current * 0.003) * k;
 
-      velY.current += GRAVITY;
-      bikerY.current += velY.current;
+      velY.current += GRAVITY * k;
+      bikerY.current += velY.current * k;
       const groundLevel = GROUND_Y - (ducking.current ? DUCK_H : BIKER_H);
       if (bikerY.current >= groundLevel) {
         bikerY.current = groundLevel;
@@ -93,9 +98,10 @@ export default function EndlessBiker({ onGameOver }: Props) {
       }
       bikerAnim.setValue(bikerY.current);
 
-      if (frameCount.current - lastObs > 80 + Math.random() * 60) {
+      const spawnInterval = (80 + Math.random() * 60) * 16.67;
+      if (elapsedMs.current - lastObsMs.current > spawnInterval) {
         spawnObstacle();
-        lastObs = frameCount.current;
+        lastObsMs.current = elapsedMs.current;
       }
 
       for (let i = obstacles.current.length - 1; i >= 0; i--) {
@@ -206,7 +212,7 @@ export default function EndlessBiker({ onGameOver }: Props) {
         </View>
       ))}
 
-      <Text style={styles.hint}>Tap = Salta • Scorri giù = Abbassati</Text>
+      <Text style={[styles.hint, { bottom: 20 + insets.bottom }]}>Tap = Salta • Scorri giù = Abbassati</Text>
     </View>
   );
 }
@@ -241,7 +247,6 @@ const styles = StyleSheet.create({
   },
   hint: {
     position: "absolute",
-    bottom: 20,
     alignSelf: "center",
     fontSize: 12,
     color: "rgba(255,255,255,0.4)",

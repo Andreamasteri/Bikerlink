@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { View, Text, StyleSheet, Dimensions, PanResponder } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: W, height: H } = Dimensions.get("window");
 const SHIP_W = 40;
@@ -16,6 +17,7 @@ const ALIEN_BULLET_W = 4;
 const ALIEN_BULLET_H = 12;
 const GRID_W = ALIEN_COLS * (ALIEN_W + ALIEN_GAP_X) - ALIEN_GAP_X;
 const GRID_ORIGIN_X = (W - GRID_W) / 2;
+const SHIP_BOTTOM_OFFSET = 40;
 
 interface Bullet { id: number; x: number; y: number }
 interface Alien { id: number; row: number; col: number; alive: boolean }
@@ -39,6 +41,7 @@ interface Props {
 }
 
 export default function SpaceInvaders({ onGameOver }: Props) {
+  const insets = useSafeAreaInsets();
   const [shipX, setShipX] = useState(W / 2 - SHIP_W / 2);
   const [bullets, setBullets] = useState<Bullet[]>([]);
   const [alienBullets, setAlienBullets] = useState<Bullet[]>([]);
@@ -49,6 +52,9 @@ export default function SpaceInvaders({ onGameOver }: Props) {
   const [gridY, setGridY] = useState(50);
   const [, forceUpdate] = useState(0);
 
+  const insetsRef = useRef(insets);
+  useEffect(() => { insetsRef.current = insets; }, [insets]);
+
   const shipXRef = useRef(W / 2 - SHIP_W / 2);
   const bulletsRef = useRef<Bullet[]>([]);
   const alienBulletsRef = useRef<Bullet[]>([]);
@@ -57,9 +63,9 @@ export default function SpaceInvaders({ onGameOver }: Props) {
   const waveRef = useRef(1);
   const runningRef = useRef(true);
   const frameRef = useRef<number>(0);
-  const frameCount = useRef(0);
+  const elapsedMs = useRef(0);
   const lastShot = useRef(0);
-  const lastAlienShot = useRef(0);
+  const lastAlienShotMs = useRef(0);
   const lastTime = useRef(0);
   const gridXRef = useRef(GRID_ORIGIN_X);
   const gridYRef = useRef(50);
@@ -70,10 +76,11 @@ export default function SpaceInvaders({ onGameOver }: Props) {
     const now = Date.now();
     if (now - lastShot.current < 400) return;
     lastShot.current = now;
+    const bottomOffset = SHIP_BOTTOM_OFFSET + insetsRef.current.bottom;
     bulletsRef.current.push({
       id: _bid++,
       x: shipXRef.current + SHIP_W / 2 - BULLET_W / 2,
-      y: H - SHIP_H - 50,
+      y: H - SHIP_H - bottomOffset,
     });
   }, []);
 
@@ -115,65 +122,68 @@ export default function SpaceInvaders({ onGameOver }: Props) {
       lastTime.current = ts;
       if (dt > 200) { frameRef.current = requestAnimationFrame(loop); return; }
 
-      frameCount.current++;
+      const k = dt / 16.67;
+      elapsedMs.current += dt;
 
+      const bulletSpeed = 10 * k;
       bulletsRef.current = bulletsRef.current
-        .map((b) => ({ ...b, y: b.y - 10 }))
+        .map((b) => ({ ...b, y: b.y - bulletSpeed }))
         .filter((b) => b.y > -BULLET_H);
 
-      const alienBulletSpeed = 5 + waveRef.current * 0.5;
+      const alienBulletSpeed = (5 + waveRef.current * 0.5) * k;
       alienBulletsRef.current = alienBulletsRef.current
         .map((b) => ({ ...b, y: b.y + alienBulletSpeed }))
         .filter((b) => b.y < H + ALIEN_BULLET_H);
 
-      if (frameCount.current % 2 === 0) {
-        const amplitude = 30 + waveRef.current * 5;
-        const frequency = 0.015 + waveRef.current * 0.003;
-        sineOffset.current += frequency;
-        gridXRef.current = GRID_ORIGIN_X + Math.sin(sineOffset.current) * amplitude;
+      const amplitude = 30 + waveRef.current * 5;
+      const frequency = (0.0075 + waveRef.current * 0.0015) * k;
+      sineOffset.current += frequency;
+      gridXRef.current = GRID_ORIGIN_X + Math.sin(sineOffset.current) * amplitude;
 
-        const aliveAliens = aliensRef.current.filter((a) => a.alive);
-        if (aliveAliens.length === 0) {
-          const nextWave = waveRef.current + 1;
-          waveRef.current = nextWave;
-          sineOffset.current = 0;
-          gridXRef.current = GRID_ORIGIN_X;
-          gridYRef.current = 50;
-          aliensRef.current = makeAliens();
-          setWave(nextWave);
-          setAliens([...aliensRef.current]);
-          frameRef.current = requestAnimationFrame(loop);
-          return;
-        }
-
-        const maxRow = Math.max(...aliveAliens.map((a) => a.row));
-        const gridBottom = gridYRef.current + maxRow * (ALIEN_H + ALIEN_GAP_Y) + ALIEN_H;
-        if (gridBottom > H - SHIP_H - 80) {
-          runningRef.current = false;
-          onGameOver(scoreRef.current);
-          return;
-        }
-
-        gridYRef.current += 0.2 + waveRef.current * 0.05;
-        setGridX(gridXRef.current);
-        setGridY(gridYRef.current);
+      const aliveAliens = aliensRef.current.filter((a) => a.alive);
+      if (aliveAliens.length === 0) {
+        const nextWave = waveRef.current + 1;
+        waveRef.current = nextWave;
+        sineOffset.current = 0;
+        gridXRef.current = GRID_ORIGIN_X;
+        gridYRef.current = 50;
+        aliensRef.current = makeAliens();
+        setWave(nextWave);
+        setAliens([...aliensRef.current]);
+        frameRef.current = requestAnimationFrame(loop);
+        return;
       }
 
-      if (frameCount.current - lastAlienShot.current > Math.max(20, 70 - waveRef.current * 8)) {
-        const aliveAliens = aliensRef.current.filter((a) => a.alive);
-        if (aliveAliens.length > 0) {
-          const shooter = aliveAliens[Math.floor(Math.random() * aliveAliens.length)];
+      const maxRow = Math.max(...aliveAliens.map((a) => a.row));
+      const bottomOffset = SHIP_BOTTOM_OFFSET + insetsRef.current.bottom;
+      const gridBottom = gridYRef.current + maxRow * (ALIEN_H + ALIEN_GAP_Y) + ALIEN_H;
+      if (gridBottom > H - SHIP_H - bottomOffset - 40) {
+        runningRef.current = false;
+        onGameOver(scoreRef.current);
+        return;
+      }
+
+      gridYRef.current += (0.1 + waveRef.current * 0.025) * k;
+      setGridX(gridXRef.current);
+      setGridY(gridYRef.current);
+
+      const alienShotIntervalMs = Math.max(20, 70 - waveRef.current * 8) * 16.67;
+      if (elapsedMs.current - lastAlienShotMs.current > alienShotIntervalMs) {
+        const aliveAliens2 = aliensRef.current.filter((a) => a.alive);
+        if (aliveAliens2.length > 0) {
+          const shooter = aliveAliens2[Math.floor(Math.random() * aliveAliens2.length)];
           alienBulletsRef.current.push({
             id: _bid++,
             x: gridXRef.current + shooter.col * (ALIEN_W + ALIEN_GAP_X) + ALIEN_W / 2 - ALIEN_BULLET_W / 2,
             y: gridYRef.current + shooter.row * (ALIEN_H + ALIEN_GAP_Y) + ALIEN_H,
           });
-          lastAlienShot.current = frameCount.current;
+          lastAlienShotMs.current = elapsedMs.current;
         }
       }
 
+      const bottomOffset2 = SHIP_BOTTOM_OFFSET + insetsRef.current.bottom;
       const sx = shipXRef.current;
-      const sy = H - SHIP_H - 40;
+      const sy = H - SHIP_H - bottomOffset2;
       for (const ab of alienBulletsRef.current) {
         if (
           ab.x + ALIEN_BULLET_W > sx + 4 &&
@@ -223,6 +233,8 @@ export default function SpaceInvaders({ onGameOver }: Props) {
     return () => cancelAnimationFrame(frameRef.current);
   }, []);
 
+  const shipBottom = SHIP_BOTTOM_OFFSET + insets.bottom;
+
   return (
     <View style={styles.container} {...panResponder.panHandlers}>
       <Text style={styles.score}>{score} pt</Text>
@@ -250,11 +262,11 @@ export default function SpaceInvaders({ onGameOver }: Props) {
         <View key={b.id} style={[styles.alienBullet, { left: b.x, top: b.y }]} />
       ))}
 
-      <View style={[styles.ship, { left: shipX, bottom: 40 }]}>
+      <View style={[styles.ship, { left: shipX, bottom: shipBottom }]}>
         <Text style={{ fontSize: 26 }}>🚀</Text>
       </View>
 
-      <Text style={styles.hint}>Scorri per muovere • Tap per sparare</Text>
+      <Text style={[styles.hint, { bottom: 6 + insets.bottom }]}>Scorri per muovere • Tap per sparare</Text>
     </View>
   );
 }
@@ -267,5 +279,5 @@ const styles = StyleSheet.create({
   bullet: { position: "absolute", width: BULLET_W, height: BULLET_H, backgroundColor: "#FFD700", borderRadius: 2 },
   alienBullet: { position: "absolute", width: ALIEN_BULLET_W, height: ALIEN_BULLET_H, backgroundColor: "#F44336", borderRadius: 2 },
   ship: { position: "absolute", width: SHIP_W, height: SHIP_H, alignItems: "center", justifyContent: "center" },
-  hint: { position: "absolute", bottom: 6, alignSelf: "center", fontSize: 11, color: "rgba(255,255,255,0.3)", fontFamily: "Inter_400Regular" },
+  hint: { position: "absolute", alignSelf: "center", fontSize: 11, color: "rgba(255,255,255,0.3)", fontFamily: "Inter_400Regular" },
 });

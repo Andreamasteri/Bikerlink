@@ -111,7 +111,7 @@ function GameOverModal({ score, personalBest, isNewRecord, onReplay, onClose, on
           {isSaving && <ActivityIndicator size="small" color={Colors.accent} style={{ marginVertical: 8 }} />}
           {isSaveError && (
             <View style={styles.saveErrorRow}>
-              <Text style={styles.saveErrorText}>Errore salvataggio</Text>
+              <Text style={styles.saveErrorText}>Punteggio non salvato</Text>
               {onRetrySave && (
                 <Pressable onPress={onRetrySave} style={styles.retryBtn}>
                   <Ionicons name="refresh-circle" size={18} color={Colors.accent} />

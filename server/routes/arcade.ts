@@ -10,10 +10,10 @@ type GameId = (typeof VALID_GAMES)[number];
 
 const SCORE_CAPS: Record<GameId, number> = {
   endless_biker: 50_000,
-  traffic_racer: 200_000,
+  traffic_racer: 500_000,
   wheelie: 3_600,
-  tetris: 500_000,
-  space_invaders: 200_000,
+  tetris: 2_000_000,
+  space_invaders: 500_000,
 };
 
 function requireAuth(req: Request, res: Response): string | null {

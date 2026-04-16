@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { View, Text, StyleSheet, Pressable, Dimensions } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const COLS = 10;
 const ROWS = 20;
@@ -64,6 +65,7 @@ interface Props {
 }
 
 export default function Tetris({ onGameOver }: Props) {
+  const insets = useSafeAreaInsets();
   const [grid, setGrid] = useState<Grid>(emptyGrid());
   const [piece, setPiece] = useState<{ shape: number[][]; color: string; x: number; y: number } | null>(null);
   const [score, setScore] = useState(0);
@@ -195,7 +197,7 @@ export default function Tetris({ onGameOver }: Props) {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <View style={styles.header}>
         <Text style={styles.scoreLabel}>Score</Text>
         <Text style={styles.score}>{score}</Text>
