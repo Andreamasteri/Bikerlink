@@ -121,6 +121,9 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
     if (AppState.currentState === "active" && overlayActiveRef.current) {
       OverlayNative.hideOverlay();
       overlayActiveRef.current = false;
+    } else if ((AppState.currentState === "background" || AppState.currentState === "inactive") && !overlayActiveRef.current) {
+      OverlayNative.showOverlay(unreadChatRef.current, unreadNotifRef.current);
+      overlayActiveRef.current = true;
     }
 
     const sub = AppState.addEventListener("change", (nextState: AppStateStatus) => {
