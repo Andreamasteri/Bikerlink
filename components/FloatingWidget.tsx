@@ -178,7 +178,12 @@ export default function FloatingWidget() {
 
   const handleNotificationsPress = useCallback(() => {
     closeMenu();
-    router.push("/(tabs)/proposals");
+    router.push("/notifications" as any);
+  }, [closeMenu, router]);
+
+  const handlePlayerPress = useCallback(() => {
+    closeMenu();
+    router.push("/(tabs)/music");
   }, [closeMenu, router]);
 
   if (!isVisible || !positionLoaded) return null;
@@ -231,6 +236,13 @@ export default function FloatingWidget() {
                   <Text style={styles.menuBadgeText}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</Text>
                 </View>
               )}
+            </TouchableOpacity>
+
+            <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+
+            <TouchableOpacity style={styles.menuItem} onPress={handlePlayerPress} activeOpacity={0.7}>
+              <Ionicons name="musical-notes" size={18} color={colors.accent} />
+              <Text style={[styles.menuLabel, { color: colors.text }]}>Player</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>

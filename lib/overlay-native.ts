@@ -1,8 +1,9 @@
-import { NativeModules, Platform } from "react-native";
+import { NativeModules, Platform, Linking } from "react-native";
 
 const { BikerLinkOverlay } = NativeModules;
 
 const isSupported = Platform.OS === "android" && !!BikerLinkOverlay;
+const APP_PACKAGE = "com.bikerlink.app";
 
 export const OverlayNative = {
   checkPermission: (): Promise<boolean> => {
@@ -11,7 +12,14 @@ export const OverlayNative = {
   },
 
   requestPermission: (): void => {
-    if (!isSupported) return;
+    if (!isSupported) {
+      Linking.openURL(
+        `intent://package:${APP_PACKAGE}#Intent;scheme=package;action=android.settings.action.MANAGE_OVERLAY_PERMISSION;end`
+      ).catch(() => {
+        Linking.openSettings().catch(() => {});
+      });
+      return;
+    }
     BikerLinkOverlay.requestPermission();
   },
 
