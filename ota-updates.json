@@ -2375,6 +2375,27 @@
     "apkBuildId": null,
     "apkVersionCode": 27,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 51,
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-51 rv7.0.0: Fix tap club su mappa → schermata pubblica non-membro",
+    "note": "Task #606: Tappando un club sulla mappa di cui non si è membri non appare più 'Club non trovato'. Nuovo endpoint GET /api/motoclubs/:id/public restituisce info base (nome, tipo, regione, memberCount) senza richiedere appartenenza. Frontend motoclub/[id].tsx rileva errore 403 (isNotMember) e carica dati pubblici mostrando vista ridotta con pulsante 'Richiedi di entrare' via POST /api/motoclubs/:id/join. I 404 reali continuano a mostrare 'Club non trovato'. CURRENT_OTA_NUMBER=51.",
+    "releaseId": "e1bcedff-a9f2-486e-824c-c2dc72f5c109",
+    "bundleUrl": "private/ota/ota-1.51.0-1776309787565.js",
+    "updateGroupId": "f8435500-5bf1-4461-981f-2ec80049e6ba",
+    "androidUpdateId": "019d9451-086e-7426-95cc-aad654322c61",
+    "iosUpdateId": null,
+    "commitBase": "3b977a10ab35fb490f42ff268298916a1fc8e08b",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/f8435500-5bf1-4461-981f-2ec80049e6ba",
+    "apkBuildId": null,
+    "apkVersionCode": 27,
+    "apkUrl": null,
     "status": "published"
   }
 ]

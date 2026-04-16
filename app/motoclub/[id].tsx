@@ -55,6 +55,21 @@ interface ClubDetail {
   hasMore: boolean;
 }
 
+interface PublicClubInfo {
+  id: string;
+  name: string;
+  clubType: string;
+  brandName: string | null;
+  modelName: string | null;
+  region: string | null;
+  country: string | null;
+  logoUrl: string | null;
+  isApproved: boolean;
+  memberCount: number;
+  activityScore: number;
+  createdAt: string;
+}
+
 function countryFlag(code: string | null) {
   if (!code || code.length !== 2) return "";
   const base = 0x1F1E6;
@@ -127,6 +142,26 @@ export default function ClubDetailScreen() {
   const { data: club, isLoading, error } = useQuery<ClubDetail>({
     queryKey: [queryKey],
     enabled: !!id,
+  });
+
+  const isNotMember = error?.message === "Non sei membro di questo club";
+
+  const { data: publicClub, isLoading: isLoadingPublic } = useQuery<PublicClubInfo>({
+    queryKey: [`/api/motoclubs/${id}/public`],
+    enabled: !!id && isNotMember,
+  });
+
+  const joinMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/motoclubs/${id}/join`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [queryKey] });
+      queryClient.invalidateQueries({ queryKey: [`/api/motoclubs/${id}/public`] });
+      Alert.alert("Benvenuto!", "Sei entrato nel club con successo.");
+    },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const allMembers: Member[] = [...(club?.members ?? []), ...extraMembers];
@@ -207,10 +242,88 @@ export default function ClubDetailScreen() {
     router.push(`/chat/${resolvedConvId}` as any);
   }
 
-  if (isLoading) {
+  if (isLoading || (isNotMember && isLoadingPublic)) {
     return (
       <View style={[styles.center, { paddingTop: topPad }]}>
         <ActivityIndicator color={Colors.accent} size="large" />
+      </View>
+    );
+  }
+
+  if (isNotMember && publicClub) {
+    const pubBrandOrModel = [publicClub.brandName, publicClub.modelName].filter(Boolean).join(" ");
+    const clubTypeLabel =
+      publicClub.clubType === "brand" ? "Marca" :
+      publicClub.clubType === "model" ? "Modello" : "Custom";
+    return (
+      <View style={[styles.container, { paddingTop: topPad }]}>
+        <View style={styles.navBar}>
+          <TouchableOpacity onPress={handleBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="arrow-back" size={24} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.navTitle} numberOfLines={1}>{publicClub.name}</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
+          <View style={styles.heroCard}>
+            <View style={styles.heroIconWrap}>
+              <Ionicons name="shield" size={40} color={Colors.accent} />
+            </View>
+            <Text style={styles.heroName}>{publicClub.name}</Text>
+            {pubBrandOrModel ? <Text style={styles.heroSub}>{pubBrandOrModel}</Text> : null}
+            <View style={styles.heroBadges}>
+              <View style={[styles.badge, { backgroundColor: Colors.accent + "22" }]}>
+                <Text style={[styles.badgeText, { color: Colors.accent }]}>{clubTypeLabel}</Text>
+              </View>
+              {publicClub.isApproved && (
+                <View style={[styles.badge, { backgroundColor: Colors.success + "22" }]}>
+                  <Text style={[styles.badgeText, { color: Colors.success }]}>Approvato</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          <View style={[styles.statsRow, { marginBottom: 24 }]}>
+            <View style={styles.statItem}>
+              <Ionicons name="people" size={20} color={Colors.accent} />
+              <Text style={styles.statValue}>{publicClub.memberCount}</Text>
+              <Text style={styles.statLabel}>Membri</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Ionicons name="flame" size={20} color="#F59E0B" />
+              <Text style={styles.statValue}>{publicClub.activityScore}</Text>
+              <Text style={styles.statLabel}>Attività</Text>
+            </View>
+            {publicClub.region ? (
+              <>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Ionicons name="location-outline" size={20} color={Colors.textSecondary} />
+                  <Text style={styles.statValue} numberOfLines={1}>{publicClub.region}</Text>
+                  <Text style={styles.statLabel}>Regione</Text>
+                </View>
+              </>
+            ) : null}
+          </View>
+
+          <TouchableOpacity
+            style={[styles.joinBtn, joinMutation.isPending && { opacity: 0.6 }]}
+            onPress={() => joinMutation.mutate()}
+            disabled={joinMutation.isPending}
+            activeOpacity={0.8}
+          >
+            {joinMutation.isPending ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Ionicons name="person-add" size={18} color="#fff" />
+                <Text style={styles.joinBtnText}>Richiedi di entrare</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -783,4 +896,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalSubmitBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: "#fff" },
+  joinBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.accent,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    minWidth: 200,
+  },
+  joinBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 16,
+    color: "#fff",
+  },
 });

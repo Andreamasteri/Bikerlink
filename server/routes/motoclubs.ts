@@ -798,6 +798,31 @@ router.get("/:id/marketplace", requireAuth, async (req: Request, res: Response) 
   }
 });
 
+router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const clubId = req.params.id;
+    const [club] = await db.select({
+      id: motoClubs.id,
+      name: motoClubs.name,
+      clubType: motoClubs.clubType,
+      brandName: motoClubs.brandName,
+      modelName: motoClubs.modelName,
+      region: motoClubs.region,
+      country: motoClubs.country,
+      logoUrl: motoClubs.logoUrl,
+      isApproved: motoClubs.isApproved,
+      memberCount: motoClubs.memberCount,
+      activityScore: motoClubs.activityScore,
+      createdAt: motoClubs.createdAt,
+    }).from(motoClubs).where(and(eq(motoClubs.id, clubId), eq(motoClubs.isApproved, true))).limit(1);
+    if (!club) return res.status(404).json({ message: "Club non trovato" });
+    return res.json(club);
+  } catch (e) {
+    console.error("Public club error:", e);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 router.get("/:id/detail", requireAuth, async (req: Request, res: Response) => {
   try {
     const clubId = req.params.id;
