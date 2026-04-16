@@ -2460,6 +2460,28 @@
     "apkBuildId": null,
     "apkVersionCode": 28,
     "apkUrl": null,
-    "status": "published"
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 55,
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-55 rv7.0.0: Arcade tab + FloatingWidget fix + Last.fm generi + Anime 80-90",
+    "note": "Task #607 post-54: fix watcher gate bg permission + testo notifica monitoraggio attivo. Task #608: FloatingWidget banner fix (overlay-native Linking fallback), schermata /notifications con mark-read e segna-tutte-lette, Player nel menu widget. Task #609: /suggested-genres riscritto con user.getTopArtists + artist.getTopTags x5 parallelo (fallback user.getTopTags solo se zero artist call riuscite); nuovo genere Anime 80-90 📺 con fallback anisong su Radio Browser; LASTFM_TO_GENRE espanso (alternative/punk/punk rock→rock, funk→electronic, rhythm and blues→soul). Task #610: Tab Arcade con 5 mini-giochi (Snake, Memory, Reaction, Trivia Moto, Doodle Jump-like), classifiche globali + personali, integrazione avatar Pic, badge achievements. CURRENT_OTA_NUMBER=55.",
+    "releaseId": "e591194a-2ee1-486c-af1a-5ececf5a0eb1",
+    "bundleUrl": "private/ota/ota-1.55.0-1776324197687.js",
+    "updateGroupId": "d4974aae-6cd1-416f-bb17-1d7f59793245",
+    "androidUpdateId": "019d952d-4c84-70bc-ab5f-0ef21b9c4a2b",
+    "iosUpdateId": null,
+    "commitBase": "ba3f17e8121fa68c7ca23543414e3c69868fc025",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/d4974aae-6cd1-416f-bb17-1d7f59793245",
+    "apkBuildId": null,
+    "apkVersionCode": 28,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-16T07:23:20.501Z"
   }
 ]
