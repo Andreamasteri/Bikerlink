@@ -90,7 +90,9 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
   }, []);
 
   const requestOverlayPermission = useCallback(async () => {
-    await AsyncStorage.setItem(OVERLAY_PROMPTED_KEY, "true");
+    if (!overlayNativeSupported) {
+      await AsyncStorage.setItem(OVERLAY_PROMPTED_KEY, "true");
+    }
     OverlayNative.requestPermission();
   }, []);
 

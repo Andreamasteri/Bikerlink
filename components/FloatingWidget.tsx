@@ -309,7 +309,7 @@ export default function FloatingWidget() {
               style={[styles.permissionBannerSub, { color: colors.textSecondary ?? colors.text }]}
               numberOfLines={1}
             >
-              Cerca "Mostra sopra le altre app"
+              Separato da Posizione — cerca "Mostra sopra le altre app"
             </Text>
           </View>
           <Text style={[styles.permissionBannerCta, { color: colors.accent }]}>Attiva →</Text>
