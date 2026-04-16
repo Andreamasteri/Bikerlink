@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  Alert,
 } from "react-native";
 import { Stack } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -78,6 +79,28 @@ export default function NotificationsScreen() {
     qc.invalidateQueries({ queryKey: ["/api/notifications"] });
   }, [notifications, qc]);
 
+  const deleteAllMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", "/api/notifications/all", {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/notifications"] });
+    },
+  });
+
+  const handleDeleteAll = useCallback(() => {
+    Alert.alert(
+      "Cancella tutte le notifiche",
+      "Questa azione eliminerà definitivamente tutte le notifiche. Continuare?",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Cancella tutto",
+          style: "destructive",
+          onPress: () => deleteAllMutation.mutate(),
+        },
+      ]
+    );
+  }, [deleteAllMutation]);
+
   const handleItemPress = useCallback((item: AppNotification) => {
     if (!item.isRead) {
       markReadMutation.mutate(item.id);
@@ -134,13 +157,26 @@ export default function NotificationsScreen() {
           headerTitle: "Notifiche",
           headerStyle: { backgroundColor: colors.surface },
           headerTintColor: colors.text,
-          headerRight: unreadCount > 0
+          headerRight: notifications.length > 0
             ? () => (
-                <TouchableOpacity onPress={markAllRead} style={styles.headerBtn}>
-                  <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
-                    Segna tutte lette
-                  </Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  {unreadCount > 0 && (
+                    <TouchableOpacity onPress={markAllRead} style={styles.headerBtn}>
+                      <Ionicons name="checkmark-done-outline" size={22} color={colors.accent} />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    onPress={handleDeleteAll}
+                    style={styles.headerBtn}
+                    disabled={deleteAllMutation.isPending}
+                  >
+                    <Ionicons
+                      name="trash-outline"
+                      size={20}
+                      color={deleteAllMutation.isPending ? (colors.textSecondary ?? "#999") : "#E63946"}
+                    />
+                  </TouchableOpacity>
+                </View>
               )
             : undefined,
         }}

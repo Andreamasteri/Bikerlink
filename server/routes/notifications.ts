@@ -1,5 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
+import { db } from "../db";
+import { notifications } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 const router = Router();
 
@@ -20,6 +23,23 @@ router.get("/", async (req: Request, res: Response) => {
     return res.json(notificationsList);
   } catch (error) {
     console.error("Get notifications error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/all", async (req: Request, res: Response) => {
+  try {
+    const userId = requireAuth(req, res);
+    if (!userId) return;
+
+    const deleted = await db
+      .delete(notifications)
+      .where(eq(notifications.userId, userId))
+      .returning({ id: notifications.id });
+
+    return res.json({ deleted: deleted.length });
+  } catch (error) {
+    console.error("Delete all notifications error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
