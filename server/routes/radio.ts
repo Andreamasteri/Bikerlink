@@ -24,6 +24,7 @@ const CURATED_GENRES = [
   { id: "80s", label: "Anni 80", icon: "📼" },
   { id: "90s", label: "Anni 90", icon: "💿" },
   { id: "anime", label: "Anime", icon: "🎌" },
+  { id: "anime-8090", label: "Anime 80-90", icon: "📺" },
   { id: "eurobeat", label: "Eurobeat", icon: "🏎️" },
   { id: "classical", label: "Classica", icon: "🎻" },
   { id: "pop", label: "Pop", icon: "⭐" },
@@ -45,6 +46,7 @@ const GENRE_TAG_MAP: Record<string, string> = {
   "80s": "80s",
   "90s": "90s",
   anime: "anime",
+  "anime-8090": "anime 80s",
   eurobeat: "eurobeat",
   classical: "classical",
   pop: "pop",
@@ -86,6 +88,10 @@ const LASTFM_TO_GENRE: Record<string, string> = {
   "electronic music": "electronic",
   "edm": "electronic",
   "techno": "electronic",
+  "house": "electronic",
+  "trance": "electronic",
+  "ambient": "electronic",
+  "disco": "electronic",
   blues: "blues",
   "electric blues": "blues",
   country: "country",
@@ -93,6 +99,8 @@ const LASTFM_TO_GENRE: Record<string, string> = {
   indie: "indie",
   "indie rock": "indie",
   "indie pop": "indie",
+  "alternative": "indie",
+  "alternative indie": "indie",
   "80s": "80s",
   "1980s": "80s",
   "new wave": "80s",
@@ -109,6 +117,15 @@ const LASTFM_TO_GENRE: Record<string, string> = {
   "j-pop": "anime",
   "j-rock": "anime",
   "japanese music": "anime",
+  "anime 80s": "anime-8090",
+  "anime 90s": "anime-8090",
+  "anisong": "anime-8090",
+  "anison": "anime-8090",
+  "retro anime": "anime-8090",
+  "80s anime": "anime-8090",
+  "90s anime": "anime-8090",
+  "anime classics": "anime-8090",
+  "classic anime": "anime-8090",
   eurobeat: "eurobeat",
   "italo dance": "eurobeat",
   "italo disco": "eurobeat",
@@ -118,6 +135,9 @@ const LASTFM_TO_GENRE: Record<string, string> = {
   "classical music": "classical",
   pop: "pop",
   "pop music": "pop",
+  "italian pop": "pop",
+  "italo pop": "pop",
+  "dance pop": "pop",
   punk: "punk",
   "punk rock": "punk",
   "hardcore punk": "punk",
@@ -413,6 +433,29 @@ router.get("/stream", async (req: Request, res: Response) => {
   }
 });
 
+function buildLastfmUrl(params: Record<string, string>, apiKey: string): string {
+  const url = new URL("https://ws.audioscrobbler.com/2.0/");
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  url.searchParams.set("api_key", apiKey);
+  url.searchParams.set("format", "json");
+  return url.toString();
+}
+
+function aggregateGenresFromTags(
+  tags: Array<{ name?: string; count?: string | number }>,
+  weight = 1
+): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const tag of tags) {
+    const tagName = (tag.name ?? "").toLowerCase().trim();
+    const mapped = LASTFM_TO_GENRE[tagName];
+    if (mapped) {
+      result[mapped] = (result[mapped] ?? 0) + Number(tag.count ?? 1) * weight;
+    }
+  }
+  return result;
+}
+
 router.get("/suggested-genres", requireAuth, async (req: Request, res: Response) => {
   const userId = req.session.userId!;
 
@@ -427,27 +470,72 @@ router.get("/suggested-genres", requireAuth, async (req: Request, res: Response)
       return res.json([]);
     }
 
-    const url = new URL("https://ws.audioscrobbler.com/2.0/");
-    url.searchParams.set("method", "user.getTopTags");
-    url.searchParams.set("user", session.lastfmUsername);
-    url.searchParams.set("api_key", process.env.LASTFM_API_KEY);
-    url.searchParams.set("format", "json");
+    const apiKey = process.env.LASTFM_API_KEY;
+    const username = session.lastfmUsername;
+    const genreScore: Record<string, number> = {};
 
-    const resp = await fetch(url.toString());
-    if (!resp.ok) throw new Error(`Last.fm API error ${resp.status}`);
-    const data = await resp.json() as { toptags?: { tag?: Array<{ name?: string; count?: string }> } };
+    try {
+      const artistsResp = await fetch(
+        buildLastfmUrl({ method: "user.getTopArtists", user: username, limit: "10", period: "overall" }, apiKey),
+        { signal: AbortSignal.timeout(6000) }
+      );
+      if (!artistsResp.ok) throw new Error(`Last.fm artists API ${artistsResp.status}`);
 
-    const tags = data?.toptags?.tag ?? [];
-    const genreCount: Record<string, number> = {};
-    for (const tag of tags as Array<{ name?: string; count?: string }>) {
-      const tagName = (tag.name ?? "").toLowerCase();
-      const mapped = LASTFM_TO_GENRE[tagName];
-      if (mapped) {
-        genreCount[mapped] = (genreCount[mapped] ?? 0) + Number(tag.count ?? 1);
+      const artistsData = await artistsResp.json() as {
+        topartists?: { artist?: Array<{ name?: string; playcount?: string }> }
+      };
+      const topArtists = (artistsData?.topartists?.artist ?? []).slice(0, 5);
+
+      if (topArtists.length > 0) {
+        const tagResults = await Promise.allSettled(
+          topArtists.map(async (artist) => {
+            const name = artist.name ?? "";
+            const playcount = Number(artist.playcount ?? 1);
+            const tagsResp = await fetch(
+              buildLastfmUrl({ method: "artist.getTopTags", artist: name, limit: "10" }, apiKey),
+              { signal: AbortSignal.timeout(5000) }
+            );
+            if (!tagsResp.ok) return;
+            const tagsData = await tagsResp.json() as {
+              toptags?: { tag?: Array<{ name?: string; count?: string | number }> }
+            };
+            const artistTags = tagsData?.toptags?.tag ?? [];
+            const partial = aggregateGenresFromTags(artistTags, playcount);
+            for (const [genre, score] of Object.entries(partial)) {
+              genreScore[genre] = (genreScore[genre] ?? 0) + score;
+            }
+          })
+        );
+
+        const succeededCount = tagResults.filter((r) => r.status === "fulfilled").length;
+        console.log(`[radio] suggested-genres: ${succeededCount}/${topArtists.length} artist tag calls succeeded`);
+      }
+    } catch (artistErr) {
+      console.warn("[radio] suggested-genres: artist strategy failed, falling back to user tags", artistErr);
+    }
+
+    if (Object.keys(genreScore).length < 2) {
+      try {
+        const tagsResp = await fetch(
+          buildLastfmUrl({ method: "user.getTopTags", user: username }, apiKey),
+          { signal: AbortSignal.timeout(5000) }
+        );
+        if (tagsResp.ok) {
+          const tagsData = await tagsResp.json() as {
+            toptags?: { tag?: Array<{ name?: string; count?: string }> }
+          };
+          const userTags = tagsData?.toptags?.tag ?? [];
+          const partial = aggregateGenresFromTags(userTags);
+          for (const [genre, score] of Object.entries(partial)) {
+            genreScore[genre] = (genreScore[genre] ?? 0) + score;
+          }
+        }
+      } catch (fallbackErr) {
+        console.warn("[radio] suggested-genres: fallback user.getTopTags also failed", fallbackErr);
       }
     }
 
-    const sorted = Object.entries(genreCount)
+    const sorted = Object.entries(genreScore)
       .sort((a, b) => b[1] - a[1])
       .map(([id]) => id)
       .slice(0, 5);
