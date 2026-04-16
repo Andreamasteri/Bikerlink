@@ -2428,16 +2428,16 @@
     "jsEngine": "hermes",
     "message": "OTA-53 rv7.0.0: Background Location Tracking — TaskManager + permesso Always + admin panel",
     "note": "Task #607: (1) lib/background-location-task.ts — TaskManager.defineTask con guard try/catch, cache settings 5min in AsyncStorage, trigger modes (always/tracking/sos/tracking_or_sos), ghost mode check. (2) location-context.tsx — hasBackgroundPermission, requestBackgroundPermission() con Alert.alert esplicativo + ios blue dot/android notifica. (3) app/_layout.tsx — AppStateHandler avvia startLocationUpdatesAsync se permesso background concesso, ferma al logout. (4) AndroidManifest.xml — ACCESS_BACKGROUND_LOCATION aggiunto (richiede APK v28). Admin panel già completo (Task prev). Codice degrada silenziosamente su APK v27 (guard isBackgroundLocationSupported). CURRENT_OTA_NUMBER=53.",
-    "releaseId": null,
-    "bundleUrl": null,
-    "updateGroupId": null,
-    "androidUpdateId": null,
+    "releaseId": "7a19fe6f-5f0f-4d7a-9370-3c4906c86b3e",
+    "bundleUrl": "private/ota/ota-1.53.0-1776311562639.js",
+    "updateGroupId": "15a1f062-2d60-4737-b5e7-452c60578204",
+    "androidUpdateId": "019d946c-223f-7662-ac57-11d8b046a1e1",
     "iosUpdateId": null,
-    "commitBase": null,
-    "easDashboard": null,
+    "commitBase": "4a72e0048d6df08bd676cfb9bc3a8d69bf158bf3",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/15a1f062-2d60-4737-b5e7-452c60578204",
     "apkBuildId": null,
     "apkVersionCode": 28,
     "apkUrl": null,
-    "status": "pending"
+    "status": "published"
   }
 ]
