@@ -5,11 +5,17 @@ description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink
 
 # BikerLink — Pubblicazione OTA
 
+## ⚡ REGOLA FONDAMENTALE — "Crea l'OTA" = Crea + Pubblica
+**Quando l'utente dice "crea l'OTA", "prepara l'OTA", "fai l'OTA" o qualsiasi variante:**
+- La pubblicazione è **inclusa automaticamente** — non è opzionale
+- **Non chiedere conferma separata** prima di eseguire lo script di pubblicazione
+- Eseguire l'intera procedura (passi 1–7) in un'unica sessione senza interruzioni
+
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
 - **Canale EAS**: `preview`
-- **Runtime Version**: `7.0.0` (ciclo corrente, APK v20)
-- **APK corrente**: versionCode 20 — IN BUILD (v10 ultima stabile: https://expo.dev/artifacts/eas/g51tK8gvgyYnoZUkM2BHk3.apk)
+- **Runtime Version**: `7.0.0` (ciclo corrente, APK v28)
+- **APK corrente**: versionCode 28 (ultima stabile con background location)
 - **Utenti**: su Android fisico via APK — NON usano il dev server
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
@@ -30,7 +36,7 @@ description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink
 ### PASSO 1 — Determinare il numero OTA
 Leggere l'ultima entry del ciclo 7.x in `ota-updates.json` e prendere `updateNumber + 1`.
 ```bash
-# Esempio: se l'ultima è 43, la nuova sarà 44
+# Esempio: se l'ultima è 55, la nuova sarà 56
 ```
 
 ### PASSO 2 — Ottenere l'hash git corrente
@@ -46,22 +52,22 @@ const CURRENT_OTA_NUMBER = <VECCHIO>;  // → <NUOVO>
 Il commento sopra va tenuto generico:
 ```typescript
 // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-// Ciclo 7.0.0 — APK v13 — aggiornare ad ogni nuova OTA pubblicata
-const CURRENT_OTA_NUMBER = 44;
+// Ciclo 7.0.0 — APK v28 — aggiornare ad ogni nuova OTA pubblicata
+const CURRENT_OTA_NUMBER = 56;
 ```
 
 ### PASSO 4 — Aggiungere entry in `ota-updates.json`
 Marcare la entry precedente come `"status": "superseded"`, poi aggiungere in fondo:
 ```json
 {
-  "updateNumber": 44,
+  "updateNumber": 56,
   "cycle": "7.x",
   "channel": "preview",
   "platform": "android",
   "runtimeVersion": "7.0.0",
   "jsEngine": "hermes",
-  "message": "OTA-44 rv7.0.0: <descrizione breve>",
-  "note": "<note dettagliate sui task inclusi. CURRENT_OTA_NUMBER=44.>",
+  "message": "OTA-56 rv7.0.0: <descrizione breve>",
+  "note": "<note dettagliate sui task inclusi. CURRENT_OTA_NUMBER=56.>",
   "releaseId": null,
   "bundleUrl": null,
   "updateGroupId": null,
@@ -70,7 +76,7 @@ Marcare la entry precedente come `"status": "superseded"`, poi aggiungere in fon
   "commitBase": "<hash git completo da passo 2>",
   "easDashboard": null,
   "apkBuildId": null,
-  "apkVersionCode": 13,
+  "apkVersionCode": 28,
   "apkUrl": null,
   "status": "pending"
 }
@@ -81,7 +87,7 @@ Marcare la entry precedente come `"status": "superseded"`, poi aggiungere in fon
 ```bash
 BIKERLINK_ADMIN_EMAIL="admin@bikerlink.it" \
 BIKERLINK_ADMIN_PASSWORD="$BIKERLINK_ADMIN_PASSWORD" \
-bash scripts/publish-ota.sh "1.44.0" "OTA-44: <messaggio di release>"
+bash scripts/publish-ota.sh "1.56.0" "OTA-56: <messaggio di release>"
 ```
 Il versioning segue `1.<numero OTA>.0`.
 
@@ -119,10 +125,10 @@ Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare 
 ## Numerazione versioni
 | OTA | Script version |
 |-----|---------------|
-| 43  | 1.43.0        |
-| 44  | 1.44.0        |
-| 45  | 1.45.0        | ← pubblicata
-| 46  | 1.46.0        |
+| 53  | 1.53.0        |
+| 54  | 1.54.0        | ← superseded
+| 55  | 1.55.0        | ← pubblicata (corrente)
+| 56  | 1.56.0        |
 
 ## Cicli precedenti (storico)
 - Ciclo 2.x: OTA 1–21, 23 (APK versionCode 4–6, rv 2.0.0)
@@ -130,7 +136,7 @@ Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare 
 - Ciclo 4.x: OTA 37–40 (APK versionCode 10, rv 4.0.0)
 - Ciclo 5.x: OTA 41 (APK versionCode 11, rv 5.0.0) — DEPRECATO (crash expo-location plugin)
 - Ciclo 6.x: OTA 42–43 (APK versionCode 12, rv 6.0.0) — OBSOLETO (utenti devono aggiornare APK)
-- Ciclo 7.x: OTA 44–45+ (APK versionCode 13→17, rv 7.0.0) ← CORRENTE
+- Ciclo 7.x: OTA 44–55+ (APK versionCode 13→28, rv 7.0.0) ← CORRENTE
   - APK v13: FAILED (react-native-maps 1.27.2 — causa esatta sconosciuta, diagnosi errata al momento)
   - APK v14: FAILED (newArchEnabled=true + react-native-maps 1.18.0 → incompatibili, fix in app.json ignorato)
   - APK v15: FAILED (fix newArchEnabled=false in app.json → ignorato, bare workflow usa gradle.properties)
@@ -139,7 +145,9 @@ Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare 
   - APK v18: FAILED (build ID: c4ff4d58) — react-native-reanimated 3.19.5 non compila con RN 0.83.4:
     hermes-engine::libhermes non trovato in CMake (struttura Hermes cambiata in RN 0.76+, Reanimated 3.x non aggiornato)
   - APK v19: FAILED — CRASH avvio: strings.xml expo_runtime_version=4.0.0 (doveva essere 7.0.0) + ACCESS_BACKGROUND_LOCATION in manifest
-  - APK v20: IN BUILD — fix strings.xml runtimeVersion 7.0.0 + rimozione ACCESS_BACKGROUND_LOCATION + rollback completo Task #564
+  - APK v20: FAILED — fix strings.xml runtimeVersion 7.0.0 + rimozione ACCESS_BACKGROUND_LOCATION + rollback completo Task #564
+  - APK v21–v27: build successive fino alla versione stabile
+  - APK v28: STABILE (corrente) — background location tracking (Task #607) + OTA 53–55
 
 ## ⚠️ ANALISI ARCHITETTURA (DEFINITIVA)
 React Native 0.82+ ha rimosso il supporto Old Architecture. Il flag newArchEnabled=false
