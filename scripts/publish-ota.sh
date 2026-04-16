@@ -207,16 +207,49 @@ if [ -z "${EXPO_TOKEN:-}" ]; then
   EAS_STATUS="skipped (EXPO_TOKEN mancante)"
 else
   EAS_LOG="/tmp/ota-eas-$$.log"
+  EAS_EXIT_FILE="/tmp/ota-eas-$$.exit"
+  rm -f "$EAS_EXIT_FILE"
+
+  # Avvia EAS in background staccato (setsid = nuovo process group, resiste alla morte del parent bash)
   set +e
-  CI=1 EXPO_PUBLIC_DOMAIN=biker-link.replit.app npx eas-cli@16 update \
-    --skip-bundler \
-    --input-dir "$DIST_DIR" \
-    --channel preview \
-    --message "$RELEASE_NOTES" \
-    --non-interactive \
-    --platform android \
-    > "$EAS_LOG" 2>&1
-  EAS_EXIT=$?
+  _DIST_DIR="$DIST_DIR"
+  _RELEASE_NOTES="$RELEASE_NOTES"
+  _EAS_LOG="$EAS_LOG"
+  _EAS_EXIT_FILE="$EAS_EXIT_FILE"
+  setsid bash -c "
+    CI=1 EXPO_PUBLIC_DOMAIN=biker-link.replit.app \
+    npx eas-cli@16 update \
+      --skip-bundler \
+      --input-dir '$_DIST_DIR' \
+      --channel preview \
+      --message '$_RELEASE_NOTES' \
+      --non-interactive \
+      --platform android \
+      >> '$_EAS_LOG' 2>&1
+    echo \$? > '$_EAS_EXIT_FILE'
+  " &
+  EAS_BG_PID=$!
+  echo "   EAS avviato (PID $EAS_BG_PID) — attendo fino a 300s..."
+
+  # Polling ogni 10s fino a completamento o timeout 300s
+  EAS_WAITED=0
+  while [ $EAS_WAITED -lt 300 ]; do
+    sleep 10
+    EAS_WAITED=$((EAS_WAITED + 10))
+    if [ -f "$EAS_EXIT_FILE" ]; then
+      echo "   EAS completato in ${EAS_WAITED}s"
+      break
+    fi
+    echo "   EAS in corso... ${EAS_WAITED}s"
+  done
+
+  if [ -f "$EAS_EXIT_FILE" ]; then
+    EAS_EXIT=$(cat "$EAS_EXIT_FILE")
+  else
+    echo "   ⚠️  EAS timeout dopo 300s — processo in background continua."
+    echo "   Controlla con: tail -f $EAS_LOG"
+    EAS_EXIT=1
+  fi
   set -e
 
   if [ $EAS_EXIT -ne 0 ]; then
@@ -251,7 +284,7 @@ else
     EAS_STATUS="pubblicato"
     echo "   ✅ EAS update pubblicato — group: $EAS_UPDATE_GROUP_ID"
   fi
-  rm -f "$EAS_LOG"
+  rm -f "$EAS_LOG" "$EAS_EXIT_FILE"
 fi
 
 echo ""
