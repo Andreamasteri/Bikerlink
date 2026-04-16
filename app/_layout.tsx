@@ -386,22 +386,36 @@ function OtaStartupChecker() {
   return null;
 }
 
+function navigateFromNotifData(data: { type?: string; unreadChat?: number } | undefined, router: ReturnType<typeof useRouter>) {
+  if (data?.type !== "background_badge") return;
+  if ((data?.unreadChat ?? 0) > 0) {
+    router.push("/(tabs)/chat");
+  } else {
+    router.push("/notifications");
+  }
+}
+
 function BackgroundNotificationHandler() {
   const router = useRouter();
 
   useEffect(() => {
     if (!Notifications) return;
+
+    (async () => {
+      try {
+        const lastResponse = await Notifications.getLastNotificationResponseAsync();
+        if (lastResponse) {
+          const data = lastResponse.notification.request.content.data as { type?: string; unreadChat?: number } | undefined;
+          navigateFromNotifData(data, router);
+        }
+      } catch {}
+    })();
+
     let sub: { remove: () => void } | null = null;
     try {
       sub = Notifications.addNotificationResponseReceivedListener((response) => {
         const data = response.notification.request.content.data as { type?: string; unreadChat?: number } | undefined;
-        if (data?.type !== "background_badge") return;
-        const unreadChat = data?.unreadChat ?? 0;
-        if (unreadChat > 0) {
-          router.push("/(tabs)/chat");
-        } else {
-          router.push("/notifications");
-        }
+        navigateFromNotifData(data, router);
       });
     } catch {}
     return () => { sub?.remove(); };

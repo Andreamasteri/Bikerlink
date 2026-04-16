@@ -27,6 +27,7 @@ async function scheduleBackgroundNotif(chat: number, notif: number) {
         title: "BikerLink",
         body: buildNotifBody(chat, notif),
         data: { type: "background_badge", unreadChat: chat, unreadNotif: notif },
+        ...(Platform.OS === "android" ? { channelId: "bikerlink-bg" } : {}),
       },
       trigger: null,
     });
