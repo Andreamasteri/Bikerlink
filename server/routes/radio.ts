@@ -99,7 +99,7 @@ const LASTFM_TO_GENRE: Record<string, string> = {
   indie: "indie",
   "indie rock": "indie",
   "indie pop": "indie",
-  "alternative": "indie",
+  "alternative": "rock",
   "alternative indie": "indie",
   "80s": "80s",
   "1980s": "80s",
@@ -138,8 +138,8 @@ const LASTFM_TO_GENRE: Record<string, string> = {
   "italian pop": "pop",
   "italo pop": "pop",
   "dance pop": "pop",
-  punk: "punk",
-  "punk rock": "punk",
+  punk: "rock",
+  "punk rock": "rock",
   "hardcore punk": "punk",
   reggae: "reggae",
   "reggaeton": "reggae",
@@ -150,7 +150,8 @@ const LASTFM_TO_GENRE: Record<string, string> = {
   soul: "soul",
   "r&b": "soul",
   "rnb": "soul",
-  funk: "soul",
+  "rhythm and blues": "soul",
+  funk: "electronic",
 };
 
 const RADIO_BROWSER_HOSTS = [
@@ -482,6 +483,7 @@ router.get("/suggested-genres", requireAuth, async (req: Request, res: Response)
     const apiKey = process.env.LASTFM_API_KEY;
     const username = session.lastfmUsername;
     const genreScore: Record<string, number> = {};
+    let artistStrategySucceeded = false;
 
     try {
       const artistsResp = await fetch(
@@ -504,7 +506,7 @@ router.get("/suggested-genres", requireAuth, async (req: Request, res: Response)
               buildLastfmUrl({ method: "artist.getTopTags", artist: name, limit: "10" }, apiKey),
               { signal: AbortSignal.timeout(5000) }
             );
-            if (!tagsResp.ok) return;
+            if (!tagsResp.ok) throw new Error(`artist.getTopTags ${tagsResp.status}`);
             const tagsData = await tagsResp.json() as {
               toptags?: { tag?: Array<{ name?: string; count?: string | number }> }
             };
@@ -517,13 +519,14 @@ router.get("/suggested-genres", requireAuth, async (req: Request, res: Response)
         );
 
         const succeededCount = tagResults.filter((r) => r.status === "fulfilled").length;
+        artistStrategySucceeded = succeededCount > 0;
         console.log(`[radio] suggested-genres: ${succeededCount}/${topArtists.length} artist tag calls succeeded`);
       }
     } catch (artistErr) {
       console.warn("[radio] suggested-genres: artist strategy failed, falling back to user tags", artistErr);
     }
 
-    if (Object.keys(genreScore).length < 2) {
+    if (!artistStrategySucceeded) {
       try {
         const tagsResp = await fetch(
           buildLastfmUrl({ method: "user.getTopTags", user: username }, apiKey),
