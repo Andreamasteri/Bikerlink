@@ -2435,7 +2435,8 @@
     "iosUpdateId": null,
     "commitBase": "4a72e0048d6df08bd676cfb9bc3a8d69bf158bf3",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/15a1f062-2d60-4737-b5e7-452c60578204",
-    "apkBuildId": null,
+    "apkBuildId": "4d4ad598-fd26-43a8-af55-ec01e7da1532",
+    "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/4d4ad598-fd26-43a8-af55-ec01e7da1532",
     "apkVersionCode": 28,
     "apkUrl": null,
     "status": "published"
