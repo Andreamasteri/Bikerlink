@@ -340,6 +340,7 @@ const LASTFM_SUGGEST_KEY = "radio_use_lastfm";
 
 function MusicRadioTab() {
   const { playRadioStation, selectedGenre, setSelectedGenre, favoriteStationIds, toggleFavorite, currentTrack } = usePlayer();
+  const queryClient = useQueryClient();
   const [useLastFm, setUseLastFm] = useState(false);
   const [loadingStationId, setLoadingStationId] = useState<string | null>(null);
 
@@ -368,9 +369,26 @@ function MusicRadioTab() {
     queryKey: ["/api/music/radio/genres"],
   });
 
+  const { data: lastfmStatus } = useQuery<{ connected: boolean; username: string | null }>({
+    queryKey: ["/api/lastfm/status"],
+    enabled: useLastFm,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const { data: suggestedGenreIds = [], isFetched: suggestedFetched } = useQuery<string[]>({
     queryKey: ["/api/music/radio/suggested-genres"],
     enabled: useLastFm,
+    staleTime: 5 * 60 * 1000,
+    refetchOnMount: true,
+  });
+
+  const disconnectLastfmMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/lastfm/disconnect", {}),
+    onSuccess: () => {
+      handleToggle(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/lastfm/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/music/radio/suggested-genres"] });
+    },
   });
 
   useEffect(() => {
@@ -417,9 +435,35 @@ function MusicRadioTab() {
         />
       </View>
       {useLastFm && suggestedFetched && suggestedGenreIds.length === 0 && (
-        <Text style={radioTabStyles.lastFmEmpty}>
-          Nessun genere trovato. Ascolta più musica su Last.fm!
-        </Text>
+        <View style={radioTabStyles.lastFmEmptyContainer}>
+          <Text style={radioTabStyles.lastFmEmpty}>
+            {lastfmStatus?.username
+              ? `Account: ${lastfmStatus.username} — nessun ascolto o brano salvato trovato.`
+              : "Nessun genere trovato. Ascolta più musica su Last.fm!"}
+          </Text>
+          {lastfmStatus?.connected && (
+            <TouchableOpacity
+              onPress={() => {
+                Alert.alert(
+                  "Disconnetti Last.fm",
+                  `Vuoi scollegare l'account ${lastfmStatus.username ?? ""}?`,
+                  [
+                    { text: "Annulla", style: "cancel" },
+                    {
+                      text: "Disconnetti",
+                      style: "destructive",
+                      onPress: () => disconnectLastfmMutation.mutate(),
+                    },
+                  ]
+                );
+              }}
+              disabled={disconnectLastfmMutation.isPending}
+              style={radioTabStyles.disconnectButton}
+            >
+              <Text style={radioTabStyles.disconnectText}>Disconnetti account</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
 
       <Text style={radioTabStyles.sectionTitle}>Generi</Text>
@@ -554,6 +598,10 @@ const radioTabStyles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
   },
+  lastFmEmptyContainer: {
+    alignItems: "center" as const,
+    paddingVertical: 4,
+  },
   lastFmEmpty: {
     fontFamily: "Inter_400Regular",
     fontSize: 12,
@@ -562,6 +610,19 @@ const radioTabStyles = StyleSheet.create({
     textAlign: "center" as const,
     paddingVertical: 8,
     paddingHorizontal: 16,
+  },
+  disconnectButton: {
+    marginTop: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E6394666",
+  },
+  disconnectText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: "#E63946",
   },
   sectionTitle: {
     fontFamily: "Inter_600SemiBold",

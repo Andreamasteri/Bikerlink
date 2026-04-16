@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db";
-import { userLastfmSessions } from "@shared/schema";
+import { userLastfmSessions, userMusicTracks } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const router = Router();
@@ -545,6 +545,54 @@ router.get("/suggested-genres", requireAuth, async (req: Request, res: Response)
       } catch (fallbackErr) {
         console.warn("[radio] suggested-genres: fallback user.getTopTags also failed", fallbackErr);
       }
+    }
+
+    try {
+      const savedTracks = await db
+        .select({
+          artistName: userMusicTracks.artistName,
+          genres: userMusicTracks.genres,
+          provider: userMusicTracks.provider,
+        })
+        .from(userMusicTracks)
+        .where(eq(userMusicTracks.userId, userId))
+        .limit(50);
+
+      const spotifyTracks = savedTracks.filter((t) => t.provider === "spotify");
+      for (const track of spotifyTracks) {
+        for (const genre of (track.genres ?? [])) {
+          const mapped = LASTFM_TO_GENRE[genre.toLowerCase().trim()];
+          if (mapped) {
+            genreScore[mapped] = (genreScore[mapped] ?? 0) + 0.6;
+          }
+        }
+      }
+
+      const lastfmTracks = savedTracks.filter((t) => t.provider === "lastfm");
+      const uniqueArtists = [...new Set(lastfmTracks.map((t) => t.artistName).filter(Boolean))].slice(0, 10);
+      if (uniqueArtists.length > 0 && apiKey) {
+        const savedTagResults = await Promise.allSettled(
+          uniqueArtists.map(async (artistName) => {
+            const tagsResp = await fetch(
+              buildLastfmUrl({ method: "artist.getTopTags", artist: artistName, limit: "10" }, apiKey),
+              { signal: AbortSignal.timeout(5000) }
+            );
+            if (!tagsResp.ok) throw new Error(`artist.getTopTags saved ${tagsResp.status}`);
+            const tagsData = await tagsResp.json() as {
+              toptags?: { tag?: Array<{ name?: string; count?: string | number }> }
+            };
+            const artistTags = tagsData?.toptags?.tag ?? [];
+            const partial = aggregateGenresFromTags(artistTags, 0.6);
+            for (const [genre, score] of Object.entries(partial)) {
+              genreScore[genre] = (genreScore[genre] ?? 0) + score;
+            }
+          })
+        );
+        const savedSucceeded = savedTagResults.filter((r) => r.status === "fulfilled").length;
+        console.log(`[radio] suggested-genres: ${savedSucceeded}/${uniqueArtists.length} saved-tracks artist tag calls succeeded`);
+      }
+    } catch (savedErr) {
+      console.warn("[radio] suggested-genres: saved tracks strategy failed", savedErr);
     }
 
     const sorted = Object.entries(genreScore)
