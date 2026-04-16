@@ -2624,7 +2624,7 @@
     "runtimeVersion": "7.0.0",
     "jsEngine": "hermes",
     "message": "OTA-62 rv7.0.0: Notifica background (expo-notifications) + pallino fix + match font",
-    "note": "Aggiunge expo-notifications per notifica Android in background: scheduleNotificationAsync al passaggio in background, dismiss al ritorno in foreground, deep-link su chat o notifications al tap. BikerLinkOverlay rimosso (nativo mai implementato). Match tab fontSize 12→14. CURRENT_OTA_NUMBER=62.",
+    "note": "Aggiunge expo-notifications per notifica Android in background: scheduleNotificationAsync al passaggio in background, dismiss al ritorno in foreground, deep-link su chat o notifications al tap. BikerLinkOverlay rimosso (nativo mai implementato). Match tab fontSize 12→14. CURRENT_OTA_NUMBER=62. APK v29 (2680c671) richiesto per modulo nativo: verifica post-install — logcat mostra 'ExpoNotifications' tra i moduli caricati; permission POST_NOTIFICATIONS deve comparire nelle impostazioni app.",
     "releaseId": "c31b39d8-9879-4f8e-b4fb-673532926e30",
     "bundleUrl": "private/ota/ota-1.62.0-1776352829855.js",
     "updateGroupId": "fca40db3-5902-4a11-b1fc-3bc4c556099d",
