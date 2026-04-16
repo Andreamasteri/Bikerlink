@@ -1,9 +1,9 @@
 import { NativeModules, Platform, Linking } from "react-native";
+import * as Application from "expo-application";
 
 const { BikerLinkOverlay } = NativeModules;
 
 const isSupported = Platform.OS === "android" && !!BikerLinkOverlay;
-const APP_PACKAGE = "com.bikerlink.app";
 
 export const OverlayNative = {
   checkPermission: (): Promise<boolean> => {
@@ -13,8 +13,9 @@ export const OverlayNative = {
 
   requestPermission: (): void => {
     if (!isSupported) {
+      const pkg = Application.applicationId ?? "com.bikerlink.app";
       Linking.openURL(
-        `intent://package:${APP_PACKAGE}#Intent;scheme=package;action=android.settings.action.MANAGE_OVERLAY_PERMISSION;end`
+        `intent://package:${pkg}#Intent;scheme=package;action=android.settings.action.MANAGE_OVERLAY_PERMISSION;end`
       ).catch(() => {
         Linking.openSettings().catch(() => {});
       });

@@ -39,6 +39,7 @@
     "docx": "^9.6.1",
     "drizzle-orm": "^0.45.2",
     "expo": "~55.0.15",
+    "expo-application": "^55.0.14",
     "expo-auth-session": "~55.0.14",
     "expo-av": "^16.0.8",
     "expo-camera": "~55.0.15",

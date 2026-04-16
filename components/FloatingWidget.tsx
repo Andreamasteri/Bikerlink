@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFloatingWidget } from "@/lib/floating-widget-context";
 import { useTheme } from "@/lib/theme-context";
@@ -178,7 +178,7 @@ export default function FloatingWidget() {
 
   const handleNotificationsPress = useCallback(() => {
     closeMenu();
-    router.push("/notifications" as any);
+    router.push("/notifications" as Href);
   }, [closeMenu, router]);
 
   const handlePlayerPress = useCallback(() => {
