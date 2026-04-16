@@ -9,8 +9,6 @@ import {
   Pressable,
   Dimensions,
   Platform,
-  AppState,
-  AppStateStatus,
   Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,7 +17,6 @@ import { useRouter, type Href } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFloatingWidget } from "@/lib/floating-widget-context";
 import { useTheme } from "@/lib/theme-context";
-import { OverlayNative } from "@/lib/overlay-native";
 
 const WIDGET_SIZE = 48;
 const POSITION_KEY = "floating_widget_position";
@@ -44,14 +41,6 @@ export default function FloatingWidget() {
   const [isTouching, setIsTouching] = useState(false);
   const dragDistanceRef = useRef(0);
   const menuOpacity = useRef(new Animated.Value(0)).current;
-
-  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
-  const overlayActiveRef = useRef(false);
-
-  const unreadChatRef = useRef(unreadChat);
-  const unreadNotifRef = useRef(unreadNotifications);
-  useEffect(() => { unreadChatRef.current = unreadChat; }, [unreadChat]);
-  useEffect(() => { unreadNotifRef.current = unreadNotifications; }, [unreadNotifications]);
 
   const openMenu = useCallback(() => {
     menuOpenRef.current = true;
@@ -80,44 +69,6 @@ export default function FloatingWidget() {
       setPositionLoaded(true);
     });
   }, []);
-
-  useEffect(() => {
-    if (Platform.OS !== "android" || !isVisible || !hasOverlayPermission) return;
-
-    if (AppState.currentState === "active" && overlayActiveRef.current) {
-      OverlayNative.hideOverlay();
-      overlayActiveRef.current = false;
-    }
-
-    const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
-      const prevState = appStateRef.current;
-      appStateRef.current = nextState;
-
-      if (
-        prevState === "active" &&
-        (nextState === "background" || nextState === "inactive")
-      ) {
-        OverlayNative.showOverlay(unreadChatRef.current, unreadNotifRef.current);
-        overlayActiveRef.current = true;
-      } else if (nextState === "active" && overlayActiveRef.current) {
-        OverlayNative.hideOverlay();
-        overlayActiveRef.current = false;
-      }
-    });
-
-    return () => {
-      subscription.remove();
-      if (overlayActiveRef.current) {
-        OverlayNative.hideOverlay();
-        overlayActiveRef.current = false;
-      }
-    };
-  }, [isVisible, hasOverlayPermission]);
-
-  useEffect(() => {
-    if (Platform.OS !== "android" || !overlayActiveRef.current) return;
-    OverlayNative.updateBadges(unreadChat, unreadNotifications);
-  }, [unreadChat, unreadNotifications]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -190,7 +141,7 @@ export default function FloatingWidget() {
   const handlePermissionBannerPress = useCallback(() => {
     Alert.alert(
       "Permesso necessario",
-      'Per mostrare il pallino quando esci dall\'app, concedi il permesso "Mostra sopra le altre app".\n\n📱 Dove trovarlo:\nInfo App → Avanzate → "Mostra sopra le altre app"\n\n⚠️ Non è in Permessi → Posizione. Cerca specificamente "Mostra sopra le altre app".',
+      'Per mostrare il pallino quando esci dall\'app, concedi il permesso "Mostra sopra le altre app".\n\n📱 Dove trovarlo:\nNella schermata Informazioni app, scorri fino in fondo e tocca "Mostra sopra le altre app", poi attiva il permesso.\n\n✅ Il pallino apparirà automaticamente la prossima volta che premi Home.',
       [
         { text: "Annulla", style: "cancel" },
         { text: "Apri Impostazioni", onPress: requestOverlayPermission },

@@ -2525,7 +2525,29 @@
     "apkBuildId": null,
     "apkVersionCode": 28,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-16T10:10:16.331Z"
+  },
+  {
+    "updateNumber": 58,
+    "version": "1.58.0",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-58 rv7.0.0: Fix pallino flottante — logica AppState nel context + istruzioni permesso corrette",
+    "note": "Task #617: Spostata logica showOverlay/hideOverlay da FloatingWidget.tsx a floating-widget-context.tsx — risolve timing race tra mount async checkPermission e AppState listener. Corretto testo Alert istruzioni permesso overlay.",
+    "releaseId": "b00eff21-58db-4f77-96ec-912a89a36977",
+    "bundleUrl": "private/ota/ota-1.58.0-1776337304190.js",
+    "updateGroupId": "dd7529b3-9721-4e44-bb43-324fb03ea861",
+    "androidUpdateId": "019d95f5-531f-759f-8aa4-d5cf83a03a12",
+    "iosUpdateId": null,
+    "commitBase": "6ed1e1ab28b32e79692c48dd92a814bfa55bc98e",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/dd7529b3-9721-4e44-bb43-324fb03ea861",
+    "apkBuildId": null,
+    "apkVersionCode": 28,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-16T11:01:47.099Z"
   }
 ]

@@ -100,6 +100,56 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
     setSuppressed(suppress);
   }, []);
 
+  // --- Overlay Android: mostra pallino nativo quando app è in background ---
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const overlayActiveRef = useRef(false);
+
+  const unreadChatRef = useRef(unreadChat);
+  const unreadNotifRef = useRef(unreadNotifications);
+  useEffect(() => { unreadChatRef.current = unreadChat; }, [unreadChat]);
+  useEffect(() => { unreadNotifRef.current = unreadNotifications; }, [unreadNotifications]);
+
+  useEffect(() => {
+    if (Platform.OS !== "android" || !isVisible || !hasOverlayPermission) {
+      if (overlayActiveRef.current) {
+        OverlayNative.hideOverlay();
+        overlayActiveRef.current = false;
+      }
+      return;
+    }
+
+    if (AppState.currentState === "active" && overlayActiveRef.current) {
+      OverlayNative.hideOverlay();
+      overlayActiveRef.current = false;
+    }
+
+    const sub = AppState.addEventListener("change", (nextState: AppStateStatus) => {
+      const prevState = appStateRef.current;
+      appStateRef.current = nextState;
+
+      if (prevState === "active" && (nextState === "background" || nextState === "inactive")) {
+        OverlayNative.showOverlay(unreadChatRef.current, unreadNotifRef.current);
+        overlayActiveRef.current = true;
+      } else if (nextState === "active" && overlayActiveRef.current) {
+        OverlayNative.hideOverlay();
+        overlayActiveRef.current = false;
+      }
+    });
+
+    return () => {
+      sub.remove();
+      if (overlayActiveRef.current) {
+        OverlayNative.hideOverlay();
+        overlayActiveRef.current = false;
+      }
+    };
+  }, [isVisible, hasOverlayPermission]);
+
+  useEffect(() => {
+    if (Platform.OS !== "android" || !overlayActiveRef.current) return;
+    OverlayNative.updateBadges(unreadChat, unreadNotifications);
+  }, [unreadChat, unreadNotifications]);
+
   return (
     <FloatingWidgetContext.Provider value={{
       isVisible,
