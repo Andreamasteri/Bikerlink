@@ -2396,6 +2396,27 @@
     "apkBuildId": null,
     "apkVersionCode": 27,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 52,
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-52 rv7.0.0: Fix vista pubblica club — logo, country, CTA, 403 via status code",
+    "note": "Task #606 fix review: 1) Logo club visualizzato se logoUrl disponibile (fallback shield icon). 2) Country mostrato con emoji bandiera + codice paese accanto alla region. 3) CTA cambiata in 'Entra nel club' (tutti i club usano join diretto senza approvazione). 4) Rilevamento non-membro usa HTTP status 403 via custom queryFn invece di confronto stringa errore. CURRENT_OTA_NUMBER=52.",
+    "releaseId": "fa554bec-8549-4751-875a-2734f7ba2dd0",
+    "bundleUrl": "private/ota/ota-1.52.0-1776310096843.js",
+    "updateGroupId": "1daca626-4d97-4699-9154-e089a519c3dc",
+    "androidUpdateId": "019d9455-be12-7e05-86b3-6c1b086f52f4",
+    "iosUpdateId": null,
+    "commitBase": "00c02fa2112b1e08cde12de5b354e6a3e708f11b",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/1daca626-4d97-4699-9154-e089a519c3dc",
+    "apkBuildId": null,
+    "apkVersionCode": 27,
+    "apkUrl": null,
     "status": "published"
   }
 ]

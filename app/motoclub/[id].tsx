@@ -10,6 +10,7 @@ import {
   Modal,
   TextInput,
   Alert,
+  Image,
 } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -17,7 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import MapView, { Marker } from "react-native-maps";
 import Colors from "@/constants/colors";
-import { apiRequest, queryClient } from "@/lib/query-client";
+import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import * as Location from "expo-location";
 import FavoriteStar from "@/components/FavoriteStar";
 import { useAuth } from "@/lib/auth-context";
@@ -142,9 +143,22 @@ export default function ClubDetailScreen() {
   const { data: club, isLoading, error } = useQuery<ClubDetail>({
     queryKey: [queryKey],
     enabled: !!id,
+    queryFn: async () => {
+      const res = await fetch(new URL(queryKey, getApiUrl()).toString(), { credentials: "include" });
+      if (res.status === 403) {
+        const e = new Error("Non sei membro di questo club") as Error & { status: number };
+        e.status = 403;
+        throw e;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { message?: string }).message || `${res.status}`);
+      }
+      return res.json() as Promise<ClubDetail>;
+    },
   });
 
-  const isNotMember = error?.message === "Non sei membro di questo club";
+  const isNotMember = (error as (Error & { status?: number }) | null)?.status === 403;
 
   const { data: publicClub, isLoading: isLoadingPublic } = useQuery<PublicClubInfo>({
     queryKey: [`/api/motoclubs/${id}/public`],
@@ -255,6 +269,7 @@ export default function ClubDetailScreen() {
     const clubTypeLabel =
       publicClub.clubType === "brand" ? "Marca" :
       publicClub.clubType === "model" ? "Modello" : "Custom";
+    const locationLabel = [publicClub.region, publicClub.country ? countryFlag(publicClub.country) + " " + publicClub.country.toUpperCase() : null].filter(Boolean).join(" · ");
     return (
       <View style={[styles.container, { paddingTop: topPad }]}>
         <View style={styles.navBar}>
@@ -268,10 +283,15 @@ export default function ClubDetailScreen() {
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
           <View style={styles.heroCard}>
             <View style={styles.heroIconWrap}>
-              <Ionicons name="shield" size={40} color={Colors.accent} />
+              {publicClub.logoUrl ? (
+                <Image source={{ uri: publicClub.logoUrl }} style={{ width: 56, height: 56, borderRadius: 12 }} resizeMode="contain" />
+              ) : (
+                <Ionicons name="shield" size={40} color={Colors.accent} />
+              )}
             </View>
             <Text style={styles.heroName}>{publicClub.name}</Text>
             {pubBrandOrModel ? <Text style={styles.heroSub}>{pubBrandOrModel}</Text> : null}
+            {locationLabel ? <Text style={[styles.heroSub, { fontSize: 13, marginTop: 2 }]}>{locationLabel}</Text> : null}
             <View style={styles.heroBadges}>
               <View style={[styles.badge, { backgroundColor: Colors.accent + "22" }]}>
                 <Text style={[styles.badgeText, { color: Colors.accent }]}>{clubTypeLabel}</Text>
@@ -296,16 +316,14 @@ export default function ClubDetailScreen() {
               <Text style={styles.statValue}>{publicClub.activityScore}</Text>
               <Text style={styles.statLabel}>Attività</Text>
             </View>
-            {publicClub.region ? (
-              <>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Ionicons name="location-outline" size={20} color={Colors.textSecondary} />
-                  <Text style={styles.statValue} numberOfLines={1}>{publicClub.region}</Text>
-                  <Text style={styles.statLabel}>Regione</Text>
-                </View>
-              </>
-            ) : null}
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Ionicons name="calendar-outline" size={20} color={Colors.textSecondary} />
+              <Text style={styles.statValue}>
+                {new Date(publicClub.createdAt).toLocaleDateString("it-IT", { month: "short", year: "numeric" })}
+              </Text>
+              <Text style={styles.statLabel}>Creato</Text>
+            </View>
           </View>
 
           <TouchableOpacity
@@ -319,7 +337,7 @@ export default function ClubDetailScreen() {
             ) : (
               <>
                 <Ionicons name="person-add" size={18} color="#fff" />
-                <Text style={styles.joinBtnText}>Richiedi di entrare</Text>
+                <Text style={styles.joinBtnText}>Entra nel club</Text>
               </>
             )}
           </TouchableOpacity>
