@@ -116,7 +116,7 @@ export default function TabLayout() {
 
   const HIDDEN_TAB_NAMES = new Set(["tracking", "garage"]);
   if (isGpsGateActive) {
-    ["index", "proposals", "ready", "motoclub", "match", "music", "chat", "contest", "eventi"].forEach(
+    ["index", "proposals", "ready", "motoclub", "match", "music", "chat", "contest", "eventi", "arcade"].forEach(
       (n) => HIDDEN_TAB_NAMES.add(n)
     );
   }
@@ -328,6 +328,17 @@ export default function TabLayout() {
               <Ionicons name="camera" size={size} color={color} />
             ),
             headerTitle: "Pic!",
+            href: gpsTabHref,
+          }}
+        />
+        <Tabs.Screen
+          name="arcade"
+          options={{
+            title: "Arcade",
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="game-controller" size={size} color={color} />
+            ),
+            headerTitle: "Arcade",
             href: gpsTabHref,
           }}
         />

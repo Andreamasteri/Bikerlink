@@ -11,6 +11,7 @@ import {
   jsonb,
   index,
   uniqueIndex,
+  pgEnum,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -1290,6 +1291,32 @@ export const userFavorites = pgTable("user_favorites", {
   index("user_favorites_user_id_idx").on(table.userId),
 ]);
 
+
+export const arcadeGameEnum = pgEnum("arcade_game", [
+  "endless_biker",
+  "traffic_racer",
+  "wheelie",
+  "tetris",
+  "space_invaders",
+]);
+
+export const arcadeScores = pgTable("arcade_scores", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  game: arcadeGameEnum("game").notNull(),
+  score: integer("score").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("arcade_scores_user_game_idx").on(table.userId, table.game),
+  index("arcade_scores_game_score_idx").on(table.game, table.score),
+]);
+
+export type ArcadeScore = typeof arcadeScores.$inferSelect;
+export type InsertArcadeScore = typeof arcadeScores.$inferInsert;
 
 export const eventClubInvites = pgTable("event_club_invites", {
   id: varchar("id", { length: 36 })

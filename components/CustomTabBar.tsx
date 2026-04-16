@@ -27,7 +27,7 @@ interface CustomTabBarProps {
   tabBarPaddingBottom: number;
 }
 
-const COMMUNITY_TABS = new Set(["match", "motoclub", "contest", "music", "eventi"]);
+const COMMUNITY_TABS = new Set(["match", "motoclub", "contest", "music", "eventi", "arcade"]);
 const MAX_SCORRI_VISIBLE = 6;
 
 function TabIcon({ tab, isActive }: { tab: TabItem; isActive: boolean }) {
