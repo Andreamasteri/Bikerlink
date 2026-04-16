@@ -586,8 +586,8 @@ export default function RootLayout() {
                     <LanguageKeyedRoot />
                   </MapReadyGate>
                 </StartupGate>
-                <FloatingWidget />
                 </GestureHandlerRootView>
+                <FloatingWidget />
                 </FloatingWidgetProvider>
                 </PlayerProvider>
               </LocationProvider>

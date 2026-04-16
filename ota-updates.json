@@ -2679,7 +2679,29 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-16T21:03:00.000Z"
+  },
+  {
+    "updateNumber": 65,
+    "version": "1.65.0",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-65 rv7.0.0: Fix pallino — position:absolute fuori da GHRV, elevation:20",
+    "note": "Fix definitivo FloatingWidget dopo regressione OTA-64 (Modal bloccava touch): rimosso Modal, ripristinato position:absolute con elevation:20 sul container, spostato FloatingWidget FUORI da GestureHandlerRootView in _layout.tsx (sibling dopo GHRV, dentro FloatingWidgetProvider). PanResponder non richiede GHRV. CURRENT_OTA_NUMBER=65.",
+    "releaseId": "f60f3841-839a-4c25-b099-960260891e11",
+    "bundleUrl": "private/ota/ota-1.65.0-1776376717436.js",
+    "updateGroupId": "5bbb7e41-a12b-4384-ae2d-7e2615a75100",
+    "androidUpdateId": "019d984e-7788-73ce-b5a3-5d5776e8a0ea",
+    "iosUpdateId": null,
+    "commitBase": "67fde0227c55d05d904ea8d8a61fe16622db8c57",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/5bbb7e41-a12b-4384-ae2d-7e2615a75100",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-16T21:58:40.413Z"
   }
 ]
