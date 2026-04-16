@@ -2418,5 +2418,26 @@
     "apkVersionCode": 27,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 53,
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-53 rv7.0.0: Background Location Tracking — TaskManager + permesso Always + admin panel",
+    "note": "Task #607: (1) lib/background-location-task.ts — TaskManager.defineTask con guard try/catch, cache settings 5min in AsyncStorage, trigger modes (always/tracking/sos/tracking_or_sos), ghost mode check. (2) location-context.tsx — hasBackgroundPermission, requestBackgroundPermission() con Alert.alert esplicativo + ios blue dot/android notifica. (3) app/_layout.tsx — AppStateHandler avvia startLocationUpdatesAsync se permesso background concesso, ferma al logout. (4) AndroidManifest.xml — ACCESS_BACKGROUND_LOCATION aggiunto (richiede APK v28). Admin panel già completo (Task prev). Codice degrada silenziosamente su APK v27 (guard isBackgroundLocationSupported). CURRENT_OTA_NUMBER=53.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": null,
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 28,
+    "apkUrl": null,
+    "status": "pending"
   }
 ]

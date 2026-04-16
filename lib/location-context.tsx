@@ -1,21 +1,27 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
-import { Platform, AppState, AppStateStatus } from "react-native";
+import { Platform, AppState, AppStateStatus, Alert } from "react-native";
 import * as Location from "expo-location";
 import { useQuery } from "@tanstack/react-query";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 
 interface LocationContextType {
   hasLocationPermission: boolean;
+  hasBackgroundPermission: boolean;
+  backgroundPermissionRevoked: boolean;
   gpsRequired: boolean;
   isGpsGateActive: boolean;
   requestPermission: () => Promise<boolean>;
+  requestBackgroundPermission: () => Promise<boolean>;
 }
 
 const LocationContext = createContext<LocationContextType>({
   hasLocationPermission: true,
+  hasBackgroundPermission: false,
+  backgroundPermissionRevoked: false,
   gpsRequired: true,
   isGpsGateActive: false,
   requestPermission: async () => true,
+  requestBackgroundPermission: async () => false,
 });
 
 export function useLocationGate() {
@@ -23,6 +29,7 @@ export function useLocationGate() {
 }
 
 const GPS_CHECK_INTERVAL = 4000;
+const BG_PERMISSION_CHECK_INTERVAL = 30000;
 
 function isWebPermissionsAvailable(): boolean {
   try {
@@ -37,8 +44,11 @@ function isWebPermissionsAvailable(): boolean {
 
 export function LocationProvider({ children }: { children: React.ReactNode }) {
   const [hasPermission, setHasPermission] = useState(true);
+  const [hasBackgroundPermission, setHasBackgroundPermission] = useState(false);
+  const [backgroundPermissionRevoked, setBackgroundPermissionRevoked] = useState(false);
   const appState = useRef(AppState.currentState);
   const permissionStatusRef = useRef<PermissionStatus | null>(null);
+  const hadBackgroundPermissionRef = useRef(false);
 
   const { data: gpsData } = useQuery<{ required: boolean }>({
     queryKey: ["/api/settings/gps-required"],
@@ -62,6 +72,24 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       }
     } catch {
       setHasPermission(true);
+    }
+  }, []);
+
+  const checkBackgroundPermission = useCallback(async () => {
+    if (Platform.OS === "web") return;
+    try {
+      const { status } = await Location.getBackgroundPermissionsAsync();
+      const granted = status === "granted";
+      setHasBackgroundPermission(granted);
+
+      if (hadBackgroundPermissionRef.current && !granted) {
+        setBackgroundPermissionRevoked(true);
+      } else if (granted) {
+        hadBackgroundPermissionRef.current = true;
+        setBackgroundPermissionRevoked(false);
+      }
+    } catch {
+      setHasBackgroundPermission(false);
     }
   }, []);
 
@@ -91,13 +119,49 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const requestBackgroundPermission = useCallback(async (): Promise<boolean> => {
+    if (Platform.OS === "web") return false;
+
+    return new Promise<boolean>((resolve) => {
+      Alert.alert(
+        "Posizione in Background",
+        "BikerLink ha bisogno della tua posizione anche quando l'app è minimizzata per:\n\n• Registrare percorsi in moto senza interruzioni\n• Inviare la posizione durante un'emergenza SOS\n• Mantenere la tua visibilità per la community\n\nTocca Continua e seleziona \"Sempre\" nella schermata successiva.",
+        [
+          {
+            text: "Non ora",
+            style: "cancel",
+            onPress: () => resolve(false),
+          },
+          {
+            text: "Continua",
+            onPress: async () => {
+              try {
+                const { status } = await Location.requestBackgroundPermissionsAsync();
+                const granted = status === "granted";
+                setHasBackgroundPermission(granted);
+                if (granted) {
+                  hadBackgroundPermissionRef.current = true;
+                  setBackgroundPermissionRevoked(false);
+                }
+                resolve(granted);
+              } catch {
+                resolve(false);
+              }
+            },
+          },
+        ]
+      );
+    });
+  }, []);
+
   useEffect(() => {
     sendStartupBeacon("location_provider_mount");
   }, []);
 
   useEffect(() => {
     checkPermission();
-  }, [checkPermission]);
+    checkBackgroundPermission();
+  }, [checkPermission, checkBackgroundPermission]);
 
   useEffect(() => {
     if (!gpsRequired) return;
@@ -109,15 +173,22 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (Platform.OS === "web") return;
+    const interval = setInterval(checkBackgroundPermission, BG_PERMISSION_CHECK_INTERVAL);
+    return () => clearInterval(interval);
+  }, [checkBackgroundPermission]);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
 
     const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
       if (appState.current.match(/inactive|background/) && nextState === "active") {
         checkPermission();
+        checkBackgroundPermission();
       }
       appState.current = nextState;
     });
     return () => subscription.remove();
-  }, [checkPermission]);
+  }, [checkPermission, checkBackgroundPermission]);
 
   useEffect(() => {
     if (!isWebPermissionsAvailable()) return;
@@ -147,9 +218,12 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   return (
     <LocationContext.Provider value={{
       hasLocationPermission: hasPermission,
+      hasBackgroundPermission,
+      backgroundPermissionRevoked,
       gpsRequired,
       isGpsGateActive,
       requestPermission,
+      requestBackgroundPermission,
     }}>
       {children}
     </LocationContext.Provider>

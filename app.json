@@ -32,7 +32,7 @@
     },
     "android": {
       "package": "com.bikerlink.app",
-      "versionCode": 27,
+      "versionCode": 28,
       "config": {
         "googleMaps": {
           "apiKey": ""
@@ -41,6 +41,7 @@
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
         "READ_MEDIA_IMAGES",
         "READ_MEDIA_AUDIO",
         "CAMERA",

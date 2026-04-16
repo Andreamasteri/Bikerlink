@@ -40,7 +40,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient, apiRequest } from "@/lib/query-client";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
-import { LocationProvider } from "@/lib/location-context";
+import { LocationProvider, useLocationGate } from "@/lib/location-context";
 import { LanguageProvider, useLanguage } from "@/lib/language-context";
 import { MapSettingsProvider, useMapConfig } from "@/lib/map-context";
 import { TaskbarStyleProvider } from "@/lib/taskbar-style-context";
@@ -51,6 +51,12 @@ import FloatingWidget from "@/components/FloatingWidget";
 import UptimeWidget from "@/components/UptimeWidget";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { sendStartupBeacon, recoverLastBeacon } from "@/lib/startup-beacon";
+import {
+  BACKGROUND_LOCATION_TASK_NAME,
+  startBackgroundLocationTask,
+  stopBackgroundLocationTask,
+  isBackgroundLocationSupported,
+} from "@/lib/background-location-task";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -79,6 +85,7 @@ async function sendWebLocation() {
 
 function AppStateHandler() {
   const { user } = useAuth();
+  const { hasBackgroundPermission } = useLocationGate();
   const appStateRef = useRef(AppState.currentState);
   const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const webLocationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -172,6 +179,42 @@ function AppStateHandler() {
       stopNativeWatcher();
     };
   }, [user]);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    if (!user) {
+      stopBackgroundLocationTask().catch(() => {});
+      return;
+    }
+    if (!hasBackgroundPermission) return;
+
+    async function maybeStartBgTask() {
+      try {
+        const supported = await isBackgroundLocationSupported();
+        if (!supported) return;
+
+        let intervalSeconds = 30;
+        let notificationText = "BikerLink: {motivo} — posizione attiva in background";
+        try {
+          const domain = process.env.EXPO_PUBLIC_DOMAIN || "biker-link.replit.app";
+          const res = await fetch(`https://${domain}/api/admin/settings/bg-location`, {
+            credentials: "include",
+          });
+          if (res.ok) {
+            const settings = await res.json();
+            if (settings.enabled === false) return;
+            intervalSeconds = settings.intervalSeconds || 30;
+            notificationText = settings.notificationText || notificationText;
+          }
+        } catch {}
+
+        await startBackgroundLocationTask(intervalSeconds, notificationText);
+        sendStartupBeacon("bg_location_task_started");
+      } catch {}
+    }
+
+    maybeStartBgTask();
+  }, [user, hasBackgroundPermission]);
 
   return null;
 }
