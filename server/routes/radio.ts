@@ -226,11 +226,20 @@ router.get("/stations", async (req: Request, res: Response) => {
   }
 
   const tag = GENRE_TAG_MAP[genre] ?? genre;
+  const fallbackTag = genre === "anime-8090" ? "anisong" : null;
 
   try {
-    const stations = await fetchRadioBrowser(
+    let stations = await fetchRadioBrowser(
       `json/stations/bytag/${encodeURIComponent(tag)}?limit=${limit}&order=votes&reverse=true&hidebroken=true`
     );
+
+    if (fallbackTag && stations.filter((s) => !!s.url_resolved).length < 3) {
+      const fallback = await fetchRadioBrowser(
+        `json/stations/bytag/${encodeURIComponent(fallbackTag)}?limit=${limit}&order=votes&reverse=true&hidebroken=true`
+      );
+      const existingIds = new Set(stations.map((s) => s.stationuuid));
+      stations = [...stations, ...fallback.filter((s) => !existingIds.has(s.stationuuid))];
+    }
 
     const mapped = stations
       .filter((s) => !!s.url_resolved)
