@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from "react";
+import React, { useRef, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,6 @@ import {
   Pressable,
   Dimensions,
   Platform,
-  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,7 +22,7 @@ const POSITION_KEY = "floating_widget_position";
 const TAP_THRESHOLD = 5;
 
 export default function FloatingWidget() {
-  const { isVisible, unreadChat, unreadNotifications, hasOverlayPermission, requestOverlayPermission } = useFloatingWidget();
+  const { isVisible, unreadChat, unreadNotifications } = useFloatingWidget();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -138,16 +137,6 @@ export default function FloatingWidget() {
     router.push("/(tabs)/music");
   }, [closeMenu, router]);
 
-  const handlePermissionBannerPress = useCallback(() => {
-    Alert.alert(
-      "Permesso necessario",
-      'Per mostrare il pallino quando esci dall\'app, concedi il permesso "Mostra sopra le altre app".\n\n📱 Dove trovarlo:\nNella schermata Informazioni app, scorri fino in fondo e tocca "Mostra sopra le altre app", poi attiva il permesso.\n\n✅ Il pallino apparirà automaticamente la prossima volta che premi Home.',
-      [
-        { text: "Annulla", style: "cancel" },
-        { text: "Apri Impostazioni", onPress: requestOverlayPermission },
-      ]
-    );
-  }, [requestOverlayPermission]);
 
   if (!isVisible || !positionLoaded) return null;
   if (Platform.OS === "web") return null;
@@ -236,36 +225,6 @@ export default function FloatingWidget() {
         </View>
       </Animated.View>
 
-      {Platform.OS === "android" && !hasOverlayPermission && (
-        <Pressable
-          style={[
-            styles.permissionBanner,
-            {
-              bottom: insets.bottom + 90,
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-            },
-          ]}
-          onPress={handlePermissionBannerPress}
-        >
-          <Ionicons name="layers-outline" size={18} color={colors.accent} />
-          <View style={styles.permissionBannerContent}>
-            <Text
-              style={[styles.permissionBannerText, { color: colors.text }]}
-              numberOfLines={1}
-            >
-              Attiva widget in background
-            </Text>
-            <Text
-              style={[styles.permissionBannerSub, { color: colors.textSecondary ?? colors.text }]}
-              numberOfLines={1}
-            >
-              Separato da Posizione — cerca "Mostra sopra le altre app"
-            </Text>
-          </View>
-          <Text style={[styles.permissionBannerCta, { color: colors.accent }]}>Attiva →</Text>
-        </Pressable>
-      )}
     </>
   );
 }
@@ -356,39 +315,5 @@ const styles = StyleSheet.create({
   menuDivider: {
     height: 1,
     marginHorizontal: 0,
-  },
-  permissionBanner: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  permissionBannerContent: {
-    flex: 1,
-    gap: 2,
-  },
-  permissionBannerText: {
-    fontSize: 13,
-    fontWeight: "600" as const,
-  },
-  permissionBannerSub: {
-    fontSize: 11,
-    fontWeight: "400" as const,
-    opacity: 0.75,
-  },
-  permissionBannerCta: {
-    fontSize: 13,
-    fontWeight: "700" as const,
   },
 });

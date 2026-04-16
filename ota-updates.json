@@ -2591,7 +2591,29 @@
     "apkBuildId": null,
     "apkVersionCode": 28,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-16T13:08:03.000Z"
+  },
+  {
+    "updateNumber": 61,
+    "version": "1.61.0",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-61 rv7.0.0: Fix pallino background (rimozione overlay broken) + match tab font",
+    "note": "BikerLinkOverlay nativo mai implementato: rimosso flusso 'Attiva widget in background' fuorviante. Pallino in-app invariato. Match tab fontSize 12→14. OTA checker già corretto (nessun AsyncStorage). CURRENT_OTA_NUMBER=61.",
+    "releaseId": "49183a66-a07c-442d-a80f-bac8127f6384",
+    "bundleUrl": "private/ota/ota-1.61.0-1776352307800.js",
+    "updateGroupId": "0c3093c6-4024-4bb5-b270-64c91d027ef3",
+    "androidUpdateId": "019d96da-50fc-7f96-a639-a15692e8b03d",
+    "iosUpdateId": null,
+    "commitBase": "e5fcd11033be191cfb52eb380ff601bc72dc2e00",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/0c3093c6-4024-4bb5-b270-64c91d027ef3",
+    "apkBuildId": null,
+    "apkVersionCode": 28,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-16T15:18:27.800Z"
   }
 ]
