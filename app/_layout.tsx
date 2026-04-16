@@ -93,12 +93,20 @@ function AppStateHandler() {
   const locationWatcherRef = useRef<Location.LocationSubscription | null>(null);
 
   useEffect(() => {
+    if (hasBackgroundPermission && locationWatcherRef.current) {
+      locationWatcherRef.current.remove();
+      locationWatcherRef.current = null;
+    }
+  }, [hasBackgroundPermission]);
+
+  useEffect(() => {
     if (!user) return;
 
     let cancelled = false;
 
     async function startNativeWatcher() {
       if (locationWatcherRef.current) return;
+      if (hasBackgroundPermission) return;
       try {
         sendStartupBeacon("gps_check_start");
         const { status } = await Location.getForegroundPermissionsAsync();
@@ -163,7 +171,7 @@ function AppStateHandler() {
         if (Platform.OS === "web") {
           sendWebLocation();
         } else {
-          if (!locationWatcherRef.current) {
+          if (!locationWatcherRef.current && !hasBackgroundPermission) {
             startNativeWatcher();
           }
         }

@@ -28,14 +28,14 @@ export async function startBackgroundLocationTask(
     const supported = await isBackgroundLocationSupported();
     if (!supported) return false;
 
-    const body = notificationText.replace("{motivo}", "monitoraggio posizione");
+    const body = notificationText.replace("{motivo}", "monitoraggio attivo");
 
     await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME, {
       accuracy: Location.Accuracy.Balanced,
       timeInterval: intervalSeconds * 1000,
       distanceInterval: 10,
       foregroundService: {
-        notificationTitle: "BikerLink",
+        notificationTitle: "BikerLink — monitoraggio attivo",
         notificationBody: body,
         notificationColor: "#FF6600",
       },
@@ -87,7 +87,7 @@ async function fetchAndCacheSettings(domain: string): Promise<{
     enabled: true,
     trigger: "always",
     intervalSeconds: 30,
-    notificationText: "BikerLink: {motivo} — posizione attiva in background",
+    notificationText: "BikerLink — {motivo}: posizione attiva in background",
     ghostModeContinue: false,
   };
   try {
