@@ -210,24 +210,27 @@ else
   EAS_EXIT_FILE="/tmp/ota-eas-$$.exit"
   rm -f "$EAS_EXIT_FILE"
 
-  # Avvia EAS in background staccato (setsid = nuovo process group, resiste alla morte del parent bash)
+  # Avvia EAS in background staccato — setsid crea nuovo process group che sopravvive alla morte del parent bash
+  # Variabili passate via env (sicuro contro caratteri speciali nei valori, es. apostrofi nelle note)
   set +e
-  _DIST_DIR="$DIST_DIR"
-  _RELEASE_NOTES="$RELEASE_NOTES"
-  _EAS_LOG="$EAS_LOG"
-  _EAS_EXIT_FILE="$EAS_EXIT_FILE"
-  setsid bash -c "
+  EAS_COMPLETED=0
+  env \
+    _EAS_INPUT_DIR="$DIST_DIR" \
+    _EAS_NOTES="$RELEASE_NOTES" \
+    _EAS_LOG="$EAS_LOG" \
+    _EAS_EXIT_FILE="$EAS_EXIT_FILE" \
+  setsid bash -c '
     CI=1 EXPO_PUBLIC_DOMAIN=biker-link.replit.app \
     npx eas-cli@16 update \
       --skip-bundler \
-      --input-dir '$_DIST_DIR' \
+      --input-dir "$_EAS_INPUT_DIR" \
       --channel preview \
-      --message '$_RELEASE_NOTES' \
+      --message "$_EAS_NOTES" \
       --non-interactive \
       --platform android \
-      >> '$_EAS_LOG' 2>&1
-    echo \$? > '$_EAS_EXIT_FILE'
-  " &
+      >> "$_EAS_LOG" 2>&1
+    echo $? > "$_EAS_EXIT_FILE"
+  ' &
   EAS_BG_PID=$!
   echo "   EAS avviato (PID $EAS_BG_PID) — attendo fino a 300s..."
 
@@ -238,41 +241,39 @@ else
     EAS_WAITED=$((EAS_WAITED + 10))
     if [ -f "$EAS_EXIT_FILE" ]; then
       echo "   EAS completato in ${EAS_WAITED}s"
+      EAS_COMPLETED=1
       break
     fi
     echo "   EAS in corso... ${EAS_WAITED}s"
   done
 
-  if [ -f "$EAS_EXIT_FILE" ]; then
+  if [ "$EAS_COMPLETED" -eq 1 ]; then
     EAS_EXIT=$(cat "$EAS_EXIT_FILE")
   else
-    echo "   ⚠️  EAS timeout dopo 300s — processo in background continua."
-    echo "   Controlla con: tail -f $EAS_LOG"
+    echo "   ⚠️  EAS timeout dopo 300s — processo setsid continua in background."
+    echo "   Monitorare: tail -f $EAS_LOG"
+    echo "   Quando completato, leggere gli ID da quel file."
     EAS_EXIT=1
+    EAS_STATUS="IN_BACKGROUND — monitorare: tail -f $EAS_LOG"
   fi
   set -e
 
-  if [ $EAS_EXIT -ne 0 ]; then
-    # Rileva specificamente timeout vs altri errori EAS
+  if [ $EAS_EXIT -ne 0 ] && [ "$EAS_COMPLETED" -eq 1 ]; then
+    # EAS completato ma con errore
     if grep -qiE "(timeout|timed out|ETIMEDOUT|ECONNRESET)" "$EAS_LOG" 2>/dev/null; then
       echo "   ⚠️  EAS update andato in TIMEOUT (exit $EAS_EXIT) — il bundle custom è già attivo sul backend."
-      echo "   EAS non ha ricevuto l'OTA: gli utenti su Expo Go potrebbero restare bloccati sull'OTA precedente."
-      echo "   PROCEDURA CORRETTA: pubblica una nuova OTA superseding con numero N+1:"
-      echo "     1. Aggiorna CURRENT_OTA_NUMBER in OtaStartupChecker e ota-updates.json al numero N+1"
-      echo "     2. Esegui: bash scripts/publish-ota.sh"
-      echo "   NON eseguire npx eas-cli direttamente — usa sempre publish-ota.sh."
+      echo "   PROCEDURA CORRETTA: pubblica una nuova OTA superseding con numero N+1."
       EAS_STATUS="TIMEOUT — pubblicare nuova OTA superseding con publish-ota.sh"
     else
       echo "   ⚠️  EAS update fallito (exit $EAS_EXIT) — custom backend rimane attivo."
       echo "   Errore:"
       tail -10 "$EAS_LOG" | sed 's/^/     /'
-      echo "   PROCEDURA CORRETTA: pubblica una nuova OTA superseding con numero N+1:"
-      echo "     1. Aggiorna CURRENT_OTA_NUMBER in OtaStartupChecker e ota-updates.json al numero N+1"
-      echo "     2. Esegui: bash scripts/publish-ota.sh"
-      echo "   NON eseguire npx eas-cli direttamente — usa sempre publish-ota.sh."
+      echo "   PROCEDURA CORRETTA: pubblica una nuova OTA superseding con numero N+1."
       EAS_STATUS="FALLITO — pubblicare nuova OTA superseding con publish-ota.sh"
     fi
-  else
+    rm -f "$EAS_LOG" "$EAS_EXIT_FILE"
+  elif [ "$EAS_COMPLETED" -eq 1 ]; then
+    # EAS completato con successo
     set +e
     EAS_UPDATE_GROUP_ID=$(grep -o 'Update group ID[[:space:]]*[a-f0-9-]*' "$EAS_LOG" 2>/dev/null | awk '{print $NF}' | head -1 || true)
     EAS_ANDROID_UPDATE_ID=$(grep -o 'Android update ID[[:space:]]*[a-f0-9-]*' "$EAS_LOG" 2>/dev/null | awk '{print $NF}' | head -1 || true)
@@ -283,8 +284,9 @@ else
     [ -z "$EAS_DASHBOARD_URL" ] && EAS_DASHBOARD_URL="N/A"
     EAS_STATUS="pubblicato"
     echo "   ✅ EAS update pubblicato — group: $EAS_UPDATE_GROUP_ID"
+    rm -f "$EAS_LOG" "$EAS_EXIT_FILE"
   fi
-  rm -f "$EAS_LOG" "$EAS_EXIT_FILE"
+  # In caso di background in corso (EAS_COMPLETED=0), NON eliminare EAS_LOG — è necessario per il monitoraggio
 fi
 
 echo ""
@@ -303,6 +305,9 @@ echo "║  EAS Status       : $EAS_STATUS"
 echo "║  EAS Update Group : $EAS_UPDATE_GROUP_ID"
 echo "║  EAS Android ID   : $EAS_ANDROID_UPDATE_ID"
 echo "║  EAS Dashboard    : $EAS_DASHBOARD_URL"
+if [ "$EAS_COMPLETED" != "1" ] && [ -n "${EAS_LOG:-}" ]; then
+  echo "║  EAS Log (live)   : tail -f $EAS_LOG"
+fi
 echo "╠══════════════════════════════════════════════════════════════════╣"
 echo "║  ⑧ Aggiorna ota-updates.json con gli ID qui sopra             ║"
 echo "║  ⑨ Riesegui: bash scripts/validate-ota.sh                     ║"
