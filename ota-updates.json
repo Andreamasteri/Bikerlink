@@ -2632,9 +2632,9 @@
     "iosUpdateId": null,
     "commitBase": "6342bc2a8669cf8fce85d12aba3596ed40e23062",
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/fca40db3-5902-4a11-b1fc-3bc4c556099d",
-    "apkBuildId": null,
-    "apkVersionCode": 28,
-    "apkUrl": null,
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
     "status": "published",
     "publishedAt": "2026-04-16T15:20:32.688Z"
   }
