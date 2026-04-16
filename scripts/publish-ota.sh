@@ -203,6 +203,7 @@ EAS_STATUS="skipped"
 
 EAS_COMPLETED=0
 EAS_LOG=""
+EAS_STAGED_DIR=""
 
 if [ -z "${EXPO_TOKEN:-}" ]; then
   echo "   ⚠️  EXPO_TOKEN non impostato — passo EAS saltato."
@@ -213,11 +214,17 @@ else
   EAS_EXIT_FILE="/tmp/ota-eas-$$.exit"
   rm -f "$EAS_EXIT_FILE"
 
+  # Copia DIST_DIR in /tmp per EAS: il trap cleanup EXIT del parent rimuove DIST_DIR all'uscita,
+  # ma il processo setsid (background) deve ancora leggere i file. Usando una copia in /tmp,
+  # cleanup e EAS non interferiscono.
+  EAS_STAGED_DIR="/tmp/ota-eas-staged-$$"
+  cp -a "$DIST_DIR" "$EAS_STAGED_DIR"
+
   # Avvia EAS in background staccato — setsid crea nuovo process group che sopravvive alla morte del parent bash
   # Variabili passate via env (sicuro contro caratteri speciali nei valori, es. apostrofi nelle note)
   set +e
   env \
-    _EAS_INPUT_DIR="$DIST_DIR" \
+    _EAS_INPUT_DIR="$EAS_STAGED_DIR" \
     _EAS_NOTES="$RELEASE_NOTES" \
     _EAS_LOG="$EAS_LOG" \
     _EAS_EXIT_FILE="$EAS_EXIT_FILE" \
@@ -274,6 +281,7 @@ else
       EAS_STATUS="FALLITO — pubblicare nuova OTA superseding con publish-ota.sh"
     fi
     rm -f "$EAS_LOG" "$EAS_EXIT_FILE"
+    rm -rf "$EAS_STAGED_DIR"
   elif [ "$EAS_COMPLETED" -eq 1 ]; then
     # EAS completato con successo
     set +e
@@ -287,8 +295,10 @@ else
     EAS_STATUS="pubblicato"
     echo "   ✅ EAS update pubblicato — group: $EAS_UPDATE_GROUP_ID"
     rm -f "$EAS_LOG" "$EAS_EXIT_FILE"
+    rm -rf "$EAS_STAGED_DIR"
   fi
-  # In caso di background in corso (EAS_COMPLETED=0), NON eliminare EAS_LOG — è necessario per il monitoraggio
+  # In caso di background in corso (EAS_COMPLETED=0), NON eliminare EAS_LOG né EAS_STAGED_DIR
+  # — sono necessari per il processo setsid ancora in esecuzione
 fi
 
 echo ""
