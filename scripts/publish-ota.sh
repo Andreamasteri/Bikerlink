@@ -201,6 +201,9 @@ EAS_ANDROID_UPDATE_ID="N/A"
 EAS_DASHBOARD_URL="N/A"
 EAS_STATUS="skipped"
 
+EAS_COMPLETED=0
+EAS_LOG=""
+
 if [ -z "${EXPO_TOKEN:-}" ]; then
   echo "   ⚠️  EXPO_TOKEN non impostato — passo EAS saltato."
   echo "   Per abilitarlo: imposta EXPO_TOKEN nei secrets Replit."
@@ -213,7 +216,6 @@ else
   # Avvia EAS in background staccato — setsid crea nuovo process group che sopravvive alla morte del parent bash
   # Variabili passate via env (sicuro contro caratteri speciali nei valori, es. apostrofi nelle note)
   set +e
-  EAS_COMPLETED=0
   env \
     _EAS_INPUT_DIR="$DIST_DIR" \
     _EAS_NOTES="$RELEASE_NOTES" \
