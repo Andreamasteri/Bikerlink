@@ -6,7 +6,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
 import { getApiUrl } from "@/lib/query-client";
@@ -14,6 +14,11 @@ import { Platform, AppState, ActivityIndicator, View, Text, StyleSheet } from "r
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import * as Updates from "expo-updates";
+
+let Notifications: typeof import("expo-notifications") | null = null;
+try {
+  Notifications = require("expo-notifications");
+} catch {}
 
 
 if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -381,6 +386,30 @@ function OtaStartupChecker() {
   return null;
 }
 
+function BackgroundNotificationHandler() {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!Notifications) return;
+    let sub: { remove: () => void } | null = null;
+    try {
+      sub = Notifications.addNotificationResponseReceivedListener((response) => {
+        const data = response.notification.request.content.data as { type?: string; unreadChat?: number } | undefined;
+        if (data?.type !== "background_badge") return;
+        const unreadChat = data?.unreadChat ?? 0;
+        if (unreadChat > 0) {
+          router.push("/(tabs)/chat");
+        } else {
+          router.push("/notifications");
+        }
+      });
+    } catch {}
+    return () => { sub?.remove(); };
+  }, [router]);
+
+  return null;
+}
+
 function AdminUptimeOverlay() {
   const { user } = useAuth();
   const [enabled, setEnabled] = useState<boolean>(false);
@@ -539,6 +568,7 @@ export default function RootLayout() {
                     <BackgroundPermissionPrompter />
                     <BackgroundRevocationBanner />
                     <AdminUptimeOverlay />
+                    <BackgroundNotificationHandler />
                     <LanguageKeyedRoot />
                   </MapReadyGate>
                 </StartupGate>
