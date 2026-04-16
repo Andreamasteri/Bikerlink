@@ -2547,7 +2547,29 @@
     "apkBuildId": null,
     "apkVersionCode": 28,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-16T11:01:47.099Z"
+  },
+  {
+    "updateNumber": 59,
+    "version": "1.59.0",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-59 rv7.0.0: Fix arcade — giochi fullscreen reali con Modal, tab bar non copre più i controlli touch",
+    "note": "Task #618: Sostituito if(activeGame){return} con <Modal visible={!!activeGame}> in arcade.tsx. La tab bar rimane visibile nella schermata hub ma è coperta dal Modal durante il gioco — fix reale indipendente da CustomTabBar. Rimosso navigation.setOptions({tabBarStyle}) che non funzionava con tabBar custom. CURRENT_OTA_NUMBER=59.",
+    "releaseId": "67a39c57-5e91-468c-8d34-1663d45b2631",
+    "bundleUrl": "private/ota/ota-1.59.0-1776339705824.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "a495bf772e818e7eacc2f8fe4d554c4692a4db44",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 28,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-16T12:01:45.000Z"
   }
 ]

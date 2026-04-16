@@ -16,7 +16,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLocalSearchParams, useNavigation } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { useFloatingWidget } from "@/lib/floating-widget-context";
@@ -252,7 +252,6 @@ export default function ArcadeScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ tab?: string; game?: string }>();
   const { suppressWidget } = useFloatingWidget();
-  const navigation = useNavigation();
   const [hubTab, setHubTab] = useState<HubTab>(
     params.tab === "leaderboard" ? "leaderboard" : params.tab === "hof" ? "hof" : "games"
   );
@@ -269,12 +268,6 @@ export default function ArcadeScreen() {
     suppressWidget(!!activeGame);
     return () => { suppressWidget(false); };
   }, [activeGame, suppressWidget]);
-
-  useEffect(() => {
-    navigation.setOptions({
-      tabBarStyle: activeGame ? { display: "none" } : undefined,
-    });
-  }, [activeGame, navigation]);
 
   useEffect(() => {
     if (params.tab === "leaderboard") {
@@ -341,50 +334,56 @@ export default function ArcadeScreen() {
     }
   };
 
-  if (activeGame) {
-    const gameInfo = GAMES.find((g) => g.id === activeGame)!;
-    const personal = myScores?.[activeGame] ?? 0;
-    const hofEntry = hofData?.[activeGame];
-    const communityRecord = hofEntry?.score ?? 0;
-
-    return (
-      <View style={{ flex: 1 }}>
-        <View style={[styles.gameHeader, { paddingTop: Platform.OS === "web" ? 67 + 8 : insets.top + 8 }]}>
-          <Pressable onPress={handleExitGame} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={22} color="#fff" />
-          </Pressable>
-          <Text style={styles.gameHeaderTitle}>{gameInfo.title}</Text>
-          <View style={styles.gameHeaderStats}>
-            <Text style={styles.gameHeaderStat}>Best: {personal}{gameInfo.scoreLabel}</Text>
-            <Text style={styles.gameHeaderStat}>Record: {communityRecord}{gameInfo.scoreLabel}</Text>
-          </View>
-        </View>
-        <View style={{ flex: 1 }}>
-          {renderGame()}
-        </View>
-        {gameOver && (
-          <GameOverModal
-            score={gameOver.score}
-            personalBest={gameOver.prevBest}
-            isNewRecord={gameOver.score > gameOver.prevBest}
-            onReplay={handleReplay}
-            onClose={handleExitGame}
-            scoreLabel={gameInfo.scoreLabel}
-            isSaving={scoreMutation.isPending}
-            isSaveError={scoreMutation.isError}
-            onRetrySave={
-              scoreMutation.isError && activeGame
-                ? () => scoreMutation.mutate({ game: activeGame, score: gameOver.score })
-                : undefined
-            }
-          />
-        )}
-      </View>
-    );
-  }
+  const activeGameInfo = activeGame ? GAMES.find((g) => g.id === activeGame) ?? null : null;
+  const activePersonal = activeGame ? (myScores?.[activeGame] ?? 0) : 0;
+  const activeHofEntry = activeGame ? hofData?.[activeGame] : undefined;
+  const activeCommunityRecord = activeHofEntry?.score ?? 0;
 
   return (
-    <View style={[styles.container, { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom }]}>
+    <>
+      <Modal
+        visible={!!activeGame}
+        animationType="none"
+        statusBarTranslucent
+        onRequestClose={handleExitGame}
+      >
+        <View style={{ flex: 1, backgroundColor: Colors.background }}>
+          {activeGameInfo && (
+            <View style={[styles.gameHeader, { paddingTop: Platform.OS === "web" ? 67 + 8 : insets.top + 8 }]}>
+              <Pressable onPress={handleExitGame} style={styles.backBtn}>
+                <Ionicons name="arrow-back" size={22} color="#fff" />
+              </Pressable>
+              <Text style={styles.gameHeaderTitle}>{activeGameInfo.title}</Text>
+              <View style={styles.gameHeaderStats}>
+                <Text style={styles.gameHeaderStat}>Best: {activePersonal}{activeGameInfo.scoreLabel}</Text>
+                <Text style={styles.gameHeaderStat}>Record: {activeCommunityRecord}{activeGameInfo.scoreLabel}</Text>
+              </View>
+            </View>
+          )}
+          <View style={{ flex: 1 }}>
+            {renderGame()}
+          </View>
+          {gameOver && activeGameInfo && (
+            <GameOverModal
+              score={gameOver.score}
+              personalBest={gameOver.prevBest}
+              isNewRecord={gameOver.score > gameOver.prevBest}
+              onReplay={handleReplay}
+              onClose={handleExitGame}
+              scoreLabel={activeGameInfo.scoreLabel}
+              isSaving={scoreMutation.isPending}
+              isSaveError={scoreMutation.isError}
+              onRetrySave={
+                scoreMutation.isError && activeGame
+                  ? () => scoreMutation.mutate({ game: activeGame, score: gameOver.score })
+                  : undefined
+              }
+            />
+          )}
+        </View>
+      </Modal>
+
+      <View style={[styles.container, { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom }]}>
       <View style={styles.tabSwitcher}>
         {([["games", "🕹️ Giochi"], ["leaderboard", "🏅 Classifiche"], ["hof", "🏆 Hall of Fame"]] as const).map(([key, label]) => (
           <Pressable
@@ -445,7 +444,8 @@ export default function ArcadeScreen() {
       )}
 
       {hubTab === "hof" && <HallOfFameView />}
-    </View>
+      </View>
+    </>
   );
 }
 
