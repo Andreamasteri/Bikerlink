@@ -2657,7 +2657,29 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-16T19:11:54.246Z"
+  },
+  {
+    "updateNumber": 64,
+    "version": "1.64.0",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-64 rv7.0.0: Fix pallino — Modal nativo (sopra navigator Android)",
+    "note": "Fix definitivo FloatingWidget: sostituito position:absolute+zIndex con Modal React Native transparent+statusBarTranslucent+hardwareAccelerated. Il Modal renderizza in una window nativa separata, sopra qualsiasi navigator/tab bar Android. pointerEvents=box-none sul root del Modal per non bloccare i touch sull'app. CURRENT_OTA_NUMBER=64.",
+    "releaseId": "47d7009e-86e0-4ee6-9e22-77eb723c31ff",
+    "bundleUrl": "private/ota/ota-1.64.0-1776373791702.js",
+    "updateGroupId": "1c522876-a54b-4e59-90e6-e8ece6471842",
+    "androidUpdateId": "019d9824-cba4-7442-8eb1-d88473877aef",
+    "iosUpdateId": null,
+    "commitBase": "659b22c623d9a3995b840af464ec24042d46600b",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/1c522876-a54b-4e59-90e6-e8ece6471842",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-16T21:03:00.000Z"
   }
 ]

@@ -9,6 +9,7 @@ import {
   Pressable,
   Dimensions,
   Platform,
+  Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -138,108 +139,118 @@ export default function FloatingWidget() {
   }, [closeMenu, router]);
 
 
-  console.log("[FloatingWidget] isVisible:", isVisible, "positionLoaded:", positionLoaded, "Platform:", Platform.OS);
-  if (!isVisible || !positionLoaded) return null;
   if (Platform.OS === "web") return null;
 
   const totalUnread = unreadChat + unreadNotifications;
+  const modalVisible = isVisible && positionLoaded;
 
   return (
-    <>
-      {menuOpen && (
-        <Pressable style={StyleSheet.absoluteFill} onPress={closeMenu} />
-      )}
+    <Modal
+      visible={modalVisible}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      hardwareAccelerated
+      onRequestClose={() => {}}
+    >
+      <View style={styles.modalRoot} pointerEvents="box-none">
+        {menuOpen && (
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeMenu} pointerEvents="auto" />
+        )}
 
-      {menuOpen && (
+        {menuOpen && (
+          <Animated.View
+            style={[
+              styles.menuContainer,
+              { opacity: menuOpacity, transform: [{ translateX: pan.x }, { translateY: pan.y }] },
+            ]}
+            pointerEvents="box-none"
+          >
+            <View
+              style={[
+                styles.menu,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  bottom: WIDGET_SIZE + 8,
+                  right: 0,
+                },
+              ]}
+            >
+              <TouchableOpacity style={styles.menuItem} onPress={handleChatPress} activeOpacity={0.7}>
+                <Ionicons name="chatbubbles" size={18} color={colors.accent} />
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Chat</Text>
+                {unreadChat > 0 && (
+                  <View style={[styles.menuBadge, { backgroundColor: colors.accent }]}>
+                    <Text style={styles.menuBadgeText}>{unreadChat > 99 ? "99+" : unreadChat}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+
+              <TouchableOpacity style={styles.menuItem} onPress={handleNotificationsPress} activeOpacity={0.7}>
+                <Ionicons name="notifications" size={18} color={colors.accent} />
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Notifiche</Text>
+                {unreadNotifications > 0 && (
+                  <View style={[styles.menuBadge, { backgroundColor: colors.accentRed ?? "#FF3B30" }]}>
+                    <Text style={styles.menuBadgeText}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+
+              <TouchableOpacity style={styles.menuItem} onPress={handlePlayerPress} activeOpacity={0.7}>
+                <Ionicons name="musical-notes" size={18} color={colors.accent} />
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Player</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        )}
+
         <Animated.View
           style={[
-            styles.menuContainer,
-            { opacity: menuOpacity, transform: [{ translateX: pan.x }, { translateY: pan.y }] },
+            styles.widgetContainer,
+            { transform: [{ translateX: pan.x }, { translateY: pan.y }] },
           ]}
-          pointerEvents="box-none"
+          pointerEvents="auto"
+          {...panResponder.panHandlers}
         >
           <View
             style={[
-              styles.menu,
+              styles.ball,
               {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                bottom: WIDGET_SIZE + 8,
-                right: 0,
+                backgroundColor: colors.accent,
+                opacity: isTouching ? 1 : 0.9,
               },
             ]}
           >
-            <TouchableOpacity style={styles.menuItem} onPress={handleChatPress} activeOpacity={0.7}>
-              <Ionicons name="chatbubbles" size={18} color={colors.accent} />
-              <Text style={[styles.menuLabel, { color: colors.text }]}>Chat</Text>
-              {unreadChat > 0 && (
-                <View style={[styles.menuBadge, { backgroundColor: colors.accent }]}>
-                  <Text style={styles.menuBadgeText}>{unreadChat > 99 ? "99+" : unreadChat}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
-
-            <TouchableOpacity style={styles.menuItem} onPress={handleNotificationsPress} activeOpacity={0.7}>
-              <Ionicons name="notifications" size={18} color={colors.accent} />
-              <Text style={[styles.menuLabel, { color: colors.text }]}>Notifiche</Text>
-              {unreadNotifications > 0 && (
-                <View style={[styles.menuBadge, { backgroundColor: colors.accentRed ?? "#FF3B30" }]}>
-                  <Text style={styles.menuBadgeText}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
-
-            <TouchableOpacity style={styles.menuItem} onPress={handlePlayerPress} activeOpacity={0.7}>
-              <Ionicons name="musical-notes" size={18} color={colors.accent} />
-              <Text style={[styles.menuLabel, { color: colors.text }]}>Player</Text>
-            </TouchableOpacity>
+            <Ionicons name="notifications" size={22} color="#fff" />
+            {totalUnread > 0 && (
+              <View style={[styles.badge, { backgroundColor: colors.accentRed ?? "#FF3B30" }]}>
+                <Text style={styles.badgeText}>{totalUnread > 99 ? "99+" : totalUnread}</Text>
+              </View>
+            )}
           </View>
         </Animated.View>
-      )}
-
-      <Animated.View
-        style={[
-          styles.widgetContainer,
-          { transform: [{ translateX: pan.x }, { translateY: pan.y }] },
-        ]}
-        {...panResponder.panHandlers}
-      >
-        <View
-          style={[
-            styles.ball,
-            {
-              backgroundColor: colors.primary ?? colors.accent,
-              opacity: isTouching ? 1 : 0.85,
-            },
-          ]}
-        >
-          <Ionicons name="notifications" size={22} color="#fff" />
-          {totalUnread > 0 && (
-            <View style={[styles.badge, { backgroundColor: colors.accentRed ?? "#FF3B30" }]}>
-              <Text style={styles.badgeText}>{totalUnread > 99 ? "99+" : totalUnread}</Text>
-            </View>
-          )}
-        </View>
-      </Animated.View>
-
-    </>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  modalRoot: {
+    flex: 1,
+    position: "relative",
+  },
   menuContainer: {
     position: "absolute",
-    zIndex: 9998,
     width: WIDGET_SIZE,
     height: WIDGET_SIZE,
   },
   widgetContainer: {
     position: "absolute",
-    zIndex: 9999,
     width: WIDGET_SIZE,
     height: WIDGET_SIZE,
   },
