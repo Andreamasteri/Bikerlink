@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Platform } from "react-native";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { AppState, AppStateStatus, Platform } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { OverlayNative } from "@/lib/overlay-native";
@@ -58,7 +58,6 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
   }, [notificationsData]);
 
   const [hasOverlayPermission, setHasOverlayPermission] = useState(false);
-  const permissionRequestedRef = useRef(false);
 
   useEffect(() => {
     if (Platform.OS !== "android" || !isVisible) return;
@@ -67,20 +66,16 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
 
   useEffect(() => {
     if (Platform.OS !== "android") return;
-    if (!isVisible || hasOverlayPermission || permissionRequestedRef.current) return;
-    permissionRequestedRef.current = true;
-    OverlayNative.requestPermission();
-    const timer = setTimeout(() => {
-      OverlayNative.checkPermission().then(setHasOverlayPermission);
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [isVisible, hasOverlayPermission]);
+    const sub = AppState.addEventListener("change", (state: AppStateStatus) => {
+      if (state === "active") {
+        OverlayNative.checkPermission().then(setHasOverlayPermission);
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   const requestOverlayPermission = () => {
     OverlayNative.requestPermission();
-    setTimeout(() => {
-      OverlayNative.checkPermission().then(setHasOverlayPermission);
-    }, 2000);
   };
 
   return (

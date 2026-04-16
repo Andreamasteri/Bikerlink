@@ -25,7 +25,7 @@ const POSITION_KEY = "floating_widget_position";
 const TAP_THRESHOLD = 5;
 
 export default function FloatingWidget() {
-  const { isVisible, unreadChat, unreadNotifications, hasOverlayPermission } = useFloatingWidget();
+  const { isVisible, unreadChat, unreadNotifications, hasOverlayPermission, requestOverlayPermission } = useFloatingWidget();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -260,6 +260,29 @@ export default function FloatingWidget() {
           )}
         </View>
       </Animated.View>
+
+      {Platform.OS === "android" && !hasOverlayPermission && (
+        <Pressable
+          style={[
+            styles.permissionBanner,
+            {
+              bottom: insets.bottom + 90,
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+          onPress={requestOverlayPermission}
+        >
+          <Ionicons name="notifications-outline" size={16} color={colors.accent} />
+          <Text
+            style={[styles.permissionBannerText, { color: colors.textSecondary ?? colors.text }]}
+            numberOfLines={1}
+          >
+            Attiva widget in background
+          </Text>
+          <Text style={[styles.permissionBannerCta, { color: colors.accent }]}>Attiva</Text>
+        </Pressable>
+      )}
     </>
   );
 }
@@ -350,5 +373,31 @@ const styles = StyleSheet.create({
   menuDivider: {
     height: 1,
     marginHorizontal: 0,
+  },
+  permissionBanner: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  permissionBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "500" as const,
+  },
+  permissionBannerCta: {
+    fontSize: 13,
+    fontWeight: "700" as const,
   },
 });

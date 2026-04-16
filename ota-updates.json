@@ -2354,6 +2354,27 @@
     "apkBuildId": null,
     "apkVersionCode": 26,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 50,
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-50 rv7.0.0: Fix overlay widget Android — AppState listener + banner permesso",
+    "note": "Task #605: hasOverlayPermission rimasto false dopo grant risolto. 1) AppState listener in floating-widget-context sostituisce timer 2s inaffidabile — ri-controlla permesso ogni volta che app torna in foreground. 2) Banner non invasivo in FloatingWidget mostra 'Attiva widget in background' con bottone che apre le impostazioni di sistema. CURRENT_OTA_NUMBER=50.",
+    "releaseId": "eb7049ef-d37d-4833-bcc6-3c82c89c05bf",
+    "bundleUrl": "private/ota/ota-1.50.0-1776309297631.js",
+    "updateGroupId": "823eecce-8e96-402d-92cd-b705d8da8d93",
+    "androidUpdateId": "019d9449-f22a-760f-8f57-088e4454665d",
+    "iosUpdateId": null,
+    "commitBase": "ff8d60d93b0d6c6437829ac9bd771f671aeb1cd7",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/823eecce-8e96-402d-92cd-b705d8da8d93",
+    "apkBuildId": null,
+    "apkVersionCode": 27,
+    "apkUrl": null,
     "status": "published"
   }
 ]
