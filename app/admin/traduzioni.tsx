@@ -400,9 +400,12 @@ function DriveFileBrowser({
                         {sheet.name}
                       </Text>
                       {isSearchMode && sheet.folderPath ? (
-                        <Text style={styles.folderPathText} numberOfLines={1}>
-                          {sheet.folderPath}
-                        </Text>
+                        <View style={styles.searchFolderPathRow}>
+                          <MaterialCommunityIcons name="folder-outline" size={11} color={Colors.textSecondary} />
+                          <Text style={styles.folderPathText} numberOfLines={1}>
+                            {sheet.folderPath}
+                          </Text>
+                        </View>
                       ) : null}
                     </View>
                   </TouchableOpacity>
@@ -1134,12 +1137,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     marginTop: -4,
   },
-  folderPathText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: Colors.textSecondary,
-    flex: 1,
-  },
   clearButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -1355,6 +1352,12 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     color: Colors.textSecondary,
+    flex: 1,
+  },
+  searchFolderPathRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
     marginTop: 2,
   },
 });
