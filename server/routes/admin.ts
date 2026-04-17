@@ -3432,38 +3432,58 @@ router.get("/translations/browse", async (req: Request, res: Response) => {
     const connectors = new ReplitConnectors();
 
     if (searchQuery) {
-      const namePart = searchQuery.replace(/'/g, "\\'");
-      const qFolders = `fullText contains '${namePart}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-      const qSheets = `fullText contains '${namePart}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
-
-      const [foldersResp, sheetsResp] = await Promise.all([
-        connectors.proxy(
-          "google-drive",
-          `/drive/v3/files?q=${encodeURIComponent(qFolders)}&fields=files(id,name)&orderBy=name&pageSize=50`,
-          { method: "GET" }
-        ),
-        connectors.proxy(
-          "google-drive",
-          `/drive/v3/files?q=${encodeURIComponent(qSheets)}&fields=files(id,name,modifiedTime)&orderBy=name&pageSize=50`,
-          { method: "GET" }
-        ),
-      ]);
-
-      if (!foldersResp.ok || !sheetsResp.ok) {
-        const errText = !foldersResp.ok
-          ? await foldersResp.text()
-          : await sheetsResp.text();
-        console.error("[translations/browse] Drive search error:", errText);
+      const escapedQ = searchQuery.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+      const driveQ = `name contains '${escapedQ}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
+      const sheetsResp = await connectors.proxy(
+        "google-drive",
+        `/drive/v3/files?q=${encodeURIComponent(driveQ)}&fields=files(id,name,modifiedTime,parents)&orderBy=modifiedTime desc&pageSize=50`,
+        { method: "GET" }
+      );
+      if (!sheetsResp.ok) {
+        const errText = await sheetsResp.text();
+        console.error("[translations/browse] Search Drive error:", errText);
         return res.status(502).json({ message: "Errore nella ricerca Drive" });
       }
+      const sheetsData = await sheetsResp.json() as { files?: { id: string; name: string; modifiedTime?: string; parents?: string[] }[] };
+      const files = sheetsData.files || [];
 
-      const foldersData = await foldersResp.json() as { files?: { id: string; name: string }[] };
-      const sheetsData = await sheetsResp.json() as { files?: { id: string; name: string; modifiedTime?: string }[] };
+      async function resolveFolderPath(parentId: string | undefined): Promise<string> {
+        if (!parentId) return "";
+        const parts: string[] = [];
+        let currentId: string | undefined = parentId;
+        const MAX_DEPTH = 6;
+        for (let i = 0; i < MAX_DEPTH && currentId; i++) {
+          try {
+            const resp = await connectors.proxy(
+              "google-drive",
+              `/drive/v3/files/${encodeURIComponent(currentId)}?fields=name,parents`,
+              { method: "GET" }
+            );
+            if (!resp.ok) break;
+            const data = await resp.json() as { name?: string; parents?: string[] };
+            if (!data.name) break;
+            parts.unshift(data.name);
+            currentId = data.parents?.[0];
+          } catch {
+            break;
+          }
+        }
+        return parts.join(" / ");
+      }
+
+      const sheetsWithPaths = await Promise.all(
+        files.map(async (f) => ({
+          id: f.id,
+          name: f.name,
+          modifiedTime: f.modifiedTime,
+          folderPath: await resolveFolderPath(f.parents?.[0]).catch(() => ""),
+        }))
+      );
 
       return res.json({
         folderName: "Risultati ricerca",
-        folders: foldersData.files || [],
-        sheets: sheetsData.files || [],
+        folders: [],
+        sheets: sheetsWithPaths,
         isSearch: true,
       });
     }

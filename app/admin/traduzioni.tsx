@@ -31,6 +31,7 @@ interface DriveSheet {
   id: string;
   name: string;
   modifiedTime?: string;
+  folderPath?: string;
 }
 
 const LANGS = [
@@ -243,6 +244,7 @@ function DriveFileBrowser({
     loadFolder(item.id);
   }
 
+  const isSearchMode = !!searchText.trim() && !!browseData.isSearch;
   const hasItems = browseData.folders.length > 0 || (mode === "sheet" && browseData.sheets.length > 0);
 
   return (
@@ -346,7 +348,11 @@ function DriveFileBrowser({
           ) : !hasItems ? (
             <View style={styles.modalLoading}>
               <Text style={styles.emptyText}>
-                {mode === "folder" ? "Nessuna sottocartella" : "Nessun foglio o cartella qui"}
+                {isSearchMode
+                  ? "Nessun risultato trovato"
+                  : mode === "folder"
+                  ? "Nessuna sottocartella"
+                  : "Nessun foglio o cartella qui"}
               </Text>
             </View>
           ) : (
@@ -388,9 +394,16 @@ function DriveFileBrowser({
                       size={20}
                       color={isSelected ? Colors.accent : Colors.textSecondary}
                     />
-                    <Text style={[styles.modalItemText, { flex: 1 }]} numberOfLines={1}>
-                      {sheet.name}
-                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.modalItemText} numberOfLines={1}>
+                        {sheet.name}
+                      </Text>
+                      {isSearchMode && sheet.folderPath ? (
+                        <Text style={styles.folderPathText} numberOfLines={1}>
+                          {sheet.folderPath}
+                        </Text>
+                      ) : null}
+                    </View>
                   </TouchableOpacity>
                 );
               }}
@@ -1244,5 +1257,27 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 13,
     color: "#fff",
+  },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.text,
+    paddingVertical: 4,
+  },
+  folderPathText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
 });
