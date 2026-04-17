@@ -46,6 +46,7 @@ interface GpsPoint {
 
 type TrackingMode = "highway" | "city" | "idle";
 type BatteryImpact = "alta" | "media" | "bassa";
+type UpdateProfile = "easy" | "medium" | "race";
 
 const IDLE_THRESHOLD_KMH = 3;
 const BATCH_SIZE = 10;
@@ -53,20 +54,36 @@ const BATCH_FLUSH_INTERVAL_MS = 30000;
 const AUTO_PAUSE_TIMEOUT_MS = 10 * 60 * 1000;
 const STATS_SYNC_INTERVAL_MS = 60000;
 
+const PROFILE_LABELS: Record<UpdateProfile, string> = {
+  easy: "Easy",
+  medium: "Medium",
+  race: "Race",
+};
+
+const PROFILE_DESCRIPTIONS: Record<UpdateProfile, string> = {
+  easy: "Risparmio energetico",
+  medium: "Bilanciato",
+  race: "Massima precisione (1s)",
+};
+
 function getTrackingMode(speedKmh: number): TrackingMode {
   if (speedKmh > 60) return "highway";
   if (speedKmh > 10) return "city";
   return "idle";
 }
 
-function getModeConfig(mode: TrackingMode): { accuracy: Location.Accuracy; timeInterval: number; distanceInterval: number } {
+function getModeConfig(mode: TrackingMode, profile: UpdateProfile = "medium"): { accuracy: Location.Accuracy; timeInterval: number; distanceInterval: number } {
+  if (profile === "race") {
+    return { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 1 };
+  }
+  const mult = profile === "easy" ? 2 : 1;
   switch (mode) {
     case "highway":
-      return { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 3000, distanceInterval: 10 };
+      return { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 3000 * mult, distanceInterval: 10 * mult };
     case "city":
-      return { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 5 };
+      return { accuracy: Location.Accuracy.High, timeInterval: 5000 * mult, distanceInterval: 5 * mult };
     case "idle":
-      return { accuracy: Location.Accuracy.Balanced, timeInterval: 15000, distanceInterval: 2 };
+      return { accuracy: Location.Accuracy.Balanced, timeInterval: 15000 * mult, distanceInterval: 2 * mult };
   }
 }
 
@@ -80,17 +97,17 @@ function getBatteryImpact(mode: TrackingMode): BatteryImpact {
 
 function getBatteryColor(impact: BatteryImpact): string {
   switch (impact) {
-    case "alta": return Colors.accentRed;
+    case "alta": return Colors.success;
     case "media": return Colors.warning;
-    case "bassa": return Colors.success;
+    case "bassa": return Colors.accentRed;
   }
 }
 
 function getBatteryIcon(impact: BatteryImpact): string {
   switch (impact) {
-    case "alta": return "battery-dead";
+    case "alta": return "battery-full";
     case "media": return "battery-half";
-    case "bassa": return "battery-full";
+    case "bassa": return "battery-dead";
   }
 }
 
@@ -130,6 +147,9 @@ export default function TrackingScreen() {
   const currentModeRef = useRef<TrackingMode>("idle");
   const totalPointsSentRef = useRef(0);
   const statsSyncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [updateProfile, setUpdateProfile] = useState<UpdateProfile>("medium");
+  const updateProfileRef = useRef<UpdateProfile>("medium");
 
   const [publishRecord, setPublishRecord] = useState<RouteRecord | null>(null);
   const [publishCaption, setPublishCaption] = useState("");
@@ -256,7 +276,7 @@ export default function TrackingScreen() {
       watchSubRef.current = null;
     }
 
-    const config = getModeConfig(newMode);
+    const config = getModeConfig(newMode, updateProfileRef.current);
     const sub = await Location.watchPositionAsync(
       { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
       (loc) => {
@@ -272,7 +292,17 @@ export default function TrackingScreen() {
     if (isPausedRef.current) return;
 
     const now = Date.now();
-    const speedKmh = speedMs !== null && speedMs >= 0 ? speedMs * 3.6 : 0;
+
+    let speedKmh: number;
+    if (speedMs !== null && speedMs >= 0) {
+      speedKmh = speedMs * 3.6;
+    } else if (lastPosRef.current && (now - lastPosRef.current.time) > 500) {
+      const fallbackDist = haversineKm(lastPosRef.current.lat, lastPosRef.current.lng, lat, lng);
+      const intervalSec = (now - lastPosRef.current.time) / 1000;
+      speedKmh = (fallbackDist / intervalSec) * 3600;
+    } else {
+      speedKmh = 0;
+    }
 
     setCurrentSpeed(speedKmh);
 
@@ -348,7 +378,7 @@ export default function TrackingScreen() {
       autoPauseAlertedRef.current = false;
 
       if (Platform.OS !== "web") {
-        const config = getModeConfig(currentModeRef.current);
+        const config = getModeConfig(currentModeRef.current, updateProfileRef.current);
         Location.watchPositionAsync(
           { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
           (loc) => {
@@ -459,6 +489,7 @@ export default function TrackingScreen() {
       isPausedRef.current = false;
       currentModeRef.current = "idle";
       totalPointsSentRef.current = 0;
+      updateProfileRef.current = updateProfile;
 
       setIsTracking(true);
 
@@ -482,7 +513,7 @@ export default function TrackingScreen() {
       }, STATS_SYNC_INTERVAL_MS);
 
       if (Platform.OS !== "web") {
-        const config = getModeConfig("idle");
+        const config = getModeConfig("idle", updateProfile);
         const sub = await Location.watchPositionAsync(
           { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
           (loc) => {
@@ -530,21 +561,31 @@ export default function TrackingScreen() {
 
     setLoading(true);
     try {
-      await apiRequest("PUT", `/api/routes/${routeId}/stop`);
+      const dur = totalTime;
+      const idle = Math.round(idleAccRef.current);
+      const netT = Math.max(dur - idle, 0);
+      const avgSpd = netT > 0 ? totalKmRef.current / (netT / 3600) : 0;
+
+      await apiRequest("PUT", `/api/routes/${routeId}/stop`, {
+        totalDistanceKm: totalKmRef.current,
+        maxSpeedKmh: maxSpeedRef.current,
+        avgSpeedKmh: avgSpd,
+        maxAltitude: maxAltRef.current,
+        durationSeconds: dur,
+        idleTimeSeconds: idle,
+      });
       setIsTracking(false);
       routeIdRef.current = null;
       queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
 
-      const dur = totalTime;
-      const idle = Math.round(idleAccRef.current);
-      const netT = Math.max(dur - idle, 0);
       Alert.alert(
         "Sessione Completata",
         `Km: ${totalKmRef.current.toFixed(2)}\n` +
         `Tempo totale: ${formatTime(dur)}\n` +
         `Pause: ${formatTime(idle)}\n` +
         `Tempo netto: ${formatTime(netT)}\n` +
-        `Vel. Max: ${maxSpeedRef.current.toFixed(0)} km/h\n` +
+        `Vel. Media: ${avgSpd.toFixed(2)} km/h\n` +
+        `Vel. Max: ${maxSpeedRef.current.toFixed(1)} km/h\n` +
         `Quota Max: ${maxAltRef.current.toFixed(0)} m\n` +
         `Punti GPS: ${totalPointsSentRef.current}`
       );
@@ -606,7 +647,7 @@ export default function TrackingScreen() {
 
           <View style={styles.speedBox}>
             <Text style={[styles.speedValue, isPaused && { color: Colors.textSecondary }]}>
-              {isPaused ? "--" : currentSpeed.toFixed(0)}
+              {isPaused ? "--" : currentSpeed.toFixed(1)}
             </Text>
             <Text style={styles.speedUnit}>km/h</Text>
           </View>
@@ -653,17 +694,47 @@ export default function TrackingScreen() {
           <View style={styles.controlPlaceholder} />
         </View>
       ) : (
-        <Pressable
-          style={[styles.mainBtn, { backgroundColor: Colors.warning, alignSelf: "center" }]}
-          onPress={startTracking}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" size="large" />
-          ) : (
-            <Ionicons name="play-circle" size={56} color="#fff" />
-          )}
-        </Pressable>
+        <>
+          <View style={styles.profileSection}>
+            <Text style={styles.profileTitle}>Strategia di aggiornamento GPS</Text>
+            <View style={styles.profileRow}>
+              {(["easy", "medium", "race"] as UpdateProfile[]).map((p) => (
+                <TouchableOpacity
+                  key={p}
+                  style={[styles.profileBtn, updateProfile === p && styles.profileBtnActive]}
+                  onPress={() => {
+                    setUpdateProfile(p);
+                    updateProfileRef.current = p;
+                  }}
+                >
+                  <Text style={[styles.profileBtnLabel, updateProfile === p && styles.profileBtnLabelActive]}>
+                    {PROFILE_LABELS[p]}
+                  </Text>
+                  <Text style={[styles.profileBtnDesc, updateProfile === p && styles.profileBtnDescActive]}>
+                    {PROFILE_DESCRIPTIONS[p]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.profileWarning}>
+              <Ionicons name="warning-outline" size={14} color={Colors.warning} />
+              <Text style={styles.profileWarningText}>
+                Attenzione, più precisione significa maggior consumo di batteria
+              </Text>
+            </View>
+          </View>
+          <Pressable
+            style={[styles.mainBtn, { backgroundColor: Colors.warning, alignSelf: "center" }]}
+            onPress={startTracking}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" size="large" />
+            ) : (
+              <Ionicons name="play-circle" size={56} color="#fff" />
+            )}
+          </Pressable>
+        </>
       )}
       <Text style={styles.hint}>
         {isTracking ? (isPaused ? "In pausa — tocca Riprendi o Stop" : "Tracciamento attivo") : "Tocca per iniziare"}
@@ -673,7 +744,7 @@ export default function TrackingScreen() {
         <View style={styles.infoBox}>
           <Ionicons name="information-circle" size={16} color={Colors.textSecondary} />
           <Text style={styles.infoText}>
-            Frequenza GPS adattiva: {trackingMode === "highway" ? "3s (alta precisione)" : trackingMode === "city" ? "5s (bilanciato)" : "15s (risparmio)"}
+            Profilo: {PROFILE_LABELS[updateProfile]} · Frequenza GPS adattiva: {trackingMode === "highway" ? "autostrada" : trackingMode === "city" ? "città" : "fermo"}
             {" · "}Punti inviati in batch da {BATCH_SIZE}
           </Text>
         </View>
@@ -781,7 +852,7 @@ function RecordCard({ item, onPublish }: { item: RouteRecord; onPublish: () => v
         <RecordStat value={formatTime(net)} label="netto" />
       </View>
       <View style={styles.recordRow}>
-        <RecordStat value={(item.avgSpeedKmh || 0).toFixed(1)} label="vel. media" />
+        <RecordStat value={(item.avgSpeedKmh || 0).toFixed(2)} label="vel. media" />
         <RecordStat value={(item.maxSpeedKmh || 0).toFixed(0)} label="vel. max" />
         <RecordStat value={(item.maxAltitude || 0).toFixed(0)} label="quota max" />
       </View>
@@ -964,5 +1035,73 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
     color: "#fff",
+  },
+  profileSection: {
+    marginBottom: 20,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  profileTitle: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginBottom: 12,
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.5,
+  },
+  profileRow: {
+    flexDirection: "row" as const,
+    gap: 8,
+    marginBottom: 12,
+  },
+  profileBtn: {
+    flex: 1,
+    alignItems: "center" as const,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.background,
+  },
+  profileBtnActive: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent + "18",
+  },
+  profileBtnLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: Colors.textSecondary,
+  },
+  profileBtnLabelActive: {
+    color: Colors.accent,
+  },
+  profileBtnDesc: {
+    fontSize: 9,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center" as const,
+    marginTop: 2,
+  },
+  profileBtnDescActive: {
+    color: Colors.accent,
+  },
+  profileWarning: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    backgroundColor: Colors.warning + "15",
+    borderRadius: 8,
+    padding: 8,
+  },
+  profileWarningText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: Colors.warning,
   },
 });

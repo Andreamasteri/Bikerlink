@@ -88,36 +88,67 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Non autorizzato" });
     }
 
-    const allPoints = await storage.getRoutePoints(id);
+    const stoppedAt = new Date();
 
-    let totalDistanceKm = 0;
-    let maxSpeedKmh = 0;
-    let maxAltitude = 0;
-    let idleTimeSeconds = 0;
+    const {
+      totalDistanceKm: clientDistanceKm,
+      maxSpeedKmh: clientMaxSpeed,
+      avgSpeedKmh: clientAvgSpeed,
+      maxAltitude: clientMaxAlt,
+      durationSeconds: clientDuration,
+      idleTimeSeconds: clientIdleTime,
+    } = req.body;
 
-    for (let i = 0; i < allPoints.length; i++) {
-      const pt = allPoints[i];
-      if (pt.speedKmh !== null && pt.speedKmh !== undefined) {
-        if (pt.speedKmh > maxSpeedKmh) maxSpeedKmh = pt.speedKmh;
-      }
-      if (pt.altitude !== null && pt.altitude !== undefined) {
-        if (pt.altitude > maxAltitude) maxAltitude = pt.altitude;
-      }
-      if (i > 0) {
-        const prev = allPoints[i - 1];
-        totalDistanceKm += haversineKm(prev.latitude, prev.longitude, pt.latitude, pt.longitude);
-        const intervalSec = Math.abs(new Date(pt.timestamp).getTime() - new Date(prev.timestamp).getTime()) / 1000;
-        const speed = pt.speedKmh ?? 0;
-        if (speed < 3) {
-          idleTimeSeconds += intervalSec;
+    let totalDistanceKm: number;
+    let maxSpeedKmh: number;
+    let avgSpeedKmh: number;
+    let maxAltitude: number;
+    let durationSeconds: number;
+    let idleTimeSeconds: number;
+
+    if (
+      clientDistanceKm !== undefined &&
+      clientMaxSpeed !== undefined &&
+      clientDuration !== undefined
+    ) {
+      totalDistanceKm = Number(clientDistanceKm) || 0;
+      maxSpeedKmh = Number(clientMaxSpeed) || 0;
+      avgSpeedKmh = Number(clientAvgSpeed) || 0;
+      maxAltitude = Number(clientMaxAlt) || 0;
+      durationSeconds = Number(clientDuration) || 0;
+      idleTimeSeconds = Math.round(Number(clientIdleTime) || 0);
+    } else {
+      const allPoints = await storage.getRoutePoints(id);
+
+      totalDistanceKm = 0;
+      maxSpeedKmh = 0;
+      maxAltitude = 0;
+      let idleTimeSec = 0;
+
+      for (let i = 0; i < allPoints.length; i++) {
+        const pt = allPoints[i];
+        if (pt.speedKmh !== null && pt.speedKmh !== undefined) {
+          if (pt.speedKmh > maxSpeedKmh) maxSpeedKmh = pt.speedKmh;
+        }
+        if (pt.altitude !== null && pt.altitude !== undefined) {
+          if (pt.altitude > maxAltitude) maxAltitude = pt.altitude;
+        }
+        if (i > 0) {
+          const prev = allPoints[i - 1];
+          totalDistanceKm += haversineKm(prev.latitude, prev.longitude, pt.latitude, pt.longitude);
+          const intervalSec = Math.abs(new Date(pt.timestamp).getTime() - new Date(prev.timestamp).getTime()) / 1000;
+          const speed = pt.speedKmh ?? 0;
+          if (speed < 3) {
+            idleTimeSec += intervalSec;
+          }
         }
       }
-    }
 
-    const stoppedAt = new Date();
-    const durationSeconds = Math.floor((stoppedAt.getTime() - new Date(route.startedAt).getTime()) / 1000);
-    const netTravelSeconds = Math.max(durationSeconds - idleTimeSeconds, 1);
-    const avgSpeedKmh = totalDistanceKm > 0 ? totalDistanceKm / (netTravelSeconds / 3600) : 0;
+      durationSeconds = Math.floor((stoppedAt.getTime() - new Date(route.startedAt).getTime()) / 1000);
+      idleTimeSeconds = Math.round(idleTimeSec);
+      const netTravelSeconds = Math.max(durationSeconds - idleTimeSeconds, 1);
+      avgSpeedKmh = totalDistanceKm > 0 ? totalDistanceKm / (netTravelSeconds / 3600) : 0;
+    }
 
     const updated = await storage.updateRoute(id, {
       status: "completed",
@@ -126,7 +157,7 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
       avgSpeedKmh,
       maxAltitude,
       durationSeconds,
-      idleTimeSeconds: Math.round(idleTimeSeconds),
+      idleTimeSeconds,
       stoppedAt,
     } as any);
 
