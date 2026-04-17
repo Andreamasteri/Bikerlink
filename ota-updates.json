@@ -2861,7 +2861,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-17T17:48:12.813Z"
+  },
+  {
+    "updateNumber": 73,
+    "version": "1.73.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-73 rv7.0.0: Fix posizione pulsante X mappa fullscreen",
+    "note": "Task #654: spostato pulsante X chiusura mappa fullscreen di 15px più in basso (top: insets.top+17 → insets.top+32, web: 25 → 40) e 8px più vicino al bordo destro (right: 16 → 8). CURRENT_OTA_NUMBER=73.",
+    "releaseId": "bd55255a-fd68-4c88-963e-ebb53ddc9a0a",
+    "bundleUrl": "private/ota/ota-1.73.0-1776448810242.js",
+    "updateGroupId": "2932977f-d334-4bdb-8609-6b734c6d4cac",
+    "androidUpdateId": "019d9c9a-6a4e-7822-bcc7-caf96f7cf6ea",
+    "iosUpdateId": null,
+    "commitBase": "9f35ed8025c6e56dadf0c5747d866b1d1b2edd1f",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/2932977f-d334-4bdb-8609-6b734c6d4cac",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-17T18:00:13.150Z"
   }
 ]

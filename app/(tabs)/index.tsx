@@ -846,7 +846,7 @@ export default function MapScreen() {
               <ActivityIndicator size="large" color={Colors.accent} />
             </View>
           )}
-          <Pressable style={[styles.closeBtn, { top: Platform.OS === "web" ? 25 : insets.top + 17 }]} onPress={() => setMapFullscreen(false)}>
+          <Pressable style={[styles.closeBtn, { top: Platform.OS === "web" ? 40 : insets.top + 32 }]} onPress={() => setMapFullscreen(false)}>
             <Ionicons name="close" size={28} color="#fff" />
           </Pressable>
           <Pressable
@@ -1741,7 +1741,7 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     position: "absolute",
-    right: 16,
+    right: 8,
     backgroundColor: "rgba(0,0,0,0.6)",
     borderRadius: 20,
     width: 40,
