@@ -451,7 +451,7 @@ export default function TraduzioniScreen() {
           const detected = (data.langColumns as string[])
             .map((c: string) => c.toLowerCase())
             .filter((l) => LANGS.some((lang) => lang.code === l));
-          if (detected.length > 0) setImportLangs(detected);
+          setImportLangs(detected);
         } else {
           setPreviewCols([]);
         }
