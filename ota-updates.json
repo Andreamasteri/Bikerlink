@@ -2769,7 +2769,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-17T12:17:19.916Z"
+  },
+  {
+    "updateNumber": 69,
+    "version": "1.69.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-69 rv7.0.0: Drive SA + cache cartelle + backup Drive + Colori App",
+    "note": "Task #634: percorso cartella Drive nei risultati di ricerca (admin traduzioni). Task #635: percorso cartella per foglio Drive già selezionato (import step). Task #636: percorso cartella padre nei risultati DriveFileBrowser. Task #637: cache nomi cartelle Drive per velocizzare ricerca. Task #638: cache TTL + eviction per nomi cartelle Drive. Task #639: refresh immediato nomi cartelle Drive per admin. Task #631: preferenze cartella/foglio Drive salvate lato server (app_settings). Task #641: migrazione Drive da ReplitConnectors a Service Account. Task #642: backup automatici su Google Drive (sostituisce Object Storage). Task #643: unifica \"Colori App\" nelle impostazioni admin. CURRENT_OTA_NUMBER=69.",
+    "releaseId": "f56fcdf5-f52f-44dd-82c1-cd2357efd7f3",
+    "bundleUrl": "private/ota/ota-1.69.0-1776434184935.js",
+    "updateGroupId": "29e76bd5-cc4b-4d14-b544-ad509f6edea8",
+    "androidUpdateId": "019d9bbb-3673-76d9-b821-e647940969b5",
+    "iosUpdateId": null,
+    "commitBase": "045f1aa500d4da87a5a6f54350f87edc42cd603f",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/29e76bd5-cc4b-4d14-b544-ad509f6edea8",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-17T13:56:27.804Z"
   }
 ]
