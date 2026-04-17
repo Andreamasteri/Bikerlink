@@ -11,6 +11,8 @@ import {
   Platform,
   Alert,
   Modal,
+  Image,
+  Pressable,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -20,7 +22,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { t, getCurrentLocale } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
-import { apiRequest, queryClient } from "@/lib/query-client";
+import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
+import { showImagePickerMenu } from "@/lib/image-picker-utils";
 import FavoriteStar from "@/components/FavoriteStar";
 
 interface MessageSender {
@@ -155,6 +158,40 @@ function PlaylistBubble({ message, isOwn }: { message: ChatMessage; isOwn: boole
   );
 }
 
+function ImageMessageBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolean }) {
+  const [fullscreen, setFullscreen] = useState(false);
+  const baseUrl = getApiUrl();
+  const imageUri = message.imageUrl
+    ? message.imageUrl.startsWith("http")
+      ? message.imageUrl
+      : new URL(message.imageUrl, baseUrl).toString()
+    : null;
+
+  return (
+    <>
+      <Pressable onPress={() => imageUri && setFullscreen(true)}>
+        {imageUri ? (
+          <Image
+            source={{ uri: imageUri }}
+            style={styles.chatImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.locationContent}>
+            <Ionicons name="image" size={18} color={isOwn ? "#fff" : Colors.accent} />
+            <Text style={[styles.messageText, isOwn ? styles.ownText : styles.otherText]}>Foto</Text>
+          </View>
+        )}
+      </Pressable>
+      <Modal visible={fullscreen} transparent animationType="fade" onRequestClose={() => setFullscreen(false)}>
+        <Pressable style={styles.fullscreenOverlay} onPress={() => setFullscreen(false)}>
+          <Image source={{ uri: imageUri ?? "" }} style={styles.fullscreenImage} resizeMode="contain" />
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
 function MessageBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolean }) {
   const hasHashtag =
     message.messageType === "text" &&
@@ -168,7 +205,7 @@ function MessageBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolea
           {message.sender.nickname}
         </Text>
       )}
-      <View style={[styles.bubble, isOwn ? styles.ownBubble : styles.otherBubble]}>
+      <View style={[styles.bubble, isOwn ? styles.ownBubble : styles.otherBubble, message.messageType === "image" && styles.imageBubble]}>
         {message.messageType === "playlist" ? (
           <PlaylistBubble message={message} isOwn={isOwn} />
         ) : message.messageType === "location" && message.latitude && message.longitude ? (
@@ -179,12 +216,7 @@ function MessageBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolea
             </Text>
           </View>
         ) : message.messageType === "image" ? (
-          <View style={styles.locationContent}>
-            <Ionicons name="image" size={18} color={isOwn ? "#fff" : Colors.accent} />
-            <Text style={[styles.messageText, isOwn ? styles.ownText : styles.otherText]}>
-              {message.content || "Foto"}
-            </Text>
-          </View>
+          <ImageMessageBubble message={message} isOwn={isOwn} />
         ) : hasHashtag ? (
           <TextWithHashtags
             text={message.content!}
@@ -196,11 +228,18 @@ function MessageBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolea
             {message.content}
           </Text>
         )}
-        <Text style={[styles.timeStamp, isOwn ? styles.ownTimeStamp : styles.otherTimeStamp]}>
-          {formatMessageTime(message.createdAt)}
-          {message.isFiltered && " \u26A0"}
-        </Text>
+        {message.messageType !== "image" && (
+          <Text style={[styles.timeStamp, isOwn ? styles.ownTimeStamp : styles.otherTimeStamp]}>
+            {formatMessageTime(message.createdAt)}
+            {message.isFiltered && " \u26A0"}
+          </Text>
+        )}
       </View>
+      {message.messageType === "image" && (
+        <Text style={[styles.timeStamp, isOwn ? styles.ownTimeStamp : styles.otherTimeStamp, { marginTop: 2 }]}>
+          {formatMessageTime(message.createdAt)}
+        </Text>
+      )}
     </View>
   );
 }
@@ -231,6 +270,7 @@ export default function ChatConversationScreen() {
   const [hashtagInput, setHashtagInput] = useState("");
   const [autoHashtag, setAutoHashtag] = useState(false);
   const [showMembersPanel, setShowMembersPanel] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const { data: conversations } = useQuery<ConversationDetail[]>({
     queryKey: ["/api/chat/conversations"],
@@ -411,6 +451,41 @@ export default function ChatConversationScreen() {
       }
     }
   }, []);
+
+  const uploadPhoto = useCallback(async (uri: string) => {
+    setIsUploadingImage(true);
+    try {
+      const formData = new FormData();
+      const filename = uri.split("/").pop() ?? "photo.jpg";
+      const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
+      const mimeType = ext === "png" ? "image/png" : ext === "gif" ? "image/gif" : "image/jpeg";
+      (formData as any).append("image", { uri, name: filename, type: mimeType } as any);
+
+      const uploadUrl = new URL(`/api/chat/conversations/${id}/images`, getApiUrl()).toString();
+      const resp = await fetch(uploadUrl, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ message: "Errore upload" }));
+        throw new Error(err.message ?? "Errore upload foto");
+      }
+
+      await queryClient.invalidateQueries({ queryKey: [`/api/chat/conversations/${id}/messages`] });
+    } catch (err: any) {
+      Alert.alert("Errore", err?.message ?? "Impossibile inviare la foto.");
+    } finally {
+      setIsUploadingImage(false);
+    }
+  }, [id]);
+
+  const handleSendPhoto = useCallback(() => {
+    showImagePickerMenu((uri) => {
+      uploadPhoto(uri);
+    });
+  }, [uploadPhoto]);
 
   const getTitle = (): string => {
     if (conversation?.title) return conversation.title;
@@ -618,6 +693,12 @@ export default function ChatConversationScreen() {
       <View style={[styles.inputBar, { paddingBottom: Platform.OS === "web" ? 34 : Math.max(insets.bottom, 12) }]}>
         <TouchableOpacity onPress={handleSendLocation} style={styles.iconButton}>
           <Ionicons name="location-outline" size={24} color={Colors.accent} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleSendPhoto} style={styles.iconButton} disabled={isUploadingImage}>
+          {isUploadingImage
+            ? <ActivityIndicator size="small" color={Colors.accent} />
+            : <Ionicons name="image-outline" size={24} color={Colors.accent} />
+          }
         </TouchableOpacity>
         {isPrivateChat && (
           <TouchableOpacity
@@ -1009,5 +1090,24 @@ const styles = StyleSheet.create({
     height: 0.5,
     backgroundColor: Colors.border,
     marginLeft: 70,
+  },
+  imageBubble: {
+    padding: 3,
+    overflow: "hidden",
+  },
+  chatImage: {
+    width: 220,
+    height: 160,
+    borderRadius: 10,
+  },
+  fullscreenOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.92)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fullscreenImage: {
+    width: "100%",
+    height: "100%",
   },
 });

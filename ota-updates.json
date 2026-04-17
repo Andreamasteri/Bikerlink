@@ -2838,7 +2838,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-17T16:08:55.836Z"
+  },
+  {
+    "updateNumber": 72,
+    "version": "1.72.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-72 rv7.0.0: Toggle motore mappa admin + invio foto in chat",
+    "note": "Task #649: toggle motore mappa (Google Maps vs Leaflet) nell'area admin, backend setting maps_engine, useGoogleMaps context, 4 componenti nativi NativeTrackingMap/PickerMap/MiniMap/RouteMap con switch condizionale. Task #653: invio foto in chat — endpoint POST /api/chat/conversations/:id/images con multer+objectStorage, GET /api/chat/images/:filename, pulsante image-outline in input bar, ImageMessageBubble con miniatura 220x160 e modal fullscreen al tap. CURRENT_OTA_NUMBER=72.",
+    "releaseId": "6bb378af-6749-4327-8c9e-e989cfcc8f6a",
+    "bundleUrl": "private/ota/ota-1.72.0-1776448089619.js",
+    "updateGroupId": "cb8cc99d-fc94-4aaf-a11f-e3b6afe22199",
+    "androidUpdateId": "019d9c8f-792a-7651-a337-84a539bedf3a",
+    "iosUpdateId": null,
+    "commitBase": "32b106b91ed909d4e235695845262e9fc14f54b4",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/cb8cc99d-fc94-4aaf-a11f-e3b6afe22199",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-17T17:48:12.813Z"
   }
 ]

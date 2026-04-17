@@ -1,9 +1,21 @@
 import { Router, type Request, type Response } from "express";
+import multer from "multer";
 import { storage } from "../storage";
 import { db } from "../db";
 import { motoClubs, motoClubMembers, users } from "@shared/schema";
 import { eq, and, ne } from "drizzle-orm";
 import { sendEmail } from "../email";
+import { uploadBuffer, downloadBuffer } from "../objectStorage";
+
+const chatImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error("Formato non supportato. Usa JPEG, PNG, WebP o GIF."));
+  },
+});
 
 function escapeHtml(text: string): string {
   return text
@@ -931,6 +943,71 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
   } catch (error) {
     console.error("Send message error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/conversations/:id/images", chatImageUpload.single("image"), async (req: Request, res: Response) => {
+  try {
+    const userId = requireAuth(req, res);
+    if (!userId) return;
+
+    if (!req.file) return res.status(400).json({ message: "Nessun file ricevuto" });
+
+    const conversationId = req.params.id as string;
+
+    const participants = await storage.getConversationParticipants(conversationId);
+    if (!participants.find((p) => p.userId === userId)) {
+      return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+    }
+
+    const ext = req.file.mimetype === "image/png" ? "png" : req.file.mimetype === "image/gif" ? "gif" : "jpg";
+    const filename = `chat-${conversationId}-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const objectPath = `public/chat-images/${filename}`;
+
+    await uploadBuffer(objectPath, req.file.buffer, req.file.mimetype);
+
+    const imageUrl = `/api/chat/images/${filename}`;
+
+    const message = await storage.createMessage({
+      conversationId,
+      senderId: userId,
+      messageType: "image",
+      content: null,
+      imageUrl,
+      latitude: null,
+      longitude: null,
+      isFiltered: false,
+    });
+
+    await storage.updateConversationTimestamp(conversationId);
+
+    const sender = await storage.getUser(userId);
+    return res.status(201).json({
+      ...message,
+      sender: sender
+        ? { id: sender.id, nickname: sender.nickname, avatarUrl: sender.avatarUrl, userType: sender.userType }
+        : null,
+    });
+  } catch (error) {
+    console.error("Chat image upload error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/images/:filename", async (req: Request, res: Response) => {
+  try {
+    const filename = req.params.filename as string;
+    if (!filename || filename.includes("..")) return res.status(400).end();
+    const objectPath = `public/chat-images/${filename}`;
+    const buffer = await downloadBuffer(objectPath);
+    const ext = filename.split(".").pop()?.toLowerCase();
+    const mimeMap: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp" };
+    const mime = mimeMap[ext ?? "jpg"] ?? "image/jpeg";
+    res.set("Content-Type", mime);
+    res.set("Cache-Control", "public, max-age=86400");
+    res.send(buffer);
+  } catch {
+    res.status(404).end();
   }
 });
 
