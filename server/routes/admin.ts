@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import { uploadBuffer } from "../objectStorage";
 import { storage } from "../storage";
 import { db } from "../db";
-import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts } from "@shared/schema";
+import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings } from "@shared/schema";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { eq, and, ne, desc, sql, count, notExists, inArray, lte, isNull, or, ilike } from "drizzle-orm";
 import { sendEmail } from "../email";
@@ -3626,6 +3626,42 @@ router.delete("/translations/folder-cache", (_req: Request, res: Response) => {
   driveFolderNameCache.clear();
   console.log(`[translations/folder-cache] Cache svuotata: ${clearedCount} voci rimosse`);
   return res.json({ cleared: clearedCount });
+});
+
+const TRANSLATIONS_PREFS_KEY = "translations.prefs";
+
+router.get("/translations/prefs", async (_req: Request, res: Response) => {
+  try {
+    const rows = await db.select().from(appSettings).where(eq(appSettings.key, TRANSLATIONS_PREFS_KEY));
+    if (rows.length === 0 || !rows[0].valueJson) return res.json({});
+    return res.json(rows[0].valueJson);
+  } catch (error) {
+    console.error("[translations/prefs GET] error:", error);
+    return res.status(500).json({ message: "Errore nel recupero delle preferenze" });
+  }
+});
+
+router.post("/translations/prefs", async (req: Request, res: Response) => {
+  try {
+    const { folder, sheet } = req.body as {
+      folder?: { id: string; name: string } | null;
+      sheet?: { id: string; name: string; folderPath?: string } | null;
+    };
+    const existing = await db.select().from(appSettings).where(eq(appSettings.key, TRANSLATIONS_PREFS_KEY));
+    const current = (existing.length > 0 && existing[0].valueJson ? existing[0].valueJson : {}) as Record<string, unknown>;
+    const updated = {
+      ...current,
+      ...(folder !== undefined ? { folder } : {}),
+      ...(sheet !== undefined ? { sheet } : {}),
+    };
+    await db.insert(appSettings)
+      .values({ key: TRANSLATIONS_PREFS_KEY, valueJson: updated, description: "Preferenze admin traduzioni (cartella export + foglio import)" })
+      .onConflictDoUpdate({ target: appSettings.key, set: { valueJson: updated, updatedAt: new Date() } });
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("[translations/prefs POST] error:", error);
+    return res.status(500).json({ message: "Errore nel salvataggio delle preferenze" });
+  }
 });
 
 router.get("/translations/preview-sheet", async (req: Request, res: Response) => {

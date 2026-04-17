@@ -514,18 +514,72 @@ export default function TraduzioniScreen() {
 
   useEffect(() => {
     loadImportInfo();
-    loadSavedFolder();
-    loadSavedSheet();
+    loadPrefs();
   }, []);
 
-  async function loadSavedFolder() {
+  async function loadPrefs() {
+    let serverFolder: DriveFolder | null = null;
+    let serverSheet: DriveSheet | null = null;
     try {
-      const raw = await AsyncStorage.getItem(STORAGE_KEY_FOLDER);
-      if (raw) {
-        const folder: DriveFolder = JSON.parse(raw);
-        setSelectedFolder(folder);
+      const url = new URL("/api/admin/translations/prefs", getApiUrl());
+      const resp = await fetch(url.toString(), { credentials: "include" });
+      if (resp.ok) {
+        const data = await resp.json() as { folder?: DriveFolder | null; sheet?: DriveSheet | null };
+        serverFolder = data.folder ?? null;
+        serverSheet = data.sheet ?? null;
       }
     } catch {}
+
+    if (serverFolder) {
+      setSelectedFolder(serverFolder);
+      try { await AsyncStorage.setItem(STORAGE_KEY_FOLDER, JSON.stringify(serverFolder)); } catch {}
+    } else {
+      try {
+        const raw = await AsyncStorage.getItem(STORAGE_KEY_FOLDER);
+        if (raw) setSelectedFolder(JSON.parse(raw));
+      } catch {}
+    }
+
+    if (serverSheet) {
+      setSelectedSheet(serverSheet);
+      try { await AsyncStorage.setItem(STORAGE_KEY_SHEET, JSON.stringify(serverSheet)); } catch {}
+      if (!serverSheet.folderPath) {
+        try {
+          const url = new URL(`/api/admin/translations/file-path?fileId=${encodeURIComponent(serverSheet.id)}`, getApiUrl());
+          const resp = await fetch(url.toString(), { credentials: "include" });
+          if (resp.ok) {
+            const data = await resp.json() as { folderPath?: string };
+            if (data.folderPath) {
+              const enriched: DriveSheet = { ...serverSheet, folderPath: data.folderPath };
+              setSelectedSheet(enriched);
+              saveSheet(enriched);
+            }
+          }
+        } catch {}
+      }
+    } else {
+      try {
+        const raw = await AsyncStorage.getItem(STORAGE_KEY_SHEET);
+        if (raw) {
+          const sheet: DriveSheet = JSON.parse(raw);
+          setSelectedSheet(sheet);
+          if (!sheet.folderPath) {
+            try {
+              const url = new URL(`/api/admin/translations/file-path?fileId=${encodeURIComponent(sheet.id)}`, getApiUrl());
+              const resp = await fetch(url.toString(), { credentials: "include" });
+              if (resp.ok) {
+                const data = await resp.json() as { folderPath?: string };
+                if (data.folderPath) {
+                  const enriched: DriveSheet = { ...sheet, folderPath: data.folderPath };
+                  setSelectedSheet(enriched);
+                  saveSheet(enriched);
+                }
+              }
+            } catch {}
+          }
+        }
+      } catch {}
+    }
   }
 
   async function saveFolder(folder: DriveFolder | null) {
@@ -536,29 +590,13 @@ export default function TraduzioniScreen() {
         await AsyncStorage.removeItem(STORAGE_KEY_FOLDER);
       }
     } catch {}
-  }
-
-  async function loadSavedSheet() {
     try {
-      const raw = await AsyncStorage.getItem(STORAGE_KEY_SHEET);
-      if (raw) {
-        const sheet: DriveSheet = JSON.parse(raw);
-        setSelectedSheet(sheet);
-        if (!sheet.folderPath) {
-          try {
-            const url = new URL(`/api/admin/translations/file-path?fileId=${encodeURIComponent(sheet.id)}`, getApiUrl());
-            const resp = await fetch(url.toString(), { credentials: "include" });
-            if (resp.ok) {
-              const data = await resp.json() as { folderPath?: string };
-              if (data.folderPath) {
-                const enriched: DriveSheet = { ...sheet, folderPath: data.folderPath };
-                setSelectedSheet(enriched);
-                saveSheet(enriched);
-              }
-            }
-          } catch {}
-        }
-      }
+      const url = new URL("/api/admin/translations/prefs", getApiUrl());
+      fetch(url.toString(), {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folder }),
+      }).catch(() => {});
     } catch {}
   }
 
@@ -569,6 +607,14 @@ export default function TraduzioniScreen() {
       } else {
         await AsyncStorage.removeItem(STORAGE_KEY_SHEET);
       }
+    } catch {}
+    try {
+      const url = new URL("/api/admin/translations/prefs", getApiUrl());
+      fetch(url.toString(), {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sheet }),
+      }).catch(() => {});
     } catch {}
   }
 
