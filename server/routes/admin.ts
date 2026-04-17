@@ -3464,12 +3464,16 @@ router.get("/translations/browse", async (req: Request, res: Response) => {
       } catch {}
     }
 
-    const foldersData = foldersResp.ok
-      ? (await foldersResp.json() as { files?: { id: string; name: string }[] })
-      : { files: [] };
-    const sheetsData = sheetsResp.ok
-      ? (await sheetsResp.json() as { files?: { id: string; name: string; modifiedTime?: string }[] })
-      : { files: [] };
+    if (!foldersResp.ok || !sheetsResp.ok) {
+      const errText = !foldersResp.ok
+        ? await foldersResp.text()
+        : await sheetsResp.text();
+      console.error("[translations/browse] Drive error:", errText);
+      return res.status(502).json({ message: "Errore nel recupero del contenuto Drive" });
+    }
+
+    const foldersData = await foldersResp.json() as { files?: { id: string; name: string }[] };
+    const sheetsData = await sheetsResp.json() as { files?: { id: string; name: string; modifiedTime?: string }[] };
 
     return res.json({
       folderName,

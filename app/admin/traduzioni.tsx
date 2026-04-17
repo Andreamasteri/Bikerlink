@@ -160,7 +160,6 @@ function DriveFileBrowser({
   visible,
   mode,
   title,
-  selectedFolderId,
   selectedSheetId,
   onSelectFolder,
   onSelectSheet,
@@ -169,7 +168,6 @@ function DriveFileBrowser({
   visible: boolean;
   mode: "folder" | "sheet";
   title: string;
-  selectedFolderId?: string | null;
   selectedSheetId?: string | null;
   onSelectFolder?: (folder: DriveFolder) => void;
   onSelectSheet?: (sheet: DriveSheet) => void;
@@ -231,11 +229,22 @@ function DriveFileBrowser({
           </View>
 
           <View style={styles.breadcrumbRow}>
+            {breadcrumb.length > 1 && (
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => navigateTo(breadcrumb[breadcrumb.length - 2], breadcrumb.length - 2)}
+                activeOpacity={0.7}
+              >
+                <MaterialCommunityIcons name="arrow-left" size={16} color={Colors.accent} />
+                <Text style={styles.backButtonText}>Indietro</Text>
+              </TouchableOpacity>
+            )}
             <FlatList
               data={breadcrumb}
               horizontal
               showsHorizontalScrollIndicator={false}
               keyExtractor={(_, i) => String(i)}
+              style={{ marginTop: breadcrumb.length > 1 ? 6 : 0 }}
               renderItem={({ item, index }) => {
                 const isLast = index === breadcrumb.length - 1;
                 return (
@@ -803,7 +812,6 @@ export default function TraduzioniScreen() {
         visible={showFolderBrowser}
         mode="folder"
         title="Scegli cartella di destinazione"
-        selectedFolderId={selectedFolder?.id}
         onSelectFolder={(f) => {
           if (f.id === "root") {
             setSelectedFolder(null);
@@ -1124,6 +1132,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 2,
+    alignSelf: "flex-start",
+  },
+  backButtonText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.accent,
   },
   breadcrumbItem: {
     flexDirection: "row",
