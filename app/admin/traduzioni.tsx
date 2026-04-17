@@ -14,8 +14,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
+
+const STORAGE_KEY_FOLDER = "@admin_last_export_folder";
 
 type StepStatus = "idle" | "loading" | "success" | "error";
 
@@ -244,7 +247,28 @@ export default function TraduzioniScreen() {
 
   useEffect(() => {
     loadImportInfo();
+    loadSavedFolder();
   }, []);
+
+  async function loadSavedFolder() {
+    try {
+      const raw = await AsyncStorage.getItem(STORAGE_KEY_FOLDER);
+      if (raw) {
+        const folder: DriveFolder = JSON.parse(raw);
+        setSelectedFolder(folder);
+      }
+    } catch {}
+  }
+
+  async function saveFolder(folder: DriveFolder | null) {
+    try {
+      if (folder) {
+        await AsyncStorage.setItem(STORAGE_KEY_FOLDER, JSON.stringify(folder));
+      } else {
+        await AsyncStorage.removeItem(STORAGE_KEY_FOLDER);
+      }
+    } catch {}
+  }
 
   async function loadImportInfo() {
     try {
@@ -526,7 +550,7 @@ export default function TraduzioniScreen() {
         </TouchableOpacity>
         {selectedFolder ? (
           <TouchableOpacity
-            onPress={() => setSelectedFolder(null)}
+            onPress={() => { setSelectedFolder(null); saveFolder(null); }}
             style={styles.clearButton}
             activeOpacity={0.7}
           >
@@ -683,7 +707,7 @@ export default function TraduzioniScreen() {
         items={folders}
         loading={foldersLoading}
         selectedId={selectedFolder?.id}
-        onSelect={(f) => setSelectedFolder(f)}
+        onSelect={(f) => { setSelectedFolder(f); saveFolder(f); }}
         onClose={() => setShowFolderPicker(false)}
         emptyMessage="Nessuna cartella trovata su Drive"
       />
