@@ -2884,7 +2884,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-17T18:00:13.150Z"
+  },
+  {
+    "updateNumber": 74,
+    "version": "1.74.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-74 rv7.0.0: Performance Counter GPS + rinomina mappa Detailed Map",
+    "note": "Task #656: icona/colore batteria (alta=verde/full, media=giallo/half, bassa=rosso/dead); velocità con fallback haversine se GPS null (.toFixed(1)); 3 profili GPS Easy/Medium/Race con selettore UI + avviso consumo batteria; calcolo locale statistiche e invio al server allo STOP; avgSpeed .toFixed(2) in alert e RecordCard; backend PUT /:id/stop accetta body pre-calcolato con fallback ricalcolo GPS. Task #657: rinominata label mappa carto_dark da 'FullMap' a 'Detailed Map' in lib/map-tiles.ts. CURRENT_OTA_NUMBER=74.",
+    "releaseId": "09039149-9bf8-4476-97d3-38586ec9a177",
+    "bundleUrl": "private/ota/ota-1.74.0-1776452755353.js",
+    "updateGroupId": "868dc3a8-c11f-4985-b53d-cfb82cbfab74",
+    "androidUpdateId": "019d9cd6-93a4-7478-9a72-54dcaf560d1f",
+    "iosUpdateId": null,
+    "commitBase": "00d151d62a861e3ebe2e170ee3676101a88c4381",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/868dc3a8-c11f-4985-b53d-cfb82cbfab74",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-17T19:05:57.956Z"
   }
 ]
