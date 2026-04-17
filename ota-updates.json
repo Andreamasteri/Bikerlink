@@ -2701,7 +2701,29 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-16T21:58:40.413Z"
+  },
+  {
+    "updateNumber": 66,
+    "version": "1.66.0",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-66 rv7.0.0: Widget rispetta setting admin floating_widget_enabled",
+    "note": "Bug fix: FloatingWidgetProvider ignorava il setting globale admin floating_widget_enabled. Aggiunta useQuery su /api/settings/floating-widget nel provider, incluso adminEnabled nella condizione isVisible (default true in caso errore/loading). CURRENT_OTA_NUMBER=66.",
+    "releaseId": "8ac03795-fde0-44ce-8b3b-9efd4375cfb4",
+    "bundleUrl": "private/ota/ota-1.66.0-1776408904629.js",
+    "updateGroupId": "b590a378-ef26-43a8-9592-47ae0ff36bed",
+    "androidUpdateId": "019d9a39-b7c3-75df-a81e-4efc1bf56c98",
+    "iosUpdateId": null,
+    "commitBase": "38f63ade7a1734fbf566b729dc672ecafad822d6",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/b590a378-ef26-43a8-9592-47ae0ff36bed",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-17T06:55:07.566Z"
   }
 ]
