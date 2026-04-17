@@ -16,6 +16,7 @@ interface DriveFolder {
 
 interface BackupStatus {
   scheduled: boolean;
+  autoEnabled: boolean;
   lastDbBackup: { timestamp: string; size: number } | null;
   lastMediaBackup: { timestamp: string; size: number } | null;
   isBackingUp: boolean;

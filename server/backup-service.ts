@@ -27,7 +27,7 @@ function addMs(ms: number): Date {
 }
 
 function getTimestamp(): string {
-  return new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 16);
+  return new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
 }
 
 async function readSetting(key: string): Promise<string | null> {
@@ -133,14 +133,16 @@ async function saveLastBackup(type: "db" | "media", meta: LastBackupMeta) {
 }
 
 export async function getBackupStatus() {
-  const [lastDb, lastMedia, folder, freq] = await Promise.all([
+  const [lastDb, lastMedia, folder, freq, autoEnabled] = await Promise.all([
     readJsonSetting<LastBackupMeta>("backup.last_db"),
     readJsonSetting<LastBackupMeta>("backup.last_media"),
     getDriveFolder(),
     getBackupFrequency(),
+    isAutoBackupEnabled(),
   ]);
   return {
     scheduled: dbSchedulerTimer !== null,
+    autoEnabled,
     lastDbBackup: lastDb ?? null,
     lastMediaBackup: lastMedia ?? null,
     isBackingUp,
