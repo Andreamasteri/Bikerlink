@@ -14,6 +14,7 @@ import { MOTORCYCLES, pickRandomN, getMotoYear } from "../mass-seed-data";
 import { getLastMatchingCycleMeta, runBikerBikerMatching, runWishlistMatching, runMatchingForUser } from "../matching-engine";
 import { isProtectedUser } from "../constants";
 import { SERVER_START_TIME, uptimeState } from "../uptime";
+import { getDriveClient } from "../lib/drive-client";
 
 const router = Router();
 
@@ -64,9 +65,7 @@ function evictExpiredDriveFolderCache(): void {
 }
 
 async function getDriveFolderMeta(
-  folderId: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  connectors: any
+  folderId: string
 ): Promise<{ name: string; parents: string[] | undefined } | null> {
   const now = Date.now();
   const cached = driveFolderNameCache.get(folderId);
@@ -74,21 +73,21 @@ async function getDriveFolderMeta(
     return { name: cached.name, parents: cached.parents };
   }
   try {
-    const resp = await connectors.proxy(
-      "google-drive",
-      `/drive/v3/files/${encodeURIComponent(folderId)}?fields=name,parents`,
-      { method: "GET" }
-    );
-    if (!resp.ok) return null;
-    const data = await resp.json() as { name?: string; parents?: string[] };
+    const drive = getDriveClient();
+    const resp = await drive.files.get({
+      fileId: folderId,
+      fields: "name,parents",
+    });
+    const data = resp.data;
     if (!data.name) return null;
+    const parents = (data.parents as string[] | undefined) ?? undefined;
     evictExpiredDriveFolderCache();
     driveFolderNameCache.set(folderId, {
       name: data.name,
-      parents: data.parents,
+      parents,
       expiresAt: now + DRIVE_FOLDER_CACHE_TTL_MS,
     });
-    return { name: data.name, parents: data.parents };
+    return { name: data.name, parents };
   } catch {
     return null;
   }
@@ -3389,9 +3388,6 @@ router.post("/translations/export", async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Esegui prima 'Prepara generazione'" });
     }
 
-    const { ReplitConnectors } = await import("@replit/connectors-sdk");
-    const connectors = new ReplitConnectors();
-
     const spreadsheetTitle = `BikerLink Traduzioni ${new Date().toISOString().slice(0, 10)}`;
 
     const csvHeaders = ["Chiave", "Posizione nell'app", "IT (fonte)", ...langs.map((l) => l.toUpperCase())];
@@ -3414,40 +3410,26 @@ router.post("/translations/export", async (req: Request, res: Response) => {
       .map((row) => row.map(csvEscape).join(","))
       .join("\r\n");
 
-    const boundary = `drive_boundary_${Date.now()}`;
-    const fileMeta: Record<string, unknown> = { name: spreadsheetTitle, mimeType: "application/vnd.google-apps.spreadsheet" };
-    if (folderId && folderId.trim()) {
-      fileMeta.parents = [folderId.trim()];
-    }
-    const multipartBody = [
-      `--${boundary}`,
-      "Content-Type: application/json; charset=UTF-8",
-      "",
-      JSON.stringify(fileMeta),
-      `--${boundary}`,
-      "Content-Type: text/csv; charset=UTF-8",
-      "",
-      csvLines,
-      `--${boundary}--`,
-    ].join("\r\n");
+    const drive = getDriveClient();
+    const createResp = await drive.files.create({
+      requestBody: {
+        name: spreadsheetTitle,
+        mimeType: "application/vnd.google-apps.spreadsheet",
+        ...(folderId && folderId.trim() ? { parents: [folderId.trim()] } : {}),
+      },
+      media: {
+        mimeType: "text/csv",
+        body: csvLines,
+      },
+      fields: "id,name",
+    });
 
-    const createResp = await connectors.proxy(
-      "google-drive",
-      "/upload/drive/v3/files?uploadType=multipart",
-      {
-        method: "POST",
-        headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
-        body: multipartBody,
-      }
-    );
-
-    if (!createResp.ok) {
-      const errText = await createResp.text();
-      console.error("[translations/export] Drive create error:", errText);
+    if (!createResp.data.id) {
+      console.error("[translations/export] Drive create error: no id in response");
       return res.status(500).json({ message: "Errore nella creazione del Google Sheet" });
     }
 
-    const driveFile = await createResp.json() as { id: string; name: string };
+    const driveFile = { id: createResp.data.id!, name: createResp.data.name ?? spreadsheetTitle };
 
     TRANSLATIONS_STAGING.exportedFileId = driveFile.id;
     TRANSLATIONS_STAGING.exportedLangs = langs;
@@ -3483,24 +3465,24 @@ router.get("/translations/browse", async (req: Request, res: Response) => {
   try {
     const folderId = (req.query.folderId as string | undefined)?.trim();
     const searchQuery = (req.query.q as string | undefined)?.trim();
-    const { ReplitConnectors } = await import("@replit/connectors-sdk");
-    const connectors = new ReplitConnectors();
+    const drive = getDriveClient();
 
     if (searchQuery) {
       const escapedQ = searchQuery.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
       const driveQ = `name contains '${escapedQ}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
-      const sheetsResp = await connectors.proxy(
-        "google-drive",
-        `/drive/v3/files?q=${encodeURIComponent(driveQ)}&fields=files(id,name,modifiedTime,parents)&orderBy=modifiedTime desc&pageSize=50`,
-        { method: "GET" }
-      );
-      if (!sheetsResp.ok) {
-        const errText = await sheetsResp.text();
-        console.error("[translations/browse] Search Drive error:", errText);
+      let sheetsData: { id?: string | null; name?: string | null; modifiedTime?: string | null; parents?: string[] | null }[] = [];
+      try {
+        const sheetsResp = await drive.files.list({
+          q: driveQ,
+          fields: "files(id,name,modifiedTime,parents)",
+          orderBy: "modifiedTime desc",
+          pageSize: 50,
+        });
+        sheetsData = sheetsResp.data.files || [];
+      } catch (driveErr) {
+        console.error("[translations/browse] Search Drive error:", driveErr);
         return res.status(502).json({ message: "Errore nella ricerca Drive" });
       }
-      const sheetsData = await sheetsResp.json() as { files?: { id: string; name: string; modifiedTime?: string; parents?: string[] }[] };
-      const files = sheetsData.files || [];
 
       async function resolveFolderPath(parentId: string | undefined): Promise<string> {
         if (!parentId) return "";
@@ -3508,7 +3490,7 @@ router.get("/translations/browse", async (req: Request, res: Response) => {
         let currentId: string | undefined = parentId;
         const MAX_DEPTH = 6;
         for (let i = 0; i < MAX_DEPTH && currentId; i++) {
-          const meta = await getDriveFolderMeta(currentId, connectors);
+          const meta = await getDriveFolderMeta(currentId);
           if (!meta) break;
           parts.unshift(meta.name);
           currentId = meta.parents?.[0];
@@ -3517,11 +3499,11 @@ router.get("/translations/browse", async (req: Request, res: Response) => {
       }
 
       const sheetsWithPaths = await Promise.all(
-        files.map(async (f) => ({
-          id: f.id,
-          name: f.name,
-          modifiedTime: f.modifiedTime,
-          folderPath: await resolveFolderPath(f.parents?.[0]).catch(() => ""),
+        sheetsData.map(async (f) => ({
+          id: f.id ?? "",
+          name: f.name ?? "",
+          modifiedTime: f.modifiedTime ?? undefined,
+          folderPath: await resolveFolderPath(f.parents?.[0] ?? undefined).catch(() => ""),
         }))
       );
 
@@ -3539,40 +3521,30 @@ router.get("/translations/browse", async (req: Request, res: Response) => {
     const qFolders = `${parentClause} and mimeType='application/vnd.google-apps.folder' and trashed=false`;
     const qSheets = `${parentClause} and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
 
-    const [foldersResp, sheetsResp] = await Promise.all([
-      connectors.proxy(
-        "google-drive",
-        `/drive/v3/files?q=${encodeURIComponent(qFolders)}&fields=files(id,name)&orderBy=name&pageSize=100`,
-        { method: "GET" }
-      ),
-      connectors.proxy(
-        "google-drive",
-        `/drive/v3/files?q=${encodeURIComponent(qSheets)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc&pageSize=100`,
-        { method: "GET" }
-      ),
-    ]);
-
-    let folderName = "Drive";
-    if (folderId) {
-      const meta = await getDriveFolderMeta(folderId, connectors);
-      if (meta) folderName = meta.name;
-    }
-
-    if (!foldersResp.ok || !sheetsResp.ok) {
-      const errText = !foldersResp.ok
-        ? await foldersResp.text()
-        : await sheetsResp.text();
-      console.error("[translations/browse] Drive error:", errText);
+    let foldersFiles: { id?: string | null; name?: string | null }[] = [];
+    let sheetsFiles: { id?: string | null; name?: string | null; modifiedTime?: string | null }[] = [];
+    try {
+      const [foldersResp, sheetsResp] = await Promise.all([
+        drive.files.list({ q: qFolders, fields: "files(id,name)", orderBy: "name", pageSize: 100 }),
+        drive.files.list({ q: qSheets, fields: "files(id,name,modifiedTime)", orderBy: "modifiedTime desc", pageSize: 100 }),
+      ]);
+      foldersFiles = foldersResp.data.files || [];
+      sheetsFiles = sheetsResp.data.files || [];
+    } catch (driveErr) {
+      console.error("[translations/browse] Drive error:", driveErr);
       return res.status(502).json({ message: "Errore nel recupero del contenuto Drive" });
     }
 
-    const foldersData = await foldersResp.json() as { files?: { id: string; name: string }[] };
-    const sheetsData = await sheetsResp.json() as { files?: { id: string; name: string; modifiedTime?: string }[] };
+    let folderName = "Drive";
+    if (folderId) {
+      const meta = await getDriveFolderMeta(folderId);
+      if (meta) folderName = meta.name;
+    }
 
     return res.json({
       folderName,
-      folders: foldersData.files || [],
-      sheets: sheetsData.files || [],
+      folders: foldersFiles.map((f) => ({ id: f.id ?? "", name: f.name ?? "" })),
+      sheets: sheetsFiles.map((f) => ({ id: f.id ?? "", name: f.name ?? "", modifiedTime: f.modifiedTime ?? undefined })),
     });
   } catch (error) {
     console.error("[translations/browse] error:", error);
@@ -3586,10 +3558,7 @@ router.get("/translations/file-path", async (req: Request, res: Response) => {
     if (!fileId) {
       return res.status(400).json({ message: "fileId richiesto" });
     }
-    const { ReplitConnectors } = await import("@replit/connectors-sdk");
-    const connectors = new ReplitConnectors();
-
-    const fileMeta = await getDriveFolderMeta(fileId, connectors);
+    const fileMeta = await getDriveFolderMeta(fileId);
     if (!fileMeta) {
       return res.status(502).json({ message: "Impossibile recuperare il percorso del file" });
     }
@@ -3598,7 +3567,7 @@ router.get("/translations/file-path", async (req: Request, res: Response) => {
       return res.json({ folderPath: "Drive" });
     }
 
-    const parent = await getDriveFolderMeta(parentId, connectors);
+    const parent = await getDriveFolderMeta(parentId);
     if (!parent) {
       return res.json({ folderPath: "Drive" });
     }
@@ -3609,7 +3578,7 @@ router.get("/translations/file-path", async (req: Request, res: Response) => {
       return res.json({ folderPath: parentName });
     }
 
-    const grandParent = await getDriveFolderMeta(grandParentId, connectors);
+    const grandParent = await getDriveFolderMeta(grandParentId);
     if (!grandParent) {
       return res.json({ folderPath: parentName });
     }
@@ -3677,22 +3646,18 @@ router.get("/translations/preview-sheet", async (req: Request, res: Response) =>
       return res.status(400).json({ message: "fileId richiesto" });
     }
 
-    const { ReplitConnectors } = await import("@replit/connectors-sdk");
-    const connectors = new ReplitConnectors();
-
-    const exportResp = await connectors.proxy(
-      "google-drive",
-      `/drive/v3/files/${encodeURIComponent(fileId)}/export?mimeType=text/csv`,
-      { method: "GET" }
-    );
-
-    if (!exportResp.ok) {
-      const errText = await exportResp.text();
-      console.error("[translations/preview-sheet] Drive error:", errText);
+    const drive = getDriveClient();
+    let csvText: string;
+    try {
+      const exportResp = await drive.files.export(
+        { fileId, mimeType: "text/csv" },
+        { responseType: "text" }
+      );
+      csvText = exportResp.data as string;
+    } catch (driveErr) {
+      console.error("[translations/preview-sheet] Drive error:", driveErr);
       return res.status(500).json({ message: "Errore nella lettura del Google Sheet" });
     }
-
-    const csvText = await exportResp.text();
     const firstLine = csvText.split(/\r?\n/)[0] ?? "";
 
     // Simple split for header — headers don't contain commas/quotes in our format
@@ -3733,22 +3698,18 @@ router.post("/translations/import", async (req: Request, res: Response) => {
       }
     }
 
-    const { ReplitConnectors } = await import("@replit/connectors-sdk");
-    const connectors = new ReplitConnectors();
-
-    const exportResp = await connectors.proxy(
-      "google-drive",
-      `/drive/v3/files/${encodeURIComponent(resolvedFileId)}/export?mimeType=text/csv`,
-      { method: "GET" }
-    );
-
-    if (!exportResp.ok) {
-      const errText = await exportResp.text();
-      console.error("[translations/import] read error:", errText);
+    const drive = getDriveClient();
+    let csvText: string;
+    try {
+      const exportResp = await drive.files.export(
+        { fileId: resolvedFileId, mimeType: "text/csv" },
+        { responseType: "text" }
+      );
+      csvText = exportResp.data as string;
+    } catch (driveErr) {
+      console.error("[translations/import] read error:", driveErr);
       return res.status(500).json({ message: "Errore nella lettura del Google Sheet" });
     }
-
-    const csvText = await exportResp.text();
 
     function parseCsv(text: string): string[][] {
       const rows: string[][] = [];
