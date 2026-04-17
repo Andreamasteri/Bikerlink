@@ -21,6 +21,7 @@ import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
 import * as Location from "expo-location";
+import * as Battery from "expo-battery";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getCurrentLocale } from "@/lib/i18n";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
@@ -96,6 +97,13 @@ function getBatteryImpact(mode: TrackingMode): BatteryImpact {
   }
 }
 
+function getBatteryImpactFromLevel(level: number): BatteryImpact {
+  if (level < 0) return "bassa";
+  if (level <= 0.33) return "bassa";
+  if (level <= 0.66) return "media";
+  return "alta";
+}
+
 function getBatteryColor(impact: BatteryImpact): string {
   switch (impact) {
     case "alta": return Colors.success;
@@ -157,6 +165,15 @@ export default function TrackingScreen() {
   const [countdownValue, setCountdownValue] = useState<number | "GO" | null>(null);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const [batteryLevel, setBatteryLevel] = useState<number>(-1);
+
+  const [stopAtZeroEnabled, setStopAtZeroEnabled] = useState(false);
+  const stopAtZeroFreezeRef = useRef(false);
+
+  const [handsOffEnabled, setHandsOffEnabled] = useState(false);
+  const [handsOffSpeed, setHandsOffSpeed] = useState("80");
+  const [handsOffActive, setHandsOffActive] = useState(false);
+
   const [publishRecord, setPublishRecord] = useState<RouteRecord | null>(null);
   const [publishCaption, setPublishCaption] = useState("");
 
@@ -209,6 +226,19 @@ export default function TrackingScreen() {
       subscription.remove();
       cleanupTracking();
     };
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    const fetchBattery = async () => {
+      try {
+        const level = await Battery.getBatteryLevelAsync();
+        setBatteryLevel(level);
+      } catch {}
+    };
+    fetchBattery();
+    const interval = setInterval(fetchBattery, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleAppStateChange = useCallback((nextState: AppStateStatus) => {
@@ -298,6 +328,10 @@ export default function TrackingScreen() {
     watchSubRef.current = sub;
   }, []);
 
+  const stopAtZeroEnabledRef = useRef(false);
+  const handsOffEnabledRef = useRef(false);
+  const handsOffSpeedRef = useRef(80);
+
   const handleGpsUpdate = useCallback((lat: number, lng: number, altitude: number | null, speedMs: number | null) => {
     if (isPausedRef.current) return;
 
@@ -315,6 +349,25 @@ export default function TrackingScreen() {
     }
 
     setCurrentSpeed(speedKmh);
+
+    if (stopAtZeroEnabledRef.current) {
+      const shouldFreeze = speedKmh < 1;
+      stopAtZeroFreezeRef.current = shouldFreeze;
+    } else {
+      stopAtZeroFreezeRef.current = false;
+    }
+
+    if (handsOffEnabledRef.current) {
+      const threshold = handsOffSpeedRef.current;
+      setHandsOffActive(speedKmh > threshold);
+    } else {
+      setHandsOffActive(false);
+    }
+
+    if (stopAtZeroFreezeRef.current) {
+      lastPosRef.current = { lat, lng, time: now };
+      return;
+    }
 
     if (speedKmh > maxSpeedRef.current) {
       maxSpeedRef.current = speedKmh;
@@ -500,11 +553,16 @@ export default function TrackingScreen() {
       currentModeRef.current = "idle";
       totalPointsSentRef.current = 0;
       updateProfileRef.current = updateProfile;
+      stopAtZeroEnabledRef.current = stopAtZeroEnabled;
+      handsOffEnabledRef.current = handsOffEnabled;
+      handsOffSpeedRef.current = parseFloat(handsOffSpeed || "80") || 80;
+      stopAtZeroFreezeRef.current = false;
+      setHandsOffActive(false);
 
       setIsTracking(true);
 
       timerRef.current = setInterval(() => {
-        if (!isPausedRef.current) {
+        if (!isPausedRef.current && !stopAtZeroFreezeRef.current) {
           const elapsed = Math.floor((Date.now() - startTimeRef.current - pausedTimeRef.current) / 1000);
           setTotalTime(elapsed);
         }
@@ -642,7 +700,10 @@ export default function TrackingScreen() {
 
   const netTime = totalTime - idleTime;
   const avgSpeed = netTime > 0 ? totalKm / (netTime / 3600) : 0;
-  const batteryImpact = getBatteryImpact(trackingMode);
+  const grossAvgSpeed = totalTime > 0 ? totalKm / (totalTime / 3600) : 0;
+  const batteryImpact = Platform.OS !== "web" && batteryLevel >= 0
+    ? getBatteryImpactFromLevel(batteryLevel)
+    : getBatteryImpact(trackingMode);
   const batteryColor = getBatteryColor(batteryImpact);
 
   return (
@@ -666,6 +727,7 @@ export default function TrackingScreen() {
         </View>
       )}
       <ScrollView
+        pointerEvents={handsOffActive ? "none" : "auto"}
         contentContainerStyle={[
           styles.content,
           {
@@ -674,79 +736,85 @@ export default function TrackingScreen() {
           },
         ]}
       >
-      <Ionicons name="speedometer" size={48} color={Colors.accent} style={styles.headerIcon} />
-      <Text style={styles.title}>Performance Counter</Text>
-      <Text style={styles.subtitle}>Registra le tue prestazioni in moto</Text>
-
-      {isTracking && (
-        <View style={styles.dashboard}>
-          <View style={styles.statusRow}>
-            <View style={[styles.statusBadge, { backgroundColor: isPaused ? Colors.warning + "30" : Colors.success + "30" }]}>
-              <View style={[styles.statusDot, { backgroundColor: isPaused ? Colors.warning : Colors.success }]} />
-              <Text style={[styles.statusText, { color: isPaused ? Colors.warning : Colors.success }]}>
-                {isPaused ? "IN PAUSA" : trackingMode === "highway" ? "AUTOSTRADA" : trackingMode === "city" ? "CITTÀ" : "FERMO"}
-              </Text>
-            </View>
-            <View style={[styles.batteryBadge, { backgroundColor: batteryColor + "20" }]}>
-              <Ionicons name={getBatteryIcon(batteryImpact) as any} size={14} color={batteryColor} />
-              <Text style={[styles.batteryText, { color: batteryColor }]}>
-                {batteryImpact.toUpperCase()}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.speedBox}>
-            <Text style={[styles.speedValue, isPaused && { color: Colors.textSecondary }]}>
-              {isPaused ? "--" : currentSpeed.toFixed(1)}
-            </Text>
-            <Text style={styles.speedUnit}>km/h</Text>
-          </View>
-
-          <View style={styles.row}>
-            <StatCard icon="time" color={Colors.accent} value={formatTime(totalTime)} label="Tempo totale" />
-            <StatCard icon="pause-circle" color={Colors.warning} value={formatTime(idleTime)} label="Tempo fermo" />
-          </View>
-          <View style={styles.row}>
-            <StatCard icon="bicycle" color={Colors.success} value={formatTime(Math.max(netTime, 0))} label="Tempo netto" />
-            <StatCard icon="speedometer" color={Colors.accent} value={avgSpeed.toFixed(1)} label="Vel. media km/h" />
-          </View>
-          <View style={styles.row}>
-            <StatCard icon="flash" color={Colors.accentRed} value={maxSpeed.toFixed(0)} label="Vel. max km/h" />
-            <StatCard icon="trending-up" color={Colors.success} value={maxAltitude.toFixed(0)} label="Quota max m" />
-          </View>
-          <View style={styles.row}>
-            <StatCard icon="navigate" color={Colors.accent} value={totalKm.toFixed(2)} label="Km totali" />
-            <StatCard icon="cloud-upload" color={Colors.maleIcon} value={`${pointsBuffered}/${totalPointsSent}`} label="Buffer / Inviati" />
-          </View>
-        </View>
-      )}
 
       {isTracking ? (
-        <View style={styles.controlRow}>
-          <Pressable
-            style={[styles.controlBtn, { backgroundColor: isPaused ? Colors.success : Colors.warning }]}
-            onPress={togglePause}
-          >
-            <Ionicons name={isPaused ? "play" : "pause"} size={28} color="#fff" />
-            <Text style={styles.controlLabel}>{isPaused ? "Riprendi" : "Pausa"}</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.mainBtn, { backgroundColor: Colors.accentRed }]}
-            onPress={stopTracking}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" size="large" />
-            ) : (
-              <Ionicons name="stop-circle" size={56} color="#fff" />
-            )}
-          </Pressable>
-          <View style={styles.controlPlaceholder} />
-        </View>
+        <>
+          <View style={styles.trackingHeader}>
+            <Pressable
+              style={[styles.mainBtn, { backgroundColor: Colors.accentRed }]}
+              onPress={stopTracking}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" size="large" />
+              ) : (
+                <Ionicons name="stop-circle" size={68} color="#fff" />
+              )}
+            </Pressable>
+            <Pressable
+              style={[styles.controlBtn, { backgroundColor: isPaused ? Colors.success : Colors.warning }]}
+              onPress={togglePause}
+            >
+              <Ionicons name={isPaused ? "play" : "pause"} size={28} color="#fff" />
+              <Text style={styles.controlLabel}>{isPaused ? "Riprendi" : "Pausa"}</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.dashboard}>
+            <View style={styles.statusRow}>
+              {(() => {
+                const fermoGreen = !isPaused && currentSpeed < 1.5;
+                const fermoColor = isPaused ? Colors.warning : fermoGreen ? Colors.success : Colors.textSecondary;
+                const fermoBg = isPaused ? Colors.warning + "30" : fermoGreen ? Colors.success + "30" : Colors.textSecondary + "20";
+                return (
+                  <View style={[styles.statusBadge, { backgroundColor: fermoBg }]}>
+                    <View style={[styles.statusDot, { backgroundColor: fermoColor }]} />
+                    <Text style={[styles.statusText, { color: fermoColor }]}>
+                      {isPaused ? "IN PAUSA" : "FERMO"}
+                    </Text>
+                  </View>
+                );
+              })()}
+              <View style={[styles.batteryBadge, { backgroundColor: batteryColor + "20" }]}>
+                <Ionicons name={getBatteryIcon(batteryImpact) as any} size={14} color={batteryColor} />
+                <Text style={[styles.batteryText, { color: batteryColor }]}>
+                  {batteryImpact.toUpperCase()}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.speedBox}>
+              <Text style={[styles.speedValue, isPaused && { color: Colors.textSecondary }]}>
+                {isPaused ? "--" : currentSpeed.toFixed(1)}
+              </Text>
+              <Text style={styles.speedUnit}>km/h</Text>
+            </View>
+            <Text style={styles.subtitle}>Registra le tue prestazioni in moto</Text>
+
+            <View style={styles.row}>
+              <StatCard icon="time" color={Colors.accent} value={formatTime(totalTime)} label="Tempo totale" />
+              <StatCard icon="pause-circle" color={Colors.warning} value={formatTime(idleTime)} label="Tempo fermo" />
+            </View>
+            <View style={styles.row}>
+              <StatCard icon="bicycle" color={Colors.success} value={formatTime(Math.max(netTime, 0))} label="Tempo netto" />
+              <StatCard icon="navigate" color={Colors.accent} value={totalKm.toFixed(2)} label="Km totali" />
+            </View>
+            <View style={styles.row}>
+              <StatCard icon="speedometer" color={Colors.accent} value={avgSpeed.toFixed(1)} label="Vel. media netta" />
+              <StatCard icon="analytics-outline" color={Colors.success} value={grossAvgSpeed.toFixed(1)} label="Vel. media lorda" />
+            </View>
+            <View style={styles.row}>
+              <StatCard icon="flash" color={Colors.accentRed} value={maxSpeed.toFixed(0)} label="Vel. max km/h" />
+              <StatCard icon="trending-up" color={Colors.success} value={maxAltitude.toFixed(0)} label="Quota max m" />
+            </View>
+          </View>
+        </>
       ) : (
         <>
+          <Ionicons name="speedometer" size={48} color={Colors.accent} style={styles.headerIcon} />
+
           <View style={styles.profileSection}>
-            <Text style={styles.profileTitle}>Strategia di aggiornamento GPS</Text>
+            <Text style={styles.profileTitle}>Frequenza di aggiornamento GPS</Text>
             <View style={styles.profileRow}>
               {(["easy", "medium", "race"] as UpdateProfile[]).map((p) => (
                 <TouchableOpacity
@@ -769,7 +837,7 @@ export default function TrackingScreen() {
             <View style={styles.profileWarning}>
               <Ionicons name="warning-outline" size={14} color={Colors.warning} />
               <Text style={styles.profileWarningText}>
-                Più precisione significa maggior consumo di batteria
+                Più precisione = Maggior consumo di batteria
               </Text>
             </View>
           </View>
@@ -778,8 +846,17 @@ export default function TrackingScreen() {
             <View style={styles.delayedRow}>
               <View style={styles.delayedLeft}>
                 <Ionicons name="timer-outline" size={18} color={Colors.textSecondary} />
-                <Text style={styles.delayedLabel}>Delayed Start</Text>
+                <Text style={styles.delayedLabel}>Countdown</Text>
               </View>
+              <TextInput
+                style={styles.delayedInput}
+                value={delayedStartSeconds}
+                onChangeText={setDelayedStartSeconds}
+                keyboardType="numeric"
+                placeholder="10"
+                placeholderTextColor={Colors.textSecondary}
+                maxLength={3}
+              />
               <Switch
                 value={delayedStartEnabled}
                 onValueChange={setDelayedStartEnabled}
@@ -787,31 +864,52 @@ export default function TrackingScreen() {
                 thumbColor={delayedStartEnabled ? Colors.accent : Colors.textSecondary}
               />
             </View>
-            {delayedStartEnabled && (
-              <View style={styles.delayedInputRow}>
-                <Text style={styles.delayedInputLabel}>Ritardo (secondi):</Text>
-                <TextInput
-                  style={styles.delayedInput}
-                  value={delayedStartSeconds}
-                  onChangeText={setDelayedStartSeconds}
-                  keyboardType="numeric"
-                  placeholder="10"
-                  placeholderTextColor={Colors.textSecondary}
-                  maxLength={3}
-                />
+
+            <View style={styles.triggerRow}>
+              <View style={styles.delayedLeft}>
+                <Ionicons name="stop-circle-outline" size={16} color={Colors.textSecondary} />
+                <Text style={styles.triggerLabel}>Stop at 0 km/h</Text>
               </View>
-            )}
+              <Switch
+                value={stopAtZeroEnabled}
+                onValueChange={setStopAtZeroEnabled}
+                trackColor={{ false: Colors.border, true: Colors.accent + "80" }}
+                thumbColor={stopAtZeroEnabled ? Colors.accent : Colors.textSecondary}
+              />
+            </View>
+
+            <View style={styles.triggerRow}>
+              <View style={styles.delayedLeft}>
+                <Ionicons name="hand-left-outline" size={16} color={Colors.textSecondary} />
+                <Text style={styles.triggerLabel}>Hands Off</Text>
+              </View>
+              <TextInput
+                style={styles.delayedInput}
+                value={handsOffSpeed}
+                onChangeText={setHandsOffSpeed}
+                keyboardType="numeric"
+                placeholder="80"
+                placeholderTextColor={Colors.textSecondary}
+                maxLength={3}
+              />
+              <Switch
+                value={handsOffEnabled}
+                onValueChange={setHandsOffEnabled}
+                trackColor={{ false: Colors.border, true: Colors.accent + "80" }}
+                thumbColor={handsOffEnabled ? Colors.accent : Colors.textSecondary}
+              />
+            </View>
           </View>
 
           <Pressable
-            style={[styles.mainBtn, { backgroundColor: Colors.success, alignSelf: "center" }]}
+            style={[styles.mainBtnStart, { backgroundColor: Colors.success, alignSelf: "center" }]}
             onPress={handleStartPress}
             disabled={loading}
           >
             {loading ? (
               <ActivityIndicator color="#fff" size="large" />
             ) : (
-              <Ionicons name="play-circle" size={67} color="#fff" />
+              <Ionicons name="play-circle" size={87} color="#fff" />
             )}
           </Pressable>
         </>
@@ -819,16 +917,6 @@ export default function TrackingScreen() {
       <Text style={styles.hint}>
         {isTracking ? (isPaused ? "In pausa — tocca Riprendi o Stop" : "Tracciamento attivo") : "Tocca per iniziare"}
       </Text>
-
-      {isTracking && (
-        <View style={styles.infoBox}>
-          <Ionicons name="information-circle" size={16} color={Colors.textSecondary} />
-          <Text style={styles.infoText}>
-            Profilo: {PROFILE_LABELS[updateProfile]} · Frequenza GPS adattiva: {trackingMode === "highway" ? "autostrada" : trackingMode === "city" ? "città" : "fermo"}
-            {" · "}Punti inviati in batch da {BATCH_SIZE}
-          </Text>
-        </View>
-      )}
 
       <View style={styles.recordsSection}>
         <Text style={styles.recordsTitle}>I tuoi record</Text>
@@ -1022,7 +1110,10 @@ const styles = StyleSheet.create({
   },
   statValue: { fontSize: 20, fontFamily: "Inter_700Bold", color: Colors.text },
   statLabel: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
-  controlRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 4 },
+  trackingHeader: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 20, marginBottom: 16,
+  },
   controlBtn: {
     width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center",
     elevation: 4,
@@ -1033,9 +1124,18 @@ const styles = StyleSheet.create({
     }),
   },
   controlLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#fff", marginTop: 2 },
-  controlPlaceholder: { width: 80 },
   mainBtn: {
-    width: 144, height: 144, borderRadius: 72,
+    width: 173, height: 173, borderRadius: 87,
+    alignItems: "center", justifyContent: "center",
+    elevation: 8,
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+      android: {},
+      web: { boxShadow: "0px 4px 8px rgba(0,0,0,0.3)" },
+    }),
+  },
+  mainBtnStart: {
+    width: 187, height: 187, borderRadius: 94,
     alignItems: "center", justifyContent: "center",
     elevation: 8,
     ...Platform.select({
@@ -1219,45 +1319,48 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderWidth: 1,
     borderColor: Colors.border,
+    gap: 10,
   },
   delayedRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    justifyContent: "space-between" as const,
+    gap: 8,
   },
   delayedLeft: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: 8,
+    flex: 1,
   },
   delayedLabel: {
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
   },
-  delayedInputRow: {
+  triggerRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    marginTop: 12,
-    gap: 10,
+    gap: 8,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
   },
-  delayedInputLabel: {
+  triggerLabel: {
     fontSize: 13,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
-    flex: 1,
   },
   delayedInput: {
     backgroundColor: Colors.background,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: Colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    fontSize: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 15,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
-    width: 80,
+    width: 60,
     textAlign: "center" as const,
   },
   countdownOverlay: {
@@ -1272,7 +1375,7 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   countdownText: {
-    fontSize: 160,
+    fontSize: 240,
     fontFamily: "Inter_700Bold",
     textAlign: "center" as const,
   },

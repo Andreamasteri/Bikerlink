@@ -2930,7 +2930,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-17T19:30:24.145Z"
+  },
+  {
+    "updateNumber": 76,
+    "version": "1.76.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-76 rv7.0.0: Performance Counter UX Upgrade v2",
+    "note": "Task #663: batteria reale expo-battery (0-33/34-66/67-100); stop+pausa in alto durante tracciamento; rimozione title+headerIcon; 'Registra...' sotto speedbox; stats riordinate (Tempo netto|Km tot → Vel media netta|lorda → Vel max|Quota); Buffer/Inviati rimosso; badge FERMO verde<1.5kmh grigio>1.5kmh; Countdown compatto (icona+label+input+switch su 1 riga) con 2 trigger Stop@0kmh e HandsOff+soglia; countdownText fontSize 240; START 187x187; GPS label rinominato; avviso riformulato; infoBox Profilo rimossa. CURRENT_OTA_NUMBER=76.",
+    "releaseId": "b1606207-8bbe-4c21-85b7-93f555ea761d",
+    "bundleUrl": "private/ota/ota-1.76.0-1776461426873.js",
+    "updateGroupId": "920eb151-0fb2-4fb4-b731-3798436199b2",
+    "androidUpdateId": "019d9d5a-e05c-72fe-bbe3-3d3cbe5769dc",
+    "iosUpdateId": null,
+    "commitBase": "0ed7be4d594ef8f0bedee8367416c118a37d6e7d",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/920eb151-0fb2-4fb4-b731-3798436199b2",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-17T21:30:29.809Z"
   }
 ]
