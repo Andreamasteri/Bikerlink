@@ -518,21 +518,30 @@ export default function TraduzioniScreen() {
   }, []);
 
   async function loadPrefs() {
-    let serverFolder: DriveFolder | null = null;
-    let serverSheet: DriveSheet | null = null;
+    type PrefsResponse = {
+      hasRecord: boolean;
+      folderId: string | null;
+      folderName: string | null;
+      sheet: DriveSheet | null;
+    };
+    let serverData: PrefsResponse | null = null;
     try {
       const url = new URL("/api/admin/translations/prefs", getApiUrl());
       const resp = await fetch(url.toString(), { credentials: "include" });
-      if (resp.ok) {
-        const data = await resp.json() as { folder?: DriveFolder | null; sheet?: DriveSheet | null };
-        serverFolder = data.folder ?? null;
-        serverSheet = data.sheet ?? null;
-      }
+      if (resp.ok) serverData = await resp.json() as PrefsResponse;
     } catch {}
 
-    if (serverFolder) {
-      setSelectedFolder(serverFolder);
-      try { await AsyncStorage.setItem(STORAGE_KEY_FOLDER, JSON.stringify(serverFolder)); } catch {}
+    const serverHasRecord = serverData?.hasRecord === true;
+
+    if (serverHasRecord) {
+      const folder: DriveFolder | null = serverData!.folderId
+        ? { id: serverData!.folderId!, name: serverData!.folderName ?? "" }
+        : null;
+      setSelectedFolder(folder);
+      try {
+        if (folder) await AsyncStorage.setItem(STORAGE_KEY_FOLDER, JSON.stringify(folder));
+        else await AsyncStorage.removeItem(STORAGE_KEY_FOLDER);
+      } catch {}
     } else {
       try {
         const raw = await AsyncStorage.getItem(STORAGE_KEY_FOLDER);
@@ -540,17 +549,21 @@ export default function TraduzioniScreen() {
       } catch {}
     }
 
-    if (serverSheet) {
-      setSelectedSheet(serverSheet);
-      try { await AsyncStorage.setItem(STORAGE_KEY_SHEET, JSON.stringify(serverSheet)); } catch {}
-      if (!serverSheet.folderPath) {
+    const sheet = serverHasRecord ? (serverData!.sheet ?? null) : null;
+    if (serverHasRecord) {
+      setSelectedSheet(sheet);
+      try {
+        if (sheet) await AsyncStorage.setItem(STORAGE_KEY_SHEET, JSON.stringify(sheet));
+        else await AsyncStorage.removeItem(STORAGE_KEY_SHEET);
+      } catch {}
+      if (sheet && !sheet.folderPath) {
         try {
-          const url = new URL(`/api/admin/translations/file-path?fileId=${encodeURIComponent(serverSheet.id)}`, getApiUrl());
+          const url = new URL(`/api/admin/translations/file-path?fileId=${encodeURIComponent(sheet.id)}`, getApiUrl());
           const resp = await fetch(url.toString(), { credentials: "include" });
           if (resp.ok) {
             const data = await resp.json() as { folderPath?: string };
             if (data.folderPath) {
-              const enriched: DriveSheet = { ...serverSheet, folderPath: data.folderPath };
+              const enriched: DriveSheet = { ...sheet, folderPath: data.folderPath };
               setSelectedSheet(enriched);
               saveSheet(enriched);
             }
@@ -561,16 +574,16 @@ export default function TraduzioniScreen() {
       try {
         const raw = await AsyncStorage.getItem(STORAGE_KEY_SHEET);
         if (raw) {
-          const sheet: DriveSheet = JSON.parse(raw);
-          setSelectedSheet(sheet);
-          if (!sheet.folderPath) {
+          const localSheet: DriveSheet = JSON.parse(raw);
+          setSelectedSheet(localSheet);
+          if (!localSheet.folderPath) {
             try {
-              const url = new URL(`/api/admin/translations/file-path?fileId=${encodeURIComponent(sheet.id)}`, getApiUrl());
+              const url = new URL(`/api/admin/translations/file-path?fileId=${encodeURIComponent(localSheet.id)}`, getApiUrl());
               const resp = await fetch(url.toString(), { credentials: "include" });
               if (resp.ok) {
                 const data = await resp.json() as { folderPath?: string };
                 if (data.folderPath) {
-                  const enriched: DriveSheet = { ...sheet, folderPath: data.folderPath };
+                  const enriched: DriveSheet = { ...localSheet, folderPath: data.folderPath };
                   setSelectedSheet(enriched);
                   saveSheet(enriched);
                 }

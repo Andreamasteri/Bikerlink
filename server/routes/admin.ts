@@ -3633,8 +3633,14 @@ const TRANSLATIONS_PREFS_KEY = "translations.prefs";
 router.get("/translations/prefs", async (_req: Request, res: Response) => {
   try {
     const rows = await db.select().from(appSettings).where(eq(appSettings.key, TRANSLATIONS_PREFS_KEY));
-    if (rows.length === 0 || !rows[0].valueJson) return res.json({});
-    return res.json(rows[0].valueJson);
+    if (rows.length === 0 || !rows[0].valueJson) return res.json({ hasRecord: false });
+    const stored = rows[0].valueJson as { folder?: { id: string; name: string } | null; sheet?: { id: string; name: string; folderPath?: string } | null };
+    return res.json({
+      hasRecord: true,
+      folderId: stored.folder?.id ?? null,
+      folderName: stored.folder?.name ?? null,
+      sheet: stored.sheet ?? null,
+    });
   } catch (error) {
     console.error("[translations/prefs GET] error:", error);
     return res.status(500).json({ message: "Errore nel recupero delle preferenze" });
