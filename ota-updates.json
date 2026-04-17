@@ -2723,7 +2723,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-17T06:55:07.566Z"
+  },
+  {
+    "updateNumber": 67,
+    "version": "1.67.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-67 rv7.0.0: Preview colonne Google Sheet + ricorda cartella Drive export",
+    "note": "Task #630: anteprima colonne Google Sheet nell'admin traduzioni — nuovo endpoint GET /api/admin/translations/preview-sheet, Step 3 mostra colonne trovate e pre-seleziona checkboxes lingue. Task #629: ricorda ultima cartella Drive usata per l'export (AsyncStorage). CURRENT_OTA_NUMBER=67.",
+    "releaseId": "08cdffc3-a6c7-42a6-951e-4307fd8cd209",
+    "bundleUrl": "private/ota/ota-1.67.0-1776416695771.js",
+    "updateGroupId": "f1010ec4-a103-4dc7-b1de-1733b5ac5bf2",
+    "androidUpdateId": "019d9ab0-6d85-7934-a311-8ff47eb69962",
+    "iosUpdateId": null,
+    "commitBase": "65ce2744f98b1a071cec6c94cd0db7d8fcd92b7c",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/f1010ec4-a103-4dc7-b1de-1733b5ac5bf2",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-17T09:04:58.712Z"
   }
 ]

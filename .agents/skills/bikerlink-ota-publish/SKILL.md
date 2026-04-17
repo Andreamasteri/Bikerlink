@@ -136,7 +136,7 @@ Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare 
 - Ciclo 4.x: OTA 37–40 (APK versionCode 10, rv 4.0.0)
 - Ciclo 5.x: OTA 41 (APK versionCode 11, rv 5.0.0) — DEPRECATO (crash expo-location plugin)
 - Ciclo 6.x: OTA 42–43 (APK versionCode 12, rv 6.0.0) — OBSOLETO (utenti devono aggiornare APK)
-- Ciclo 7.x: OTA 44–55+ (APK versionCode 13→28, rv 7.0.0) ← CORRENTE
+- Ciclo 7.x: OTA 44–67+ (APK versionCode 13→29, rv 7.0.0) ← CORRENTE
   - APK v13: FAILED (react-native-maps 1.27.2 — causa esatta sconosciuta, diagnosi errata al momento)
   - APK v14: FAILED (newArchEnabled=true + react-native-maps 1.18.0 → incompatibili, fix in app.json ignorato)
   - APK v15: FAILED (fix newArchEnabled=false in app.json → ignorato, bare workflow usa gradle.properties)
@@ -148,7 +148,7 @@ Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare 
   - APK v20: FAILED — fix strings.xml runtimeVersion 7.0.0 + rimozione ACCESS_BACKGROUND_LOCATION + rollback completo Task #564
   - APK v21–v27: build successive fino alla versione stabile
   - APK v28: STABILE — background location tracking (Task #607) + OTA 53–62
-  - APK v29: STABILE — expo-notifications nativo + versionCode 29 + versionName 1.9.4 (EAS: 2680c671, APK: https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk) + OTA 63–64–65–66–
+  - APK v29: STABILE — expo-notifications nativo + versionCode 29 + versionName 1.9.4 (EAS: 2680c671, APK: https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk) + OTA 63–64–65–66–67
 
 ## ⚠️ ANALISI ARCHITETTURA (DEFINITIVA)
 React Native 0.82+ ha rimosso il supporto Old Architecture. Il flag newArchEnabled=false
