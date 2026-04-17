@@ -3424,53 +3424,61 @@ router.get("/translations/import", (_req: Request, res: Response) => {
   return res.json(getImportInfo());
 });
 
-router.get("/translations/list-folders", async (_req: Request, res: Response) => {
+router.get("/translations/browse", async (req: Request, res: Response) => {
   try {
+    const folderId = (req.query.folderId as string | undefined)?.trim();
     const { ReplitConnectors } = await import("@replit/connectors-sdk");
     const connectors = new ReplitConnectors();
 
-    const listResp = await connectors.proxy(
-      "google-drive",
-      "/drive/v3/files?q=mimeType%3D'application%2Fvnd.google-apps.folder'%20and%20trashed%3Dfalse&fields=files(id%2Cname)&orderBy=name&pageSize=100",
-      { method: "GET" }
-    );
+    const parentClause = folderId
+      ? `'${folderId}' in parents`
+      : "'root' in parents";
+    const qFolders = `${parentClause} and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    const qSheets = `${parentClause} and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
 
-    if (!listResp.ok) {
-      const errText = await listResp.text();
-      console.error("[translations/list-folders] Drive error:", errText);
-      return res.status(500).json({ message: "Errore nel recupero delle cartelle Drive" });
+    const [foldersResp, sheetsResp] = await Promise.all([
+      connectors.proxy(
+        "google-drive",
+        `/drive/v3/files?q=${encodeURIComponent(qFolders)}&fields=files(id,name)&orderBy=name&pageSize=100`,
+        { method: "GET" }
+      ),
+      connectors.proxy(
+        "google-drive",
+        `/drive/v3/files?q=${encodeURIComponent(qSheets)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc&pageSize=100`,
+        { method: "GET" }
+      ),
+    ]);
+
+    let folderName = "Drive";
+    if (folderId) {
+      try {
+        const metaResp = await connectors.proxy(
+          "google-drive",
+          `/drive/v3/files/${encodeURIComponent(folderId)}?fields=name`,
+          { method: "GET" }
+        );
+        if (metaResp.ok) {
+          const meta = await metaResp.json() as { name?: string };
+          if (meta.name) folderName = meta.name;
+        }
+      } catch {}
     }
 
-    const data = await listResp.json() as { files?: { id: string; name: string }[] };
-    return res.json({ folders: data.files || [] });
+    const foldersData = foldersResp.ok
+      ? (await foldersResp.json() as { files?: { id: string; name: string }[] })
+      : { files: [] };
+    const sheetsData = sheetsResp.ok
+      ? (await sheetsResp.json() as { files?: { id: string; name: string; modifiedTime?: string }[] })
+      : { files: [] };
+
+    return res.json({
+      folderName,
+      folders: foldersData.files || [],
+      sheets: sheetsData.files || [],
+    });
   } catch (error) {
-    console.error("[translations/list-folders] error:", error);
-    return res.status(500).json({ message: "Errore durante il recupero delle cartelle" });
-  }
-});
-
-router.get("/translations/list-sheets", async (_req: Request, res: Response) => {
-  try {
-    const { ReplitConnectors } = await import("@replit/connectors-sdk");
-    const connectors = new ReplitConnectors();
-
-    const listResp = await connectors.proxy(
-      "google-drive",
-      "/drive/v3/files?q=mimeType%3D'application%2Fvnd.google-apps.spreadsheet'%20and%20trashed%3Dfalse&fields=files(id%2Cname%2CmodifiedTime)&orderBy=modifiedTime%20desc&pageSize=50",
-      { method: "GET" }
-    );
-
-    if (!listResp.ok) {
-      const errText = await listResp.text();
-      console.error("[translations/list-sheets] Drive error:", errText);
-      return res.status(500).json({ message: "Errore nel recupero dei fogli Drive" });
-    }
-
-    const data = await listResp.json() as { files?: { id: string; name: string; modifiedTime?: string }[] };
-    return res.json({ sheets: data.files || [] });
-  } catch (error) {
-    console.error("[translations/list-sheets] error:", error);
-    return res.status(500).json({ message: "Errore durante il recupero dei fogli" });
+    console.error("[translations/browse] error:", error);
+    return res.status(500).json({ message: "Errore durante la navigazione Drive" });
   }
 });
 

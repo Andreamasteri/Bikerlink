@@ -145,28 +145,83 @@ function LangCheckbox({
   );
 }
 
-function PickerModal<T extends { id: string; name: string }>({
+interface BrowseResult {
+  folderName: string;
+  folders: DriveFolder[];
+  sheets: DriveSheet[];
+}
+
+interface BreadcrumbItem {
+  id: string | null;
+  name: string;
+}
+
+function DriveFileBrowser({
   visible,
+  mode,
   title,
-  items,
-  loading,
-  onSelect,
+  selectedFolderId,
+  selectedSheetId,
+  onSelectFolder,
+  onSelectSheet,
   onClose,
-  selectedId,
-  emptyMessage,
 }: {
   visible: boolean;
+  mode: "folder" | "sheet";
   title: string;
-  items: T[];
-  loading: boolean;
-  onSelect: (item: T) => void;
+  selectedFolderId?: string | null;
+  selectedSheetId?: string | null;
+  onSelectFolder?: (folder: DriveFolder) => void;
+  onSelectSheet?: (sheet: DriveSheet) => void;
   onClose: () => void;
-  selectedId?: string | null;
-  emptyMessage: string;
 }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [breadcrumb, setBreadcrumb] = useState<BreadcrumbItem[]>([{ id: null, name: "Drive" }]);
+  const [browseData, setBrowseData] = useState<BrowseResult>({ folderName: "Drive", folders: [], sheets: [] });
+
+  useEffect(() => {
+    if (visible) {
+      setCurrentFolderId(null);
+      setBreadcrumb([{ id: null, name: "Drive" }]);
+      loadFolder(null);
+    }
+  }, [visible]);
+
+  async function loadFolder(folderId: string | null) {
+    setLoading(true);
+    setError(null);
+    try {
+      const url = new URL("/api/admin/translations/browse", getApiUrl());
+      if (folderId) url.searchParams.set("folderId", folderId);
+      const resp = await fetch(url.toString(), { credentials: "include" });
+      if (!resp.ok) throw new Error("Errore Drive");
+      const data: BrowseResult = await resp.json();
+      setBrowseData(data);
+    } catch {
+      setError("Impossibile caricare il contenuto di Drive");
+    }
+    setLoading(false);
+  }
+
+  function navigateInto(folder: DriveFolder) {
+    setCurrentFolderId(folder.id);
+    setBreadcrumb((prev) => [...prev, { id: folder.id, name: folder.name }]);
+    loadFolder(folder.id);
+  }
+
+  function navigateTo(item: BreadcrumbItem, index: number) {
+    setCurrentFolderId(item.id);
+    setBreadcrumb((prev) => prev.slice(0, index + 1));
+    loadFolder(item.id);
+  }
+
+  const hasItems = browseData.folders.length > 0 || (mode === "sheet" && browseData.sheets.length > 0);
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+      <View style={styles.modalOverlay}>
         <View style={styles.modalSheet}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{title}</Text>
@@ -174,37 +229,116 @@ function PickerModal<T extends { id: string; name: string }>({
               <MaterialCommunityIcons name="close" size={20} color={Colors.textSecondary} />
             </TouchableOpacity>
           </View>
+
+          <View style={styles.breadcrumbRow}>
+            <FlatList
+              data={breadcrumb}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(_, i) => String(i)}
+              renderItem={({ item, index }) => {
+                const isLast = index === breadcrumb.length - 1;
+                return (
+                  <View style={styles.breadcrumbItem}>
+                    {index > 0 && (
+                      <MaterialCommunityIcons name="chevron-right" size={14} color={Colors.textSecondary} />
+                    )}
+                    <TouchableOpacity
+                      onPress={() => !isLast && navigateTo(item, index)}
+                      disabled={isLast}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.breadcrumbText, isLast && styles.breadcrumbTextActive]}>
+                        {item.name}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              }}
+            />
+          </View>
+
+          {mode === "folder" && (
+            <TouchableOpacity
+              style={styles.selectHereButton}
+              onPress={() => {
+                const currentFolder: DriveFolder = {
+                  id: currentFolderId ?? "root",
+                  name: breadcrumb[breadcrumb.length - 1]?.name ?? "Drive",
+                };
+                onSelectFolder?.(currentFolder);
+                onClose();
+              }}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="folder-check" size={16} color="#fff" />
+              <Text style={styles.selectHereButtonText}>Salva in questa cartella</Text>
+            </TouchableOpacity>
+          )}
+
           {loading ? (
             <View style={styles.modalLoading}>
               <ActivityIndicator color={Colors.accent} />
             </View>
-          ) : items.length === 0 ? (
+          ) : error ? (
             <View style={styles.modalLoading}>
-              <Text style={styles.emptyText}>{emptyMessage}</Text>
+              <Text style={[styles.emptyText, { color: "#F44336" }]}>{error}</Text>
+            </View>
+          ) : !hasItems ? (
+            <View style={styles.modalLoading}>
+              <Text style={styles.emptyText}>
+                {mode === "folder" ? "Nessuna sottocartella" : "Nessun foglio o cartella qui"}
+              </Text>
             </View>
           ) : (
             <FlatList
-              data={items}
-              keyExtractor={(item) => item.id}
+              data={[
+                ...browseData.folders.map((f) => ({ type: "folder" as const, item: f })),
+                ...(mode === "sheet"
+                  ? browseData.sheets.map((s) => ({ type: "sheet" as const, item: s }))
+                  : []),
+              ]}
+              keyExtractor={(row) => `${row.type}-${row.item.id}`}
               style={styles.modalList}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[styles.modalItem, selectedId === item.id && styles.modalItemSelected]}
-                  onPress={() => { onSelect(item); onClose(); }}
-                  activeOpacity={0.7}
-                >
-                  <MaterialCommunityIcons
-                    name={selectedId === item.id ? "check-circle" : "circle-outline"}
-                    size={18}
-                    color={selectedId === item.id ? Colors.accent : Colors.textSecondary}
-                  />
-                  <Text style={styles.modalItemText} numberOfLines={2}>{item.name}</Text>
-                </TouchableOpacity>
-              )}
+              renderItem={({ item: row }) => {
+                if (row.type === "folder") {
+                  return (
+                    <TouchableOpacity
+                      style={styles.modalItem}
+                      onPress={() => navigateInto(row.item as DriveFolder)}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialCommunityIcons name="folder" size={20} color="#FFC107" />
+                      <Text style={[styles.modalItemText, { flex: 1 }]} numberOfLines={1}>
+                        {row.item.name}
+                      </Text>
+                      <MaterialCommunityIcons name="chevron-right" size={18} color={Colors.textSecondary} />
+                    </TouchableOpacity>
+                  );
+                }
+                const sheet = row.item as DriveSheet;
+                const isSelected = sheet.id === selectedSheetId;
+                return (
+                  <TouchableOpacity
+                    style={[styles.modalItem, isSelected && styles.modalItemSelected]}
+                    onPress={() => { onSelectSheet?.(sheet); onClose(); }}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialCommunityIcons
+                      name={isSelected ? "check-circle" : "table"}
+                      size={20}
+                      color={isSelected ? Colors.accent : Colors.textSecondary}
+                    />
+                    <Text style={[styles.modalItemText, { flex: 1 }]} numberOfLines={1}>
+                      {sheet.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }}
             />
           )}
         </View>
-      </TouchableOpacity>
+      </View>
     </Modal>
   );
 }
@@ -220,9 +354,7 @@ export default function TraduzioniScreen() {
   const [exportResult, setExportResult] = useState("");
   const [exportedFileUrl, setExportedFileUrl] = useState<string | null>(null);
 
-  const [folders, setFolders] = useState<DriveFolder[]>([]);
-  const [foldersLoading, setFoldersLoading] = useState(false);
-  const [showFolderPicker, setShowFolderPicker] = useState(false);
+  const [showFolderBrowser, setShowFolderBrowser] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState<DriveFolder | null>(null);
 
   const [importInfo, setImportInfo] = useState<{ exportedLangs: string[] }>({ exportedLangs: [] });
@@ -231,9 +363,7 @@ export default function TraduzioniScreen() {
   const [importResult, setImportResult] = useState("");
 
   const [manualFileInput, setManualFileInput] = useState("");
-  const [sheets, setSheets] = useState<DriveSheet[]>([]);
-  const [sheetsLoading, setSheetsLoading] = useState(false);
-  const [showSheetPicker, setShowSheetPicker] = useState(false);
+  const [showSheetBrowser, setShowSheetBrowser] = useState(false);
   const [selectedSheet, setSelectedSheet] = useState<DriveSheet | null>(null);
 
   const [previewCols, setPreviewCols] = useState<string[] | null>(null);
@@ -283,44 +413,12 @@ export default function TraduzioniScreen() {
     } catch {}
   }
 
-  async function loadFolders() {
-    if (foldersLoading) return;
-    setFoldersLoading(true);
-    try {
-      const resp = await fetch(new URL("/api/admin/translations/list-folders", getApiUrl()).toString(), {
-        credentials: "include",
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        setFolders(data.folders || []);
-      }
-    } catch {}
-    setFoldersLoading(false);
+  function openFolderBrowser() {
+    setShowFolderBrowser(true);
   }
 
-  async function loadSheets() {
-    if (sheetsLoading) return;
-    setSheetsLoading(true);
-    try {
-      const resp = await fetch(new URL("/api/admin/translations/list-sheets", getApiUrl()).toString(), {
-        credentials: "include",
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        setSheets(data.sheets || []);
-      }
-    } catch {}
-    setSheetsLoading(false);
-  }
-
-  function openFolderPicker() {
-    if (folders.length === 0) loadFolders();
-    setShowFolderPicker(true);
-  }
-
-  function openSheetPicker() {
-    if (sheets.length === 0) loadSheets();
-    setShowSheetPicker(true);
+  function openSheetBrowser() {
+    setShowSheetBrowser(true);
   }
 
   async function handlePrepare() {
@@ -541,7 +639,7 @@ export default function TraduzioniScreen() {
 
         <View style={styles.sectionDivider} />
         <Text style={styles.langPickerLabel}>Cartella di destinazione:</Text>
-        <TouchableOpacity style={styles.pickerButton} onPress={openFolderPicker} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.pickerButton} onPress={openFolderBrowser} activeOpacity={0.7}>
           <MaterialCommunityIcons name="folder-outline" size={18} color={Colors.accent} />
           <Text style={styles.pickerButtonText} numberOfLines={1}>
             {selectedFolder ? selectedFolder.name : "Root / Drive principale"}
@@ -608,7 +706,7 @@ export default function TraduzioniScreen() {
           </View>
         ) : null}
 
-        <TouchableOpacity style={styles.pickerButton} onPress={openSheetPicker} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.pickerButton} onPress={openSheetBrowser} activeOpacity={0.7}>
           <MaterialCommunityIcons name="table" size={18} color={Colors.accent} />
           <Text style={styles.pickerButtonText} numberOfLines={1}>
             {selectedSheet ? selectedSheet.name : "Sfoglia Drive…"}
@@ -701,26 +799,30 @@ export default function TraduzioniScreen() {
         </View>
       ) : null}
 
-      <PickerModal
-        visible={showFolderPicker}
-        title="Seleziona cartella"
-        items={folders}
-        loading={foldersLoading}
-        selectedId={selectedFolder?.id}
-        onSelect={(f) => { setSelectedFolder(f); saveFolder(f); }}
-        onClose={() => setShowFolderPicker(false)}
-        emptyMessage="Nessuna cartella trovata su Drive"
+      <DriveFileBrowser
+        visible={showFolderBrowser}
+        mode="folder"
+        title="Scegli cartella di destinazione"
+        selectedFolderId={selectedFolder?.id}
+        onSelectFolder={(f) => {
+          if (f.id === "root") {
+            setSelectedFolder(null);
+            saveFolder(null);
+          } else {
+            setSelectedFolder(f);
+            saveFolder(f);
+          }
+        }}
+        onClose={() => setShowFolderBrowser(false)}
       />
 
-      <PickerModal
-        visible={showSheetPicker}
-        title="Seleziona Google Sheet"
-        items={sheets}
-        loading={sheetsLoading}
-        selectedId={selectedSheet?.id}
-        onSelect={(s) => { setSelectedSheet(s); setManualFileInput(""); }}
-        onClose={() => setShowSheetPicker(false)}
-        emptyMessage="Nessun foglio trovato su Drive"
+      <DriveFileBrowser
+        visible={showSheetBrowser}
+        mode="sheet"
+        title="Scegli Google Sheet"
+        selectedSheetId={selectedSheet?.id}
+        onSelectSheet={(s) => { setSelectedSheet(s); setManualFileInput(""); }}
+        onClose={() => setShowSheetBrowser(false)}
       />
     </ScrollView>
   );
@@ -1016,5 +1118,42 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     flex: 1,
+  },
+  breadcrumbRow: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  breadcrumbItem: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  breadcrumbText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    paddingHorizontal: 4,
+  },
+  breadcrumbTextActive: {
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
+  selectHereButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.accent,
+    marginHorizontal: 12,
+    marginTop: 10,
+    marginBottom: 4,
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  selectHereButtonText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: "#fff",
   },
 });
