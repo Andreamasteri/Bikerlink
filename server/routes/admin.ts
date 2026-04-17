@@ -3544,6 +3544,63 @@ router.get("/translations/browse", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/translations/file-path", async (req: Request, res: Response) => {
+  try {
+    const fileId = (req.query.fileId as string | undefined)?.trim();
+    if (!fileId) {
+      return res.status(400).json({ message: "fileId richiesto" });
+    }
+    const { ReplitConnectors } = await import("@replit/connectors-sdk");
+    const connectors = new ReplitConnectors();
+
+    const metaResp = await connectors.proxy(
+      "google-drive",
+      `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,parents`,
+      { method: "GET" }
+    );
+    if (!metaResp.ok) {
+      return res.status(502).json({ message: "Impossibile recuperare il percorso del file" });
+    }
+    const meta = await metaResp.json() as { id?: string; name?: string; parents?: string[] };
+    const parentId = meta.parents?.[0];
+    if (!parentId) {
+      return res.json({ folderPath: "Drive" });
+    }
+
+    const parentResp = await connectors.proxy(
+      "google-drive",
+      `/drive/v3/files/${encodeURIComponent(parentId)}?fields=id,name,parents`,
+      { method: "GET" }
+    );
+    if (!parentResp.ok) {
+      return res.json({ folderPath: "Drive" });
+    }
+    const parent = await parentResp.json() as { id?: string; name?: string; parents?: string[] };
+    const parentName = parent.name || "Drive";
+    const grandParentId = parent.parents?.[0];
+
+    if (!grandParentId) {
+      return res.json({ folderPath: parentName });
+    }
+
+    const grandParentResp = await connectors.proxy(
+      "google-drive",
+      `/drive/v3/files/${encodeURIComponent(grandParentId)}?fields=id,name`,
+      { method: "GET" }
+    );
+    if (!grandParentResp.ok) {
+      return res.json({ folderPath: parentName });
+    }
+    const grandParent = await grandParentResp.json() as { id?: string; name?: string };
+    const grandParentName = grandParent.name || "Drive";
+
+    return res.json({ folderPath: `${grandParentName} / ${parentName}` });
+  } catch (error) {
+    console.error("[translations/file-path] error:", error);
+    return res.status(500).json({ message: "Errore durante il recupero del percorso" });
+  }
+});
+
 router.get("/translations/preview-sheet", async (req: Request, res: Response) => {
   try {
     const fileId = (req.query.fileId as string | undefined)?.trim();

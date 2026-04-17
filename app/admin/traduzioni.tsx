@@ -19,6 +19,7 @@ import { apiRequest, getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 
 const STORAGE_KEY_FOLDER = "@admin_last_export_folder";
+const STORAGE_KEY_SHEET = "@admin_last_import_sheet";
 
 type StepStatus = "idle" | "loading" | "success" | "error";
 
@@ -428,6 +429,7 @@ export default function TraduzioniScreen() {
 
   const [showFolderBrowser, setShowFolderBrowser] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState<DriveFolder | null>(null);
+  const sheetFetchSeq = useRef(0);
 
   const [importInfo, setImportInfo] = useState<{ exportedLangs: string[] }>({ exportedLangs: [] });
   const [importLangs, setImportLangs] = useState<string[]>([]);
@@ -450,6 +452,7 @@ export default function TraduzioniScreen() {
   useEffect(() => {
     loadImportInfo();
     loadSavedFolder();
+    loadSavedSheet();
   }, []);
 
   async function loadSavedFolder() {
@@ -468,6 +471,61 @@ export default function TraduzioniScreen() {
         await AsyncStorage.setItem(STORAGE_KEY_FOLDER, JSON.stringify(folder));
       } else {
         await AsyncStorage.removeItem(STORAGE_KEY_FOLDER);
+      }
+    } catch {}
+  }
+
+  async function loadSavedSheet() {
+    try {
+      const raw = await AsyncStorage.getItem(STORAGE_KEY_SHEET);
+      if (raw) {
+        const sheet: DriveSheet = JSON.parse(raw);
+        setSelectedSheet(sheet);
+        if (!sheet.folderPath) {
+          try {
+            const url = new URL(`/api/admin/translations/file-path?fileId=${encodeURIComponent(sheet.id)}`, getApiUrl());
+            const resp = await fetch(url.toString(), { credentials: "include" });
+            if (resp.ok) {
+              const data = await resp.json() as { folderPath?: string };
+              if (data.folderPath) {
+                const enriched: DriveSheet = { ...sheet, folderPath: data.folderPath };
+                setSelectedSheet(enriched);
+                saveSheet(enriched);
+              }
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+  }
+
+  async function saveSheet(sheet: DriveSheet | null) {
+    try {
+      if (sheet) {
+        await AsyncStorage.setItem(STORAGE_KEY_SHEET, JSON.stringify(sheet));
+      } else {
+        await AsyncStorage.removeItem(STORAGE_KEY_SHEET);
+      }
+    } catch {}
+  }
+
+  async function fetchAndSetSheet(sheet: DriveSheet) {
+    const seq = ++sheetFetchSeq.current;
+    setSelectedSheet(sheet);
+    setManualFileInput("");
+    saveSheet(sheet);
+    try {
+      const url = new URL(`/api/admin/translations/file-path?fileId=${encodeURIComponent(sheet.id)}`, getApiUrl());
+      const resp = await fetch(url.toString(), { credentials: "include" });
+      if (seq !== sheetFetchSeq.current) return;
+      if (resp.ok) {
+        const data = await resp.json() as { folderPath?: string };
+        if (seq !== sheetFetchSeq.current) return;
+        if (data.folderPath) {
+          const enriched: DriveSheet = { ...sheet, folderPath: data.folderPath };
+          setSelectedSheet(enriched);
+          saveSheet(enriched);
+        }
       }
     } catch {}
   }
@@ -785,9 +843,15 @@ export default function TraduzioniScreen() {
           </Text>
           <MaterialCommunityIcons name="chevron-down" size={18} color={Colors.textSecondary} />
         </TouchableOpacity>
+        {selectedSheet?.folderPath ? (
+          <View style={styles.folderPathRow}>
+            <MaterialCommunityIcons name="folder-outline" size={13} color={Colors.textSecondary} />
+            <Text style={styles.folderPathText} numberOfLines={1}>{selectedSheet.folderPath}</Text>
+          </View>
+        ) : null}
         {selectedSheet ? (
           <TouchableOpacity
-            onPress={() => setSelectedSheet(null)}
+            onPress={() => { setSelectedSheet(null); saveSheet(null); }}
             style={styles.clearButton}
             activeOpacity={0.7}
           >
@@ -892,7 +956,7 @@ export default function TraduzioniScreen() {
         mode="sheet"
         title="Scegli Google Sheet"
         selectedSheetId={selectedSheet?.id}
-        onSelectSheet={(s) => { setSelectedSheet(s); setManualFileInput(""); }}
+        onSelectSheet={(s) => { fetchAndSetSheet(s); }}
         onClose={() => setShowSheetBrowser(false)}
       />
     </ScrollView>
@@ -1062,6 +1126,19 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 13,
     color: Colors.text,
+  },
+  folderPathRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 2,
+    marginTop: -4,
+  },
+  folderPathText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    flex: 1,
   },
   clearButton: {
     flexDirection: "row",
