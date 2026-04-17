@@ -71,18 +71,6 @@ async function upsertJsonSetting(key: string, value: unknown, description?: stri
   }
 }
 
-export interface DriveFolder {
-  folderId: string;
-  folderName: string;
-}
-
-export async function getDriveFolder(): Promise<DriveFolder | null> {
-  return { folderId: DRIVE_FOLDER_DB_ID, folderName: "Backup DB" };
-}
-
-export async function setDriveFolder(_folder: DriveFolder | null): Promise<void> {
-}
-
 export interface BackupFrequency {
   dbHours: number;
   mediaHours: number;

@@ -281,18 +281,6 @@ const styles = StyleSheet.create({
   cardTitle: { flex: 1, fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.text },
   folderRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   folderName: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.text },
-  changeFolderBtn: {
-    backgroundColor: Colors.surface, borderRadius: 8,
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  changeFolderText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.accent },
-  pickFolderBtn: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: Colors.accent, borderRadius: 10, padding: 12,
-  },
-  pickFolderText: { color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14 },
-  hintText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, marginTop: 8 },
   statusSub: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, marginBottom: 4, marginLeft: 32 },
   lastRow: { flexDirection: "row", borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 12, marginTop: 4 },
   lastItem: { flex: 1, alignItems: "center" },
