@@ -40,14 +40,7 @@ import * as Updates from "expo-updates";
 import Constants from "expo-constants";
 import * as Location from "expo-location";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
-
-let MapView: any = null;
-let Marker: any = null;
-if (Platform.OS !== "web") {
-  const maps = require("react-native-maps");
-  MapView = maps.default;
-  Marker = maps.Marker;
-}
+import LeafletPickerMap from "@/components/LeafletPickerMap";
 
 
 interface ProfileData {
@@ -1240,26 +1233,13 @@ export default function ProfileScreen() {
               <Text style={{ color: "#fff", fontWeight: "700" }}>Conferma</Text>
             </Pressable>
           </View>
-          {Platform.OS !== "web" && MapView ? (
-            <MapView
-              style={{ flex: 1 }}
-              initialRegion={{
-                latitude: mapPickerCoord.latitude,
-                longitude: mapPickerCoord.longitude,
-                latitudeDelta: 0.05,
-                longitudeDelta: 0.05,
-              }}
-              onPress={(e: any) => setMapPickerCoord(e.nativeEvent.coordinate)}
-            >
-              {Marker && (
-                <Marker coordinate={mapPickerCoord} />
-              )}
-            </MapView>
-          ) : (
-            <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-              <Text style={{ color: Colors.textSecondary }}>Mappa non disponibile su web</Text>
-            </View>
-          )}
+          <LeafletPickerMap
+            initialLat={mapPickerCoord.latitude}
+            initialLng={mapPickerCoord.longitude}
+            initialZoom={12}
+            selectedCoord={{ lat: mapPickerCoord.latitude, lng: mapPickerCoord.longitude }}
+            onCoordPicked={(coord) => setMapPickerCoord(coord)}
+          />
           <View style={{ padding: 12, paddingBottom: insets.bottom + 8, backgroundColor: Colors.card }}>
             <Text style={{ textAlign: "center", color: Colors.textSecondary, fontSize: 13 }}>
               Tocca sulla mappa per spostare il pin

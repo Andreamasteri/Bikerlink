@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
+import LeafletMiniMap from "@/components/LeafletMiniMap";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -300,26 +300,11 @@ export default function EventoDetail() {
 
             {event.latitude != null && event.longitude != null && (
               <Pressable style={styles.miniMapWrapper} onPress={handleOpenMap}>
-                <MapView
-                  provider={PROVIDER_DEFAULT}
-                  style={styles.miniMap}
-                  initialRegion={{
-                    latitude: event.latitude,
-                    longitude: event.longitude,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01,
-                  }}
-                  scrollEnabled={false}
-                  zoomEnabled={false}
-                  pitchEnabled={false}
-                  rotateEnabled={false}
-                  pointerEvents="none"
-                >
-                  <Marker
-                    coordinate={{ latitude: event.latitude, longitude: event.longitude }}
-                    pinColor={Colors.accent}
-                  />
-                </MapView>
+                <LeafletMiniMap
+                  latitude={event.latitude}
+                  longitude={event.longitude}
+                  height={160}
+                />
                 <View style={styles.miniMapOverlay}>
                   <Ionicons name="expand-outline" size={16} color="#fff" />
                   <Text style={styles.miniMapOverlayText}>Apri mappa</Text>

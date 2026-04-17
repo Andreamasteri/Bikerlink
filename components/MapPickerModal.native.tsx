@@ -1,9 +1,10 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import MapView, { Marker, Polyline } from "react-native-maps";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import LeafletPickerMap from "@/components/LeafletPickerMap";
+import type { PickerWaypoint } from "@/lib/leaflet-picker-map-html";
 
 interface ExistingWaypoint {
   latitude: number;
@@ -21,27 +22,21 @@ interface Props {
   existingWaypoints?: ExistingWaypoint[];
 }
 
-const ITALY_REGION = {
-  latitude: 42.5,
-  longitude: 12.5,
-  latitudeDelta: 12,
-  longitudeDelta: 12,
-};
-
-const WAYPOINT_TYPE_COLORS: Record<string, string> = {
-  start: "#4CAF50",
-  stop: "#FF9800",
-  poi: "#2196F3",
-  end: "#E63946",
-};
-
 export default function MapPickerContent({ coord, onCoordChange, onConfirm, onClose, initialRegion, existingWaypoints = [] }: Props) {
   const insets = useSafeAreaInsets();
-  const region = initialRegion || ITALY_REGION;
 
-  const existingPolyline = existingWaypoints.length > 1
-    ? existingWaypoints.map((wp) => ({ latitude: wp.latitude, longitude: wp.longitude }))
-    : [];
+  const pickerWaypoints: PickerWaypoint[] = existingWaypoints.map((wp) => ({
+    lat: wp.latitude,
+    lng: wp.longitude,
+    name: wp.name,
+    waypointType: wp.waypointType,
+  }));
+
+  const initialLat = initialRegion?.latitude ?? 42.5;
+  const initialLng = initialRegion?.longitude ?? 12.5;
+  const initialZoom = initialRegion ? 10 : 6;
+
+  const selectedCoord = coord ? { lat: coord.latitude, lng: coord.longitude } : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: Colors.background }}>
@@ -54,32 +49,14 @@ export default function MapPickerContent({ coord, onCoordChange, onConfirm, onCl
           <Text style={[styles.mapConfirmText, !coord && { opacity: 0.4 }]}>Conferma</Text>
         </TouchableOpacity>
       </View>
-      <MapView
-        key={`map-${region.latitude}-${region.longitude}`}
-        style={{ flex: 1 }}
-        initialRegion={region}
-        provider={undefined}
-        onPress={(e: any) => onCoordChange(e.nativeEvent.coordinate)}
-      >
-        {existingPolyline.length > 1 && (
-          <Polyline
-            coordinates={existingPolyline}
-            strokeColor={Colors.accent}
-            strokeWidth={2}
-            lineDashPattern={[6, 4]}
-          />
-        )}
-        {existingWaypoints.map((wp, index) => (
-          <Marker
-            key={`existing-${index}`}
-            coordinate={{ latitude: wp.latitude, longitude: wp.longitude }}
-            title={wp.name}
-            pinColor={WAYPOINT_TYPE_COLORS[wp.waypointType] || "#888"}
-            opacity={0.7}
-          />
-        ))}
-        {coord && <Marker coordinate={coord} pinColor="#FFD700" />}
-      </MapView>
+      <LeafletPickerMap
+        initialLat={initialLat}
+        initialLng={initialLng}
+        initialZoom={initialZoom}
+        selectedCoord={selectedCoord}
+        existingWaypoints={pickerWaypoints}
+        onCoordPicked={onCoordChange}
+      />
       {coord && (
         <View style={styles.mapCoordsBar}>
           <Text style={styles.mapCoordsText}>

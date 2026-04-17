@@ -18,14 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import Colors from "@/constants/colors";
 import { getApiUrl, apiRequest } from "@/lib/query-client";
-
-let MapView: any = null;
-let Marker: any = null;
-if (Platform.OS !== "web") {
-  const maps = require("react-native-maps");
-  MapView = maps.default;
-  Marker = maps.Marker;
-}
+import LeafletPickerMap from "@/components/LeafletPickerMap";
 
 type Club = { id: string; name: string; clubType: string };
 type UserResult = { id: string; nickname: string; userType: string };
@@ -256,38 +249,15 @@ export default function CreateMotoclub() {
           <Text style={styles.fieldDesc}>
             Tocca la mappa per posizionare il pin del tuo motoclub.
           </Text>
-          {Platform.OS !== "web" ? (
-            <MapView
-              style={styles.map}
-              region={mapRegion}
-              onPress={(e: any) => setPin(e.nativeEvent.coordinate)}
-            >
-              {pin && <Marker coordinate={pin} />}
-            </MapView>
-          ) : (
-            <View style={styles.mapWebFallback}>
-              <Ionicons name="map" size={40} color={Colors.textSecondary} />
-              <Text style={styles.mapWebText}>Inserisci le coordinate manualmente</Text>
-              <View style={styles.coordRow}>
-                <TextInput
-                  style={[styles.textInput, { flex: 1, marginRight: 8 }]}
-                  placeholder="Latitudine (es. 45.4)"
-                  placeholderTextColor={Colors.textSecondary}
-                  keyboardType="decimal-pad"
-                  value={pin ? String(pin.latitude) : ""}
-                  onChangeText={(t) => setPin((p) => ({ latitude: parseFloat(t) || 0, longitude: p?.longitude ?? 0 }))}
-                />
-                <TextInput
-                  style={[styles.textInput, { flex: 1 }]}
-                  placeholder="Longitudine (es. 9.2)"
-                  placeholderTextColor={Colors.textSecondary}
-                  keyboardType="decimal-pad"
-                  value={pin ? String(pin.longitude) : ""}
-                  onChangeText={(t) => setPin((p) => ({ latitude: p?.latitude ?? 0, longitude: parseFloat(t) || 0 }))}
-                />
-              </View>
-            </View>
-          )}
+          <View style={styles.map}>
+            <LeafletPickerMap
+              initialLat={mapRegion.latitude}
+              initialLng={mapRegion.longitude}
+              initialZoom={6}
+              selectedCoord={pin ? { lat: pin.latitude, lng: pin.longitude } : null}
+              onCoordPicked={(coord) => setPin(coord)}
+            />
+          </View>
           <TouchableOpacity style={styles.locationBtn} onPress={handleGetLocation} disabled={loadingLocation}>
             {loadingLocation ? (
               <ActivityIndicator size="small" color={Colors.accent} />

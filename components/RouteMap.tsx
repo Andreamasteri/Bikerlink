@@ -1,7 +1,6 @@
-import React from "react";
-import { View, StyleSheet } from "react-native";
-import MapView, { Polyline, Marker } from "react-native-maps";
-import Colors from "@/constants/colors";
+import React, { useMemo } from "react";
+import LeafletRouteMap from "@/components/LeafletRouteMap";
+import type { RouteWaypoint } from "@/lib/leaflet-route-map-html";
 
 interface RouteMapProps {
   points: Array<{ latitude: number; longitude: number }>;
@@ -10,40 +9,30 @@ interface RouteMapProps {
 }
 
 export default function RouteMap({ points, height = 260, showMarkers = true }: RouteMapProps) {
-  const hasPoints = points.length > 0;
-  const region = hasPoints
-    ? {
-        latitude: points[Math.floor(points.length / 2)].latitude,
-        longitude: points[Math.floor(points.length / 2)].longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      }
-    : { latitude: 41.9, longitude: 12.5, latitudeDelta: 5, longitudeDelta: 5 };
+  const markerWaypoints: RouteWaypoint[] = useMemo(() => {
+    if (points.length === 0) return [];
+    const first = points[0];
+    const last = points[points.length - 1];
+    if (points.length === 1) {
+      return [{ lat: first.latitude, lng: first.longitude, name: "Partenza", waypointType: "start" }];
+    }
+    return [
+      { lat: first.latitude, lng: first.longitude, name: "Partenza", waypointType: "start" },
+      { lat: last.latitude, lng: last.longitude, name: "Arrivo", waypointType: "end" },
+    ];
+  }, [points]);
+
+  const trackPoints = useMemo(
+    () => points.map((p) => ({ lat: p.latitude, lng: p.longitude })),
+    [points]
+  );
 
   return (
-    <View style={[styles.wrapper, { height }]}>
-      <MapView style={styles.map} initialRegion={region}>
-        {hasPoints && (
-          <>
-            <Polyline
-              coordinates={points}
-              strokeColor={Colors.accent}
-              strokeWidth={4}
-            />
-            {showMarkers && (
-              <>
-                <Marker coordinate={points[0]} pinColor={Colors.success} title="Partenza" />
-                <Marker coordinate={points[points.length - 1]} pinColor={Colors.error} title="Arrivo" />
-              </>
-            )}
-          </>
-        )}
-      </MapView>
-    </View>
+    <LeafletRouteMap
+      waypoints={markerWaypoints}
+      trackPoints={trackPoints}
+      height={height}
+      showMarkers={showMarkers}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  wrapper: { borderRadius: 0, overflow: "hidden" },
-  map: { flex: 1 },
-});

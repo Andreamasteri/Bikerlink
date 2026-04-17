@@ -16,7 +16,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import MapView, { Marker } from "react-native-maps";
+import LeafletPickerMap from "@/components/LeafletPickerMap";
+import LeafletMiniMap from "@/components/LeafletMiniMap";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import * as Location from "expo-location";
@@ -528,10 +529,15 @@ export default function ClubDetailScreen() {
             {club.isApproved && (
               <View style={styles.locationSection}>
                 {club.latitude != null ? (
-                  <View style={styles.locationRow}>
-                    <MaterialCommunityIcons name="map-marker-check" size={18} color={Colors.success} />
-                    <Text style={styles.locationText}>Sede confermata in mappa</Text>
-                  </View>
+                  <>
+                    <View style={styles.locationRow}>
+                      <MaterialCommunityIcons name="map-marker-check" size={18} color={Colors.success} />
+                      <Text style={styles.locationText}>Sede confermata in mappa</Text>
+                    </View>
+                    <View style={{ height: 160, marginTop: 8, borderRadius: 8, overflow: "hidden" }}>
+                      <LeafletMiniMap latitude={club.latitude} longitude={club.longitude!} height={160} />
+                    </View>
+                  </>
                 ) : (
                   <View style={styles.locationRow}>
                     <MaterialCommunityIcons name="map-marker-question" size={18} color={Colors.textSecondary} />
@@ -567,25 +573,13 @@ export default function ClubDetailScreen() {
             <Text style={styles.modalSub}>Indica la posizione della sede fisica di "{club.name}". L'admin approverà la proposta prima che appaia in mappa.</Text>
 
             <View style={styles.mapPickerContainer}>
-              <MapView
-                style={styles.mapPicker}
-                initialRegion={{
-                  latitude: 41.9,
-                  longitude: 12.5,
-                  latitudeDelta: 8.0,
-                  longitudeDelta: 8.0,
-                }}
-                onPress={(e) => setProposeCoords(e.nativeEvent.coordinate)}
-              >
-                {proposeCoords && (
-                  <Marker
-                    coordinate={proposeCoords}
-                    draggable
-                    onDragEnd={(e) => setProposeCoords(e.nativeEvent.coordinate)}
-                    pinColor="#009688"
-                  />
-                )}
-              </MapView>
+              <LeafletPickerMap
+                initialLat={41.9}
+                initialLng={12.5}
+                initialZoom={5}
+                selectedCoord={proposeCoords ? { lat: proposeCoords.latitude, lng: proposeCoords.longitude } : null}
+                onCoordPicked={(coord) => setProposeCoords(coord)}
+              />
               {!proposeCoords && (
                 <View style={styles.mapPickerHint}>
                   <Text style={styles.mapPickerHintText}>Tocca sulla mappa per posizionare il pin</Text>
