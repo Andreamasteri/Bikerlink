@@ -2907,7 +2907,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-17T19:05:57.956Z"
+  },
+  {
+    "updateNumber": 75,
+    "version": "1.75.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-75 rv7.0.0: Tracking UX — Delayed Start, Elimina Record, Tasto Verde, Spacing, Avviso",
+    "note": "Task #661: paddingTop ScrollView 56→20; tasto START verde+144×144+icona 67; testo avviso senza 'Attenzione,'+fontSize 13; Delayed Start toggle+TextInput (default 10s)+countdown overlay giallo/rosso/GO-verde; handleStartPress con guard anti-doppio-tap+cleanup unmount; cestino su RecordCard con Alert conferma+DELETE /api/routes/:id; backend deleteRoute(id) su storage (elimina routePoints poi route). CURRENT_OTA_NUMBER=75.",
+    "releaseId": "b328a7fb-8e91-4322-8251-a611498e007c",
+    "bundleUrl": "private/ota/ota-1.75.0-1776454221310.js",
+    "updateGroupId": "ca6c78a5-293e-4e80-a17e-eb1e503c6045",
+    "androidUpdateId": "019d9cec-efb1-7e62-9cf9-ac4d670fe2b4",
+    "iosUpdateId": null,
+    "commitBase": "26d6bceedd3628073e64e281f55efc73b99c97b3",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/ca6c78a5-293e-4e80-a17e-eb1e503c6045",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-17T19:30:24.145Z"
   }
 ]
