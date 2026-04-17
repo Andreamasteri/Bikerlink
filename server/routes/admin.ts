@@ -3621,6 +3621,13 @@ router.get("/translations/file-path", async (req: Request, res: Response) => {
   }
 });
 
+router.delete("/translations/folder-cache", (_req: Request, res: Response) => {
+  const clearedCount = driveFolderNameCache.size;
+  driveFolderNameCache.clear();
+  console.log(`[translations/folder-cache] Cache svuotata: ${clearedCount} voci rimosse`);
+  return res.json({ cleared: clearedCount });
+});
+
 router.get("/translations/preview-sheet", async (req: Request, res: Response) => {
   try {
     const fileId = (req.query.fileId as string | undefined)?.trim();

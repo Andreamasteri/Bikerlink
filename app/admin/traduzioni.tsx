@@ -182,8 +182,36 @@ function DriveFileBrowser({
   const [breadcrumb, setBreadcrumb] = useState<BreadcrumbItem[]>([{ id: null, name: "Drive" }]);
   const [browseData, setBrowseData] = useState<BrowseResult>({ folderName: "Drive", folders: [], sheets: [] });
   const [searchText, setSearchText] = useState("");
+  const [refreshingCache, setRefreshingCache] = useState(false);
+  const [cacheMsg, setCacheMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const cacheMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestSeq = useRef(0);
+
+  function showCacheMsg(text: string, ok: boolean) {
+    if (cacheMsgTimer.current) clearTimeout(cacheMsgTimer.current);
+    setCacheMsg({ text, ok });
+    cacheMsgTimer.current = setTimeout(() => setCacheMsg(null), 2500);
+  }
+
+  async function refreshFolderCache() {
+    setRefreshingCache(true);
+    try {
+      const url = new URL("/api/admin/translations/folder-cache", getApiUrl());
+      const resp = await fetch(url.toString(), { method: "DELETE", credentials: "include" });
+      if (!resp.ok) {
+        showCacheMsg("Errore durante l'aggiornamento", false);
+        return;
+      }
+      const activeSearch = searchText.trim();
+      await loadFolder(activeSearch ? null : currentFolderId, activeSearch || undefined);
+      showCacheMsg("Nomi cartelle aggiornati", true);
+    } catch {
+      showCacheMsg("Errore durante l'aggiornamento", false);
+    } finally {
+      setRefreshingCache(false);
+    }
+  }
 
   useEffect(() => {
     if (visible) {
@@ -194,6 +222,7 @@ function DriveFileBrowser({
     }
     return () => {
       if (searchTimer.current) clearTimeout(searchTimer.current);
+      if (cacheMsgTimer.current) clearTimeout(cacheMsgTimer.current);
     };
   }, [visible]);
 
@@ -254,10 +283,41 @@ function DriveFileBrowser({
         <View style={styles.modalSheet}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{title}</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <MaterialCommunityIcons name="close" size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <TouchableOpacity
+                onPress={refreshFolderCache}
+                disabled={refreshingCache}
+                style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                {refreshingCache ? (
+                  <ActivityIndicator size="small" color={Colors.accent} />
+                ) : (
+                  <MaterialCommunityIcons name="refresh" size={18} color={Colors.accent} />
+                )}
+                <Text style={{ fontSize: 13, color: Colors.accent, fontWeight: "500" }}>
+                  Aggiorna nomi
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <MaterialCommunityIcons name="close" size={20} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
           </View>
+          {cacheMsg && (
+            <View style={{
+              backgroundColor: cacheMsg.ok ? "#1a4a2e" : "#4a1a1a",
+              paddingHorizontal: 14,
+              paddingVertical: 6,
+              borderRadius: 6,
+              marginHorizontal: 16,
+              marginBottom: 6,
+            }}>
+              <Text style={{ fontSize: 13, color: cacheMsg.ok ? "#6fcf97" : "#eb5757" }}>
+                {cacheMsg.text}
+              </Text>
+            </View>
+          )}
 
           <View style={styles.searchRow}>
             <MaterialCommunityIcons name="magnify" size={18} color={Colors.textSecondary} style={{ marginRight: 6 }} />
