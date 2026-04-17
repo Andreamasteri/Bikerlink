@@ -2813,28 +2813,16 @@ router.get("/backup/status", async (_req: Request, res: Response) => {
   }
 });
 
-router.get("/backup/list", async (_req: Request, res: Response) => {
-  try {
-    const { listBackups } = await import("../backup-service");
-    const result = await listBackups();
-    return res.json(result);
-  } catch (error) {
-    console.error("Admin backup list error:", error);
-    return res.status(500).json({ message: "Errore durante il recupero dei backup" });
-  }
-});
-
 router.post("/backup/db", async (_req: Request, res: Response) => {
   try {
-    const { backupDatabase, purgeOldBackups } = await import("../backup-service");
+    const { backupDatabase } = await import("../backup-service");
     const result = await backupDatabase();
-    purgeOldBackups().catch((e: Error) => console.error("[backup] purge error:", e.message));
     await storage.createModeratorLog({
       moderatorId: (_req as any).currentUser?.id || "system",
       action: "backup_db",
       targetType: "system",
       targetId: result.name.slice(0, 36),
-      details: `Backup DB eseguito: ${result.name} (${result.size} bytes)`,
+      details: `Backup DB su Drive: ${result.name} (${result.size} bytes)`,
     });
     return res.json({ ok: true, ...result });
   } catch (error: any) {
@@ -2845,77 +2833,19 @@ router.post("/backup/db", async (_req: Request, res: Response) => {
 
 router.post("/backup/media", async (_req: Request, res: Response) => {
   try {
-    const { backupMedia, purgeOldBackups } = await import("../backup-service");
+    const { backupMedia } = await import("../backup-service");
     const result = await backupMedia();
-    purgeOldBackups().catch((e: Error) => console.error("[backup] purge error:", e.message));
     await storage.createModeratorLog({
       moderatorId: (_req as any).currentUser?.id || "system",
       action: "backup_media",
       targetType: "system",
       targetId: result.name.slice(0, 36),
-      details: `Backup media eseguito: ${result.name} (${result.size} bytes)`,
+      details: `Backup media su Drive: ${result.name} (${result.size} bytes)`,
     });
     return res.json({ ok: true, ...result });
   } catch (error: any) {
     console.error("Admin backup media error:", error);
     return res.status(500).json({ message: error.message || "Errore durante il backup dei media" });
-  }
-});
-
-router.post("/backup/restore", async (req: Request, res: Response) => {
-  try {
-    const { filePath, adminPassword } = req.body;
-    if (!filePath || !adminPassword) {
-      return res.status(400).json({ message: "filePath e adminPassword sono obbligatori" });
-    }
-    const user = (req as any).currentUser;
-    const fullUser = await storage.getUser(user.id);
-    if (!fullUser || !fullUser.password) {
-      return res.status(403).json({ message: "Utente non trovato" });
-    }
-    const valid = await bcrypt.compare(adminPassword, fullUser.password);
-    if (!valid) {
-      return res.status(401).json({ message: "Password non corretta" });
-    }
-    const { restoreDatabase } = await import("../backup-service");
-    await restoreDatabase(filePath);
-    const backupName = (filePath as string).split("/").pop() ?? filePath;
-    await storage.createModeratorLog({
-      moderatorId: user.id,
-      action: "restore_db",
-      targetType: "system",
-      targetId: (backupName as string).slice(0, 36),
-      details: `Database ripristinato dal backup: ${filePath}`,
-    });
-    return res.json({ ok: true, message: "Database ripristinato con successo" });
-  } catch (error: any) {
-    console.error("Admin restore db error:", error);
-    return res.status(500).json({ message: error.message || "Errore durante il ripristino del database" });
-  }
-});
-
-router.get("/backup/download", async (req: Request, res: Response) => {
-  try {
-    const { path: filePath } = req.query;
-    if (!filePath || typeof filePath !== "string") {
-      return res.status(400).json({ message: "Parametro path mancante" });
-    }
-    if (!filePath.startsWith("backup/")) {
-      return res.status(400).json({ message: "Path non valido" });
-    }
-    const { downloadBackupBuffer } = await import("../backup-service");
-    const buf = await downloadBackupBuffer(filePath);
-    const fileName = filePath.split("/").pop() ?? "backup";
-    const contentType = fileName.endsWith(".gz")
-      ? "application/gzip"
-      : "application/zip";
-    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
-    res.setHeader("Content-Type", contentType);
-    res.setHeader("Content-Length", buf.length);
-    return res.send(buf);
-  } catch (error: any) {
-    console.error("Admin backup download error:", error);
-    return res.status(500).json({ message: error.message || "Errore durante il download" });
   }
 });
 
@@ -2931,6 +2861,58 @@ router.put("/backup/schedule", async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Admin backup schedule error:", error);
     return res.status(500).json({ message: error.message || "Errore durante la configurazione del backup" });
+  }
+});
+
+router.get("/backup/drive-folder", async (_req: Request, res: Response) => {
+  try {
+    const { getDriveFolder } = await import("../backup-service");
+    const folder = await getDriveFolder();
+    return res.json({ folder: folder ?? null });
+  } catch (error) {
+    console.error("Admin backup drive-folder GET error:", error);
+    return res.status(500).json({ message: "Errore nel recupero della cartella Drive" });
+  }
+});
+
+router.post("/backup/drive-folder", async (req: Request, res: Response) => {
+  try {
+    const { folderId, folderName } = req.body as { folderId?: string; folderName?: string };
+    const { setDriveFolder } = await import("../backup-service");
+    if (!folderId) {
+      await setDriveFolder(null);
+    } else {
+      await setDriveFolder({ folderId, folderName: folderName ?? "" });
+    }
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("Admin backup drive-folder POST error:", error);
+    return res.status(500).json({ message: "Errore nel salvataggio della cartella Drive" });
+  }
+});
+
+router.get("/backup/frequency", async (_req: Request, res: Response) => {
+  try {
+    const { getBackupFrequency } = await import("../backup-service");
+    return res.json(await getBackupFrequency());
+  } catch (error) {
+    console.error("Admin backup frequency GET error:", error);
+    return res.status(500).json({ message: "Errore nel recupero della frequenza" });
+  }
+});
+
+router.post("/backup/frequency", async (req: Request, res: Response) => {
+  try {
+    const { dbHours, mediaHours } = req.body as { dbHours?: number; mediaHours?: number };
+    const { setBackupFrequency } = await import("../backup-service");
+    const result = await setBackupFrequency({
+      ...(dbHours !== undefined ? { dbHours: Math.max(1, Number(dbHours)) } : {}),
+      ...(mediaHours !== undefined ? { mediaHours: Math.max(1, Number(mediaHours)) } : {}),
+    });
+    return res.json({ ok: true, ...result });
+  } catch (error) {
+    console.error("Admin backup frequency POST error:", error);
+    return res.status(500).json({ message: "Errore nel salvataggio della frequenza" });
   }
 });
 

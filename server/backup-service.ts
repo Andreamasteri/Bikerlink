@@ -5,187 +5,182 @@ import archiver from "archiver";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import {
-  uploadBuffer,
-  downloadBuffer,
-  deleteObject,
-  listObjects,
-  type StorageFile,
-} from "./objectStorage";
+import { Readable } from "stream";
+import { getDriveClient } from "./lib/drive-client";
 import { db } from "./db";
 import { appSettings } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const execAsync = promisify(exec);
 
-const DB_PREFIX = "backup/database";
-const MEDIA_PREFIX = "backup/media";
-const RETENTION_DAYS = 90;
+const DEFAULT_DB_HOURS = 24;
+const DEFAULT_MEDIA_HOURS = 168;
 
 let dbSchedulerTimer: NodeJS.Timeout | null = null;
 let mediaSchedulerTimer: NodeJS.Timeout | null = null;
 let dbNextAt: Date | null = null;
 let mediaNextAt: Date | null = null;
 let isBackingUp = false;
-let isRestoringDb = false;
 
 function addMs(ms: number): Date {
   return new Date(Date.now() + ms);
 }
 
-const INTERVAL_DB_MS = 24 * 60 * 60 * 1000;
-const INTERVAL_MEDIA_MS = 7 * 24 * 60 * 60 * 1000;
-
-export interface BackupFile extends StorageFile {
-  path: string;
+function getTimestamp(): string {
+  return new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 16);
 }
 
-async function deriveLastBackup(prefix: string): Promise<{ timestamp: string; size: number } | null> {
+async function readSetting(key: string): Promise<string | null> {
   try {
-    const files = await listObjects(prefix);
-    if (files.length === 0) return null;
-    files.sort((a, b) => b.createdTime.localeCompare(a.createdTime));
-    const latest = files[0];
-    return { timestamp: latest.createdTime, size: latest.size };
+    const rows = await db.select().from(appSettings).where(eq(appSettings.key, key));
+    return rows.length > 0 ? (rows[0].value ?? null) : null;
   } catch {
     return null;
   }
 }
 
-export async function getBackupStatus() {
-  const [lastDbBackup, lastMediaBackup] = await Promise.all([
-    deriveLastBackup(DB_PREFIX),
-    deriveLastBackup(MEDIA_PREFIX),
+async function upsertSetting(key: string, value: string, description?: string) {
+  const existing = await db.select().from(appSettings).where(eq(appSettings.key, key));
+  if (existing.length > 0) {
+    await db.update(appSettings).set({ value, updatedAt: new Date() }).where(eq(appSettings.key, key));
+  } else {
+    await db.insert(appSettings).values({ key, value, description });
+  }
+}
+
+async function readJsonSetting<T>(key: string): Promise<T | null> {
+  try {
+    const rows = await db.select().from(appSettings).where(eq(appSettings.key, key));
+    if (rows.length === 0 || rows[0].valueJson == null) return null;
+    return rows[0].valueJson as T;
+  } catch {
+    return null;
+  }
+}
+
+async function upsertJsonSetting(key: string, value: unknown, description?: string) {
+  const existing = await db.select().from(appSettings).where(eq(appSettings.key, key));
+  if (existing.length > 0) {
+    await db.update(appSettings).set({ valueJson: value as Record<string, unknown>, updatedAt: new Date() }).where(eq(appSettings.key, key));
+  } else {
+    await db.insert(appSettings).values({ key, valueJson: value as Record<string, unknown>, description });
+  }
+}
+
+export interface DriveFolder {
+  folderId: string;
+  folderName: string;
+}
+
+export async function getDriveFolder(): Promise<DriveFolder | null> {
+  return readJsonSetting<DriveFolder>("backup.drive_folder");
+}
+
+export async function setDriveFolder(folder: DriveFolder | null): Promise<void> {
+  await upsertJsonSetting("backup.drive_folder", folder, "Cartella Drive destinazione backup");
+}
+
+export interface BackupFrequency {
+  dbHours: number;
+  mediaHours: number;
+}
+
+export async function getBackupFrequency(): Promise<BackupFrequency> {
+  const [dbVal, mediaVal] = await Promise.all([
+    readSetting("backup.freq_db_hours"),
+    readSetting("backup.freq_media_hours"),
   ]);
   return {
-    scheduled: dbSchedulerTimer !== null,
-    lastDbBackup,
-    lastMediaBackup,
-    isBackingUp,
-    isRestoringDb,
-    nextScheduled: dbNextAt?.toISOString() ?? null,
-    nextMediaScheduled: mediaNextAt?.toISOString() ?? null,
-    configured: true,
+    dbHours: dbVal ? parseInt(dbVal, 10) || DEFAULT_DB_HOURS : DEFAULT_DB_HOURS,
+    mediaHours: mediaVal ? parseInt(mediaVal, 10) || DEFAULT_MEDIA_HOURS : DEFAULT_MEDIA_HOURS,
   };
 }
 
-export async function startScheduler() {
-  await startDbScheduler();
-  await startMediaScheduler();
+export async function setBackupFrequency(freq: Partial<BackupFrequency>): Promise<BackupFrequency> {
+  const current = await getBackupFrequency();
+  const next: BackupFrequency = {
+    dbHours: freq.dbHours ?? current.dbHours,
+    mediaHours: freq.mediaHours ?? current.mediaHours,
+  };
+  await Promise.all([
+    upsertSetting("backup.freq_db_hours", String(next.dbHours), "Frequenza backup DB (ore)"),
+    upsertSetting("backup.freq_media_hours", String(next.mediaHours), "Frequenza backup media (ore)"),
+  ]);
+  await restartSchedulerWithNewFrequency();
+  return next;
 }
 
-async function startDbScheduler() {
-  if (dbSchedulerTimer) return;
-  const enabled = await isAutoBackupEnabled();
-  if (!enabled) return;
-
-  dbNextAt = addMs(INTERVAL_DB_MS);
-  dbSchedulerTimer = setInterval(async () => {
-    try {
-      const stillEnabled = await isAutoBackupEnabled();
-      if (!stillEnabled) { stopDbScheduler(); return; }
-      await backupDatabase();
-      await purgeOldBackups();
-      dbNextAt = addMs(INTERVAL_DB_MS);
-    } catch (err) {
-      console.error("[backup-service] Scheduled DB backup failed:", err);
-      dbNextAt = addMs(INTERVAL_DB_MS);
-    }
-  }, INTERVAL_DB_MS);
-
-  console.log("[backup-service] DB scheduler started (every 24h)");
+interface LastBackupMeta {
+  timestamp: string;
+  size: number;
+  fileId?: string;
 }
 
-async function startMediaScheduler() {
-  if (mediaSchedulerTimer) return;
-  const enabled = await isAutoBackupEnabled();
-  if (!enabled) return;
-
-  mediaNextAt = addMs(INTERVAL_MEDIA_MS);
-  mediaSchedulerTimer = setInterval(async () => {
-    try {
-      const stillEnabled = await isAutoBackupEnabled();
-      if (!stillEnabled) { stopMediaScheduler(); return; }
-      await backupMedia();
-      await purgeOldBackups();
-      mediaNextAt = addMs(INTERVAL_MEDIA_MS);
-    } catch (err) {
-      console.error("[backup-service] Scheduled media backup failed:", err);
-      mediaNextAt = addMs(INTERVAL_MEDIA_MS);
-    }
-  }, INTERVAL_MEDIA_MS);
-
-  console.log("[backup-service] Media scheduler started (every 7 days)");
+async function saveLastBackup(type: "db" | "media", meta: LastBackupMeta) {
+  await upsertJsonSetting(
+    type === "db" ? "backup.last_db" : "backup.last_media",
+    meta,
+    type === "db" ? "Ultimo backup DB su Drive" : "Ultimo backup media su Drive"
+  );
 }
 
-function stopDbScheduler() {
-  if (dbSchedulerTimer) {
-    clearInterval(dbSchedulerTimer);
-    dbSchedulerTimer = null;
-    dbNextAt = null;
-    console.log("[backup-service] DB scheduler stopped");
-  }
-}
-
-function stopMediaScheduler() {
-  if (mediaSchedulerTimer) {
-    clearInterval(mediaSchedulerTimer);
-    mediaSchedulerTimer = null;
-    mediaNextAt = null;
-    console.log("[backup-service] Media scheduler stopped");
-  }
-}
-
-export function stopScheduler() {
-  stopDbScheduler();
-  stopMediaScheduler();
+export async function getBackupStatus() {
+  const [lastDb, lastMedia, folder, freq] = await Promise.all([
+    readJsonSetting<LastBackupMeta>("backup.last_db"),
+    readJsonSetting<LastBackupMeta>("backup.last_media"),
+    getDriveFolder(),
+    getBackupFrequency(),
+  ]);
+  return {
+    scheduled: dbSchedulerTimer !== null,
+    lastDbBackup: lastDb ?? null,
+    lastMediaBackup: lastMedia ?? null,
+    isBackingUp,
+    nextScheduled: dbNextAt?.toISOString() ?? null,
+    nextMediaScheduled: mediaNextAt?.toISOString() ?? null,
+    driveFolder: folder,
+    dbHours: freq.dbHours,
+    mediaHours: freq.mediaHours,
+    configured: !!folder,
+  };
 }
 
 async function isAutoBackupEnabled(): Promise<boolean> {
   if (process.env.BACKUP_AUTO_ENABLED === "false") return false;
   if (process.env.BACKUP_AUTO_ENABLED === "true") return true;
-  try {
-    const rows = await db.select().from(appSettings).where(eq(appSettings.key, "backup_auto_enabled"));
-    if (rows.length === 0) return true;
-    return rows[0].value !== "false";
-  } catch {
-    return true;
-  }
+  const val = await readSetting("backup_auto_enabled");
+  if (val === null) return true;
+  return val !== "false";
 }
 
 export async function setAutoBackupEnabled(enabled: boolean) {
-  try {
-    const existing = await db.select().from(appSettings).where(eq(appSettings.key, "backup_auto_enabled"));
-    if (existing.length > 0) {
-      await db.update(appSettings).set({ value: enabled ? "true" : "false" }).where(eq(appSettings.key, "backup_auto_enabled"));
-    } else {
-      await db.insert(appSettings).values({
-        key: "backup_auto_enabled",
-        value: enabled ? "true" : "false",
-        description: "Backup automatico (Replit Object Storage)",
-      });
-    }
-    if (enabled) {
-      await startScheduler();
-    } else {
-      stopScheduler();
-    }
-  } catch (err) {
-    console.error("[backup-service] setAutoBackupEnabled error:", err);
-    throw err;
+  await upsertSetting("backup_auto_enabled", enabled ? "true" : "false", "Backup automatico (Google Drive)");
+  if (enabled) {
+    await startScheduler();
+  } else {
+    stopScheduler();
   }
 }
 
-function getObjectPath(type: "db" | "media", fileName: string): string {
-  const now = new Date();
-  const year = now.getFullYear().toString();
-  const month = (now.getMonth() + 1).toString().padStart(2, "0");
-  const prefix = type === "db" ? DB_PREFIX : MEDIA_PREFIX;
-  return `${prefix}/${year}/${month}/${fileName}`;
-}
-
-function getTimestamp(): string {
-  return new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 19);
+async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string): Promise<string | null> {
+  const folder = await getDriveFolder();
+  if (!folder?.folderId) {
+    console.warn("[backup-service] Nessuna cartella Drive configurata — backup su Drive saltato");
+    return null;
+  }
+  const drive = getDriveClient();
+  const readable = new Readable();
+  readable.push(buffer);
+  readable.push(null);
+  const resp = await drive.files.create({
+    requestBody: {
+      name: fileName,
+      parents: [folder.folderId],
+    },
+    media: { mimeType, body: readable },
+    fields: "id",
+  });
+  return resp.data.id ?? null;
 }
 
 export async function backupDatabase(): Promise<{ path: string; name: string; size: number }> {
@@ -212,11 +207,13 @@ export async function backupDatabase(): Promise<{ path: string; name: string; si
 
     const buf = fs.readFileSync(tmpGz);
     const fileName = `bikerlink_db_${ts}.sql.gz`;
-    const objectPath = getObjectPath("db", fileName);
-    await uploadBuffer(objectPath, buf, "application/gzip");
 
-    console.log(`[backup-service] DB backup salvato: ${objectPath} (${buf.length} bytes)`);
-    return { path: objectPath, name: fileName, size: buf.length };
+    const fileId = await uploadToDrive(buf, fileName, "application/gzip");
+    const meta: LastBackupMeta = { timestamp: new Date().toISOString(), size: buf.length, fileId: fileId ?? undefined };
+    await saveLastBackup("db", meta);
+
+    console.log(`[backup-service] DB backup su Drive: ${fileName} (${buf.length} bytes)${fileId ? ` → ${fileId}` : " [Drive skip]"}`);
+    return { path: fileId ?? fileName, name: fileName, size: buf.length };
   } finally {
     isBackingUp = false;
     try { fs.unlinkSync(tmpSql); } catch {}
@@ -251,85 +248,96 @@ export async function backupMedia(): Promise<{ path: string; name: string; size:
     });
 
     const fileName = `bikerlink_media_${ts}.zip`;
-    const objectPath = getObjectPath("media", fileName);
-    await uploadBuffer(objectPath, zipBuffer, "application/zip");
 
-    console.log(`[backup-service] Media backup salvato: ${objectPath} (${zipBuffer.length} bytes)`);
-    return { path: objectPath, name: fileName, size: zipBuffer.length };
+    const fileId = await uploadToDrive(zipBuffer, fileName, "application/zip");
+    const meta: LastBackupMeta = { timestamp: new Date().toISOString(), size: zipBuffer.length, fileId: fileId ?? undefined };
+    await saveLastBackup("media", meta);
+
+    console.log(`[backup-service] Media backup su Drive: ${fileName} (${zipBuffer.length} bytes)${fileId ? ` → ${fileId}` : " [Drive skip]"}`);
+    return { path: fileId ?? fileName, name: fileName, size: zipBuffer.length };
   } finally {
     isBackingUp = false;
     try { fs.unlinkSync(tmpZip); } catch {}
   }
 }
 
-export async function restoreDatabase(objectPath: string): Promise<void> {
-  if (isRestoringDb) throw new Error("Ripristino già in corso");
-  isRestoringDb = true;
-
-  const tmpGz = path.join(os.tmpdir(), `bikerlink_restore_${Date.now()}.sql.gz`);
-  const tmpSql = tmpGz.replace(".sql.gz", ".sql");
-
-  try {
-    const buf = await downloadBuffer(objectPath);
-    fs.writeFileSync(tmpGz, buf);
-
-    await new Promise<void>((resolve, reject) => {
-      const inp = fs.createReadStream(tmpGz);
-      const out = fs.createWriteStream(tmpSql);
-      const gz = zlib.createGunzip();
-      inp.pipe(gz).pipe(out);
-      out.on("finish", resolve);
-      out.on("error", reject);
-      inp.on("error", reject);
-    });
-
-    const dbUrl = process.env.DATABASE_URL!;
-    await execAsync(`psql "${dbUrl}" -v ON_ERROR_STOP=1 -f "${tmpSql}" --no-password`);
-    console.log("[backup-service] Database ripristinato con successo");
-  } finally {
-    isRestoringDb = false;
-    try { fs.unlinkSync(tmpGz); } catch {}
-    try { fs.unlinkSync(tmpSql); } catch {}
-  }
-}
-
-export async function listBackups(): Promise<{ db: BackupFile[]; media: BackupFile[] }> {
-  const [dbFiles, mediaFiles] = await Promise.all([
-    listObjects(DB_PREFIX).catch(() => [] as StorageFile[]),
-    listObjects(MEDIA_PREFIX).catch(() => [] as StorageFile[]),
-  ]);
-
-  const toBackupFile = (f: StorageFile): BackupFile => ({
-    ...f,
-    path: f.name,
-    name: f.name.split("/").pop() ?? f.name,
-  });
-
-  const db2 = dbFiles.map(toBackupFile).sort((a, b) => b.createdTime.localeCompare(a.createdTime));
-  const media = mediaFiles.map(toBackupFile).sort((a, b) => b.createdTime.localeCompare(a.createdTime));
-
-  return { db: db2, media };
-}
-
-export async function purgeOldBackups(): Promise<number> {
-  const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
-  const all = await listBackups();
-  const toDelete = [...all.db, ...all.media].filter(
-    (f) => new Date(f.createdTime) < cutoff
-  );
-  let deleted = 0;
-  for (const f of toDelete) {
+async function startDbScheduler() {
+  stopDbScheduler();
+  const enabled = await isAutoBackupEnabled();
+  if (!enabled) return;
+  const { dbHours } = await getBackupFrequency();
+  const intervalMs = dbHours * 60 * 60 * 1000;
+  dbNextAt = addMs(intervalMs);
+  dbSchedulerTimer = setInterval(async () => {
     try {
-      await deleteObject(f.path);
-      deleted++;
-      console.log(`[backup-service] Eliminato backup vecchio: ${f.name}`);
+      const stillEnabled = await isAutoBackupEnabled();
+      if (!stillEnabled) { stopDbScheduler(); return; }
+      await backupDatabase();
+      const { dbHours: newHours } = await getBackupFrequency();
+      dbNextAt = addMs(newHours * 60 * 60 * 1000);
     } catch (err) {
-      console.error(`[backup-service] Impossibile eliminare ${f.name}:`, err);
+      console.error("[backup-service] Scheduled DB backup failed:", err);
+      const { dbHours: newHours } = await getBackupFrequency();
+      dbNextAt = addMs(newHours * 60 * 60 * 1000);
     }
-  }
-  return deleted;
+  }, intervalMs);
+  console.log(`[backup-service] DB scheduler started (every ${dbHours}h)`);
 }
 
-export async function downloadBackupBuffer(objectPath: string): Promise<Buffer> {
-  return downloadBuffer(objectPath);
+async function startMediaScheduler() {
+  stopMediaScheduler();
+  const enabled = await isAutoBackupEnabled();
+  if (!enabled) return;
+  const { mediaHours } = await getBackupFrequency();
+  const intervalMs = mediaHours * 60 * 60 * 1000;
+  mediaNextAt = addMs(intervalMs);
+  mediaSchedulerTimer = setInterval(async () => {
+    try {
+      const stillEnabled = await isAutoBackupEnabled();
+      if (!stillEnabled) { stopMediaScheduler(); return; }
+      await backupMedia();
+      const { mediaHours: newHours } = await getBackupFrequency();
+      mediaNextAt = addMs(newHours * 60 * 60 * 1000);
+    } catch (err) {
+      console.error("[backup-service] Scheduled media backup failed:", err);
+      const { mediaHours: newHours } = await getBackupFrequency();
+      mediaNextAt = addMs(newHours * 60 * 60 * 1000);
+    }
+  }, intervalMs);
+  console.log(`[backup-service] Media scheduler started (every ${mediaHours}h)`);
+}
+
+function stopDbScheduler() {
+  if (dbSchedulerTimer) {
+    clearInterval(dbSchedulerTimer);
+    dbSchedulerTimer = null;
+    dbNextAt = null;
+    console.log("[backup-service] DB scheduler stopped");
+  }
+}
+
+function stopMediaScheduler() {
+  if (mediaSchedulerTimer) {
+    clearInterval(mediaSchedulerTimer);
+    mediaSchedulerTimer = null;
+    mediaNextAt = null;
+    console.log("[backup-service] Media scheduler stopped");
+  }
+}
+
+export function stopScheduler() {
+  stopDbScheduler();
+  stopMediaScheduler();
+}
+
+export async function startScheduler() {
+  await startDbScheduler();
+  await startMediaScheduler();
+}
+
+async function restartSchedulerWithNewFrequency() {
+  const enabled = await isAutoBackupEnabled();
+  if (!enabled) return;
+  await startDbScheduler();
+  await startMediaScheduler();
 }
