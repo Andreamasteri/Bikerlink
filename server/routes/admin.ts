@@ -2903,12 +2903,24 @@ router.get("/backup/frequency", async (_req: Request, res: Response) => {
 
 router.post("/backup/frequency", async (req: Request, res: Response) => {
   try {
-    const { dbHours, mediaHours } = req.body as { dbHours?: number; mediaHours?: number };
+    const { dbHours, mediaHours } = req.body as { dbHours?: unknown; mediaHours?: unknown };
+    const parsed: { dbHours?: number; mediaHours?: number } = {};
+    if (dbHours !== undefined) {
+      const n = Number(dbHours);
+      if (!Number.isFinite(n) || n < 1) {
+        return res.status(400).json({ message: "dbHours deve essere un numero intero >= 1" });
+      }
+      parsed.dbHours = Math.floor(n);
+    }
+    if (mediaHours !== undefined) {
+      const n = Number(mediaHours);
+      if (!Number.isFinite(n) || n < 1) {
+        return res.status(400).json({ message: "mediaHours deve essere un numero intero >= 1" });
+      }
+      parsed.mediaHours = Math.floor(n);
+    }
     const { setBackupFrequency } = await import("../backup-service");
-    const result = await setBackupFrequency({
-      ...(dbHours !== undefined ? { dbHours: Math.max(1, Number(dbHours)) } : {}),
-      ...(mediaHours !== undefined ? { mediaHours: Math.max(1, Number(mediaHours)) } : {}),
-    });
+    const result = await setBackupFrequency(parsed);
     return res.json({ ok: true, ...result });
   } catch (error) {
     console.error("Admin backup frequency POST error:", error);

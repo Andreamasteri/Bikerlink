@@ -80,6 +80,11 @@ export async function setDriveFolder(folder: DriveFolder | null): Promise<void> 
   await upsertJsonSetting("backup.drive_folder", folder, "Cartella Drive destinazione backup");
   if (!folder) {
     stopScheduler();
+  } else {
+    const enabled = await isAutoBackupEnabled();
+    if (enabled) {
+      await startScheduler();
+    }
   }
 }
 
