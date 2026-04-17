@@ -2792,7 +2792,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-17T13:56:27.804Z"
+  },
+  {
+    "updateNumber": 70,
+    "version": "1.70.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-70 rv7.0.0: Drive SA email + cleanup export admin",
+    "note": "Task #645: banner email service account Drive (FolderPickerModal backup + DriveFileBrowser traduzioni), pulsante Pulisci export vecchi con endpoint DELETE /api/admin/drive/cleanup-exports, endpoint GET /api/admin/drive/storage-info. CURRENT_OTA_NUMBER=70.",
+    "releaseId": "c64e3f20-3c8e-482f-ad82-71e7922c223e",
+    "bundleUrl": "private/ota/ota-1.70.0-1776436709164.js",
+    "updateGroupId": "b8ceec6e-eb7c-417c-95db-5250614cbfd1",
+    "androidUpdateId": "019d9be1-b988-7d56-b281-08d0b54af88f",
+    "iosUpdateId": null,
+    "commitBase": "fc0526978f56f0b7b21ae7780fcc4c1e5cc209ce",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/b8ceec6e-eb7c-417c-95db-5250614cbfd1",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-17T14:38:32.092Z"
   }
 ]
