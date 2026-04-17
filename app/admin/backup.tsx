@@ -32,6 +32,7 @@ interface BrowseResult {
   folderName: string;
   folders: DriveFolder[];
   isSearch?: boolean;
+  saEmail?: string;
 }
 
 function formatBytes(bytes: number): string {
@@ -72,8 +73,8 @@ function FolderPickerModal({
       if (current.id) url.searchParams.set("folderId", current.id);
       const resp = await fetch(url.toString(), { credentials: "include" });
       if (!resp.ok) throw new Error("Errore Drive");
-      const raw = await resp.json() as { folderName: string; folders: DriveFolder[]; sheets?: unknown[] };
-      return { folderName: raw.folderName, folders: raw.folders };
+      const raw = await resp.json() as { folderName: string; folders: DriveFolder[]; sheets?: unknown[]; saEmail?: string };
+      return { folderName: raw.folderName, folders: raw.folders, saEmail: raw.saEmail };
     },
     enabled: visible,
   });
@@ -124,12 +125,22 @@ function FolderPickerModal({
             </TouchableOpacity>
           )}
 
+          {!current.id && data?.saEmail && (
+            <View style={fpStyles.saHint}>
+              <Text style={fpStyles.saHintTitle}>Condividi con il service account:</Text>
+              <Text style={fpStyles.saHintEmail} selectable>{data.saEmail}</Text>
+              <Text style={fpStyles.saHintSub}>Apri Google Drive → tasto destro sulla cartella → Condividi</Text>
+            </View>
+          )}
+
           {isLoading ? (
             <ActivityIndicator style={{ marginTop: 32 }} color={Colors.accent} />
           ) : error ? (
             <Text style={fpStyles.errorText}>Errore nel caricamento Drive</Text>
           ) : (data?.folders ?? []).length === 0 ? (
-            <Text style={fpStyles.emptyText}>Nessuna sottocartella</Text>
+            <Text style={fpStyles.emptyText}>
+              {current.id ? "Nessuna sottocartella" : "Nessuna cartella condivisa.\nCondividi una cartella con l'email qui sopra."}
+            </Text>
           ) : (
             <FlatList
               data={data?.folders ?? []}
@@ -437,6 +448,10 @@ const fpStyles = StyleSheet.create({
   folderName: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.text },
   emptyText: { textAlign: "center", color: Colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 14, marginTop: 32 },
   errorText: { textAlign: "center", color: Colors.error, fontFamily: "Inter_400Regular", fontSize: 14, marginTop: 32 },
+  saHint: { backgroundColor: "#1a2a3a", borderRadius: 10, padding: 12, marginBottom: 12, gap: 4 },
+  saHintTitle: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.textSecondary },
+  saHintEmail: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.accent },
+  saHintSub: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary },
 });
 
 const styles = StyleSheet.create({

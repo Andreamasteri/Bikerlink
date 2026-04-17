@@ -152,6 +152,7 @@ interface BrowseResult {
   folders: DriveFolder[];
   sheets: DriveSheet[];
   isSearch?: boolean;
+  saEmail?: string;
 }
 
 interface BreadcrumbItem {
@@ -182,6 +183,8 @@ function DriveFileBrowser({
   const [breadcrumb, setBreadcrumb] = useState<BreadcrumbItem[]>([{ id: null, name: "Drive" }]);
   const [browseData, setBrowseData] = useState<BrowseResult>({ folderName: "Drive", folders: [], sheets: [] });
   const [searchText, setSearchText] = useState("");
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<string | null>(null);
   const [refreshingCache, setRefreshingCache] = useState(false);
   const [cacheMsg, setCacheMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const cacheMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -213,11 +216,32 @@ function DriveFileBrowser({
     }
   }
 
+  async function handleCleanupExports() {
+    setCleanupLoading(true);
+    setCleanupResult(null);
+    try {
+      const url = new URL("/api/admin/drive/cleanup-exports", getApiUrl());
+      const resp = await fetch(url.toString(), { method: "DELETE", credentials: "include" });
+      const data = await resp.json();
+      if (!resp.ok) {
+        setCleanupResult(`Errore: ${data.message ?? "sconosciuto"}`);
+      } else {
+        const mb = data.freed > 0 ? ` (${(data.freed / 1024 / 1024).toFixed(1)} MB)` : "";
+        setCleanupResult(`Eliminati ${data.deleted} file${mb}`);
+      }
+    } catch {
+      setCleanupResult("Errore di rete");
+    } finally {
+      setCleanupLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (visible) {
       setCurrentFolderId(null);
       setBreadcrumb([{ id: null, name: "Drive" }]);
       setSearchText("");
+      setCleanupResult(null);
       loadFolder(null);
     }
     return () => {
@@ -319,6 +343,42 @@ function DriveFileBrowser({
             </View>
           )}
 
+          {!currentFolderId && browseData.saEmail && (
+            <View style={{ backgroundColor: "#0d1f2d", borderRadius: 10, padding: 12, marginHorizontal: 16, marginBottom: 8, gap: 6 }}>
+              <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.textSecondary }}>
+                SERVICE ACCOUNT — condividi le cartelle con:
+              </Text>
+              <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.accent }} selectable>
+                {browseData.saEmail}
+              </Text>
+              <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary }}>
+                Google Drive → tasto destro sulla cartella → Condividi
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 }}>
+                <TouchableOpacity
+                  onPress={handleCleanupExports}
+                  disabled={cleanupLoading}
+                  style={{
+                    flexDirection: "row", alignItems: "center", gap: 4,
+                    backgroundColor: "#4a1a1a", borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5,
+                  }}
+                  activeOpacity={0.7}
+                >
+                  {cleanupLoading
+                    ? <ActivityIndicator size="small" color="#eb5757" />
+                    : <MaterialCommunityIcons name="trash-can-outline" size={14} color="#eb5757" />
+                  }
+                  <Text style={{ fontSize: 12, color: "#eb5757", fontFamily: "Inter_500Medium" }}>Pulisci export vecchi</Text>
+                </TouchableOpacity>
+                {cleanupResult && (
+                  <Text style={{ fontSize: 11, color: Colors.textSecondary, fontFamily: "Inter_400Regular", flex: 1 }}>
+                    {cleanupResult}
+                  </Text>
+                )}
+              </View>
+            </View>
+          )}
+
           <View style={styles.searchRow}>
             <MaterialCommunityIcons name="magnify" size={18} color={Colors.textSecondary} style={{ marginRight: 6 }} />
             <TextInput
@@ -411,6 +471,8 @@ function DriveFileBrowser({
               <Text style={styles.emptyText}>
                 {isSearchMode
                   ? "Nessun risultato trovato"
+                  : !currentFolderId
+                  ? "Nessuna cartella condivisa.\nCondividi una cartella con l'email SA qui sopra."
                   : mode === "folder"
                   ? "Nessuna sottocartella"
                   : "Nessun foglio o cartella qui"}

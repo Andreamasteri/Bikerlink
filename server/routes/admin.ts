@@ -3405,18 +3405,41 @@ router.post("/translations/export", async (req: Request, res: Response) => {
       .join("\r\n");
 
     const drive = getDriveClient();
-    const createResp = await drive.files.create({
-      requestBody: {
-        name: spreadsheetTitle,
-        mimeType: "application/vnd.google-apps.spreadsheet",
-        ...(folderId && folderId.trim() ? { parents: [folderId.trim()] } : {}),
-      },
-      media: {
-        mimeType: "text/csv",
-        body: csvLines,
-      },
-      fields: "id,name",
-    });
+
+    if (TRANSLATIONS_STAGING.exportedFileId) {
+      try {
+        await drive.files.delete({ fileId: TRANSLATIONS_STAGING.exportedFileId, supportsAllDrives: true });
+        console.log(`[translations/export] Vecchio file Drive eliminato: ${TRANSLATIONS_STAGING.exportedFileId}`);
+      } catch (delErr: any) {
+        console.warn(`[translations/export] Impossibile eliminare vecchio file ${TRANSLATIONS_STAGING.exportedFileId}:`, delErr?.message);
+      }
+      TRANSLATIONS_STAGING.exportedFileId = null;
+    }
+
+    let createResp: Awaited<ReturnType<typeof drive.files.create>>;
+    try {
+      createResp = await drive.files.create({
+        requestBody: {
+          name: spreadsheetTitle,
+          mimeType: "application/vnd.google-apps.spreadsheet",
+          ...(folderId && folderId.trim() ? { parents: [folderId.trim()] } : {}),
+        },
+        media: {
+          mimeType: "text/csv",
+          body: csvLines,
+        },
+        fields: "id,name",
+      });
+    } catch (createErr: any) {
+      const isQuota = createErr?.errors?.some((e: any) => e.reason === "storageQuotaExceeded") ||
+        createErr?.message?.toLowerCase().includes("quota");
+      if (isQuota) {
+        return res.status(507).json({
+          message: "Quota Drive esaurita. Vai in Admin → Traduzioni → 'Pulisci file Drive' per liberare spazio.",
+        });
+      }
+      throw createErr;
+    }
 
     if (!createResp.data.id) {
       console.error("[translations/export] Drive create error: no id in response");
@@ -3509,36 +3532,70 @@ router.get("/translations/browse", async (req: Request, res: Response) => {
       });
     }
 
-    const parentClause = folderId
-      ? `'${folderId}' in parents`
-      : "'root' in parents";
-    const qFolders = `${parentClause} and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-    const qSheets = `${parentClause} and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
+    const driveListOpts = { supportsAllDrives: true, includeItemsFromAllDrives: true };
 
     let foldersFiles: { id?: string | null; name?: string | null }[] = [];
     let sheetsFiles: { id?: string | null; name?: string | null; modifiedTime?: string | null }[] = [];
-    try {
-      const [foldersResp, sheetsResp] = await Promise.all([
-        drive.files.list({ q: qFolders, fields: "files(id,name)", orderBy: "name", pageSize: 100 }),
-        drive.files.list({ q: qSheets, fields: "files(id,name,modifiedTime)", orderBy: "modifiedTime desc", pageSize: 100 }),
-      ]);
-      foldersFiles = foldersResp.data.files || [];
-      sheetsFiles = sheetsResp.data.files || [];
-    } catch (driveErr) {
-      console.error("[translations/browse] Drive error:", driveErr);
-      return res.status(502).json({ message: "Errore nel recupero del contenuto Drive" });
+
+    if (folderId) {
+      const parentClause = `'${folderId}' in parents`;
+      const qFolders = `${parentClause} and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+      const qSheets = `${parentClause} and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
+      try {
+        const [foldersResp, sheetsResp] = await Promise.all([
+          drive.files.list({ q: qFolders, fields: "files(id,name)", orderBy: "name", pageSize: 100, ...driveListOpts }),
+          drive.files.list({ q: qSheets, fields: "files(id,name,modifiedTime)", orderBy: "modifiedTime desc", pageSize: 100, ...driveListOpts }),
+        ]);
+        foldersFiles = foldersResp.data.files || [];
+        sheetsFiles = sheetsResp.data.files || [];
+      } catch (driveErr) {
+        console.error("[translations/browse] Drive error:", driveErr);
+        return res.status(502).json({ message: "Errore nel recupero del contenuto Drive" });
+      }
+    } else {
+      const qRootFolders = `'root' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+      const qRootSheets = `'root' in parents and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
+      const qSharedFolders = `sharedWithMe=true and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+      const qSharedSheets = `sharedWithMe=true and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
+      try {
+        const [rF, rS, sF, sS] = await Promise.all([
+          drive.files.list({ q: qRootFolders, fields: "files(id,name)", orderBy: "name", pageSize: 100, ...driveListOpts }),
+          drive.files.list({ q: qRootSheets, fields: "files(id,name,modifiedTime)", orderBy: "modifiedTime desc", pageSize: 100, ...driveListOpts }),
+          drive.files.list({ q: qSharedFolders, fields: "files(id,name)", orderBy: "name", pageSize: 100, ...driveListOpts }),
+          drive.files.list({ q: qSharedSheets, fields: "files(id,name,modifiedTime)", orderBy: "modifiedTime desc", pageSize: 100, ...driveListOpts }),
+        ]);
+        const seenF = new Set<string>();
+        for (const f of [...(rF.data.files || []), ...(sF.data.files || [])]) {
+          if (f.id && !seenF.has(f.id)) { seenF.add(f.id); foldersFiles.push(f); }
+        }
+        const seenS = new Set<string>();
+        for (const f of [...(rS.data.files || []), ...(sS.data.files || [])]) {
+          if (f.id && !seenS.has(f.id)) { seenS.add(f.id); sheetsFiles.push(f); }
+        }
+        foldersFiles.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+      } catch (driveErr) {
+        console.error("[translations/browse] Drive error:", driveErr);
+        return res.status(502).json({ message: "Errore nel recupero del contenuto Drive" });
+      }
     }
 
     let folderName = "Drive";
+    let saEmail: string | undefined;
     if (folderId) {
       const meta = await getDriveFolderMeta(folderId);
       if (meta) folderName = meta.name;
+    } else {
+      try {
+        const saJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+        if (saJson) saEmail = (JSON.parse(saJson) as { client_email?: string }).client_email;
+      } catch { /* ignore */ }
     }
 
     return res.json({
       folderName,
       folders: foldersFiles.map((f) => ({ id: f.id ?? "", name: f.name ?? "" })),
       sheets: sheetsFiles.map((f) => ({ id: f.id ?? "", name: f.name ?? "", modifiedTime: f.modifiedTime ?? undefined })),
+      ...(saEmail ? { saEmail } : {}),
     });
   } catch (error) {
     console.error("[translations/browse] error:", error);
@@ -4071,6 +4128,56 @@ router.patch("/settings/floating-widget", async (req: Request, res: Response) =>
   } catch (error) {
     console.error("Update floating-widget setting error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/drive/storage-info", async (_req: Request, res: Response) => {
+  try {
+    const drive = getDriveClient();
+    const about = await drive.about.get({ fields: "storageQuota" });
+    const quota = about.data?.storageQuota ?? {};
+    return res.json({
+      limit: quota.limit ? parseInt(quota.limit) : null,
+      usage: quota.usage ? parseInt(quota.usage) : null,
+      usageInDrive: quota.usageInDrive ? parseInt(quota.usageInDrive) : null,
+    });
+  } catch (error) {
+    console.error("Drive storage-info error:", error);
+    return res.status(500).json({ message: "Errore nel recupero quota Drive" });
+  }
+});
+
+router.delete("/drive/cleanup-exports", async (_req: Request, res: Response) => {
+  try {
+    const drive = getDriveClient();
+    const q = `(name contains 'BikerLink' OR name contains 'Traduzioni' OR name contains 'bikerlink') and trashed=false`;
+    const listResp = await drive.files.list({
+      q,
+      fields: "files(id,name,size)",
+      pageSize: 100,
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+    });
+    const files = listResp.data.files || [];
+    let deleted = 0;
+    let freed = 0;
+    for (const f of files) {
+      try {
+        await drive.files.delete({ fileId: f.id!, supportsAllDrives: true });
+        deleted++;
+        freed += f.size ? parseInt(f.size as unknown as string) : 0;
+        console.log(`[cleanup-exports] Eliminato: ${f.name} (${f.id})`);
+      } catch (err: any) {
+        console.warn(`[cleanup-exports] Impossibile eliminare ${f.id}:`, err?.message);
+      }
+    }
+    if (TRANSLATIONS_STAGING.exportedFileId && files.some((f) => f.id === TRANSLATIONS_STAGING.exportedFileId)) {
+      TRANSLATIONS_STAGING.exportedFileId = null;
+    }
+    return res.json({ deleted, freed, total: files.length });
+  } catch (error) {
+    console.error("Drive cleanup-exports error:", error);
+    return res.status(500).json({ message: "Errore durante la pulizia Drive" });
   }
 });
 
