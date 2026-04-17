@@ -233,6 +233,9 @@ export default function TraduzioniScreen() {
   const [showSheetPicker, setShowSheetPicker] = useState(false);
   const [selectedSheet, setSelectedSheet] = useState<DriveSheet | null>(null);
 
+  const [previewCols, setPreviewCols] = useState<string[] | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
   const [applyStatus, setApplyStatus] = useState<StepStatus>("idle");
   const [applyResult, setApplyResult] = useState("");
 
@@ -422,6 +425,42 @@ export default function TraduzioniScreen() {
     }
   }, [hasCustomImportSource, importInfo.exportedLangs]);
 
+  useEffect(() => {
+    const fileId = manualFileInput.trim()
+      ? extractFileId(manualFileInput)
+      : selectedSheet?.id ?? null;
+    if (!fileId) {
+      setPreviewCols(null);
+      return;
+    }
+    let cancelled = false;
+    setPreviewLoading(true);
+    setPreviewCols(null);
+    fetch(
+      new URL(
+        `/api/admin/translations/preview-sheet?fileId=${encodeURIComponent(fileId)}`,
+        getApiUrl()
+      ).toString(),
+      { credentials: "include" }
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.langColumns) {
+          setPreviewCols(data.langColumns as string[]);
+          const detected = (data.langColumns as string[])
+            .map((c: string) => c.toLowerCase())
+            .filter((l) => LANGS.some((lang) => lang.code === l));
+          if (detected.length > 0) setImportLangs(detected);
+        } else {
+          setPreviewCols([]);
+        }
+      })
+      .catch(() => { if (!cancelled) setPreviewCols([]); })
+      .finally(() => { if (!cancelled) setPreviewLoading(false); });
+    return () => { cancelled = true; };
+  }, [manualFileInput, selectedSheet]);
+
   function toggleImportLang(code: string) {
     if (!hasCustomImportSource && !importInfo.exportedLangs.includes(code)) return;
     setImportLangs((prev) =>
@@ -579,6 +618,27 @@ export default function TraduzioniScreen() {
             <MaterialCommunityIcons name="information-outline" size={14} color={Colors.accent} />
             <Text style={[styles.sessionFileText, { color: Colors.accent }]}>
               File ID: {extractFileId(manualFileInput)}
+            </Text>
+          </View>
+        ) : null}
+
+        {previewLoading && hasCustomImportSource ? (
+          <View style={styles.previewRow}>
+            <ActivityIndicator size="small" color={Colors.accent} />
+            <Text style={styles.previewText}>Analisi colonne…</Text>
+          </View>
+        ) : previewCols !== null && previewCols.length > 0 ? (
+          <View style={styles.previewRow}>
+            <MaterialCommunityIcons name="table-column" size={14} color="#4CAF50" />
+            <Text style={[styles.previewText, { color: "#4CAF50" }]}>
+              Colonne trovate: {previewCols.join(", ")}
+            </Text>
+          </View>
+        ) : previewCols !== null && previewCols.length === 0 && hasCustomImportSource ? (
+          <View style={styles.previewRow}>
+            <MaterialCommunityIcons name="alert-outline" size={14} color={Colors.textSecondary} />
+            <Text style={[styles.previewText, { color: Colors.textSecondary }]}>
+              Nessuna colonna lingua rilevata nel foglio
             </Text>
           </View>
         ) : null}
@@ -921,5 +981,16 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 13,
     color: Colors.textSecondary,
+  },
+  previewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 4,
+  },
+  previewText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    flex: 1,
   },
 });

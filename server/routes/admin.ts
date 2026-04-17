@@ -3474,6 +3474,42 @@ router.get("/translations/list-sheets", async (_req: Request, res: Response) => 
   }
 });
 
+router.get("/translations/preview-sheet", async (req: Request, res: Response) => {
+  try {
+    const fileId = (req.query.fileId as string | undefined)?.trim();
+    if (!fileId) {
+      return res.status(400).json({ message: "fileId richiesto" });
+    }
+
+    const { ReplitConnectors } = await import("@replit/connectors-sdk");
+    const connectors = new ReplitConnectors();
+
+    const exportResp = await connectors.proxy(
+      "google-drive",
+      `/drive/v3/files/${encodeURIComponent(fileId)}/export?mimeType=text/csv`,
+      { method: "GET" }
+    );
+
+    if (!exportResp.ok) {
+      const errText = await exportResp.text();
+      console.error("[translations/preview-sheet] Drive error:", errText);
+      return res.status(500).json({ message: "Errore nella lettura del Google Sheet" });
+    }
+
+    const csvText = await exportResp.text();
+    const firstLine = csvText.split(/\r?\n/)[0] ?? "";
+
+    // Simple split for header — headers don't contain commas/quotes in our format
+    const columns = firstLine.split(",").map((c) => c.trim().replace(/^"|"$/g, "").toUpperCase());
+    const langColumns = columns.filter((c) => ALLOWED_LANGS.has(c.toLowerCase()));
+
+    return res.json({ columns, langColumns });
+  } catch (error) {
+    console.error("[translations/preview-sheet] error:", error);
+    return res.status(500).json({ message: "Errore durante la preview del foglio" });
+  }
+});
+
 router.post("/translations/import", async (req: Request, res: Response) => {
   try {
     const { langs, fileId: customFileId } = req.body as { langs: string[]; fileId?: string };
