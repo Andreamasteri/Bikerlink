@@ -12,6 +12,7 @@ import {
   Modal,
   TextInput,
   TouchableOpacity,
+  Switch,
   type AppStateStatus,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -150,6 +151,11 @@ export default function TrackingScreen() {
 
   const [updateProfile, setUpdateProfile] = useState<UpdateProfile>("medium");
   const updateProfileRef = useRef<UpdateProfile>("medium");
+
+  const [delayedStartEnabled, setDelayedStartEnabled] = useState(false);
+  const [delayedStartSeconds, setDelayedStartSeconds] = useState("10");
+  const [countdownValue, setCountdownValue] = useState<number | "GO" | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [publishRecord, setPublishRecord] = useState<RouteRecord | null>(null);
   const [publishCaption, setPublishCaption] = useState("");
@@ -605,6 +611,30 @@ export default function TrackingScreen() {
     }
   };
 
+  const handleStartPress = useCallback(() => {
+    if (!delayedStartEnabled) {
+      startTracking();
+      return;
+    }
+    const secs = Math.max(1, parseInt(delayedStartSeconds || "10", 10) || 10);
+    setCountdownValue(secs);
+    let remaining = secs;
+    countdownIntervalRef.current = setInterval(() => {
+      remaining -= 1;
+      if (remaining > 0) {
+        setCountdownValue(remaining);
+      } else {
+        clearInterval(countdownIntervalRef.current!);
+        countdownIntervalRef.current = null;
+        setCountdownValue("GO");
+        setTimeout(() => {
+          setCountdownValue(null);
+          startTracking();
+        }, 600);
+      }
+    }, 1000);
+  }, [delayedStartEnabled, delayedStartSeconds, startTracking]);
+
   const netTime = totalTime - idleTime;
   const avgSpeed = netTime > 0 ? totalKm / (netTime / 3600) : 0;
   const batteryImpact = getBatteryImpact(trackingMode);
@@ -615,11 +645,26 @@ export default function TrackingScreen() {
       <View style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 10 }}>
         <InlineMiniPlayer />
       </View>
+
+      {countdownValue !== null && (
+        <View style={styles.countdownOverlay}>
+          <Text style={[
+            styles.countdownText,
+            countdownValue === "GO"
+              ? { color: Colors.success }
+              : typeof countdownValue === "number" && countdownValue <= 3
+              ? { color: Colors.accentRed }
+              : { color: Colors.warning },
+          ]}>
+            {countdownValue}
+          </Text>
+        </View>
+      )}
       <ScrollView
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: 56,
+            paddingTop: 20,
             paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16,
           },
         ]}
@@ -719,19 +764,49 @@ export default function TrackingScreen() {
             <View style={styles.profileWarning}>
               <Ionicons name="warning-outline" size={14} color={Colors.warning} />
               <Text style={styles.profileWarningText}>
-                Attenzione, più precisione significa maggior consumo di batteria
+                Più precisione significa maggior consumo di batteria
               </Text>
             </View>
           </View>
+
+          <View style={styles.delayedSection}>
+            <View style={styles.delayedRow}>
+              <View style={styles.delayedLeft}>
+                <Ionicons name="timer-outline" size={18} color={Colors.textSecondary} />
+                <Text style={styles.delayedLabel}>Delayed Start</Text>
+              </View>
+              <Switch
+                value={delayedStartEnabled}
+                onValueChange={setDelayedStartEnabled}
+                trackColor={{ false: Colors.border, true: Colors.accent + "80" }}
+                thumbColor={delayedStartEnabled ? Colors.accent : Colors.textSecondary}
+              />
+            </View>
+            {delayedStartEnabled && (
+              <View style={styles.delayedInputRow}>
+                <Text style={styles.delayedInputLabel}>Ritardo (secondi):</Text>
+                <TextInput
+                  style={styles.delayedInput}
+                  value={delayedStartSeconds}
+                  onChangeText={setDelayedStartSeconds}
+                  keyboardType="numeric"
+                  placeholder="10"
+                  placeholderTextColor={Colors.textSecondary}
+                  maxLength={3}
+                />
+              </View>
+            )}
+          </View>
+
           <Pressable
-            style={[styles.mainBtn, { backgroundColor: Colors.warning, alignSelf: "center" }]}
-            onPress={startTracking}
+            style={[styles.mainBtn, { backgroundColor: Colors.success, alignSelf: "center" }]}
+            onPress={handleStartPress}
             disabled={loading}
           >
             {loading ? (
               <ActivityIndicator color="#fff" size="large" />
             ) : (
-              <Ionicons name="play-circle" size={56} color="#fff" />
+              <Ionicons name="play-circle" size={67} color="#fff" />
             )}
           </Pressable>
         </>
@@ -761,7 +836,32 @@ export default function TrackingScreen() {
           </View>
         ) : (
           completedRecords.map((item: RouteRecord) => (
-            <RecordCard key={item.id} item={item} onPublish={() => { setPublishRecord(item); setPublishCaption(""); }} />
+            <RecordCard
+              key={item.id}
+              item={item}
+              onPublish={() => { setPublishRecord(item); setPublishCaption(""); }}
+              onDelete={() => {
+                Alert.alert(
+                  "Elimina record",
+                  "Vuoi eliminare questo record? L'operazione è irreversibile.",
+                  [
+                    { text: "Annulla", style: "cancel" },
+                    {
+                      text: "Elimina",
+                      style: "destructive",
+                      onPress: async () => {
+                        try {
+                          await apiRequest("DELETE", `/api/routes/${item.id}`);
+                          queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
+                        } catch {
+                          Alert.alert("Errore", "Impossibile eliminare il record.");
+                        }
+                      },
+                    },
+                  ]
+                );
+              }}
+            />
           ))
         )}
       </View>
@@ -829,7 +929,7 @@ function StatCard({ icon, color, value, label }: { icon: string; color: string; 
   );
 }
 
-function RecordCard({ item, onPublish }: { item: RouteRecord; onPublish: () => void }) {
+function RecordCard({ item, onPublish, onDelete }: { item: RouteRecord; onPublish: () => void; onDelete: () => void }) {
   const dur = item.durationSeconds || 0;
   const idle = item.idleTimeSeconds || 0;
   const net = Math.max(dur - idle, 0);
@@ -843,6 +943,9 @@ function RecordCard({ item, onPublish }: { item: RouteRecord; onPublish: () => v
         </Text>
         <TouchableOpacity onPress={onPublish} style={styles.publishIconBtn} activeOpacity={0.7}>
           <Ionicons name="share-outline" size={18} color={Colors.accent} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onDelete} style={[styles.publishIconBtn, { backgroundColor: Colors.accentRed + "15", marginLeft: 6 }]} activeOpacity={0.7}>
+          <Ionicons name="trash-outline" size={18} color={Colors.accentRed} />
         </TouchableOpacity>
       </View>
       <View style={styles.recordRow}>
@@ -927,7 +1030,7 @@ const styles = StyleSheet.create({
   controlLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#fff", marginTop: 2 },
   controlPlaceholder: { width: 80 },
   mainBtn: {
-    width: 120, height: 120, borderRadius: 60,
+    width: 144, height: 144, borderRadius: 72,
     alignItems: "center", justifyContent: "center",
     elevation: 8,
     ...Platform.select({
@@ -1100,8 +1203,72 @@ const styles = StyleSheet.create({
   },
   profileWarningText: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
     color: Colors.warning,
+  },
+  delayedSection: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  delayedRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "space-between" as const,
+  },
+  delayedLeft: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+  },
+  delayedLabel: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
+  delayedInputRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    marginTop: 12,
+    gap: 10,
+  },
+  delayedInputLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    flex: 1,
+  },
+  delayedInput: {
+    backgroundColor: Colors.background,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+    width: 80,
+    textAlign: "center" as const,
+  },
+  countdownOverlay: {
+    position: "absolute" as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    zIndex: 100,
+  },
+  countdownText: {
+    fontSize: 160,
+    fontFamily: "Inter_700Bold",
+    textAlign: "center" as const,
   },
 });

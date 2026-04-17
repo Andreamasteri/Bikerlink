@@ -193,6 +193,7 @@ export interface IStorage {
   updateRoute(id: string, data: Partial<InsertRoute>): Promise<Route | undefined>;
   getRoutePoints(routeId: string): Promise<RoutePoint[]>;
   createRoutePoints(points: InsertRoutePoint[]): Promise<RoutePoint[]>;
+  deleteRoute(id: string): Promise<void>;
 
   getPhotoContestEntries(weekNumber: number, year: number): Promise<PhotoContestEntry[]>;
   createPhotoContestEntry(entry: InsertPhotoContestEntry): Promise<PhotoContestEntry>;
@@ -751,6 +752,11 @@ export class DatabaseStorage implements IStorage {
   async createRoutePoints(data: InsertRoutePoint[]): Promise<RoutePoint[]> {
     if (data.length === 0) return [];
     return db.insert(routePoints).values(data).returning();
+  }
+
+  async deleteRoute(id: string): Promise<void> {
+    await db.delete(routePoints).where(eq(routePoints.routeId, id));
+    await db.delete(routes).where(eq(routes.id, id));
   }
 
   async getPhotoContestEntries(weekNumber: number, year: number): Promise<PhotoContestEntry[]> {
