@@ -225,6 +225,10 @@ export default function TrackingScreen() {
     if (webWatchIdRef.current !== null && Platform.OS === "web") {
       navigator.geolocation.clearWatch(webWatchIdRef.current);
     }
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
   };
 
   const flushPoints = useCallback(async () => {
@@ -612,6 +616,7 @@ export default function TrackingScreen() {
   };
 
   const handleStartPress = useCallback(() => {
+    if (countdownValue !== null) return;
     if (!delayedStartEnabled) {
       startTracking();
       return;
@@ -633,7 +638,7 @@ export default function TrackingScreen() {
         }, 600);
       }
     }, 1000);
-  }, [delayedStartEnabled, delayedStartSeconds, startTracking]);
+  }, [countdownValue, delayedStartEnabled, delayedStartSeconds, startTracking]);
 
   const netTime = totalTime - idleTime;
   const avgSpeed = netTime > 0 ? totalKm / (netTime / 3600) : 0;
