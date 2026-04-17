@@ -2746,7 +2746,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-17T09:04:58.712Z"
+  },
+  {
+    "updateNumber": 68,
+    "version": "1.68.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-68 rv7.0.0: Drive browser navigabile + ricerca foglio per nome (admin traduzioni)",
+    "note": "Task #632: browser Drive navigabile per selezione cartella export e foglio import — endpoint GET /api/admin/translations/browse, componente DriveFileBrowser con breadcrumb, pulsante Indietro, modalità folder/sheet. Task #633: campo di ricerca per nome nel browser Drive, ricerca globale fullText Drive API con debounce 400ms. CURRENT_OTA_NUMBER=68.",
+    "releaseId": "6172517e-2448-4546-8d54-81ba0b9dccdc",
+    "bundleUrl": "private/ota/ota-1.68.0-1776428237074.js",
+    "updateGroupId": "38e64bf9-ebae-47b2-9346-851c18963f81",
+    "androidUpdateId": "019d9b60-ce4c-77f6-94e7-99b1ae89655d",
+    "iosUpdateId": null,
+    "commitBase": "6dc52374a2a9a687c4caf7075cc6b0910206f363",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/38e64bf9-ebae-47b2-9346-851c18963f81",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-17T12:17:19.916Z"
   }
 ]
