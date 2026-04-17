@@ -17,6 +17,9 @@ import { SERVER_START_TIME, uptimeState } from "../uptime";
 
 const router = Router();
 
+const driveFolderNameCache = new Map<string, string>();
+const driveFolderNameInflight = new Map<string, Promise<{ name: string; parentId?: string }>>();
+
 interface OtaErrorEntry {
   error: string;
   failCount: number;
@@ -3447,26 +3450,49 @@ router.get("/translations/browse", async (req: Request, res: Response) => {
       const sheetsData = await sheetsResp.json() as { files?: { id: string; name: string; modifiedTime?: string; parents?: string[] }[] };
       const files = sheetsData.files || [];
 
+      async function fetchFolderInfo(id: string): Promise<{ name: string; parentId?: string }> {
+        if (driveFolderNameCache.has(id)) {
+          const cached = driveFolderNameCache.get(id)!;
+          const sep = cached.indexOf("\0");
+          return sep === -1
+            ? { name: cached }
+            : { name: cached.slice(0, sep), parentId: cached.slice(sep + 1) || undefined };
+        }
+        const existing = driveFolderNameInflight.get(id);
+        if (existing) return existing;
+        const promise = (async () => {
+          try {
+            const resp = await connectors.proxy(
+              "google-drive",
+              `/drive/v3/files/${encodeURIComponent(id)}?fields=name,parents`,
+              { method: "GET" }
+            );
+            if (!resp.ok) return { name: "" };
+            const data = await resp.json() as { name?: string; parents?: string[] };
+            const name = data.name || "";
+            const parentId = data.parents?.[0];
+            driveFolderNameCache.set(id, parentId ? `${name}\0${parentId}` : name);
+            return { name, parentId };
+          } catch {
+            return { name: "" };
+          } finally {
+            driveFolderNameInflight.delete(id);
+          }
+        })();
+        driveFolderNameInflight.set(id, promise);
+        return promise;
+      }
+
       async function resolveFolderPath(parentId: string | undefined): Promise<string> {
         if (!parentId) return "";
         const parts: string[] = [];
         let currentId: string | undefined = parentId;
         const MAX_DEPTH = 6;
         for (let i = 0; i < MAX_DEPTH && currentId; i++) {
-          try {
-            const resp = await connectors.proxy(
-              "google-drive",
-              `/drive/v3/files/${encodeURIComponent(currentId)}?fields=name,parents`,
-              { method: "GET" }
-            );
-            if (!resp.ok) break;
-            const data = await resp.json() as { name?: string; parents?: string[] };
-            if (!data.name) break;
-            parts.unshift(data.name);
-            currentId = data.parents?.[0];
-          } catch {
-            break;
-          }
+          const { name, parentId: nextId } = await fetchFolderInfo(currentId);
+          if (!name) break;
+          parts.unshift(name);
+          currentId = nextId;
         }
         return parts.join(" / ");
       }
