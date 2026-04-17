@@ -78,6 +78,9 @@ export async function getDriveFolder(): Promise<DriveFolder | null> {
 
 export async function setDriveFolder(folder: DriveFolder | null): Promise<void> {
   await upsertJsonSetting("backup.drive_folder", folder, "Cartella Drive destinazione backup");
+  if (!folder) {
+    stopScheduler();
+  }
 }
 
 export interface BackupFrequency {
@@ -154,6 +157,12 @@ async function isAutoBackupEnabled(): Promise<boolean> {
 }
 
 export async function setAutoBackupEnabled(enabled: boolean) {
+  if (enabled) {
+    const folder = await getDriveFolder();
+    if (!folder?.folderId) {
+      throw new Error("Configura prima una cartella Google Drive per abilitare il backup automatico");
+    }
+  }
   await upsertSetting("backup_auto_enabled", enabled ? "true" : "false", "Backup automatico (Google Drive)");
   if (enabled) {
     await startScheduler();
@@ -162,11 +171,10 @@ export async function setAutoBackupEnabled(enabled: boolean) {
   }
 }
 
-async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string): Promise<string | null> {
+async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string): Promise<string> {
   const folder = await getDriveFolder();
   if (!folder?.folderId) {
-    console.warn("[backup-service] Nessuna cartella Drive configurata — backup su Drive saltato");
-    return null;
+    throw new Error("Nessuna cartella Google Drive configurata. Configurala prima di eseguire il backup.");
   }
   const drive = getDriveClient();
   const readable = new Readable();
@@ -180,7 +188,8 @@ async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string)
     media: { mimeType, body: readable },
     fields: "id",
   });
-  return resp.data.id ?? null;
+  if (!resp.data.id) throw new Error("Upload su Drive completato ma senza fileId nella risposta");
+  return resp.data.id;
 }
 
 export async function backupDatabase(): Promise<{ path: string; name: string; size: number }> {
@@ -209,11 +218,11 @@ export async function backupDatabase(): Promise<{ path: string; name: string; si
     const fileName = `bikerlink_db_${ts}.sql.gz`;
 
     const fileId = await uploadToDrive(buf, fileName, "application/gzip");
-    const meta: LastBackupMeta = { timestamp: new Date().toISOString(), size: buf.length, fileId: fileId ?? undefined };
+    const meta: LastBackupMeta = { timestamp: new Date().toISOString(), size: buf.length, fileId };
     await saveLastBackup("db", meta);
 
-    console.log(`[backup-service] DB backup su Drive: ${fileName} (${buf.length} bytes)${fileId ? ` → ${fileId}` : " [Drive skip]"}`);
-    return { path: fileId ?? fileName, name: fileName, size: buf.length };
+    console.log(`[backup-service] DB backup su Drive: ${fileName} (${buf.length} bytes) → ${fileId}`);
+    return { path: fileId, name: fileName, size: buf.length };
   } finally {
     isBackingUp = false;
     try { fs.unlinkSync(tmpSql); } catch {}
@@ -250,11 +259,11 @@ export async function backupMedia(): Promise<{ path: string; name: string; size:
     const fileName = `bikerlink_media_${ts}.zip`;
 
     const fileId = await uploadToDrive(zipBuffer, fileName, "application/zip");
-    const meta: LastBackupMeta = { timestamp: new Date().toISOString(), size: zipBuffer.length, fileId: fileId ?? undefined };
+    const meta: LastBackupMeta = { timestamp: new Date().toISOString(), size: zipBuffer.length, fileId };
     await saveLastBackup("media", meta);
 
-    console.log(`[backup-service] Media backup su Drive: ${fileName} (${zipBuffer.length} bytes)${fileId ? ` → ${fileId}` : " [Drive skip]"}`);
-    return { path: fileId ?? fileName, name: fileName, size: zipBuffer.length };
+    console.log(`[backup-service] Media backup su Drive: ${fileName} (${zipBuffer.length} bytes) → ${fileId}`);
+    return { path: fileId, name: fileName, size: zipBuffer.length };
   } finally {
     isBackingUp = false;
     try { fs.unlinkSync(tmpZip); } catch {}
@@ -265,6 +274,11 @@ async function startDbScheduler() {
   stopDbScheduler();
   const enabled = await isAutoBackupEnabled();
   if (!enabled) return;
+  const folder = await getDriveFolder();
+  if (!folder?.folderId) {
+    console.log("[backup-service] DB scheduler: cartella Drive non configurata, scheduler non avviato");
+    return;
+  }
   const { dbHours } = await getBackupFrequency();
   const intervalMs = dbHours * 60 * 60 * 1000;
   dbNextAt = addMs(intervalMs);
@@ -288,6 +302,11 @@ async function startMediaScheduler() {
   stopMediaScheduler();
   const enabled = await isAutoBackupEnabled();
   if (!enabled) return;
+  const folder = await getDriveFolder();
+  if (!folder?.folderId) {
+    console.log("[backup-service] Media scheduler: cartella Drive non configurata, scheduler non avviato");
+    return;
+  }
   const { mediaHours } = await getBackupFrequency();
   const intervalMs = mediaHours * 60 * 60 * 1000;
   mediaNextAt = addMs(intervalMs);
