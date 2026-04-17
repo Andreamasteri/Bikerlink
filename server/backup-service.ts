@@ -16,6 +16,10 @@ const execAsync = promisify(exec);
 const DEFAULT_DB_HOURS = 24;
 const DEFAULT_MEDIA_HOURS = 168;
 
+export const DRIVE_FOLDER_TRADUZIONI_ID = "1Jp5v-Ds5EZmMeBwQMenUO_0wFEDRF-Cs";
+export const DRIVE_FOLDER_DB_ID = "1tPAYmQSRqLQOxeu4yqPhi6XxaTj-UPnl";
+export const DRIVE_FOLDER_MEDIA_ID = "1qI_KDsqipaN7FRGmHeD0HF-m1Crk21Iy";
+
 let dbSchedulerTimer: NodeJS.Timeout | null = null;
 let mediaSchedulerTimer: NodeJS.Timeout | null = null;
 let dbNextAt: Date | null = null;
@@ -73,19 +77,10 @@ export interface DriveFolder {
 }
 
 export async function getDriveFolder(): Promise<DriveFolder | null> {
-  return readJsonSetting<DriveFolder>("backup.drive_folder");
+  return { folderId: DRIVE_FOLDER_DB_ID, folderName: "Backup DB" };
 }
 
-export async function setDriveFolder(folder: DriveFolder | null): Promise<void> {
-  await upsertJsonSetting("backup.drive_folder", folder, "Cartella Drive destinazione backup");
-  if (!folder) {
-    stopScheduler();
-  } else {
-    const enabled = await isAutoBackupEnabled();
-    if (enabled) {
-      await startScheduler();
-    }
-  }
+export async function setDriveFolder(_folder: DriveFolder | null): Promise<void> {
 }
 
 export interface BackupFrequency {
@@ -133,10 +128,9 @@ async function saveLastBackup(type: "db" | "media", meta: LastBackupMeta) {
 }
 
 export async function getBackupStatus() {
-  const [lastDb, lastMedia, folder, freq, autoEnabled] = await Promise.all([
+  const [lastDb, lastMedia, freq, autoEnabled] = await Promise.all([
     readJsonSetting<LastBackupMeta>("backup.last_db"),
     readJsonSetting<LastBackupMeta>("backup.last_media"),
-    getDriveFolder(),
     getBackupFrequency(),
     isAutoBackupEnabled(),
   ]);
@@ -148,10 +142,10 @@ export async function getBackupStatus() {
     isBackingUp,
     nextScheduled: dbNextAt?.toISOString() ?? null,
     nextMediaScheduled: mediaNextAt?.toISOString() ?? null,
-    driveFolder: folder,
+    driveFolder: { folderId: DRIVE_FOLDER_DB_ID, folderName: "Backup DB" },
     dbHours: freq.dbHours,
     mediaHours: freq.mediaHours,
-    configured: !!folder,
+    configured: true,
   };
 }
 
@@ -164,12 +158,6 @@ async function isAutoBackupEnabled(): Promise<boolean> {
 }
 
 export async function setAutoBackupEnabled(enabled: boolean) {
-  if (enabled) {
-    const folder = await getDriveFolder();
-    if (!folder?.folderId) {
-      throw new Error("Configura prima una cartella Google Drive per abilitare il backup automatico");
-    }
-  }
   await upsertSetting("backup_auto_enabled", enabled ? "true" : "false", "Backup automatico (Google Drive)");
   if (enabled) {
     await startScheduler();
@@ -178,11 +166,7 @@ export async function setAutoBackupEnabled(enabled: boolean) {
   }
 }
 
-async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string): Promise<string> {
-  const folder = await getDriveFolder();
-  if (!folder?.folderId) {
-    throw new Error("Nessuna cartella Google Drive configurata. Configurala prima di eseguire il backup.");
-  }
+async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string, folderId: string): Promise<string> {
   const drive = getDriveClient();
   const readable = new Readable();
   readable.push(buffer);
@@ -190,7 +174,7 @@ async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string)
   const resp = await drive.files.create({
     requestBody: {
       name: fileName,
-      parents: [folder.folderId],
+      parents: [folderId],
     },
     media: { mimeType, body: readable },
     fields: "id",
@@ -224,7 +208,7 @@ export async function backupDatabase(): Promise<{ path: string; name: string; si
     const buf = fs.readFileSync(tmpGz);
     const fileName = `bikerlink_db_${ts}.sql.gz`;
 
-    const fileId = await uploadToDrive(buf, fileName, "application/gzip");
+    const fileId = await uploadToDrive(buf, fileName, "application/gzip", DRIVE_FOLDER_DB_ID);
     const meta: LastBackupMeta = { timestamp: new Date().toISOString(), size: buf.length, fileId };
     await saveLastBackup("db", meta);
 
@@ -265,7 +249,7 @@ export async function backupMedia(): Promise<{ path: string; name: string; size:
 
     const fileName = `bikerlink_media_${ts}.zip`;
 
-    const fileId = await uploadToDrive(zipBuffer, fileName, "application/zip");
+    const fileId = await uploadToDrive(zipBuffer, fileName, "application/zip", DRIVE_FOLDER_MEDIA_ID);
     const meta: LastBackupMeta = { timestamp: new Date().toISOString(), size: zipBuffer.length, fileId };
     await saveLastBackup("media", meta);
 
@@ -281,11 +265,6 @@ async function startDbScheduler() {
   stopDbScheduler();
   const enabled = await isAutoBackupEnabled();
   if (!enabled) return;
-  const folder = await getDriveFolder();
-  if (!folder?.folderId) {
-    console.log("[backup-service] DB scheduler: cartella Drive non configurata, scheduler non avviato");
-    return;
-  }
   const { dbHours } = await getBackupFrequency();
   const intervalMs = dbHours * 60 * 60 * 1000;
   dbNextAt = addMs(intervalMs);
@@ -309,11 +288,6 @@ async function startMediaScheduler() {
   stopMediaScheduler();
   const enabled = await isAutoBackupEnabled();
   if (!enabled) return;
-  const folder = await getDriveFolder();
-  if (!folder?.folderId) {
-    console.log("[backup-service] Media scheduler: cartella Drive non configurata, scheduler non avviato");
-    return;
-  }
   const { mediaHours } = await getBackupFrequency();
   const intervalMs = mediaHours * 60 * 60 * 1000;
   mediaNextAt = addMs(intervalMs);

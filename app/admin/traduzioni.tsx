@@ -18,7 +18,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 
-const STORAGE_KEY_FOLDER = "@admin_last_export_folder";
 const STORAGE_KEY_SHEET = "@admin_last_import_sheet";
 
 type StepStatus = "idle" | "loading" | "success" | "error";
@@ -552,8 +551,6 @@ export default function TraduzioniScreen() {
   const [exportResult, setExportResult] = useState("");
   const [exportedFileUrl, setExportedFileUrl] = useState<string | null>(null);
 
-  const [showFolderBrowser, setShowFolderBrowser] = useState(false);
-  const [selectedFolder, setSelectedFolder] = useState<DriveFolder | null>(null);
   const sheetFetchSeq = useRef(0);
 
   const [importInfo, setImportInfo] = useState<{ exportedLangs: string[] }>({ exportedLangs: [] });
@@ -582,8 +579,6 @@ export default function TraduzioniScreen() {
   async function loadPrefs() {
     type PrefsResponse = {
       hasRecord: boolean;
-      folderId: string | null;
-      folderName: string | null;
       sheet: DriveSheet | null;
     };
     let serverData: PrefsResponse | null = null;
@@ -594,23 +589,6 @@ export default function TraduzioniScreen() {
     } catch {}
 
     const serverHasRecord = serverData?.hasRecord === true;
-
-    if (serverHasRecord) {
-      const folder: DriveFolder | null = serverData!.folderId
-        ? { id: serverData!.folderId!, name: serverData!.folderName ?? "" }
-        : null;
-      setSelectedFolder(folder);
-      try {
-        if (folder) await AsyncStorage.setItem(STORAGE_KEY_FOLDER, JSON.stringify(folder));
-        else await AsyncStorage.removeItem(STORAGE_KEY_FOLDER);
-      } catch {}
-    } else {
-      try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY_FOLDER);
-        if (raw) setSelectedFolder(JSON.parse(raw));
-      } catch {}
-    }
-
     const sheet = serverHasRecord ? (serverData!.sheet ?? null) : null;
     if (serverHasRecord) {
       setSelectedSheet(sheet);
@@ -655,24 +633,6 @@ export default function TraduzioniScreen() {
         }
       } catch {}
     }
-  }
-
-  async function saveFolder(folder: DriveFolder | null) {
-    try {
-      if (folder) {
-        await AsyncStorage.setItem(STORAGE_KEY_FOLDER, JSON.stringify(folder));
-      } else {
-        await AsyncStorage.removeItem(STORAGE_KEY_FOLDER);
-      }
-    } catch {}
-    try {
-      const url = new URL("/api/admin/translations/prefs", getApiUrl());
-      fetch(url.toString(), {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ folder }),
-      }).catch(() => {});
-    } catch {}
   }
 
   async function saveSheet(sheet: DriveSheet | null) {
@@ -727,10 +687,6 @@ export default function TraduzioniScreen() {
     } catch {}
   }
 
-  function openFolderBrowser() {
-    setShowFolderBrowser(true);
-  }
-
   function openSheetBrowser() {
     setShowSheetBrowser(true);
   }
@@ -766,9 +722,7 @@ export default function TraduzioniScreen() {
     setExportResult("");
     setExportedFileUrl(null);
     try {
-      const body: Record<string, unknown> = { langs: exportLangs };
-      if (selectedFolder) body.folderId = selectedFolder.id;
-      const resp = await apiRequest("POST", "/api/admin/translations/export", body);
+      const resp = await apiRequest("POST", "/api/admin/translations/export", { langs: exportLangs });
       const data = await resp.json();
       setExportStatus("success");
       setExportResult(data.message || "Sheet creato con successo");
@@ -952,24 +906,10 @@ export default function TraduzioniScreen() {
         </View>
 
         <View style={styles.sectionDivider} />
-        <Text style={styles.langPickerLabel}>Cartella di destinazione:</Text>
-        <TouchableOpacity style={styles.pickerButton} onPress={openFolderBrowser} activeOpacity={0.7}>
+        <View style={styles.pickerButton}>
           <MaterialCommunityIcons name="folder-outline" size={18} color={Colors.accent} />
-          <Text style={styles.pickerButtonText} numberOfLines={1}>
-            {selectedFolder ? selectedFolder.name : "Root / Drive principale"}
-          </Text>
-          <MaterialCommunityIcons name="chevron-down" size={18} color={Colors.textSecondary} />
-        </TouchableOpacity>
-        {selectedFolder ? (
-          <TouchableOpacity
-            onPress={() => { setSelectedFolder(null); saveFolder(null); }}
-            style={styles.clearButton}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons name="close-circle-outline" size={14} color={Colors.textSecondary} />
-            <Text style={styles.clearButtonText}>Usa Root</Text>
-          </TouchableOpacity>
-        ) : null}
+          <Text style={styles.pickerButtonText} numberOfLines={1}>Cartella: Traduzioni BikerLink</Text>
+        </View>
 
         {exportedFileUrl ? (
           <TouchableOpacity
@@ -1118,22 +1058,6 @@ export default function TraduzioniScreen() {
           </View>
         </View>
       ) : null}
-
-      <DriveFileBrowser
-        visible={showFolderBrowser}
-        mode="folder"
-        title="Scegli cartella di destinazione"
-        onSelectFolder={(f) => {
-          if (f.id === "root") {
-            setSelectedFolder(null);
-            saveFolder(null);
-          } else {
-            setSelectedFolder(f);
-            saveFolder(f);
-          }
-        }}
-        onClose={() => setShowFolderBrowser(false)}
-      />
 
       <DriveFileBrowser
         visible={showSheetBrowser}

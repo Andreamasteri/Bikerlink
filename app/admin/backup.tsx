@@ -1,18 +1,13 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, Modal, TextInput, Platform, Switch, FlatList,
+  ActivityIndicator, TextInput, Platform, Switch,
 } from "react-native";
-import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { getApiUrl, queryClient, apiRequest } from "@/lib/query-client";
-
-interface DriveFolder {
-  id: string;
-  name: string;
-}
 
 interface BackupStatus {
   scheduled: boolean;
@@ -26,13 +21,6 @@ interface BackupStatus {
   dbHours: number;
   mediaHours: number;
   configured: boolean;
-}
-
-interface BrowseResult {
-  folderName: string;
-  folders: DriveFolder[];
-  isSearch?: boolean;
-  saEmail?: string;
 }
 
 function formatBytes(bytes: number): string {
@@ -54,116 +42,8 @@ function formatDate(iso: string): string {
   }
 }
 
-function FolderPickerModal({
-  visible,
-  onClose,
-  onSelect,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  onSelect: (folder: DriveFolder) => void;
-}) {
-  const [folderStack, setFolderStack] = useState<{ id: string | null; name: string }[]>([{ id: null, name: "Drive" }]);
-  const current = folderStack[folderStack.length - 1];
-
-  const { data, isLoading, error } = useQuery<BrowseResult>({
-    queryKey: ["/api/admin/translations/browse-folders", current.id],
-    queryFn: async () => {
-      const url = new URL("/api/admin/translations/browse", getApiUrl());
-      if (current.id) url.searchParams.set("folderId", current.id);
-      const resp = await fetch(url.toString(), { credentials: "include" });
-      if (!resp.ok) throw new Error("Errore Drive");
-      const raw = await resp.json() as { folderName: string; folders: DriveFolder[]; sheets?: unknown[]; saEmail?: string };
-      return { folderName: raw.folderName, folders: raw.folders, saEmail: raw.saEmail };
-    },
-    enabled: visible,
-  });
-
-  function navigateInto(folder: DriveFolder) {
-    setFolderStack((s) => [...s, { id: folder.id, name: folder.name }]);
-  }
-
-  function navigateBack() {
-    setFolderStack((s) => s.length > 1 ? s.slice(0, -1) : s);
-  }
-
-  function handleClose() {
-    setFolderStack([{ id: null, name: "Drive" }]);
-    onClose();
-  }
-
-  function handleSelect(folder: DriveFolder) {
-    setFolderStack([{ id: null, name: "Drive" }]);
-    onSelect(folder);
-  }
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-      <View style={fpStyles.overlay}>
-        <View style={fpStyles.sheet}>
-          <View style={fpStyles.header}>
-            {folderStack.length > 1 ? (
-              <TouchableOpacity onPress={navigateBack} style={fpStyles.backBtn}>
-                <Ionicons name="chevron-back" size={20} color={Colors.text} />
-              </TouchableOpacity>
-            ) : (
-              <View style={{ width: 36 }} />
-            )}
-            <Text style={fpStyles.title} numberOfLines={1}>{current.id ? current.name : "Scegli cartella Drive"}</Text>
-            <TouchableOpacity onPress={handleClose} style={fpStyles.closeBtn}>
-              <Ionicons name="close" size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          {current.id && (
-            <TouchableOpacity
-              style={fpStyles.selectCurrentBtn}
-              onPress={() => handleSelect({ id: current.id!, name: current.name })}
-            >
-              <MaterialCommunityIcons name="folder-check" size={16} color="#fff" />
-              <Text style={fpStyles.selectCurrentText}>Seleziona "{current.name}"</Text>
-            </TouchableOpacity>
-          )}
-
-          {!current.id && data?.saEmail && (
-            <View style={fpStyles.saHint}>
-              <Text style={fpStyles.saHintTitle}>Condividi con il service account:</Text>
-              <Text style={fpStyles.saHintEmail} selectable>{data.saEmail}</Text>
-              <Text style={fpStyles.saHintSub}>Apri Google Drive → tasto destro sulla cartella → Condividi</Text>
-            </View>
-          )}
-
-          {isLoading ? (
-            <ActivityIndicator style={{ marginTop: 32 }} color={Colors.accent} />
-          ) : error ? (
-            <Text style={fpStyles.errorText}>Errore nel caricamento Drive</Text>
-          ) : (data?.folders ?? []).length === 0 ? (
-            <Text style={fpStyles.emptyText}>
-              {current.id ? "Nessuna sottocartella" : "Nessuna cartella condivisa.\nCondividi una cartella con l'email qui sopra."}
-            </Text>
-          ) : (
-            <FlatList
-              data={data?.folders ?? []}
-              keyExtractor={(f) => f.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity style={fpStyles.folderRow} onPress={() => navigateInto(item)}>
-                  <MaterialCommunityIcons name="folder" size={20} color={Colors.accent} />
-                  <Text style={fpStyles.folderName} numberOfLines={1}>{item.name}</Text>
-                  <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
-                </TouchableOpacity>
-              )}
-              style={{ maxHeight: 350 }}
-            />
-          )}
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 export default function BackupScreen() {
   const insets = useSafeAreaInsets();
-  const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [dbHoursInput, setDbHoursInput] = useState("");
   const [mediaHoursInput, setMediaHoursInput] = useState("");
   const [freqEditing, setFreqEditing] = useState(false);
@@ -218,25 +98,6 @@ export default function BackupScreen() {
     },
   });
 
-  const folderMutation = useMutation({
-    mutationFn: async (folder: DriveFolder | null) => {
-      const url = new URL("/api/admin/backup/drive-folder", getApiUrl()).toString();
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(folder ? { folderId: folder.id, folderName: folder.name } : {}),
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Errore");
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/backup/status"] });
-      refetchStatus();
-    },
-  });
-
   const freqMutation = useMutation({
     mutationFn: async ({ dbHours, mediaHours }: { dbHours: number; mediaHours: number }) => {
       const url = new URL("/api/admin/backup/frequency", getApiUrl()).toString();
@@ -256,11 +117,6 @@ export default function BackupScreen() {
       refetchStatus();
     },
   });
-
-  const handleFolderSelect = useCallback((folder: DriveFolder) => {
-    setShowFolderPicker(false);
-    folderMutation.mutate(folder);
-  }, []);
 
   function saveFrequency() {
     const dbH = parseInt(dbHoursInput, 10);
@@ -282,26 +138,16 @@ export default function BackupScreen() {
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
           <MaterialCommunityIcons name="google-drive" size={22} color={Colors.accent} />
-          <Text style={styles.cardTitle}>Cartella Drive</Text>
-          {folderMutation.isPending && <ActivityIndicator size="small" color={Colors.accent} />}
+          <Text style={styles.cardTitle}>Cartelle Drive</Text>
         </View>
-        {status?.driveFolder ? (
-          <View style={styles.folderRow}>
-            <MaterialCommunityIcons name="folder" size={18} color={Colors.accent} />
-            <Text style={styles.folderName} numberOfLines={1}>{status.driveFolder.folderName}</Text>
-            <TouchableOpacity onPress={() => setShowFolderPicker(true)} style={styles.changeFolderBtn}>
-              <Text style={styles.changeFolderText}>Cambia</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity style={styles.pickFolderBtn} onPress={() => setShowFolderPicker(true)}>
-            <MaterialCommunityIcons name="folder-plus" size={18} color="#fff" />
-            <Text style={styles.pickFolderText}>Scegli cartella</Text>
-          </TouchableOpacity>
-        )}
-        {!status?.driveFolder && (
-          <Text style={styles.hintText}>Scegli una cartella Drive per abilitare i backup automatici</Text>
-        )}
+        <View style={styles.folderRow}>
+          <MaterialCommunityIcons name="folder" size={18} color={Colors.accent} />
+          <Text style={styles.folderName} numberOfLines={1}>DB → Backup DB BikerLink</Text>
+        </View>
+        <View style={styles.folderRow}>
+          <MaterialCommunityIcons name="folder" size={18} color={Colors.accent} />
+          <Text style={styles.folderName} numberOfLines={1}>Media → Backup Media BikerLink</Text>
+        </View>
       </View>
 
       <View style={styles.card}>
@@ -311,7 +157,7 @@ export default function BackupScreen() {
           <Switch
             value={!!status?.scheduled}
             onValueChange={(v) => scheduleMutation.mutate(v)}
-            disabled={scheduleMutation.isPending || !status?.driveFolder}
+            disabled={scheduleMutation.isPending}
             trackColor={{ false: Colors.border, true: Colors.accent }}
             thumbColor="#fff"
           />
@@ -420,39 +266,9 @@ export default function BackupScreen() {
         </View>
       )}
 
-      <FolderPickerModal
-        visible={showFolderPicker}
-        onClose={() => setShowFolderPicker(false)}
-        onSelect={handleFolderSelect}
-      />
     </ScrollView>
   );
 }
-
-const fpStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: Colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, minHeight: 300 },
-  header: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
-  backBtn: { padding: 8 },
-  closeBtn: { padding: 8 },
-  title: { flex: 1, fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.text, textAlign: "center" },
-  selectCurrentBtn: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: Colors.accent, borderRadius: 10, padding: 10, marginBottom: 12,
-  },
-  selectCurrentText: { color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14, flex: 1 },
-  folderRow: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  folderName: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.text },
-  emptyText: { textAlign: "center", color: Colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 14, marginTop: 32 },
-  errorText: { textAlign: "center", color: Colors.error, fontFamily: "Inter_400Regular", fontSize: 14, marginTop: 32 },
-  saHint: { backgroundColor: "#1a2a3a", borderRadius: 10, padding: 12, marginBottom: 12, gap: 4 },
-  saHintTitle: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.textSecondary },
-  saHintEmail: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.accent },
-  saHintSub: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary },
-});
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },

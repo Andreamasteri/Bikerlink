@@ -15,6 +15,7 @@ import { getLastMatchingCycleMeta, runBikerBikerMatching, runWishlistMatching, r
 import { isProtectedUser } from "../constants";
 import { SERVER_START_TIME, uptimeState } from "../uptime";
 import { getDriveClient } from "../lib/drive-client";
+import { DRIVE_FOLDER_TRADUZIONI_ID } from "../backup-service";
 
 const router = Router();
 
@@ -2864,31 +2865,12 @@ router.put("/backup/schedule", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/backup/drive-folder", async (_req: Request, res: Response) => {
-  try {
-    const { getDriveFolder } = await import("../backup-service");
-    const folder = await getDriveFolder();
-    return res.json({ folder: folder ?? null });
-  } catch (error) {
-    console.error("Admin backup drive-folder GET error:", error);
-    return res.status(500).json({ message: "Errore nel recupero della cartella Drive" });
-  }
+router.get("/backup/drive-folder", (_req: Request, res: Response) => {
+  return res.json({ folder: null });
 });
 
-router.post("/backup/drive-folder", async (req: Request, res: Response) => {
-  try {
-    const { folderId, folderName } = req.body as { folderId?: string; folderName?: string };
-    const { setDriveFolder } = await import("../backup-service");
-    if (!folderId) {
-      await setDriveFolder(null);
-    } else {
-      await setDriveFolder({ folderId, folderName: folderName ?? "" });
-    }
-    return res.json({ ok: true });
-  } catch (error) {
-    console.error("Admin backup drive-folder POST error:", error);
-    return res.status(500).json({ message: "Errore nel salvataggio della cartella Drive" });
-  }
+router.post("/backup/drive-folder", (_req: Request, res: Response) => {
+  return res.json({ ok: true });
 });
 
 router.get("/backup/frequency", async (_req: Request, res: Response) => {
@@ -3368,7 +3350,7 @@ router.post("/translations/prepare", async (_req: Request, res: Response) => {
 
 router.post("/translations/export", async (req: Request, res: Response) => {
   try {
-    const { langs, folderId } = req.body as { langs: string[]; folderId?: string };
+    const { langs } = req.body as { langs: string[] };
     if (!langs || !Array.isArray(langs) || langs.length === 0) {
       return res.status(400).json({ message: "Seleziona almeno una lingua" });
     }
@@ -3422,7 +3404,7 @@ router.post("/translations/export", async (req: Request, res: Response) => {
         requestBody: {
           name: spreadsheetTitle,
           mimeType: "application/vnd.google-apps.spreadsheet",
-          ...(folderId && folderId.trim() ? { parents: [folderId.trim()] } : {}),
+          parents: [DRIVE_FOLDER_TRADUZIONI_ID],
         },
         media: {
           mimeType: "text/csv",
@@ -3654,11 +3636,9 @@ router.get("/translations/prefs", async (_req: Request, res: Response) => {
   try {
     const rows = await db.select().from(appSettings).where(eq(appSettings.key, TRANSLATIONS_PREFS_KEY));
     if (rows.length === 0 || !rows[0].valueJson) return res.json({ hasRecord: false });
-    const stored = rows[0].valueJson as { folder?: { id: string; name: string } | null; sheet?: { id: string; name: string; folderPath?: string } | null };
+    const stored = rows[0].valueJson as { sheet?: { id: string; name: string; folderPath?: string } | null };
     return res.json({
       hasRecord: true,
-      folderId: stored.folder?.id ?? null,
-      folderName: stored.folder?.name ?? null,
       sheet: stored.sheet ?? null,
     });
   } catch (error) {
@@ -3669,19 +3649,15 @@ router.get("/translations/prefs", async (_req: Request, res: Response) => {
 
 router.post("/translations/prefs", async (req: Request, res: Response) => {
   try {
-    const { folder, sheet } = req.body as {
-      folder?: { id: string; name: string } | null;
+    const { sheet } = req.body as {
       sheet?: { id: string; name: string; folderPath?: string } | null;
     };
+    if (sheet === undefined) return res.json({ ok: true });
     const existing = await db.select().from(appSettings).where(eq(appSettings.key, TRANSLATIONS_PREFS_KEY));
     const current = (existing.length > 0 && existing[0].valueJson ? existing[0].valueJson : {}) as Record<string, unknown>;
-    const updated = {
-      ...current,
-      ...(folder !== undefined ? { folder } : {}),
-      ...(sheet !== undefined ? { sheet } : {}),
-    };
+    const updated = { ...current, sheet };
     await db.insert(appSettings)
-      .values({ key: TRANSLATIONS_PREFS_KEY, valueJson: updated, description: "Preferenze admin traduzioni (cartella export + foglio import)" })
+      .values({ key: TRANSLATIONS_PREFS_KEY, valueJson: updated, description: "Preferenze admin traduzioni (foglio import)" })
       .onConflictDoUpdate({ target: appSettings.key, set: { valueJson: updated, updatedAt: new Date() } });
     return res.json({ ok: true });
   } catch (error) {
