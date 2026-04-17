@@ -1414,7 +1414,7 @@ export default function AdminSettings() {
 
       <View style={[styles.sectionHeaderRow, { marginTop: 0 }]}>
         <Ionicons name="color-palette" size={20} color={Colors.accent} />
-        <Text style={styles.sectionTitle}>Tema Brand</Text>
+        <Text style={styles.sectionTitle}>Colori App</Text>
       </View>
 
       <View style={themeStyles.switchRow}>
@@ -1469,6 +1469,40 @@ export default function AdminSettings() {
           </View>
         </>
       )}
+
+      {!themeUserSwitching && (
+        <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: 16, marginHorizontal: 4 }} />
+      )}
+      <Text style={[themeStyles.defaultLabel, { marginBottom: 8 }]}>Il tuo tema (questo dispositivo):</Text>
+      <View style={brandThemeStyles.grid}>
+        {(Object.keys(THEMES) as ThemeName[]).map((key) => {
+          const theme = THEMES[key];
+          const isSelected = currentTheme === key;
+          return (
+            <TouchableOpacity
+              key={key}
+              style={[brandThemeStyles.card, isSelected && brandThemeStyles.cardSelected]}
+              onPress={() => setTheme(key)}
+              activeOpacity={0.75}
+            >
+              <View style={[brandThemeStyles.swatch, { backgroundColor: theme.background }]}>
+                <View style={[brandThemeStyles.swatchAccent, { backgroundColor: theme.accent }]} />
+                <View style={[brandThemeStyles.swatchSurface, { backgroundColor: theme.surface }]} />
+                <View style={[brandThemeStyles.swatchText, { backgroundColor: theme.text + "33" }]} />
+              </View>
+              <View style={brandThemeStyles.cardBody}>
+                <Text style={[brandThemeStyles.cardLabel, isSelected && { color: Colors.accent }]}>
+                  {THEME_META[key].label}
+                </Text>
+                <Text style={brandThemeStyles.cardDesc}>{THEME_META[key].description}</Text>
+              </View>
+              {isSelected && (
+                <Ionicons name="checkmark-circle" size={20} color={Colors.accent} style={{ marginLeft: "auto" }} />
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       <View style={styles.sectionHeaderRow}>
         <Ionicons name="apps" size={20} color={Colors.accent} />
@@ -2740,46 +2774,6 @@ export default function AdminSettings() {
             </View>
           </View>
         )}
-      </View>
-
-      <View style={styles.sectionHeaderRow}>
-        <Ionicons name="color-palette" size={20} color={Colors.accent} />
-        <Text style={styles.sectionTitle}>Brand Theme</Text>
-      </View>
-
-      <View style={brandThemeStyles.container}>
-        <Text style={brandThemeStyles.subtitle}>
-          Seleziona lo stile visivo dell&apos;app. Il tema viene salvato localmente su questo dispositivo.
-        </Text>
-        <View style={brandThemeStyles.grid}>
-          {(Object.keys(THEMES) as ThemeName[]).map((key) => {
-            const theme = THEMES[key];
-            const isSelected = currentTheme === key;
-            return (
-              <TouchableOpacity
-                key={key}
-                style={[brandThemeStyles.card, isSelected && brandThemeStyles.cardSelected]}
-                onPress={() => setTheme(key)}
-                activeOpacity={0.75}
-              >
-                <View style={[brandThemeStyles.swatch, { backgroundColor: theme.background }]}>
-                  <View style={[brandThemeStyles.swatchAccent, { backgroundColor: theme.accent }]} />
-                  <View style={[brandThemeStyles.swatchSurface, { backgroundColor: theme.surface }]} />
-                  <View style={[brandThemeStyles.swatchText, { backgroundColor: theme.text + "33" }]} />
-                </View>
-                <View style={brandThemeStyles.cardBody}>
-                  <Text style={[brandThemeStyles.cardLabel, isSelected && { color: Colors.accent }]}>
-                    {THEME_META[key].label}
-                  </Text>
-                  <Text style={brandThemeStyles.cardDesc}>{THEME_META[key].description}</Text>
-                </View>
-                {isSelected && (
-                  <Ionicons name="checkmark-circle" size={20} color={Colors.accent} style={{ marginLeft: "auto" }} />
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
       </View>
 
       <View style={styles.sectionHeaderRow}>
