@@ -3427,8 +3427,46 @@ router.get("/translations/import", (_req: Request, res: Response) => {
 router.get("/translations/browse", async (req: Request, res: Response) => {
   try {
     const folderId = (req.query.folderId as string | undefined)?.trim();
+    const searchQuery = (req.query.q as string | undefined)?.trim();
     const { ReplitConnectors } = await import("@replit/connectors-sdk");
     const connectors = new ReplitConnectors();
+
+    if (searchQuery) {
+      const namePart = searchQuery.replace(/'/g, "\\'");
+      const qFolders = `fullText contains '${namePart}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+      const qSheets = `fullText contains '${namePart}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
+
+      const [foldersResp, sheetsResp] = await Promise.all([
+        connectors.proxy(
+          "google-drive",
+          `/drive/v3/files?q=${encodeURIComponent(qFolders)}&fields=files(id,name)&orderBy=name&pageSize=50`,
+          { method: "GET" }
+        ),
+        connectors.proxy(
+          "google-drive",
+          `/drive/v3/files?q=${encodeURIComponent(qSheets)}&fields=files(id,name,modifiedTime)&orderBy=name&pageSize=50`,
+          { method: "GET" }
+        ),
+      ]);
+
+      if (!foldersResp.ok || !sheetsResp.ok) {
+        const errText = !foldersResp.ok
+          ? await foldersResp.text()
+          : await sheetsResp.text();
+        console.error("[translations/browse] Drive search error:", errText);
+        return res.status(502).json({ message: "Errore nella ricerca Drive" });
+      }
+
+      const foldersData = await foldersResp.json() as { files?: { id: string; name: string }[] };
+      const sheetsData = await sheetsResp.json() as { files?: { id: string; name: string; modifiedTime?: string }[] };
+
+      return res.json({
+        folderName: "Risultati ricerca",
+        folders: foldersData.files || [],
+        sheets: sheetsData.files || [],
+        isSearch: true,
+      });
+    }
 
     const parentClause = folderId
       ? `'${folderId}' in parents`

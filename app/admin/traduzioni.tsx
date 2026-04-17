@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -149,6 +149,7 @@ interface BrowseResult {
   folderName: string;
   folders: DriveFolder[];
   sheets: DriveSheet[];
+  isSearch?: boolean;
 }
 
 interface BreadcrumbItem {
@@ -178,29 +179,56 @@ function DriveFileBrowser({
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumb, setBreadcrumb] = useState<BreadcrumbItem[]>([{ id: null, name: "Drive" }]);
   const [browseData, setBrowseData] = useState<BrowseResult>({ folderName: "Drive", folders: [], sheets: [] });
+  const [searchText, setSearchText] = useState("");
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestSeq = useRef(0);
 
   useEffect(() => {
     if (visible) {
       setCurrentFolderId(null);
       setBreadcrumb([{ id: null, name: "Drive" }]);
+      setSearchText("");
       loadFolder(null);
     }
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    };
   }, [visible]);
 
-  async function loadFolder(folderId: string | null) {
+  async function loadFolder(folderId: string | null, q?: string) {
     setLoading(true);
     setError(null);
+    const seq = ++requestSeq.current;
     try {
       const url = new URL("/api/admin/translations/browse", getApiUrl());
-      if (folderId) url.searchParams.set("folderId", folderId);
+      if (q) {
+        url.searchParams.set("q", q);
+      } else if (folderId) {
+        url.searchParams.set("folderId", folderId);
+      }
       const resp = await fetch(url.toString(), { credentials: "include" });
+      if (seq !== requestSeq.current) return;
       if (!resp.ok) throw new Error("Errore Drive");
       const data: BrowseResult = await resp.json();
+      if (seq !== requestSeq.current) return;
       setBrowseData(data);
     } catch {
+      if (seq !== requestSeq.current) return;
       setError("Impossibile caricare il contenuto di Drive");
     }
-    setLoading(false);
+    if (seq === requestSeq.current) setLoading(false);
+  }
+
+  function onSearchChange(text: string) {
+    setSearchText(text);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (text.trim().length === 0) {
+      loadFolder(currentFolderId);
+      return;
+    }
+    searchTimer.current = setTimeout(() => {
+      loadFolder(null, text.trim());
+    }, 400);
   }
 
   function navigateInto(folder: DriveFolder) {
@@ -228,44 +256,66 @@ function DriveFileBrowser({
             </TouchableOpacity>
           </View>
 
-          <View style={styles.breadcrumbRow}>
-            {breadcrumb.length > 1 && (
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={() => navigateTo(breadcrumb[breadcrumb.length - 2], breadcrumb.length - 2)}
-                activeOpacity={0.7}
-              >
-                <MaterialCommunityIcons name="arrow-left" size={16} color={Colors.accent} />
-                <Text style={styles.backButtonText}>Indietro</Text>
+          <View style={styles.searchRow}>
+            <MaterialCommunityIcons name="magnify" size={18} color={Colors.textSecondary} style={{ marginRight: 6 }} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Cerca per nome..."
+              placeholderTextColor={Colors.textSecondary}
+              value={searchText}
+              onChangeText={onSearchChange}
+              autoCapitalize="none"
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+              returnKeyType="search"
+            />
+            {searchText.length > 0 && (
+              <TouchableOpacity onPress={() => onSearchChange("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <MaterialCommunityIcons name="close-circle" size={16} color={Colors.textSecondary} />
               </TouchableOpacity>
             )}
-            <FlatList
-              data={breadcrumb}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(_, i) => String(i)}
-              style={{ marginTop: breadcrumb.length > 1 ? 6 : 0 }}
-              renderItem={({ item, index }) => {
-                const isLast = index === breadcrumb.length - 1;
-                return (
-                  <View style={styles.breadcrumbItem}>
-                    {index > 0 && (
-                      <MaterialCommunityIcons name="chevron-right" size={14} color={Colors.textSecondary} />
-                    )}
-                    <TouchableOpacity
-                      onPress={() => !isLast && navigateTo(item, index)}
-                      disabled={isLast}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.breadcrumbText, isLast && styles.breadcrumbTextActive]}>
-                        {item.name}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                );
-              }}
-            />
           </View>
+
+          {searchText.trim().length === 0 && (
+            <View style={styles.breadcrumbRow}>
+              {breadcrumb.length > 1 && (
+                <TouchableOpacity
+                  style={styles.backButton}
+                  onPress={() => navigateTo(breadcrumb[breadcrumb.length - 2], breadcrumb.length - 2)}
+                  activeOpacity={0.7}
+                >
+                  <MaterialCommunityIcons name="arrow-left" size={16} color={Colors.accent} />
+                  <Text style={styles.backButtonText}>Indietro</Text>
+                </TouchableOpacity>
+              )}
+              <FlatList
+                data={breadcrumb}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(_, i) => String(i)}
+                style={{ marginTop: breadcrumb.length > 1 ? 6 : 0 }}
+                renderItem={({ item, index }) => {
+                  const isLast = index === breadcrumb.length - 1;
+                  return (
+                    <View style={styles.breadcrumbItem}>
+                      {index > 0 && (
+                        <MaterialCommunityIcons name="chevron-right" size={14} color={Colors.textSecondary} />
+                      )}
+                      <TouchableOpacity
+                        onPress={() => !isLast && navigateTo(item, index)}
+                        disabled={isLast}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.breadcrumbText, isLast && styles.breadcrumbTextActive]}>
+                          {item.name}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                }}
+              />
+            </View>
+          )}
 
           {mode === "folder" && (
             <TouchableOpacity
@@ -1126,6 +1176,25 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     flex: 1,
+  },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 12,
+    marginVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    backgroundColor: Colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: Colors.text,
+    paddingVertical: 0,
   },
   breadcrumbRow: {
     paddingHorizontal: 12,
