@@ -8,6 +8,9 @@ import {
   ActivityIndicator,
   Platform,
   Linking,
+  TextInput,
+  Modal,
+  FlatList,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
@@ -16,6 +19,17 @@ import Colors from "@/constants/colors";
 
 type StepStatus = "idle" | "loading" | "success" | "error";
 
+interface DriveFolder {
+  id: string;
+  name: string;
+}
+
+interface DriveSheet {
+  id: string;
+  name: string;
+  modifiedTime?: string;
+}
+
 const LANGS = [
   { code: "en", label: "EN — Inglese" },
   { code: "de", label: "DE — Tedesco" },
@@ -23,6 +37,13 @@ const LANGS = [
   { code: "fr", label: "FR — Francese" },
   { code: "tr", label: "TR — Turco" },
 ];
+
+function extractFileId(input: string): string {
+  const trimmed = input.trim();
+  const match = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  if (match) return match[1];
+  return trimmed;
+}
 
 function StepCard({
   stepNumber,
@@ -121,6 +142,70 @@ function LangCheckbox({
   );
 }
 
+function PickerModal<T extends { id: string; name: string }>({
+  visible,
+  title,
+  items,
+  loading,
+  onSelect,
+  onClose,
+  selectedId,
+  emptyMessage,
+}: {
+  visible: boolean;
+  title: string;
+  items: T[];
+  loading: boolean;
+  onSelect: (item: T) => void;
+  onClose: () => void;
+  selectedId?: string | null;
+  emptyMessage: string;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>{title}</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <MaterialCommunityIcons name="close" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          {loading ? (
+            <View style={styles.modalLoading}>
+              <ActivityIndicator color={Colors.accent} />
+            </View>
+          ) : items.length === 0 ? (
+            <View style={styles.modalLoading}>
+              <Text style={styles.emptyText}>{emptyMessage}</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={items}
+              keyExtractor={(item) => item.id}
+              style={styles.modalList}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.modalItem, selectedId === item.id && styles.modalItemSelected]}
+                  onPress={() => { onSelect(item); onClose(); }}
+                  activeOpacity={0.7}
+                >
+                  <MaterialCommunityIcons
+                    name={selectedId === item.id ? "check-circle" : "circle-outline"}
+                    size={18}
+                    color={selectedId === item.id ? Colors.accent : Colors.textSecondary}
+                  />
+                  <Text style={styles.modalItemText} numberOfLines={2}>{item.name}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          )}
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
 export default function TraduzioniScreen() {
   const insets = useSafeAreaInsets();
 
@@ -132,10 +217,21 @@ export default function TraduzioniScreen() {
   const [exportResult, setExportResult] = useState("");
   const [exportedFileUrl, setExportedFileUrl] = useState<string | null>(null);
 
+  const [folders, setFolders] = useState<DriveFolder[]>([]);
+  const [foldersLoading, setFoldersLoading] = useState(false);
+  const [showFolderPicker, setShowFolderPicker] = useState(false);
+  const [selectedFolder, setSelectedFolder] = useState<DriveFolder | null>(null);
+
   const [importInfo, setImportInfo] = useState<{ exportedLangs: string[] }>({ exportedLangs: [] });
   const [importLangs, setImportLangs] = useState<string[]>([]);
   const [importStatus, setImportStatus] = useState<StepStatus>("idle");
   const [importResult, setImportResult] = useState("");
+
+  const [manualFileInput, setManualFileInput] = useState("");
+  const [sheets, setSheets] = useState<DriveSheet[]>([]);
+  const [sheetsLoading, setSheetsLoading] = useState(false);
+  const [showSheetPicker, setShowSheetPicker] = useState(false);
+  const [selectedSheet, setSelectedSheet] = useState<DriveSheet | null>(null);
 
   const [applyStatus, setApplyStatus] = useState<StepStatus>("idle");
   const [applyResult, setApplyResult] = useState("");
@@ -158,6 +254,46 @@ export default function TraduzioniScreen() {
         setImportLangs(data.exportedLangs || []);
       }
     } catch {}
+  }
+
+  async function loadFolders() {
+    if (foldersLoading) return;
+    setFoldersLoading(true);
+    try {
+      const resp = await fetch(new URL("/api/admin/translations/list-folders", getApiUrl()).toString(), {
+        credentials: "include",
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setFolders(data.folders || []);
+      }
+    } catch {}
+    setFoldersLoading(false);
+  }
+
+  async function loadSheets() {
+    if (sheetsLoading) return;
+    setSheetsLoading(true);
+    try {
+      const resp = await fetch(new URL("/api/admin/translations/list-sheets", getApiUrl()).toString(), {
+        credentials: "include",
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setSheets(data.sheets || []);
+      }
+    } catch {}
+    setSheetsLoading(false);
+  }
+
+  function openFolderPicker() {
+    if (folders.length === 0) loadFolders();
+    setShowFolderPicker(true);
+  }
+
+  function openSheetPicker() {
+    if (sheets.length === 0) loadSheets();
+    setShowSheetPicker(true);
   }
 
   async function handlePrepare() {
@@ -191,7 +327,9 @@ export default function TraduzioniScreen() {
     setExportResult("");
     setExportedFileUrl(null);
     try {
-      const resp = await apiRequest("POST", "/api/admin/translations/export", { langs: exportLangs });
+      const body: Record<string, unknown> = { langs: exportLangs };
+      if (selectedFolder) body.folderId = selectedFolder.id;
+      const resp = await apiRequest("POST", "/api/admin/translations/export", body);
       const data = await resp.json();
       setExportStatus("success");
       setExportResult(data.message || "Sheet creato con successo");
@@ -203,6 +341,12 @@ export default function TraduzioniScreen() {
     }
   }
 
+  function getResolvedFileId(): string | null {
+    if (manualFileInput.trim()) return extractFileId(manualFileInput);
+    if (selectedSheet) return selectedSheet.id;
+    return null;
+  }
+
   async function handleImport() {
     if (importLangs.length === 0) {
       setImportStatus("error");
@@ -212,7 +356,10 @@ export default function TraduzioniScreen() {
     setImportStatus("loading");
     setImportResult("");
     try {
-      const resp = await apiRequest("POST", "/api/admin/translations/import", { langs: importLangs });
+      const body: Record<string, unknown> = { langs: importLangs };
+      const customFileId = getResolvedFileId();
+      if (customFileId) body.fileId = customFileId;
+      const resp = await apiRequest("POST", "/api/admin/translations/import", body);
       const data = await resp.json();
       setImportStatus("success");
       setImportResult(data.message || "Dati importati con successo");
@@ -267,12 +414,23 @@ export default function TraduzioniScreen() {
     );
   }
 
+  const hasCustomImportSource = !!(manualFileInput.trim() || selectedSheet);
+
+  useEffect(() => {
+    if (!hasCustomImportSource && importInfo.exportedLangs.length > 0) {
+      setImportLangs((prev) => prev.filter((l) => importInfo.exportedLangs.includes(l)));
+    }
+  }, [hasCustomImportSource, importInfo.exportedLangs]);
+
   function toggleImportLang(code: string) {
-    if (!importInfo.exportedLangs.includes(code)) return;
+    if (!hasCustomImportSource && !importInfo.exportedLangs.includes(code)) return;
     setImportLangs((prev) =>
       prev.includes(code) ? prev.filter((l) => l !== code) : [...prev, code]
     );
   }
+
+  const importDisabled = importLangs.length === 0 ||
+    (!hasCustomImportSource && importInfo.exportedLangs.length === 0);
 
   return (
     <ScrollView
@@ -317,6 +475,27 @@ export default function TraduzioniScreen() {
             />
           ))}
         </View>
+
+        <View style={styles.sectionDivider} />
+        <Text style={styles.langPickerLabel}>Cartella di destinazione:</Text>
+        <TouchableOpacity style={styles.pickerButton} onPress={openFolderPicker} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="folder-outline" size={18} color={Colors.accent} />
+          <Text style={styles.pickerButtonText} numberOfLines={1}>
+            {selectedFolder ? selectedFolder.name : "Root / Drive principale"}
+          </Text>
+          <MaterialCommunityIcons name="chevron-down" size={18} color={Colors.textSecondary} />
+        </TouchableOpacity>
+        {selectedFolder ? (
+          <TouchableOpacity
+            onPress={() => setSelectedFolder(null)}
+            style={styles.clearButton}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons name="close-circle-outline" size={14} color={Colors.textSecondary} />
+            <Text style={styles.clearButtonText}>Usa Root</Text>
+          </TouchableOpacity>
+        ) : null}
+
         {exportedFileUrl ? (
           <TouchableOpacity
             style={styles.linkButton}
@@ -337,16 +516,12 @@ export default function TraduzioniScreen() {
         buttonLabel="Importa"
         onPress={handleImport}
         resultText={importResult}
-        disabled={importInfo.exportedLangs.length === 0}
+        disabled={importDisabled}
       >
         <View style={styles.langPicker}>
-          <Text style={styles.langPickerLabel}>
-            {importInfo.exportedLangs.length === 0
-              ? "Nessuna esportazione disponibile — esegui prima il passo 2"
-              : "Lingue da importare (solo quelle esportate):"}
-          </Text>
+          <Text style={styles.langPickerLabel}>Lingue da importare:</Text>
           {LANGS.map((l) => {
-            const available = importInfo.exportedLangs.includes(l.code);
+            const available = hasCustomImportSource || importInfo.exportedLangs.includes(l.code);
             return (
               <LangCheckbox
                 key={l.code}
@@ -359,6 +534,54 @@ export default function TraduzioniScreen() {
             );
           })}
         </View>
+
+        <View style={styles.sectionDivider} />
+        <Text style={styles.langPickerLabel}>File sorgente:</Text>
+
+        {importInfo.exportedLangs.length > 0 && !hasCustomImportSource ? (
+          <View style={styles.sessionFileInfo}>
+            <MaterialCommunityIcons name="check-circle-outline" size={14} color="#4CAF50" />
+            <Text style={styles.sessionFileText}>Usa il file esportato in questa sessione</Text>
+          </View>
+        ) : null}
+
+        <TouchableOpacity style={styles.pickerButton} onPress={openSheetPicker} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="table" size={18} color={Colors.accent} />
+          <Text style={styles.pickerButtonText} numberOfLines={1}>
+            {selectedSheet ? selectedSheet.name : "Sfoglia Drive…"}
+          </Text>
+          <MaterialCommunityIcons name="chevron-down" size={18} color={Colors.textSecondary} />
+        </TouchableOpacity>
+        {selectedSheet ? (
+          <TouchableOpacity
+            onPress={() => setSelectedSheet(null)}
+            style={styles.clearButton}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons name="close-circle-outline" size={14} color={Colors.textSecondary} />
+            <Text style={styles.clearButtonText}>Rimuovi selezione</Text>
+          </TouchableOpacity>
+        ) : null}
+
+        <Text style={[styles.langPickerLabel, { marginTop: 8 }]}>oppure incolla URL / ID del foglio:</Text>
+        <TextInput
+          style={styles.textInput}
+          value={manualFileInput}
+          onChangeText={setManualFileInput}
+          placeholder="https://docs.google.com/spreadsheets/d/…  oppure ID"
+          placeholderTextColor={Colors.textSecondary}
+          autoCapitalize="none"
+          autoCorrect={false}
+          spellCheck={false}
+        />
+        {manualFileInput.trim() ? (
+          <View style={styles.sessionFileInfo}>
+            <MaterialCommunityIcons name="information-outline" size={14} color={Colors.accent} />
+            <Text style={[styles.sessionFileText, { color: Colors.accent }]}>
+              File ID: {extractFileId(manualFileInput)}
+            </Text>
+          </View>
+        ) : null}
       </StepCard>
 
       <StepCard
@@ -393,6 +616,28 @@ export default function TraduzioniScreen() {
           </View>
         </View>
       ) : null}
+
+      <PickerModal
+        visible={showFolderPicker}
+        title="Seleziona cartella"
+        items={folders}
+        loading={foldersLoading}
+        selectedId={selectedFolder?.id}
+        onSelect={(f) => setSelectedFolder(f)}
+        onClose={() => setShowFolderPicker(false)}
+        emptyMessage="Nessuna cartella trovata su Drive"
+      />
+
+      <PickerModal
+        visible={showSheetPicker}
+        title="Seleziona Google Sheet"
+        items={sheets}
+        loading={sheetsLoading}
+        selectedId={selectedSheet?.id}
+        onSelect={(s) => { setSelectedSheet(s); setManualFileInput(""); }}
+        onClose={() => setShowSheetPicker(false)}
+        emptyMessage="Nessun foglio trovato su Drive"
+      />
     </ScrollView>
   );
 }
@@ -539,6 +784,63 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.accent,
   },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginVertical: 2,
+  },
+  pickerButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  pickerButtonText: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.text,
+  },
+  clearButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 2,
+    alignSelf: "flex-start",
+  },
+  clearButtonText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+  },
+  textInput: {
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.text,
+  },
+  sessionFileInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 2,
+  },
+  sessionFileText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "#4CAF50",
+    flex: 1,
+  },
   infoBanner: {
     backgroundColor: "rgba(255, 152, 0, 0.1)",
     borderRadius: 12,
@@ -563,5 +865,61 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
     lineHeight: 18,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "70%",
+    paddingBottom: 24,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: Colors.text,
+  },
+  modalLoading: {
+    padding: 32,
+    alignItems: "center",
+  },
+  modalList: {
+    paddingHorizontal: 8,
+    paddingTop: 8,
+  },
+  modalItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  modalItemSelected: {
+    backgroundColor: "rgba(255,152,0,0.08)",
+  },
+  modalItemText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.text,
+    flex: 1,
+  },
+  emptyText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
   },
 });

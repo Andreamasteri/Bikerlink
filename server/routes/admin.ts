@@ -3320,7 +3320,7 @@ router.post("/translations/prepare", async (_req: Request, res: Response) => {
 
 router.post("/translations/export", async (req: Request, res: Response) => {
   try {
-    const { langs } = req.body as { langs: string[] };
+    const { langs, folderId } = req.body as { langs: string[]; folderId?: string };
     if (!langs || !Array.isArray(langs) || langs.length === 0) {
       return res.status(400).json({ message: "Seleziona almeno una lingua" });
     }
@@ -3360,11 +3360,15 @@ router.post("/translations/export", async (req: Request, res: Response) => {
       .join("\r\n");
 
     const boundary = `drive_boundary_${Date.now()}`;
+    const fileMeta: Record<string, unknown> = { name: spreadsheetTitle, mimeType: "application/vnd.google-apps.spreadsheet" };
+    if (folderId && folderId.trim()) {
+      fileMeta.parents = [folderId.trim()];
+    }
     const multipartBody = [
       `--${boundary}`,
       "Content-Type: application/json; charset=UTF-8",
       "",
-      JSON.stringify({ name: spreadsheetTitle, mimeType: "application/vnd.google-apps.spreadsheet" }),
+      JSON.stringify(fileMeta),
       `--${boundary}`,
       "Content-Type: text/csv; charset=UTF-8",
       "",
@@ -3420,25 +3424,81 @@ router.get("/translations/import", (_req: Request, res: Response) => {
   return res.json(getImportInfo());
 });
 
+router.get("/translations/list-folders", async (_req: Request, res: Response) => {
+  try {
+    const { ReplitConnectors } = await import("@replit/connectors-sdk");
+    const connectors = new ReplitConnectors();
+
+    const listResp = await connectors.proxy(
+      "google-drive",
+      "/drive/v3/files?q=mimeType%3D'application%2Fvnd.google-apps.folder'%20and%20trashed%3Dfalse&fields=files(id%2Cname)&orderBy=name&pageSize=100",
+      { method: "GET" }
+    );
+
+    if (!listResp.ok) {
+      const errText = await listResp.text();
+      console.error("[translations/list-folders] Drive error:", errText);
+      return res.status(500).json({ message: "Errore nel recupero delle cartelle Drive" });
+    }
+
+    const data = await listResp.json() as { files?: { id: string; name: string }[] };
+    return res.json({ folders: data.files || [] });
+  } catch (error) {
+    console.error("[translations/list-folders] error:", error);
+    return res.status(500).json({ message: "Errore durante il recupero delle cartelle" });
+  }
+});
+
+router.get("/translations/list-sheets", async (_req: Request, res: Response) => {
+  try {
+    const { ReplitConnectors } = await import("@replit/connectors-sdk");
+    const connectors = new ReplitConnectors();
+
+    const listResp = await connectors.proxy(
+      "google-drive",
+      "/drive/v3/files?q=mimeType%3D'application%2Fvnd.google-apps.spreadsheet'%20and%20trashed%3Dfalse&fields=files(id%2Cname%2CmodifiedTime)&orderBy=modifiedTime%20desc&pageSize=50",
+      { method: "GET" }
+    );
+
+    if (!listResp.ok) {
+      const errText = await listResp.text();
+      console.error("[translations/list-sheets] Drive error:", errText);
+      return res.status(500).json({ message: "Errore nel recupero dei fogli Drive" });
+    }
+
+    const data = await listResp.json() as { files?: { id: string; name: string; modifiedTime?: string }[] };
+    return res.json({ sheets: data.files || [] });
+  } catch (error) {
+    console.error("[translations/list-sheets] error:", error);
+    return res.status(500).json({ message: "Errore durante il recupero dei fogli" });
+  }
+});
+
 router.post("/translations/import", async (req: Request, res: Response) => {
   try {
-    const { langs } = req.body as { langs: string[] };
+    const { langs, fileId: customFileId } = req.body as { langs: string[]; fileId?: string };
     if (!langs || !Array.isArray(langs) || langs.length === 0) {
       return res.status(400).json({ message: "Seleziona almeno una lingua da importare" });
     }
 
     const { exportedFileId, exportedLangs, keyMap } = TRANSLATIONS_STAGING;
-    if (!exportedFileId) {
-      return res.status(400).json({ message: "Nessun file esportato. Esegui prima 'Genera ed esporta'" });
+    const resolvedFileId = (customFileId && customFileId.trim()) ? customFileId.trim() : exportedFileId;
+
+    if (!resolvedFileId) {
+      return res.status(400).json({ message: "Nessun file selezionato. Esegui prima 'Genera ed esporta' o specifica un file manualmente" });
     }
 
     const invalidLangsImport = langs.filter((l) => !ALLOWED_LANGS.has(l));
     if (invalidLangsImport.length > 0) {
       return res.status(400).json({ message: `Lingue non valide: ${invalidLangsImport.join(", ")}` });
     }
-    const invalidLangs = langs.filter((l) => !exportedLangs.includes(l));
-    if (invalidLangs.length > 0) {
-      return res.status(400).json({ message: `Lingue non presenti nell'esportazione: ${invalidLangs.join(", ")}` });
+
+    const usingSessionFile = resolvedFileId === exportedFileId && !customFileId?.trim();
+    if (usingSessionFile && exportedLangs.length > 0) {
+      const invalidLangs = langs.filter((l) => !exportedLangs.includes(l));
+      if (invalidLangs.length > 0) {
+        return res.status(400).json({ message: `Lingue non presenti nell'esportazione: ${invalidLangs.join(", ")}` });
+      }
     }
 
     const { ReplitConnectors } = await import("@replit/connectors-sdk");
@@ -3446,7 +3506,7 @@ router.post("/translations/import", async (req: Request, res: Response) => {
 
     const exportResp = await connectors.proxy(
       "google-drive",
-      `/drive/v3/files/${exportedFileId}/export?mimeType=text/csv`,
+      `/drive/v3/files/${encodeURIComponent(resolvedFileId)}/export?mimeType=text/csv`,
       { method: "GET" }
     );
 
