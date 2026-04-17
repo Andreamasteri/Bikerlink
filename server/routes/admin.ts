@@ -17,9 +17,6 @@ import { SERVER_START_TIME, uptimeState } from "../uptime";
 
 const router = Router();
 
-const driveFolderNameCache = new Map<string, string>();
-const driveFolderNameInflight = new Map<string, Promise<{ name: string; parentId?: string }>>();
-
 interface OtaErrorEntry {
   error: string;
   failCount: number;
@@ -41,6 +38,61 @@ interface StartupBeaconEntry {
 }
 const startupBeacons: StartupBeaconEntry[] = [];
 const BEACONS_MAX = 50;
+
+const DRIVE_FOLDER_CACHE_TTL_MS = 10 * 60 * 1000;
+const DRIVE_FOLDER_CACHE_MAX = 500;
+
+interface DriveFolderCacheEntry {
+  name: string;
+  parents: string[] | undefined;
+  expiresAt: number;
+}
+
+const driveFolderNameCache = new Map<string, DriveFolderCacheEntry>();
+
+function evictExpiredDriveFolderCache(): void {
+  const now = Date.now();
+  for (const [key, entry] of driveFolderNameCache) {
+    if (entry.expiresAt <= now) {
+      driveFolderNameCache.delete(key);
+    }
+  }
+  while (driveFolderNameCache.size > DRIVE_FOLDER_CACHE_MAX) {
+    const firstKey = driveFolderNameCache.keys().next().value;
+    if (firstKey !== undefined) driveFolderNameCache.delete(firstKey as string);
+  }
+}
+
+async function getDriveFolderMeta(
+  folderId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  connectors: any
+): Promise<{ name: string; parents: string[] | undefined } | null> {
+  const now = Date.now();
+  const cached = driveFolderNameCache.get(folderId);
+  if (cached && cached.expiresAt > now) {
+    return { name: cached.name, parents: cached.parents };
+  }
+  try {
+    const resp = await connectors.proxy(
+      "google-drive",
+      `/drive/v3/files/${encodeURIComponent(folderId)}?fields=name,parents`,
+      { method: "GET" }
+    );
+    if (!resp.ok) return null;
+    const data = await resp.json() as { name?: string; parents?: string[] };
+    if (!data.name) return null;
+    evictExpiredDriveFolderCache();
+    driveFolderNameCache.set(folderId, {
+      name: data.name,
+      parents: data.parents,
+      expiresAt: now + DRIVE_FOLDER_CACHE_TTL_MS,
+    });
+    return { name: data.name, parents: data.parents };
+  } catch {
+    return null;
+  }
+}
 
 interface ClubAssignStats {
   assigned: number;
@@ -3450,49 +3502,16 @@ router.get("/translations/browse", async (req: Request, res: Response) => {
       const sheetsData = await sheetsResp.json() as { files?: { id: string; name: string; modifiedTime?: string; parents?: string[] }[] };
       const files = sheetsData.files || [];
 
-      async function fetchFolderInfo(id: string): Promise<{ name: string; parentId?: string }> {
-        if (driveFolderNameCache.has(id)) {
-          const cached = driveFolderNameCache.get(id)!;
-          const sep = cached.indexOf("\0");
-          return sep === -1
-            ? { name: cached }
-            : { name: cached.slice(0, sep), parentId: cached.slice(sep + 1) || undefined };
-        }
-        const existing = driveFolderNameInflight.get(id);
-        if (existing) return existing;
-        const promise = (async () => {
-          try {
-            const resp = await connectors.proxy(
-              "google-drive",
-              `/drive/v3/files/${encodeURIComponent(id)}?fields=name,parents`,
-              { method: "GET" }
-            );
-            if (!resp.ok) return { name: "" };
-            const data = await resp.json() as { name?: string; parents?: string[] };
-            const name = data.name || "";
-            const parentId = data.parents?.[0];
-            driveFolderNameCache.set(id, parentId ? `${name}\0${parentId}` : name);
-            return { name, parentId };
-          } catch {
-            return { name: "" };
-          } finally {
-            driveFolderNameInflight.delete(id);
-          }
-        })();
-        driveFolderNameInflight.set(id, promise);
-        return promise;
-      }
-
       async function resolveFolderPath(parentId: string | undefined): Promise<string> {
         if (!parentId) return "";
         const parts: string[] = [];
         let currentId: string | undefined = parentId;
         const MAX_DEPTH = 6;
         for (let i = 0; i < MAX_DEPTH && currentId; i++) {
-          const { name, parentId: nextId } = await fetchFolderInfo(currentId);
-          if (!name) break;
-          parts.unshift(name);
-          currentId = nextId;
+          const meta = await getDriveFolderMeta(currentId, connectors);
+          if (!meta) break;
+          parts.unshift(meta.name);
+          currentId = meta.parents?.[0];
         }
         return parts.join(" / ");
       }
@@ -3535,17 +3554,8 @@ router.get("/translations/browse", async (req: Request, res: Response) => {
 
     let folderName = "Drive";
     if (folderId) {
-      try {
-        const metaResp = await connectors.proxy(
-          "google-drive",
-          `/drive/v3/files/${encodeURIComponent(folderId)}?fields=name`,
-          { method: "GET" }
-        );
-        if (metaResp.ok) {
-          const meta = await metaResp.json() as { name?: string };
-          if (meta.name) folderName = meta.name;
-        }
-      } catch {}
+      const meta = await getDriveFolderMeta(folderId, connectors);
+      if (meta) folderName = meta.name;
     }
 
     if (!foldersResp.ok || !sheetsResp.ok) {
@@ -3579,48 +3589,32 @@ router.get("/translations/file-path", async (req: Request, res: Response) => {
     const { ReplitConnectors } = await import("@replit/connectors-sdk");
     const connectors = new ReplitConnectors();
 
-    const metaResp = await connectors.proxy(
-      "google-drive",
-      `/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,parents`,
-      { method: "GET" }
-    );
-    if (!metaResp.ok) {
+    const fileMeta = await getDriveFolderMeta(fileId, connectors);
+    if (!fileMeta) {
       return res.status(502).json({ message: "Impossibile recuperare il percorso del file" });
     }
-    const meta = await metaResp.json() as { id?: string; name?: string; parents?: string[] };
-    const parentId = meta.parents?.[0];
+    const parentId = fileMeta.parents?.[0];
     if (!parentId) {
       return res.json({ folderPath: "Drive" });
     }
 
-    const parentResp = await connectors.proxy(
-      "google-drive",
-      `/drive/v3/files/${encodeURIComponent(parentId)}?fields=id,name,parents`,
-      { method: "GET" }
-    );
-    if (!parentResp.ok) {
+    const parent = await getDriveFolderMeta(parentId, connectors);
+    if (!parent) {
       return res.json({ folderPath: "Drive" });
     }
-    const parent = await parentResp.json() as { id?: string; name?: string; parents?: string[] };
-    const parentName = parent.name || "Drive";
+    const parentName = parent.name;
     const grandParentId = parent.parents?.[0];
 
     if (!grandParentId) {
       return res.json({ folderPath: parentName });
     }
 
-    const grandParentResp = await connectors.proxy(
-      "google-drive",
-      `/drive/v3/files/${encodeURIComponent(grandParentId)}?fields=id,name`,
-      { method: "GET" }
-    );
-    if (!grandParentResp.ok) {
+    const grandParent = await getDriveFolderMeta(grandParentId, connectors);
+    if (!grandParent) {
       return res.json({ folderPath: parentName });
     }
-    const grandParent = await grandParentResp.json() as { id?: string; name?: string };
-    const grandParentName = grandParent.name || "Drive";
 
-    return res.json({ folderPath: `${grandParentName} / ${parentName}` });
+    return res.json({ folderPath: `${grandParent.name} / ${parentName}` });
   } catch (error) {
     console.error("[translations/file-path] error:", error);
     return res.status(500).json({ message: "Errore durante il recupero del percorso" });
