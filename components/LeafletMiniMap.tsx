@@ -4,6 +4,7 @@ import WebView from "react-native-webview";
 import { useMapConfig } from "@/lib/map-context";
 import { getTileConfig } from "@/lib/map-tiles";
 import { buildLeafletMiniMapHtml } from "@/lib/leaflet-mini-map-html";
+import NativeMiniMap from "@/components/NativeMiniMap";
 
 interface LeafletMiniMapProps {
   latitude: number;
@@ -12,13 +13,17 @@ interface LeafletMiniMapProps {
 }
 
 export default function LeafletMiniMap({ latitude, longitude, height = 180 }: LeafletMiniMapProps) {
-  const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
+  const { enabled: mapsEnabled, resolvedProvider, useGoogleMaps } = useMapConfig();
   const tileConfig = getTileConfig(mapsEnabled ? resolvedProvider : "carto_dark");
 
   const html = useMemo(
     () => buildLeafletMiniMapHtml(tileConfig.urlTemplate, tileConfig.maximumZ, latitude, longitude),
     [tileConfig.urlTemplate, tileConfig.maximumZ, latitude, longitude]
   );
+
+  if (useGoogleMaps) {
+    return <NativeMiniMap latitude={latitude} longitude={longitude} height={height} />;
+  }
 
   return (
     <View style={[styles.wrapper, { height }]} pointerEvents="none">

@@ -1006,12 +1006,13 @@ export default function AdminSettings() {
     },
   });
 
-  const { data: mapsData } = useQuery<{ enabled: boolean; provider: string; userChoiceEnabled: boolean }>({
+  const { data: mapsData } = useQuery<{ enabled: boolean; provider: string; userChoiceEnabled: boolean; engine: string }>({
     queryKey: ["/api/settings/maps"],
   });
   const mapsEnabled = mapsData?.enabled !== false;
   const mapsProvider = (mapsData?.provider || "carto_light") as "carto_light" | "carto_dark" | "esri_gray";
   const mapsUserChoiceEnabled = mapsData?.userChoiceEnabled !== false;
+  const mapsEngine = (mapsData?.engine || "leaflet") as "leaflet" | "google";
 
   const mapsEnabledMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
@@ -1061,6 +1062,26 @@ export default function AdminSettings() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/maps"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const mapsEngineMutation = useMutation({
+    mutationFn: async (engine: "leaflet" | "google") => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/maps_engine", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: engine }),
         credentials: "include",
       });
       if (!res.ok) throw new Error(await res.text());
@@ -2347,6 +2368,47 @@ export default function AdminSettings() {
           {mapsUserChoiceEnabled
             ? "Gli utenti possono scegliere il proprio stile mappa"
             : "Tutti gli utenti vedono il provider di default"}
+        </Text>
+        <View style={[styles.synecoHeader, { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: Colors.border }]}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="navigate-circle-outline" size={18} color={Colors.textSecondary} />
+            <Text style={[styles.synecoDesc, { marginBottom: 0 }]}>Motore mappe</Text>
+          </View>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <TouchableOpacity
+              style={[
+                styles.dropdownButton,
+                { paddingHorizontal: 12, paddingVertical: 6, minWidth: 0 },
+                mapsEngine === "leaflet" && { borderColor: Colors.accent, backgroundColor: Colors.accent + "22" },
+              ]}
+              onPress={() => mapsEngineMutation.mutate("leaflet")}
+              disabled={mapsEngineMutation.isPending}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.dropdownButtonText, mapsEngine === "leaflet" && { color: Colors.accent }]}>
+                Leaflet
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.dropdownButton,
+                { paddingHorizontal: 12, paddingVertical: 6, minWidth: 0 },
+                mapsEngine === "google" && { borderColor: Colors.accent, backgroundColor: Colors.accent + "22" },
+              ]}
+              onPress={() => mapsEngineMutation.mutate("google")}
+              disabled={mapsEngineMutation.isPending}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.dropdownButtonText, mapsEngine === "google" && { color: Colors.accent }]}>
+                Google Maps
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <Text style={styles.synecoDesc}>
+          {mapsEngine === "leaflet"
+            ? "Mappe WebView Leaflet (default, stabile)"
+            : "Mappe native Google Maps (react-native-maps)"}
         </Text>
           </View>
         )}

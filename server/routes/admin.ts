@@ -1194,6 +1194,27 @@ router.put("/settings/maps_user_choice_enabled", async (req: Request, res: Respo
   }
 });
 
+router.put("/settings/maps_engine", async (req: Request, res: Response) => {
+  try {
+    const { value } = req.body as { value: string };
+    if (value !== "leaflet" && value !== "google") {
+      return res.status(400).json({ message: "Valore non valido: usare 'leaflet' o 'google'" });
+    }
+    const setting = await storage.upsertAppSetting("maps_engine", value);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_setting",
+      targetType: "app_setting",
+      targetId: "maps_engine",
+      details: `maps_engine = ${value}`,
+    });
+    return res.json(setting);
+  } catch (error) {
+    console.error("Admin maps_engine error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/settings/theme_user_switching_enabled", async (req: Request, res: Response) => {
   try {
     const { value } = req.body as { value: string };
