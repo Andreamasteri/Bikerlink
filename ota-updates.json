@@ -2815,7 +2815,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-17T14:38:32.092Z"
+  },
+  {
+    "updateNumber": 71,
+    "version": "1.71.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-71 rv7.0.0: Mappe Leaflet + cartelle Drive fisse admin",
+    "note": "Task #647: Sostituzione react-native-maps con Leaflet+WebView in tutti i componenti (LeafletMiniMap, LeafletPickerMap, LeafletRouteMap, LeafletTrackingMap). Rimosso PROVIDER_GOOGLE crash Android. Task #651: Cartelle Drive hardcoded lato server (backup DB, backup Media, export Traduzioni), rimosso folder picker UI da admin backup e traduzioni. CURRENT_OTA_NUMBER=71.",
+    "releaseId": "20ae047e-5630-49a0-b5d6-f8389087b5d7",
+    "bundleUrl": "private/ota/ota-1.71.0-1776442132888.js",
+    "updateGroupId": "0f7922ea-4cdf-43ba-888d-490ad060218b",
+    "androidUpdateId": "019d9c34-80db-77ad-866f-11376f9901f0",
+    "iosUpdateId": null,
+    "commitBase": "19fbb1918f76b0f13319b605845743949d3103d1",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/0f7922ea-4cdf-43ba-888d-490ad060218b",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-17T16:08:55.836Z"
   }
 ]
