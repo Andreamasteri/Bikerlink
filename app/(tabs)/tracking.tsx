@@ -21,7 +21,6 @@ import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
 import * as Location from "expo-location";
-import * as Battery from "expo-battery";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getCurrentLocale } from "@/lib/i18n";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
@@ -47,7 +46,6 @@ interface GpsPoint {
 }
 
 type TrackingMode = "highway" | "city" | "idle";
-type BatteryImpact = "alta" | "media" | "bassa";
 type UpdateProfile = "easy" | "medium" | "race";
 
 const IDLE_THRESHOLD_KMH = 3;
@@ -89,35 +87,13 @@ function getModeConfig(mode: TrackingMode, profile: UpdateProfile = "medium"): {
   }
 }
 
-function getBatteryImpact(mode: TrackingMode): BatteryImpact {
-  switch (mode) {
-    case "highway": return "alta";
-    case "city": return "media";
-    case "idle": return "bassa";
-  }
-}
-
-function getBatteryImpactFromLevel(level: number): BatteryImpact {
-  if (level < 0) return "bassa";
-  if (level <= 0.33) return "bassa";
-  if (level <= 0.66) return "media";
-  return "alta";
-}
-
-function getBatteryColor(impact: BatteryImpact): string {
-  switch (impact) {
-    case "alta": return Colors.success;
-    case "media": return Colors.warning;
-    case "bassa": return Colors.accentRed;
-  }
-}
-
-function getBatteryIcon(impact: BatteryImpact): string {
-  switch (impact) {
-    case "alta": return "battery-full";
-    case "media": return "battery-half";
-    case "bassa": return "battery-dead";
-  }
+function getAccuracyTier(meters: number | null): { label: string; color: string; value: string } | null {
+  if (meters === null || meters < 0) return null;
+  const m = Math.round(meters);
+  if (meters < 5) return { label: "Ottima", color: Colors.success, value: `${m}m` };
+  if (meters < 15) return { label: "Buona", color: "#4A9EFF", value: `${m}m` };
+  if (meters <= 30) return { label: "Discreta", color: Colors.warning, value: `${m}m` };
+  return { label: "Scarsa", color: Colors.accentRed, value: `${m}m` };
 }
 
 export default function TrackingScreen() {
@@ -165,7 +141,7 @@ export default function TrackingScreen() {
   const [countdownValue, setCountdownValue] = useState<number | "GO" | null>(null);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const [batteryLevel, setBatteryLevel] = useState<number>(-1);
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
 
   const [stopAtZeroEnabled, setStopAtZeroEnabled] = useState(false);
   const stopAtZeroFreezeRef = useRef(false);
@@ -226,19 +202,6 @@ export default function TrackingScreen() {
       subscription.remove();
       cleanupTracking();
     };
-  }, []);
-
-  useEffect(() => {
-    if (Platform.OS === "web") return;
-    const fetchBattery = async () => {
-      try {
-        const level = await Battery.getBatteryLevelAsync();
-        setBatteryLevel(level);
-      } catch {}
-    };
-    fetchBattery();
-    const interval = setInterval(fetchBattery, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   const handleAppStateChange = useCallback((nextState: AppStateStatus) => {
@@ -320,6 +283,7 @@ export default function TrackingScreen() {
     const sub = await Location.watchPositionAsync(
       { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
       (loc) => {
+        setGpsAccuracy(loc.coords.accuracy);
         if (!isPausedRef.current) {
           handleGpsUpdate(loc.coords.latitude, loc.coords.longitude, loc.coords.altitude, loc.coords.speed);
         }
@@ -445,6 +409,7 @@ export default function TrackingScreen() {
         Location.watchPositionAsync(
           { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
           (loc) => {
+            setGpsAccuracy(loc.coords.accuracy);
             if (!isPausedRef.current) {
               handleGpsUpdate(loc.coords.latitude, loc.coords.longitude, loc.coords.altitude, loc.coords.speed);
             }
@@ -455,6 +420,7 @@ export default function TrackingScreen() {
       } else if (Platform.OS === "web") {
         const wid = navigator.geolocation.watchPosition(
           (pos) => {
+            setGpsAccuracy(pos.coords.accuracy);
             if (!isPausedRef.current) {
               handleGpsUpdate(pos.coords.latitude, pos.coords.longitude, pos.coords.altitude, pos.coords.speed);
             }
@@ -585,6 +551,7 @@ export default function TrackingScreen() {
         const sub = await Location.watchPositionAsync(
           { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
           (loc) => {
+            setGpsAccuracy(loc.coords.accuracy);
             if (!isPausedRef.current) {
               handleGpsUpdate(loc.coords.latitude, loc.coords.longitude, loc.coords.altitude, loc.coords.speed);
             }
@@ -594,6 +561,7 @@ export default function TrackingScreen() {
       } else {
         const wid = navigator.geolocation.watchPosition(
           (pos) => {
+            setGpsAccuracy(pos.coords.accuracy);
             if (!isPausedRef.current) {
               handleGpsUpdate(pos.coords.latitude, pos.coords.longitude, pos.coords.altitude, pos.coords.speed);
             }
@@ -701,10 +669,7 @@ export default function TrackingScreen() {
   const netTime = totalTime - idleTime;
   const avgSpeed = netTime > 0 ? totalKm / (netTime / 3600) : 0;
   const grossAvgSpeed = totalTime > 0 ? totalKm / (totalTime / 3600) : 0;
-  const batteryImpact = Platform.OS !== "web" && batteryLevel >= 0
-    ? getBatteryImpactFromLevel(batteryLevel)
-    : getBatteryImpact(trackingMode);
-  const batteryColor = getBatteryColor(batteryImpact);
+  const accuracyTier = getAccuracyTier(gpsAccuracy);
 
   return (
     <View style={styles.container}>
@@ -775,12 +740,16 @@ export default function TrackingScreen() {
                   </View>
                 );
               })()}
-              <View style={[styles.batteryBadge, { backgroundColor: batteryColor + "20" }]}>
-                <Ionicons name={getBatteryIcon(batteryImpact) as any} size={14} color={batteryColor} />
-                <Text style={[styles.batteryText, { color: batteryColor }]}>
-                  {batteryImpact.toUpperCase()}
-                </Text>
-              </View>
+              {accuracyTier ? (
+                <View style={styles.batteryBadge}>
+                  <Text style={[styles.batteryText, { color: accuracyTier.color }]}>
+                    {accuracyTier.label}
+                  </Text>
+                  <Text style={[styles.batteryText, { color: "#ffffff" }]}>
+                    {" "}{accuracyTier.value}
+                  </Text>
+                </View>
+              ) : null}
             </View>
 
             <View style={styles.speedBox}>

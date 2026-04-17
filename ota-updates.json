@@ -2953,7 +2953,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-17T21:30:29.809Z"
+  },
+  {
+    "updateNumber": 77,
+    "version": "1.77.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-77 rv7.0.0: Fix crash expo-battery + accuracy GPS in tempo reale",
+    "note": "Task #667: rimosso import expo-battery (causava crash su APK v29 che non ha il modulo nativo); rimosso stato batteryLevel, useEffect polling, funzioni getBatteryImpact/getBatteryImpactFromLevel/getBatteryColor/getBatteryIcon e tipo BatteryImpact. Aggiunto stato gpsAccuracy (number|null), funzione getAccuracyTier con soglie <5m=Ottima/verde, 5-15m=Buona/blu, 15-30m=Discreta/giallo, >30m=Scarsa/rosso. Badge accuracy affianca il badge FERMO: etichetta colorata + valore metri bianco, aggiornato in tempo reale. Tre callback watchPositionAsync aggiornati per leggere coords.accuracy. CURRENT_OTA_NUMBER=77.",
+    "releaseId": "d85a1f6e-2580-465d-b62f-96104f745586",
+    "bundleUrl": "private/ota/ota-1.77.0-1776463773770.js",
+    "updateGroupId": "ed848e9f-0e3c-493e-9536-f6915692766e",
+    "androidUpdateId": "019d9d7e-b05e-7da8-bd1a-fe2b9c93ceb2",
+    "iosUpdateId": null,
+    "commitBase": "07bf0ac4d247ffa507f7de09e16b9ce1df59a42b",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/ed848e9f-0e3c-493e-9536-f6915692766e",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-17T22:09:36.570Z"
   }
 ]
