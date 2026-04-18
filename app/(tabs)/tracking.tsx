@@ -522,22 +522,24 @@ export default function TrackingScreen() {
     currentModeRef.current = newMode;
     setTrackingMode(newMode);
 
+    sendStartupBeacon("switchTrackingAccuracy:removeOldWatcher", { mode: newMode });
     if (watchSubRef.current) {
       watchSubRef.current.remove();
       watchSubRef.current = null;
     }
 
     const config = getModeConfig(newMode, updateProfileRef.current);
-    await sendStartupBeacon("switchTrackingAccuracy:watchPositionBegin", { mode: newMode });
+    sendStartupBeacon("switchTrackingAccuracy:watchPositionBegin", { mode: newMode });
     try {
       const sub = await Location.watchPositionAsync(
         { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
         onNativeLocation
       );
       watchSubRef.current = sub;
-      await sendStartupBeacon("switchTrackingAccuracy:watchPositionOK", { mode: newMode });
-    } catch (err) {
-      await sendStartupBeacon("switchTrackingAccuracy:watchPositionError", { mode: newMode, err: String((err as any)?.message ?? err) });
+      sendStartupBeacon("switchTrackingAccuracy:watchPositionOK", { mode: newMode });
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      sendStartupBeacon("switchTrackingAccuracy:watchPositionError", { mode: newMode, err: errMsg });
       logGpsError(err, "switchTrackingAccuracy");
     }
   }, [onNativeLocation]);
@@ -724,8 +726,9 @@ export default function TrackingScreen() {
         ).then((sub) => {
           watchSubRef.current = sub;
           sendStartupBeacon("togglePause:resume:watchPositionOK");
-        }).catch((err) => {
-          sendStartupBeacon("togglePause:resume:watchPositionError", { err: String((err as any)?.message ?? err) });
+        }).catch((err: unknown) => {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          sendStartupBeacon("togglePause:resume:watchPositionError", { err: errMsg });
           logGpsError(err, "togglePause");
         });
       } else if (Platform.OS === "web") {
@@ -802,7 +805,7 @@ export default function TrackingScreen() {
     const tracking = !!routeIdRef.current;
 
     if (nextState === "background" && tracking && Platform.OS !== "web") {
-      await sendStartupBeacon("handleAppStateChange:background");
+      sendStartupBeacon("handleAppStateChange:background");
       if (watchSubRef.current) {
         watchSubRef.current.remove();
         watchSubRef.current = null;
@@ -826,26 +829,29 @@ export default function TrackingScreen() {
         } catch {}
       }
     } else if (nextState === "active" && tracking && Platform.OS !== "web") {
-      await sendStartupBeacon("handleAppStateChange:foreground");
+      sendStartupBeacon("handleAppStateChange:foreground");
       try {
         const running = await Location.hasStartedLocationUpdatesAsync(BG_LOCATION_TASK);
         if (running) {
           await Location.stopLocationUpdatesAsync(BG_LOCATION_TASK);
         }
       } catch {}
+      sendStartupBeacon("handleAppStateChange:foreground:loadBgPointsBegin");
       await loadBgPoints();
+      sendStartupBeacon("handleAppStateChange:foreground:loadBgPointsDone");
       if (!isPausedRef.current) {
         const config = getModeConfig(currentModeRef.current, updateProfileRef.current);
-        await sendStartupBeacon("handleAppStateChange:foreground:watchPositionBegin");
+        sendStartupBeacon("handleAppStateChange:foreground:watchPositionBegin");
         try {
           const sub = await Location.watchPositionAsync(
             { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
             onNativeLocation
           );
           watchSubRef.current = sub;
-          await sendStartupBeacon("handleAppStateChange:foreground:watchPositionOK");
-        } catch (err) {
-          await sendStartupBeacon("handleAppStateChange:foreground:watchPositionError", { err: String((err as any)?.message ?? err) });
+          sendStartupBeacon("handleAppStateChange:foreground:watchPositionOK");
+        } catch (err: unknown) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          sendStartupBeacon("handleAppStateChange:foreground:watchPositionError", { err: errMsg });
         }
       }
       if (pointsBufferRef.current.length > 0) {
@@ -857,17 +863,17 @@ export default function TrackingScreen() {
   const startTracking = async () => {
     try {
       setLoading(true);
-      await sendStartupBeacon("startTracking:begin");
+      sendStartupBeacon("startTracking:begin");
 
       if (Platform.OS !== "web") {
-        await sendStartupBeacon("startTracking:requestPermissions");
+        sendStartupBeacon("startTracking:requestPermissions");
         const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
         if (fgStatus !== "granted") {
-          await sendStartupBeacon("startTracking:permissionDenied");
+          sendStartupBeacon("startTracking:permissionDenied");
           Alert.alert("Permesso Negato", "Il permesso GPS è necessario per il tracciamento.");
           return;
         }
-        await sendStartupBeacon("startTracking:permissionGranted");
+        sendStartupBeacon("startTracking:permissionGranted");
       } else {
         const perm = await new Promise<boolean>((resolve) => {
           if (!navigator.geolocation) {
@@ -887,12 +893,13 @@ export default function TrackingScreen() {
       }
 
       let res;
-      await sendStartupBeacon("startTracking:apiRouteCreate");
+      sendStartupBeacon("startTracking:apiRouteCreate");
       try {
         res = await apiRequest("POST", "/api/routes", { trackingFrequency: 5, isSprint: sprint0100EnabledRef.current });
-      } catch (err: any) {
-        await sendStartupBeacon("startTracking:apiRouteError", { msg: String(err?.message ?? err) });
-        if (err.message?.includes("401")) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        sendStartupBeacon("startTracking:apiRouteError", { msg });
+        if (msg.includes("401")) {
           Alert.alert("Login Richiesto", "Devi effettuare il login per usare il tracciamento.");
         } else {
           Alert.alert("Errore", "Impossibile avviare il tracciamento.");
@@ -902,7 +909,7 @@ export default function TrackingScreen() {
 
       const data = await res.json();
       routeIdRef.current = data.id;
-      await sendStartupBeacon("startTracking:routeCreated", { routeId: data.id });
+      sendStartupBeacon("startTracking:routeCreated", { routeId: data.id });
 
 
       setTotalTime(0);
@@ -1067,7 +1074,7 @@ export default function TrackingScreen() {
       }, STATS_SYNC_INTERVAL_MS);
 
       if (Platform.OS !== "web") {
-        await sendStartupBeacon("startTracking:watchPositionBegin");
+        sendStartupBeacon("startTracking:watchPositionBegin");
         try {
           const config = getModeConfig("idle", updateProfileRef.current);
           const sub = await Location.watchPositionAsync(
@@ -1075,9 +1082,10 @@ export default function TrackingScreen() {
             onNativeLocation
           );
           watchSubRef.current = sub;
-          await sendStartupBeacon("startTracking:watchPositionOK");
-        } catch (gpsErr) {
-          await sendStartupBeacon("startTracking:watchPositionError", { err: String((gpsErr as any)?.message ?? gpsErr) });
+          sendStartupBeacon("startTracking:watchPositionOK");
+        } catch (gpsErr: unknown) {
+          const errMsg = gpsErr instanceof Error ? gpsErr.message : String(gpsErr);
+          sendStartupBeacon("startTracking:watchPositionError", { err: errMsg });
           logGpsError(gpsErr, "watchPositionAsync");
           cleanupTracking();
           setIsTracking(false);
@@ -1094,7 +1102,7 @@ export default function TrackingScreen() {
         webWatchIdRef.current = wid;
       }
 
-      await sendStartupBeacon("startTracking:done");
+      sendStartupBeacon("startTracking:done");
 
       if (sprint0100Enabled) {
         if (Platform.OS !== "web") {

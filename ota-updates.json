@@ -3367,7 +3367,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T15:06:02.481Z"
+  },
+  {
+    "updateNumber": 95,
+    "version": "1.95.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-95 rv7.0.0: Beacon diagnostici (fix fire-and-forget, type safety, beacon completi)",
+    "note": "Task #705: corregge OTA-94. sendStartupBeacon è fire-and-forget (void) — rimossi tutti gli await. Rimossi cast as any: usa err instanceof Error ? err.message : String(err). Aggiunti beacon mancanti: switchTrackingAccuracy:removeOldWatcher (prima del .remove()), handleAppStateChange:foreground:loadBgPointsBegin/Done (prima e dopo loadBgPoints). Tutti i beacon sono ora: startTracking (begin, requestPermissions, permissionGranted/Denied, apiRouteCreate, apiRouteError, routeCreated, watchPositionBegin/OK/Error, done), switchTrackingAccuracy (removeOldWatcher, watchPositionBegin/OK/Error), togglePause resume (watchPositionBegin/OK/Error), handleAppStateChange (background, foreground, loadBgPointsBegin, loadBgPointsDone, watchPositionBegin/OK/Error). CURRENT_OTA_NUMBER=95.",
+    "releaseId": "4a445af7-ac78-411c-b694-8873b1c98b00",
+    "bundleUrl": "private/ota/ota-1.95.0-1776525115178.js",
+    "updateGroupId": "be29c7c8-fc4f-47e2-b5d2-ac2352d45064",
+    "androidUpdateId": "019da126-afad-7c6f-85b0-a43480e681a6",
+    "iosUpdateId": null,
+    "commitBase": "06fbe78658c62f69c3a2120597856ef3fa47eece",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/be29c7c8-fc4f-47e2-b5d2-ac2352d45064",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T15:11:58.081Z"
   }
 ]
