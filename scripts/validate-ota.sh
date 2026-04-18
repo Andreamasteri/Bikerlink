@@ -51,6 +51,14 @@ for CALL in "Updates.checkForUpdateAsync" "Updates.fetchUpdateAsync" "Updates.re
 done
 
 # ── 3. CURRENT_OTA_NUMBER aggiornato (cycle-aware, last by position) ─────
+# DESIGN: si usa l'ultima entry PER POSIZIONE nell'array (non per status=published).
+# Motivo: la procedura OTA prevede che l'entry venga aggiunta in ota-updates.json
+# PRIMA di pubblicare (con CURRENT_OTA_NUMBER già aggiornato in profile.tsx).
+# Al momento del check la entry può avere status "building"/"pending".
+# Usare status="published" causerebbe un falso-OK: il check passerebbe anche
+# se CURRENT_OTA_NUMBER non fosse stato ancora aggiornato (confronterebbe con
+# la OTA precedente già published). "Last by position" è il criterio corretto
+# per catturare il drift prima che la pubblicazione avvenga.
 CURRENT_OTA=$(grep -oE 'CURRENT_OTA_NUMBER\s*=\s*[0-9]+' "$PROFILE_FILE" 2>/dev/null \
   | grep -oE '[0-9]+$' || true)
 
@@ -63,8 +71,8 @@ else
     const data = JSON.parse(require('fs').readFileSync('ota-updates.json','utf8'));
     const cycle = data.filter(e => typeof e.updateNumber === 'number' && e.runtimeVersion === rv);
     if (cycle.length === 0) { console.log('NEW_CYCLE'); process.exit(0); }
-    // Usa l'ultima entry per posizione nell'array (non il valore massimo)
-    // per gestire correttamente OTA eliminate/saltate/rollback
+    // Ultima entry per posizione: corrisponde all'OTA preparata o appena pubblicata.
+    // Non si usa status='published' (vedi commento sopra).
     console.log(cycle[cycle.length - 1].updateNumber);
   " 2>/dev/null || echo "")
 
