@@ -3321,7 +3321,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T13:10:12.938Z"
+  },
+  {
+    "updateNumber": 93,
+    "version": "1.93.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-93 rv7.0.0: Fix crash durante giro — switchTrackingAccuracy e togglePause",
+    "note": "Task #702: aggiunto try-catch in switchTrackingAccuracy() attorno a watchPositionAsync (chiamata al cambio velocità idle/guida/veloce — causa del 'gira un po'...crasha'). Aggiunto .catch(logGpsError) a togglePause() watchPositionAsync. Inclusi i fix di Task #696 (logGpsError con logging remoto). CURRENT_OTA_NUMBER=93.",
+    "releaseId": "61e79132-607e-46f4-b69c-1d8e17ad669e",
+    "bundleUrl": "private/ota/ota-1.93.0-1776522115841.js",
+    "updateGroupId": "ed3933fd-c67c-43f7-bed1-ab617d2ae1bd",
+    "androidUpdateId": "019da0f8-fe3f-761e-b6e1-f4d2c88419c7",
+    "iosUpdateId": null,
+    "commitBase": "10e1b515bf58bb16351bae062f496034ea83db2e",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/ed3933fd-c67c-43f7-bed1-ab617d2ae1bd",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T14:21:58.730Z"
   }
 ]

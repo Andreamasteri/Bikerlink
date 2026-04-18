@@ -32,7 +32,7 @@ import Constants from "expo-constants";
 
 const BG_LOCATION_TASK = "bikerlink-bg-location";
 const BG_POINTS_KEY = "bikerlink-bg-gps-points";
-const CURRENT_OTA_NUMBER = 92;
+const CURRENT_OTA_NUMBER = 93;
 
 async function logGpsError(error: unknown, context: string) {
   try {
@@ -527,11 +527,15 @@ export default function TrackingScreen() {
     }
 
     const config = getModeConfig(newMode, updateProfileRef.current);
-    const sub = await Location.watchPositionAsync(
-      { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
-      onNativeLocation
-    );
-    watchSubRef.current = sub;
+    try {
+      const sub = await Location.watchPositionAsync(
+        { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
+        onNativeLocation
+      );
+      watchSubRef.current = sub;
+    } catch (err) {
+      logGpsError(err, "switchTrackingAccuracy");
+    }
   }, [onNativeLocation]);
 
   const stopAtZeroEnabledRef = useRef(false);
@@ -714,6 +718,8 @@ export default function TrackingScreen() {
           onNativeLocation
         ).then((sub) => {
           watchSubRef.current = sub;
+        }).catch((err) => {
+          logGpsError(err, "togglePause");
         });
       } else if (Platform.OS === "web") {
         const wid = navigator.geolocation.watchPosition(
