@@ -34,6 +34,7 @@ import lastfmRoutes from "./routes/lastfm";
 import radioRoutes from "./routes/radio";
 import eventsRoutes from "./routes/events";
 import arcadeRoutes from "./routes/arcade";
+import errorsRoutes from "./routes/errors";
 import { triggerMatchingRun, triggerMatchingForUser } from "./matching-engine";
 import { db } from "./db";
 import { users, userFavorites } from "@shared/schema";
@@ -134,6 +135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/music/radio", radioRoutes);
   app.use("/api/events", eventsRoutes);
   app.use("/api/arcade", arcadeRoutes);
+  app.use("/api/errors", errorsRoutes);
 
   app.get("/api/favorites", async (req: Request, res: Response) => {
     if (!req.session.userId) return res.status(401).json({ message: "Non autenticato" });

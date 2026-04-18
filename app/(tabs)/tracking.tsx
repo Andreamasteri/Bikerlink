@@ -28,9 +28,34 @@ import { getCurrentLocale } from "@/lib/i18n";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { DeviceMotion } from "expo-sensors";
 import TrackingMap from "@/components/TrackingMap";
+import Constants from "expo-constants";
 
 const BG_LOCATION_TASK = "bikerlink-bg-location";
 const BG_POINTS_KEY = "bikerlink-bg-gps-points";
+const CURRENT_OTA_NUMBER = 92;
+
+async function logGpsError(error: unknown, context: string) {
+  try {
+    const err = error instanceof Error ? error : new Error(String(error));
+    const payload = {
+      errorMessage: err.message || String(error),
+      stackTrace: err.stack || null,
+      otaNumber: CURRENT_OTA_NUMBER,
+      timestamp: new Date().toISOString(),
+      platform: Platform.OS,
+      osVersion: String(Platform.Version),
+      deviceName: Constants.deviceName ?? null,
+      context,
+    };
+    const url = new URL("/api/errors", getApiUrl());
+    await fetch(url.toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+  }
+}
 
 if (Platform.OS !== "web") {
   TaskManager.defineTask<{ locations: Location.LocationObject[] }>(
@@ -1023,7 +1048,8 @@ export default function TrackingScreen() {
             onNativeLocation
           );
           watchSubRef.current = sub;
-        } catch {
+        } catch (gpsErr) {
+          logGpsError(gpsErr, "watchPositionAsync");
           cleanupTracking();
           setIsTracking(false);
           routeIdRef.current = null;
@@ -1060,7 +1086,8 @@ export default function TrackingScreen() {
           }
         }, 1000);
       }
-    } catch {
+    } catch (trackingErr) {
+      logGpsError(trackingErr, "startTracking_outer");
       cleanupTracking();
       setIsTracking(false);
       routeIdRef.current = null;
