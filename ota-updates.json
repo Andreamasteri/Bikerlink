@@ -3344,7 +3344,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T14:21:58.730Z"
+  },
+  {
+    "updateNumber": 94,
+    "version": "1.94.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-94 rv7.0.0: Beacon diagnostici nel flusso di tracciamento",
+    "note": "Task #705: aggiunto sendStartupBeacon() in startTracking (begin, requestPermissions, permissionGranted, apiRouteCreate, routeCreated, watchPositionBegin/OK/Error, done), switchTrackingAccuracy (watchPositionBegin/OK/Error), togglePause resume (watchPositionBegin/OK/Error), handleAppStateChange (background, foreground, watchPositionBegin/OK/Error). Permette di localizzare il punto esatto del crash tramite recupero beacon al riavvio. CURRENT_OTA_NUMBER=94.",
+    "releaseId": "61965128-2b2e-4ee8-9087-27392e1b0391",
+    "bundleUrl": "private/ota/ota-1.94.0-1776524759497.js",
+    "updateGroupId": "9db8ad30-9d4d-4ba2-93ee-38b0c0fb079d",
+    "androidUpdateId": "019da121-44c2-7989-8329-d161f4691520",
+    "iosUpdateId": null,
+    "commitBase": "235f6d757e918a0cf550f3e6bc63d5199a0fdc74",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/9db8ad30-9d4d-4ba2-93ee-38b0c0fb079d",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T15:06:02.481Z"
   }
 ]

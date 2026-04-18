@@ -30,6 +30,7 @@ import { DeviceMotion } from "expo-sensors";
 import TrackingMap from "@/components/TrackingMap";
 import Constants from "expo-constants";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
+import { sendStartupBeacon } from "@/lib/startup-beacon";
 
 const BG_LOCATION_TASK = "bikerlink-bg-location";
 const BG_POINTS_KEY = "bikerlink-bg-gps-points";
@@ -527,13 +528,16 @@ export default function TrackingScreen() {
     }
 
     const config = getModeConfig(newMode, updateProfileRef.current);
+    await sendStartupBeacon("switchTrackingAccuracy:watchPositionBegin", { mode: newMode });
     try {
       const sub = await Location.watchPositionAsync(
         { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
         onNativeLocation
       );
       watchSubRef.current = sub;
+      await sendStartupBeacon("switchTrackingAccuracy:watchPositionOK", { mode: newMode });
     } catch (err) {
+      await sendStartupBeacon("switchTrackingAccuracy:watchPositionError", { mode: newMode, err: String((err as any)?.message ?? err) });
       logGpsError(err, "switchTrackingAccuracy");
     }
   }, [onNativeLocation]);
@@ -713,12 +717,15 @@ export default function TrackingScreen() {
 
       if (Platform.OS !== "web") {
         const config = getModeConfig(currentModeRef.current, updateProfileRef.current);
+        sendStartupBeacon("togglePause:resume:watchPositionBegin");
         Location.watchPositionAsync(
           { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
           onNativeLocation
         ).then((sub) => {
           watchSubRef.current = sub;
+          sendStartupBeacon("togglePause:resume:watchPositionOK");
         }).catch((err) => {
+          sendStartupBeacon("togglePause:resume:watchPositionError", { err: String((err as any)?.message ?? err) });
           logGpsError(err, "togglePause");
         });
       } else if (Platform.OS === "web") {
@@ -795,6 +802,7 @@ export default function TrackingScreen() {
     const tracking = !!routeIdRef.current;
 
     if (nextState === "background" && tracking && Platform.OS !== "web") {
+      await sendStartupBeacon("handleAppStateChange:background");
       if (watchSubRef.current) {
         watchSubRef.current.remove();
         watchSubRef.current = null;
@@ -818,6 +826,7 @@ export default function TrackingScreen() {
         } catch {}
       }
     } else if (nextState === "active" && tracking && Platform.OS !== "web") {
+      await sendStartupBeacon("handleAppStateChange:foreground");
       try {
         const running = await Location.hasStartedLocationUpdatesAsync(BG_LOCATION_TASK);
         if (running) {
@@ -827,13 +836,17 @@ export default function TrackingScreen() {
       await loadBgPoints();
       if (!isPausedRef.current) {
         const config = getModeConfig(currentModeRef.current, updateProfileRef.current);
+        await sendStartupBeacon("handleAppStateChange:foreground:watchPositionBegin");
         try {
           const sub = await Location.watchPositionAsync(
             { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
             onNativeLocation
           );
           watchSubRef.current = sub;
-        } catch {}
+          await sendStartupBeacon("handleAppStateChange:foreground:watchPositionOK");
+        } catch (err) {
+          await sendStartupBeacon("handleAppStateChange:foreground:watchPositionError", { err: String((err as any)?.message ?? err) });
+        }
       }
       if (pointsBufferRef.current.length > 0) {
         flushPoints();
@@ -844,13 +857,17 @@ export default function TrackingScreen() {
   const startTracking = async () => {
     try {
       setLoading(true);
+      await sendStartupBeacon("startTracking:begin");
 
       if (Platform.OS !== "web") {
+        await sendStartupBeacon("startTracking:requestPermissions");
         const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
         if (fgStatus !== "granted") {
+          await sendStartupBeacon("startTracking:permissionDenied");
           Alert.alert("Permesso Negato", "Il permesso GPS è necessario per il tracciamento.");
           return;
         }
+        await sendStartupBeacon("startTracking:permissionGranted");
       } else {
         const perm = await new Promise<boolean>((resolve) => {
           if (!navigator.geolocation) {
@@ -870,9 +887,11 @@ export default function TrackingScreen() {
       }
 
       let res;
+      await sendStartupBeacon("startTracking:apiRouteCreate");
       try {
         res = await apiRequest("POST", "/api/routes", { trackingFrequency: 5, isSprint: sprint0100EnabledRef.current });
       } catch (err: any) {
+        await sendStartupBeacon("startTracking:apiRouteError", { msg: String(err?.message ?? err) });
         if (err.message?.includes("401")) {
           Alert.alert("Login Richiesto", "Devi effettuare il login per usare il tracciamento.");
         } else {
@@ -883,6 +902,7 @@ export default function TrackingScreen() {
 
       const data = await res.json();
       routeIdRef.current = data.id;
+      await sendStartupBeacon("startTracking:routeCreated", { routeId: data.id });
 
 
       setTotalTime(0);
@@ -1047,6 +1067,7 @@ export default function TrackingScreen() {
       }, STATS_SYNC_INTERVAL_MS);
 
       if (Platform.OS !== "web") {
+        await sendStartupBeacon("startTracking:watchPositionBegin");
         try {
           const config = getModeConfig("idle", updateProfileRef.current);
           const sub = await Location.watchPositionAsync(
@@ -1054,7 +1075,9 @@ export default function TrackingScreen() {
             onNativeLocation
           );
           watchSubRef.current = sub;
+          await sendStartupBeacon("startTracking:watchPositionOK");
         } catch (gpsErr) {
+          await sendStartupBeacon("startTracking:watchPositionError", { err: String((gpsErr as any)?.message ?? gpsErr) });
           logGpsError(gpsErr, "watchPositionAsync");
           cleanupTracking();
           setIsTracking(false);
@@ -1070,6 +1093,8 @@ export default function TrackingScreen() {
         );
         webWatchIdRef.current = wid;
       }
+
+      await sendStartupBeacon("startTracking:done");
 
       if (sprint0100Enabled) {
         if (Platform.OS !== "web") {
