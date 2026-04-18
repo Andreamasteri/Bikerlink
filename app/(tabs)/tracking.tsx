@@ -911,7 +911,6 @@ export default function TrackingScreen() {
       prevMotionTimeRef.current = null;
       sprintBearingRad.current = 0;
       lastGpsHeadingRef.current = null;
-      sprintAutoHandsOffRef.current = false;
 
       if (sprint0100Enabled) {
         prevUpdateProfileRef.current = updateProfileRef.current;
