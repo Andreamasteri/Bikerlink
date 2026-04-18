@@ -29,6 +29,7 @@ import TrackingMap from "@/components/TrackingMap";
 import { setTrackingActive, setHandsOffBroadcast, setSprintMeasuringBroadcast } from "@/lib/tracking-active";
 import * as Haptics from "expo-haptics";
 import { logGpsError } from "@/lib/gps-logger";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -59,11 +60,20 @@ interface RouteRecord {
   sprint0to100Ms?: number | null;
 }
 
+// ─── Local record type (offline-recovered, not synced to server) ──────────────
+
+interface LocalRouteRecord extends RouteRecord {
+  isRecovered: true;
+  notes: string;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const IDLE_THRESHOLD_KMH = 2;
 const BATCH_SIZE = 10;
 const BATCH_FLUSH_MS = 20000;
+const GPS_BUFFER_KEY = "@bikerlink/gps_buffer";
+const GPS_BUFFER_WRITE_EVERY = 5;
 
 const PROFILE_LABELS: Record<UpdateProfile, string> = {
   easy: "Passeggio",
@@ -294,6 +304,7 @@ export default function TrackingScreen() {
   const [summaryVisible, setSummaryVisible] = useState(false);
   const [publishRecord, setPublishRecord] = useState<RouteRecord | null>(null);
   const [publishCaption, setPublishCaption] = useState("");
+  const [recoveredRecords, setRecoveredRecords] = useState<LocalRouteRecord[]>([]);
 
   // GPS display
   const [currentSpeed, setCurrentSpeed] = useState(0);
@@ -363,6 +374,8 @@ export default function TrackingScreen() {
   const sprintPhaseRef = useRef<"waiting" | "measuring" | "done">("waiting");
   const handsOffAnim = useRef(new Animated.Value(1)).current;
   const sprint0to100MsRef = useRef<number | null>(null);
+  const gpsOfflineBufferRef = useRef<GpsPoint[]>([]);
+  const gpsOfflineWriteCountRef = useRef(0);
 
   // Derived
   const isFermo = currentSpeed <= IDLE_THRESHOLD_KMH;
@@ -462,6 +475,107 @@ export default function TrackingScreen() {
       profileRef.current = "race";
     }
   }, [is0100Enabled]);
+
+  // ── Offline GPS buffer helpers ─────────────────────────────────────────────
+  const writeGpsBuffer = useCallback(async () => {
+    try {
+      await AsyncStorage.setItem(
+        GPS_BUFFER_KEY,
+        JSON.stringify(gpsOfflineBufferRef.current)
+      );
+    } catch (_) {}
+  }, []);
+
+  const clearGpsBuffer = useCallback(async () => {
+    gpsOfflineBufferRef.current = [];
+    gpsOfflineWriteCountRef.current = 0;
+    try {
+      await AsyncStorage.removeItem(GPS_BUFFER_KEY);
+    } catch (_) {}
+  }, []);
+
+  const appendPointToOfflineBuffer = useCallback(
+    (point: GpsPoint) => {
+      gpsOfflineBufferRef.current.push(point);
+      gpsOfflineWriteCountRef.current += 1;
+      if (gpsOfflineWriteCountRef.current >= GPS_BUFFER_WRITE_EVERY) {
+        gpsOfflineWriteCountRef.current = 0;
+        writeGpsBuffer();
+      }
+    },
+    [writeGpsBuffer]
+  );
+
+  // ── Check for orphan buffer on mount ──────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(GPS_BUFFER_KEY);
+        if (!raw) return;
+        const points: GpsPoint[] = JSON.parse(raw);
+        if (points.length <= 3) {
+          await AsyncStorage.removeItem(GPS_BUFFER_KEY);
+          return;
+        }
+        Alert.alert(
+          "Giro interrotto trovato",
+          `Trovato un giro incompleto con ${points.length} punti GPS. Vuoi recuperarlo o scartarlo?`,
+          [
+            {
+              text: "Scarta",
+              style: "destructive",
+              onPress: async () => {
+                await AsyncStorage.removeItem(GPS_BUFFER_KEY);
+              },
+            },
+            {
+              text: "Recupera",
+              onPress: () => {
+                let totalDistKm = 0;
+                let maxSpeedKmh = 0;
+                let sumSpeed = 0;
+
+                for (let i = 0; i < points.length; i++) {
+                  const p = points[i];
+                  if (i > 0) {
+                    const prev = points[i - 1];
+                    const d = haversineKm(
+                      prev.latitude, prev.longitude,
+                      p.latitude, p.longitude
+                    );
+                    if (d > 0.001 && d < 1) totalDistKm += d;
+                  }
+                  if (p.speedKmh > maxSpeedKmh) maxSpeedKmh = p.speedKmh;
+                  sumSpeed += p.speedKmh;
+                }
+
+                const firstTs = new Date(points[0].timestamp).getTime();
+                const lastTs = new Date(points[points.length - 1].timestamp).getTime();
+                const durationSec = Math.max(Math.round((lastTs - firstTs) / 1000), 1);
+                const avgSpeed = sumSpeed / points.length;
+
+                const recovered: LocalRouteRecord = {
+                  id: `recovered-${Date.now()}`,
+                  totalDistanceKm: totalDistKm,
+                  maxSpeedKmh: maxSpeedKmh,
+                  avgSpeedKmh: avgSpeed,
+                  durationSeconds: durationSec,
+                  status: "completed",
+                  createdAt: points[0].timestamp,
+                  isRecovered: true,
+                  notes: "(recuperato)",
+                };
+
+                setRecoveredRecords((prev) => [recovered, ...prev]);
+                AsyncStorage.removeItem(GPS_BUFFER_KEY).catch(() => {});
+              },
+            },
+          ],
+          { cancelable: false }
+        );
+      } catch (_) {}
+    })();
+  }, []); // only on mount
 
   // ── Flush GPS points ───────────────────────────────────────────────────────
   const flushPoints = useCallback(async () => {
@@ -573,8 +687,9 @@ export default function TrackingScreen() {
       if (pointsBufferRef.current.length >= BATCH_SIZE) {
         flushPoints();
       }
+      appendPointToOfflineBuffer(point);
     },
-    [flushPoints]
+    [flushPoints, appendPointToOfflineBuffer]
   );
 
   // ── Web GPS handler ────────────────────────────────────────────────────────
@@ -646,8 +761,9 @@ export default function TrackingScreen() {
       if (pointsBufferRef.current.length >= BATCH_SIZE) {
         flushPoints();
       }
+      appendPointToOfflineBuffer(point);
     },
-    [flushPoints]
+    [flushPoints, appendPointToOfflineBuffer]
   );
 
   // ── Cleanup all subscriptions ──────────────────────────────────────────────
@@ -714,6 +830,8 @@ export default function TrackingScreen() {
     pausedMsRef.current = 0;
     isPausedRef.current = false;
     setIsCalibrating(false);
+    gpsOfflineBufferRef.current = [];
+    gpsOfflineWriteCountRef.current = 0;
   }, []);
 
   // ── Recalibrate G on-demand ────────────────────────────────────────────────
@@ -955,12 +1073,14 @@ export default function TrackingScreen() {
         maxDecelerationG: maxDecelGRef.current,
         sprint0to100Ms: sprint0to100MsRef.current,
       });
+      await clearGpsBuffer();
       await refetchRecords();
       setSummaryVisible(true);
     } catch (e) {
       logGpsError(e, "stopTracking:PUT", { routeId: rId });
+      clearGpsBuffer().catch(() => {});
     }
-  }, [cleanupTracking, flushPoints, refetchRecords]);
+  }, [cleanupTracking, flushPoints, refetchRecords, clearGpsBuffer]);
 
   // ── Handle STOP (user-initiated) ───────────────────────────────────────────
   const handleStop = useCallback(() => {
@@ -1528,6 +1648,42 @@ export default function TrackingScreen() {
             </TouchableOpacity>
             <Text style={styles.startBtnLabel}>Tocca per iniziare</Text>
           </View>
+
+          {/* Recovered records (offline-only, not synced) */}
+          {recoveredRecords.length > 0 && (
+            <View style={styles.recordsSection}>
+              <Text style={styles.sectionTitle}>Giri recuperati</Text>
+              {recoveredRecords.map((item) => (
+                <View key={item.id} style={[styles.statCard, { flexDirection: "column", alignItems: "flex-start", gap: 6 }]}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Ionicons name="warning-outline" size={14} color={Colors.warning} />
+                    <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.warning }}>
+                      {item.notes}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() =>
+                        setRecoveredRecords((prev) => prev.filter((r) => r.id !== item.id))
+                      }
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      style={{ marginLeft: "auto" }}
+                    >
+                      <Ionicons name="close-circle-outline" size={18} color={Colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.statValue}>
+                    {formatDistance(item.totalDistanceKm ?? 0, distanceUnit, 2)}
+                  </Text>
+                  <Text style={styles.statLabel}>
+                    Vel. max {formatSpeed(item.maxSpeedKmh ?? 0, speedUnit, 1)} ·{" "}
+                    {formatHMS((item.durationSeconds ?? 0) * 1000)}
+                  </Text>
+                  <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary }}>
+                    {new Date(item.createdAt).toLocaleString(getCurrentLocale())}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Completed records */}
           {completedRecords.length > 0 && (
