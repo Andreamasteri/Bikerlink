@@ -3275,7 +3275,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T12:13:42.850Z"
+  },
+  {
+    "updateNumber": 91,
+    "version": "1.91.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-91 rv7.0.0: Fix pulsante Start — rimozione requestBackgroundPermissionsAsync",
+    "note": "Task #692: rimossa chiamata requestBackgroundPermissionsAsync() da startTracking() che su Android 11+ mandava l'utente alle impostazioni di sistema bloccando il tracking. Aggiunto setCountdownValue(null) in cleanupTracking() per evitare countdown bloccato. Aggiunto routeIdRef.current = null nel finally di stopTracking per pulizia stato stale se API fallisce. CURRENT_OTA_NUMBER=91.",
+    "releaseId": "a4cf3cb1-4c0e-45dc-bc18-91aa551b55a6",
+    "bundleUrl": "private/ota/ota-1.91.0-1776516343186.js",
+    "updateGroupId": "1892b759-bfae-4aed-a07a-57bf6a21abd5",
+    "androidUpdateId": "019da0a1-3f5d-7420-904b-54c16a09550e",
+    "iosUpdateId": null,
+    "commitBase": "1c49803bf30cde7d020b0b1b2444e6dc0490f9ba",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/1892b759-bfae-4aed-a07a-57bf6a21abd5",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T12:45:46.117Z"
   }
 ]

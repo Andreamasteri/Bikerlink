@@ -417,6 +417,7 @@ export default function TrackingScreen() {
       clearTimeout(bgDismissTimerRef.current);
       bgDismissTimerRef.current = null;
     }
+    setCountdownValue(null);
     if (Platform.OS !== "web") {
       Location.hasStartedLocationUpdatesAsync(BG_LOCATION_TASK)
         .then((running) => {
@@ -819,17 +820,6 @@ export default function TrackingScreen() {
           Alert.alert("Permesso Negato", "Il permesso GPS è necessario per il tracciamento.");
           return;
         }
-        const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
-        if (bgStatus === "granted") {
-          setBgPermGranted(true);
-        } else {
-          setBgPermGranted(false);
-          Alert.alert(
-            "Background GPS",
-            "Per registrare la gita con lo schermo spento, consenti l'accesso alla posizione 'Sempre' nelle impostazioni.",
-            [{ text: "Continua", style: "default" }]
-          );
-        }
       } else {
         const perm = await new Promise<boolean>((resolve) => {
           if (!navigator.geolocation) {
@@ -1145,6 +1135,7 @@ export default function TrackingScreen() {
     } catch {
       Alert.alert("Errore", "Errore nel completamento della sessione.");
     } finally {
+      routeIdRef.current = null;
       setIsTracking(false);
       if (sprintAutoHandsOffRef.current) {
         sprintAutoHandsOffRef.current = false;
