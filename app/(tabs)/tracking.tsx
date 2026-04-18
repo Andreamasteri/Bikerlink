@@ -1009,6 +1009,9 @@ export default function TrackingScreen() {
       }
 
       resetTrackingState();
+      // Clear any orphan buffer segments from a previous failed session
+      // so they don't mix with the new ride's points
+      await clearGpsBuffer();
 
       const route = (await apiRequest("POST", "/api/routes", {
         trackingFrequency: profile === "race" ? 1 : profile === "easy" ? 3 : 2,
@@ -1067,6 +1070,7 @@ export default function TrackingScreen() {
     countdownEnabled,
     countdownSec,
     resetTrackingState,
+    clearGpsBuffer,
     beginActiveTracking,
     countdownAnim,
   ]);
