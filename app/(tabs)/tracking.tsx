@@ -26,7 +26,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getCurrentLocale } from "@/lib/i18n";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
-import { DeviceMotion } from "expo-sensors";
+import DeviceMotion from "expo-sensors/build/DeviceMotion";
 import TrackingMap from "@/components/TrackingMap";
 import Constants from "expo-constants";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";

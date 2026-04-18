@@ -3436,7 +3436,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T16:10:30.711Z"
+  },
+  {
+    "updateNumber": 98,
+    "version": "1.98.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-98 rv7.0.0: Fix crash ExponentPedometer — import DeviceMotion diretto",
+    "note": "Task #713: crash post-OTA-97 — Cannot find native module 'ExponentPedometer'. Causa: import { DeviceMotion } from 'expo-sensors' caricava staticamente il barrel export che esegue import * as Pedometer from './Pedometer', il cui modulo nativo non è nell'APK v29. Fix one-liner: import DeviceMotion from 'expo-sensors/build/DeviceMotion' — bypassa il barrel e carica solo DeviceMotion senza toccare il Pedometer. CURRENT_OTA_NUMBER=98.",
+    "releaseId": "1f8eeee8-f926-4235-bc60-8c4d2c6550ae",
+    "bundleUrl": "private/ota/ota-1.98.0-1776531850744.js",
+    "updateGroupId": "634cf99f-aaa9-40b4-8a19-8d35730cd773",
+    "androidUpdateId": "019da18d-7422-73d5-91cf-b83569a6a9d4",
+    "iosUpdateId": null,
+    "commitBase": "d43a65a4e9f05eae8d01bdb1029ac3eab54c46df",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/634cf99f-aaa9-40b4-8a19-8d35730cd773",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T17:04:13.419Z"
   }
 ]
