@@ -3045,7 +3045,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T03:06:21.187Z"
+  },
+  {
+    "updateNumber": 81,
+    "version": "1.81.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-81 rv7.0.0: GPS callback TDZ fix + Promise.race timeout pre-warm",
+    "note": "Task #669 fix finale: sostituisce OTA-80 (aveva timeInterval+as any). onNativeLocation/onWebLocation dichiarate PRIMA di switchTrackingAccuracy con deps:[]. Pre-warm timeout 8s via Promise.race senza as any. CURRENT_OTA_NUMBER=81.",
+    "releaseId": "facad573-9552-44cb-91c0-094c670a62f0",
+    "bundleUrl": "private/ota/ota-1.81.0-1776481902747.js",
+    "updateGroupId": "72a95499-6c3d-49e4-8ce2-a3a11e560635",
+    "androidUpdateId": "019d9e93-5086-7229-aa8e-88e77ab777b0",
+    "iosUpdateId": null,
+    "commitBase": "eb37a729b457b0b51b4fba9b7109d3386e637818",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/72a95499-6c3d-49e4-8ce2-a3a11e560635",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T03:11:45.458Z"
   }
 ]

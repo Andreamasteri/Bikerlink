@@ -210,10 +210,13 @@ export default function TrackingScreen() {
         if (Platform.OS !== "web") {
           const { status } = await Location.getForegroundPermissionsAsync();
           if (status === "granted") {
-            const loc = await Location.getCurrentPositionAsync({
-              accuracy: Location.Accuracy.Balanced,
-              timeInterval: 8000,
-            } as any);
+            const gpsTimeout = new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("GPS pre-warm timeout")), 8000)
+            );
+            const loc = await Promise.race([
+              Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+              gpsTimeout,
+            ]);
             setGpsAccuracy(loc.coords.accuracy ?? null);
           }
         } else if (typeof navigator !== "undefined" && navigator.geolocation) {
