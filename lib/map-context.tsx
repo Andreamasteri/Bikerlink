@@ -17,7 +17,6 @@ interface MapsApiResponse {
   enabled: boolean;
   provider: string;
   userChoiceEnabled: boolean;
-  engine: string;
 }
 
 interface UserProfileResponse {

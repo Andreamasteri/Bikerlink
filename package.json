@@ -110,7 +110,6 @@
   "expo": {
     "install": {
       "exclude": [
-        "react-native-maps",
         "react-native-reanimated"
       ]
     },

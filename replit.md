@@ -19,7 +19,7 @@ BikerLink utilizes a modern full-stack architecture.
 - Internationalization supports 5 languages (IT/EN/DE/ES/FR) via `lib/i18n.ts` and `lib/language-context.tsx`.
 - The UI/UX features a dark theme by default (background `#0D0D0D`, accent `#FF6600`) and includes custom icons like a Shark Carbon helmet for SOS.
 - **Brand Theme Switcher**: Admin panel includes a 4-theme selector ("Attuale", "Asfalto Caldo", "Velocità Pura", "Rotta Libera"). Themes are defined in `constants/colors.ts` (`THEMES`), managed via `ThemeProvider` in `lib/theme-context.tsx`, persisted in AsyncStorage. Components use `useColors()` from `hooks/useColors.ts` to receive dynamic colors.
-- Interactive maps are implemented using `react-native-maps`, with web-specific components (`.web.tsx`) providing alternative UIs where native map features are not available.
+- Interactive maps are implemented esclusivamente con Leaflet in WebView (componenti `Leaflet*Map.tsx`), con varianti web-specifiche (`.web.tsx`) dove necessario.
 - Features include user profiles (Biker, Zavorrina/Zavorrino, Coppia), interactive maps displaying users, Syneco workshops, and collectible easter eggs.
 - Users can create and respond to ride proposals, engage in private and group chats, and track GPS routes with performance statistics.
 - A photo contest system allows users to upload and vote on photos.
@@ -64,7 +64,7 @@ BikerLink utilizes a modern full-stack architecture.
 **Deployment & Operations:**
 - Development workflow includes separate commands for frontend and backend, with watchdog scripts for automatic restarts and error monitoring.
 - EAS Build is used for cloud-based Android APK and AAB generation, supporting `preview` and `production` profiles.
-- **react-native-reanimated@~4.2.1** (versione corretta SDK 55, bundledNativeModules.json) e **react-native-maps@1.27.2** configurati per compatibilità EAS. NOTA: reanimated 3.x causava CMake build failure con NDK r27b (immagine EAS ubuntu-24.04-jdk-17-ndk-r27b-sdk-55). Android/ rimosso da git — EAS usa managed workflow (expo prebuild automatico).
+- **react-native-reanimated@~4.2.1** (versione corretta SDK 55, bundledNativeModules.json) configurato per compatibilità EAS. NOTA: reanimated 3.x causava CMake build failure con NDK r27b (immagine EAS ubuntu-24.04-jdk-17-ndk-r27b-sdk-55). Android/ rimosso da git — EAS usa managed workflow (expo prebuild automatico). `react-native-maps` rimosso (Task #717): tutte le mappe usano Leaflet in WebView.
 - OTA updates are managed via custom scripts for seamless deployment of new features.
 
 ## Utenti Seed
@@ -90,7 +90,6 @@ Il seed imposta `emailVerified: true` per tutti gli utenti creati.
 - **Drizzle ORM**: Object-Relational Mapper for database interaction.
 - **@tanstack/react-query**: Data fetching and caching library for React.
 - **Replit Object Storage**: Cloud storage for media files and backups.
-- **react-native-maps**: Native map components for React Native.
 - **pdfkit**: Library for PDF generation (used in scripts).
 - **Zod**: Schema validation library.
 - **express-rate-limit**: Middleware for rate limiting API requests.

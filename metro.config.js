@@ -93,24 +93,6 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     }
   }
 
-  if (platform === "web") {
-    if (moduleName === "react-native-maps") {
-      return {
-        filePath: path.join(__dirname, "mocks/react-native-maps.js"),
-        type: "sourceFile",
-      };
-    }
-    if (
-      context.originModulePath &&
-      context.originModulePath.includes("node_modules/react-native-maps")
-    ) {
-      return {
-        filePath: path.join(__dirname, "mocks/empty.js"),
-        type: "sourceFile",
-      };
-    }
-  }
-
   return context.resolveRequest(context, moduleName, platform);
 };
 
