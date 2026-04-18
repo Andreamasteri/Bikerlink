@@ -26,6 +26,7 @@ import { getCurrentLocale } from "@/lib/i18n";
 import TrackingMap from "@/components/TrackingMap";
 import { setTrackingActive } from "@/lib/tracking-active";
 import Constants from "expo-constants";
+import { useUnits, SpeedUnit, DistanceUnit } from "@/lib/units-context";
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -107,6 +108,32 @@ function getAccuracyTier(meters: number | null): { label: string; color: string;
   return { label: "Scarsa", color: Colors.accentRed, value: `${m}m` };
 }
 
+// ─── Unit conversions ─────────────────────────────────────────────────────────
+
+function convertSpeed(kmh: number, unit: SpeedUnit): number {
+  if (unit === "mph") return kmh * 0.621371;
+  if (unit === "knots") return kmh * 0.539957;
+  return kmh;
+}
+
+function speedUnitLabel(unit: SpeedUnit): string {
+  if (unit === "mph") return "mph";
+  if (unit === "knots") return "kn";
+  return "km/h";
+}
+
+function convertDistance(km: number, unit: DistanceUnit): number {
+  if (unit === "mi_ft" || unit === "mi_yd") return km * 0.621371;
+  if (unit === "nmi_ftm") return km * 0.539957;
+  return km;
+}
+
+function distanceUnitLabel(unit: DistanceUnit): string {
+  if (unit === "mi_ft" || unit === "mi_yd") return "mi";
+  if (unit === "nmi_ftm") return "nmi";
+  return "km";
+}
+
 function getModeConfig(profile: UpdateProfile): {
   accuracy: Location.Accuracy;
   timeInterval: number;
@@ -179,6 +206,7 @@ function RecordCard({
   onPublish: () => void;
   onDelete: () => void;
 }) {
+  const { speedUnit, distanceUnit } = useUnits();
   const dur = item.durationSeconds || 0;
   return (
     <View
@@ -222,11 +250,13 @@ function RecordCard({
             <Text style={styles.recordStatValue}>
               {item.sprint0to100Ms != null ? (item.sprint0to100Ms / 1000).toFixed(2) + "s" : "—"}
             </Text>
-            <Text style={styles.recordStatLabel}>0→100 km/h</Text>
+            <Text style={styles.recordStatLabel}>0→{convertSpeed(100, speedUnit).toFixed(0)} {speedUnitLabel(speedUnit)}</Text>
           </View>
           <View style={styles.recordStat}>
-            <Text style={styles.recordStatValue}>{(item.maxSpeedKmh || 0).toFixed(0)}</Text>
-            <Text style={styles.recordStatLabel}>vel. max</Text>
+            <Text style={styles.recordStatValue}>
+              {convertSpeed(item.maxSpeedKmh || 0, speedUnit).toFixed(0)}
+            </Text>
+            <Text style={styles.recordStatLabel}>vel. max {speedUnitLabel(speedUnit)}</Text>
           </View>
           {item.maxAccelerationG != null && (
             <View style={styles.recordStat}>
@@ -239,7 +269,7 @@ function RecordCard({
         <View style={styles.recordRow}>
           <View style={styles.recordStat}>
             <Text style={styles.recordStatValue}>
-              {(item.totalDistanceKm || 0).toFixed(2)} km
+              {convertDistance(item.totalDistanceKm || 0, distanceUnit).toFixed(2)} {distanceUnitLabel(distanceUnit)}
             </Text>
             <Text style={styles.recordStatLabel}>distanza</Text>
           </View>
@@ -248,8 +278,10 @@ function RecordCard({
             <Text style={styles.recordStatLabel}>durata</Text>
           </View>
           <View style={styles.recordStat}>
-            <Text style={styles.recordStatValue}>{(item.maxSpeedKmh || 0).toFixed(0)}</Text>
-            <Text style={styles.recordStatLabel}>vel. max</Text>
+            <Text style={styles.recordStatValue}>
+              {convertSpeed(item.maxSpeedKmh || 0, speedUnit).toFixed(0)}
+            </Text>
+            <Text style={styles.recordStatLabel}>vel. max {speedUnitLabel(speedUnit)}</Text>
           </View>
         </View>
       )}
@@ -261,6 +293,7 @@ function RecordCard({
 
 export default function TrackingScreen() {
   const insets = useSafeAreaInsets();
+  const { speedUnit, distanceUnit } = useUnits();
 
   // Settings
   const [profile, setProfile] = useState<UpdateProfile>("medium");
@@ -966,10 +999,10 @@ export default function TrackingScreen() {
             <Text style={styles.handsOffMsg}>VELOCITÀ HANDS OFF RAGGIUNTA!</Text>
           </Animated.View>
           <View style={styles.handsOffInfo}>
-            <Text style={styles.handsOffSpeed}>{currentSpeed.toFixed(0)}</Text>
-            <Text style={styles.handsOffUnit}>km/h</Text>
+            <Text style={styles.handsOffSpeed}>{convertSpeed(currentSpeed, speedUnit).toFixed(0)}</Text>
+            <Text style={styles.handsOffUnit}>{speedUnitLabel(speedUnit)}</Text>
             <Text style={styles.handsOffSub}>
-              Tocchi bloccati sopra {handsOffSpeedStr} km/h
+              Tocchi bloccati sopra {convertSpeed(parseFloat(handsOffSpeedStr || "50") || 50, speedUnit).toFixed(0)} {speedUnitLabel(speedUnit)}
             </Text>
             <Text style={styles.handsOffSub}>
               Si riattivano quando rallenti
@@ -1077,10 +1110,10 @@ export default function TrackingScreen() {
               </View>
               <Text style={[styles.speedValue, is0100Enabled && styles.speedValueSprint]}>
                 {is0100Enabled
-                  ? currentSpeed.toFixed(1)
-                  : currentSpeed.toFixed(0)}
+                  ? convertSpeed(currentSpeed, speedUnit).toFixed(1)
+                  : convertSpeed(currentSpeed, speedUnit).toFixed(0)}
               </Text>
-              <Text style={styles.speedUnit}>km/h</Text>
+              <Text style={styles.speedUnit}>{speedUnitLabel(speedUnit)}</Text>
             </View>
 
             {/* Stats — standard mode */}
@@ -1102,14 +1135,14 @@ export default function TrackingScreen() {
                   <StatCard
                     icon="flash"
                     color={Colors.accentRed}
-                    value={maxSpeed.toFixed(2)}
-                    label="Vel. max km/h"
+                    value={convertSpeed(maxSpeed, speedUnit).toFixed(2)}
+                    label={`Vel. max ${speedUnitLabel(speedUnit)}`}
                   />
                   <StatCard
                     icon="navigate-outline"
                     color={Colors.accent}
-                    value={totalKm.toFixed(3)}
-                    label="Km totali"
+                    value={convertDistance(totalKm, distanceUnit).toFixed(3)}
+                    label={`${distanceUnitLabel(distanceUnit)} totali`}
                   />
                 </View>
                 <View style={styles.statsCol}>
@@ -1122,8 +1155,8 @@ export default function TrackingScreen() {
                   <StatCard
                     icon="speedometer-outline"
                     color={Colors.success}
-                    value={avgSpeedKmh.toFixed(2)}
-                    label="Vel. media km/h"
+                    value={convertSpeed(avgSpeedKmh, speedUnit).toFixed(2)}
+                    label={`Vel. media ${speedUnitLabel(speedUnit)}`}
                   />
                   <StatCard
                     icon="trending-up-outline"
@@ -1186,7 +1219,7 @@ export default function TrackingScreen() {
 
                 {sprint0to100Ms !== null && (
                   <Text style={styles.sprint0100Time}>
-                    0→100 in {(sprint0to100Ms / 1000).toFixed(2)}s
+                    0→{convertSpeed(100, speedUnit).toFixed(0)} {speedUnitLabel(speedUnit)} in {(sprint0to100Ms / 1000).toFixed(2)}s
                   </Text>
                 )}
 
@@ -1394,7 +1427,7 @@ export default function TrackingScreen() {
                   color={Colors.textSecondary}
                 />
                 <View>
-                  <Text style={styles.triggerLabel}>0-100 km/h</Text>
+                  <Text style={styles.triggerLabel}>0-{convertSpeed(100, speedUnit).toFixed(0)} {speedUnitLabel(speedUnit)}</Text>
                   {is0100Enabled && (
                     <Text style={[styles.triggerDesc, { color: Colors.accent }]}>
                       Forza modalità Race
@@ -1521,14 +1554,14 @@ export default function TrackingScreen() {
               <StatCard
                 icon="navigate-outline"
                 color={Colors.accent}
-                value={totalKm.toFixed(3) + " km"}
+                value={convertDistance(totalKm, distanceUnit).toFixed(3) + " " + distanceUnitLabel(distanceUnit)}
                 label="Distanza"
               />
               <StatCard
                 icon="flash"
                 color={Colors.accentRed}
-                value={maxSpeed.toFixed(1)}
-                label="Vel. max km/h"
+                value={convertSpeed(maxSpeed, speedUnit).toFixed(1)}
+                label={`Vel. max ${speedUnitLabel(speedUnit)}`}
               />
             </View>
             <View style={styles.statsRow}>
@@ -1541,8 +1574,8 @@ export default function TrackingScreen() {
               <StatCard
                 icon="speedometer-outline"
                 color={Colors.success}
-                value={avgSpeedKmh.toFixed(1)}
-                label="Vel. media"
+                value={convertSpeed(avgSpeedKmh, speedUnit).toFixed(1)}
+                label={`Vel. media ${speedUnitLabel(speedUnit)}`}
               />
             </View>
             {is0100Enabled && sprint0to100Ms !== null && (
@@ -1551,7 +1584,7 @@ export default function TrackingScreen() {
                   icon="timer-outline"
                   color={Colors.accentRed}
                   value={(sprint0to100Ms / 1000).toFixed(2) + "s"}
-                  label="0→100 km/h"
+                  label={`0→${convertSpeed(100, speedUnit).toFixed(0)} ${speedUnitLabel(speedUnit)}`}
                 />
                 <StatCard
                   icon="pulse-outline"
