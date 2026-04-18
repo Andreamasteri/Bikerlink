@@ -204,6 +204,29 @@ export default function TrackingScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    const warmUp = async () => {
+      try {
+        if (Platform.OS !== "web") {
+          const { status } = await Location.getForegroundPermissionsAsync();
+          if (status === "granted") {
+            const loc = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+            setGpsAccuracy(loc.coords.accuracy ?? null);
+          }
+        } else if (typeof navigator !== "undefined" && navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => setGpsAccuracy(pos.coords.accuracy),
+            () => {},
+            { enableHighAccuracy: false, timeout: 8000 }
+          );
+        }
+      } catch {}
+    };
+    warmUp();
+  }, []);
+
   const handleAppStateChange = useCallback((nextState: AppStateStatus) => {
     if (nextState === "active" && routeIdRef.current && pointsBufferRef.current.length > 0) {
       flushPoints();
@@ -282,15 +305,10 @@ export default function TrackingScreen() {
     const config = getModeConfig(newMode, updateProfileRef.current);
     const sub = await Location.watchPositionAsync(
       { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
-      (loc) => {
-        setGpsAccuracy(loc.coords.accuracy);
-        if (!isPausedRef.current) {
-          handleGpsUpdate(loc.coords.latitude, loc.coords.longitude, loc.coords.altitude, loc.coords.speed);
-        }
-      }
+      onNativeLocation
     );
     watchSubRef.current = sub;
-  }, []);
+  }, [onNativeLocation]);
 
   const stopAtZeroEnabledRef = useRef(false);
   const handsOffEnabledRef = useRef(false);
@@ -395,6 +413,20 @@ export default function TrackingScreen() {
     }
   }, []);
 
+  const onNativeLocation = useCallback((loc: Location.LocationObject) => {
+    setGpsAccuracy(loc.coords.accuracy ?? null);
+    if (!isPausedRef.current) {
+      handleGpsUpdate(loc.coords.latitude, loc.coords.longitude, loc.coords.altitude, loc.coords.speed);
+    }
+  }, [handleGpsUpdate]);
+
+  const onWebLocation = useCallback((pos: GeolocationPosition) => {
+    setGpsAccuracy(pos.coords.accuracy);
+    if (!isPausedRef.current) {
+      handleGpsUpdate(pos.coords.latitude, pos.coords.longitude, pos.coords.altitude, pos.coords.speed);
+    }
+  }, [handleGpsUpdate]);
+
   const togglePause = useCallback(() => {
     if (isPausedRef.current) {
       const pauseDuration = Date.now() - pauseStartRef.current;
@@ -408,23 +440,13 @@ export default function TrackingScreen() {
         const config = getModeConfig(currentModeRef.current, updateProfileRef.current);
         Location.watchPositionAsync(
           { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
-          (loc) => {
-            setGpsAccuracy(loc.coords.accuracy);
-            if (!isPausedRef.current) {
-              handleGpsUpdate(loc.coords.latitude, loc.coords.longitude, loc.coords.altitude, loc.coords.speed);
-            }
-          }
+          onNativeLocation
         ).then((sub) => {
           watchSubRef.current = sub;
         });
       } else if (Platform.OS === "web") {
         const wid = navigator.geolocation.watchPosition(
-          (pos) => {
-            setGpsAccuracy(pos.coords.accuracy);
-            if (!isPausedRef.current) {
-              handleGpsUpdate(pos.coords.latitude, pos.coords.longitude, pos.coords.altitude, pos.coords.speed);
-            }
-          },
+          onWebLocation,
           () => {},
           { enableHighAccuracy: true, maximumAge: 3000 }
         );
@@ -550,22 +572,12 @@ export default function TrackingScreen() {
         const config = getModeConfig("idle", updateProfile);
         const sub = await Location.watchPositionAsync(
           { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
-          (loc) => {
-            setGpsAccuracy(loc.coords.accuracy);
-            if (!isPausedRef.current) {
-              handleGpsUpdate(loc.coords.latitude, loc.coords.longitude, loc.coords.altitude, loc.coords.speed);
-            }
-          }
+          onNativeLocation
         );
         watchSubRef.current = sub;
       } else {
         const wid = navigator.geolocation.watchPosition(
-          (pos) => {
-            setGpsAccuracy(pos.coords.accuracy);
-            if (!isPausedRef.current) {
-              handleGpsUpdate(pos.coords.latitude, pos.coords.longitude, pos.coords.altitude, pos.coords.speed);
-            }
-          },
+          onWebLocation,
           () => {},
           { enableHighAccuracy: true, maximumAge: 3000 }
         );
@@ -740,18 +752,17 @@ export default function TrackingScreen() {
                   </View>
                 );
               })()}
+              {accuracyTier ? (
+                <View style={styles.accuracyBadge}>
+                  <Text style={[styles.accuracyText, { color: accuracyTier.color }]}>
+                    {accuracyTier.label}
+                  </Text>
+                  <Text style={[styles.accuracyText, { color: "#ffffff" }]}>
+                    {" "}{accuracyTier.value}
+                  </Text>
+                </View>
+              ) : null}
             </View>
-
-            {accuracyTier ? (
-              <View style={styles.accuracyRow}>
-                <Text style={[styles.accuracyText, { color: accuracyTier.color }]}>
-                  {accuracyTier.label}
-                </Text>
-                <Text style={[styles.accuracyText, { color: "#ffffff" }]}>
-                  {" "}{accuracyTier.value}
-                </Text>
-              </View>
-            ) : null}
 
             <View style={styles.speedBox}>
               <Text style={[styles.speedValue, isPaused && { color: Colors.textSecondary }]}>
@@ -1064,9 +1075,9 @@ const styles = StyleSheet.create({
   statusRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
   statusBadge: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
-  statusText: { fontSize: 12, fontFamily: "Inter_700Bold" },
-  accuracyRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "center", marginTop: 8, marginBottom: 4 },
-  accuracyText: { fontSize: 33, fontFamily: "Inter_700Bold" },
+  statusText: { fontSize: 23, fontFamily: "Inter_700Bold" },
+  accuracyBadge: { flexDirection: "row", alignItems: "baseline", gap: 3 },
+  accuracyText: { fontSize: 23, fontFamily: "Inter_700Bold" },
   speedBox: {
     backgroundColor: Colors.surface, borderRadius: 20, padding: 20, alignItems: "center",
     marginBottom: 12, borderWidth: 1, borderColor: Colors.accent,

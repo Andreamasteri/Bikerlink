@@ -2999,7 +2999,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T02:23:16.149Z"
+  },
+  {
+    "updateNumber": 79,
+    "version": "1.79.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-79 rv7.0.0: Tracking: GPS pre-warm, badge accuracy inline, code cleanup",
+    "note": "Task #669: (1) GPS pre-warm al mount — getForegroundPermissionsAsync + getCurrentPositionAsync(Balanced) su nativo, getCurrentPosition su web — aggiorna gpsAccuracy prima di premere START. (2) Badge accuracy torna inline nel statusRow (destra, space-between), fontSize 23 per accuracy e FERMO (da 12/33). Stile accuracyRow→accuracyBadge. (3) Code cleanup: estratti onNativeLocation + onWebLocation (useCallback) usati nei 3 watchPositionAsync di startTracking/togglePause/switchTrackingAccuracy. CURRENT_OTA_NUMBER=79.",
+    "releaseId": "16eb9f2f-55e4-417d-bdcb-02f04a6cde39",
+    "bundleUrl": "private/ota/ota-1.79.0-1776481228276.js",
+    "updateGroupId": "afb52e70-b5c8-4fcd-bec8-5f5da8633ef5",
+    "androidUpdateId": "019d9e89-101d-7984-ac4a-874295812eb0",
+    "iosUpdateId": null,
+    "commitBase": "b41dd359ad929c98ff1d9b1f2964948e8305c53e",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/afb52e70-b5c8-4fcd-bec8-5f5da8633ef5",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T03:00:31.284Z"
   }
 ]
