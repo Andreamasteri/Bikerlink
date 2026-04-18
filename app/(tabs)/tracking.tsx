@@ -61,8 +61,9 @@ async function logGpsError(error: unknown, context: string) {
 
 if (Platform.OS !== "web") {
   try {
-    TaskManager.defineTask<{ locations: Location.LocationObject[] }>(
-      BG_LOCATION_TASK,
+    if (!TaskManager.isTaskDefined(BG_LOCATION_TASK)) {
+      TaskManager.defineTask<{ locations: Location.LocationObject[] }>(
+        BG_LOCATION_TASK,
       async ({ data, error }: TaskManager.TaskManagerTaskBody<{ locations: Location.LocationObject[] }>) => {
       if (error || !data) return;
       const { locations } = data;
@@ -84,6 +85,7 @@ if (Platform.OS !== "web") {
         await AsyncStorage.setItem(BG_POINTS_KEY, JSON.stringify(stored));
       } catch {}
     });
+    }
   } catch (e) {
     logGpsError(e, "module-level:TaskManager.defineTask").catch(() => {});
   }
