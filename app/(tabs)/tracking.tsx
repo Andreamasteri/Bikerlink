@@ -27,12 +27,6 @@ import TrackingMap from "@/components/TrackingMap";
 import { setTrackingActive } from "@/lib/tracking-active";
 import Constants from "expo-constants";
 
-let Accelerometer: typeof import("expo-sensors").Accelerometer | null = null;
-if (Platform.OS !== "web") {
-  try {
-    Accelerometer = require("expo-sensors").Accelerometer;
-  } catch {}
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -692,9 +686,11 @@ export default function TrackingScreen() {
 
   // ── Start accelerometer ────────────────────────────────────────────────────
   const startAccelerometer = useCallback(() => {
-    if (!Accelerometer || Platform.OS === "web") return;
+    if (Platform.OS === "web") return;
     const interval = is0100EnabledRef.current ? 100 : 250;
     try {
+      // Dynamic require inside the function to avoid module-level side effects
+      const { Accelerometer } = require("expo-sensors") as typeof import("expo-sensors");
       Accelerometer.setUpdateInterval(interval);
       const sub = Accelerometer.addListener(({ x: _x, y, z: _z }) => {
         // Calibration: average first 20 samples to remove gravity offset
