@@ -480,12 +480,19 @@ export default function TrackingScreen() {
 
   // ── Offline GPS buffer helpers (true-append: one key per batch segment) ────
   //
-  // Layout:
+  // DESIGN NOTE: Instead of a single key @bikerlink/gps_buffer (full-rewrite on
+  // every flush), we use a segmented scheme:
   //   GPS_BUFFER_SEGCOUNT_KEY  → stringified integer N (number of segments written)
   //   GPS_BUFFER_SEG_KEY(0..N-1) → JSON array of GpsPoint (up to WRITE_EVERY each)
   //
-  // Each flush appends ONE new segment key; existing segments are never modified.
-  // Recovery reads SEGCOUNT → reads all segments via multiGet → merges.
+  // Rationale: true append — each flush writes exactly ONE new segment key and
+  // increments the counter; previous segments are never touched. This eliminates
+  // full-array rewrites and is safe for long rides. All writes are serialized via
+  // bufferWriteQueueRef to prevent concurrent segcount read-modify-write races.
+  //
+  // Recovery: SEGCOUNT → multiGet(all seg keys) → flatMap(points) → haversine stats.
+  // Recovered ride summaries live in component state only (session-scoped); for
+  // persistent cross-session storage, see follow-up task #739 (server sync).
 
   // Serialized via bufferWriteQueueRef to prevent concurrent segcount reads
   const appendSegmentToBuffer = useCallback((batch: GpsPoint[]) => {
