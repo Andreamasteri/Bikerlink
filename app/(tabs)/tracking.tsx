@@ -368,6 +368,11 @@ export default function TrackingScreen() {
     return () => {
       subscription.remove();
       cleanupTracking();
+      const orphanId = routeIdRef.current;
+      if (orphanId && totalPointsSentRef.current === 0 && totalKmRef.current === 0) {
+        routeIdRef.current = null;
+        apiRequest("DELETE", `/api/routes/${orphanId}`).catch(() => {});
+      }
     };
   }, []);
 
@@ -1115,7 +1120,11 @@ export default function TrackingScreen() {
           logGpsError(gpsErr, "watchPositionAsync");
           cleanupTracking();
           setIsTracking(false);
+          const failedRouteId = routeIdRef.current;
           routeIdRef.current = null;
+          if (failedRouteId) {
+            apiRequest("DELETE", `/api/routes/${failedRouteId}`).catch(() => {});
+          }
           Alert.alert("GPS non disponibile", "Impossibile avviare il GPS. Riprova tra un momento.");
           return;
         }
@@ -1155,7 +1164,11 @@ export default function TrackingScreen() {
       logGpsError(trackingErr, "startTracking_outer");
       cleanupTracking();
       setIsTracking(false);
+      const outerFailRouteId = routeIdRef.current;
       routeIdRef.current = null;
+      if (outerFailRouteId) {
+        apiRequest("DELETE", `/api/routes/${outerFailRouteId}`).catch(() => {});
+      }
       Alert.alert("Errore", "Errore imprevisto all'avvio del tracciamento. Riprova.");
     } finally {
       setLoading(false);
@@ -1193,6 +1206,24 @@ export default function TrackingScreen() {
 
     setLoading(true);
     try {
+      if (totalPointsSentRef.current === 0 && totalKmRef.current === 0) {
+        try {
+          await apiRequest("DELETE", `/api/routes/${routeId}`);
+        } catch {
+        }
+        routeIdRef.current = null;
+        queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
+        if (sprintAutoHandsOffRef.current) {
+          sprintAutoHandsOffRef.current = false;
+          handsOffEnabledRef.current = handsOffEnabled;
+          handsOffSpeedRef.current = parseFloat(handsOffSpeed || "80") || 80;
+        }
+        setIsTracking(false);
+        setHandsOffActive(false);
+        setLoading(false);
+        return;
+      }
+
       const dur = totalTime;
       const idle = Math.round(idleAccRef.current);
       const netT = Math.max(dur - idle, 0);

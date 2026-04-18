@@ -16,6 +16,21 @@ router.post("/", async (req: Request, res: Response) => {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const existingRoutes = await storage.getRoutes(userId);
+    const orphans = existingRoutes.filter((r: any) =>
+      r.status === "active" &&
+      (r.totalDistanceKm === null || r.totalDistanceKm === undefined || r.totalDistanceKm === 0) &&
+      r.startedAt &&
+      new Date(r.startedAt) < tenMinutesAgo
+    );
+    for (const orphan of orphans) {
+      try {
+        await storage.deleteRoute(orphan.id);
+      } catch {
+      }
+    }
+
     const { title, trackingFrequency, isSprint } = req.body;
 
     const route = await storage.createRoute({
@@ -232,7 +247,16 @@ router.get("/", async (req: Request, res: Response) => {
     if (!userId) return;
 
     const userRoutes = await storage.getRoutes(userId);
-    return res.json(userRoutes);
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const filtered = userRoutes.filter((r: any) => {
+      const isOrphan =
+        r.status === "active" &&
+        (r.totalDistanceKm === null || r.totalDistanceKm === undefined || r.totalDistanceKm === 0) &&
+        r.startedAt &&
+        new Date(r.startedAt) < tenMinutesAgo;
+      return !isOrphan;
+    });
+    return res.json(filtered);
   } catch (error) {
     console.error("Get routes error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
