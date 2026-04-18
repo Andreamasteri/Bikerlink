@@ -23,12 +23,12 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 import { getCurrentLocale } from "@/lib/i18n";
-import { useUnits } from "@/lib/units-context";
+import { useUnits, SpeedUnit, DistanceUnit } from "@/lib/units-context";
 import { formatDistance, formatSpeed } from "@/lib/units";
 import TrackingMap from "@/components/TrackingMap";
 import { setTrackingActive } from "@/lib/tracking-active";
 import Constants from "expo-constants";
-import { useUnits, SpeedUnit, DistanceUnit } from "@/lib/units-context";
+import * as Haptics from "expo-haptics";
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -412,9 +412,12 @@ export default function TrackingScreen() {
     onError: () => Alert.alert("Errore", "Impossibile pubblicare il record"),
   });
 
-  // ── Hands-off blink ────────────────────────────────────────────────────────
+  // ── Hands-off blink + haptic ───────────────────────────────────────────────
   useEffect(() => {
     if (handsOffActive) {
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      }
       const loop = Animated.loop(
         Animated.sequence([
           Animated.timing(handsOffAnim, {
