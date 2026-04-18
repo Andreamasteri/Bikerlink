@@ -131,7 +131,7 @@ export default function ProfileScreen() {
 
   // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
   // Ciclo 7.0.0 — APK v29 — aggiornare ad ogni nuova OTA pubblicata
-  const CURRENT_OTA_NUMBER = 82;
+  const CURRENT_OTA_NUMBER = 83;
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -241,6 +241,8 @@ export default function ProfileScreen() {
   const [fakeHomeLatitude, setFakeHomeLatitude] = useState<number | null>(null);
   const [fakeHomeLongitude, setFakeHomeLongitude] = useState<number | null>(null);
   const [fakeHomeRadius, setFakeHomeRadius] = useState(2);
+  const [gpsPrecision, setGpsPrecision] = useState("balanced");
+  const [gpsPrecisionExpanded, setGpsPrecisionExpanded] = useState(false);
   const [privacyExpanded, setPrivacyExpanded] = useState(false);
   const [mapStyleExpanded, setMapStyleExpanded] = useState(false);
   const [themeExpanded, setThemeExpanded] = useState(false);
@@ -260,6 +262,7 @@ export default function ProfileScreen() {
       setFakeHomeLatitude(profile.profile.fakeHomeLatitude ?? null);
       setFakeHomeLongitude(profile.profile.fakeHomeLongitude ?? null);
       setFakeHomeRadius(profile.profile.fakeHomeRadius ?? 2);
+      setGpsPrecision(profile.profile.gpsPrecision ?? "balanced");
     }
   }, [profile?.profile]);
 
@@ -773,6 +776,53 @@ export default function ProfileScreen() {
             {isBikerOrCoppia ? "Il Mio Garage" : "La Mia Wishlist"}
           </Text>
         </Pressable>
+      </View>
+
+      <View style={styles.section}>
+        <Pressable style={styles.accordionHeader} onPress={() => setGpsPrecisionExpanded((v) => !v)}>
+          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Precisione GPS Tracking</Text>
+          <Ionicons
+            name={gpsPrecisionExpanded ? "chevron-up" : "chevron-down"}
+            size={18}
+            color={Colors.textSecondary}
+          />
+        </Pressable>
+        {gpsPrecisionExpanded && (
+          <View style={{ paddingTop: 12, gap: 8 }}>
+            {([
+              { key: "lowest", label: "Risparmio Batteria", desc: "Aggiornamenti radi, massimo risparmio", icon: "battery-half-outline" },
+              { key: "balanced", label: "Bilanciato", desc: "Precisione e batteria in equilibrio", icon: "compass-outline" },
+              { key: "high", label: "Alta Precisione", desc: "GPS preciso, più consumo", icon: "locate-outline" },
+              { key: "highest", label: "Massima Precisione", desc: "Massima accuratezza, elevato consumo", icon: "navigate-outline" },
+              { key: "bestForNavigation", label: "Navigazione", desc: "Ottimizzato per uso continuativo", icon: "map-outline" },
+            ] as { key: string; label: string; desc: string; icon: string }[]).map((opt) => {
+              const isSelected = gpsPrecision === opt.key;
+              return (
+                <Pressable
+                  key={opt.key}
+                  style={[styles.mapStyleOption, isSelected && styles.mapStyleOptionActive]}
+                  onPress={() => {
+                    setGpsPrecision(opt.key);
+                    privacyMutation.mutate({ gpsPrecision: opt.key } as any);
+                  }}
+                >
+                  <Ionicons name={opt.icon as any} size={20} color={isSelected ? Colors.accent : Colors.textSecondary} />
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={[styles.mapStyleName, isSelected && { color: Colors.accent }]}>{opt.label}</Text>
+                    <Text style={styles.mapStyleDesc}>{opt.desc}</Text>
+                  </View>
+                  {isSelected && <Ionicons name="checkmark-circle" size={20} color={Colors.accent} />}
+                </Pressable>
+              );
+            })}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: Colors.accent + "10", borderRadius: 8, padding: 8, marginTop: 4 }}>
+              <Ionicons name="information-circle-outline" size={14} color={Colors.accent} />
+              <Text style={{ flex: 1, fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary }}>
+                Le modalità Passeggio/Standard/Race nel tracking sovrascrivono temporaneamente questa preferenza.
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       <View style={styles.section}>

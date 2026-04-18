@@ -346,7 +346,7 @@ router.put("/me/ghost-mode", requireAuth, async (req: Request, res: Response) =>
 router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const { hideFromMap, positionFuzz, positionFuzzKm, fakeHomeEnabled, homeLatitude, homeLongitude, fakeHomeLatitude, fakeHomeLongitude, fakeHomeRadius } = req.body;
+    const { hideFromMap, positionFuzz, positionFuzzKm, fakeHomeEnabled, homeLatitude, homeLongitude, fakeHomeLatitude, fakeHomeLongitude, fakeHomeRadius, gpsPrecision } = req.body;
     const updateData: Record<string, unknown> = {};
     if (typeof hideFromMap === "boolean") updateData.hideFromMap = hideFromMap;
     if (typeof positionFuzz === "boolean") updateData.positionFuzz = positionFuzz;
@@ -392,6 +392,13 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
         return res.status(400).json({ message: "fakeHomeRadius deve essere un intero tra 1 e 100" });
       }
       updateData.fakeHomeRadius = r;
+    }
+    if (gpsPrecision !== undefined) {
+      const validPrecisions = ["lowest", "balanced", "high", "highest", "bestForNavigation"];
+      if (!validPrecisions.includes(gpsPrecision)) {
+        return res.status(400).json({ message: "gpsPrecision non valida" });
+      }
+      updateData.gpsPrecision = gpsPrecision;
     }
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ message: "Nessun campo da aggiornare" });

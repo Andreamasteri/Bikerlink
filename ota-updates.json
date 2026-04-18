@@ -3093,5 +3093,28 @@
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
     "status": "published",
     "publishedAt": "2026-04-18T03:15:46.214Z"
+  },
+  {
+    "updateNumber": 83,
+    "version": "1.83.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-83 rv7.0.0: Precisione GPS accordion profilo, Passeggio/Standard, sensori tilt+accel, modalità 0-100 km/h sprint",
+    "note": "Task #672: gpsPrecision campo DB + accordion profilo 5 opzioni. Rinomina Easy→Passeggio Medium→Standard. expo-sensors DeviceMotion: Max Tilt (gradi), Acceleraz. Max (G). Toggle 0-100 km/h: GPS Race forzato, countdown 10s, dashboard sprint con pannelli verticali. Fix velocità GPS fallback haversine. Margini profileSection/delayedSection ridotti. CURRENT_OTA_NUMBER=83.",
+    "releaseId": "f8037da5-513e-4432-8b5f-f609705fe72d",
+    "bundleUrl": "private/ota/ota-1.83.0-1776490470084.js",
+    "updateGroupId": "b9739f93-4a99-40cc-92a7-92e4d3bab347",
+    "androidUpdateId": "019d9f16-0ec5-7970-9837-dd84d7c35386",
+    "iosUpdateId": null,
+    "commitBase": "0ae47d76051ca2744f07906689957ef4e70fd5d9",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/b9739f93-4a99-40cc-92a7-92e4d3bab347",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T05:34:32.939Z"
   }
 ]

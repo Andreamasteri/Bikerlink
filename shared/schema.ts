@@ -120,6 +120,7 @@ export const userProfiles = pgTable("user_profiles", {
   fakeHomeLatitude: doublePrecision("fake_home_latitude"),
   fakeHomeLongitude: doublePrecision("fake_home_longitude"),
   fakeHomeRadius: integer("fake_home_radius").notNull().default(2),
+  gpsPrecision: varchar("gps_precision", { length: 30 }).notNull().default("balanced"),
   coordinatesUpdatedAt: timestamp("coordinates_updated_at"),
   adminOverrideUntil: timestamp("admin_override_until"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

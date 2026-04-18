@@ -24,6 +24,7 @@ import * as Location from "expo-location";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getCurrentLocale } from "@/lib/i18n";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
+import { DeviceMotion } from "expo-sensors";
 
 interface RouteRecord {
   id: string;
@@ -55,14 +56,14 @@ const AUTO_PAUSE_TIMEOUT_MS = 10 * 60 * 1000;
 const STATS_SYNC_INTERVAL_MS = 60000;
 
 const PROFILE_LABELS: Record<UpdateProfile, string> = {
-  easy: "Easy",
-  medium: "Medium",
+  easy: "Passeggio",
+  medium: "Standard",
   race: "Race",
 };
 
 const PROFILE_DESCRIPTIONS: Record<UpdateProfile, string> = {
   easy: "Risparmio energetico",
-  medium: "Bilanciato",
+  medium: "Alta precisione",
   race: "Massima precisione (1s)",
 };
 
@@ -76,14 +77,23 @@ function getModeConfig(mode: TrackingMode, profile: UpdateProfile = "medium"): {
   if (profile === "race") {
     return { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 1 };
   }
-  const mult = profile === "easy" ? 2 : 1;
+  if (profile === "medium") {
+    switch (mode) {
+      case "highway":
+        return { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 10 };
+      case "city":
+        return { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 5 };
+      case "idle":
+        return { accuracy: Location.Accuracy.High, timeInterval: 15000, distanceInterval: 2 };
+    }
+  }
   switch (mode) {
     case "highway":
-      return { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 3000 * mult, distanceInterval: 10 * mult };
+      return { accuracy: Location.Accuracy.Balanced, timeInterval: 6000, distanceInterval: 20 };
     case "city":
-      return { accuracy: Location.Accuracy.High, timeInterval: 5000 * mult, distanceInterval: 5 * mult };
+      return { accuracy: Location.Accuracy.Balanced, timeInterval: 10000, distanceInterval: 10 };
     case "idle":
-      return { accuracy: Location.Accuracy.Balanced, timeInterval: 15000 * mult, distanceInterval: 2 * mult };
+      return { accuracy: Location.Accuracy.Balanced, timeInterval: 30000, distanceInterval: 5 };
   }
 }
 
@@ -152,6 +162,28 @@ export default function TrackingScreen() {
 
   const [publishRecord, setPublishRecord] = useState<RouteRecord | null>(null);
   const [publishCaption, setPublishCaption] = useState("");
+
+  const [maxTilt, setMaxTilt] = useState(0);
+  const [maxAcceleration, setMaxAcceleration] = useState(0);
+  const maxTiltRef = useRef(0);
+  const maxAccelerationRef = useRef(0);
+  const prevAccelRef = useRef<{ value: number; time: number } | null>(null);
+  const deviceMotionSubRef = useRef<ReturnType<typeof DeviceMotion.addListener> | null>(null);
+
+  const [sprint0100Enabled, setSprint0100Enabled] = useState(false);
+  const sprint0100EnabledRef = useRef(false);
+  const [sprintPhase, setSprintPhase] = useState<"idle" | "countdown" | "waiting" | "measuring" | "done">("idle");
+  const sprintPhaseRef = useRef<"idle" | "countdown" | "waiting" | "measuring" | "done">("idle");
+  const [sprintCountdown, setSprintCountdown] = useState(10);
+  const sprintCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [sprint0to100Ms, setSprint0to100Ms] = useState<number | null>(null);
+  const sprintStartTimeRef = useRef<number | null>(null);
+  const [sprintMaxAccelSensor, setSprintMaxAccelSensor] = useState(0);
+  const [sprintMaxDecelSensor, setSprintMaxDecelSensor] = useState(0);
+  const [sprintMaxTilt, setSprintMaxTilt] = useState(0);
+  const sprintMaxAccelSensorRef = useRef(0);
+  const sprintMaxDecelSensorRef = useRef(0);
+  const sprintMaxTiltRef = useRef(0);
 
   const publishMutation = useMutation({
     mutationFn: async (data: { performanceData: string; caption: string }) => {
@@ -248,6 +280,15 @@ export default function TrackingScreen() {
     if (countdownIntervalRef.current) {
       clearInterval(countdownIntervalRef.current);
       countdownIntervalRef.current = null;
+    }
+    if (deviceMotionSubRef.current) {
+      deviceMotionSubRef.current.remove();
+      deviceMotionSubRef.current = null;
+      if (Platform.OS !== "web") DeviceMotion.setUpdateInterval(1000);
+    }
+    if (sprintCountdownRef.current) {
+      clearInterval(sprintCountdownRef.current);
+      sprintCountdownRef.current = null;
     }
   };
 
@@ -349,6 +390,42 @@ export default function TrackingScreen() {
     }
 
     setCurrentSpeed(speedKmh);
+
+    if (sprint0100EnabledRef.current) {
+      if (sprintPhaseRef.current === "waiting" && speedKmh >= 5) {
+        sprintPhaseRef.current = "measuring";
+        setSprintPhase("measuring");
+        sprintStartTimeRef.current = now;
+        sprintMaxAccelSensorRef.current = 0;
+        sprintMaxDecelSensorRef.current = 0;
+        sprintMaxTiltRef.current = 0;
+        prevAccelRef.current = null;
+      } else if (sprintPhaseRef.current === "measuring") {
+        if (prevAccelRef.current) {
+          const dt = (now - prevAccelRef.current.time) / 1000;
+          if (dt > 0) {
+            const accelKmhS = (speedKmh - prevAccelRef.current.value) / dt;
+            const accelG = Math.abs(accelKmhS / 3.6) / 9.81;
+            if (accelKmhS > 0 && accelG > sprintMaxAccelSensorRef.current) {
+              sprintMaxAccelSensorRef.current = accelG;
+              setSprintMaxAccelSensor(accelG);
+            }
+            if (accelKmhS < 0 && accelG > sprintMaxDecelSensorRef.current) {
+              sprintMaxDecelSensorRef.current = accelG;
+              setSprintMaxDecelSensor(accelG);
+            }
+          }
+        }
+        prevAccelRef.current = { value: speedKmh, time: now };
+
+        if (speedKmh >= 100 && sprintStartTimeRef.current) {
+          const elapsed = now - sprintStartTimeRef.current;
+          setSprint0to100Ms(elapsed);
+          sprintPhaseRef.current = "done";
+          setSprintPhase("done");
+        }
+      }
+    }
 
     if (stopAtZeroEnabledRef.current) {
       const shouldFreeze = speedKmh < 1;
@@ -551,7 +628,69 @@ export default function TrackingScreen() {
       stopAtZeroFreezeRef.current = false;
       setHandsOffActive(false);
 
+      maxTiltRef.current = 0;
+      maxAccelerationRef.current = 0;
+      setMaxTilt(0);
+      setMaxAcceleration(0);
+      prevAccelRef.current = null;
+
+      sprint0100EnabledRef.current = sprint0100Enabled;
+      sprintPhaseRef.current = "idle";
+      setSprintPhase("idle");
+      setSprint0to100Ms(null);
+      sprintStartTimeRef.current = null;
+      sprintMaxAccelSensorRef.current = 0;
+      sprintMaxDecelSensorRef.current = 0;
+      sprintMaxTiltRef.current = 0;
+      setSprintMaxAccelSensor(0);
+      setSprintMaxDecelSensor(0);
+      setSprintMaxTilt(0);
+
+      if (sprint0100Enabled) {
+        setUpdateProfile("race");
+        updateProfileRef.current = "race";
+      }
+
       setIsTracking(true);
+
+      if (Platform.OS !== "web") {
+        try {
+          const available = await DeviceMotion.isAvailableAsync();
+          if (available) {
+            DeviceMotion.setUpdateInterval(250);
+            deviceMotionSubRef.current = DeviceMotion.addListener((data) => {
+              if (data.rotation) {
+                const tiltRad = Math.abs(data.rotation.gamma ?? 0);
+                const tiltDeg = tiltRad * (180 / Math.PI);
+                if (tiltDeg > maxTiltRef.current) {
+                  maxTiltRef.current = tiltDeg;
+                  setMaxTilt(tiltDeg);
+                }
+                if (sprint0100EnabledRef.current && (sprintPhaseRef.current === "measuring")) {
+                  if (tiltDeg > sprintMaxTiltRef.current) {
+                    sprintMaxTiltRef.current = tiltDeg;
+                    setSprintMaxTilt(tiltDeg);
+                  }
+                }
+              }
+              if (data.acceleration) {
+                const { x, y, z } = data.acceleration;
+                const magnitude = Math.sqrt((x ?? 0) ** 2 + (y ?? 0) ** 2 + (z ?? 0) ** 2) / 9.81;
+                if (magnitude > maxAccelerationRef.current) {
+                  maxAccelerationRef.current = magnitude;
+                  setMaxAcceleration(magnitude);
+                }
+                if (sprint0100EnabledRef.current && (sprintPhaseRef.current === "measuring")) {
+                  if (magnitude > sprintMaxAccelSensorRef.current) {
+                    sprintMaxAccelSensorRef.current = magnitude;
+                    setSprintMaxAccelSensor(magnitude);
+                  }
+                }
+              }
+            });
+          }
+        } catch {}
+      }
 
       timerRef.current = setInterval(() => {
         if (!isPausedRef.current && !stopAtZeroFreezeRef.current) {
@@ -573,7 +712,7 @@ export default function TrackingScreen() {
       }, STATS_SYNC_INTERVAL_MS);
 
       if (Platform.OS !== "web") {
-        const config = getModeConfig("idle", updateProfile);
+        const config = getModeConfig("idle", updateProfileRef.current);
         const sub = await Location.watchPositionAsync(
           { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
           onNativeLocation
@@ -586,6 +725,23 @@ export default function TrackingScreen() {
           { enableHighAccuracy: true, maximumAge: 3000 }
         );
         webWatchIdRef.current = wid;
+      }
+
+      if (sprint0100Enabled) {
+        let remaining = 10;
+        setSprintCountdown(remaining);
+        sprintPhaseRef.current = "countdown";
+        setSprintPhase("countdown");
+        sprintCountdownRef.current = setInterval(() => {
+          remaining -= 1;
+          setSprintCountdown(remaining);
+          if (remaining <= 0) {
+            clearInterval(sprintCountdownRef.current!);
+            sprintCountdownRef.current = null;
+            sprintPhaseRef.current = "waiting";
+            setSprintPhase("waiting");
+          }
+        }, 1000);
       }
     } finally {
       setLoading(false);
@@ -742,56 +898,76 @@ export default function TrackingScreen() {
           </View>
 
           <View style={styles.dashboard}>
-            <View style={styles.statusRow}>
-              {(() => {
-                const fermoGreen = !isPaused && currentSpeed < 1.5;
-                const fermoColor = isPaused ? Colors.warning : fermoGreen ? Colors.success : Colors.textSecondary;
-                const fermoBg = isPaused ? Colors.warning + "30" : fermoGreen ? Colors.success + "30" : Colors.textSecondary + "20";
-                return (
-                  <View style={[styles.statusBadge, { backgroundColor: fermoBg }]}>
-                    <View style={[styles.statusDot, { backgroundColor: fermoColor }]} />
-                    <Text style={[styles.statusText, { color: fermoColor }]}>
-                      {isPaused ? "IN PAUSA" : "FERMO"}
-                    </Text>
-                  </View>
-                );
-              })()}
-              {accuracyTier ? (
-                <View style={styles.accuracyBadge}>
-                  <Text style={[styles.accuracyText, { color: accuracyTier.color }]}>
-                    {accuracyTier.label}
-                  </Text>
-                  <Text style={[styles.accuracyText, { color: "#ffffff" }]}>
-                    {" "}{accuracyTier.value}
-                  </Text>
+            {sprintPhase !== "idle" ? (
+              <SprintDashboard
+                phase={sprintPhase}
+                countdown={sprintCountdown}
+                time0to100Ms={sprint0to100Ms}
+                maxAccelSensor={sprintMaxAccelSensor}
+                maxDecelSensor={sprintMaxDecelSensor}
+                maxTilt={sprintMaxTilt}
+                currentSpeed={currentSpeed}
+              />
+            ) : (
+              <>
+                <View style={styles.statusRow}>
+                  {(() => {
+                    const fermoGreen = !isPaused && currentSpeed < 1.5;
+                    const fermoColor = isPaused ? Colors.warning : fermoGreen ? Colors.success : Colors.textSecondary;
+                    const fermoBg = isPaused ? Colors.warning + "30" : fermoGreen ? Colors.success + "30" : Colors.textSecondary + "20";
+                    return (
+                      <View style={[styles.statusBadge, { backgroundColor: fermoBg }]}>
+                        <View style={[styles.statusDot, { backgroundColor: fermoColor }]} />
+                        <Text style={[styles.statusText, { color: fermoColor }]}>
+                          {isPaused ? "IN PAUSA" : "FERMO"}
+                        </Text>
+                      </View>
+                    );
+                  })()}
+                  {accuracyTier ? (
+                    <View style={styles.accuracyBadge}>
+                      <Text style={[styles.accuracyText, { color: accuracyTier.color }]}>
+                        {accuracyTier.label}
+                      </Text>
+                      <Text style={[styles.accuracyText, { color: "#ffffff" }]}>
+                        {" "}{accuracyTier.value}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
-              ) : null}
-            </View>
 
-            <View style={styles.speedBox}>
-              <Text style={[styles.speedValue, isPaused && { color: Colors.textSecondary }]}>
-                {isPaused ? "--" : currentSpeed.toFixed(1)}
-              </Text>
-              <Text style={styles.speedUnit}>km/h</Text>
-            </View>
-            <Text style={styles.subtitle}>Registra le tue prestazioni in moto</Text>
+                <View style={styles.speedBox}>
+                  <Text style={[styles.speedValue, isPaused && { color: Colors.textSecondary }]}>
+                    {isPaused ? "--" : currentSpeed.toFixed(1)}
+                  </Text>
+                  <Text style={styles.speedUnit}>km/h</Text>
+                </View>
+                <Text style={styles.subtitle}>Registra le tue prestazioni in moto</Text>
 
-            <View style={styles.row}>
-              <StatCard icon="time" color={Colors.accent} value={formatTime(totalTime)} label="Tempo totale" />
-              <StatCard icon="pause-circle" color={Colors.warning} value={formatTime(idleTime)} label="Tempo fermo" />
-            </View>
-            <View style={styles.row}>
-              <StatCard icon="bicycle" color={Colors.success} value={formatTime(Math.max(netTime, 0))} label="Tempo netto" />
-              <StatCard icon="navigate" color={Colors.accent} value={totalKm.toFixed(2)} label="Km totali" />
-            </View>
-            <View style={styles.row}>
-              <StatCard icon="speedometer" color={Colors.accent} value={avgSpeed.toFixed(1)} label="Vel. media netta" />
-              <StatCard icon="analytics-outline" color={Colors.success} value={grossAvgSpeed.toFixed(1)} label="Vel. media lorda" />
-            </View>
-            <View style={styles.row}>
-              <StatCard icon="flash" color={Colors.accentRed} value={maxSpeed.toFixed(0)} label="Vel. max km/h" />
-              <StatCard icon="trending-up" color={Colors.success} value={maxAltitude.toFixed(0)} label="Quota max m" />
-            </View>
+                <View style={styles.row}>
+                  <StatCard icon="time" color={Colors.accent} value={formatTime(totalTime)} label="Tempo totale" />
+                  <StatCard icon="pause-circle" color={Colors.warning} value={formatTime(idleTime)} label="Tempo fermo" />
+                </View>
+                <View style={styles.row}>
+                  <StatCard icon="bicycle" color={Colors.success} value={formatTime(Math.max(netTime, 0))} label="Tempo netto" />
+                  <StatCard icon="navigate" color={Colors.accent} value={totalKm.toFixed(2)} label="Km totali" />
+                </View>
+                <View style={styles.row}>
+                  <StatCard icon="speedometer" color={Colors.accent} value={avgSpeed.toFixed(1)} label="Vel. media netta" />
+                  <StatCard icon="analytics-outline" color={Colors.success} value={grossAvgSpeed.toFixed(1)} label="Vel. media lorda" />
+                </View>
+                <View style={styles.row}>
+                  <StatCard icon="flash" color={Colors.accentRed} value={maxSpeed.toFixed(0)} label="Vel. max km/h" />
+                  <StatCard icon="trending-up" color={Colors.success} value={maxAltitude.toFixed(0)} label="Quota max m" />
+                </View>
+                {Platform.OS !== "web" && (
+                  <View style={styles.row}>
+                    <StatCard icon="compass-outline" color={Colors.accent} value={maxTilt.toFixed(1) + "°"} label="Max Tilt" />
+                    <StatCard icon="pulse-outline" color={Colors.accentRed} value={maxAcceleration.toFixed(2) + "G"} label="Acceleraz. Max" />
+                  </View>
+                )}
+              </>
+            )}
           </View>
         </>
       ) : (
@@ -882,6 +1058,26 @@ export default function TrackingScreen() {
                 onValueChange={setHandsOffEnabled}
                 trackColor={{ false: Colors.border, true: Colors.accent + "80" }}
                 thumbColor={handsOffEnabled ? Colors.accent : Colors.textSecondary}
+              />
+            </View>
+
+            <View style={styles.triggerRow}>
+              <View style={styles.delayedLeft}>
+                <Ionicons name="speedometer-outline" size={16} color={sprint0100Enabled ? Colors.accentRed : Colors.textSecondary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.triggerLabel, sprint0100Enabled && { color: Colors.accentRed, fontFamily: "Inter_700Bold" }]}>0-100 km/h</Text>
+                  {sprint0100Enabled && (
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: Colors.textSecondary }}>
+                      GPS Race forzato · countdown 10s
+                    </Text>
+                  )}
+                </View>
+              </View>
+              <Switch
+                value={sprint0100Enabled}
+                onValueChange={setSprint0100Enabled}
+                trackColor={{ false: Colors.border, true: Colors.accentRed + "80" }}
+                thumbColor={sprint0100Enabled ? Colors.accentRed : Colors.textSecondary}
               />
             </View>
           </View>
@@ -1063,6 +1259,108 @@ function RecordStat({ value, label }: { value: string; label: string }) {
   );
 }
 
+function SprintDashboard({
+  phase, countdown, time0to100Ms, maxAccelSensor, maxDecelSensor, maxTilt, currentSpeed
+}: {
+  phase: "idle" | "countdown" | "waiting" | "measuring" | "done";
+  countdown: number;
+  time0to100Ms: number | null;
+  maxAccelSensor: number;
+  maxDecelSensor: number;
+  maxTilt: number;
+  currentSpeed: number;
+}) {
+  const phaseLabel = phase === "countdown"
+    ? `Preparati... ${countdown}`
+    : phase === "waiting"
+    ? "Accelera! ▶"
+    : phase === "measuring"
+    ? "In misura..."
+    : "Risultati";
+
+  const phaseColor = phase === "countdown"
+    ? Colors.warning
+    : phase === "waiting"
+    ? Colors.success
+    : phase === "measuring"
+    ? Colors.accentRed
+    : Colors.accent;
+
+  const timeStr = time0to100Ms !== null
+    ? `${(time0to100Ms / 1000).toFixed(2)}s`
+    : phase === "done" ? "N/D" : "--";
+
+  return (
+    <View>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <View style={{ flex: 1, backgroundColor: phaseColor + "20", borderRadius: 12, padding: 10, borderWidth: 1, borderColor: phaseColor }}>
+          <Text style={{ fontSize: 16, fontFamily: "Inter_700Bold", color: phaseColor, textAlign: "center" }}>
+            {phaseLabel}
+          </Text>
+        </View>
+        <View style={{ backgroundColor: Colors.surface, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: Colors.border, alignItems: "center", minWidth: 80 }}>
+          <Text style={{ fontSize: 22, fontFamily: "Inter_700Bold", color: Colors.accent }}>{currentSpeed.toFixed(0)}</Text>
+          <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: Colors.textSecondary }}>km/h</Text>
+        </View>
+      </View>
+
+      <View style={sprintStyles.panel}>
+        <Ionicons name="timer-outline" size={20} color={Colors.accentRed} />
+        <Text style={sprintStyles.panelLabel}>Tempo 0→100 km/h</Text>
+        <Text style={[sprintStyles.panelValue, { color: Colors.accentRed }]}>{timeStr}</Text>
+      </View>
+
+      <View style={sprintStyles.panel}>
+        <Ionicons name="trending-up-outline" size={20} color={Colors.success} />
+        <Text style={sprintStyles.panelLabel}>Acceleraz. Max (GPS)</Text>
+        <Text style={[sprintStyles.panelValue, { color: Colors.success }]}>
+          {maxAccelSensor > 0 ? `${maxAccelSensor.toFixed(2)}G` : "--"}
+        </Text>
+      </View>
+
+      <View style={sprintStyles.panel}>
+        <Ionicons name="trending-down-outline" size={20} color={Colors.warning} />
+        <Text style={sprintStyles.panelLabel}>Decel. Max (GPS)</Text>
+        <Text style={[sprintStyles.panelValue, { color: Colors.warning }]}>
+          {maxDecelSensor > 0 ? `${maxDecelSensor.toFixed(2)}G` : "--"}
+        </Text>
+      </View>
+
+      <View style={sprintStyles.panel}>
+        <Ionicons name="compass-outline" size={20} color={Colors.accent} />
+        <Text style={sprintStyles.panelLabel}>Max Tilt</Text>
+        <Text style={[sprintStyles.panelValue, { color: Colors.accent }]}>
+          {maxTilt > 0 ? `${maxTilt.toFixed(1)}°` : "--"}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const sprintStyles = StyleSheet.create({
+  panel: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 12,
+  },
+  panelLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold" as const,
+    color: Colors.text,
+  },
+  panelValue: {
+    fontSize: 24,
+    fontFamily: "Inter_700Bold" as const,
+  },
+});
+
 function formatTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -1243,26 +1541,26 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   profileSection: {
-    marginBottom: 20,
+    marginBottom: 12,
     backgroundColor: Colors.surface,
     borderRadius: 16,
-    padding: 16,
+    padding: 12,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   profileTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
     color: Colors.textSecondary,
     textAlign: "center",
-    marginBottom: 12,
+    marginBottom: 8,
     textTransform: "uppercase" as const,
     letterSpacing: 0.5,
   },
   profileRow: {
     flexDirection: "row" as const,
-    gap: 8,
-    marginBottom: 12,
+    gap: 6,
+    marginBottom: 8,
   },
   profileBtn: {
     flex: 1,
@@ -1313,11 +1611,11 @@ const styles = StyleSheet.create({
   delayedSection: {
     backgroundColor: Colors.surface,
     borderRadius: 16,
-    padding: 14,
-    marginBottom: 20,
+    padding: 10,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.border,
-    gap: 10,
+    gap: 6,
   },
   delayedRow: {
     flexDirection: "row" as const,
@@ -1339,7 +1637,7 @@ const styles = StyleSheet.create({
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: 8,
-    paddingTop: 6,
+    paddingTop: 4,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },
