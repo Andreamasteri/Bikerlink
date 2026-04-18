@@ -48,7 +48,7 @@ BikerLink utilizes a modern full-stack architecture.
 - **Interactive Maps**: Display users, workshops, and easter eggs.
 - **Proposals & Requests**: Facilitate ride organization with group chat.
 - **Chat System**: Private and group messaging with phone number filtering.
-- **GPS Tracking**: Records ride statistics.
+- **GPS Tracking**: `app/(tabs)/tracking.tsx` — rebuilt v2 (no TaskManager, foreground-only). GPS profile (Passeggio/Standard/Race), Countdown semaforo colorato, Hands Off Modal app-wide, sprint 0-100 con Accelerometer G values (calibrazione 1-tap baseline), mappa Leaflet, Stats grid (tempo totale/netto/fermo, km, vel. max/media, quota max, G max), Pubblica su Pic!, salvataggio locale. Tutti i calcoli sul client. Backend: `maxAccelerationG`, `sprint0to100Ms` già in schema. NOTA CRITICA: MAI aggiungere TaskManager.defineTask a module-level (crash Android).
 - **Photo Contest**: Weekly contest with voting.
 - **Syneco Integration**: Workshop locator and advertising.
 - **Collectible Easter Eggs**: Geolocation-based hidden items.
