@@ -3068,7 +3068,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T03:11:45.458Z"
+  },
+  {
+    "updateNumber": 82,
+    "version": "1.82.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-82 rv7.0.0: Badge accuracy GPS anche in idle (pre-START)",
+    "note": "Task #669 fix finale: aggiunto badge accuracyTier anche nel branch !isTracking, centrato sopra il pulsante START. Ora il pre-warm GPS è visibile anche prima di avviare il tracking. CURRENT_OTA_NUMBER=82.",
+    "releaseId": "1588d2aa-2666-48b3-af80-3d3e806a41c2",
+    "bundleUrl": "private/ota/ota-1.82.0-1776482143428.js",
+    "updateGroupId": "657e3b5c-ec6e-483f-8ce4-261338fda491",
+    "androidUpdateId": "019d9e96-fab5-7478-9e55-653174483898",
+    "iosUpdateId": null,
+    "commitBase": "31267b9e53fa5e84868ead23c898ba7208fe8042",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/657e3b5c-ec6e-483f-8ce4-261338fda491",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T03:15:46.214Z"
   }
 ]

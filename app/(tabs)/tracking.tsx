@@ -886,6 +886,19 @@ export default function TrackingScreen() {
             </View>
           </View>
 
+          {accuracyTier ? (
+            <View style={[styles.statusRow, { justifyContent: "center", marginBottom: 8 }]}>
+              <View style={styles.accuracyBadge}>
+                <Text style={[styles.accuracyText, { color: accuracyTier.color }]}>
+                  {accuracyTier.label}
+                </Text>
+                <Text style={[styles.accuracyText, { color: "#ffffff" }]}>
+                  {" "}{accuracyTier.value}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
           <Pressable
             style={[styles.mainBtnStart, { backgroundColor: Colors.success, alignSelf: "center" }]}
             onPress={handleStartPress}
