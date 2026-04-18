@@ -193,6 +193,12 @@ export default function TrackingScreen() {
   const sprintMaxDecelSensorRef = useRef(0);
   const sprintMaxTiltRef = useRef(0);
 
+  const [sprintMaxAccelGps, setSprintMaxAccelGps] = useState(0);
+  const [sprintMaxDecelGps, setSprintMaxDecelGps] = useState(0);
+  const sprintMaxAccelGpsRef = useRef(0);
+  const sprintMaxDecelGpsRef = useRef(0);
+  const vehicleDeceleratingRef = useRef(false);
+
   const publishMutation = useMutation({
     mutationFn: async (data: { performanceData: string; caption: string }) => {
       await apiRequest("POST", "/api/contest/entries", data);
@@ -406,7 +412,7 @@ export default function TrackingScreen() {
     const now = Date.now();
 
     let speedKmh: number;
-    if (speedMs !== null && speedMs >= 0) {
+    if (speedMs !== null && speedMs > 0) {
       speedKmh = speedMs * 3.6;
     } else if (lastPosRef.current && (now - lastPosRef.current.time) > 500) {
       const fallbackDist = haversineKm(lastPosRef.current.lat, lastPosRef.current.lng, lat, lng);
@@ -425,7 +431,10 @@ export default function TrackingScreen() {
         sprintStartTimeRef.current = now;
         sprintMaxAccelSensorRef.current = 0;
         sprintMaxDecelSensorRef.current = 0;
+        sprintMaxAccelGpsRef.current = 0;
+        sprintMaxDecelGpsRef.current = 0;
         sprintMaxTiltRef.current = 0;
+        vehicleDeceleratingRef.current = false;
         prevAccelRef.current = null;
       } else if (sprintPhaseRef.current === "measuring") {
         if (prevAccelRef.current) {
@@ -433,13 +442,19 @@ export default function TrackingScreen() {
           if (dt > 0) {
             const accelKmhS = (speedKmh - prevAccelRef.current.value) / dt;
             const accelG = Math.abs(accelKmhS / 3.6) / 9.81;
-            if (accelKmhS > 0 && accelG > sprintMaxAccelSensorRef.current) {
-              sprintMaxAccelSensorRef.current = accelG;
-              setSprintMaxAccelSensor(accelG);
+            if (accelKmhS > 0) {
+              vehicleDeceleratingRef.current = false;
+              if (accelG > sprintMaxAccelGpsRef.current) {
+                sprintMaxAccelGpsRef.current = accelG;
+                setSprintMaxAccelGps(accelG);
+              }
             }
-            if (accelKmhS < 0 && accelG > sprintMaxDecelSensorRef.current) {
-              sprintMaxDecelSensorRef.current = accelG;
-              setSprintMaxDecelSensor(accelG);
+            if (accelKmhS < 0) {
+              vehicleDeceleratingRef.current = true;
+              if (accelG > sprintMaxDecelGpsRef.current) {
+                sprintMaxDecelGpsRef.current = accelG;
+                setSprintMaxDecelGps(accelG);
+              }
             }
           }
         }
@@ -668,9 +683,14 @@ export default function TrackingScreen() {
       sprintStartTimeRef.current = null;
       sprintMaxAccelSensorRef.current = 0;
       sprintMaxDecelSensorRef.current = 0;
+      sprintMaxAccelGpsRef.current = 0;
+      sprintMaxDecelGpsRef.current = 0;
       sprintMaxTiltRef.current = 0;
+      vehicleDeceleratingRef.current = false;
       setSprintMaxAccelSensor(0);
       setSprintMaxDecelSensor(0);
+      setSprintMaxAccelGps(0);
+      setSprintMaxDecelGps(0);
       setSprintMaxTilt(0);
 
       if (sprint0100Enabled) {
@@ -708,9 +728,13 @@ export default function TrackingScreen() {
                   setMaxAcceleration(magnitude);
                 }
                 if (sprint0100EnabledRef.current && (sprintPhaseRef.current === "measuring")) {
-                  if (magnitude > sprintMaxAccelSensorRef.current) {
+                  if (!vehicleDeceleratingRef.current && magnitude > sprintMaxAccelSensorRef.current) {
                     sprintMaxAccelSensorRef.current = magnitude;
                     setSprintMaxAccelSensor(magnitude);
+                  }
+                  if (vehicleDeceleratingRef.current && magnitude > sprintMaxDecelSensorRef.current) {
+                    sprintMaxDecelSensorRef.current = magnitude;
+                    setSprintMaxDecelSensor(magnitude);
                   }
                 }
               }
@@ -808,6 +832,8 @@ export default function TrackingScreen() {
         maxAltitude: maxAltRef.current,
         durationSeconds: dur,
         idleTimeSeconds: idle,
+        maxTiltDeg: maxTiltRef.current,
+        maxAccelerationG: maxAccelerationRef.current,
       });
       setIsTracking(false);
       routeIdRef.current = null;
@@ -930,6 +956,8 @@ export default function TrackingScreen() {
                 phase={sprintPhase}
                 countdown={sprintCountdown}
                 time0to100Ms={sprint0to100Ms}
+                maxAccelGps={sprintMaxAccelGps}
+                maxDecelGps={sprintMaxDecelGps}
                 maxAccelSensor={sprintMaxAccelSensor}
                 maxDecelSensor={sprintMaxDecelSensor}
                 maxTilt={sprintMaxTilt}
@@ -1297,11 +1325,13 @@ function RecordStat({ value, label }: { value: string; label: string }) {
 }
 
 function SprintDashboard({
-  phase, countdown, time0to100Ms, maxAccelSensor, maxDecelSensor, maxTilt, currentSpeed
+  phase, countdown, time0to100Ms, maxAccelGps, maxDecelGps, maxAccelSensor, maxDecelSensor, maxTilt, currentSpeed
 }: {
   phase: "idle" | "countdown" | "waiting" | "measuring" | "done";
   countdown: number;
   time0to100Ms: number | null;
+  maxAccelGps: number;
+  maxDecelGps: number;
   maxAccelSensor: number;
   maxDecelSensor: number;
   maxTilt: number;
@@ -1349,18 +1379,40 @@ function SprintDashboard({
 
       <View style={sprintStyles.panel}>
         <Ionicons name="trending-up-outline" size={20} color={Colors.success} />
-        <Text style={sprintStyles.panelLabel}>Acceleraz. Max (GPS)</Text>
-        <Text style={[sprintStyles.panelValue, { color: Colors.success }]}>
-          {maxAccelSensor > 0 ? `${maxAccelSensor.toFixed(2)}G` : "--"}
-        </Text>
+        <Text style={sprintStyles.panelLabel}>Acceleraz. Max</Text>
+        <View style={{ flexDirection: "row", gap: 16, marginTop: 4 }}>
+          <View style={{ alignItems: "center" }}>
+            <Text style={[sprintStyles.panelValue, { color: Colors.success, fontSize: 22 }]}>
+              {maxAccelGps > 0 ? `${maxAccelGps.toFixed(2)}G` : "--"}
+            </Text>
+            <Text style={{ fontSize: 10, color: Colors.textSecondary, fontFamily: "Inter_400Regular" }}>GPS</Text>
+          </View>
+          <View style={{ alignItems: "center" }}>
+            <Text style={[sprintStyles.panelValue, { color: Colors.success, fontSize: 22 }]}>
+              {maxAccelSensor > 0 ? `${maxAccelSensor.toFixed(2)}G` : "--"}
+            </Text>
+            <Text style={{ fontSize: 10, color: Colors.textSecondary, fontFamily: "Inter_400Regular" }}>Sensore</Text>
+          </View>
+        </View>
       </View>
 
       <View style={sprintStyles.panel}>
         <Ionicons name="trending-down-outline" size={20} color={Colors.warning} />
-        <Text style={sprintStyles.panelLabel}>Decel. Max (GPS)</Text>
-        <Text style={[sprintStyles.panelValue, { color: Colors.warning }]}>
-          {maxDecelSensor > 0 ? `${maxDecelSensor.toFixed(2)}G` : "--"}
-        </Text>
+        <Text style={sprintStyles.panelLabel}>Decel. Max</Text>
+        <View style={{ flexDirection: "row", gap: 16, marginTop: 4 }}>
+          <View style={{ alignItems: "center" }}>
+            <Text style={[sprintStyles.panelValue, { color: Colors.warning, fontSize: 22 }]}>
+              {maxDecelGps > 0 ? `${maxDecelGps.toFixed(2)}G` : "--"}
+            </Text>
+            <Text style={{ fontSize: 10, color: Colors.textSecondary, fontFamily: "Inter_400Regular" }}>GPS</Text>
+          </View>
+          <View style={{ alignItems: "center" }}>
+            <Text style={[sprintStyles.panelValue, { color: Colors.warning, fontSize: 22 }]}>
+              {maxDecelSensor > 0 ? `${maxDecelSensor.toFixed(2)}G` : "--"}
+            </Text>
+            <Text style={{ fontSize: 10, color: Colors.textSecondary, fontFamily: "Inter_400Regular" }}>Sensore</Text>
+          </View>
+        </View>
       </View>
 
       <View style={sprintStyles.panel}>

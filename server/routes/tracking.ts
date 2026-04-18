@@ -97,6 +97,8 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
       maxAltitude: clientMaxAlt,
       durationSeconds: clientDuration,
       idleTimeSeconds: clientIdleTime,
+      maxTiltDeg: clientMaxTilt,
+      maxAccelerationG: clientMaxAccel,
     } = req.body;
 
     let totalDistanceKm: number;
@@ -105,6 +107,8 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
     let maxAltitude: number;
     let durationSeconds: number;
     let idleTimeSeconds: number;
+    const maxTiltDeg = Number(clientMaxTilt) || 0;
+    const maxAccelerationG = Number(clientMaxAccel) || 0;
 
     if (
       clientDistanceKm !== undefined &&
@@ -158,6 +162,8 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
       maxAltitude,
       durationSeconds,
       idleTimeSeconds,
+      maxTiltDeg,
+      maxAccelerationG,
       stoppedAt,
     } as any);
 
