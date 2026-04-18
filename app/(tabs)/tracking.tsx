@@ -72,7 +72,8 @@ interface LocalRouteRecord extends RouteRecord {
 const IDLE_THRESHOLD_KMH = 2;
 const BATCH_SIZE = 10;
 const BATCH_FLUSH_MS = 20000;
-const GPS_BUFFER_KEY = "@bikerlink/gps_buffer";
+const GPS_BUFFER_SEGCOUNT_KEY = "@bikerlink/gps_buffer_segcount";
+const GPS_BUFFER_SEG_KEY = (n: number) => `@bikerlink/gps_buffer_seg_${n}`;
 const GPS_BUFFER_WRITE_EVERY = 5;
 
 const PROFILE_LABELS: Record<UpdateProfile, string> = {
@@ -476,13 +477,21 @@ export default function TrackingScreen() {
     }
   }, [is0100Enabled]);
 
-  // ── Offline GPS buffer helpers ─────────────────────────────────────────────
-  const writeGpsBuffer = useCallback(async () => {
+  // ── Offline GPS buffer helpers (true-append: one key per batch segment) ────
+  //
+  // Layout:
+  //   GPS_BUFFER_SEGCOUNT_KEY  → stringified integer N (number of segments written)
+  //   GPS_BUFFER_SEG_KEY(0..N-1) → JSON array of GpsPoint (up to WRITE_EVERY each)
+  //
+  // Each flush appends ONE new segment key; existing segments are never modified.
+  // Recovery reads SEGCOUNT → reads all segments via multiGet → merges.
+
+  const appendSegmentToBuffer = useCallback(async (batch: GpsPoint[]) => {
     try {
-      await AsyncStorage.setItem(
-        GPS_BUFFER_KEY,
-        JSON.stringify(gpsOfflineBufferRef.current)
-      );
+      const rawN = await AsyncStorage.getItem(GPS_BUFFER_SEGCOUNT_KEY);
+      const n = rawN ? parseInt(rawN, 10) : 0;
+      await AsyncStorage.setItem(GPS_BUFFER_SEG_KEY(n), JSON.stringify(batch));
+      await AsyncStorage.setItem(GPS_BUFFER_SEGCOUNT_KEY, String(n + 1));
     } catch (_) {}
   }, []);
 
@@ -490,7 +499,13 @@ export default function TrackingScreen() {
     gpsOfflineBufferRef.current = [];
     gpsOfflineWriteCountRef.current = 0;
     try {
-      await AsyncStorage.removeItem(GPS_BUFFER_KEY);
+      const rawN = await AsyncStorage.getItem(GPS_BUFFER_SEGCOUNT_KEY);
+      const n = rawN ? parseInt(rawN, 10) : 0;
+      const keys = [
+        GPS_BUFFER_SEGCOUNT_KEY,
+        ...Array.from({ length: n }, (_, i) => GPS_BUFFER_SEG_KEY(i)),
+      ];
+      await AsyncStorage.multiRemove(keys);
     } catch (_) {}
   }, []);
 
@@ -499,24 +514,41 @@ export default function TrackingScreen() {
       gpsOfflineBufferRef.current.push(point);
       gpsOfflineWriteCountRef.current += 1;
       if (gpsOfflineWriteCountRef.current >= GPS_BUFFER_WRITE_EVERY) {
+        const batch = gpsOfflineBufferRef.current.slice(-GPS_BUFFER_WRITE_EVERY);
         gpsOfflineWriteCountRef.current = 0;
-        writeGpsBuffer();
+        appendSegmentToBuffer(batch);
       }
     },
-    [writeGpsBuffer]
+    [appendSegmentToBuffer]
   );
 
   // ── Check for orphan buffer on mount ──────────────────────────────────────
   useEffect(() => {
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(GPS_BUFFER_KEY);
-        if (!raw) return;
-        const points: GpsPoint[] = JSON.parse(raw);
-        if (points.length <= 3) {
-          await AsyncStorage.removeItem(GPS_BUFFER_KEY);
+        const rawN = await AsyncStorage.getItem(GPS_BUFFER_SEGCOUNT_KEY);
+        if (!rawN) return;
+        const segCount = parseInt(rawN, 10);
+        if (!segCount || segCount <= 0) {
+          await AsyncStorage.removeItem(GPS_BUFFER_SEGCOUNT_KEY);
           return;
         }
+
+        // Read all segments in one multiGet call
+        const segKeys = Array.from({ length: segCount }, (_, i) => GPS_BUFFER_SEG_KEY(i));
+        const pairs = await AsyncStorage.multiGet(segKeys);
+        const points: GpsPoint[] = pairs.flatMap(([, val]) => {
+          if (!val) return [];
+          try { return JSON.parse(val) as GpsPoint[]; } catch { return []; }
+        });
+
+        // Auto-discard trivial traces
+        const allKeys = [GPS_BUFFER_SEGCOUNT_KEY, ...segKeys];
+        if (points.length <= 3) {
+          await AsyncStorage.multiRemove(allKeys);
+          return;
+        }
+
         Alert.alert(
           "Giro interrotto trovato",
           `Trovato un giro incompleto con ${points.length} punti GPS. Vuoi recuperarlo o scartarlo?`,
@@ -525,7 +557,7 @@ export default function TrackingScreen() {
               text: "Scarta",
               style: "destructive",
               onPress: async () => {
-                await AsyncStorage.removeItem(GPS_BUFFER_KEY);
+                await AsyncStorage.multiRemove(allKeys);
               },
             },
             {
@@ -533,7 +565,6 @@ export default function TrackingScreen() {
               onPress: () => {
                 let totalDistKm = 0;
                 let maxSpeedKmh = 0;
-                let sumSpeed = 0;
 
                 for (let i = 0; i < points.length; i++) {
                   const p = points[i];
@@ -546,19 +577,21 @@ export default function TrackingScreen() {
                     if (d > 0.001 && d < 1) totalDistKm += d;
                   }
                   if (p.speedKmh > maxSpeedKmh) maxSpeedKmh = p.speedKmh;
-                  sumSpeed += p.speedKmh;
                 }
 
                 const firstTs = new Date(points[0].timestamp).getTime();
                 const lastTs = new Date(points[points.length - 1].timestamp).getTime();
                 const durationSec = Math.max(Math.round((lastTs - firstTs) / 1000), 1);
-                const avgSpeed = sumSpeed / points.length;
+                // avgSpeedKmh = distance / time (consistent with normal stop logic)
+                const avgSpeedKmh = durationSec > 0
+                  ? (totalDistKm / (durationSec / 3600))
+                  : 0;
 
                 const recovered: LocalRouteRecord = {
                   id: `recovered-${Date.now()}`,
                   totalDistanceKm: totalDistKm,
                   maxSpeedKmh: maxSpeedKmh,
-                  avgSpeedKmh: avgSpeed,
+                  avgSpeedKmh: avgSpeedKmh,
                   durationSeconds: durationSec,
                   status: "completed",
                   createdAt: points[0].timestamp,
@@ -567,7 +600,7 @@ export default function TrackingScreen() {
                 };
 
                 setRecoveredRecords((prev) => [recovered, ...prev]);
-                AsyncStorage.removeItem(GPS_BUFFER_KEY).catch(() => {});
+                AsyncStorage.multiRemove(allKeys).catch(() => {});
               },
             },
           ],
@@ -1078,7 +1111,9 @@ export default function TrackingScreen() {
       setSummaryVisible(true);
     } catch (e) {
       logGpsError(e, "stopTracking:PUT", { routeId: rId });
-      clearGpsBuffer().catch(() => {});
+      // Buffer intentionally NOT cleared on PUT failure:
+      // the segmented buffer remains in AsyncStorage and will be offered
+      // for recovery the next time the app launches.
     }
   }, [cleanupTracking, flushPoints, refetchRecords, clearGpsBuffer]);
 
