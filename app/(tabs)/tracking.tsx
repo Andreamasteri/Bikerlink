@@ -1248,15 +1248,17 @@ export default function TrackingScreen() {
                 currentLocation={currentCoord}
               />
               <TouchableOpacity
-                style={styles.mapExpandBtn}
+                style={styles.mapTapOverlay}
                 onPress={() => setMapExpanded((e) => !e)}
-                activeOpacity={0.8}
+                activeOpacity={1}
               >
-                <Ionicons
-                  name={mapExpanded ? "contract-outline" : "expand-outline"}
-                  size={16}
-                  color="#fff"
-                />
+                <View style={styles.mapExpandBtn} pointerEvents="none">
+                  <Ionicons
+                    name={mapExpanded ? "contract-outline" : "expand-outline"}
+                    size={16}
+                    color="#fff"
+                  />
+                </View>
               </TouchableOpacity>
             </View>
           )}
@@ -2077,10 +2079,17 @@ const styles = StyleSheet.create({
   mapCardExpanded: {
     height: 380,
   },
-  mapExpandBtn: {
+  mapTapOverlay: {
     position: "absolute" as const,
-    bottom: 10,
-    right: 10,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "flex-end" as const,
+    justifyContent: "flex-end" as const,
+    padding: 10,
+  },
+  mapExpandBtn: {
     backgroundColor: "rgba(0,0,0,0.55)",
     borderRadius: 8,
     padding: 6,
