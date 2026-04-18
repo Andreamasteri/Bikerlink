@@ -425,6 +425,7 @@ export default function TrackingScreen() {
         .catch(() => {});
       AsyncStorage.removeItem(BG_POINTS_KEY).catch(() => {});
     }
+    setHandsOffActive(false);
   };
 
   const flushPoints = useCallback(async () => {
@@ -1084,8 +1085,11 @@ export default function TrackingScreen() {
     await flushPoints();
 
     const routeId = routeIdRef.current;
-    if (!routeId) return;
-
+    if (!routeId) {
+      setIsTracking(false);
+      setHandsOffActive(false);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -1105,7 +1109,6 @@ export default function TrackingScreen() {
         maxAccelerationG: maxAccelerationRef.current,
         ...(sprint0to100MsRef.current !== null && { sprint0to100Ms: sprint0to100MsRef.current }),
       });
-      setIsTracking(false);
       routeIdRef.current = null;
       queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
 
@@ -1134,15 +1137,16 @@ export default function TrackingScreen() {
         setUpdateProfile(prevUpdateProfileRef.current);
         updateProfileRef.current = prevUpdateProfileRef.current;
       }
+    } catch {
+      Alert.alert("Errore", "Errore nel completamento della sessione.");
+    } finally {
+      setIsTracking(false);
       if (sprintAutoHandsOffRef.current) {
         sprintAutoHandsOffRef.current = false;
         handsOffEnabledRef.current = handsOffEnabled;
         handsOffSpeedRef.current = parseFloat(handsOffSpeed || "80") || 80;
-        setHandsOffActive(false);
       }
-    } catch {
-      Alert.alert("Errore", "Errore nel completamento della sessione.");
-    } finally {
+      setHandsOffActive(false);
       setLoading(false);
     }
   };

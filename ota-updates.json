@@ -3252,7 +3252,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T08:52:17.012Z"
+  },
+  {
+    "updateNumber": 90,
+    "version": "1.90.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-90 rv7.0.0: Fix pulsante Start bloccato dopo errore API",
+    "note": "Task #689: fix critico in stopTracking — setIsTracking(false) e setHandsOffActive(false) spostati nel blocco finally, così vengono sempre eseguiti anche se la chiamata API /api/routes/:id/stop fallisce. Aggiunta setHandsOffActive(false) anche in cleanupTracking come salvaguardia. Fix anche per early-return quando routeId è null. Impedisce che pointerEvents=none blocchi Start/Stop dopo un errore di rete. CURRENT_OTA_NUMBER=90.",
+    "releaseId": "7a366993-8b5e-4ae0-942d-b6a0deb8f905",
+    "bundleUrl": "private/ota/ota-1.90.0-1776514419994.js",
+    "updateGroupId": "170bd414-0633-44ab-94fa-8dae4978ef13",
+    "androidUpdateId": "019da083-80a3-7d8e-b73d-3a0dae0dd858",
+    "iosUpdateId": null,
+    "commitBase": "8ce714710c0b30d6d5db49d37e340151f10c41e8",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/170bd414-0633-44ab-94fa-8dae4978ef13",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T12:13:42.850Z"
   }
 ]
