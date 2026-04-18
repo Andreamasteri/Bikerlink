@@ -1006,7 +1006,7 @@ export default function AdminSettings() {
     },
   });
 
-  const { data: mapsData } = useQuery<{ enabled: boolean; provider: string; userChoiceEnabled: boolean; engine: string }>({
+  const { data: mapsData } = useQuery<{ enabled: boolean; provider: string; userChoiceEnabled: boolean }>({
     queryKey: ["/api/settings/maps"],
   });
   const mapsEnabled = mapsData?.enabled !== false;

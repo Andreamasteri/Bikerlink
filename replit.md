@@ -20,6 +20,7 @@ BikerLink utilizes a modern full-stack architecture.
 - The UI/UX features a dark theme by default (background `#0D0D0D`, accent `#FF6600`) and includes custom icons like a Shark Carbon helmet for SOS.
 - **Brand Theme Switcher**: Admin panel includes a 4-theme selector ("Attuale", "Asfalto Caldo", "Velocità Pura", "Rotta Libera"). Themes are defined in `constants/colors.ts` (`THEMES`), managed via `ThemeProvider` in `lib/theme-context.tsx`, persisted in AsyncStorage. Components use `useColors()` from `hooks/useColors.ts` to receive dynamic colors.
 - Interactive maps are implemented esclusivamente con Leaflet in WebView (componenti `Leaflet*Map.tsx`), con varianti web-specifiche (`.web.tsx`) dove necessario.
+- **Legacy app_settings keys**: la chiave `maps_engine` (Task #720) è stata rimossa completamente: il toggle Google Maps vs Leaflet non esiste più, l'endpoint `PUT /api/admin/settings/maps_engine` è stato eliminato e la risposta di `GET /api/settings/maps` non include più il campo `engine`.
 - Features include user profiles (Biker, Zavorrina/Zavorrino, Coppia), interactive maps displaying users, Syneco workshops, and collectible easter eggs.
 - Users can create and respond to ride proposals, engage in private and group chats, and track GPS routes with performance statistics.
 - A photo contest system allows users to upload and vote on photos.

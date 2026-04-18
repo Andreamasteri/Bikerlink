@@ -1212,12 +1212,6 @@ router.put("/settings/maps_user_choice_enabled", async (req: Request, res: Respo
   }
 });
 
-router.put("/settings/maps_engine", async (_req: Request, res: Response) => {
-  return res.status(410).json({
-    message: "Endpoint rimosso: il setting 'maps_engine' non è più utilizzato (Leaflet only).",
-  });
-});
-
 router.put("/settings/theme_user_switching_enabled", async (req: Request, res: Response) => {
   try {
     const { value } = req.body as { value: string };
