@@ -1199,16 +1199,13 @@ export default function TrackingScreen() {
                       </Text>
                     )}
                     <Text style={styles.statLabel}>G max</Text>
-                    {phase === "active" && !isCalibrating && (
+                    {phase === "active" && !isCalibrating && Platform.OS !== "web" && (
                       <TouchableOpacity
                         onPress={handleRecalibrate}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
                         <Text style={styles.recalibrateLink}>Ricalibra</Text>
                       </TouchableOpacity>
-                    )}
-                    {phase === "active" && isCalibrating && (
-                      <Text style={styles.recalibrateLink}>—</Text>
                     )}
                   </View>
                 </View>
