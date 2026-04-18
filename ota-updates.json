@@ -2976,7 +2976,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-17T22:09:36.570Z"
+  },
+  {
+    "updateNumber": 78,
+    "version": "1.78.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-78 rv7.0.0: Accuracy GPS: testo triplicato e posizione dedicata",
+    "note": "Task #668: badge accuracy GPS spostato dalla statusRow (inline con FERMO) a una riga dedicata tra statusRow e speedBox. fontSize 11→33 (Inter_700Bold). accuracyRow centrata con alignItems:baseline. Stili batteryBadge/batteryText rimossi, sostituiti da accuracyRow/accuracyText. CURRENT_OTA_NUMBER=78.",
+    "releaseId": "e73ec7af-eff7-4f88-88a3-1c05da02da66",
+    "bundleUrl": "private/ota/ota-1.78.0-1776478993255.js",
+    "updateGroupId": "450d5ecc-1f2d-4195-9729-9d8aa3564484",
+    "androidUpdateId": "019d9e67-5128-7c44-b33c-302f0bd75fd4",
+    "iosUpdateId": null,
+    "commitBase": "8d625bc77f3783e4b8068dbffdfcf8ebfda4f128",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/450d5ecc-1f2d-4195-9729-9d8aa3564484",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T02:23:16.149Z"
   }
 ]

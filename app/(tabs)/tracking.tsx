@@ -740,17 +740,18 @@ export default function TrackingScreen() {
                   </View>
                 );
               })()}
-              {accuracyTier ? (
-                <View style={styles.batteryBadge}>
-                  <Text style={[styles.batteryText, { color: accuracyTier.color }]}>
-                    {accuracyTier.label}
-                  </Text>
-                  <Text style={[styles.batteryText, { color: "#ffffff" }]}>
-                    {" "}{accuracyTier.value}
-                  </Text>
-                </View>
-              ) : null}
             </View>
+
+            {accuracyTier ? (
+              <View style={styles.accuracyRow}>
+                <Text style={[styles.accuracyText, { color: accuracyTier.color }]}>
+                  {accuracyTier.label}
+                </Text>
+                <Text style={[styles.accuracyText, { color: "#ffffff" }]}>
+                  {" "}{accuracyTier.value}
+                </Text>
+              </View>
+            ) : null}
 
             <View style={styles.speedBox}>
               <Text style={[styles.speedValue, isPaused && { color: Colors.textSecondary }]}>
@@ -1064,8 +1065,8 @@ const styles = StyleSheet.create({
   statusBadge: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   statusText: { fontSize: 12, fontFamily: "Inter_700Bold" },
-  batteryBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
-  batteryText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  accuracyRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "center", marginTop: 8, marginBottom: 4 },
+  accuracyText: { fontSize: 33, fontFamily: "Inter_700Bold" },
   speedBox: {
     backgroundColor: Colors.surface, borderRadius: 20, padding: 20, alignItems: "center",
     marginBottom: 12, borderWidth: 1, borderColor: Colors.accent,
