@@ -21,10 +21,41 @@ import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
 import * as Location from "expo-location";
+import * as TaskManager from "expo-task-manager";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getCurrentLocale } from "@/lib/i18n";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { DeviceMotion } from "expo-sensors";
+
+const BG_LOCATION_TASK = "bikerlink-bg-location";
+const BG_POINTS_KEY = "bikerlink-bg-gps-points";
+
+if (Platform.OS !== "web") {
+  TaskManager.defineTask<{ locations: Location.LocationObject[] }>(
+    BG_LOCATION_TASK,
+    async ({ data, error }: TaskManager.TaskManagerTaskBody<{ locations: Location.LocationObject[] }>) => {
+    if (error || !data) return;
+    const { locations } = data;
+    if (!locations || locations.length === 0) return;
+    try {
+      const raw = await AsyncStorage.getItem(BG_POINTS_KEY);
+      const stored: GpsPoint[] = raw ? JSON.parse(raw) : [];
+      for (const loc of locations) {
+        const speedMs = loc.coords.speed;
+        const speedKmh = speedMs !== null && speedMs >= 0 ? speedMs * 3.6 : 0;
+        stored.push({
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+          altitude: loc.coords.altitude ?? 0,
+          speedKmh,
+          timestamp: new Date(loc.timestamp).toISOString(),
+        });
+      }
+      await AsyncStorage.setItem(BG_POINTS_KEY, JSON.stringify(stored));
+    } catch {}
+  });
+}
 
 interface RouteRecord {
   id: string;
@@ -195,6 +226,10 @@ export default function TrackingScreen() {
   const [handsOffSpeed, setHandsOffSpeed] = useState("80");
   const [handsOffActive, setHandsOffActive] = useState(false);
 
+  const [bgPermGranted, setBgPermGranted] = useState(false);
+  const [bgReturnPoints, setBgReturnPoints] = useState<number | null>(null);
+  const bgDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [publishRecord, setPublishRecord] = useState<RouteRecord | null>(null);
   const [publishCaption, setPublishCaption] = useState("");
 
@@ -326,11 +361,6 @@ export default function TrackingScreen() {
     warmUp();
   }, []);
 
-  const handleAppStateChange = useCallback((nextState: AppStateStatus) => {
-    if (nextState === "active" && routeIdRef.current && pointsBufferRef.current.length > 0) {
-      flushPoints();
-    }
-  }, []);
 
   const cleanupTracking = () => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -352,6 +382,18 @@ export default function TrackingScreen() {
     if (sprintCountdownRef.current) {
       clearInterval(sprintCountdownRef.current);
       sprintCountdownRef.current = null;
+    }
+    if (bgDismissTimerRef.current) {
+      clearTimeout(bgDismissTimerRef.current);
+      bgDismissTimerRef.current = null;
+    }
+    if (Platform.OS !== "web") {
+      Location.hasStartedLocationUpdatesAsync(BG_LOCATION_TASK)
+        .then((running) => {
+          if (running) Location.stopLocationUpdatesAsync(BG_LOCATION_TASK).catch(() => {});
+        })
+        .catch(() => {});
+      AsyncStorage.removeItem(BG_POINTS_KEY).catch(() => {});
     }
   };
 
@@ -625,6 +667,93 @@ export default function TrackingScreen() {
     }
   }, []);
 
+  const loadBgPoints = useCallback(async () => {
+    if (Platform.OS === "web") return;
+    try {
+      const raw = await AsyncStorage.getItem(BG_POINTS_KEY);
+      if (!raw) return;
+      const bgPoints: GpsPoint[] = JSON.parse(raw);
+      if (bgPoints.length === 0) return;
+      await AsyncStorage.removeItem(BG_POINTS_KEY);
+      for (const pt of bgPoints) {
+        if (pt.speedKmh > maxSpeedRef.current) {
+          maxSpeedRef.current = pt.speedKmh;
+          setMaxSpeed(pt.speedKmh);
+        }
+        const alt = pt.altitude ?? 0;
+        if (alt > maxAltRef.current) {
+          maxAltRef.current = alt;
+          setMaxAltitude(alt);
+        }
+        if (lastPosRef.current) {
+          const dist = haversineKm(lastPosRef.current.lat, lastPosRef.current.lng, pt.latitude, pt.longitude);
+          if (dist > 0.001) {
+            totalKmRef.current += dist;
+          }
+        }
+        const t = new Date(pt.timestamp).getTime();
+        lastPosRef.current = { lat: pt.latitude, lng: pt.longitude, time: t };
+        pointsBufferRef.current.push(pt);
+      }
+      setTotalKm(totalKmRef.current);
+      setPointsBuffered(pointsBufferRef.current.length);
+      setBgReturnPoints(bgPoints.length);
+      if (bgDismissTimerRef.current) clearTimeout(bgDismissTimerRef.current);
+      bgDismissTimerRef.current = setTimeout(() => setBgReturnPoints(null), 5000);
+      flushPoints();
+    } catch {}
+  }, [flushPoints]);
+
+  const handleAppStateChange = useCallback(async (nextState: AppStateStatus) => {
+    const tracking = !!routeIdRef.current;
+
+    if (nextState === "background" && tracking && Platform.OS !== "web") {
+      if (watchSubRef.current) {
+        watchSubRef.current.remove();
+        watchSubRef.current = null;
+      }
+      if (!isPausedRef.current) {
+        try {
+          const alreadyRunning = await Location.hasStartedLocationUpdatesAsync(BG_LOCATION_TASK);
+          if (!alreadyRunning) {
+            await Location.startLocationUpdatesAsync(BG_LOCATION_TASK, {
+              accuracy: Location.Accuracy.High,
+              timeInterval: 5000,
+              distanceInterval: 5,
+              showsBackgroundLocationIndicator: true,
+              foregroundService: {
+                notificationTitle: "BikerLink — Tracciamento attivo",
+                notificationBody: "La tua gita viene registrata in background.",
+                notificationColor: "#FF6600",
+              },
+            });
+          }
+        } catch {}
+      }
+    } else if (nextState === "active" && tracking && Platform.OS !== "web") {
+      try {
+        const running = await Location.hasStartedLocationUpdatesAsync(BG_LOCATION_TASK);
+        if (running) {
+          await Location.stopLocationUpdatesAsync(BG_LOCATION_TASK);
+        }
+      } catch {}
+      await loadBgPoints();
+      if (!isPausedRef.current) {
+        const config = getModeConfig(currentModeRef.current, updateProfileRef.current);
+        try {
+          const sub = await Location.watchPositionAsync(
+            { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
+            onNativeLocation
+          );
+          watchSubRef.current = sub;
+        } catch {}
+      }
+      if (pointsBufferRef.current.length > 0) {
+        flushPoints();
+      }
+    }
+  }, [flushPoints, loadBgPoints, onNativeLocation]);
+
   const startTracking = async () => {
     try {
       setLoading(true);
@@ -635,7 +764,17 @@ export default function TrackingScreen() {
           Alert.alert("Permesso Negato", "Il permesso GPS è necessario per il tracciamento.");
           return;
         }
-
+        const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
+        if (bgStatus === "granted") {
+          setBgPermGranted(true);
+        } else {
+          setBgPermGranted(false);
+          Alert.alert(
+            "Background GPS",
+            "Per registrare la gita con lo schermo spento, consenti l'accesso alla posizione 'Sempre' nelle impostazioni.",
+            [{ text: "Continua", style: "default" }]
+          );
+        }
       } else {
         const perm = await new Promise<boolean>((resolve) => {
           if (!navigator.geolocation) {
@@ -837,6 +976,8 @@ export default function TrackingScreen() {
       isPausedRef.current = false;
       setIsPaused(false);
     }
+    setBgPermGranted(false);
+    setBgReturnPoints(null);
 
     cleanupTracking();
     timerRef.current = null;
@@ -968,6 +1109,22 @@ export default function TrackingScreen() {
 
       {isTracking ? (
         <>
+          {bgPermGranted && (
+            <View style={styles.bgBadge}>
+              <Ionicons name="moon" size={12} color={Colors.accent} />
+              <Text style={styles.bgBadgeText}>Background attivo</Text>
+            </View>
+          )}
+
+          {bgReturnPoints !== null && (
+            <View style={styles.bgBanner}>
+              <Ionicons name="checkmark-circle" size={14} color="#fff" />
+              <Text style={styles.bgBannerText}>
+                {bgReturnPoints} {bgReturnPoints === 1 ? "punto GPS" : "punti GPS"} registrat{bgReturnPoints === 1 ? "o" : "i"} in background
+              </Text>
+            </View>
+          )}
+
           <View style={styles.trackingHeader}>
             <Pressable
               style={[styles.mainBtn, { backgroundColor: Colors.accentRed }]}
@@ -1831,5 +1988,41 @@ const styles = StyleSheet.create({
     fontSize: 240,
     fontFamily: "Inter_700Bold",
     textAlign: "center" as const,
+  },
+  bgBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    alignSelf: "flex-end" as const,
+    gap: 4,
+    backgroundColor: Colors.accent + "18",
+    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.accent + "40",
+  },
+  bgBadgeText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    color: Colors.accent,
+  },
+  bgBanner: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 6,
+    backgroundColor: Colors.success + "CC",
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.success,
+  },
+  bgBannerText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: "#ffffff",
   },
 });

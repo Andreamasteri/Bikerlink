@@ -41,6 +41,7 @@
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
         "READ_MEDIA_IMAGES",
         "READ_MEDIA_AUDIO",
         "CAMERA",
@@ -77,6 +78,18 @@
       "expo-camera",
       "expo-image",
       "expo-sharing",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "BikerLink ha bisogno di accedere alla posizione anche in background per registrare il percorso in moto senza interruzioni, inviare la posizione durante un'emergenza SOS e ricevere avvisi dalla community.",
+          "locationAlwaysPermission": "BikerLink usa la posizione in background per il tracciamento percorsi e la funzione SOS.",
+          "locationWhenInUsePermission": "BikerLink usa la tua posizione GPS per mostrare i motociclisti vicini e registrare i tuoi percorsi.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      "expo-task-manager",
       [
         "expo-media-library",
         {
