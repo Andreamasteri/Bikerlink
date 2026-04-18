@@ -1343,6 +1343,14 @@ export default function TrackingScreen() {
               </TouchableOpacity>
             </View>
           )}
+
+          {sprint0100Enabled && (sprintPhase === "waiting" || sprintPhase === "measuring") && (
+            <SprintSpeedPanel
+              currentSpeed={currentSpeed}
+              phase={sprintPhase}
+              maxAccelSensor={sprintMaxAccelSensor}
+            />
+          )}
         </>
       ) : (
         <>
@@ -1671,6 +1679,112 @@ function RecordStat({ value, label }: { value: string; label: string }) {
     </View>
   );
 }
+
+function SprintSpeedPanel({
+  currentSpeed,
+  phase,
+  maxAccelSensor,
+}: {
+  currentSpeed: number;
+  phase: "waiting" | "measuring";
+  maxAccelSensor: number;
+}) {
+  const isMeasuring = phase === "measuring";
+  const phaseColor = isMeasuring ? Colors.accentRed : Colors.success;
+  const phaseLabel = isMeasuring ? "VIA!" : "ATTENDI";
+  const phaseSubLabel = isMeasuring ? "In misurazione 0→100 km/h" : "Fermo — accelera per iniziare";
+  const phaseIcon: "flash" | "hourglass-outline" = isMeasuring ? "flash" : "hourglass-outline";
+
+  return (
+    <View style={sprintSpeedStyles.container}>
+      <View style={[sprintSpeedStyles.phaseBadge, { backgroundColor: phaseColor + "20", borderColor: phaseColor }]}>
+        <Ionicons name={phaseIcon} size={16} color={phaseColor} />
+        <Text style={[sprintSpeedStyles.phaseLabel, { color: phaseColor }]}>{phaseLabel}</Text>
+      </View>
+
+      <View style={sprintSpeedStyles.speedBlock}>
+        <Text style={[sprintSpeedStyles.speedValue, { color: isMeasuring ? Colors.accentRed : Colors.text }]}>
+          {currentSpeed.toFixed(0)}
+        </Text>
+        <Text style={sprintSpeedStyles.speedUnit}>km/h</Text>
+      </View>
+
+      <Text style={sprintSpeedStyles.subLabel}>{phaseSubLabel}</Text>
+
+      {isMeasuring && maxAccelSensor > 0 && (
+        <View style={sprintSpeedStyles.accelRow}>
+          <Ionicons name="trending-up-outline" size={14} color={Colors.success} />
+          <Text style={sprintSpeedStyles.accelText}>
+            Accel. max {maxAccelSensor.toFixed(2)} G
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const sprintSpeedStyles = StyleSheet.create({
+  container: {
+    marginTop: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    height: 220,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 8,
+    paddingHorizontal: 20,
+  },
+  phaseBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  phaseLabel: {
+    fontSize: 15,
+    fontFamily: "Inter_700Bold" as const,
+    letterSpacing: 1.5,
+  },
+  speedBlock: {
+    flexDirection: "row" as const,
+    alignItems: "flex-end" as const,
+    gap: 6,
+  },
+  speedValue: {
+    fontSize: 80,
+    fontFamily: "Inter_700Bold" as const,
+    lineHeight: 88,
+    letterSpacing: -2,
+  },
+  speedUnit: {
+    fontSize: 22,
+    fontFamily: "Inter_400Regular" as const,
+    color: Colors.textSecondary,
+    marginBottom: 12,
+  },
+  subLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular" as const,
+    color: Colors.textSecondary,
+    textAlign: "center" as const,
+  },
+  accelRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    marginTop: 2,
+  },
+  accelText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold" as const,
+    color: Colors.success,
+  },
+});
 
 function SprintDashboard({
   phase, countdown, time0to100Ms, maxAccelGps, maxDecelGps, maxAccelSensor, maxDecelSensor, maxTilt, currentSpeed
