@@ -500,12 +500,18 @@ export default function TrackingScreen() {
   }, []);
 
   const onNativeLocation = useCallback((loc: Location.LocationObject) => {
-    setGpsAccuracy(loc.coords.accuracy ?? null);
-    if ((loc.coords.heading ?? -1) >= 0) {
-      lastGpsHeadingRef.current = loc.coords.heading!;
-    }
-    if (!isPausedRef.current) {
-      handleGpsUpdate(loc.coords.latitude, loc.coords.longitude, loc.coords.altitude, loc.coords.speed);
+    try {
+      setGpsAccuracy(loc.coords.accuracy ?? null);
+      if ((loc.coords.heading ?? -1) >= 0) {
+        lastGpsHeadingRef.current = loc.coords.heading!;
+      }
+      if (!isPausedRef.current) {
+        handleGpsUpdate(loc.coords.latitude, loc.coords.longitude, loc.coords.altitude, loc.coords.speed);
+      }
+    } catch (cbErr: unknown) {
+      const errMsg = cbErr instanceof Error ? cbErr.message : String(cbErr);
+      sendStartupBeacon("onNativeLocation:error", { err: errMsg });
+      logGpsError(cbErr, "onNativeLocation_callback");
     }
   }, []);
 
@@ -990,6 +996,10 @@ export default function TrackingScreen() {
 
       if (Platform.OS !== "web") {
         try {
+          if (deviceMotionSubRef.current) {
+            deviceMotionSubRef.current.remove();
+            deviceMotionSubRef.current = null;
+          }
           const available = await DeviceMotion.isAvailableAsync();
           if (available) {
             DeviceMotion.setUpdateInterval(sprint0100EnabledRef.current ? 100 : 250);
@@ -1081,6 +1091,7 @@ export default function TrackingScreen() {
             { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
             onNativeLocation
           );
+          sendStartupBeacon("startTracking:watchPositionResolved");
           watchSubRef.current = sub;
           sendStartupBeacon("startTracking:watchPositionOK");
         } catch (gpsErr: unknown) {

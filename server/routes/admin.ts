@@ -172,6 +172,24 @@ router.post("/ota-error", (req: Request, res: Response) => {
   }
 });
 
+router.post("/client-error", (req: Request, res: Response) => {
+  try {
+    const { message, stack, componentStack, platform, appVersion, isFatal } = req.body || {};
+    console.error("[CLIENT-ERROR]", JSON.stringify({
+      message: message || "unknown",
+      stack: (stack || "").substring(0, 2000),
+      componentStack: (componentStack || "").substring(0, 1000),
+      platform: platform || "unknown",
+      appVersion: appVersion || "unknown",
+      isFatal: !!isFatal,
+      timestamp: new Date().toISOString(),
+    }));
+    return res.json({ received: true });
+  } catch {
+    return res.status(200).json({ received: true });
+  }
+});
+
 router.post("/startup-beacon", (req: Request, res: Response) => {
   try {
     const { step, ts, recovered, platform, ...rest } = req.body as {

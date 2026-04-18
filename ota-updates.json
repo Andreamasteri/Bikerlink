@@ -3390,7 +3390,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T15:11:58.081Z"
+  },
+  {
+    "updateNumber": 96,
+    "version": "1.96.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-96 rv7.0.0: Fix crash Start — diagnostica client-error + difesa onNativeLocation",
+    "note": "Task #706: analisi beacon deployment logs ha localizzato il crash in Location.watchPositionAsync() dopo startTracking:watchPositionBegin. (1) POST /api/admin/client-error rimosso da requireAdmin middleware in admin.ts (aggiunto prima di router.use(requireAdmin)): il messaggio errore ora appare in [CLIENT-ERROR] nei log. (2) onNativeLocation wrappato in try-catch con beacon onNativeLocation:error + logGpsError: crash nella callback GPS non propaga più come fatal error. (3) Cleanup deviceMotionSubRef.current prima di DeviceMotion.addListener() in startTracking: evita listener duplicati su crash-restart cycles. (4) Beacon startTracking:watchPositionResolved aggiunto tra await e watchSubRef.current = sub: distingue crash nella promise da crash post-risoluzione. CURRENT_OTA_NUMBER=96.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "eef9ee690a16d7d1656fc7c1eaef60d85b59f154",
+    "easDashboard": null,
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "pending",
+    "publishedAt": null
   }
 ]
