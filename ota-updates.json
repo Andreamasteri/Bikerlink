@@ -3229,7 +3229,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T08:28:42.572Z"
+  },
+  {
+    "updateNumber": 89,
+    "version": "1.89.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-89 rv7.0.0: Pannello velocità dedicato durante la corsa 0-100 km/h",
+    "note": "Task #687: pubblica le modifiche di Task #683 (SprintSpeedPanel) non incluse in OTA-88. SprintSpeedPanel mostra velocità GPS in grande (80pt) con badge fase ATTENDI/VIA! e indicatore accelerazione in G durante la misurazione. CURRENT_OTA_NUMBER=89.",
+    "releaseId": "4da8d534-f838-4d26-a4bf-f404eaf1a23d",
+    "bundleUrl": "private/ota/ota-1.89.0-1776502334055.js",
+    "updateGroupId": "16049255-64ec-485c-a59f-58d9e8a723d4",
+    "androidUpdateId": "019d9fcb-1df2-7349-88dc-096f214bc007",
+    "iosUpdateId": null,
+    "commitBase": "561a8ed1899072161b097f5b189069e67bd0eb4f",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/16049255-64ec-485c-a59f-58d9e8a723d4",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T08:52:17.012Z"
   }
 ]
