@@ -278,10 +278,10 @@ export default function TrackingScreen() {
     if (!profileData?.profile?.gpsPrecision) return;
     const gpsPrec = profileData.profile.gpsPrecision;
     const mapped: UpdateProfile =
-      gpsPrec === "lowest" ? "lowest"
+      gpsPrec === "lowest" ? "easy"
       : gpsPrec === "balanced" ? "easy"
       : gpsPrec === "high" ? "medium"
-      : gpsPrec === "highest" ? "high"
+      : gpsPrec === "highest" ? "medium"
       : gpsPrec === "bestForNavigation" ? "race"
       : "medium";
     setUpdateProfile(mapped);
