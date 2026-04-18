@@ -10,7 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTaskbarStyle } from "@/lib/taskbar-style-context";
 import CustomTabBar, { type TabItem } from "@/components/CustomTabBar";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
-import { registerHandsOffCallback } from "@/lib/tracking-active";
+import { registerHandsOffCallback, registerSprintMeasuringCallback } from "@/lib/tracking-active";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -28,6 +28,14 @@ export default function TabLayout() {
 
   useEffect(() => {
     const unsub = registerHandsOffCallback(setGlobalHandsOffActive);
+    return unsub;
+  }, []);
+
+  // ── Global 0-100 Sprint nav-lock overlay ────────────────────────────────────
+  const [globalSprintMeasuring, setGlobalSprintMeasuring] = useState(false);
+
+  useEffect(() => {
+    const unsub = registerSprintMeasuringCallback(setGlobalSprintMeasuring);
     return unsub;
   }, []);
 
@@ -409,6 +417,14 @@ export default function TabLayout() {
         />
       </Tabs>
 
+      {globalSprintMeasuring && (
+        <View style={sprintLockOverlayStyles.overlay} pointerEvents="box-only">
+          <Text style={sprintLockOverlayStyles.icon}>🏁</Text>
+          <Text style={sprintLockOverlayStyles.title}>MISURAZIONE 0-100</Text>
+          <Text style={sprintLockOverlayStyles.msg}>Naviga completata la corsa</Text>
+        </View>
+      )}
+
       {globalHandsOffActive && (
         <View
           style={handsOffOverlayStyles.overlay}
@@ -456,6 +472,37 @@ export default function TabLayout() {
     </>
   );
 }
+
+const sprintLockOverlayStyles = StyleSheet.create({
+  overlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 9998,
+  },
+  icon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  title: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+    color: "#facc15",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  msg: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+    color: "#ffffff",
+    textAlign: "center",
+  },
+});
 
 const handsOffOverlayStyles = StyleSheet.create({
   overlay: {

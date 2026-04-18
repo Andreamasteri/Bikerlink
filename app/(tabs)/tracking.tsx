@@ -26,7 +26,7 @@ import { getCurrentLocale } from "@/lib/i18n";
 import { useUnits, SpeedUnit, DistanceUnit } from "@/lib/units-context";
 import { formatDistance, formatSpeed } from "@/lib/units";
 import TrackingMap from "@/components/TrackingMap";
-import { setTrackingActive, setHandsOffBroadcast } from "@/lib/tracking-active";
+import { setTrackingActive, setHandsOffBroadcast, setSprintMeasuringBroadcast } from "@/lib/tracking-active";
 import * as Haptics from "expo-haptics";
 import { logGpsError } from "@/lib/gps-logger";
 
@@ -186,9 +186,8 @@ function RecordCard({
   onPublish: () => void;
   onDelete: () => void;
 }) {
-  const { speedUnit, distanceUnit } = useUnits();
+  const { speedUnit, distanceUnit, timeFormat } = useUnits();
   const dur = item.durationSeconds || 0;
-  const { distanceUnit, speedUnit, timeFormat } = useUnits();
   const locale = getCurrentLocale();
   return (
     <View
@@ -389,6 +388,11 @@ export default function TrackingScreen() {
     },
     onError: () => Alert.alert("Errore", "Impossibile pubblicare il record"),
   });
+
+  // ── 0-100 sprint nav-lock broadcast ──────────────────────────────────────
+  useEffect(() => {
+    setSprintMeasuringBroadcast(sprintPhase === "measuring");
+  }, [sprintPhase]);
 
   // ── Hands-off blink + haptic + global broadcast ───────────────────────────
   useEffect(() => {
@@ -825,7 +829,14 @@ export default function TrackingScreen() {
       routeIdRef.current = route.id;
 
       if (countdownEnabled) {
-        const secs = Math.max(parseInt(countdownSec || "10", 10) || 10, 1);
+        const _parsed = parseInt(countdownSec, 10);
+        const secs = isNaN(_parsed) ? 10 : Math.max(_parsed, 0);
+        if (secs === 0) {
+          // Immediate start — bypass countdown
+          phaseRef.current = "active";
+          setPhase("active");
+          await beginActiveTracking();
+        } else {
         setCountdownValue(secs);
         phaseRef.current = "countdown";
         setPhase("countdown");
@@ -852,6 +863,7 @@ export default function TrackingScreen() {
             await beginActiveTracking();
           }
         }, 1000);
+        } // end secs > 0 else
       } else {
         await beginActiveTracking();
       }
@@ -1606,6 +1618,35 @@ export default function TrackingScreen() {
                 <Text style={styles.summaryPublishText}>Pubblica su Pic!</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                style={styles.summaryDeleteBtn}
+                onPress={() => {
+                  const last = completedRecords[0];
+                  if (!last) { setSummaryVisible(false); return; }
+                  Alert.alert(
+                    "Elimina giro",
+                    "Vuoi eliminare definitivamente questo giro?",
+                    [
+                      { text: "Annulla", style: "cancel" },
+                      {
+                        text: "Elimina",
+                        style: "destructive",
+                        onPress: async () => {
+                          try {
+                            await apiRequest("DELETE", `/api/routes/${last.id}`);
+                            queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
+                          } catch (_) {}
+                          setSummaryVisible(false);
+                        },
+                      },
+                    ]
+                  );
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                <Text style={styles.summaryDeleteText}>Elimina</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={styles.summaryCloseBtn}
                 onPress={() => setSummaryVisible(false)}
                 activeOpacity={0.8}
@@ -2265,6 +2306,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_600SemiBold" as const,
     color: Colors.textSecondary,
+  },
+  summaryDeleteBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 5,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#ef4444",
+  },
+  summaryDeleteText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold" as const,
+    color: "#ef4444",
   },
 
   // Publish modal

@@ -23,6 +23,27 @@ export function isTrackingActive(): boolean {
   return _isTrackingActive;
 }
 
+// ── 0-100 Sprint nav-lock broadcast ───────────────────────────────────────
+let _sprintMeasuring = false;
+const _sprintCallbacks: ((active: boolean) => void)[] = [];
+
+export function setSprintMeasuringBroadcast(value: boolean): void {
+  if (_sprintMeasuring === value) return;
+  _sprintMeasuring = value;
+  _sprintCallbacks.forEach((cb) => cb(value));
+}
+
+export function registerSprintMeasuringCallback(
+  cb: (active: boolean) => void
+): () => void {
+  _sprintCallbacks.push(cb);
+  cb(_sprintMeasuring);
+  return () => {
+    const idx = _sprintCallbacks.indexOf(cb);
+    if (idx >= 0) _sprintCallbacks.splice(idx, 1);
+  };
+}
+
 // ── Hands Off global broadcast ─────────────────────────────────────────────
 let _handsOffActive = false;
 const _handsOffCallbacks: ((active: boolean) => void)[] = [];

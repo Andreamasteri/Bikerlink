@@ -4175,6 +4175,7 @@ router.delete("/drive/cleanup-exports", async (_req: Request, res: Response) => 
   }
 });
 
+// Protected by router.use(requireAdmin) above — only admins can access
 router.get("/gps-errors", async (req: Request, res: Response) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 100, 500);
