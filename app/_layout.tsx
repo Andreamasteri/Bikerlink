@@ -51,6 +51,7 @@ import { LanguageProvider, useLanguage } from "@/lib/language-context";
 import { MapSettingsProvider, useMapConfig } from "@/lib/map-context";
 import { TaskbarStyleProvider } from "@/lib/taskbar-style-context";
 import { ThemeProvider, useTheme } from "@/lib/theme-context";
+import { UnitsProvider } from "@/lib/units-context";
 import { PlayerProvider } from "@/lib/player-context";
 import { FloatingWidgetProvider } from "@/lib/floating-widget-context";
 import FloatingWidget from "@/components/FloatingWidget";
@@ -588,6 +589,7 @@ export default function RootLayout() {
           <AuthProvider>
             <MapSettingsProvider>
               <TaskbarStyleProvider>
+              <UnitsProvider>
               <LocationProvider>
                 <PlayerProvider>
                 <FloatingWidgetProvider>
@@ -608,6 +610,7 @@ export default function RootLayout() {
                 </FloatingWidgetProvider>
                 </PlayerProvider>
               </LocationProvider>
+              </UnitsProvider>
               </TaskbarStyleProvider>
             </MapSettingsProvider>
           </AuthProvider>

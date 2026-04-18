@@ -36,6 +36,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMapConfig } from "@/lib/map-context";
 import { MAP_PROVIDER_LABELS, MAP_PROVIDER_DESCRIPTIONS, type MapProvider } from "@/lib/map-tiles";
 import { useTaskbarStyle, type TaskbarStyle } from "@/lib/taskbar-style-context";
+import { useUnits, type TimeFormat, type SpeedUnit, type DistanceUnit } from "@/lib/units-context";
 import * as Updates from "expo-updates";
 import Constants from "expo-constants";
 import * as Location from "expo-location";
@@ -124,6 +125,8 @@ export default function ProfileScreen() {
   const { enabled: mapsEnabled, userChoiceEnabled } = useMapConfig();
   const { currentTheme, setTheme, userSwitchingEnabled } = useTheme();
   const { taskbarStyle, setTaskbarStyle } = useTaskbarStyle();
+  const { timeFormat, speedUnit, distanceUnit, setTimeFormat, setSpeedUnit, setDistanceUnit } = useUnits();
+  const [unitsExpanded, setUnitsExpanded] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isDownloadingManual, setIsDownloadingManual] = useState(false);
   const [isDownloadingEula, setIsDownloadingEula] = useState(false);
@@ -1136,6 +1139,100 @@ export default function ProfileScreen() {
       )}
 
       <View style={styles.section}>
+        <Pressable style={styles.accordionHeader} onPress={() => setUnitsExpanded(v => !v)}>
+          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Preferenze unità</Text>
+          <Ionicons name={unitsExpanded ? "chevron-up" : "chevron-down"} size={18} color={colors.textSecondary} />
+        </Pressable>
+        {unitsExpanded && (
+          <View style={{ paddingTop: 12, gap: 16 }}>
+            <View>
+              <Text style={[styles.unitsGroupLabel, { color: colors.textSecondary }]}>Formato orario</Text>
+              <View style={{ gap: 8 }}>
+                {([
+                  { value: "24h" as TimeFormat, label: "24 ore", desc: "es. 14:30" },
+                  { value: "12h" as TimeFormat, label: "12 ore (AM/PM)", desc: "es. 2:30 PM" },
+                ] as { value: TimeFormat; label: string; desc: string }[]).map((opt) => {
+                  const isSelected = timeFormat === opt.value;
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      style={[styles.unitsOption, isSelected && { backgroundColor: colors.accent + "14", borderColor: colors.accent }]}
+                      onPress={() => setTimeFormat(opt.value)}
+                    >
+                      <View style={[styles.unitsRadio, { borderColor: isSelected ? colors.accent : colors.border }]}>
+                        {isSelected && <View style={[styles.unitsRadioDot, { backgroundColor: colors.accent }]} />}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.unitsOptionLabel, isSelected && { color: colors.accent }]}>{opt.label}</Text>
+                        <Text style={[styles.unitsOptionDesc, { color: colors.textSecondary }]}>{opt.desc}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View>
+              <Text style={[styles.unitsGroupLabel, { color: colors.textSecondary }]}>Velocità</Text>
+              <View style={{ gap: 8 }}>
+                {([
+                  { value: "kmh" as SpeedUnit, label: "km/h", desc: "Chilometri all'ora" },
+                  { value: "mph" as SpeedUnit, label: "mph", desc: "Miglia all'ora" },
+                  { value: "knots" as SpeedUnit, label: "nodi (kn)", desc: "Miglia nautiche all'ora" },
+                ] as { value: SpeedUnit; label: string; desc: string }[]).map((opt) => {
+                  const isSelected = speedUnit === opt.value;
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      style={[styles.unitsOption, isSelected && { backgroundColor: colors.accent + "14", borderColor: colors.accent }]}
+                      onPress={() => setSpeedUnit(opt.value)}
+                    >
+                      <View style={[styles.unitsRadio, { borderColor: isSelected ? colors.accent : colors.border }]}>
+                        {isSelected && <View style={[styles.unitsRadioDot, { backgroundColor: colors.accent }]} />}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.unitsOptionLabel, isSelected && { color: colors.accent }]}>{opt.label}</Text>
+                        <Text style={[styles.unitsOptionDesc, { color: colors.textSecondary }]}>{opt.desc}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View>
+              <Text style={[styles.unitsGroupLabel, { color: colors.textSecondary }]}>Distanza</Text>
+              <View style={{ gap: 8 }}>
+                {([
+                  { value: "km_m" as DistanceUnit, label: "km / m", desc: "Chilometri e metri" },
+                  { value: "mi_ft" as DistanceUnit, label: "mi / ft", desc: "Miglia e piedi" },
+                  { value: "mi_yd" as DistanceUnit, label: "mi / yd", desc: "Miglia e iarde" },
+                  { value: "nmi_ftm" as DistanceUnit, label: "nmi / ftm", desc: "Miglia nautiche e braccia" },
+                ] as { value: DistanceUnit; label: string; desc: string }[]).map((opt) => {
+                  const isSelected = distanceUnit === opt.value;
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      style={[styles.unitsOption, isSelected && { backgroundColor: colors.accent + "14", borderColor: colors.accent }]}
+                      onPress={() => setDistanceUnit(opt.value)}
+                    >
+                      <View style={[styles.unitsRadio, { borderColor: isSelected ? colors.accent : colors.border }]}>
+                        {isSelected && <View style={[styles.unitsRadioDot, { backgroundColor: colors.accent }]} />}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.unitsOptionLabel, isSelected && { color: colors.accent }]}>{opt.label}</Text>
+                        <Text style={[styles.unitsOptionDesc, { color: colors.textSecondary }]}>{opt.desc}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.section}>
         <Pressable style={styles.accordionHeader} onPress={() => setDocsExpanded(v => !v)}>
           <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>{t("profile.documentation")}</Text>
           <Ionicons name={docsExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
@@ -1997,6 +2094,48 @@ const styles = StyleSheet.create({
   langDropdownItemLabelActive: {
     color: Colors.accent,
     fontFamily: "Inter_600SemiBold",
+  },
+  unitsGroupLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  unitsOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  unitsRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  unitsRadioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  unitsOptionLabel: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+    marginBottom: 1,
+  },
+  unitsOptionDesc: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 16,
   },
   clearCacheBtn: {
     flexDirection: "row",
