@@ -31,6 +31,7 @@ import TrackingMap from "@/components/TrackingMap";
 import Constants from "expo-constants";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
+import { setTrackingActive } from "@/lib/tracking-active";
 
 const BG_LOCATION_TASK = "bikerlink-bg-location";
 const BG_POINTS_KEY = "bikerlink-bg-gps-points";
@@ -424,6 +425,7 @@ export default function TrackingScreen() {
 
 
   const cleanupTracking = () => {
+    setTrackingActive(false);
     if (timerRef.current) clearInterval(timerRef.current);
     if (flushTimerRef.current) clearInterval(flushTimerRef.current);
     if (statsSyncTimerRef.current) clearInterval(statsSyncTimerRef.current);
@@ -997,6 +999,7 @@ export default function TrackingScreen() {
         updateProfileRef.current = "race";
       }
 
+      setTrackingActive(true);
       setIsTracking(true);
 
       if (Platform.OS !== "web") {

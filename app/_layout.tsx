@@ -57,6 +57,7 @@ import FloatingWidget from "@/components/FloatingWidget";
 import UptimeWidget from "@/components/UptimeWidget";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { sendStartupBeacon, recoverLastBeacon } from "@/lib/startup-beacon";
+import { isTrackingActive, registerLayoutWatcherCallbacks } from "@/lib/tracking-active";
 import {
   BACKGROUND_LOCATION_TASK_NAME,
   startBackgroundLocationTask,
@@ -122,6 +123,7 @@ function AppStateHandler() {
         sendStartupBeacon("gps_check_start");
         const { status } = await Location.getForegroundPermissionsAsync();
         if (status !== "granted" || cancelled) return;
+        if (isTrackingActive()) return;
         sendStartupBeacon("watch_position_start");
         let cbFired = false;
         locationWatcherRef.current = await Location.watchPositionAsync(
@@ -155,6 +157,12 @@ function AppStateHandler() {
         locationWatcherRef.current = null;
       }
     }
+
+    registerLayoutWatcherCallbacks(stopNativeWatcher, () => {
+      if (!locationWatcherRef.current && !hasBackgroundPermission) {
+        startNativeWatcher();
+      }
+    });
 
     queryClient.prefetchQuery({ queryKey: ["/api/settings/music-provider"], staleTime: 120_000 }).catch(() => {});
     queryClient.prefetchQuery({ queryKey: ["/api/lastfm/status"], staleTime: 60_000 }).catch(() => {});

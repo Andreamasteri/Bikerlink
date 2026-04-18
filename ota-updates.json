@@ -3459,7 +3459,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T17:04:13.419Z"
+  },
+  {
+    "updateNumber": 99,
+    "version": "1.99.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-99 rv7.0.0: Stop watcher layout durante tracking + cleanup rotte orfane",
+    "note": "Task #714+#715: (1) Nuovo modulo lib/tracking-active.ts con flag e callback pause/resume. tracking.tsx chiama setTrackingActive(true) a Start e setTrackingActive(false) in cleanupTracking. _layout.tsx registra stopNativeWatcher/startNativeWatcher come callback: quando il tracking parte il watcher globale viene sospeso (risparmio batteria, nessun doppio GPS), al termine viene ripreso automaticamente. Guard isTrackingActive() anche nel ramo gps_check_start. (2) Backend tracking.ts: cleanup esteso — route active senza distanza >10min vengono eliminate (come prima), route active CON distanza >2h vengono marcate status=completed preservando i dati. CURRENT_OTA_NUMBER=99.",
+    "releaseId": "a237ee41-b5d3-4645-b7a1-058e09017a81",
+    "bundleUrl": "private/ota/ota-1.99.0-1776532368406.js",
+    "updateGroupId": "2df51dfe-f1df-4414-8bbf-51d217fe43c6",
+    "androidUpdateId": "019da195-64b3-7c97-bd7b-24dcf4439f56",
+    "iosUpdateId": null,
+    "commitBase": "3dd1c051568e9f55b428a6525193d51394bf8447",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/2df51dfe-f1df-4414-8bbf-51d217fe43c6",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T17:12:51.430Z"
   }
 ]
