@@ -267,6 +267,12 @@ export default function TrackingScreen() {
   const sprintMaxDecelGpsRef = useRef(0);
   const vehicleDeceleratingRef = useRef(false);
 
+  const sensorVelocityRef = useRef(0);
+  const prevMotionTimeRef = useRef<number | null>(null);
+  const sprintBearingRad = useRef(0);
+  const sprintAutoHandsOffRef = useRef(false);
+  const lastGpsHeadingRef = useRef<number | null>(null);
+
   const publishMutation = useMutation({
     mutationFn: async (data: { performanceData: string; caption: string }) => {
       await apiRequest("POST", "/api/contest/entries", data);
@@ -448,6 +454,9 @@ export default function TrackingScreen() {
 
   const onNativeLocation = useCallback((loc: Location.LocationObject) => {
     setGpsAccuracy(loc.coords.accuracy ?? null);
+    if ((loc.coords.heading ?? -1) >= 0) {
+      lastGpsHeadingRef.current = loc.coords.heading!;
+    }
     if (!isPausedRef.current) {
       handleGpsUpdate(loc.coords.latitude, loc.coords.longitude, loc.coords.altitude, loc.coords.speed);
     }
@@ -513,6 +522,12 @@ export default function TrackingScreen() {
         sprintMaxTiltRef.current = 0;
         vehicleDeceleratingRef.current = false;
         prevAccelRef.current = null;
+        sensorVelocityRef.current = 0;
+        prevMotionTimeRef.current = null;
+        const headingDeg = lastGpsHeadingRef.current;
+        sprintBearingRad.current = (headingDeg !== null && headingDeg >= 0)
+          ? headingDeg * (Math.PI / 180)
+          : 0;
       } else if (sprintPhaseRef.current === "measuring") {
         if (prevAccelRef.current) {
           const dt = (now - prevAccelRef.current.time) / 1000;
@@ -543,6 +558,10 @@ export default function TrackingScreen() {
           sprint0to100MsRef.current = elapsed;
           sprintPhaseRef.current = "done";
           setSprintPhase("done");
+          if (sprintAutoHandsOffRef.current) {
+            handsOffEnabledRef.current = false;
+            setHandsOffActive(false);
+          }
         }
       }
     }
@@ -858,6 +877,11 @@ export default function TrackingScreen() {
       handsOffEnabledRef.current = handsOffEnabled;
       handsOffSpeedRef.current = parseFloat(handsOffSpeed || "80") || 80;
       stopAtZeroFreezeRef.current = false;
+      if (sprint0100Enabled) {
+        sprintAutoHandsOffRef.current = true;
+        handsOffEnabledRef.current = true;
+        handsOffSpeedRef.current = 2;
+      }
       setHandsOffActive(false);
 
       maxTiltRef.current = 0;
@@ -883,6 +907,11 @@ export default function TrackingScreen() {
       setSprintMaxAccelGps(0);
       setSprintMaxDecelGps(0);
       setSprintMaxTilt(0);
+      sensorVelocityRef.current = 0;
+      prevMotionTimeRef.current = null;
+      sprintBearingRad.current = 0;
+      lastGpsHeadingRef.current = null;
+      sprintAutoHandsOffRef.current = false;
 
       if (sprint0100Enabled) {
         prevUpdateProfileRef.current = updateProfileRef.current;
@@ -896,7 +925,7 @@ export default function TrackingScreen() {
         try {
           const available = await DeviceMotion.isAvailableAsync();
           if (available) {
-            DeviceMotion.setUpdateInterval(250);
+            DeviceMotion.setUpdateInterval(sprint0100EnabledRef.current ? 100 : 250);
             deviceMotionSubRef.current = DeviceMotion.addListener((data) => {
               if (data.rotation) {
                 const tiltRad = Math.abs(data.rotation.gamma ?? 0);
@@ -927,6 +956,29 @@ export default function TrackingScreen() {
                   if (vehicleDeceleratingRef.current && magnitude > sprintMaxDecelSensorRef.current) {
                     sprintMaxDecelSensorRef.current = magnitude;
                     setSprintMaxDecelSensor(magnitude);
+                  }
+                  const ax = x ?? 0;
+                  const ay = y ?? 0;
+                  const bearing = sprintBearingRad.current;
+                  const aFwd = ax * Math.sin(bearing) + ay * Math.cos(bearing);
+                  const tsNow = Date.now();
+                  if (prevMotionTimeRef.current !== null) {
+                    const dt = (tsNow - prevMotionTimeRef.current) / 1000;
+                    if (dt > 0 && dt < 0.5 && aFwd > 0) {
+                      sensorVelocityRef.current += aFwd * dt;
+                    }
+                  }
+                  prevMotionTimeRef.current = tsNow;
+                  if (sensorVelocityRef.current >= 27.78 && sprintStartTimeRef.current !== null) {
+                    const elapsed = tsNow - sprintStartTimeRef.current;
+                    setSprint0to100Ms(elapsed);
+                    sprint0to100MsRef.current = elapsed;
+                    sprintPhaseRef.current = "done";
+                    setSprintPhase("done");
+                    if (sprintAutoHandsOffRef.current) {
+                      handsOffEnabledRef.current = false;
+                      setHandsOffActive(false);
+                    }
                   }
                 }
               }
@@ -1058,6 +1110,12 @@ export default function TrackingScreen() {
       if (sprint0100EnabledRef.current && prevUpdateProfileRef.current !== "race") {
         setUpdateProfile(prevUpdateProfileRef.current);
         updateProfileRef.current = prevUpdateProfileRef.current;
+      }
+      if (sprintAutoHandsOffRef.current) {
+        sprintAutoHandsOffRef.current = false;
+        handsOffEnabledRef.current = handsOffEnabled;
+        handsOffSpeedRef.current = parseFloat(handsOffSpeed || "80") || 80;
+        setHandsOffActive(false);
       }
     } catch {
       Alert.alert("Errore", "Errore nel completamento della sessione.");

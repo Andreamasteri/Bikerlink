@@ -3160,7 +3160,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T07:08:44.406Z"
+  },
+  {
+    "updateNumber": 86,
+    "version": "1.86.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-86 rv7.0.0: Sprint 0-100 hands-off auto 2 km/h + trigger inerziale accelerometro",
+    "note": "Task #678: Sprint 0-100 con auto-attivazione Hands Off soglia 2 km/h al avvio tracking (ripristino a fine sessione). Trigger stop a 100 km/h via GPS oppure stima inerziale: integrazione accelerometro su asse bearing GPS (aFwd = ax*sin(θ) + ay*cos(θ), dt reale). DeviceMotion a 100ms durante sprint. Restore handsOff a stop/done. CURRENT_OTA_NUMBER=86.",
+    "releaseId": "9a0934c8-9dca-4680-96fa-80ea566b7bf0",
+    "bundleUrl": "private/ota/ota-1.86.0-1776499992588.js",
+    "updateGroupId": "2d133471-0bb0-4a9d-8116-e32bb5308e82",
+    "androidUpdateId": "019d9fa7-58dd-7b4e-857d-99cfa7397d95",
+    "iosUpdateId": null,
+    "commitBase": "852c44c0e818d14af66a99f621cac67fe406a9e9",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/2d133471-0bb0-4a9d-8116-e32bb5308e82",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T08:13:15.415Z"
   }
 ]
