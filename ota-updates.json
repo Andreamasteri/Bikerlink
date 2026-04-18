@@ -3528,7 +3528,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T18:28:21.455Z"
+  },
+  {
+    "updateNumber": 102,
+    "version": "1.102.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-102 rv7.0.0: Riscrittura tracking.tsx come cronometro minimale (test base)",
+    "note": "Task #721: dopo 2 OTA fallite (OTA-100 try/catch TaskManager+DeviceMotion, OTA-101 rimozione react-native-maps) il crash al tap del tab 'Registra giro e performance' persisteva. Strategia: stop al fixing difensivo del file di 2437 righe, riscrittura da zero come cronometro minimale per provare bisection inversa. Il vecchio file e' stato spostato in app/(tabs)/tracking.legacy.tsx.bak (esclusione bundle via estensione). Il nuovo tracking.tsx (~150 righe) importa SOLO react/react-native/safe-area-context/colors/lib/ota: zero expo-location, zero expo-task-manager, zero expo-sensors, zero AsyncStorage, zero TrackingMap, zero MiniPlayer, zero TaskManager.defineTask top-level. UI: titolo 'Cronometro' + tasto verde START -> al tap parte setInterval(100ms) che mostra HH:MM:SS.cc + tasto rosso STOP che azzera. Se questo build NON crasha, le funzionalita' (GPS, sensori, background, mappa) verranno reintrodotte una alla volta in OTA-103/104/105/106 finche' non si trova il colpevole. CURRENT_OTA_NUMBER=102.",
+    "releaseId": "55b6d39e-c888-469f-8957-5b4467902fb3",
+    "bundleUrl": "private/ota/ota-1.102.0-1776540771002.js",
+    "updateGroupId": "70eb99f1-585d-4029-9b98-619ed2af212d",
+    "androidUpdateId": "019da215-9721-7a67-b610-ae2ab8bdb988",
+    "iosUpdateId": null,
+    "commitBase": "603e62fe52ce6a14566fd3a691e724d4adb929e3",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/70eb99f1-585d-4029-9b98-619ed2af212d",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T19:32:53.923Z"
   }
 ]
