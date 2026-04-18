@@ -36,6 +36,14 @@ interface RouteRecord {
   idleTimeSeconds?: number;
   status: string;
   createdAt: string;
+  maxTiltDeg?: number | null;
+  maxAccelerationG?: number | null;
+}
+
+interface UserProfileMinimal {
+  profile?: {
+    gpsPrecision?: string | null;
+  };
 }
 
 interface GpsPoint {
@@ -225,6 +233,25 @@ export default function TrackingScreen() {
   const { data: records = [], isLoading: recordsLoading } = useQuery<RouteRecord[]>({
     queryKey: ["/api/routes"],
   });
+
+  const { data: profileData } = useQuery<UserProfileMinimal>({
+    queryKey: ["/api/users/me"],
+  });
+  const profilePrecisionInitializedRef = useRef(false);
+
+  useEffect(() => {
+    if (profilePrecisionInitializedRef.current) return;
+    if (!profileData?.profile?.gpsPrecision) return;
+    const gpsPrec = profileData.profile.gpsPrecision;
+    const mapped: UpdateProfile =
+      gpsPrec === "lowest" || gpsPrec === "balanced" ? "easy"
+      : gpsPrec === "high" ? "medium"
+      : gpsPrec === "highest" || gpsPrec === "bestForNavigation" ? "race"
+      : "medium";
+    setUpdateProfile(mapped);
+    updateProfileRef.current = mapped;
+    profilePrecisionInitializedRef.current = true;
+  }, [profileData]);
 
   const completedRecords = (records || []).filter((r: RouteRecord) => r.status === "completed");
 
@@ -1246,6 +1273,16 @@ function RecordCard({ item, onPublish, onDelete }: { item: RouteRecord; onPublis
         <RecordStat value={(item.maxSpeedKmh || 0).toFixed(0)} label="vel. max" />
         <RecordStat value={(item.maxAltitude || 0).toFixed(0)} label="quota max" />
       </View>
+      {(item.maxTiltDeg != null || item.maxAccelerationG != null) && (
+        <View style={styles.recordRow}>
+          {item.maxTiltDeg != null && (
+            <RecordStat value={item.maxTiltDeg.toFixed(1) + "°"} label="inclin. max" />
+          )}
+          {item.maxAccelerationG != null && (
+            <RecordStat value={item.maxAccelerationG.toFixed(2) + " G"} label="accel. max" />
+          )}
+        </View>
+      )}
     </View>
   );
 }

@@ -295,6 +295,7 @@ export default function ProfileScreen() {
       fakeHomeLatitude?: number | null;
       fakeHomeLongitude?: number | null;
       fakeHomeRadius?: number;
+      gpsPrecision?: string;
     }) => {
       await apiRequest("PUT", "/api/users/me/privacy", data);
     },
@@ -803,7 +804,7 @@ export default function ProfileScreen() {
                   style={[styles.mapStyleOption, isSelected && styles.mapStyleOptionActive]}
                   onPress={() => {
                     setGpsPrecision(opt.key);
-                    privacyMutation.mutate({ gpsPrecision: opt.key } as any);
+                    privacyMutation.mutate({ gpsPrecision: opt.key });
                   }}
                 >
                   <Ionicons name={opt.icon as any} size={20} color={isSelected ? Colors.accent : Colors.textSecondary} />
