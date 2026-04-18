@@ -1241,7 +1241,7 @@ export default function TrackingScreen() {
             )}
           </View>
 
-          {currentCoord !== null && (
+          {currentCoord !== null && !sprint0100Enabled && (
             <View style={[styles.mapCard, mapExpanded && styles.mapCardExpanded]}>
               <TrackingMap
                 points={mapCoords}
