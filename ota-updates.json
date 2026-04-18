@@ -3206,7 +3206,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T08:21:10.186Z"
+  },
+  {
+    "updateNumber": 88,
+    "version": "1.88.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-88 rv7.0.0: Mappa GPS nascosta durante modalità 0-100 km/h",
+    "note": "Task #682: la condizione !sprint0100Enabled era già presente a riga 1325 di tracking.tsx (aggiunta durante Task #678). Fix confermato: {currentCoord !== null && !sprint0100Enabled && ( — la mappa non appare quando la modalità 0-100 è attiva. CURRENT_OTA_NUMBER=88.",
+    "releaseId": "be245dcb-1377-4763-a882-c1e90f0761b5",
+    "bundleUrl": "private/ota/ota-1.88.0-1776500919677.js",
+    "updateGroupId": "c221d970-a23c-403b-a1d5-a8c3c4da1a10",
+    "androidUpdateId": "019d9fb5-80ff-77c5-8d3c-7ca8970af4f9",
+    "iosUpdateId": null,
+    "commitBase": "d150ae1e2e19f581598c9c50a99cfa5e8f9f2964",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/c221d970-a23c-403b-a1d5-a8c3c4da1a10",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T08:28:42.572Z"
   }
 ]
