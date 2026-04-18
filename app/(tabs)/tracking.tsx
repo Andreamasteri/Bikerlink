@@ -377,6 +377,7 @@ export default function TrackingScreen() {
   const sprint0to100MsRef = useRef<number | null>(null);
   const gpsOfflineBufferRef = useRef<GpsPoint[]>([]);
   const gpsOfflineWriteCountRef = useRef(0);
+  const bufferWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   // Derived
   const isFermo = currentSpeed <= IDLE_THRESHOLD_KMH;
@@ -486,13 +487,16 @@ export default function TrackingScreen() {
   // Each flush appends ONE new segment key; existing segments are never modified.
   // Recovery reads SEGCOUNT → reads all segments via multiGet → merges.
 
-  const appendSegmentToBuffer = useCallback(async (batch: GpsPoint[]) => {
-    try {
-      const rawN = await AsyncStorage.getItem(GPS_BUFFER_SEGCOUNT_KEY);
-      const n = rawN ? parseInt(rawN, 10) : 0;
-      await AsyncStorage.setItem(GPS_BUFFER_SEG_KEY(n), JSON.stringify(batch));
-      await AsyncStorage.setItem(GPS_BUFFER_SEGCOUNT_KEY, String(n + 1));
-    } catch (_) {}
+  // Serialized via bufferWriteQueueRef to prevent concurrent segcount reads
+  const appendSegmentToBuffer = useCallback((batch: GpsPoint[]) => {
+    bufferWriteQueueRef.current = bufferWriteQueueRef.current.then(async () => {
+      try {
+        const rawN = await AsyncStorage.getItem(GPS_BUFFER_SEGCOUNT_KEY);
+        const n = rawN ? parseInt(rawN, 10) : 0;
+        await AsyncStorage.setItem(GPS_BUFFER_SEG_KEY(n), JSON.stringify(batch));
+        await AsyncStorage.setItem(GPS_BUFFER_SEGCOUNT_KEY, String(n + 1));
+      } catch (_) {}
+    });
   }, []);
 
   const clearGpsBuffer = useCallback(async () => {
@@ -521,6 +525,18 @@ export default function TrackingScreen() {
     },
     [appendSegmentToBuffer]
   );
+
+  // Flush any remaining in-memory points (1–4) that haven't reached batch threshold.
+  // Called before stopTrackingInternal PUT and on cleanup so no acquired points are lost.
+  const flushRemainingToBuffer = useCallback(async () => {
+    const rem = gpsOfflineWriteCountRef.current;
+    if (rem <= 0) return;
+    const batch = gpsOfflineBufferRef.current.slice(-rem);
+    gpsOfflineWriteCountRef.current = 0;
+    appendSegmentToBuffer(batch);
+    // Wait for the serialized queue to drain so the segment is persisted
+    await bufferWriteQueueRef.current;
+  }, [appendSegmentToBuffer]);
 
   // ── Check for orphan buffer on mount ──────────────────────────────────────
   useEffect(() => {
@@ -865,6 +881,7 @@ export default function TrackingScreen() {
     setIsCalibrating(false);
     gpsOfflineBufferRef.current = [];
     gpsOfflineWriteCountRef.current = 0;
+    bufferWriteQueueRef.current = Promise.resolve();
   }, []);
 
   // ── Recalibrate G on-demand ────────────────────────────────────────────────
@@ -1094,6 +1111,9 @@ export default function TrackingScreen() {
     const finalNetSec = Math.max(finalTotalSec - finalIdleSec, 0);
     const finalAvgSpeed = finalNetSec > 0 ? totalKmRef.current / (finalNetSec / 3600) : 0;
 
+    // Persist any in-memory points that haven't reached the 5-point batch threshold yet
+    await flushRemainingToBuffer();
+
     try {
       await apiRequest("PUT", `/api/routes/${rId}/stop`, {
         totalDistanceKm: totalKmRef.current,
@@ -1115,7 +1135,7 @@ export default function TrackingScreen() {
       // the segmented buffer remains in AsyncStorage and will be offered
       // for recovery the next time the app launches.
     }
-  }, [cleanupTracking, flushPoints, refetchRecords, clearGpsBuffer]);
+  }, [cleanupTracking, flushPoints, flushRemainingToBuffer, refetchRecords, clearGpsBuffer]);
 
   // ── Handle STOP (user-initiated) ───────────────────────────────────────────
   const handleStop = useCallback(() => {
