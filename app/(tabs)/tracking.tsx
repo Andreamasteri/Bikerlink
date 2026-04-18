@@ -391,12 +391,16 @@ export default function TrackingScreen() {
 
   // ── 0-100 sprint nav-lock broadcast ──────────────────────────────────────
   useEffect(() => {
-    setSprintMeasuringBroadcast(sprintPhase === "measuring");
-  }, [sprintPhase]);
+    const locked =
+      sprintPhase === "measuring" ||
+      (is0100Enabled && (phase === "countdown" || phase === "active"));
+    setSprintMeasuringBroadcast(locked);
+  }, [sprintPhase, is0100Enabled, phase]);
 
   // ── Hands-off blink + haptic + global broadcast ───────────────────────────
   useEffect(() => {
-    setHandsOffBroadcast(handsOffActive);
+    const thresholdKmh = parseFloat(handsOffSpeedStr || "50") || 50;
+    setHandsOffBroadcast(handsOffActive, thresholdKmh);
     if (handsOffActive) {
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});

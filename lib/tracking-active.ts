@@ -46,19 +46,23 @@ export function registerSprintMeasuringCallback(
 
 // ── Hands Off global broadcast ─────────────────────────────────────────────
 let _handsOffActive = false;
-const _handsOffCallbacks: ((active: boolean) => void)[] = [];
+let _handsOffThresholdKmh = 50;
+const _handsOffCallbacks: ((active: boolean, thresholdKmh: number) => void)[] = [];
 
-export function setHandsOffBroadcast(value: boolean): void {
-  if (_handsOffActive === value) return;
+export function setHandsOffBroadcast(value: boolean, thresholdKmh?: number): void {
+  if (thresholdKmh !== undefined) _handsOffThresholdKmh = thresholdKmh;
+  const changed = _handsOffActive !== value;
   _handsOffActive = value;
-  _handsOffCallbacks.forEach((cb) => cb(value));
+  if (changed) {
+    _handsOffCallbacks.forEach((cb) => cb(value, _handsOffThresholdKmh));
+  }
 }
 
 export function registerHandsOffCallback(
-  cb: (active: boolean) => void
+  cb: (active: boolean, thresholdKmh: number) => void
 ): () => void {
   _handsOffCallbacks.push(cb);
-  cb(_handsOffActive);
+  cb(_handsOffActive, _handsOffThresholdKmh);
   return () => {
     const idx = _handsOffCallbacks.indexOf(cb);
     if (idx >= 0) _handsOffCallbacks.splice(idx, 1);

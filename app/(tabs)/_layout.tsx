@@ -24,10 +24,14 @@ export default function TabLayout() {
 
   // ── Global Hands-Off overlay ────────────────────────────────────────────────
   const [globalHandsOffActive, setGlobalHandsOffActive] = useState(false);
+  const [handsOffThreshold, setHandsOffThreshold] = useState(50);
   const handsOffBlinkAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    const unsub = registerHandsOffCallback(setGlobalHandsOffActive);
+    const unsub = registerHandsOffCallback((active, thresholdKmh) => {
+      setGlobalHandsOffActive(active);
+      setHandsOffThreshold(thresholdKmh);
+    });
     return unsub;
   }, []);
 
@@ -432,8 +436,10 @@ export default function TabLayout() {
         >
           <Animated.View style={{ opacity: handsOffBlinkAnim, alignItems: "center" }}>
             <Text style={handsOffOverlayStyles.title}>⚠ ATTENZIONE!</Text>
-            <Text style={handsOffOverlayStyles.msg}>VELOCITÀ HANDS OFF RAGGIUNTA!</Text>
-            <Text style={handsOffOverlayStyles.sub}>Rallenta per riprendere i controlli</Text>
+            <Text style={handsOffOverlayStyles.msg}>
+              SOPRA {handsOffThreshold} km/h — HANDS OFF
+            </Text>
+            <Text style={handsOffOverlayStyles.sub}>Rallenta per sbloccare i controlli</Text>
           </Animated.View>
         </View>
       )}

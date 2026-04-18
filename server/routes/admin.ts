@@ -4181,8 +4181,11 @@ router.get("/gps-errors", async (req: Request, res: Response) => {
     const limit = Math.min(Number(req.query.limit) || 100, 500);
     const page = Math.max(Number(req.query.page) || 1, 1);
     const offset = (page - 1) * limit;
-    const errors = await storage.getGpsErrors(limit, offset);
-    return res.json({ errors, total: errors.length, page, limit });
+    const [errors, total] = await Promise.all([
+      storage.getGpsErrors(limit, offset),
+      storage.countGpsErrors(),
+    ]);
+    return res.json({ errors, total, page, limit });
   } catch (error) {
     console.error("GPS errors fetch error:", error);
     return res.status(500).json({ message: "Errore interno" });

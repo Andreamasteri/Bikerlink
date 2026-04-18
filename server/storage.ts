@@ -200,6 +200,7 @@ export interface IStorage {
 
   createGpsError(data: InsertGpsError): Promise<GpsError>;
   getGpsErrors(limit: number, offset: number): Promise<GpsError[]>;
+  countGpsErrors(): Promise<number>;
 
   getPhotoContestEntries(weekNumber: number, year: number): Promise<PhotoContestEntry[]>;
   createPhotoContestEntry(entry: InsertPhotoContestEntry): Promise<PhotoContestEntry>;
@@ -772,6 +773,11 @@ export class DatabaseStorage implements IStorage {
 
   async getGpsErrors(limit: number, offset: number): Promise<GpsError[]> {
     return db.select().from(gpsErrors).orderBy(desc(gpsErrors.createdAt)).limit(limit).offset(offset);
+  }
+
+  async countGpsErrors(): Promise<number> {
+    const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(gpsErrors);
+    return row?.count ?? 0;
   }
 
   async getPhotoContestEntries(weekNumber: number, year: number): Promise<PhotoContestEntry[]> {
