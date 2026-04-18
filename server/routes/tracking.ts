@@ -25,7 +25,7 @@ router.post("/", async (req: Request, res: Response) => {
       status: "active",
       isSprint: isSprint === true,
       startedAt: new Date(),
-    } as any);
+    });
 
     return res.status(201).json(route);
   } catch (error) {
@@ -100,6 +100,7 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
       idleTimeSeconds: clientIdleTime,
       maxTiltDeg: clientMaxTilt,
       maxAccelerationG: clientMaxAccel,
+      sprint0to100Ms: clientSprint0to100Ms,
     } = req.body;
 
     let totalDistanceKm: number;
@@ -110,6 +111,7 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
     let idleTimeSeconds: number;
     const maxTiltDeg = Number(clientMaxTilt) || 0;
     const maxAccelerationG = Number(clientMaxAccel) || 0;
+    const sprint0to100Ms = clientSprint0to100Ms != null ? Number(clientSprint0to100Ms) : null;
 
     if (
       clientDistanceKm !== undefined &&
@@ -155,7 +157,7 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
       avgSpeedKmh = totalDistanceKm > 0 ? totalDistanceKm / (netTravelSeconds / 3600) : 0;
     }
 
-    const updated = await storage.updateRoute(id, {
+    const updatePayload: Partial<import("../../shared/schema").InsertRoute> = {
       status: "completed",
       totalDistanceKm,
       maxSpeedKmh,
@@ -166,7 +168,11 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
       maxTiltDeg,
       maxAccelerationG,
       stoppedAt,
-    } as any);
+    };
+    if (sprint0to100Ms !== null) {
+      updatePayload.sprint0to100Ms = sprint0to100Ms;
+    }
+    const updated = await storage.updateRoute(id, updatePayload);
 
     const profile = await storage.getUserProfile(userId);
     if (profile) {

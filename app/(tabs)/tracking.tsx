@@ -39,6 +39,7 @@ interface RouteRecord {
   maxTiltDeg?: number | null;
   maxAccelerationG?: number | null;
   isSprint?: boolean;
+  sprint0to100Ms?: number | null;
 }
 
 interface UserProfileMinimal {
@@ -212,6 +213,7 @@ export default function TrackingScreen() {
   const sprintCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [sprint0to100Ms, setSprint0to100Ms] = useState<number | null>(null);
   const sprintStartTimeRef = useRef<number | null>(null);
+  const sprint0to100MsRef = useRef<number | null>(null);
   const [sprintMaxAccelSensor, setSprintMaxAccelSensor] = useState(0);
   const [sprintMaxDecelSensor, setSprintMaxDecelSensor] = useState(0);
   const [sprintMaxTilt, setSprintMaxTilt] = useState(0);
@@ -491,6 +493,7 @@ export default function TrackingScreen() {
         if (speedKmh >= 100 && sprintStartTimeRef.current) {
           const elapsed = now - sprintStartTimeRef.current;
           setSprint0to100Ms(elapsed);
+          sprint0to100MsRef.current = elapsed;
           sprintPhaseRef.current = "done";
           setSprintPhase("done");
         }
@@ -708,6 +711,7 @@ export default function TrackingScreen() {
       sprintPhaseRef.current = "idle";
       setSprintPhase("idle");
       setSprint0to100Ms(null);
+      sprint0to100MsRef.current = null;
       sprintStartTimeRef.current = null;
       sprintMaxAccelSensorRef.current = 0;
       sprintMaxDecelSensorRef.current = 0;
@@ -863,6 +867,7 @@ export default function TrackingScreen() {
         idleTimeSeconds: idle,
         maxTiltDeg: maxTiltRef.current,
         maxAccelerationG: maxAccelerationRef.current,
+        ...(sprint0to100MsRef.current !== null && { sprint0to100Ms: sprint0to100MsRef.current }),
       });
       setIsTracking(false);
       routeIdRef.current = null;
@@ -1329,26 +1334,50 @@ function RecordCard({ item, onPublish, onDelete }: { item: RouteRecord; onPublis
           <Ionicons name="trash-outline" size={18} color={Colors.accentRed} />
         </TouchableOpacity>
       </View>
-      <View style={styles.recordRow}>
-        <RecordStat value={(item.totalDistanceKm || 0).toFixed(1)} label="km" />
-        <RecordStat value={formatTime(dur)} label="totale" />
-        <RecordStat value={formatTime(idle)} label="fermo" />
-        <RecordStat value={formatTime(net)} label="netto" />
-      </View>
-      <View style={styles.recordRow}>
-        <RecordStat value={(item.avgSpeedKmh || 0).toFixed(2)} label="vel. media" />
-        <RecordStat value={(item.maxSpeedKmh || 0).toFixed(0)} label="vel. max" />
-        <RecordStat value={(item.maxAltitude || 0).toFixed(0)} label="quota max" />
-      </View>
-      {(item.maxTiltDeg != null || item.maxAccelerationG != null) && (
-        <View style={styles.recordRow}>
-          {item.maxTiltDeg != null && (
-            <RecordStat value={item.maxTiltDeg.toFixed(1) + "°"} label="inclin. max" />
+      {item.isSprint ? (
+        <>
+          <View style={styles.recordRow}>
+            <RecordStat
+              value={item.sprint0to100Ms != null ? (item.sprint0to100Ms / 1000).toFixed(2) + "s" : "—"}
+              label="0→100 km/h"
+            />
+            <RecordStat value={(item.maxSpeedKmh || 0).toFixed(0)} label="vel. max" />
+            {item.maxAccelerationG != null && (
+              <RecordStat value={item.maxAccelerationG.toFixed(2) + " G"} label="accel. max" />
+            )}
+            {item.maxTiltDeg != null && (
+              <RecordStat value={item.maxTiltDeg.toFixed(1) + "°"} label="inclin. max" />
+            )}
+          </View>
+          <View style={styles.recordRow}>
+            <RecordStat value={formatTime(dur)} label="sessione" />
+            <RecordStat value={item.sprint0to100Ms != null ? "Completato" : "Non completato"} label="risultato" />
+          </View>
+        </>
+      ) : (
+        <>
+          <View style={styles.recordRow}>
+            <RecordStat value={(item.totalDistanceKm || 0).toFixed(1)} label="km" />
+            <RecordStat value={formatTime(dur)} label="totale" />
+            <RecordStat value={formatTime(idle)} label="fermo" />
+            <RecordStat value={formatTime(net)} label="netto" />
+          </View>
+          <View style={styles.recordRow}>
+            <RecordStat value={(item.avgSpeedKmh || 0).toFixed(2)} label="vel. media" />
+            <RecordStat value={(item.maxSpeedKmh || 0).toFixed(0)} label="vel. max" />
+            <RecordStat value={(item.maxAltitude || 0).toFixed(0)} label="quota max" />
+          </View>
+          {(item.maxTiltDeg != null || item.maxAccelerationG != null) && (
+            <View style={styles.recordRow}>
+              {item.maxTiltDeg != null && (
+                <RecordStat value={item.maxTiltDeg.toFixed(1) + "°"} label="inclin. max" />
+              )}
+              {item.maxAccelerationG != null && (
+                <RecordStat value={item.maxAccelerationG.toFixed(2) + " G"} label="accel. max" />
+              )}
+            </View>
           )}
-          {item.maxAccelerationG != null && (
-            <RecordStat value={item.maxAccelerationG.toFixed(2) + " G"} label="accel. max" />
-          )}
-        </View>
+        </>
       )}
     </View>
   );
