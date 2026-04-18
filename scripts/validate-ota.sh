@@ -31,6 +31,7 @@ echo ""
 
 LAYOUT_FILE="app/_layout.tsx"
 PROFILE_FILE="app/(tabs)/profile.tsx"
+OTA_FILE="lib/ota.ts"
 
 # ── 1. STATIC IMPORT expo-updates in _layout.tsx ─────────────
 if grep -qE "^import \* as Updates from ['\"]expo-updates['\"]" "$LAYOUT_FILE"; then
@@ -53,17 +54,17 @@ done
 # ── 3. CURRENT_OTA_NUMBER aggiornato (cycle-aware, last by position) ─────
 # DESIGN: si usa l'ultima entry PER POSIZIONE nell'array (non per status=published).
 # Motivo: la procedura OTA prevede che l'entry venga aggiunta in ota-updates.json
-# PRIMA di pubblicare (con CURRENT_OTA_NUMBER già aggiornato in profile.tsx).
+# PRIMA di pubblicare (con CURRENT_OTA_NUMBER già aggiornato in lib/ota.ts).
 # Al momento del check la entry può avere status "building"/"pending".
 # Usare status="published" causerebbe un falso-OK: il check passerebbe anche
 # se CURRENT_OTA_NUMBER non fosse stato ancora aggiornato (confronterebbe con
 # la OTA precedente già published). "Last by position" è il criterio corretto
 # per catturare il drift prima che la pubblicazione avvenga.
-CURRENT_OTA=$(grep -oE 'CURRENT_OTA_NUMBER\s*=\s*[0-9]+' "$PROFILE_FILE" 2>/dev/null \
+CURRENT_OTA=$(grep -oE 'CURRENT_OTA_NUMBER\s*=\s*[0-9]+' "$OTA_FILE" 2>/dev/null \
   | grep -oE '[0-9]+$' || true)
 
 if [ -z "$CURRENT_OTA" ]; then
-  fail "CURRENT_OTA_NUMBER non trovato in $PROFILE_FILE"
+  fail "CURRENT_OTA_NUMBER non trovato in $OTA_FILE"
 else
   LATEST_OTA=$(node -e "
     const appJson = JSON.parse(require('fs').readFileSync('app.json','utf8'));
@@ -83,7 +84,7 @@ else
   elif [ "$CURRENT_OTA" = "$LATEST_OTA" ]; then
     ok "CURRENT_OTA_NUMBER = $CURRENT_OTA corrisponde all'ultima entry del ciclo corrente"
   else
-    fail "CURRENT_OTA_NUMBER=$CURRENT_OTA in profile.tsx ma l'ultima entry del ciclo corrente in ota-updates.json è OTA-$LATEST_OTA. Aggiornare prima di pubblicare."
+    fail "CURRENT_OTA_NUMBER=$CURRENT_OTA in lib/ota.ts ma l'ultima entry del ciclo corrente in ota-updates.json è OTA-$LATEST_OTA. Aggiornare prima di pubblicare."
   fi
 fi
 

@@ -29,10 +29,10 @@ import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { DeviceMotion } from "expo-sensors";
 import TrackingMap from "@/components/TrackingMap";
 import Constants from "expo-constants";
+import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 
 const BG_LOCATION_TASK = "bikerlink-bg-location";
 const BG_POINTS_KEY = "bikerlink-bg-gps-points";
-const CURRENT_OTA_NUMBER = 93;
 
 async function logGpsError(error: unknown, context: string) {
   try {

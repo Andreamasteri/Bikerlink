@@ -41,6 +41,7 @@ import Constants from "expo-constants";
 import * as Location from "expo-location";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 import LeafletPickerMap from "@/components/LeafletPickerMap";
+import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 
 
 interface ProfileData {
@@ -128,10 +129,6 @@ export default function ProfileScreen() {
   const [isDownloadingEula, setIsDownloadingEula] = useState(false);
   const [isDownloadingPrivacy, setIsDownloadingPrivacy] = useState(false);
   const [isExportingData, setIsExportingData] = useState(false);
-
-  // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-  // Ciclo 7.0.0 — APK v29 — aggiornare ad ogni nuova OTA pubblicata
-  const CURRENT_OTA_NUMBER = 93;
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],

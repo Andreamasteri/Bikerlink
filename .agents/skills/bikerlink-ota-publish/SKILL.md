@@ -26,7 +26,7 @@ description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink
 ✅ Usare **sempre** `bash scripts/publish-ota.sh` — gestisce bundle, upload, backend custom e EAS in sequenza.
 
 ## File chiave
-- `app/(tabs)/profile.tsx` — contiene `CURRENT_OTA_NUMBER` (riga ~142)
+- `lib/ota.ts` — contiene `CURRENT_OTA_NUMBER` (unica sorgente di verità)
 - `ota-updates.json` — registro storico di tutte le OTA
 - `scripts/publish-ota.sh` — script di pubblicazione completo
 - `scripts/validate-ota.sh` — validatore pre/post pubblicazione
@@ -44,16 +44,16 @@ Leggere l'ultima entry del ciclo 7.x in `ota-updates.json` e prendere `updateNum
 git rev-parse HEAD
 ```
 
-### PASSO 3 — Aggiornare `CURRENT_OTA_NUMBER` in profile.tsx
-Trovare e modificare la riga:
+### PASSO 3 — Aggiornare `CURRENT_OTA_NUMBER` in lib/ota.ts
+Trovare e modificare la riga (è l'**unico file** da aggiornare):
 ```typescript
-const CURRENT_OTA_NUMBER = <VECCHIO>;  // → <NUOVO>
+export const CURRENT_OTA_NUMBER = <VECCHIO>;  // → <NUOVO>
 ```
 Il commento sopra va tenuto generico:
 ```typescript
 // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
 // Ciclo 7.0.0 — APK v29 — aggiornare ad ogni nuova OTA pubblicata
-const CURRENT_OTA_NUMBER = 56;
+export const CURRENT_OTA_NUMBER = 56;
 ```
 
 ### PASSO 4 — Aggiungere entry in `ota-updates.json`
