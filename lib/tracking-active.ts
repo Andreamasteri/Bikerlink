@@ -22,3 +22,24 @@ export function setTrackingActive(value: boolean): void {
 export function isTrackingActive(): boolean {
   return _isTrackingActive;
 }
+
+// ── Hands Off global broadcast ─────────────────────────────────────────────
+let _handsOffActive = false;
+const _handsOffCallbacks: ((active: boolean) => void)[] = [];
+
+export function setHandsOffBroadcast(value: boolean): void {
+  if (_handsOffActive === value) return;
+  _handsOffActive = value;
+  _handsOffCallbacks.forEach((cb) => cb(value));
+}
+
+export function registerHandsOffCallback(
+  cb: (active: boolean) => void
+): () => void {
+  _handsOffCallbacks.push(cb);
+  cb(_handsOffActive);
+  return () => {
+    const idx = _handsOffCallbacks.indexOf(cb);
+    if (idx >= 0) _handsOffCallbacks.splice(idx, 1);
+  };
+}

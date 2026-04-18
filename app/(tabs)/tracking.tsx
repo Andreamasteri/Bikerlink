@@ -26,7 +26,7 @@ import { getCurrentLocale } from "@/lib/i18n";
 import { useUnits, SpeedUnit, DistanceUnit } from "@/lib/units-context";
 import { formatDistance, formatSpeed } from "@/lib/units";
 import TrackingMap from "@/components/TrackingMap";
-import { setTrackingActive } from "@/lib/tracking-active";
+import { setTrackingActive, setHandsOffBroadcast } from "@/lib/tracking-active";
 import * as Haptics from "expo-haptics";
 import { logGpsError } from "@/lib/gps-logger";
 
@@ -390,8 +390,9 @@ export default function TrackingScreen() {
     onError: () => Alert.alert("Errore", "Impossibile pubblicare il record"),
   });
 
-  // ── Hands-off blink + haptic ───────────────────────────────────────────────
+  // ── Hands-off blink + haptic + global broadcast ───────────────────────────
   useEffect(() => {
+    setHandsOffBroadcast(handsOffActive);
     if (handsOffActive) {
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});

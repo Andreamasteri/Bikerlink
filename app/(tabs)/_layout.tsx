@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from "react";
 import { Tabs, useRouter, usePathname, type Href } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
-import { Platform, View, Pressable, Text, StyleSheet, Linking, Modal } from "react-native";
+import { Platform, View, Pressable, Text, StyleSheet, Linking, Modal, Animated } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/lib/auth-context";
 import { useLocationGate } from "@/lib/location-context";
@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTaskbarStyle } from "@/lib/taskbar-style-context";
 import CustomTabBar, { type TabItem } from "@/components/CustomTabBar";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { registerHandsOffCallback } from "@/lib/tracking-active";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -20,6 +21,30 @@ export default function TabLayout() {
   const { isGpsGateActive, requestPermission } = useLocationGate();
   const { taskbarStyle } = useTaskbarStyle();
   const prevUnreadRef = useRef<number>(0);
+
+  // ── Global Hands-Off overlay ────────────────────────────────────────────────
+  const [globalHandsOffActive, setGlobalHandsOffActive] = useState(false);
+  const handsOffBlinkAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const unsub = registerHandsOffCallback(setGlobalHandsOffActive);
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (globalHandsOffActive) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(handsOffBlinkAnim, { toValue: 0.2, duration: 500, useNativeDriver: true }),
+          Animated.timing(handsOffBlinkAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
+    } else {
+      handsOffBlinkAnim.setValue(1);
+    }
+  }, [globalHandsOffActive]);
 
   useEffect(() => {
     if (!isLoading && user === null) {
@@ -384,6 +409,19 @@ export default function TabLayout() {
         />
       </Tabs>
 
+      {globalHandsOffActive && (
+        <View
+          style={handsOffOverlayStyles.overlay}
+          pointerEvents="box-only"
+        >
+          <Animated.View style={{ opacity: handsOffBlinkAnim, alignItems: "center" }}>
+            <Text style={handsOffOverlayStyles.title}>⚠ ATTENZIONE!</Text>
+            <Text style={handsOffOverlayStyles.msg}>VELOCITÀ HANDS OFF RAGGIUNTA!</Text>
+            <Text style={handsOffOverlayStyles.sub}>Rallenta per riprendere i controlli</Text>
+          </Animated.View>
+        </View>
+      )}
+
       <Modal
         visible={showGarageReminder}
         transparent
@@ -418,6 +456,40 @@ export default function TabLayout() {
     </>
   );
 }
+
+const handsOffOverlayStyles = StyleSheet.create({
+  overlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(220, 38, 38, 0.18)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 9999,
+  },
+  title: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 30,
+    color: "#ef4444",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  msg: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 20,
+    color: "#ef4444",
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  sub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+    color: "#ef4444",
+    textAlign: "center",
+  },
+});
 
 const gpsBannerStyles = StyleSheet.create({
   banner: {
