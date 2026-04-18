@@ -38,6 +38,7 @@ interface RouteRecord {
   createdAt: string;
   maxTiltDeg?: number | null;
   maxAccelerationG?: number | null;
+  isSprint?: boolean;
 }
 
 interface UserProfileMinimal {
@@ -55,7 +56,7 @@ interface GpsPoint {
 }
 
 type TrackingMode = "highway" | "city" | "idle";
-type UpdateProfile = "easy" | "medium" | "race";
+type UpdateProfile = "lowest" | "easy" | "medium" | "high" | "race";
 
 const IDLE_THRESHOLD_KMH = 3;
 const BATCH_SIZE = 10;
@@ -64,14 +65,18 @@ const AUTO_PAUSE_TIMEOUT_MS = 10 * 60 * 1000;
 const STATS_SYNC_INTERVAL_MS = 60000;
 
 const PROFILE_LABELS: Record<UpdateProfile, string> = {
+  lowest: "Risparmio",
   easy: "Passeggio",
   medium: "Standard",
+  high: "Alta",
   race: "Race",
 };
 
 const PROFILE_DESCRIPTIONS: Record<UpdateProfile, string> = {
+  lowest: "Precisione minima (batteria)",
   easy: "Risparmio energetico",
   medium: "Alta precisione",
+  high: "Precisione massima",
   race: "Massima precisione (1s)",
 };
 
@@ -85,6 +90,16 @@ function getModeConfig(mode: TrackingMode, profile: UpdateProfile = "medium"): {
   if (profile === "race") {
     return { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 1 };
   }
+  if (profile === "high") {
+    switch (mode) {
+      case "highway":
+        return { accuracy: Location.Accuracy.Highest, timeInterval: 2000, distanceInterval: 5 };
+      case "city":
+        return { accuracy: Location.Accuracy.Highest, timeInterval: 3000, distanceInterval: 3 };
+      case "idle":
+        return { accuracy: Location.Accuracy.Highest, timeInterval: 10000, distanceInterval: 2 };
+    }
+  }
   if (profile === "medium") {
     switch (mode) {
       case "highway":
@@ -93,6 +108,16 @@ function getModeConfig(mode: TrackingMode, profile: UpdateProfile = "medium"): {
         return { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 5 };
       case "idle":
         return { accuracy: Location.Accuracy.High, timeInterval: 15000, distanceInterval: 2 };
+    }
+  }
+  if (profile === "lowest") {
+    switch (mode) {
+      case "highway":
+        return { accuracy: Location.Accuracy.Lowest, timeInterval: 15000, distanceInterval: 50 };
+      case "city":
+        return { accuracy: Location.Accuracy.Lowest, timeInterval: 20000, distanceInterval: 30 };
+      case "idle":
+        return { accuracy: Location.Accuracy.Lowest, timeInterval: 60000, distanceInterval: 10 };
     }
   }
   switch (mode) {
@@ -153,6 +178,7 @@ export default function TrackingScreen() {
 
   const [updateProfile, setUpdateProfile] = useState<UpdateProfile>("medium");
   const updateProfileRef = useRef<UpdateProfile>("medium");
+  const prevUpdateProfileRef = useRef<UpdateProfile>("medium");
 
   const [delayedStartEnabled, setDelayedStartEnabled] = useState(false);
   const [delayedStartSeconds, setDelayedStartSeconds] = useState("10");
@@ -250,9 +276,11 @@ export default function TrackingScreen() {
     if (!profileData?.profile?.gpsPrecision) return;
     const gpsPrec = profileData.profile.gpsPrecision;
     const mapped: UpdateProfile =
-      gpsPrec === "lowest" || gpsPrec === "balanced" ? "easy"
+      gpsPrec === "lowest" ? "lowest"
+      : gpsPrec === "balanced" ? "easy"
       : gpsPrec === "high" ? "medium"
-      : gpsPrec === "highest" || gpsPrec === "bestForNavigation" ? "race"
+      : gpsPrec === "highest" ? "high"
+      : gpsPrec === "bestForNavigation" ? "race"
       : "medium";
     setUpdateProfile(mapped);
     updateProfileRef.current = mapped;
@@ -625,7 +653,7 @@ export default function TrackingScreen() {
 
       let res;
       try {
-        res = await apiRequest("POST", "/api/routes", { trackingFrequency: 5 });
+        res = await apiRequest("POST", "/api/routes", { trackingFrequency: 5, isSprint: sprint0100EnabledRef.current });
       } catch (err: any) {
         if (err.message?.includes("401")) {
           Alert.alert("Login Richiesto", "Devi effettuare il login per usare il tracciamento.");
@@ -694,6 +722,7 @@ export default function TrackingScreen() {
       setSprintMaxTilt(0);
 
       if (sprint0100Enabled) {
+        prevUpdateProfileRef.current = updateProfileRef.current;
         setUpdateProfile("race");
         updateProfileRef.current = "race";
       }
@@ -859,6 +888,11 @@ export default function TrackingScreen() {
       setCurrentSpeed(0);
       setPointsBuffered(0);
       setTotalPointsSent(0);
+
+      if (sprint0100EnabledRef.current && prevUpdateProfileRef.current !== "race") {
+        setUpdateProfile(prevUpdateProfileRef.current);
+        updateProfileRef.current = prevUpdateProfileRef.current;
+      }
     } catch {
       Alert.alert("Errore", "Errore nel completamento della sessione.");
     } finally {
@@ -1277,9 +1311,14 @@ function RecordCard({ item, onPublish, onDelete }: { item: RouteRecord; onPublis
   const net = Math.max(dur - idle, 0);
 
   return (
-    <View style={styles.recordCard}>
+    <View style={[styles.recordCard, item.isSprint && { borderColor: Colors.accentRed, borderWidth: 1.5 }]}>
       <View style={styles.recordHeader}>
-        <Ionicons name="flag" size={16} color={Colors.accent} />
+        <Ionicons name={item.isSprint ? "speedometer" : "flag"} size={16} color={item.isSprint ? Colors.accentRed : Colors.accent} />
+        {item.isSprint && (
+          <View style={{ backgroundColor: Colors.accentRed + "20", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginRight: 4 }}>
+            <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: Colors.accentRed }}>0-100</Text>
+          </View>
+        )}
         <Text style={[styles.recordDate, { flex: 1 }]}>
           {new Date(item.createdAt).toLocaleDateString(getCurrentLocale(), { day: "2-digit", month: "short", year: "numeric" })}
         </Text>

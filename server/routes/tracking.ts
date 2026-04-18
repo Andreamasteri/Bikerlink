@@ -16,15 +16,16 @@ router.post("/", async (req: Request, res: Response) => {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
-    const { title, trackingFrequency } = req.body;
+    const { title, trackingFrequency, isSprint } = req.body;
 
     const route = await storage.createRoute({
       userId,
       title: title || null,
       trackingFrequency: trackingFrequency || 5,
       status: "active",
+      isSprint: isSprint === true,
       startedAt: new Date(),
-    });
+    } as any);
 
     return res.status(201).json(route);
   } catch (error) {
