@@ -1084,9 +1084,24 @@ export default function TrackingScreen() {
       }, STATS_SYNC_INTERVAL_MS);
 
       if (Platform.OS !== "web") {
-        sendStartupBeacon("startTracking:watchPositionBegin");
         try {
-          const config = getModeConfig("idle", updateProfileRef.current);
+          const bgRunning = await Location.hasStartedLocationUpdatesAsync(BG_LOCATION_TASK);
+          if (bgRunning) {
+            sendStartupBeacon("startTracking:stopStaleBgTask");
+            await Location.stopLocationUpdatesAsync(BG_LOCATION_TASK).catch(() => {});
+          }
+        } catch {}
+        if (watchSubRef.current) {
+          try { watchSubRef.current.remove(); } catch {}
+          watchSubRef.current = null;
+        }
+        const config = getModeConfig("idle", updateProfileRef.current);
+        sendStartupBeacon("startTracking:watchPositionBegin", {
+          accuracy: config.accuracy,
+          timeInterval: config.timeInterval,
+          distanceInterval: config.distanceInterval,
+        });
+        try {
           const sub = await Location.watchPositionAsync(
             { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
             onNativeLocation

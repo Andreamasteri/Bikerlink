@@ -96,6 +96,7 @@ function AppStateHandler() {
   const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const webLocationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationWatcherRef = useRef<Location.LocationSubscription | null>(null);
+  const nativeWatcherStartingRef = useRef(false);
 
   useEffect(() => {
     if (hasBackgroundPermission && locationWatcherRef.current) {
@@ -112,6 +113,11 @@ function AppStateHandler() {
     async function startNativeWatcher() {
       if (locationWatcherRef.current) return;
       if (hasBackgroundPermission) return;
+      if (nativeWatcherStartingRef.current) {
+        sendStartupBeacon("watch_position_concurrent_blocked");
+        return;
+      }
+      nativeWatcherStartingRef.current = true;
       try {
         sendStartupBeacon("gps_check_start");
         const { status } = await Location.getForegroundPermissionsAsync();
@@ -137,7 +143,10 @@ function AppStateHandler() {
             } catch {}
           }
         );
-      } catch {}
+      } catch {
+      } finally {
+        nativeWatcherStartingRef.current = false;
+      }
     }
 
     function stopNativeWatcher() {

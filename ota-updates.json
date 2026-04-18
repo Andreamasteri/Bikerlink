@@ -3413,7 +3413,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "pending",
+    "status": "superseded",
     "publishedAt": null
+  },
+  {
+    "updateNumber": 97,
+    "version": "1.97.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-97 rv7.0.0: Fix race condition GPS watcher + cleanup stale task pre-Start",
+    "note": "Task #708: (1) _layout.tsx — startNativeWatcher: aggiunto guard atomico nativeWatcherStartingRef per prevenire esecuzioni concorrenti. Beacon watch_position_concurrent_blocked inviato quando una chiamata è bloccata. finally block resetta il flag. Fix del bug che causava multiple subscription GPS leaked quando AppState cambiava durante il pending di getForegroundPermissionsAsync/watchPositionAsync (visible nei log: 3x watch_position_start in 4s). (2) tracking.tsx — startTracking: prima di watchPositionAsync, ferma eventuali BG_LOCATION_TASK stale con hasStartedLocationUpdatesAsync + stopLocationUpdatesAsync (beacon startTracking:stopStaleBgTask). Rimuove anche watchSubRef.current se rimasto stale. (3) tracking.tsx — beacon watchPositionBegin ora include accuracy/timeInterval/distanceInterval per diagnostica configurazione. CURRENT_OTA_NUMBER=97.",
+    "releaseId": "257e1114-3731-4e8a-9ef6-6181f4a1e88a",
+    "bundleUrl": "private/ota/ota-1.97.0-1776528627682.js",
+    "updateGroupId": "5e1a453e-e6c5-48f1-84ba-09a27a49aaec",
+    "androidUpdateId": "019da15c-4d99-7fbb-8ad4-d2660d805b0b",
+    "iosUpdateId": null,
+    "commitBase": "6fccfe8b2f89f3064c1d0ab0454c91935956035d",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/5e1a453e-e6c5-48f1-84ba-09a27a49aaec",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T16:10:30.711Z"
   }
 ]
