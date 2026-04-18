@@ -606,20 +606,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/settings/maps", async (_req, res) => {
     try {
-      const [enabledSetting, providerSetting, userChoiceSetting, engineSetting] = await Promise.all([
+      const [enabledSetting, providerSetting, userChoiceSetting] = await Promise.all([
         storage.getAppSetting("maps_enabled"),
         storage.getAppSetting("maps_provider"),
         storage.getAppSetting("maps_user_choice_enabled"),
-        storage.getAppSetting("maps_engine"),
       ]);
       res.json({
         enabled: enabledSetting?.value !== "false",
         provider: providerSetting?.value || "carto_light",
         userChoiceEnabled: userChoiceSetting?.value !== "false",
-        engine: engineSetting?.value || "leaflet",
       });
     } catch {
-      res.json({ enabled: true, provider: "carto_light", userChoiceEnabled: true, engine: "leaflet" });
+      res.json({ enabled: true, provider: "carto_light", userChoiceEnabled: true });
     }
   });
 
