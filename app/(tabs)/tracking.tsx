@@ -26,7 +26,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getCurrentLocale } from "@/lib/i18n";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
-import DeviceMotion from "expo-sensors/build/DeviceMotion";
+import { DeviceMotion } from "expo-sensors";
 import TrackingMap from "@/components/TrackingMap";
 import Constants from "expo-constants";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
@@ -60,29 +60,33 @@ async function logGpsError(error: unknown, context: string) {
 }
 
 if (Platform.OS !== "web") {
-  TaskManager.defineTask<{ locations: Location.LocationObject[] }>(
-    BG_LOCATION_TASK,
-    async ({ data, error }: TaskManager.TaskManagerTaskBody<{ locations: Location.LocationObject[] }>) => {
-    if (error || !data) return;
-    const { locations } = data;
-    if (!locations || locations.length === 0) return;
-    try {
-      const raw = await AsyncStorage.getItem(BG_POINTS_KEY);
-      const stored: GpsPoint[] = raw ? JSON.parse(raw) : [];
-      for (const loc of locations) {
-        const speedMs = loc.coords.speed;
-        const speedKmh = speedMs !== null && speedMs >= 0 ? speedMs * 3.6 : 0;
-        stored.push({
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-          altitude: loc.coords.altitude ?? 0,
-          speedKmh,
-          timestamp: new Date(loc.timestamp).toISOString(),
-        });
-      }
-      await AsyncStorage.setItem(BG_POINTS_KEY, JSON.stringify(stored));
-    } catch {}
-  });
+  try {
+    TaskManager.defineTask<{ locations: Location.LocationObject[] }>(
+      BG_LOCATION_TASK,
+      async ({ data, error }: TaskManager.TaskManagerTaskBody<{ locations: Location.LocationObject[] }>) => {
+      if (error || !data) return;
+      const { locations } = data;
+      if (!locations || locations.length === 0) return;
+      try {
+        const raw = await AsyncStorage.getItem(BG_POINTS_KEY);
+        const stored: GpsPoint[] = raw ? JSON.parse(raw) : [];
+        for (const loc of locations) {
+          const speedMs = loc.coords.speed;
+          const speedKmh = speedMs !== null && speedMs >= 0 ? speedMs * 3.6 : 0;
+          stored.push({
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+            altitude: loc.coords.altitude ?? 0,
+            speedKmh,
+            timestamp: new Date(loc.timestamp).toISOString(),
+          });
+        }
+        await AsyncStorage.setItem(BG_POINTS_KEY, JSON.stringify(stored));
+      } catch {}
+    });
+  } catch (e) {
+    logGpsError(e, "module-level:TaskManager.defineTask").catch(() => {});
+  }
 }
 
 interface RouteRecord {

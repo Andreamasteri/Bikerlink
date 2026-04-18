@@ -3482,7 +3482,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T17:12:51.430Z"
+  },
+  {
+    "updateNumber": 100,
+    "version": "1.100.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-100 rv7.0.0: Fix crash mount schermata tracking",
+    "note": "Task #716: dopo OTA-99 l'app si chiudeva istantaneamente al click del tab 'Registra giro e performance', prima ancora del primo render (nessun CLIENT-ERROR catturato perché il crash precede il beacon). Causa sospetta: due punti fragili a module-level in app/(tabs)/tracking.tsx — (1) deep import 'expo-sensors/build/DeviceMotion' che bypassa l'API pubblica del package; (2) TaskManager.defineTask top-level senza try/catch, che se lancia rende il modulo non caricabile. Fix: sostituito deep import con path standard `import { DeviceMotion } from 'expo-sensors'` e wrappato TaskManager.defineTask in try/catch con logGpsError per crash residui. TrackingMap (react-native-maps) escluso dai sospetti perché renderizzato condizionalmente solo a `currentCoord !== null`. CURRENT_OTA_NUMBER=100.",
+    "releaseId": "6a578065-832a-4d60-86cb-084ef15890c6",
+    "bundleUrl": "private/ota/ota-1.100.0-1776535858710.js",
+    "updateGroupId": "f01c2b2d-4830-4d46-8fe3-af00704ac086",
+    "androidUpdateId": "019da1ca-ac36-7be3-a75e-91960a578073",
+    "iosUpdateId": null,
+    "commitBase": "1e6dc4c6cbc4599c097fdc5a70b68a4810179e7d",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/f01c2b2d-4830-4d46-8fe3-af00704ac086",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T18:11:01.563Z"
   }
 ]
