@@ -315,6 +315,7 @@ export default function TrackingScreen() {
   const [currentG, setCurrentG] = useState(0);
   const [maxAccelG, setMaxAccelG] = useState(0);
   const [maxDecelG, setMaxDecelG] = useState(0);
+  const [isCalibrating, setIsCalibrating] = useState(false);
 
   // Countdown display
   const [countdownValue, setCountdownValue] = useState(0);
@@ -712,6 +713,20 @@ export default function TrackingScreen() {
     sprint0to100MsRef.current = null;
     pausedMsRef.current = 0;
     isPausedRef.current = false;
+    setIsCalibrating(false);
+  }, []);
+
+  // ── Recalibrate G on-demand ────────────────────────────────────────────────
+  const handleRecalibrate = useCallback(() => {
+    if (Platform.OS === "web") return;
+    setIsCalibrating(true);
+    accelBaselineRef.current = null;
+    accelCalibSamples.current = [];
+    maxAccelGRef.current = 0;
+    maxDecelGRef.current = 0;
+    setMaxAccelG(0);
+    setMaxDecelG(0);
+    setCurrentG(0);
   }, []);
 
   // ── Start accelerometer ────────────────────────────────────────────────────
@@ -729,6 +744,7 @@ export default function TrackingScreen() {
           if (accelCalibSamples.current.length >= 20) {
             const sum = accelCalibSamples.current.reduce((a, b) => a + b, 0);
             accelBaselineRef.current = sum / accelCalibSamples.current.length;
+            setIsCalibrating(false);
           }
           return;
         }
@@ -1170,12 +1186,31 @@ export default function TrackingScreen() {
                     value={maxAltitude.toFixed(0)}
                     label="Quota max m"
                   />
-                  <StatCard
-                    icon="pulse-outline"
-                    color={Colors.accentRed}
-                    value={`↑${maxAccelG.toFixed(2)} ↓${maxDecelG.toFixed(2)}`}
-                    label="G max"
-                  />
+                  {/* G max card with recalibrate button */}
+                  <View style={styles.statCard}>
+                    <Ionicons name="pulse-outline" size={16} color={Colors.accentRed} />
+                    {isCalibrating ? (
+                      <Text style={[styles.statValue, { color: Colors.textSecondary, fontSize: 16 }]}>
+                        Calibro...
+                      </Text>
+                    ) : (
+                      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+                        {`↑${maxAccelG.toFixed(2)} ↓${maxDecelG.toFixed(2)}`}
+                      </Text>
+                    )}
+                    <Text style={styles.statLabel}>G max</Text>
+                    {phase === "active" && !isCalibrating && (
+                      <TouchableOpacity
+                        onPress={handleRecalibrate}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={styles.recalibrateLink}>Ricalibra</Text>
+                      </TouchableOpacity>
+                    )}
+                    {phase === "active" && isCalibrating && (
+                      <Text style={styles.recalibrateLink}>—</Text>
+                    )}
+                  </View>
                 </View>
               </View>
             )}
@@ -2310,6 +2345,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_600SemiBold" as const,
     color: Colors.textSecondary,
+  },
+  recalibrateLink: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold" as const,
+    color: Colors.accent,
+    textAlign: "center" as const,
+    paddingTop: 2,
   },
   summaryDeleteBtn: {
     flexDirection: "row" as const,
