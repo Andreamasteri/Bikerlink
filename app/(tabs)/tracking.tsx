@@ -1016,12 +1016,20 @@ export default function TrackingScreen() {
       }, STATS_SYNC_INTERVAL_MS);
 
       if (Platform.OS !== "web") {
-        const config = getModeConfig("idle", updateProfileRef.current);
-        const sub = await Location.watchPositionAsync(
-          { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
-          onNativeLocation
-        );
-        watchSubRef.current = sub;
+        try {
+          const config = getModeConfig("idle", updateProfileRef.current);
+          const sub = await Location.watchPositionAsync(
+            { accuracy: config.accuracy, timeInterval: config.timeInterval, distanceInterval: config.distanceInterval },
+            onNativeLocation
+          );
+          watchSubRef.current = sub;
+        } catch {
+          cleanupTracking();
+          setIsTracking(false);
+          routeIdRef.current = null;
+          Alert.alert("GPS non disponibile", "Impossibile avviare il GPS. Riprova tra un momento.");
+          return;
+        }
       } else {
         const wid = navigator.geolocation.watchPosition(
           onWebLocation,
@@ -1052,6 +1060,11 @@ export default function TrackingScreen() {
           }
         }, 1000);
       }
+    } catch {
+      cleanupTracking();
+      setIsTracking(false);
+      routeIdRef.current = null;
+      Alert.alert("Errore", "Errore imprevisto all'avvio del tracciamento. Riprova.");
     } finally {
       setLoading(false);
     }
@@ -1150,7 +1163,7 @@ export default function TrackingScreen() {
   const handleStartPress = useCallback(() => {
     if (countdownValue !== null) return;
     if (!delayedStartEnabled) {
-      startTracking();
+      startTracking().catch(() => {});
       return;
     }
     const secs = Math.max(1, parseInt(delayedStartSeconds || "10", 10) || 10);
@@ -1166,7 +1179,7 @@ export default function TrackingScreen() {
         setCountdownValue("GO");
         setTimeout(() => {
           setCountdownValue(null);
-          startTracking();
+          startTracking().catch(() => {});
         }, 600);
       }
     }, 1000);

@@ -3298,7 +3298,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T12:45:46.117Z"
+  },
+  {
+    "updateNumber": 92,
+    "version": "1.92.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-92 rv7.0.0: Fix crash startTracking — unhandled rejection su watchPositionAsync",
+    "note": "Task #694: aggiunto catch esterno all'outer try...finally di startTracking() per catturare eccezioni non gestite (es. watchPositionAsync). Aggiunto try-catch dedicato attorno a watchPositionAsync con cleanup stato e Alert 'GPS non disponibile'. Aggiunto .catch(()=>{}) in handleStartPress su entrambe le chiamate startTracking(). Questo previene unhandled Promise rejection su Hermes che crashava l'app. CURRENT_OTA_NUMBER=92.",
+    "releaseId": "3ff84b9b-934a-4e8d-af64-1caa0bfd27c6",
+    "bundleUrl": "private/ota/ota-1.92.0-1776517810068.js",
+    "updateGroupId": "80608f29-f84e-4ede-af34-c6d44a332715",
+    "androidUpdateId": "019da0b7-5676-7b0a-bca0-dd722a88d966",
+    "iosUpdateId": null,
+    "commitBase": "563a05c3a499ad4242e72a9eef3b1cbf45520491",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/80608f29-f84e-4ede-af34-c6d44a332715",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T13:10:12.938Z"
   }
 ]
