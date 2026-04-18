@@ -16,6 +16,8 @@ import RouteMap from "@/components/RouteMap";
 import { apiRequest, getQueryFn } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { t, getCurrentLocale } from "@/lib/i18n";
+import { useUnits } from "@/lib/units-context";
+import { formatDistance, formatSpeed, formatDateTime } from "@/lib/units";
 
 interface RouteDetail {
   id: string;
@@ -45,6 +47,8 @@ export default function RouteDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const { distanceUnit, speedUnit, timeFormat } = useUnits();
+  const locale = getCurrentLocale();
 
   const { data: route, isLoading } = useQuery<RouteDetail>({
     queryKey: ["/api/routes", id],
@@ -71,14 +75,7 @@ export default function RouteDetailScreen() {
   };
 
   const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString(getCurrentLocale(), {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatDateTime(dateStr, locale, timeFormat);
   };
 
   if (isLoading) {
@@ -153,17 +150,17 @@ export default function RouteDetailScreen() {
         <StatCard
           icon="road-variant"
           label={t("tracking.distance")}
-          value={`${(route.totalDistanceKm ?? 0).toFixed(2)} km`}
+          value={formatDistance(route.totalDistanceKm ?? 0, distanceUnit, 2)}
         />
         <StatCard
           icon="speedometer"
           label="Vel. Media"
-          value={`${(route.avgSpeedKmh ?? 0).toFixed(1)} km/h`}
+          value={formatSpeed(route.avgSpeedKmh ?? 0, speedUnit, 1)}
         />
         <StatCard
           icon="speedometer-medium"
           label="Vel. Max"
-          value={`${(route.maxSpeedKmh ?? 0).toFixed(1)} km/h`}
+          value={formatSpeed(route.maxSpeedKmh ?? 0, speedUnit, 1)}
         />
         <StatCard
           icon="mountain"

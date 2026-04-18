@@ -37,6 +37,7 @@ import { useMapConfig } from "@/lib/map-context";
 import { MAP_PROVIDER_LABELS, MAP_PROVIDER_DESCRIPTIONS, type MapProvider } from "@/lib/map-tiles";
 import { useTaskbarStyle, type TaskbarStyle } from "@/lib/taskbar-style-context";
 import { useUnits, type TimeFormat, type SpeedUnit, type DistanceUnit } from "@/lib/units-context";
+import { convertDistance } from "@/lib/units";
 import * as Updates from "expo-updates";
 import Constants from "expo-constants";
 import * as Location from "expo-location";
@@ -650,7 +651,12 @@ export default function ProfileScreen() {
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={styles.statValue}>
-              {totalKm >= 1000 ? `${(totalKm / 1000).toFixed(1)}k` : Math.round(totalKm)}
+              {(() => {
+                const { value, label } = convertDistance(totalKm, distanceUnit);
+                return value >= 1000
+                  ? `${(value / 1000).toFixed(1)}k ${label}`
+                  : `${Math.round(value)} ${label}`;
+              })()}
             </Text>
             <Text style={styles.statLabel}>{t("profile.totalKm")}</Text>
           </View>

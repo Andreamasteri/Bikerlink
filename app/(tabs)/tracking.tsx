@@ -23,6 +23,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 import { getCurrentLocale } from "@/lib/i18n";
+import { useUnits } from "@/lib/units-context";
+import { formatDistance, formatSpeed } from "@/lib/units";
 import TrackingMap from "@/components/TrackingMap";
 import { setTrackingActive } from "@/lib/tracking-active";
 import Constants from "expo-constants";
@@ -208,6 +210,8 @@ function RecordCard({
 }) {
   const { speedUnit, distanceUnit } = useUnits();
   const dur = item.durationSeconds || 0;
+  const { distanceUnit, speedUnit, timeFormat } = useUnits();
+  const locale = getCurrentLocale();
   return (
     <View
       style={[
@@ -227,10 +231,13 @@ function RecordCard({
           </View>
         )}
         <Text style={[styles.recordDate, { flex: 1 }]}>
-          {new Date(item.createdAt).toLocaleDateString(getCurrentLocale(), {
+          {new Date(item.createdAt).toLocaleDateString(locale, {
             day: "2-digit",
             month: "short",
             year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: timeFormat === "12h",
           })}
         </Text>
         <TouchableOpacity onPress={onPublish} style={styles.publishIconBtn} activeOpacity={0.7}>
@@ -254,9 +261,9 @@ function RecordCard({
           </View>
           <View style={styles.recordStat}>
             <Text style={styles.recordStatValue}>
-              {convertSpeed(item.maxSpeedKmh || 0, speedUnit).toFixed(0)}
+              {formatSpeed(item.maxSpeedKmh || 0, speedUnit, 0)}
             </Text>
-            <Text style={styles.recordStatLabel}>vel. max {speedUnitLabel(speedUnit)}</Text>
+            <Text style={styles.recordStatLabel}>vel. max</Text>
           </View>
           {item.maxAccelerationG != null && (
             <View style={styles.recordStat}>
@@ -269,7 +276,7 @@ function RecordCard({
         <View style={styles.recordRow}>
           <View style={styles.recordStat}>
             <Text style={styles.recordStatValue}>
-              {convertDistance(item.totalDistanceKm || 0, distanceUnit).toFixed(2)} {distanceUnitLabel(distanceUnit)}
+              {formatDistance(item.totalDistanceKm || 0, distanceUnit, 2)}
             </Text>
             <Text style={styles.recordStatLabel}>distanza</Text>
           </View>
@@ -279,9 +286,9 @@ function RecordCard({
           </View>
           <View style={styles.recordStat}>
             <Text style={styles.recordStatValue}>
-              {convertSpeed(item.maxSpeedKmh || 0, speedUnit).toFixed(0)}
+              {formatSpeed(item.maxSpeedKmh || 0, speedUnit, 0)}
             </Text>
-            <Text style={styles.recordStatLabel}>vel. max {speedUnitLabel(speedUnit)}</Text>
+            <Text style={styles.recordStatLabel}>vel. max</Text>
           </View>
         </View>
       )}
@@ -1554,14 +1561,14 @@ export default function TrackingScreen() {
               <StatCard
                 icon="navigate-outline"
                 color={Colors.accent}
-                value={convertDistance(totalKm, distanceUnit).toFixed(3) + " " + distanceUnitLabel(distanceUnit)}
+                value={formatDistance(totalKm, distanceUnit, 3)}
                 label="Distanza"
               />
               <StatCard
                 icon="flash"
                 color={Colors.accentRed}
-                value={convertSpeed(maxSpeed, speedUnit).toFixed(1)}
-                label={`Vel. max ${speedUnitLabel(speedUnit)}`}
+                value={formatSpeed(maxSpeed, speedUnit, 1)}
+                label="Vel. max"
               />
             </View>
             <View style={styles.statsRow}>
@@ -1574,8 +1581,8 @@ export default function TrackingScreen() {
               <StatCard
                 icon="speedometer-outline"
                 color={Colors.success}
-                value={convertSpeed(avgSpeedKmh, speedUnit).toFixed(1)}
-                label={`Vel. media ${speedUnitLabel(speedUnit)}`}
+                value={formatSpeed(avgSpeedKmh, speedUnit, 1)}
+                label="Vel. media"
               />
             </View>
             {is0100Enabled && sprint0to100Ms !== null && (
