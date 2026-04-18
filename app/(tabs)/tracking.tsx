@@ -1086,6 +1086,11 @@ export default function TrackingScreen() {
 
     const routeId = routeIdRef.current;
     if (!routeId) {
+      if (sprintAutoHandsOffRef.current) {
+        sprintAutoHandsOffRef.current = false;
+        handsOffEnabledRef.current = handsOffEnabled;
+        handsOffSpeedRef.current = parseFloat(handsOffSpeed || "80") || 80;
+      }
       setIsTracking(false);
       setHandsOffActive(false);
       return;
