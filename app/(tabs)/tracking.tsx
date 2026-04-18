@@ -372,6 +372,25 @@ export default function TrackingScreen() {
     warmUp();
   }, []);
 
+  useEffect(() => {
+    if (!sprint0100Enabled || isTracking) return;
+    if (Platform.OS === "web") return;
+    (async () => {
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status !== "granted") return;
+        const gpsTimeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("GPS sprint pre-warm timeout")), 8000)
+        );
+        const loc = await Promise.race([
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.BestForNavigation }),
+          gpsTimeout,
+        ]);
+        setGpsAccuracy(loc.coords.accuracy ?? null);
+      } catch {}
+    })();
+  }, [sprint0100Enabled, isTracking]);
+
 
   const cleanupTracking = () => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -1022,6 +1041,11 @@ export default function TrackingScreen() {
       }
 
       if (sprint0100Enabled) {
+        if (Platform.OS !== "web") {
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.BestForNavigation })
+            .then((loc) => setGpsAccuracy(loc.coords.accuracy ?? null))
+            .catch(() => {});
+        }
         let remaining = 10;
         setSprintCountdown(remaining);
         sprintPhaseRef.current = "countdown";

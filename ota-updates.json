@@ -3183,7 +3183,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T08:13:15.415Z"
+  },
+  {
+    "updateNumber": 87,
+    "version": "1.87.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-87 rv7.0.0: GPS Warmup BestForNavigation al toggle e al countdown 0-100",
+    "note": "Task #681: (1) useEffect su sprint0100Enabled: quando il toggle 0-100 viene attivato (e non in tracking), lancia getCurrentPositionAsync a BestForNavigation con timeout 8s — scalda il chip GPS in anticipo. (2) All'inizio del countdown in startTracking (sprint0100Enabled), fire-and-forget getCurrentPositionAsync BestForNavigation durante i 10s di countdown. (3) Confermato che watchPositionAsync parte già con getModeConfig('idle','race') = BestForNavigation 1000ms. CURRENT_OTA_NUMBER=87.",
+    "releaseId": "86074dbf-741b-41f4-ae50-6638005544f3",
+    "bundleUrl": "private/ota/ota-1.87.0-1776500467303.js",
+    "updateGroupId": "e3e8f0eb-1b0a-4252-8cc8-ec8a7b0a5857",
+    "androidUpdateId": "019d9fae-9459-71f0-a5bf-ecd85b4eb0ab",
+    "iosUpdateId": null,
+    "commitBase": "a1953f83137d6da696b9ece9d201b73fc85e00e0",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/e3e8f0eb-1b0a-4252-8cc8-ec8a7b0a5857",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T08:21:10.186Z"
   }
 ]
