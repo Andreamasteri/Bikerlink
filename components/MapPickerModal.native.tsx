@@ -4,8 +4,6 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import LeafletPickerMap from "@/components/LeafletPickerMap";
-import NativePickerMap from "@/components/NativePickerMap";
-import { useMapConfig } from "@/lib/map-context";
 import type { PickerWaypoint } from "@/lib/leaflet-picker-map-html";
 
 interface ExistingWaypoint {
@@ -26,7 +24,6 @@ interface Props {
 
 export default function MapPickerContent({ coord, onCoordChange, onConfirm, onClose, initialRegion, existingWaypoints = [] }: Props) {
   const insets = useSafeAreaInsets();
-  const { useGoogleMaps } = useMapConfig();
 
   const pickerWaypoints: PickerWaypoint[] = existingWaypoints.map((wp) => ({
     lat: wp.latitude,
@@ -52,24 +49,14 @@ export default function MapPickerContent({ coord, onCoordChange, onConfirm, onCl
           <Text style={[styles.mapConfirmText, !coord && { opacity: 0.4 }]}>Conferma</Text>
         </TouchableOpacity>
       </View>
-      {useGoogleMaps ? (
-        <NativePickerMap
-          initialLat={initialLat}
-          initialLng={initialLng}
-          initialZoom={initialZoom}
-          selectedCoord={selectedCoord}
-          onCoordPicked={onCoordChange}
-        />
-      ) : (
-        <LeafletPickerMap
-          initialLat={initialLat}
-          initialLng={initialLng}
-          initialZoom={initialZoom}
-          selectedCoord={selectedCoord}
-          existingWaypoints={pickerWaypoints}
-          onCoordPicked={onCoordChange}
-        />
-      )}
+      <LeafletPickerMap
+        initialLat={initialLat}
+        initialLng={initialLng}
+        initialZoom={initialZoom}
+        selectedCoord={selectedCoord}
+        existingWaypoints={pickerWaypoints}
+        onCoordPicked={onCoordChange}
+      />
       {coord && (
         <View style={styles.mapCoordsBar}>
           <Text style={styles.mapCoordsText}>

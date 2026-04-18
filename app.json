@@ -33,11 +33,6 @@
     "android": {
       "package": "com.bikerlink.app",
       "versionCode": 29,
-      "config": {
-        "googleMaps": {
-          "apiKey": ""
-        }
-      },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",

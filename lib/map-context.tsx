@@ -10,7 +10,6 @@ interface MapConfig {
   adminProvider: MapProvider;
   resolvedProvider: MapProvider;
   userChoiceEnabled: boolean;
-  useGoogleMaps: boolean;
   isLoading: boolean;
 }
 
@@ -32,7 +31,6 @@ const defaultConfig: MapConfig = {
   adminProvider: "carto_light",
   resolvedProvider: "carto_light",
   userChoiceEnabled: true,
-  useGoogleMaps: false,
   isLoading: false,
 };
 
@@ -63,7 +61,6 @@ export function MapSettingsProvider({ children }: { children: ReactNode }) {
 
   const userChoiceEnabled = mapsData?.userChoiceEnabled !== false;
   const mapsEnabled = mapsData?.enabled !== false;
-  const useGoogleMaps = mapsData?.engine === "google";
 
   const rawUserPref = profileData?.profile?.preferredMapStyle as MapProvider | undefined;
   const userPref: MapProvider | undefined =
@@ -83,7 +80,6 @@ export function MapSettingsProvider({ children }: { children: ReactNode }) {
     adminProvider,
     resolvedProvider,
     userChoiceEnabled,
-    useGoogleMaps,
     isLoading: mapsLoading || profileLoading,
   };
 

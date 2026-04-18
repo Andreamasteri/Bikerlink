@@ -2408,7 +2408,7 @@ export default function AdminSettings() {
         <Text style={styles.synecoDesc}>
           {mapsEngine === "leaflet"
             ? "Mappe WebView Leaflet (default, stabile)"
-            : "Mappe native Google Maps (react-native-maps)"}
+            : "Mappe Google Maps (non più supportate, fallback su Leaflet)"}
         </Text>
           </View>
         )}

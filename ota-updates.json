@@ -3505,7 +3505,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T18:11:01.563Z"
+  },
+  {
+    "updateNumber": 101,
+    "version": "1.101.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-101 rv7.0.0: Rimosso definitivamente react-native-maps (fix crash tab tracking)",
+    "note": "Task #717: causa REALE del crash al click del tab 'Registra giro e performance' identificata. react-native-maps (^1.27.2) era ancora importato staticamente in 4 wrapper Native* (NativeTrackingMap, NativeRouteMap, NativeMiniMap, NativePickerMap) anche se a runtime veniva sempre usato Leaflet (useGoogleMaps default=false). Gli `import` top-level inizializzavano comunque il bridge nativo react-native-maps al caricamento del modulo tracking.tsx, causando crash incompatibile con runtime 7.0.0. Fix definitivo: (1) eliminati i 4 file Native*, (2) semplificati TrackingMap/RouteDetailMap/LeafletMiniMap/MapPickerModal.native a Leaflet-only, (3) rimosso useGoogleMaps da MapConfig, (4) disinstallato react-native-maps da package.json, (5) rimosso config.googleMaps da app.json. Bundle ora completamente privo di react-native-maps. CURRENT_OTA_NUMBER=101.",
+    "releaseId": "cc2f3d0d-de5d-476a-bca0-c00d63770168",
+    "bundleUrl": "private/ota/ota-1.101.0-1776536898655.js",
+    "updateGroupId": "24609165-a814-4598-b25f-5352501ad28d",
+    "androidUpdateId": "019da1da-794a-7850-8d21-328bc634ba61",
+    "iosUpdateId": null,
+    "commitBase": "aa764f46105c410b75197882f1c1442d0033463d",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/24609165-a814-4598-b25f-5352501ad28d",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T18:28:21.455Z"
   }
 ]
