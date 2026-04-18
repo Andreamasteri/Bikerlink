@@ -212,7 +212,8 @@ export default function TrackingScreen() {
           if (status === "granted") {
             const loc = await Location.getCurrentPositionAsync({
               accuracy: Location.Accuracy.Balanced,
-            });
+              timeInterval: 8000,
+            } as any);
             setGpsAccuracy(loc.coords.accuracy ?? null);
           }
         } else if (typeof navigator !== "undefined" && navigator.geolocation) {
@@ -289,6 +290,20 @@ export default function TrackingScreen() {
         }),
       });
     } catch {}
+  }, []);
+
+  const onNativeLocation = useCallback((loc: Location.LocationObject) => {
+    setGpsAccuracy(loc.coords.accuracy ?? null);
+    if (!isPausedRef.current) {
+      handleGpsUpdate(loc.coords.latitude, loc.coords.longitude, loc.coords.altitude, loc.coords.speed);
+    }
+  }, []);
+
+  const onWebLocation = useCallback((pos: GeolocationPosition) => {
+    setGpsAccuracy(pos.coords.accuracy);
+    if (!isPausedRef.current) {
+      handleGpsUpdate(pos.coords.latitude, pos.coords.longitude, pos.coords.altitude, pos.coords.speed);
+    }
   }, []);
 
   const switchTrackingAccuracy = useCallback(async (newMode: TrackingMode) => {
@@ -412,20 +427,6 @@ export default function TrackingScreen() {
       flushPoints();
     }
   }, []);
-
-  const onNativeLocation = useCallback((loc: Location.LocationObject) => {
-    setGpsAccuracy(loc.coords.accuracy ?? null);
-    if (!isPausedRef.current) {
-      handleGpsUpdate(loc.coords.latitude, loc.coords.longitude, loc.coords.altitude, loc.coords.speed);
-    }
-  }, [handleGpsUpdate]);
-
-  const onWebLocation = useCallback((pos: GeolocationPosition) => {
-    setGpsAccuracy(pos.coords.accuracy);
-    if (!isPausedRef.current) {
-      handleGpsUpdate(pos.coords.latitude, pos.coords.longitude, pos.coords.altitude, pos.coords.speed);
-    }
-  }, [handleGpsUpdate]);
 
   const togglePause = useCallback(() => {
     if (isPausedRef.current) {

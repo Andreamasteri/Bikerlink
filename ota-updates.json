@@ -3022,7 +3022,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T03:00:31.284Z"
+  },
+  {
+    "updateNumber": 80,
+    "version": "1.80.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-80 rv7.0.0: Fix dichiarazione GPS callback (TDZ) + timeout pre-warm",
+    "note": "Task #669 fix: OTA-79 aveva onNativeLocation/onWebLocation dichiarate dopo switchTrackingAccuracy, causando potenziale TDZ error al primo render. Spostate PRIMA di switchTrackingAccuracy con deps:[]. Aggiunto timeInterval:8000 al pre-warm getCurrentPositionAsync. CURRENT_OTA_NUMBER=80.",
+    "releaseId": "55aa255e-8793-4ecc-9a02-a5074d64d194",
+    "bundleUrl": "private/ota/ota-1.80.0-1776481578621.js",
+    "updateGroupId": "a3e9fd4b-1ece-49b3-9354-bbfcaec48580",
+    "androidUpdateId": "019d9e8e-5c9a-7aa8-977c-0323e9f02baf",
+    "iosUpdateId": null,
+    "commitBase": "ea287ab299807e6562661562a221bfba08cec8c2",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/a3e9fd4b-1ece-49b3-9354-bbfcaec48580",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T03:06:21.187Z"
   }
 ]
