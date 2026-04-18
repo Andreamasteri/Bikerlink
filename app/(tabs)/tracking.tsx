@@ -27,6 +27,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getCurrentLocale } from "@/lib/i18n";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { DeviceMotion } from "expo-sensors";
+import TrackingMap from "@/components/TrackingMap";
 
 const BG_LOCATION_TASK = "bikerlink-bg-location";
 const BG_POINTS_KEY = "bikerlink-bg-gps-points";
@@ -187,6 +188,10 @@ export default function TrackingScreen() {
   const [trackingMode, setTrackingMode] = useState<TrackingMode>("idle");
   const [pointsBuffered, setPointsBuffered] = useState(0);
   const [totalPointsSent, setTotalPointsSent] = useState(0);
+  const [mapCoords, setMapCoords] = useState<Array<{ latitude: number; longitude: number }>>([]);
+  const [currentCoord, setCurrentCoord] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [mapExpanded, setMapExpanded] = useState(false);
+  const mapCoordsRef = useRef<Array<{ latitude: number; longitude: number }>>([]);
 
   const startTimeRef = useRef(0);
   const pausedTimeRef = useRef(0);
@@ -618,6 +623,11 @@ export default function TrackingScreen() {
     pointsBufferRef.current.push(point);
     setPointsBuffered(pointsBufferRef.current.length);
 
+    const coord = { latitude: lat, longitude: lng };
+    mapCoordsRef.current.push(coord);
+    setMapCoords([...mapCoordsRef.current]);
+    setCurrentCoord(coord);
+
     if (pointsBufferRef.current.length >= BATCH_SIZE) {
       flushPoints();
     }
@@ -694,8 +704,14 @@ export default function TrackingScreen() {
         const t = new Date(pt.timestamp).getTime();
         lastPosRef.current = { lat: pt.latitude, lng: pt.longitude, time: t };
         pointsBufferRef.current.push(pt);
+        mapCoordsRef.current.push({ latitude: pt.latitude, longitude: pt.longitude });
       }
       setTotalKm(totalKmRef.current);
+      if (bgPoints.length > 0) {
+        setMapCoords([...mapCoordsRef.current]);
+        const last = bgPoints[bgPoints.length - 1];
+        setCurrentCoord({ latitude: last.latitude, longitude: last.longitude });
+      }
       setPointsBuffered(pointsBufferRef.current.length);
       setBgReturnPoints(bgPoints.length);
       if (bgDismissTimerRef.current) clearTimeout(bgDismissTimerRef.current);
@@ -832,6 +848,10 @@ export default function TrackingScreen() {
       autoPauseAlertedRef.current = false;
       isPausedRef.current = false;
       currentModeRef.current = "idle";
+      mapCoordsRef.current = [];
+      setMapCoords([]);
+      setCurrentCoord(null);
+      setMapExpanded(false);
       totalPointsSentRef.current = 0;
       updateProfileRef.current = updateProfile;
       stopAtZeroEnabledRef.current = stopAtZeroEnabled;
@@ -1220,6 +1240,26 @@ export default function TrackingScreen() {
               </>
             )}
           </View>
+
+          {currentCoord !== null && (
+            <View style={[styles.mapCard, mapExpanded && styles.mapCardExpanded]}>
+              <TrackingMap
+                points={mapCoords}
+                currentLocation={currentCoord}
+              />
+              <TouchableOpacity
+                style={styles.mapExpandBtn}
+                onPress={() => setMapExpanded((e) => !e)}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={mapExpanded ? "contract-outline" : "expand-outline"}
+                  size={16}
+                  color="#fff"
+                />
+              </TouchableOpacity>
+            </View>
+          )}
         </>
       ) : (
         <>
@@ -2024,5 +2064,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
     color: "#ffffff",
+  },
+  mapCard: {
+    marginTop: 16,
+    borderRadius: 14,
+    overflow: "hidden" as const,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    position: "relative" as const,
+    height: 200,
+  },
+  mapCardExpanded: {
+    height: 380,
+  },
+  mapExpandBtn: {
+    position: "absolute" as const,
+    bottom: 10,
+    right: 10,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 8,
+    padding: 6,
   },
 });

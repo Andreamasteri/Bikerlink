@@ -3114,7 +3114,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-18T05:34:32.939Z"
+  },
+  {
+    "updateNumber": 84,
+    "version": "1.84.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-84 rv7.0.0: Mappa GPS live durante tracking con polyline percorso e tap per espandere",
+    "note": "Task #671: TrackingMap live integrato in tracking.tsx. Coordinate GPS accumulate in mapCoordsRef, aggiornate ogni fix GPS (handleGpsUpdate) e al caricamento punti background (loadBgPoints). UI: card mappa con TrackingMap + bottone espandi/contrai (200→380px). Componente TrackingMap router su NativeTrackingMap (react-native-maps) o LeafletTrackingMap (WebView+Leaflet). CURRENT_OTA_NUMBER=84.",
+    "releaseId": "ca11a370-01f8-42bc-a1df-f0f2d0334d44",
+    "bundleUrl": "private/ota/ota-1.84.0-1776495450291.js",
+    "updateGroupId": "b61420c9-d929-42a7-875d-ee731ed73d16",
+    "androidUpdateId": "019d9f62-6e02-7d25-99f9-62cc414f41e3",
+    "iosUpdateId": null,
+    "commitBase": "5a4f65ec703bed36df1901d25d0c3f0946cc4cec",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/b61420c9-d929-42a7-875d-ee731ed73d16",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-18T06:57:33.201Z"
   }
 ]
