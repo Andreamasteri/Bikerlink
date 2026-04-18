@@ -130,6 +130,9 @@ import {
   coordinateHistory,
   type CoordinateHistory,
   type InsertCoordinateHistory,
+  gpsErrors,
+  type GpsError,
+  type InsertGpsError,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -194,6 +197,9 @@ export interface IStorage {
   getRoutePoints(routeId: string): Promise<RoutePoint[]>;
   createRoutePoints(points: InsertRoutePoint[]): Promise<RoutePoint[]>;
   deleteRoute(id: string): Promise<void>;
+
+  createGpsError(data: InsertGpsError): Promise<GpsError>;
+  getGpsErrors(limit: number, offset: number): Promise<GpsError[]>;
 
   getPhotoContestEntries(weekNumber: number, year: number): Promise<PhotoContestEntry[]>;
   createPhotoContestEntry(entry: InsertPhotoContestEntry): Promise<PhotoContestEntry>;
@@ -757,6 +763,15 @@ export class DatabaseStorage implements IStorage {
   async deleteRoute(id: string): Promise<void> {
     await db.delete(routePoints).where(eq(routePoints.routeId, id));
     await db.delete(routes).where(eq(routes.id, id));
+  }
+
+  async createGpsError(data: InsertGpsError): Promise<GpsError> {
+    const [row] = await db.insert(gpsErrors).values(data).returning();
+    return row;
+  }
+
+  async getGpsErrors(limit: number, offset: number): Promise<GpsError[]> {
+    return db.select().from(gpsErrors).orderBy(desc(gpsErrors.createdAt)).limit(limit).offset(offset);
   }
 
   async getPhotoContestEntries(weekNumber: number, year: number): Promise<PhotoContestEntry[]> {

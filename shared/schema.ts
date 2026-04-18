@@ -281,6 +281,7 @@ export const routes = pgTable("routes", {
   idleTimeSeconds: integer("idle_time_seconds").default(0),
   maxTiltDeg: doublePrecision("max_tilt_deg").default(0),
   maxAccelerationG: doublePrecision("max_acceleration_g").default(0),
+  maxDecelerationG: doublePrecision("max_deceleration_g").default(0),
   isSprint: boolean("is_sprint").notNull().default(false),
   sprint0to100Ms: integer("sprint_0to100_ms"),
   likes: integer("likes").notNull().default(0),
@@ -1337,3 +1338,24 @@ export const eventClubInvites = pgTable("event_club_invites", {
 }, (table) => [
   uniqueIndex("event_club_invites_unique_idx").on(table.eventId, table.clubId),
 ]);
+
+export const gpsErrors = pgTable("gps_errors", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }),
+  routeId: varchar("route_id", { length: 36 }),
+  otaNumber: integer("ota_number"),
+  platform: varchar("platform", { length: 20 }),
+  osVersion: varchar("os_version", { length: 50 }),
+  context: varchar("context", { length: 200 }),
+  errorMessage: text("error_message"),
+  stackTrace: text("stack_trace"),
+  speedKmh: doublePrecision("speed_kmh"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("gps_errors_created_at_idx").on(table.createdAt),
+]);
+
+export type GpsError = typeof gpsErrors.$inferSelect;
+export type InsertGpsError = typeof gpsErrors.$inferInsert;

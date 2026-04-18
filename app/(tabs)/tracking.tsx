@@ -27,8 +27,8 @@ import { useUnits, SpeedUnit, DistanceUnit } from "@/lib/units-context";
 import { formatDistance, formatSpeed } from "@/lib/units";
 import TrackingMap from "@/components/TrackingMap";
 import { setTrackingActive } from "@/lib/tracking-active";
-import Constants from "expo-constants";
 import * as Haptics from "expo-haptics";
+import { logGpsError } from "@/lib/gps-logger";
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -150,28 +150,6 @@ function getModeConfig(profile: UpdateProfile): {
   return { accuracy: Location.Accuracy.Highest, timeInterval: 2000, distanceInterval: 5 };
 }
 
-async function logGpsError(error: unknown, context: string, extras?: { speedKmh?: number; routeId?: string }) {
-  try {
-    const err = error instanceof Error ? error : new Error(String(error));
-    const payload = {
-      errorMessage: err.message || String(error),
-      stackTrace: err.stack ?? null,
-      otaNumber: CURRENT_OTA_NUMBER,
-      timestamp: new Date().toISOString(),
-      platform: Platform.OS,
-      osVersion: String(Platform.Version),
-      deviceName: Constants.deviceName ?? null,
-      context,
-      ...extras,
-    };
-    const url = new URL("/api/errors", getApiUrl());
-    fetch(url.toString(), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    }).catch(() => {});
-  } catch {}
-}
 
 // ─── StatCard ─────────────────────────────────────────────────────────────────
 
@@ -941,6 +919,7 @@ export default function TrackingScreen() {
         durationSeconds: finalTotalSec,
         idleTimeSeconds: finalIdleSec,
         maxAccelerationG: maxAccelGRef.current,
+        maxDecelerationG: maxDecelGRef.current,
         sprint0to100Ms: sprint0to100MsRef.current,
       });
       await refetchRecords();

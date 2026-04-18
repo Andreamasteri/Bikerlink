@@ -4175,5 +4175,17 @@ router.delete("/drive/cleanup-exports", async (_req: Request, res: Response) => 
   }
 });
 
+router.get("/gps-errors", async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 100, 500);
+    const offset = Number(req.query.page || 0) * limit;
+    const errors = await storage.getGpsErrors(limit, offset);
+    return res.json({ errors, total: errors.length });
+  } catch (error) {
+    console.error("GPS errors fetch error:", error);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 export default router;
 

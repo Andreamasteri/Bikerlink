@@ -61,6 +61,7 @@ const adminGroups: AdminGroup[] = [
     items: [
       { key: "analytics", label: "Analytics", icon: "analytics", iconSet: "MaterialIcons", route: "/admin/analytics" },
       { key: "performance", label: "Performance", icon: "speedometer", iconSet: "Ionicons", route: "/admin/performance" },
+      { key: "gps-errors", label: "GPS Error Log", icon: "location-sharp", iconSet: "Ionicons", route: "/admin/gps-errors" },
       { key: "db-debug", label: "DB Debug", icon: "database", iconSet: "MaterialCommunityIcons", route: "/admin/db-debug" },
       { key: "system", label: "System Monitor", icon: "pulse-outline", iconSet: "Ionicons", route: "/admin/system", accentColor: "#FF4444" },
     ],

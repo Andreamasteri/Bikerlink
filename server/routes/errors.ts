@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { sendEmail } from "../email";
+import { storage } from "../storage";
 
 const ADMIN_EMAIL = "bikerlinkapp@gmail.com";
 const router = Router();
@@ -120,6 +121,18 @@ router.post("/", async (req: Request, res: Response) => {
       `[BikerLink] Errore GPS — OTA-${otaNumber} — ${platform}`,
       buildErrorEmailHtml({ ...logEntry, userId: String(userId) })
     ).catch((err) => console.error("[EMAIL] Errore invio notifica GPS error:", err));
+
+    storage.createGpsError({
+      userId: userId !== "unauthenticated" ? String(userId) : null,
+      routeId: body.routeId ? truncate(body.routeId, 36) : null,
+      otaNumber: Number.isFinite(Number(body.otaNumber)) ? Number(body.otaNumber) : null,
+      platform: truncate(body.platform ?? "unknown", 20),
+      osVersion: osVersion,
+      context: context,
+      errorMessage: errorMessage,
+      stackTrace: stackTrace,
+      speedKmh: body.speedKmh != null ? Number(body.speedKmh) || null : null,
+    }).catch(() => {});
 
     return res.status(200).json({ ok: true });
   } catch (err) {

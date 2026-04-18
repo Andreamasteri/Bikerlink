@@ -123,6 +123,7 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
       idleTimeSeconds: clientIdleTime,
       maxTiltDeg: clientMaxTilt,
       maxAccelerationG: clientMaxAccel,
+      maxDecelerationG: clientMaxDecel,
       sprint0to100Ms: clientSprint0to100Ms,
     } = req.body;
 
@@ -134,6 +135,7 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
     let idleTimeSeconds: number;
     const maxTiltDeg = Number(clientMaxTilt) || 0;
     const maxAccelerationG = Number(clientMaxAccel) || 0;
+    const maxDecelerationG = Number(clientMaxDecel) || 0;
     const sprint0to100Ms = clientSprint0to100Ms != null ? Number(clientSprint0to100Ms) : null;
 
     if (
@@ -190,6 +192,7 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
       idleTimeSeconds,
       maxTiltDeg,
       maxAccelerationG,
+      maxDecelerationG,
       stoppedAt,
     };
     if (sprint0to100Ms !== null) {
