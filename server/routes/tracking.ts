@@ -297,6 +297,35 @@ router.get("/:id", async (req: Request, res: Response) => {
   }
 });
 
+router.patch("/:id/title", async (req: Request, res: Response) => {
+  try {
+    const userId = requireAuth(req, res);
+    if (!userId) return;
+
+    const id = req.params.id as string;
+    const route = await storage.getRoute(id);
+
+    if (!route) {
+      return res.status(404).json({ message: "Percorso non trovato" });
+    }
+    if (route.userId !== userId) {
+      return res.status(403).json({ message: "Non autorizzato" });
+    }
+
+    const { title } = req.body;
+    if (!title || typeof title !== "string" || title.trim().length === 0) {
+      return res.status(400).json({ message: "Titolo non valido" });
+    }
+
+    const titleUpdate: Partial<import("../../shared/schema").InsertRoute> = { title: title.trim() };
+    await storage.updateRoute(id, titleUpdate);
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("Patch route title error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.delete("/:id", async (req: Request, res: Response) => {
   try {
     const userId = requireAuth(req, res);

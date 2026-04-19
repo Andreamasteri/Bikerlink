@@ -485,6 +485,10 @@ export default function TrackingScreen() {
   const [publishCaption, setPublishCaption] = useState("");
   const [recoveredRecords, setRecoveredRecords] = useState<LocalRouteRecord[]>([]);
 
+  // Ride title (summary modal)
+  const [rideTitle, setRideTitle] = useState<string>("");
+  const [completedRouteId, setCompletedRouteId] = useState<string | null>(null);
+
   // Historical route viewer
   const [histMapVisible, setHistMapVisible] = useState(false);
   const [histMapPoints, setHistMapPoints] = useState<Array<{ lat: number; lng: number }>>([]);
@@ -1361,6 +1365,10 @@ export default function TrackingScreen() {
       setSummaryRoutePoints(
         mapCoordsRef.current.map((c) => ({ lat: c.latitude, lng: c.longitude }))
       );
+      const now = new Date();
+      const pad2 = (n: number) => n.toString().padStart(2, "0");
+      setRideTitle(`Giro del ${pad2(now.getDate())}/${pad2(now.getMonth() + 1)} · ${pad2(now.getHours())}:${pad2(now.getMinutes())}`);
+      setCompletedRouteId(rId);
       setSummaryVisible(true);
     } catch (e) {
       logGpsError(e, "stopTracking:PUT", { routeId: rId });
@@ -2111,6 +2119,16 @@ export default function TrackingScreen() {
               </View>
             </View>
 
+            <TextInput
+              style={styles.rideTitleInput}
+              value={rideTitle}
+              onChangeText={setRideTitle}
+              placeholder="Nome del giro"
+              placeholderTextColor={Colors.textSecondary}
+              maxLength={80}
+              returnKeyType="done"
+            />
+
             <View style={styles.statsRow}>
               <StatCard
                 icon="navigate-outline"
@@ -2218,7 +2236,14 @@ export default function TrackingScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.summaryCloseBtn}
-                onPress={() => setSummaryVisible(false)}
+                onPress={() => {
+                  if (completedRouteId && rideTitle.trim()) {
+                    apiRequest("PATCH", `/api/routes/${completedRouteId}/title`, {
+                      title: rideTitle.trim(),
+                    }).catch(() => {});
+                  }
+                  setSummaryVisible(false);
+                }}
                 activeOpacity={0.8}
               >
                 <Text style={styles.summaryCloseText}>Chiudi</Text>
@@ -2874,6 +2899,17 @@ const styles = StyleSheet.create({
     alignItems: "center" as const,
     gap: 8,
     marginBottom: 4,
+  },
+  rideTitleInput: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 16,
+    fontFamily: "Inter_400Regular" as const,
+    color: Colors.text,
+    backgroundColor: Colors.surfaceLight,
   },
   summaryTitle: {
     fontSize: 20,
