@@ -125,10 +125,10 @@ Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare 
 ## Numerazione versioni
 | OTA | Script version |
 |-----|---------------|
-| 53  | 1.53.0        |
-| 54  | 1.54.0        | ← superseded
-| 55  | 1.55.0        | ← pubblicata (corrente)
-| 56  | 1.56.0        |
+| 108 | 1.108.0       | ← superseded
+| 109 | 1.109.0       | ← superseded
+| 110 | 1.110.0       | ← pubblicata (corrente)
+| 111 | 1.111.0       |
 
 ## Cicli precedenti (storico)
 - Ciclo 2.x: OTA 1–21, 23 (APK versionCode 4–6, rv 2.0.0)
