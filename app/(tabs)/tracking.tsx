@@ -661,14 +661,18 @@ export default function TrackingScreen() {
       profileRef.current = "race";
     }
   }, [is0100Enabled]);
+  const sensorsHydratedRef = useRef(false);
   useEffect(() => {
     sensorsEnabledRef.current = sensorsEnabled;
-    AsyncStorage.setItem("@bikerlink/sensors_enabled", sensorsEnabled ? "1" : "0").catch(() => {});
+    if (sensorsHydratedRef.current) {
+      AsyncStorage.setItem("@bikerlink/sensors_enabled", sensorsEnabled ? "1" : "0").catch(() => {});
+    }
   }, [sensorsEnabled]);
   useEffect(() => {
     AsyncStorage.getItem("@bikerlink/sensors_enabled").then((v) => {
+      sensorsHydratedRef.current = true;
       if (v === "1") setSensorsEnabled(true);
-    }).catch(() => {});
+    }).catch(() => { sensorsHydratedRef.current = true; });
   }, []);
 
   // ── Offline GPS buffer helpers (true-append: one key per batch segment) ────
@@ -1934,7 +1938,7 @@ export default function TrackingScreen() {
 
             {/* Sensori telefono (G-force) — BETA */}
             <TouchableOpacity
-              style={[styles.triggerRow, { borderBottomWidth: 0 }]}
+              style={[styles.triggerRow, { borderBottomWidth: 0, opacity: sensorsEnabled ? 1 : 0.7 }]}
               onPress={() => setSensorsEnabled((v) => !v)}
               activeOpacity={0.7}
             >

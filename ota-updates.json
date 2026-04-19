@@ -3781,7 +3781,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-19T01:27:07.659Z"
+  },
+  {
+    "updateNumber": 113,
+    "version": "1.113.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-113 rv7.0.0: Fix race condition persistenza sensori + opacity toggle",
+    "note": "Fix hydration guard: hydratedRef impedisce la scrittura su AsyncStorage prima del load iniziale (sensorsEnabled=false non sovrascrive piu il valore salvato). Aggiunta opacity 0.7 al toggle sensori quando OFF. CURRENT_OTA_NUMBER=113.",
+    "releaseId": "29670f92-c952-4e90-9fef-c18d5e7cf901",
+    "bundleUrl": "private/ota/ota-1.113.0-1776562325874.js",
+    "updateGroupId": "8968570a-710b-4953-a271-df97dbf53e5b",
+    "androidUpdateId": "019da35e-75b4-77d8-9f1c-a3cf01178ef5",
+    "iosUpdateId": null,
+    "commitBase": "447fe1e20478f70121b9752c2cad6a86e63cb3d1",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/8968570a-710b-4953-a271-df97dbf53e5b",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-19T01:32:08.944Z"
   }
 ]
