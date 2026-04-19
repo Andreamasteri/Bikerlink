@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -26,6 +26,10 @@ import { getCurrentLocale } from "@/lib/i18n";
 import { useUnits, SpeedUnit, DistanceUnit } from "@/lib/units-context";
 import { formatDistance, formatSpeed } from "@/lib/units";
 import TrackingMap from "@/components/TrackingMap";
+import WebView from "react-native-webview";
+import { buildLeafletPostRideHtml } from "@/lib/leaflet-route-map-html";
+import { useMapConfig } from "@/lib/map-context";
+import { getTileConfig } from "@/lib/map-tiles";
 import { setTrackingActive, setHandsOffBroadcast, setSprintMeasuringBroadcast } from "@/lib/tracking-active";
 import * as Haptics from "expo-haptics";
 import { logGpsError } from "@/lib/gps-logger";
@@ -284,11 +288,117 @@ function RecordCard({
   );
 }
 
+// ─── RouteMapModal — fullscreen post-ride map ─────────────────────────────────
+
+interface RouteMapModalProps {
+  visible: boolean;
+  onClose: () => void;
+  points: Array<{ lat: number; lng: number }>;
+  tileUrl: string;
+  tileMaxZoom: number;
+  totalKm: number;
+  maxSpeed: number;
+  totalMs: number;
+  distanceUnit: DistanceUnit;
+  speedUnit: SpeedUnit;
+  insets: { top: number; bottom: number };
+}
+
+function RouteMapModal({
+  visible, onClose, points, tileUrl, tileMaxZoom,
+  totalKm, maxSpeed, totalMs, distanceUnit, speedUnit, insets,
+}: RouteMapModalProps) {
+  const html = useMemo(
+    () => buildLeafletPostRideHtml(tileUrl, tileMaxZoom, Colors.accent, points),
+    [tileUrl, tileMaxZoom, points]
+  );
+
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: Colors.background }}>
+        {/* Header */}
+        <View style={{
+          paddingTop: insets.top + 12,
+          paddingBottom: 12,
+          paddingHorizontal: 16,
+          flexDirection: "row",
+          alignItems: "center",
+          backgroundColor: Colors.surface,
+          borderBottomWidth: 1,
+          borderBottomColor: Colors.border,
+        }}>
+          <Ionicons name="map-outline" size={20} color={Colors.accent} />
+          <Text style={{
+            flex: 1,
+            marginLeft: 8,
+            fontFamily: "Inter_600SemiBold",
+            fontSize: 16,
+            color: Colors.text,
+          }}>Il mio percorso</Text>
+          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close" size={24} color={Colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Map */}
+        <View style={{ flex: 1 }}>
+          {Platform.OS !== "web" ? (
+            <WebView
+              source={{ html, baseUrl: "" }}
+              style={{ flex: 1, backgroundColor: "#1a1a1a" }}
+              javaScriptEnabled
+              domStorageEnabled
+              originWhitelist={["https://*", "http://*", "about:*"]}
+              scrollEnabled={false}
+              bounces={false}
+              overScrollMode="never"
+              cacheEnabled={false}
+            />
+          ) : (
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name="map-outline" size={48} color={Colors.textSecondary} />
+              <Text style={{ fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, marginTop: 8 }}>
+                Mappa non disponibile su web
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Stats bar */}
+        <View style={{
+          flexDirection: "row",
+          justifyContent: "space-around",
+          paddingVertical: 14,
+          paddingHorizontal: 16,
+          paddingBottom: insets.bottom + 14,
+          backgroundColor: Colors.surface,
+          borderTopWidth: 1,
+          borderTopColor: Colors.border,
+        }}>
+          {[
+            { icon: "navigate-outline" as const, label: "Distanza", value: formatDistance(totalKm, distanceUnit, 2) },
+            { icon: "flash" as const, label: "Vel. max", value: formatSpeed(maxSpeed, speedUnit, 1) },
+            { icon: "time-outline" as const, label: "Durata", value: formatHMS(totalMs) },
+          ].map((s) => (
+            <View key={s.label} style={{ alignItems: "center", flex: 1 }}>
+              <Ionicons name={s.icon} size={18} color={Colors.accent} />
+              <Text style={{ fontFamily: "Inter_700Bold", fontSize: 14, color: Colors.text, marginTop: 2 }}>{s.value}</Text>
+              <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary }}>{s.label}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function TrackingScreen() {
   const insets = useSafeAreaInsets();
   const { speedUnit, distanceUnit } = useUnits();
+  const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
+  const tileConfig = getTileConfig(mapsEnabled ? resolvedProvider : "carto_dark");
 
   // Settings
   const [profile, setProfile] = useState<UpdateProfile>("medium");
@@ -303,6 +413,8 @@ export default function TrackingScreen() {
   const [handsOffActive, setHandsOffActive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [summaryVisible, setSummaryVisible] = useState(false);
+  const [summaryRoutePoints, setSummaryRoutePoints] = useState<Array<{ lat: number; lng: number }>>([]);
+  const [routeMapVisible, setRouteMapVisible] = useState(false);
   const [publishRecord, setPublishRecord] = useState<RouteRecord | null>(null);
   const [publishCaption, setPublishCaption] = useState("");
   const [recoveredRecords, setRecoveredRecords] = useState<LocalRouteRecord[]>([]);
@@ -1139,6 +1251,10 @@ export default function TrackingScreen() {
       });
       await clearGpsBuffer();
       await refetchRecords();
+      // Capture route points for "Vedi percorso" in Summary Modal
+      setSummaryRoutePoints(
+        mapCoordsRef.current.map((c) => ({ lat: c.latitude, lng: c.longitude }))
+      );
       setSummaryVisible(true);
     } catch (e) {
       logGpsError(e, "stopTracking:PUT", { routeId: rId });
@@ -1672,30 +1788,19 @@ export default function TrackingScreen() {
               />
             </View>
 
-            {/* Show My Route — placeholder */}
-            <TouchableOpacity
-              style={[styles.triggerRow, { borderBottomWidth: 0 }]}
-              onPress={() =>
-                Alert.alert(
-                  "In arrivo",
-                  "Questa funzione sarà disponibile prossimamente."
-                )
-              }
-              activeOpacity={0.7}
-            >
+            {/* Show My Route — info row (feature attiva) */}
+            <View style={[styles.triggerRow, { borderBottomWidth: 0 }]}>
               <View style={styles.triggerLeft}>
-                <Ionicons
-                  name="map-outline"
-                  size={18}
-                  color={Colors.textSecondary}
-                />
-                <Text style={styles.triggerLabel}>Show My Route</Text>
+                <Ionicons name="map-outline" size={18} color={Colors.accent} />
+                <Text style={styles.triggerLabel}>Mostra percorso</Text>
               </View>
-              <View style={styles.comingSoonBadge}>
-                <Ionicons name="map-outline" size={12} color={Colors.textSecondary} />
-                <Text style={styles.comingSoonText}>In arrivo</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
+                <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.success }}>
+                  Attivo
+                </Text>
               </View>
-            </TouchableOpacity>
+            </View>
           </View>
 
           {/* START button */}
@@ -1855,6 +1960,17 @@ export default function TrackingScreen() {
               </View>
             )}
 
+            {summaryRoutePoints.length >= 10 && (
+              <TouchableOpacity
+                style={styles.summaryRouteBtn}
+                onPress={() => setRouteMapVisible(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="map-outline" size={16} color={Colors.accent} />
+                <Text style={styles.summaryRouteBtnText}>Vedi percorso</Text>
+              </TouchableOpacity>
+            )}
+
             <Text style={styles.summaryNote}>
               Puoi rivedere il giro in "I miei percorsi"
             </Text>
@@ -1915,6 +2031,21 @@ export default function TrackingScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ── ROUTE MAP MODAL ──────────────────────────────────────────────── */}
+      <RouteMapModal
+        visible={routeMapVisible}
+        onClose={() => setRouteMapVisible(false)}
+        points={summaryRoutePoints}
+        tileUrl={tileConfig.urlTemplate}
+        tileMaxZoom={tileConfig.maximumZ}
+        totalKm={totalKm}
+        maxSpeed={maxSpeed}
+        totalMs={totalMs}
+        distanceUnit={distanceUnit}
+        speedUnit={speedUnit}
+        insets={insets}
+      />
 
       {/* ── PUBLISH MODAL ────────────────────────────────────────────────── */}
       <Modal
@@ -2524,6 +2655,22 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold" as const,
     color: Colors.success,
     letterSpacing: 1,
+  },
+  summaryRouteBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  summaryRouteBtnText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold" as const,
+    color: Colors.accent,
   },
   summaryNote: {
     fontSize: 13,

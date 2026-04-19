@@ -1,3 +1,74 @@
+// ── Post-ride route display (solid polyline + start/stop dots + fitBounds) ──
+
+export function buildLeafletPostRideHtml(
+  tileUrl: string,
+  tileMaxZoom: number,
+  accentColor: string,
+  points: Array<{ lat: number; lng: number }>
+): string {
+  const pointsJson = JSON.stringify(points);
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
+.leaflet-container { background: #1a1a1a !important; }
+.leaflet-control-zoom { display: none !important; }
+.leaflet-control-attribution { font-size: 8px !important; opacity: 0.4; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function() {
+  var accentColor = ${JSON.stringify(accentColor)};
+  var points = ${pointsJson};
+
+  var map = L.map("map", { zoomControl: false, attributionControl: true });
+  L.tileLayer(${JSON.stringify(tileUrl)}, { maxZoom: ${tileMaxZoom}, attribution: "" }).addTo(map);
+
+  if (points.length > 1) {
+    var latlngs = points.map(function(p) { return [p.lat, p.lng]; });
+
+    L.polyline(latlngs, { color: accentColor, weight: 4, opacity: 0.9 }).addTo(map);
+
+    function dotIcon(bg) {
+      return L.divIcon({
+        html: "<div style=\\"width:14px;height:14px;border-radius:7px;background:" + bg + ";border:3px solid #fff;box-shadow:0 0 4px rgba(0,0,0,0.5);\\"></div>",
+        className: "", iconSize: [14,14], iconAnchor: [7,7]
+      });
+    }
+    L.marker(latlngs[0], { icon: dotIcon("#22c55e"), zIndexOffset: 1000 }).addTo(map);
+    L.marker(latlngs[latlngs.length-1], { icon: dotIcon("#ef4444"), zIndexOffset: 1001 }).addTo(map);
+
+    var lats = points.map(function(p){return p.lat;});
+    var lngs = points.map(function(p){return p.lng;});
+    var bounds = [[Math.min.apply(null,lats), Math.min.apply(null,lngs)],
+                  [Math.max.apply(null,lats), Math.max.apply(null,lngs)]];
+    if (lats[0]===lats[lats.length-1] && lngs[0]===lngs[lngs.length-1]) {
+      map.setView(bounds[0], 14, { animate: false });
+    } else {
+      map.fitBounds(bounds, { padding: [20, 20], animate: false });
+    }
+  } else if (points.length === 1) {
+    map.setView([points[0].lat, points[0].lng], 14, { animate: false });
+  } else {
+    map.setView([41.9, 12.5], 6, { animate: false });
+  }
+})();
+</script>
+</body>
+</html>`;
+}
+
+// ── Waypoint-based planning map ──────────────────────────────────────────────
+
 export interface RouteWaypoint {
   lat: number;
   lng: number;
