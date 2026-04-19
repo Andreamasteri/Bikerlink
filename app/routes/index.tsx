@@ -7,7 +7,6 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
-  Alert,
   TouchableOpacity,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -19,6 +18,8 @@ import { useAuth } from "@/lib/auth-context";
 import { useSetting } from "@/lib/settings-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
+type Visibility = "public" | "friends" | "private";
+
 interface CustomRoute {
   id: string;
   userId: string;
@@ -26,10 +27,30 @@ interface CustomRoute {
   description: string | null;
   totalDistanceKm: number | null;
   isPublic: boolean;
+  visibility: Visibility;
   createdAt: string;
   updatedAt: string;
   waypointCount?: number;
   ownerNickname?: string;
+}
+
+const VISIBILITY_CYCLE: Visibility[] = ["public", "friends", "private"];
+
+function nextVisibility(current: Visibility): Visibility {
+  const idx = VISIBILITY_CYCLE.indexOf(current);
+  return VISIBILITY_CYCLE[(idx + 1) % VISIBILITY_CYCLE.length];
+}
+
+function visibilityLabel(v: Visibility): string {
+  if (v === "public") return "Pubblico";
+  if (v === "friends") return "Amici";
+  return "Privato";
+}
+
+function visibilityIcon(v: Visibility): string {
+  if (v === "public") return "globe-outline";
+  if (v === "friends") return "people-outline";
+  return "lock-closed-outline";
 }
 
 export default function RoutesListScreen() {
@@ -45,49 +66,26 @@ export default function RoutesListScreen() {
     enabled: featureEnabled,
   });
 
-  const toggleVisibilityMutation = useMutation({
-    mutationFn: async ({ id, isPublic }: { id: string; isPublic: boolean }) => {
-      await apiRequest("PUT", `/api/custom-routes/${id}`, { isPublic });
+  const changeVisibilityMutation = useMutation({
+    mutationFn: async ({ id, visibility }: { id: string; visibility: Visibility }) => {
+      await apiRequest("PUT", `/api/custom-routes/${id}`, { visibility });
       return id;
     },
     onSuccess: (id) => {
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes", id] });
     },
-    onError: (e: any) => {
-      Alert.alert("Errore", e.message || "Impossibile aggiornare la visibilità");
-    },
     onSettled: () => {
       setTogglingId(null);
     },
   });
 
-  const handleToggleVisibility = (route: CustomRoute) => {
-    const newState = !route.isPublic;
-    const message = newState
-      ? `Rendere pubblico "${route.title}"? Sarà visibile a tutti.`
-      : `Rendere privato "${route.title}"? Sarà visibile solo a te.`;
-    if (Platform.OS === "web") {
-      if (confirm(message)) {
-        setTogglingId(route.id);
-        toggleVisibilityMutation.mutate({ id: route.id, isPublic: newState });
-      }
-    } else {
-      Alert.alert(
-        newState ? "Rendi pubblico" : "Rendi privato",
-        message,
-        [
-          { text: "Annulla", style: "cancel" },
-          {
-            text: newState ? "Pubblica" : "Rendi privato",
-            onPress: () => {
-              setTogglingId(route.id);
-              toggleVisibilityMutation.mutate({ id: route.id, isPublic: newState });
-            },
-          },
-        ]
-      );
-    }
+  const handleCycleVisibility = (route: CustomRoute) => {
+    if (togglingId) return;
+    const current: Visibility = route.visibility ?? (route.isPublic ? "public" : "private");
+    const next = nextVisibility(current);
+    setTogglingId(route.id);
+    changeVisibilityMutation.mutate({ id: route.id, visibility: next });
   };
 
   const isLoading = routesQuery.isLoading;
@@ -140,6 +138,39 @@ export default function RoutesListScreen() {
     const waypointCount = route.waypointCount ?? 0;
     const distance = route.totalDistanceKm ? `${route.totalDistanceKm.toFixed(1)} km` : "N/D";
     const isToggling = togglingId === route.id;
+    const vis: Visibility = route.visibility ?? (route.isPublic ? "public" : "private");
+
+    const badgeStyle =
+      vis === "public"
+        ? styles.badgePublic
+        : vis === "friends"
+        ? styles.badgeFriends
+        : styles.badgePrivate;
+
+    const badgeTextStyle =
+      vis === "public"
+        ? styles.badgeTextPublic
+        : vis === "friends"
+        ? styles.badgeTextFriends
+        : styles.badgeTextPrivate;
+
+    const badgeIconColor =
+      vis === "public"
+        ? Colors.success
+        : vis === "friends"
+        ? "#7C83FD"
+        : Colors.textSecondary;
+
+    const badge = (
+      <View style={[styles.badge, badgeStyle]}>
+        {isToggling ? (
+          <ActivityIndicator size="small" color={badgeIconColor} style={{ width: 12, height: 12 }} />
+        ) : (
+          <Ionicons name={visibilityIcon(vis) as any} size={12} color={badgeIconColor} />
+        )}
+        <Text style={[styles.badgeText, badgeTextStyle]}>{visibilityLabel(vis)}</Text>
+      </View>
+    );
 
     return (
       <Pressable
@@ -156,16 +187,17 @@ export default function RoutesListScreen() {
         <View style={styles.routeInfo}>
           <View style={styles.routeTitleRow}>
             <Text style={styles.routeTitle} numberOfLines={1}>{route.title}</Text>
-            {route.isPublic ? (
-              <View style={styles.badge}>
-                <Ionicons name="globe-outline" size={12} color={Colors.success} />
-                <Text style={styles.badgeText}>Pubblico</Text>
-              </View>
+            {item.isMine ? (
+              <TouchableOpacity
+                onPress={() => handleCycleVisibility(route)}
+                disabled={!!togglingId}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                activeOpacity={0.7}
+              >
+                {badge}
+              </TouchableOpacity>
             ) : (
-              <View style={[styles.badge, styles.privateBadge]}>
-                <Ionicons name="lock-closed-outline" size={12} color={Colors.textSecondary} />
-                <Text style={[styles.badgeText, styles.privateBadgeText]}>Privato</Text>
-              </View>
+              badge
             )}
           </View>
           {route.description ? (
@@ -188,26 +220,7 @@ export default function RoutesListScreen() {
             ) : null}
           </View>
         </View>
-        {item.isMine ? (
-          <TouchableOpacity
-            onPress={() => handleToggleVisibility(route)}
-            disabled={isToggling}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            style={styles.toggleBtn}
-          >
-            {isToggling ? (
-              <ActivityIndicator size="small" color={Colors.textSecondary} />
-            ) : (
-              <Ionicons
-                name={route.isPublic ? "globe-outline" : "lock-closed-outline"}
-                size={22}
-                color={route.isPublic ? Colors.success : Colors.textSecondary}
-              />
-            )}
-          </TouchableOpacity>
-        ) : (
-          <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-        )}
+        <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
       </Pressable>
     );
   };
@@ -339,20 +352,30 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
-    backgroundColor: "rgba(76, 175, 80, 0.15)",
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
   },
+  badgePublic: {
+    backgroundColor: "rgba(76, 175, 80, 0.15)",
+  },
+  badgeFriends: {
+    backgroundColor: "rgba(124, 131, 253, 0.15)",
+  },
+  badgePrivate: {
+    backgroundColor: "rgba(170, 170, 170, 0.15)",
+  },
   badgeText: {
-    color: Colors.success,
     fontSize: 10,
     fontWeight: "600" as const,
   },
-  privateBadge: {
-    backgroundColor: "rgba(170, 170, 170, 0.15)",
+  badgeTextPublic: {
+    color: Colors.success,
   },
-  privateBadgeText: {
+  badgeTextFriends: {
+    color: "#7C83FD",
+  },
+  badgeTextPrivate: {
     color: Colors.textSecondary,
   },
   routeDescription: {
@@ -374,11 +397,6 @@ const styles = StyleSheet.create({
   metaText: {
     color: Colors.textSecondary,
     fontSize: 12,
-  },
-  toggleBtn: {
-    padding: 4,
-    justifyContent: "center",
-    alignItems: "center",
   },
   fab: {
     position: "absolute",

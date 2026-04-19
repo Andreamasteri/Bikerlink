@@ -360,6 +360,8 @@ export interface IStorage {
 
   getCustomRoutes(userId: string): Promise<CustomRoute[]>;
   getPublicCustomRoutes(): Promise<CustomRoute[]>;
+  getFriendsCustomRoutes(userId: string): Promise<CustomRoute[]>;
+  isUserFriendOf(userId: string, ownerId: string): Promise<boolean>;
   getCustomRoute(id: string): Promise<CustomRoute | undefined>;
   createCustomRoute(data: InsertCustomRoute): Promise<CustomRoute>;
   updateCustomRoute(id: string, data: Partial<InsertCustomRoute>): Promise<CustomRoute | undefined>;
@@ -1803,7 +1805,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPublicCustomRoutes(): Promise<CustomRoute[]> {
-    return db.select().from(customRoutes).where(eq(customRoutes.isPublic, true)).orderBy(desc(customRoutes.createdAt));
+    return db.select().from(customRoutes).where(eq(customRoutes.visibility, "public")).orderBy(desc(customRoutes.createdAt));
+  }
+
+  async getFriendsCustomRoutes(userId: string): Promise<CustomRoute[]> {
+    return db.select().from(customRoutes).where(eq(customRoutes.visibility, "friends")).orderBy(desc(customRoutes.createdAt));
+  }
+
+  async isUserFriendOf(userId: string, ownerId: string): Promise<boolean> {
+    const [match] = await db.select({ id: bikerBikerMatches.id }).from(bikerBikerMatches).where(
+      and(
+        eq(bikerBikerMatches.status, "accepted"),
+        or(
+          and(eq(bikerBikerMatches.biker1Id, userId), eq(bikerBikerMatches.biker2Id, ownerId)),
+          and(eq(bikerBikerMatches.biker1Id, ownerId), eq(bikerBikerMatches.biker2Id, userId))
+        )
+      )
+    ).limit(1);
+    return !!match;
   }
 
   async getCustomRoute(id: string): Promise<CustomRoute | undefined> {

@@ -32,6 +32,15 @@ interface Waypoint {
   createdAt: string;
 }
 
+type Visibility = "public" | "friends" | "private";
+
+const VISIBILITY_CYCLE: Visibility[] = ["public", "friends", "private"];
+
+function nextVisibility(current: Visibility): Visibility {
+  const idx = VISIBILITY_CYCLE.indexOf(current);
+  return VISIBILITY_CYCLE[(idx + 1) % VISIBILITY_CYCLE.length];
+}
+
 interface CustomRouteDetail {
   id: string;
   userId: string;
@@ -39,6 +48,7 @@ interface CustomRouteDetail {
   description: string | null;
   totalDistanceKm: number | null;
   isPublic: boolean;
+  visibility: Visibility;
   createdAt: string;
   updatedAt: string;
   waypoints: Waypoint[];
@@ -91,38 +101,19 @@ export default function CustomRouteDetailScreen() {
     },
   });
 
-  const handleToggleVisibility = async () => {
-    if (!route) return;
-    const newState = !route.isPublic;
-    const message = newState
-      ? "Rendere pubblico questo percorso? Sarà visibile a tutti gli utenti."
-      : "Rendere privato questo percorso? Sarà visibile solo a te.";
-    const confirmText = newState ? "Pubblica" : "Rendi privato";
-
-    const doToggle = async () => {
-      setIsTogglingVisibility(true);
-      try {
-        await apiRequest("PUT", `/api/custom-routes/${id}`, { isPublic: newState });
-        queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/custom-routes", id] });
-      } catch (e: any) {
-        Alert.alert("Errore", e.message || "Impossibile aggiornare la visibilità");
-      } finally {
-        setIsTogglingVisibility(false);
-      }
-    };
-
-    if (Platform.OS === "web") {
-      if (confirm(message)) doToggle();
-    } else {
-      Alert.alert(
-        newState ? "Rendi pubblico" : "Rendi privato",
-        message,
-        [
-          { text: "Annulla", style: "cancel" },
-          { text: confirmText, onPress: doToggle },
-        ]
-      );
+  const handleCycleVisibility = async () => {
+    if (!route || isTogglingVisibility) return;
+    const current: Visibility = route.visibility ?? (route.isPublic ? "public" : "private");
+    const next = nextVisibility(current);
+    setIsTogglingVisibility(true);
+    try {
+      await apiRequest("PUT", `/api/custom-routes/${id}`, { visibility: next });
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-routes", id] });
+    } catch (e: any) {
+      Alert.alert("Errore", e.message || "Impossibile aggiornare la visibilità");
+    } finally {
+      setIsTogglingVisibility(false);
     }
   };
 
@@ -207,17 +198,27 @@ export default function CustomRouteDetailScreen() {
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>{route.title}</Text>
-          {route.isPublic ? (
-            <View style={[styles.badge, { backgroundColor: Colors.success }]}>
-              <MaterialCommunityIcons name="earth" size={12} color="#fff" />
-              <Text style={styles.badgeText}>Pubblico</Text>
-            </View>
-          ) : (
-            <View style={[styles.badge, { backgroundColor: Colors.surfaceLight }]}>
-              <MaterialCommunityIcons name="lock" size={12} color={Colors.textSecondary} />
-              <Text style={[styles.badgeText, { color: Colors.textSecondary }]}>Privato</Text>
-            </View>
-          )}
+          {(() => {
+            const vis: Visibility = route.visibility ?? (route.isPublic ? "public" : "private");
+            if (vis === "public") return (
+              <View style={[styles.badge, { backgroundColor: Colors.success }]}>
+                <MaterialCommunityIcons name="earth" size={12} color="#fff" />
+                <Text style={styles.badgeText}>Pubblico</Text>
+              </View>
+            );
+            if (vis === "friends") return (
+              <View style={[styles.badge, { backgroundColor: "#7C83FD" }]}>
+                <MaterialCommunityIcons name="account-group" size={12} color="#fff" />
+                <Text style={styles.badgeText}>Amici</Text>
+              </View>
+            );
+            return (
+              <View style={[styles.badge, { backgroundColor: Colors.surfaceLight }]}>
+                <MaterialCommunityIcons name="lock" size={12} color={Colors.textSecondary} />
+                <Text style={[styles.badgeText, { color: Colors.textSecondary }]}>Privato</Text>
+              </View>
+            );
+          })()}
         </View>
 
         {route.description ? (
@@ -246,27 +247,39 @@ export default function CustomRouteDetailScreen() {
 
       {route.isMine && (
         <View style={styles.ownerActions}>
-          <TouchableOpacity
-            style={[styles.visibilityButton, route.isPublic ? styles.visibilityPublicButton : styles.visibilityPrivateButton]}
-            onPress={handleToggleVisibility}
-            disabled={isTogglingVisibility}
-            activeOpacity={0.7}
-          >
-            {isTogglingVisibility ? (
-              <ActivityIndicator size="small" color={route.isPublic ? Colors.success : Colors.textSecondary} />
-            ) : (
-              <>
-                <MaterialCommunityIcons
-                  name={route.isPublic ? "earth" : "lock"}
-                  size={18}
-                  color={route.isPublic ? Colors.success : Colors.textSecondary}
-                />
-                <Text style={[styles.visibilityButtonText, route.isPublic ? styles.visibilityPublicText : styles.visibilityPrivateText]}>
-                  {route.isPublic ? "Pubblico" : "Privato"}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
+          {(() => {
+            const vis: Visibility = route.visibility ?? (route.isPublic ? "public" : "private");
+            const btnStyle = vis === "public"
+              ? styles.visibilityPublicButton
+              : vis === "friends"
+              ? styles.visibilityFriendsButton
+              : styles.visibilityPrivateButton;
+            const iconName = vis === "public" ? "earth" : vis === "friends" ? "account-group" : "lock";
+            const iconColor = vis === "public" ? Colors.success : vis === "friends" ? "#7C83FD" : Colors.textSecondary;
+            const textStyle = vis === "public"
+              ? styles.visibilityPublicText
+              : vis === "friends"
+              ? styles.visibilityFriendsText
+              : styles.visibilityPrivateText;
+            const label = vis === "public" ? "Pubblico" : vis === "friends" ? "Amici" : "Privato";
+            return (
+              <TouchableOpacity
+                style={[styles.visibilityButton, btnStyle]}
+                onPress={handleCycleVisibility}
+                disabled={isTogglingVisibility}
+                activeOpacity={0.7}
+              >
+                {isTogglingVisibility ? (
+                  <ActivityIndicator size="small" color={iconColor} />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name={iconName as any} size={18} color={iconColor} />
+                    <Text style={[styles.visibilityButtonText, textStyle]}>{label}</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            );
+          })()}
           <TouchableOpacity
             style={styles.editButton}
             onPress={() => router.push(`/routes/create?editId=${route.id}`)}
@@ -507,6 +520,10 @@ const styles = StyleSheet.create({
     borderColor: Colors.success,
     backgroundColor: "rgba(76, 175, 80, 0.08)",
   },
+  visibilityFriendsButton: {
+    borderColor: "#7C83FD",
+    backgroundColor: "rgba(124, 131, 253, 0.08)",
+  },
   visibilityPrivateButton: {
     borderColor: Colors.border,
   },
@@ -516,6 +533,9 @@ const styles = StyleSheet.create({
   },
   visibilityPublicText: {
     color: Colors.success,
+  },
+  visibilityFriendsText: {
+    color: "#7C83FD",
   },
   visibilityPrivateText: {
     color: Colors.textSecondary,
