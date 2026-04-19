@@ -3942,7 +3942,29 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-19T22:34:35.553Z"
+  },
+  {
+    "updateNumber": 120,
+    "version": "1.120.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-120 rv7.0.0: Importa playlist ricevute da chat in Brani tab",
+    "note": "Task #766. PlaylistBubble in chat naviga a Brani tab con playlist del mittente caricata. Nuovo endpoint GET /api/spotify/shared-playlists/:id. Banner override + pulsante reset + empty state differenziato. CURRENT_OTA_NUMBER=120.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "05dd81967f88283af4a23e7564ea94c674e886c8",
+    "easDashboard": null,
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "pending"
   }
 ]
