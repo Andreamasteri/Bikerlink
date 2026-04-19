@@ -35,6 +35,7 @@ import * as Haptics from "expo-haptics";
 import { logGpsError } from "@/lib/gps-logger";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Accelerometer } from "expo-sensors";
+import { VolumeManager } from "react-native-volume-manager";
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -568,6 +569,9 @@ export default function TrackingScreen() {
   const gpsOfflineBufferRef = useRef<GpsPoint[]>([]);
   const gpsOfflineWriteCountRef = useRef(0);
   const bufferWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const volumePressTimestampsRef = useRef<number[]>([]);
+  const lastVolumeRef = useRef<number | null>(null);
+  const handsOffDismissedForRideRef = useRef(false);
   const lastAvgSpeedUpdateRef = useRef(0);
 
   // Derived
@@ -635,6 +639,43 @@ export default function TrackingScreen() {
       handsOffAnim.setValue(1);
     }
   }, [handsOffActive]);
+
+  // ── Volume down x5 to dismiss Hands-Off (Android only) ───────────────────
+  useEffect(() => {
+    if (!handsOffActive || Platform.OS !== "android") return;
+
+    volumePressTimestampsRef.current = [];
+    lastVolumeRef.current = null;
+
+    VolumeManager.getVolume().then((vol) => {
+      const v = typeof vol === "object" && vol !== null ? (vol as { volume: number }).volume : (vol as number);
+      lastVolumeRef.current = v;
+    }).catch(() => {});
+
+    const subscription = VolumeManager.addVolumeListener((result) => {
+      const currentVol = result.volume;
+      const prevVol = lastVolumeRef.current;
+      lastVolumeRef.current = currentVol;
+
+      if (prevVol !== null && currentVol < prevVol) {
+        const now = Date.now();
+        volumePressTimestampsRef.current.push(now);
+        volumePressTimestampsRef.current = volumePressTimestampsRef.current.filter(
+          (t) => now - t <= 3000
+        );
+        if (volumePressTimestampsRef.current.length >= 5) {
+          volumePressTimestampsRef.current = [];
+          handsOffDismissedForRideRef.current = true;
+          setHandsOffActive(false);
+          setHandsOffBroadcast(false, parseFloat(handsOffSpeedStr || "50") || 50);
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [handsOffActive, handsOffSpeedStr]);
 
   // ── Cleanup on unmount ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -872,11 +913,10 @@ export default function TrackingScreen() {
       setCurrentSpeed(smoothedSpeed);
       setGpsAccuracy(accuracy ?? null);
 
-      if (handsOffEnabledRef.current) {
+      if (handsOffEnabledRef.current && !handsOffDismissedForRideRef.current) {
         setHandsOffActive(speedKmh > handsOffSpeedRef.current);
       }
 
-      // Idle tracking
       if (speedKmh <= IDLE_THRESHOLD_KMH) {
         if (!isIdleRef.current) {
           isIdleRef.current = true;
@@ -981,7 +1021,7 @@ export default function TrackingScreen() {
       setCurrentSpeed(smoothedSpeed);
       setGpsAccuracy(accuracy ?? null);
 
-      if (handsOffEnabledRef.current) {
+      if (handsOffEnabledRef.current && !handsOffDismissedForRideRef.current) {
         setHandsOffActive(speedKmh > handsOffSpeedRef.current);
       }
 
@@ -1125,6 +1165,9 @@ export default function TrackingScreen() {
     gpsOfflineBufferRef.current = [];
     gpsOfflineWriteCountRef.current = 0;
     bufferWriteQueueRef.current = Promise.resolve();
+    volumePressTimestampsRef.current = [];
+    lastVolumeRef.current = null;
+    handsOffDismissedForRideRef.current = false;
   }, []);
 
   // ── Recalibrate G on-demand ────────────────────────────────────────────────
