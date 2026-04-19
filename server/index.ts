@@ -733,9 +733,8 @@ function setupErrorHandler(app: express.Application) {
           await db.execute(sql`
             UPDATE custom_routes
             SET visibility = CASE WHEN is_public = true THEN 'public' ELSE 'private' END
-            WHERE visibility = 'public' AND is_public = false
-               OR visibility = 'public' AND is_public = true AND visibility != 'public'
-               OR (visibility NOT IN ('public','friends','private'))
+            WHERE (visibility = 'public' AND is_public = false)
+               OR (visibility NOT IN ('public', 'friends', 'private'))
           `);
           await db.execute(sql`
             UPDATE custom_routes
