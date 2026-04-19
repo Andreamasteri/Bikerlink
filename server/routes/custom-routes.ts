@@ -3,7 +3,19 @@ import { storage } from "../storage";
 
 const router = Router();
 
-type Visibility = "public" | "friends" | "private";
+const VALID_VISIBILITY = ["public", "friends", "private"] as const;
+type Visibility = typeof VALID_VISIBILITY[number];
+
+function isValidVisibility(v: unknown): v is Visibility {
+  return typeof v === "string" && (VALID_VISIBILITY as readonly string[]).includes(v);
+}
+
+function resolveVisibility(visibility: unknown, isPublic: unknown): Visibility {
+  if (isValidVisibility(visibility)) return visibility;
+  if (isPublic === true) return "public";
+  if (isPublic === false) return "private";
+  return "public";
+}
 
 router.get("/api/custom-routes", async (req, res) => {
   try {
@@ -19,7 +31,7 @@ router.get("/api/custom-routes", async (req, res) => {
     const publicRoutesRaw = await storage.getPublicCustomRoutes();
     const friendsRoutesRaw = await storage.getFriendsCustomRoutes(userId);
 
-    const enrichRoute = async (route: any) => {
+    const enrichRoute = async (route: (typeof myRoutesRaw)[number]) => {
       const waypoints = await storage.getCustomRouteWaypoints(route.id);
       const creator = await storage.getUser(route.userId);
       return {
@@ -32,18 +44,18 @@ router.get("/api/custom-routes", async (req, res) => {
 
     const myRoutes = await Promise.all(myRoutesRaw.map(enrichRoute));
 
-    const publicAndFriends: typeof publicRoutesRaw = [...publicRoutesRaw];
+    const friendsVisible: typeof publicRoutesRaw = [];
     for (const route of friendsRoutesRaw) {
       if (route.userId === userId) continue;
       const isFriend = await storage.isUserFriendOf(userId, route.userId);
-      if (isFriend) publicAndFriends.push(route);
+      if (isFriend) friendsVisible.push(route);
     }
 
-    const publicRoutes = await Promise.all(
-      publicAndFriends
-        .filter((r) => r.userId !== userId)
-        .map(enrichRoute)
+    const publicAndFriends = [...publicRoutesRaw, ...friendsVisible].filter(
+      (r) => r.userId !== userId
     );
+
+    const publicRoutes = await Promise.all(publicAndFriends.map(enrichRoute));
 
     res.json({ disabled: false, myRoutes, publicRoutes });
   } catch (error: any) {
@@ -66,15 +78,19 @@ router.post("/api/custom-routes", async (req, res) => {
       return res.status(400).json({ error: "Il titolo è obbligatorio" });
     }
 
-    const resolvedVisibility: Visibility = visibility || (isPublic ? "public" : "public");
+    if (visibility !== undefined && !isValidVisibility(visibility)) {
+      return res.status(400).json({ error: "Valore visibility non valido. Usa: public, friends, private" });
+    }
+
+    const resolvedVis = resolveVisibility(visibility, isPublic);
 
     const route = await storage.createCustomRoute({
       userId,
       title: title.trim(),
       description: description?.trim() || null,
-      isPublic: resolvedVisibility === "public",
-      visibility: resolvedVisibility,
-    } as any);
+      isPublic: resolvedVis === "public",
+      visibility: resolvedVis,
+    });
 
     res.json(route);
   } catch (error: any) {
@@ -90,7 +106,12 @@ router.get("/api/custom-routes/:id", async (req, res) => {
     const route = await storage.getCustomRoute(req.params.id);
     if (!route) return res.status(404).json({ error: "Percorso non trovato" });
 
-    const routeVisibility: string = (route as any).visibility || (route.isPublic ? "public" : "private");
+    const rawVis: unknown = (route as Record<string, unknown>).visibility;
+    const routeVisibility: Visibility = isValidVisibility(rawVis)
+      ? rawVis
+      : route.isPublic
+      ? "public"
+      : "private";
 
     if (route.userId !== userId) {
       if (routeVisibility === "private") {
@@ -128,22 +149,29 @@ router.put("/api/custom-routes/:id", async (req, res) => {
 
     const { title, description, isPublic, visibility, totalDistanceKm } = req.body;
 
-    const resolvedVisibility: Visibility | undefined =
-      visibility !== undefined
-        ? (visibility as Visibility)
-        : isPublic !== undefined
-        ? (isPublic ? "public" : "private")
-        : undefined;
+    if (visibility !== undefined && !isValidVisibility(visibility)) {
+      return res.status(400).json({ error: "Valore visibility non valido. Usa: public, friends, private" });
+    }
 
-    const updated = await storage.updateCustomRoute(req.params.id, {
-      ...(title !== undefined && { title: title.trim() }),
-      ...(description !== undefined && { description: description?.trim() || null }),
-      ...(resolvedVisibility !== undefined && {
-        visibility: resolvedVisibility,
-        isPublic: resolvedVisibility === "public",
-      }),
-      ...(totalDistanceKm !== undefined && { totalDistanceKm }),
-    } as any);
+    type UpdateFields = {
+      title?: string;
+      description?: string | null;
+      totalDistanceKm?: number | null;
+      visibility?: string;
+      isPublic?: boolean;
+    };
+    const updateFields: UpdateFields = {};
+    if (title !== undefined) updateFields.title = title.trim();
+    if (description !== undefined) updateFields.description = description?.trim() || null;
+    if (totalDistanceKm !== undefined) updateFields.totalDistanceKm = totalDistanceKm;
+
+    if (visibility !== undefined || isPublic !== undefined) {
+      const resolvedVis = resolveVisibility(visibility, isPublic);
+      updateFields.visibility = resolvedVis;
+      updateFields.isPublic = resolvedVis === "public";
+    }
+
+    const updated = await storage.updateCustomRoute(req.params.id, updateFields);
 
     res.json(updated);
   } catch (error: any) {
@@ -251,7 +279,12 @@ router.get("/api/users/:userId/custom-routes", async (req, res) => {
       : false;
 
     const visibleRoutes = routesRaw.filter((r) => {
-      const vis: string = (r as any).visibility || (r.isPublic ? "public" : "private");
+      const rawVis: unknown = (r as Record<string, unknown>).visibility;
+      const vis: Visibility = isValidVisibility(rawVis)
+        ? rawVis
+        : r.isPublic
+        ? "public"
+        : "private";
       if (vis === "public") return true;
       if (vis === "friends" && isFriend) return true;
       return false;
@@ -260,10 +293,7 @@ router.get("/api/users/:userId/custom-routes", async (req, res) => {
     const enriched = await Promise.all(
       visibleRoutes.map(async (route) => {
         const waypoints = await storage.getCustomRouteWaypoints(route.id);
-        return {
-          ...route,
-          waypointCount: waypoints.length,
-        };
+        return { ...route, waypointCount: waypoints.length };
       })
     );
 

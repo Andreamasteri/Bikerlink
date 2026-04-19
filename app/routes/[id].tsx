@@ -254,7 +254,9 @@ export default function CustomRouteDetailScreen() {
               : vis === "friends"
               ? styles.visibilityFriendsButton
               : styles.visibilityPrivateButton;
-            const iconName = vis === "public" ? "earth" : vis === "friends" ? "account-group" : "lock";
+            const iconName = (
+              vis === "public" ? "earth" : vis === "friends" ? "account-group" : "lock"
+            ) as React.ComponentProps<typeof MaterialCommunityIcons>["name"];
             const iconColor = vis === "public" ? Colors.success : vis === "friends" ? "#7C83FD" : Colors.textSecondary;
             const textStyle = vis === "public"
               ? styles.visibilityPublicText
@@ -273,7 +275,7 @@ export default function CustomRouteDetailScreen() {
                   <ActivityIndicator size="small" color={iconColor} />
                 ) : (
                   <>
-                    <MaterialCommunityIcons name={iconName as any} size={18} color={iconColor} />
+                    <MaterialCommunityIcons name={iconName} size={18} color={iconColor} />
                     <Text style={[styles.visibilityButtonText, textStyle]}>{label}</Text>
                   </>
                 )}
