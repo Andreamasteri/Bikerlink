@@ -293,6 +293,7 @@ function RecordCard({
 interface RouteMapModalProps {
   visible: boolean;
   onClose: () => void;
+  onCloseAll: () => void;
   points: Array<{ lat: number; lng: number }>;
   tileUrl: string;
   tileMaxZoom: number;
@@ -305,7 +306,7 @@ interface RouteMapModalProps {
 }
 
 function RouteMapModal({
-  visible, onClose, points, tileUrl, tileMaxZoom,
+  visible, onClose, onCloseAll, points, tileUrl, tileMaxZoom,
   totalKm, maxSpeed, totalMs, distanceUnit, speedUnit, insets,
 }: RouteMapModalProps) {
   const html = useMemo(
@@ -364,28 +365,65 @@ function RouteMapModal({
           )}
         </View>
 
-        {/* Stats bar */}
+        {/* Stats bar + actions */}
         <View style={{
-          flexDirection: "row",
-          justifyContent: "space-around",
-          paddingVertical: 14,
-          paddingHorizontal: 16,
-          paddingBottom: insets.bottom + 14,
           backgroundColor: Colors.surface,
           borderTopWidth: 1,
           borderTopColor: Colors.border,
+          paddingBottom: insets.bottom + 8,
         }}>
-          {[
-            { icon: "navigate-outline" as const, label: "Distanza", value: formatDistance(totalKm, distanceUnit, 2) },
-            { icon: "flash" as const, label: "Vel. max", value: formatSpeed(maxSpeed, speedUnit, 1) },
-            { icon: "time-outline" as const, label: "Durata", value: formatHMS(totalMs) },
-          ].map((s) => (
-            <View key={s.label} style={{ alignItems: "center", flex: 1 }}>
-              <Ionicons name={s.icon} size={18} color={Colors.accent} />
-              <Text style={{ fontFamily: "Inter_700Bold", fontSize: 14, color: Colors.text, marginTop: 2 }}>{s.value}</Text>
-              <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary }}>{s.label}</Text>
-            </View>
-          ))}
+          <View style={{
+            flexDirection: "row",
+            justifyContent: "space-around",
+            paddingVertical: 14,
+            paddingHorizontal: 16,
+          }}>
+            {[
+              { icon: "navigate-outline" as const, label: "Distanza", value: formatDistance(totalKm, distanceUnit, 2) },
+              { icon: "flash" as const, label: "Vel. max", value: formatSpeed(maxSpeed, speedUnit, 1) },
+              { icon: "time-outline" as const, label: "Durata", value: formatHMS(totalMs) },
+            ].map((s) => (
+              <View key={s.label} style={{ alignItems: "center", flex: 1 }}>
+                <Ionicons name={s.icon} size={18} color={Colors.accent} />
+                <Text style={{ fontFamily: "Inter_700Bold", fontSize: 14, color: Colors.text, marginTop: 2 }}>{s.value}</Text>
+                <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary }}>{s.label}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingBottom: 4 }}>
+            <TouchableOpacity
+              onPress={onClose}
+              activeOpacity={0.8}
+              style={{
+                flex: 1,
+                alignItems: "center",
+                justifyContent: "center",
+                paddingVertical: 12,
+                borderRadius: 12,
+                backgroundColor: Colors.surfaceLight,
+              }}
+            >
+              <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.textSecondary }}>
+                Torna al giro
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onCloseAll}
+              activeOpacity={0.8}
+              style={{
+                flex: 1,
+                alignItems: "center",
+                justifyContent: "center",
+                paddingVertical: 12,
+                borderRadius: 12,
+                backgroundColor: Colors.accent,
+              }}
+            >
+              <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: "#ffffff" }}>
+                Chiudi
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -407,6 +445,7 @@ export default function TrackingScreen() {
   const [handsOffEnabled, setHandsOffEnabled] = useState(false);
   const [handsOffSpeedStr, setHandsOffSpeedStr] = useState("50");
   const [is0100Enabled, setIs0100Enabled] = useState(false);
+  const [showMyRoute, setShowMyRoute] = useState(true);
 
   // Phase & UI
   const [phase, setPhase] = useState<Phase>("idle");
@@ -1788,19 +1827,27 @@ export default function TrackingScreen() {
               />
             </View>
 
-            {/* Show My Route — info row (feature attiva) */}
-            <View style={[styles.triggerRow, { borderBottomWidth: 0 }]}>
+            {/* Show My Route — toggle reale */}
+            <TouchableOpacity
+              style={[styles.triggerRow, { borderBottomWidth: 0 }]}
+              onPress={() => setShowMyRoute((v) => !v)}
+              activeOpacity={0.7}
+            >
               <View style={styles.triggerLeft}>
-                <Ionicons name="map-outline" size={18} color={Colors.accent} />
+                <Ionicons
+                  name="map-outline"
+                  size={18}
+                  color={showMyRoute ? Colors.accent : Colors.textSecondary}
+                />
                 <Text style={styles.triggerLabel}>Mostra percorso</Text>
               </View>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
-                <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.success }}>
-                  Attivo
-                </Text>
-              </View>
-            </View>
+              <Switch
+                value={showMyRoute}
+                onValueChange={setShowMyRoute}
+                trackColor={{ false: Colors.surfaceLight, true: Colors.accent }}
+                thumbColor="#ffffff"
+              />
+            </TouchableOpacity>
           </View>
 
           {/* START button */}
@@ -1960,7 +2007,7 @@ export default function TrackingScreen() {
               </View>
             )}
 
-            {summaryRoutePoints.length >= 10 && (
+            {showMyRoute && summaryRoutePoints.length >= 10 && (
               <TouchableOpacity
                 style={styles.summaryRouteBtn}
                 onPress={() => setRouteMapVisible(true)}
@@ -2036,6 +2083,10 @@ export default function TrackingScreen() {
       <RouteMapModal
         visible={routeMapVisible}
         onClose={() => setRouteMapVisible(false)}
+        onCloseAll={() => {
+          setRouteMapVisible(false);
+          setSummaryVisible(false);
+        }}
         points={summaryRoutePoints}
         tileUrl={tileConfig.urlTemplate}
         tileMaxZoom={tileConfig.maximumZ}
