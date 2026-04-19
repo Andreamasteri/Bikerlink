@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Platform,
   TouchableOpacity,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -74,6 +75,9 @@ export default function RoutesListScreen() {
     onSuccess: (id) => {
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes", id] });
+    },
+    onError: () => {
+      Alert.alert("Errore", "Impossibile aggiornare la visibilità. Riprova.");
     },
     onSettled: () => {
       setTogglingId(null);
