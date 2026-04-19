@@ -920,7 +920,7 @@ export default function MusicScreen() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/spotify/shared-playlists"] });
       queryClient.invalidateQueries({ queryKey: ["/api/spotify/tracks"] });
-      Alert.alert("Playlist Aggiunta!", `${data.newTracksAdded ?? 0} nuovi brani aggiunti alla tua libreria.`);
+      Alert.alert("Playlist Aggiunta!", `${data.newTracksAdded ?? 0} nuovi brani aggiunti alla tua Playlist.`);
     },
     onError: (err: Error) => {
       Alert.alert("Errore", err.message);
@@ -1189,6 +1189,7 @@ export default function MusicScreen() {
           pendingAddId={pendingAddId}
           pendingRemoveId={pendingRemoveId}
           onDisconnect={handleDisconnect}
+          onShare={() => setSendModalVisible(true)}
         />
       )}
       {activeTab === "match" && (
@@ -1398,6 +1399,7 @@ function BraniTab({
   pendingAddId,
   pendingRemoveId,
   onDisconnect,
+  onShare,
 }: {
   provider: "lastfm" | "spotify";
   isConnected: boolean | null;
@@ -1418,6 +1420,7 @@ function BraniTab({
   pendingAddId: string | null;
   pendingRemoveId: string | null;
   onDisconnect: () => void;
+  onShare: () => void;
 }) {
   const isLastfm = provider === "lastfm";
   const providerColor = isLastfm ? LASTFM_RED : SPOTIFY_GREEN;
@@ -1554,7 +1557,7 @@ function BraniTab({
                 )}
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => setSendModalVisible(true)}
+                onPress={onShare}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Ionicons name="share-social-outline" size={20} color={Colors.accent} />
