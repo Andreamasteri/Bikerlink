@@ -18,7 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import Colors from "@/constants/colors";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { apiRequest } from "@/lib/query-client";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
@@ -196,10 +196,12 @@ function RecordCard({
   item,
   onPublish,
   onDelete,
+  onViewRoute,
 }: {
   item: RouteRecord;
   onPublish: () => void;
   onDelete: () => void;
+  onViewRoute: () => void;
 }) {
   const { speedUnit, distanceUnit, timeFormat } = useUnits();
   const dur = item.durationSeconds || 0;
@@ -232,6 +234,10 @@ function RecordCard({
             hour12: timeFormat === "12h",
           })}
         </Text>
+        <TouchableOpacity onPress={onViewRoute} style={[styles.publishIconBtn, { backgroundColor: Colors.accent + "18", marginRight: 6, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8 }]} activeOpacity={0.7}>
+          <Ionicons name="map-outline" size={16} color={Colors.accent} />
+          <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.accent }}>Percorso</Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={onPublish} style={styles.publishIconBtn} activeOpacity={0.7}>
           <Ionicons name="share-outline" size={18} color={Colors.accent} />
         </TouchableOpacity>
@@ -303,11 +309,12 @@ interface RouteMapModalProps {
   distanceUnit: DistanceUnit;
   speedUnit: SpeedUnit;
   insets: { top: number; bottom: number };
+  loading?: boolean;
 }
 
 function RouteMapModal({
   visible, onClose, onCloseAll, points, tileUrl, tileMaxZoom,
-  totalKm, maxSpeed, totalMs, distanceUnit, speedUnit, insets,
+  totalKm, maxSpeed, totalMs, distanceUnit, speedUnit, insets, loading,
 }: RouteMapModalProps) {
   const html = useMemo(
     () => buildLeafletPostRideHtml(tileUrl, tileMaxZoom, Colors.accent, points),
@@ -343,7 +350,24 @@ function RouteMapModal({
 
         {/* Map */}
         <View style={{ flex: 1 }}>
-          {Platform.OS !== "web" ? (
+          {loading ? (
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#1a1a1a" }}>
+              <ActivityIndicator size="large" color={Colors.accent} />
+              <Text style={{ fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, marginTop: 12 }}>
+                Caricamento percorso...
+              </Text>
+            </View>
+          ) : points.length === 0 ? (
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#1a1a1a" }}>
+              <Ionicons name="map-outline" size={48} color={Colors.textSecondary} />
+              <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 15, color: Colors.textSecondary, marginTop: 12 }}>
+                Nessun percorso disponibile
+              </Text>
+              <Text style={{ fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, marginTop: 4, textAlign: "center", paddingHorizontal: 32 }}>
+                I punti GPS non sono stati registrati per questo giro
+              </Text>
+            </View>
+          ) : Platform.OS !== "web" ? (
             <WebView
               source={{ html, baseUrl: "" }}
               style={{ flex: 1, backgroundColor: "#1a1a1a" }}
@@ -457,6 +481,12 @@ export default function TrackingScreen() {
   const [publishRecord, setPublishRecord] = useState<RouteRecord | null>(null);
   const [publishCaption, setPublishCaption] = useState("");
   const [recoveredRecords, setRecoveredRecords] = useState<LocalRouteRecord[]>([]);
+
+  // Historical route viewer
+  const [histMapVisible, setHistMapVisible] = useState(false);
+  const [histMapPoints, setHistMapPoints] = useState<Array<{ lat: number; lng: number }>>([]);
+  const [histMapRecord, setHistMapRecord] = useState<RouteRecord | null>(null);
+  const [histMapLoading, setHistMapLoading] = useState(false);
 
   // GPS display
   const [currentSpeed, setCurrentSpeed] = useState(0);
@@ -1325,6 +1355,30 @@ export default function TrackingScreen() {
     publishMutation.mutate({ performanceData: perfData, caption: publishCaption });
   }, [publishRecord, publishCaption, publishMutation]);
 
+  // ── View historical route ──────────────────────────────────────────────────
+  const handleViewHistoricalRoute = useCallback(async (record: RouteRecord) => {
+    setHistMapRecord(record);
+    setHistMapLoading(true);
+    setHistMapVisible(true);
+    try {
+      const res = await apiRequest("GET", `/api/routes/${record.id}`);
+      const data: { points?: Array<{ latitude?: number; longitude?: number; lat?: number; lng?: number }> } = await res.json();
+      const pts = (data.points ?? [])
+        .map((p) => ({ lat: p.latitude ?? p.lat, lng: p.longitude ?? p.lng }))
+        .filter((p): p is { lat: number; lng: number } =>
+          typeof p.lat === "number" && isFinite(p.lat) &&
+          typeof p.lng === "number" && isFinite(p.lng)
+        );
+      setHistMapPoints(pts);
+    } catch (_) {
+      Alert.alert("Errore", "Impossibile caricare il percorso.");
+      setHistMapVisible(false);
+      setHistMapRecord(null);
+    } finally {
+      setHistMapLoading(false);
+    }
+  }, []);
+
   // ── Countdown colors ───────────────────────────────────────────────────────
   const countdownColor =
     countdownValue > 10
@@ -1911,6 +1965,7 @@ export default function TrackingScreen() {
                 <RecordCard
                   key={item.id}
                   item={item}
+                  onViewRoute={() => handleViewHistoricalRoute(item)}
                   onPublish={() => {
                     setPublishRecord(item);
                     setPublishCaption("");
@@ -2096,6 +2151,23 @@ export default function TrackingScreen() {
         distanceUnit={distanceUnit}
         speedUnit={speedUnit}
         insets={insets}
+      />
+
+      {/* ── HISTORICAL ROUTE MAP MODAL ────────────────────────────────────── */}
+      <RouteMapModal
+        visible={histMapVisible}
+        onClose={() => { setHistMapVisible(false); setHistMapPoints([]); setHistMapRecord(null); }}
+        onCloseAll={() => { setHistMapVisible(false); setHistMapPoints([]); setHistMapRecord(null); }}
+        points={histMapPoints}
+        tileUrl={tileConfig.urlTemplate}
+        tileMaxZoom={tileConfig.maximumZ}
+        totalKm={histMapRecord?.totalDistanceKm ?? 0}
+        maxSpeed={histMapRecord?.maxSpeedKmh ?? 0}
+        totalMs={(histMapRecord?.durationSeconds ?? 0) * 1000}
+        distanceUnit={distanceUnit}
+        speedUnit={speedUnit}
+        insets={insets}
+        loading={histMapLoading}
       />
 
       {/* ── PUBLISH MODAL ────────────────────────────────────────────────── */}
