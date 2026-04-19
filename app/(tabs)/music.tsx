@@ -29,6 +29,7 @@ import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { usePlayer, PlayerTrack, RadioStation } from "@/lib/player-context";
 import { FullPlayerModal, InlineMiniPlayer } from "@/components/MiniPlayer";
+import { useAuth } from "@/lib/auth-context";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -92,6 +93,12 @@ interface SharedPlaylistEntry {
   sharedAt: string;
   mergedAt: string | null;
   tracks: Array<{ trackId: string; trackName: string; artistId: string; artistName: string }>;
+}
+
+interface ChatConversation {
+  id: string;
+  participants: Array<{ id: string; nickname: string; avatarUrl: string | null }>;
+  lastMessage?: { content?: string } | null;
 }
 
 function formatDate(iso: string): string {
@@ -741,6 +748,10 @@ export default function MusicScreen() {
   const [lastfmError, setLastfmError] = useState<string | null>(null);
   const [lastfmConnecting, setLastfmConnecting] = useState(false);
 
+  const [sendModalVisible, setSendModalVisible] = useState(false);
+  const [sendingToConv, setSendingToConv] = useState<string | null>(null);
+  const { user: currentUser } = useAuth();
+  const router = useRouter();
 
   const { data: providerData } = useQuery<{ provider: string }>({
     queryKey: ["/api/settings/music-provider"],
@@ -754,6 +765,40 @@ export default function MusicScreen() {
     staleTime: 60_000,
     enabled: !!providerData,
   });
+
+  const conversationsQuery = useQuery<ChatConversation[]>({
+    queryKey: ["/api/chat/conversations"],
+    enabled: sendModalVisible,
+    staleTime: 30_000,
+  });
+
+  const handleSendPlaylist = useCallback(async (conv: ChatConversation) => {
+    const otherUser = conv.participants.find((p) => p.id !== currentUser?.id);
+    if (!otherUser) return;
+    setSendingToConv(conv.id);
+    try {
+      const res = await apiRequest("POST", `${apiPrefix}/share-playlist`, {
+        toUserId: otherUser.id,
+        conversationId: conv.id,
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        const msg = (body as { message?: string }).message ?? "Errore";
+        if (msg.toLowerCase().includes("nessuna traccia") || msg.toLowerCase().includes("nessun brano")) {
+          Alert.alert("Playlist vuota", "Connetti prima il tuo account musicale e sincronizza i tuoi brani per poterli condividere.");
+        } else {
+          Alert.alert("Errore", msg);
+        }
+        return;
+      }
+      setSendModalVisible(false);
+      router.push(`/chat/${conv.id}` as any);
+    } catch {
+      Alert.alert("Errore", "Impossibile inviare la playlist. Riprova.");
+    } finally {
+      setSendingToConv(null);
+    }
+  }, [currentUser, router, apiPrefix]);
 
   useEffect(() => {
     if (tabParam === "ricevute" || tabParam === "match" || tabParam === "brani" || tabParam === "telefono") {
@@ -1262,6 +1307,73 @@ export default function MusicScreen() {
       </Modal>
       )}
 
+      {sendModalVisible && (
+      <Modal
+        visible={sendModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => !sendingToConv && setSendModalVisible(false)}
+      >
+        <View style={styles.sendModalOverlay}>
+          <View style={styles.sendModalCard}>
+            <View style={styles.sendModalHeader}>
+              <Ionicons name="paper-plane" size={22} color={Colors.accent} />
+              <Text style={styles.sendModalTitle}>Invia la mia musica</Text>
+              <TouchableOpacity
+                onPress={() => setSendModalVisible(false)}
+                disabled={!!sendingToConv}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={22} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.sendModalSub}>Scegli una chat a cui inviare la tua Playlist</Text>
+            {conversationsQuery.isLoading ? (
+              <ActivityIndicator color={Colors.accent} style={{ marginVertical: 24 }} />
+            ) : (conversationsQuery.data ?? []).length === 0 ? (
+              <View style={{ alignItems: "center", paddingVertical: 24, gap: 8 }}>
+                <Ionicons name="chatbubbles-outline" size={36} color={Colors.textSecondary} />
+                <Text style={styles.sendModalEmpty}>Nessuna chat attiva. Inizia una conversazione prima.</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={conversationsQuery.data ?? []}
+                keyExtractor={(item) => item.id}
+                style={{ maxHeight: 340 }}
+                renderItem={({ item: conv }) => {
+                  const otherUser = conv.participants.find((p) => p.id !== currentUser?.id);
+                  if (!otherUser) return null;
+                  const isSending = sendingToConv === conv.id;
+                  return (
+                    <TouchableOpacity
+                      style={styles.sendConvRow}
+                      onPress={() => handleSendPlaylist(conv)}
+                      disabled={!!sendingToConv}
+                      activeOpacity={0.7}
+                    >
+                      {otherUser.avatarUrl ? (
+                        <Image source={{ uri: otherUser.avatarUrl }} style={styles.sendConvAvatar} />
+                      ) : (
+                        <View style={[styles.sendConvAvatar, styles.sendConvAvatarPlaceholder]}>
+                          <Ionicons name="person" size={16} color={Colors.textSecondary} />
+                        </View>
+                      )}
+                      <Text style={styles.sendConvName} numberOfLines={1}>{otherUser.nickname}</Text>
+                      {isSending ? (
+                        <ActivityIndicator size="small" color={Colors.accent} />
+                      ) : (
+                        <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+      )}
+
     </>
   );
 }
@@ -1425,21 +1537,29 @@ function BraniTab({
             La mia Playlist{library.length > 0 ? ` (${library.length})` : ""}
           </Text>
           {library.length > 0 && (
-            <TouchableOpacity
-              style={styles.playAllBtn}
-              onPress={handlePlayAll}
-              disabled={playAllLoading}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              {playAllLoading ? (
-                <ActivityIndicator size="small" color={Colors.accent} />
-              ) : (
-                <>
-                  <Ionicons name="play-circle-outline" size={18} color={Colors.accent} />
-                  <Text style={styles.playAllBtnText}>Riproduci tutto</Text>
-                </>
-              )}
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <TouchableOpacity
+                style={styles.playAllBtn}
+                onPress={handlePlayAll}
+                disabled={playAllLoading}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                {playAllLoading ? (
+                  <ActivityIndicator size="small" color={Colors.accent} />
+                ) : (
+                  <>
+                    <Ionicons name="play-circle-outline" size={18} color={Colors.accent} />
+                    <Text style={styles.playAllBtnText}>Riproduci tutto</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setSendModalVisible(true)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="paper-plane-outline" size={20} color={Colors.accent} />
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
@@ -2857,6 +2977,68 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
+  },
+  sendModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+  },
+  sendModalCard: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  sendModalHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 10,
+    marginBottom: 6,
+  },
+  sendModalTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+  },
+  sendModalSub: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginBottom: 16,
+  },
+  sendModalEmpty: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center" as const,
+    paddingHorizontal: 16,
+  },
+  sendConvRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    gap: 12,
+  },
+  sendConvAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  sendConvAvatarPlaceholder: {
+    backgroundColor: Colors.surfaceLight,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  sendConvName: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: "Inter_500Medium",
+    color: Colors.text,
   },
 });
 
