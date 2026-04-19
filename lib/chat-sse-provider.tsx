@@ -16,6 +16,8 @@ export const ChatSseContext = createContext<{
 
 export function ChatSseProvider({ children, enabled }: { children: React.ReactNode; enabled: boolean }) {
   const listenersRef = useRef<Set<Listener>>(new Set());
+  const streamActiveRef = useRef<boolean>(false);
+  const lastConnectAttemptRef = useRef<number>(0);
 
   const subscribeRef = useRef((fn: Listener) => {
     listenersRef.current.add(fn);
@@ -31,7 +33,9 @@ export function ChatSseProvider({ children, enabled }: { children: React.ReactNo
 
     async function connect() {
       if (aborted) return;
+      lastConnectAttemptRef.current = Date.now();
       abortController = new AbortController();
+      streamActiveRef.current = false;
       try {
         const url = new URL("/api/chat/stream", getApiUrl()).toString();
         const response = await fetch(url, {
@@ -45,6 +49,7 @@ export function ChatSseProvider({ children, enabled }: { children: React.ReactNo
           return;
         }
 
+        streamActiveRef.current = true;
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
@@ -75,6 +80,7 @@ export function ChatSseProvider({ children, enabled }: { children: React.ReactNo
           }
         }
       } catch {}
+      streamActiveRef.current = false;
       if (!aborted) reconnectTimer = setTimeout(connect, 4000);
     }
 
@@ -82,6 +88,8 @@ export function ChatSseProvider({ children, enabled }: { children: React.ReactNo
 
     const appStateSub = AppState.addEventListener("change", (state: AppStateStatus) => {
       if (state === "active") {
+        if (streamActiveRef.current) return;
+        if (Date.now() - lastConnectAttemptRef.current < 10_000) return;
         if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
         abortController.abort();
         connect();
@@ -90,6 +98,7 @@ export function ChatSseProvider({ children, enabled }: { children: React.ReactNo
 
     return () => {
       aborted = true;
+      streamActiveRef.current = false;
       if (reconnectTimer) clearTimeout(reconnectTimer);
       abortController.abort();
       appStateSub.remove();

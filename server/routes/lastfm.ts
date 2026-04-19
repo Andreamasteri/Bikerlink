@@ -41,22 +41,30 @@ async function lastfmApiCall(params: Record<string, string>, method: "GET" | "PO
     Object.fromEntries(Object.entries(allParams).filter(([k]) => k !== "format")),
     sharedSecret
   );
+
+  let resp: globalThis.Response;
   if (method === "GET") {
     const url = new URL("https://ws.audioscrobbler.com/2.0/");
     for (const [k, v] of Object.entries(allParams)) url.searchParams.set(k, v);
-    const resp = await fetch(url.toString());
-    if (!resp.ok) throw new Error(`Last.fm API error ${resp.status}`);
-    return resp.json();
+    resp = await fetch(url.toString());
   } else {
     const body = new URLSearchParams(allParams);
-    const resp = await fetch("https://ws.audioscrobbler.com/2.0/", {
+    resp = await fetch("https://ws.audioscrobbler.com/2.0/", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
     });
-    if (!resp.ok) throw new Error(`Last.fm API error ${resp.status}`);
-    return resp.json();
   }
+
+  let json: unknown;
+  try { json = await resp.json(); } catch { json = null; }
+
+  if (!resp.ok) {
+    const errMsg = (json as Record<string, unknown> | null)?.message as string | undefined
+      ?? `Last.fm API error ${resp.status}`;
+    throw new Error(errMsg);
+  }
+  return json;
 }
 
 async function lastfmPublicCall(params: Record<string, string>): Promise<unknown> {
@@ -190,10 +198,11 @@ router.post("/mobile-auth", requireAuth, async (req: Request, res: Response) => 
   const userId = req.session.userId!;
   try {
     const passwordMd5 = crypto.createHash("md5").update(password, "utf8").digest("hex");
+    const authToken = crypto.createHash("md5").update(username.toLowerCase() + passwordMd5, "utf8").digest("hex");
     const sessionData = await lastfmApiCall({
       method: "auth.getMobileSession",
       username,
-      password: passwordMd5,
+      authToken,
     }, "POST") as { session?: { key?: string; name?: string }; error?: number; message?: string };
 
     if (sessionData?.error) {

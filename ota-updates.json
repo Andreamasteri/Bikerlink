@@ -3988,7 +3988,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-19T23:34:20.281Z"
+  },
+  {
+    "updateNumber": 122,
+    "version": "1.122.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-122 rv7.0.0: Fix Last.fm authToken + debounce SSE reconnect",
+    "note": "Task #773: Fix Last.fm 403 (usa authToken=MD5(username+MD5(password)) invece di password=MD5(password), formato aggiornato richiesto da Last.fm). Fix lastfmApiCall per leggere body JSON su errori HTTP e propagare messaggio reale. Fix flickering Android: debounce 10s su AppState active nel ChatSseProvider, skip reconnect se stream già attivo. CURRENT_OTA_NUMBER=122.",
+    "releaseId": "2e29c6f0-7df7-405c-8714-f67545c38074",
+    "bundleUrl": "private/ota/ota-1.122.0-1776642911562.js",
+    "updateGroupId": "9a30167f-91a5-4935-a6e4-6e29c1eec564",
+    "androidUpdateId": "019da82c-25d0-7a6f-825d-b6fabcab16fd",
+    "iosUpdateId": null,
+    "commitBase": "c55f492d0824552d2837ac873abc4ade4a30dd4d",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/9a30167f-91a5-4935-a6e4-6e29c1eec564",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-19T23:55:14.280Z"
   }
 ]
