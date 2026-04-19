@@ -814,9 +814,11 @@ export default function MusicScreen() {
     if (isNaN(numId)) return;
     const url = new URL(`/api/spotify/shared-playlists/${numId}`, getApiUrl());
     fetch(url.toString(), { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { id: number; fromUser: { nickname: string }; tracks: Array<{ trackId: string; trackName: string; artistName: string; albumName?: string | null; imageUrl?: string | null }> } | null) => {
-        if (!data) return;
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data: { id: number; fromUser: { nickname: string }; tracks: Array<{ trackId: string; trackName: string; artistName: string; albumName?: string | null; imageUrl?: string | null }> }) => {
         const mapped: LibraryTrack[] = data.tracks.map((t, i) => ({
           id: i,
           spotifyTrackId: t.trackId,
@@ -830,7 +832,9 @@ export default function MusicScreen() {
         setPlaylistOverride({ nickname: data.fromUser.nickname, tracks: mapped });
         setActiveTab("brani");
       })
-      .catch(() => {});
+      .catch(() => {
+        Alert.alert("Playlist non disponibile", "Non è stato possibile caricare questa playlist. Potrebbe essere stata rimossa.");
+      });
   }, [playlistIdParam]);
 
   useEffect(() => {
