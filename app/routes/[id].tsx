@@ -346,14 +346,14 @@ function WaypointCard({
   isLast: boolean;
 }) {
   const color = WAYPOINT_TYPE_COLORS[waypoint.waypointType] || Colors.accent;
-  const iconName = WAYPOINT_TYPE_ICONS[waypoint.waypointType] || "map-marker";
+  const iconName = (WAYPOINT_TYPE_ICONS[waypoint.waypointType] || "map-marker") as React.ComponentProps<typeof MaterialCommunityIcons>["name"];
   const typeLabel = WAYPOINT_TYPE_LABELS[waypoint.waypointType] || waypoint.waypointType;
 
   return (
     <View style={styles.waypointRow}>
       <View style={styles.waypointTimeline}>
         <View style={[styles.waypointDot, { backgroundColor: color }]}>
-          <MaterialCommunityIcons name={iconName as any} size={14} color="#fff" />
+          <MaterialCommunityIcons name={iconName} size={14} color="#fff" />
         </View>
         {!isLast && <View style={styles.waypointLine} />}
       </View>

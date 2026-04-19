@@ -318,7 +318,7 @@ export const customRoutes = pgTable("custom_routes", {
   title: varchar("title", { length: 200 }).notNull(),
   description: text("description"),
   totalDistanceKm: doublePrecision("total_distance_km").default(0),
-  isPublic: boolean("is_public").notNull().default(false),
+  isPublic: boolean("is_public").notNull().default(true),
   visibility: varchar("visibility", { length: 20 }).notNull().default("public"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

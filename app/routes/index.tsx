@@ -47,7 +47,7 @@ function visibilityLabel(v: Visibility): string {
   return "Privato";
 }
 
-function visibilityIcon(v: Visibility): string {
+function visibilityIcon(v: Visibility): React.ComponentProps<typeof Ionicons>["name"] {
   if (v === "public") return "globe-outline";
   if (v === "friends") return "people-outline";
   return "lock-closed-outline";
@@ -166,7 +166,7 @@ export default function RoutesListScreen() {
         {isToggling ? (
           <ActivityIndicator size="small" color={badgeIconColor} style={{ width: 12, height: 12 }} />
         ) : (
-          <Ionicons name={visibilityIcon(vis) as any} size={12} color={badgeIconColor} />
+          <Ionicons name={visibilityIcon(vis)} size={12} color={badgeIconColor} />
         )}
         <Text style={[styles.badgeText, badgeTextStyle]}>{visibilityLabel(vis)}</Text>
       </View>
