@@ -888,6 +888,37 @@ router.get("/shared-playlists", requireAuth, async (req: Request, res: Response)
   }
 });
 
+router.get("/shared-playlists/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const playlistId = parseInt(req.params.id, 10);
+    if (isNaN(playlistId)) {
+      return res.status(400).json({ message: "ID non valido" });
+    }
+
+    const [playlist] = await db
+      .select()
+      .from(sharedPlaylists)
+      .where(and(eq(sharedPlaylists.id, playlistId), eq(sharedPlaylists.toUserId, userId)))
+      .limit(1);
+
+    if (!playlist) {
+      return res.status(404).json({ message: "Playlist non trovata" });
+    }
+
+    const fromUser = await storage.getUser(playlist.fromUserId);
+    return res.json({
+      id: playlist.id,
+      fromUser: { id: playlist.fromUserId, nickname: fromUser?.nickname ?? "Utente" },
+      trackCount: playlist.trackCount,
+      tracks: playlist.tracksData,
+    });
+  } catch (error) {
+    console.error("[Spotify] shared-playlists/:id error:", error);
+    return res.status(500).json({ message: "Errore nel recupero della playlist" });
+  }
+});
+
 router.post("/merge-playlist/:playlistId", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;

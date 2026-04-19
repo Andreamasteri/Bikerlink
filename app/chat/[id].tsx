@@ -122,39 +122,34 @@ function TextWithHashtags({
 
 function PlaylistBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolean }) {
   const router = useRouter();
-  let nickname = "un utente";
-  let trackCount = 0;
+  let playlistId: number | null = null;
   try {
     if (message.content) {
       const parsed = JSON.parse(message.content);
-      if (parsed.nickname) nickname = parsed.nickname;
-      if (parsed.trackCount) trackCount = parsed.trackCount;
+      if (parsed.playlistId) playlistId = parsed.playlistId;
     }
   } catch {}
+
+  const iconColor = isOwn ? "#fff" : SPOTIFY_GREEN;
   const textColor = isOwn ? "#fff" : Colors.text;
-  const subColor = isOwn ? "rgba(255,255,255,0.75)" : Colors.textSecondary;
-  const btnBg = isOwn ? "rgba(255,255,255,0.25)" : SPOTIFY_GREEN;
-  const btnText = "#fff";
+
+  const handlePress = () => {
+    if (isOwn || !playlistId) return;
+    router.push({ pathname: "/(tabs)/music", params: { tab: "brani", playlistId: String(playlistId) } } as any);
+  };
+
   return (
-    <View>
-      <View style={styles.locationContent}>
-        <Ionicons name="musical-notes" size={20} color={isOwn ? "#fff" : SPOTIFY_GREEN} style={{ marginRight: 6 }} />
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.messageText, { color: textColor, marginBottom: 1 }]}>
-            Playlist di {nickname}
-          </Text>
-          <Text style={{ fontSize: 12, color: subColor }}>{trackCount} brani · Spotify</Text>
-        </View>
-      </View>
+    <TouchableOpacity
+      onPress={handlePress}
+      activeOpacity={isOwn ? 1 : 0.7}
+      style={styles.locationContent}
+    >
+      <Ionicons name="musical-notes" size={20} color={iconColor} style={{ marginRight: 8 }} />
+      <Text style={[styles.messageText, { color: textColor }]}>Nuova playlist</Text>
       {!isOwn && (
-        <TouchableOpacity
-          onPress={() => router.push({ pathname: "/(tabs)/music", params: { tab: "ricevute" } } as any)}
-          style={{ marginTop: 8, backgroundColor: btnBg, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12, alignSelf: "flex-start" }}
-        >
-          <Text style={{ color: btnText, fontSize: 13, fontWeight: "600" }}>Vedi</Text>
-        </TouchableOpacity>
+        <Ionicons name="chevron-forward" size={14} color={Colors.textSecondary} style={{ marginLeft: 6 }} />
       )}
-    </View>
+    </TouchableOpacity>
   );
 }
 

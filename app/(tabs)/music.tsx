@@ -724,11 +724,13 @@ const radioTabStyles = StyleSheet.create({
 export default function MusicScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
+  const { tab: tabParam, playlistId: playlistIdParam } = useLocalSearchParams<{ tab?: string; playlistId?: string }>();
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     if (tabParam === "ricevute" || tabParam === "match" || tabParam === "brani" || tabParam === "radio" || tabParam === "telefono") return tabParam;
     return "brani";
   });
+
+  const [playlistOverride, setPlaylistOverride] = useState<{ nickname: string; tracks: LibraryTrack[] } | null>(null);
 
   const [matchCriteria, setMatchCriteria] = useState<string[]>(["songs", "genre"]);
   const [matchMaxKm, setMatchMaxKm] = useState<number>(100);
@@ -805,6 +807,31 @@ export default function MusicScreen() {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
+
+  useEffect(() => {
+    if (!playlistIdParam) return;
+    const numId = parseInt(playlistIdParam, 10);
+    if (isNaN(numId)) return;
+    const url = new URL(`/api/spotify/shared-playlists/${numId}`, getApiUrl());
+    fetch(url.toString(), { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { id: number; fromUser: { nickname: string }; tracks: Array<{ trackId: string; trackName: string; artistName: string; albumName?: string | null; imageUrl?: string | null }> } | null) => {
+        if (!data) return;
+        const mapped: LibraryTrack[] = data.tracks.map((t, i) => ({
+          id: i,
+          spotifyTrackId: t.trackId,
+          trackName: t.trackName,
+          artistName: t.artistName,
+          albumName: t.albumName ?? null,
+          imageUrl: t.imageUrl ?? null,
+          popularity: 0,
+          addedAt: "",
+        }));
+        setPlaylistOverride({ nickname: data.fromUser.nickname, tracks: mapped });
+        setActiveTab("brani");
+      })
+      .catch(() => {});
+  }, [playlistIdParam]);
 
   useEffect(() => {
     AsyncStorage.multiGet(["music_match_criteria", "music_match_logic", "music_match_min_songs"])
@@ -1190,6 +1217,8 @@ export default function MusicScreen() {
           pendingRemoveId={pendingRemoveId}
           onDisconnect={handleDisconnect}
           onShare={() => setSendModalVisible(true)}
+          playlistOverride={playlistOverride}
+          onResetPlaylist={() => setPlaylistOverride(null)}
         />
       )}
       {activeTab === "match" && (
@@ -1400,6 +1429,8 @@ function BraniTab({
   pendingRemoveId,
   onDisconnect,
   onShare,
+  playlistOverride,
+  onResetPlaylist,
 }: {
   provider: "lastfm" | "spotify";
   isConnected: boolean | null;
@@ -1417,6 +1448,8 @@ function BraniTab({
   savedIds: Set<string>;
   onAdd: (t: SearchTrack) => void;
   onRemove: (id: string) => void;
+  playlistOverride: { nickname: string; tracks: LibraryTrack[] } | null;
+  onResetPlaylist: () => void;
   pendingAddId: string | null;
   pendingRemoveId: string | null;
   onDisconnect: () => void;
@@ -1428,6 +1461,8 @@ function BraniTab({
   const { playQueue, isAvailable: playerAvailable, currentTrack, isPlaying } = usePlayer();
   const [playAllLoading, setPlayAllLoading] = useState(false);
   const [streamService, setStreamService] = useState<StreamService>("youtube");
+
+  const displayedLibrary: LibraryTrack[] = playlistOverride ? playlistOverride.tracks : library;
 
   useEffect(() => {
     AsyncStorage.getItem("stream_service_pref").then((v) => {
@@ -1441,22 +1476,22 @@ function BraniTab({
   }, []);
 
   const handleOpenPlaylist = useCallback(() => {
-    if (library.length === 0) return;
-    const query = library
+    if (displayedLibrary.length === 0) return;
+    const query = displayedLibrary
       .slice(0, 20)
       .map((t) => `${t.trackName} ${t.artistName}`)
       .join(" + ");
     Linking.openURL(buildSearchUrl(query, streamService));
-  }, [library, streamService]);
+  }, [displayedLibrary, streamService]);
 
   const handlePlayAll = useCallback(async () => {
-    if (!playerAvailable || library.length === 0) return;
+    if (!playerAvailable || displayedLibrary.length === 0) return;
 
     const doPlay = async () => {
       setPlayAllLoading(true);
       try {
         const tracksParam = encodeURIComponent(
-          JSON.stringify(library.map((t) => ({ trackName: t.trackName, artistName: t.artistName })))
+          JSON.stringify(displayedLibrary.map((t) => ({ trackName: t.trackName, artistName: t.artistName })))
         );
         const url = new URL(`/api/music/radio/preview-playlist?tracks=${tracksParam}`, getApiUrl());
         const resp = await fetch(url.toString());
@@ -1497,7 +1532,7 @@ function BraniTab({
     } else {
       await doPlay();
     }
-  }, [library, playQueue, playerAvailable, currentTrack, isPlaying]);
+  }, [displayedLibrary, playQueue, playerAvailable, currentTrack, isPlaying]);
 
   if (isConnected === null) {
     return (
@@ -1535,11 +1570,30 @@ function BraniTab({
   return (
     <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingTop: 0, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
       <View style={styles.section}>
-        <View style={[styles.sectionHeader, { marginTop: 12 }]}>
-          <Text style={styles.sectionTitle}>
-            La mia Playlist{library.length > 0 ? ` (${library.length})` : ""}
-          </Text>
-          {library.length > 0 && (
+        {playlistOverride && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, marginTop: 12, marginBottom: 4, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: Colors.accent + "18", borderRadius: 10 }}>
+            <Ionicons name="musical-notes" size={14} color={Colors.accent} />
+            <Text style={{ flex: 1, fontSize: 13, fontFamily: "Inter_500Medium", color: Colors.accent }}>
+              Playlist di {playlistOverride.nickname}
+            </Text>
+          </View>
+        )}
+        <View style={[styles.sectionHeader, { marginTop: playlistOverride ? 4 : 12 }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+            <Text style={styles.sectionTitle}>
+              {playlistOverride ? `Playlist di ${playlistOverride.nickname}` : `La mia Playlist${displayedLibrary.length > 0 ? ` (${displayedLibrary.length})` : ""}`}
+            </Text>
+            {playlistOverride && (
+              <TouchableOpacity
+                onPress={onResetPlaylist}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: Colors.accent + "20", alignItems: "center", justifyContent: "center" }}
+              >
+                <Ionicons name="person-outline" size={14} color={Colors.accent} />
+              </TouchableOpacity>
+            )}
+          </View>
+          {displayedLibrary.length > 0 && (
             <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
               <TouchableOpacity
                 style={styles.playAllBtn}
@@ -1556,17 +1610,19 @@ function BraniTab({
                   </>
                 )}
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={onShare}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons name="share-social-outline" size={20} color={Colors.accent} />
-              </TouchableOpacity>
+              {!playlistOverride && (
+                <TouchableOpacity
+                  onPress={onShare}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="share-social-outline" size={20} color={Colors.accent} />
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
 
-        {library.length > 0 && (
+        {displayedLibrary.length > 0 && (
           <View style={streamStyles.serviceSelector}>
             {(["youtube", "youtubemusic", "google"] as StreamService[]).map((svc) => {
               const label = svc === "youtube" ? "YouTube" : svc === "youtubemusic" ? "YouTube Music" : "Google";
@@ -1583,13 +1639,15 @@ function BraniTab({
                 </TouchableOpacity>
               );
             })}
-            <TouchableOpacity
-              onPress={onDisconnect}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={{ marginLeft: 14, marginTop: 1 }}
-            >
-              <Ionicons name="log-out-outline" size={23} color={Colors.textSecondary} />
-            </TouchableOpacity>
+            {!playlistOverride && (
+              <TouchableOpacity
+                onPress={onDisconnect}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={{ marginLeft: 14, marginTop: 1 }}
+              >
+                <Ionicons name="log-out-outline" size={23} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -1658,20 +1716,22 @@ function BraniTab({
           </Text>
         )}
 
-        {libraryLoading ? (
+        {libraryLoading && !playlistOverride ? (
           <ActivityIndicator color={Colors.accent} style={{ marginVertical: 20 }} />
-        ) : library.length === 0 ? (
+        ) : displayedLibrary.length === 0 ? (
           <View style={styles.emptyLibrary}>
             <Ionicons name="musical-notes" size={32} color={Colors.textSecondary} />
-            <Text style={styles.emptyLibraryText}>Cerca un brano e aggiungilo alla tua Playlist</Text>
+            <Text style={styles.emptyLibraryText}>
+              {playlistOverride ? "Questa playlist è vuota" : "Cerca un brano e aggiungilo alla tua Playlist"}
+            </Text>
           </View>
         ) : (
-          library.map((track) => (
+          displayedLibrary.map((track) => (
             <LibraryTrackRow
               key={track.spotifyTrackId}
               track={track}
-              isRemoving={pendingRemoveId === track.spotifyTrackId}
-              onRemove={onRemove}
+              isRemoving={!playlistOverride && pendingRemoveId === track.spotifyTrackId}
+              onRemove={playlistOverride ? () => {} : onRemove}
               streamService={streamService}
             />
           ))
