@@ -587,6 +587,13 @@ export default function TrackingScreen() {
   const { data: records, refetch: refetchRecords } = useQuery<RouteRecord[]>({
     queryKey: ["/api/routes"],
   });
+
+  // ── Admin flag: sensori telefono visibili ──────────────────────────────────
+  const { data: phoneSensorsData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/phone-sensors-enabled"],
+    staleTime: 120_000,
+  });
+  const phoneSensorsAdminEnabled = phoneSensorsData?.enabled === true;
   const completedRecords = (records || []).filter((r) => r.status === "completed");
 
   // ── Publish mutation ───────────────────────────────────────────────────────
@@ -2058,7 +2065,8 @@ export default function TrackingScreen() {
               />
             </TouchableOpacity>
 
-            {/* Sensori telefono (G-force) — BETA */}
+            {/* Sensori telefono (G-force) — BETA — visibile solo se abilitato da admin */}
+            {phoneSensorsAdminEnabled && (
             <TouchableOpacity
               style={[styles.triggerRow, { borderBottomWidth: 0, opacity: sensorsEnabled ? 1 : 0.7 }]}
               onPress={() => setSensorsEnabled((v) => !v)}
@@ -2084,6 +2092,7 @@ export default function TrackingScreen() {
                 thumbColor={sensorsEnabled ? Colors.accentRed : Colors.textSecondary}
               />
             </TouchableOpacity>
+            )}
           </View>
 
           {/* START button */}

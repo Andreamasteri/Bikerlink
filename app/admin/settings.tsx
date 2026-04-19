@@ -594,6 +594,11 @@ export default function AdminSettings() {
   });
   const sosEnabled = sosData?.enabled !== false;
 
+  const { data: phoneSensorsData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/phone-sensors-enabled"],
+  });
+  const phoneSensorsEnabled = phoneSensorsData?.enabled === true;
+
   const { data: musicMatchData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/music-match"],
   });
@@ -677,6 +682,24 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/sos-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+  });
+
+  const phoneSensorsMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/phone_sensors_enabled", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/phone-sensors-enabled"] });
     },
   });
 
@@ -2191,6 +2214,27 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {sosEnabled ? "Gli utenti possono inviare e accogliere richieste SOS" : "La funzione SOS è disattivata per tutti"}
+        </Text>
+      </View>
+
+      <View style={styles.synecoCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="phone-portrait-outline" size={20} color={phoneSensorsEnabled ? Colors.accentRed : Colors.textSecondary} />
+            <Text style={styles.synecoLabel}>Sensori Telefono (G-force)</Text>
+          </View>
+          <Switch
+            value={phoneSensorsEnabled}
+            onValueChange={(val) => phoneSensorsMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: Colors.accentRed + "80" }}
+            thumbColor={phoneSensorsEnabled ? Colors.accentRed : Colors.textSecondary}
+            disabled={phoneSensorsMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {phoneSensorsEnabled
+            ? "Il toggle G-force BETA è visibile agli utenti nella schermata Registra giro"
+            : "Il toggle G-force BETA è nascosto — gli utenti non vedono questa funzione"}
         </Text>
       </View>
 
