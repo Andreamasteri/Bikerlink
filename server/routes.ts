@@ -217,7 +217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/privacy-policy", (_req, res) => {
+  app.get(["/privacy-policy", "/privacy"], (_req, res) => {
     const templatePath = path.resolve(
       process.cwd(),
       "server",

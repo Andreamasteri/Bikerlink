@@ -3827,7 +3827,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-19T06:43:36.424Z"
+  },
+  {
+    "updateNumber": 115,
+    "version": "1.115.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-115 rv7.0.0: Preparazione Play Store — Privacy Policy completa GDPR, splash fix, testi store",
+    "note": "Privacy Policy aggiornata con copertura completa GDPR: GPS background, Spotify/LastFM OAuth, SOS, MotoClub, matching, contest, moderazione. Splash backgroundColor #ffffff → #1A1A2E. Route /privacy alias aggiunto. Documentazione Play Store: playstore-listing.md e playstore-submission-guide.md. CURRENT_OTA_NUMBER=115.",
+    "releaseId": "f6697d6b-ace8-4ffe-80f5-49aa51a6674b",
+    "bundleUrl": "private/ota/ota-1.115.0-1776590327464.js",
+    "updateGroupId": "1c0eb4c3-4619-49a8-a523-18f71590f7a0",
+    "androidUpdateId": "019da509-c8e0-7c48-9a93-86f736e21482",
+    "iosUpdateId": null,
+    "commitBase": "fec395be5f10d15606341e82aa3018129b03bda1",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/1c0eb4c3-4619-49a8-a523-18f71590f7a0",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-19T09:18:50.350Z"
   }
 ]
