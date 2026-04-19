@@ -3955,16 +3955,17 @@
     "jsEngine": "hermes",
     "message": "OTA-120 rv7.0.0: Importa playlist ricevute da chat in Brani tab",
     "note": "Task #766. PlaylistBubble in chat naviga a Brani tab con playlist del mittente caricata. Nuovo endpoint GET /api/spotify/shared-playlists/:id. Banner override + pulsante reset + empty state differenziato. CURRENT_OTA_NUMBER=120.",
-    "releaseId": null,
-    "bundleUrl": null,
-    "updateGroupId": null,
-    "androidUpdateId": null,
+    "releaseId": "431732d0-9c86-431c-9b66-0045d4d49b99",
+    "bundleUrl": "private/ota/ota-1.120.0-1776639640656.js",
+    "updateGroupId": "a1442752-2aaf-4a72-a3fe-b49fffe5de32",
+    "androidUpdateId": "019da7fa-4450-7944-9472-504923a2b8c6",
     "iosUpdateId": null,
-    "commitBase": "05dd81967f88283af4a23e7564ea94c674e886c8",
-    "easDashboard": null,
+    "commitBase": "c65e6969db3453be04fb18ffa0da202082f76260",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/a1442752-2aaf-4a72-a3fe-b49fffe5de32",
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "pending"
+    "status": "published",
+    "publishedAt": "2026-04-19T23:00:43.489Z"
   }
 ]
