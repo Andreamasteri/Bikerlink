@@ -48,6 +48,13 @@ Clicca **"Crea app"**.
 
 **Menu laterale → "Produzione" → "Versioni" → "Crea nuova versione"**
 
+> ⚠️ **FORMATO FILE — IMPORTANTE:**
+> - **Per test interni / Closed Testing:** puoi usare l'APK EAS (link sotto)
+> - **Per pubblicazione pubblica su Play Store:** Google **richiede** AAB (Android App Bundle)
+>   — vedi Task #749 per generare l'AAB con EAS Build (versionCode 30)
+
+**Per il test interno con APK:**
+
 1. Scarica l'APK da questo URL:  
    `https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk`
 2. Carica il file `.apk` (versionCode 29, versione 1.9.3)
@@ -59,10 +66,6 @@ Funzionalità: matching tra motociclisti, tracking GPS percorsi, SOS emergenza s
 ```
 
 4. Clicca **"Salva"** (non pubblicare ancora — completa prima tutti gli altri passi)
-
-> **Nota:** Google Play preferisce AAB (Android App Bundle) invece di APK.
-> L'APK EAS funziona per il test interno. Per la produzione pubblica
-> sarà necessario un AAB generato con EAS Build.
 
 ---
 
