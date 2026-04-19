@@ -1,17 +1,27 @@
 import type { Response } from "express";
 
-const sseClients = new Map<string, Response>();
-
-export function addSseClient(userId: string, res: Response): void {
-  const existing = sseClients.get(userId);
-  if (existing) {
-    try { existing.end(); } catch {}
-  }
-  sseClients.set(userId, res);
+interface SseEntry {
+  res: Response;
+  connId: string;
 }
 
-export function removeSseClient(userId: string): void {
-  sseClients.delete(userId);
+const sseClients = new Map<string, SseEntry>();
+
+export function addSseClient(userId: string, res: Response): string {
+  const connId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const existing = sseClients.get(userId);
+  if (existing) {
+    try { existing.res.end(); } catch {}
+  }
+  sseClients.set(userId, { res, connId });
+  return connId;
+}
+
+export function removeSseClient(userId: string, connId: string): void {
+  const entry = sseClients.get(userId);
+  if (entry && entry.connId === connId) {
+    sseClients.delete(userId);
+  }
 }
 
 export interface ChatSseEvent {
@@ -23,10 +33,10 @@ export interface ChatSseEvent {
 export function notifyChatEvent(participantIds: string[], event: ChatSseEvent): void {
   const payload = `event: chat\ndata: ${JSON.stringify(event)}\n\n`;
   for (const uid of participantIds) {
-    const client = sseClients.get(uid);
-    if (client) {
+    const entry = sseClients.get(uid);
+    if (entry) {
       try {
-        client.write(payload);
+        entry.res.write(payload);
       } catch {
         sseClients.delete(uid);
       }

@@ -399,7 +399,7 @@ router.get("/stream", (req: Request, res: Response) => {
 
   res.write("event: connected\ndata: {}\n\n");
 
-  addSseClient(userId, res);
+  const connId = addSseClient(userId, res);
 
   const heartbeat = setInterval(() => {
     try { res.write(":heartbeat\n\n"); } catch { clearInterval(heartbeat); }
@@ -407,7 +407,7 @@ router.get("/stream", (req: Request, res: Response) => {
 
   req.on("close", () => {
     clearInterval(heartbeat);
-    removeSseClient(userId);
+    removeSseClient(userId, connId);
   });
 });
 

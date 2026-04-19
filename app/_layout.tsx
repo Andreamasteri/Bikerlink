@@ -46,6 +46,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient, apiRequest } from "@/lib/query-client";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { ChatSseProvider } from "@/lib/chat-sse-provider";
 import { LocationProvider, useLocationGate } from "@/lib/location-context";
 import { LanguageProvider, useLanguage } from "@/lib/language-context";
 import { MapSettingsProvider, useMapConfig } from "@/lib/map-context";
@@ -463,6 +464,15 @@ function AdminUptimeOverlay() {
   return <UptimeWidget />;
 }
 
+function ChatSseGate({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  return (
+    <ChatSseProvider enabled={!!user}>
+      {children}
+    </ChatSseProvider>
+  );
+}
+
 function LanguageKeyedRoot() {
   const { renderKey } = useLanguage();
   return (
@@ -587,6 +597,7 @@ export default function RootLayout() {
       <LanguageProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
+            <ChatSseGate>
             <MapSettingsProvider>
               <TaskbarStyleProvider>
               <UnitsProvider>
@@ -613,6 +624,7 @@ export default function RootLayout() {
               </UnitsProvider>
               </TaskbarStyleProvider>
             </MapSettingsProvider>
+            </ChatSseGate>
           </AuthProvider>
         </QueryClientProvider>
       </LanguageProvider>
