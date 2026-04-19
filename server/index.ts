@@ -725,6 +725,28 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] users.floating_widget_enabled:", e);
         }
 
+        try {
+          await db.execute(sql`
+            ALTER TABLE custom_routes
+              ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) NOT NULL DEFAULT 'public'
+          `);
+          await db.execute(sql`
+            UPDATE custom_routes
+            SET visibility = CASE WHEN is_public = true THEN 'public' ELSE 'private' END
+            WHERE visibility = 'public' AND is_public = false
+               OR visibility = 'public' AND is_public = true AND visibility != 'public'
+               OR (visibility NOT IN ('public','friends','private'))
+          `);
+          await db.execute(sql`
+            UPDATE custom_routes
+            SET is_public = (visibility = 'public')
+            WHERE (visibility = 'private' AND is_public = true)
+               OR (visibility = 'public' AND is_public = false)
+          `);
+        } catch (e) {
+          console.warn("[MIGRATION] custom_routes.visibility backfill:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 
