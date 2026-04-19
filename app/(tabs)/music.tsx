@@ -1537,6 +1537,16 @@ function BraniTab({
           </Text>
           {library.length > 0 && (
             <TouchableOpacity
+              onPress={() => setSendModalVisible(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Invia la mia Playlist"
+              accessibilityRole="button"
+            >
+              <Ionicons name="paper-plane-outline" size={20} color={Colors.accent} />
+            </TouchableOpacity>
+          )}
+          {library.length > 0 && (
+            <TouchableOpacity
               style={styles.playAllBtn}
               onPress={handlePlayAll}
               disabled={playAllLoading}
