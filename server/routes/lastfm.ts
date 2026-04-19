@@ -215,7 +215,12 @@ router.post("/mobile-auth", requireAuth, async (req: Request, res: Response) => 
         set: { lastfmUsername, sessionKey, connectedAt: new Date() },
       });
 
-    const trackCount = await syncLastfmTracks(userId, sessionKey, lastfmUsername);
+    let trackCount = 0;
+    try {
+      trackCount = await syncLastfmTracks(userId, sessionKey, lastfmUsername);
+    } catch (syncErr) {
+      console.error("[Last.fm mobile-auth] sync brani fallita (login già salvato):", syncErr);
+    }
 
     return res.json({ connected: true, username: lastfmUsername, trackCount });
   } catch (err) {
