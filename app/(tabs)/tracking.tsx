@@ -1274,7 +1274,7 @@ export default function TrackingScreen() {
       const effectiveCountdownSecs = is0100Enabled
         ? 10
         : countdownEnabled
-        ? Math.max(parseInt(countdownSec, 10) || 0, 0)
+        ? Math.max(parseInt(countdownSec, 10) || 10, 0)
         : 0;
 
       if (effectiveCountdownSecs > 0) {
