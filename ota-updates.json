@@ -3758,7 +3758,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-19T01:16:03.007Z"
+  },
+  {
+    "updateNumber": 112,
+    "version": "1.112.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-112 rv7.0.0: Sensori telefono (G-force) opzionali con toggle BETA",
+    "note": "Nuovo toggle nel pannello pre-avvio: Sensori telefono (G) con badge BETA. Default OFF — accelerometro non parte se disabilitato (guard in startAccelerometer). Display G-max e sprint G nascosti se sensori OFF. Impostazione persistita in AsyncStorage. CURRENT_OTA_NUMBER=112.",
+    "releaseId": "4b8abc79-bf91-4ea6-abf6-0b3b7fe1a8a4",
+    "bundleUrl": "private/ota/ota-1.112.0-1776562024487.js",
+    "updateGroupId": "72a5b577-869c-4bea-bd26-6e2e2738a6c4",
+    "androidUpdateId": "019da359-dc32-7abb-9254-800b2496c04a",
+    "iosUpdateId": null,
+    "commitBase": "dd798947afdaf40b372de5c98bfbbbfd57955207",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/72a5b577-869c-4bea-bd26-6e2e2738a6c4",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-19T01:27:07.659Z"
   }
 ]

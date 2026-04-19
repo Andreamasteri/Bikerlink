@@ -471,6 +471,7 @@ export default function TrackingScreen() {
   const [handsOffSpeedStr, setHandsOffSpeedStr] = useState("50");
   const [is0100Enabled, setIs0100Enabled] = useState(false);
   const [showMyRoute, setShowMyRoute] = useState(true);
+  const [sensorsEnabled, setSensorsEnabled] = useState(false);
 
   // Phase & UI
   const [phase, setPhase] = useState<Phase>("idle");
@@ -528,6 +529,7 @@ export default function TrackingScreen() {
   const handsOffEnabledRef = useRef(false);
   const handsOffSpeedRef = useRef(50);
   const is0100EnabledRef = useRef(false);
+  const sensorsEnabledRef = useRef(false);
   const watchSubRef = useRef<Location.LocationSubscription | null>(null);
   const webWatchIdRef = useRef<number | null>(null);
   const accelSubRef = useRef<{ remove: () => void } | null>(null);
@@ -659,6 +661,15 @@ export default function TrackingScreen() {
       profileRef.current = "race";
     }
   }, [is0100Enabled]);
+  useEffect(() => {
+    sensorsEnabledRef.current = sensorsEnabled;
+    AsyncStorage.setItem("@bikerlink/sensors_enabled", sensorsEnabled ? "1" : "0").catch(() => {});
+  }, [sensorsEnabled]);
+  useEffect(() => {
+    AsyncStorage.getItem("@bikerlink/sensors_enabled").then((v) => {
+      if (v === "1") setSensorsEnabled(true);
+    }).catch(() => {});
+  }, []);
 
   // ── Offline GPS buffer helpers (true-append: one key per batch segment) ────
   //
@@ -1089,6 +1100,7 @@ export default function TrackingScreen() {
   // ── Start accelerometer ────────────────────────────────────────────────────
   const startAccelerometer = useCallback(() => {
     if (Platform.OS === "web") return;
+    if (!sensorsEnabledRef.current) return;
     const interval = is0100EnabledRef.current ? 100 : 250;
     try {
       Accelerometer.setUpdateInterval(interval);
@@ -1594,8 +1606,8 @@ export default function TrackingScreen() {
                     value={maxAltitude.toFixed(0)}
                     label="Quota max m"
                   />
-                  {/* G max card with recalibrate button */}
-                  <View style={styles.statCard}>
+                  {/* G max card with recalibrate button — only when sensors enabled */}
+                  {sensorsEnabled && <View style={styles.statCard}>
                     <Ionicons name="pulse-outline" size={16} color={Colors.accentRed} />
                     {isCalibrating ? (
                       <Text style={[styles.statValue, { color: Colors.textSecondary, fontSize: 16 }]}>
@@ -1615,7 +1627,7 @@ export default function TrackingScreen() {
                         <Text style={styles.recalibrateLink}>Ricalibra</Text>
                       </TouchableOpacity>
                     )}
-                  </View>
+                  </View>}
                 </View>
               </View>
             )}
@@ -1669,27 +1681,31 @@ export default function TrackingScreen() {
                   </Text>
                 )}
 
+                {sensorsEnabled && (
+                  <View style={styles.statsRow}>
+                    <StatCard
+                      icon="trending-up-outline"
+                      color={Colors.success}
+                      value={`${currentG.toFixed(2)} G`}
+                      label="G istantaneo"
+                    />
+                    <StatCard
+                      icon="pulse-outline"
+                      color={Colors.accentRed}
+                      value={`${maxAccelG.toFixed(2)} G`}
+                      label="G max accel"
+                    />
+                  </View>
+                )}
                 <View style={styles.statsRow}>
-                  <StatCard
-                    icon="trending-up-outline"
-                    color={Colors.success}
-                    value={`${currentG.toFixed(2)} G`}
-                    label="G istantaneo"
-                  />
-                  <StatCard
-                    icon="pulse-outline"
-                    color={Colors.accentRed}
-                    value={`${maxAccelG.toFixed(2)} G`}
-                    label="G max accel"
-                  />
-                </View>
-                <View style={styles.statsRow}>
-                  <StatCard
-                    icon="trending-down-outline"
-                    color={Colors.warning}
-                    value={`${maxDecelG.toFixed(2)} G`}
-                    label="G max frenata"
-                  />
+                  {sensorsEnabled && (
+                    <StatCard
+                      icon="trending-down-outline"
+                      color={Colors.warning}
+                      value={`${maxDecelG.toFixed(2)} G`}
+                      label="G max frenata"
+                    />
+                  )}
                   {accuracyTier ? (
                     <StatCard
                       icon="locate-outline"
@@ -1896,7 +1912,7 @@ export default function TrackingScreen() {
 
             {/* Show My Route — toggle reale */}
             <TouchableOpacity
-              style={[styles.triggerRow, { borderBottomWidth: 0 }]}
+              style={styles.triggerRow}
               onPress={() => setShowMyRoute((v) => !v)}
               activeOpacity={0.7}
             >
@@ -1913,6 +1929,33 @@ export default function TrackingScreen() {
                 onValueChange={setShowMyRoute}
                 trackColor={{ false: Colors.surfaceLight, true: Colors.accent }}
                 thumbColor="#ffffff"
+              />
+            </TouchableOpacity>
+
+            {/* Sensori telefono (G-force) — BETA */}
+            <TouchableOpacity
+              style={[styles.triggerRow, { borderBottomWidth: 0 }]}
+              onPress={() => setSensorsEnabled((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.triggerLeft}>
+                <Ionicons
+                  name="pulse-outline"
+                  size={18}
+                  color={sensorsEnabled ? Colors.accentRed : Colors.textSecondary}
+                />
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={styles.triggerLabel}>Sensori telefono (G)</Text>
+                  <View style={{ backgroundColor: Colors.warning + "30", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
+                    <Text style={{ fontSize: 10, fontWeight: "700", color: Colors.warning, letterSpacing: 0.5 }}>BETA</Text>
+                  </View>
+                </View>
+              </View>
+              <Switch
+                value={sensorsEnabled}
+                onValueChange={setSensorsEnabled}
+                trackColor={{ false: Colors.border, true: Colors.accentRed + "80" }}
+                thumbColor={sensorsEnabled ? Colors.accentRed : Colors.textSecondary}
               />
             </TouchableOpacity>
           </View>
