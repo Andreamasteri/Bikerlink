@@ -15,6 +15,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 
@@ -571,6 +573,12 @@ export default function TraduzioniScreen() {
   const [restartStatus, setRestartStatus] = useState<StepStatus>("idle");
   const [restartResult, setRestartResult] = useState("");
 
+  const [downloadLoading, setDownloadLoading] = useState(false);
+  const [downloadResult, setDownloadResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const [cleanupLoading2, setCleanupLoading2] = useState(false);
+  const [cleanupResult2, setCleanupResult2] = useState<string | null>(null);
+
   useEffect(() => {
     loadImportInfo();
     loadPrefs();
@@ -721,6 +729,8 @@ export default function TraduzioniScreen() {
     setExportStatus("loading");
     setExportResult("");
     setExportedFileUrl(null);
+    setDownloadResult(null);
+    setCleanupResult2(null);
     try {
       const resp = await apiRequest("POST", "/api/admin/translations/export", { langs: exportLangs });
       const data = await resp.json();
@@ -731,6 +741,73 @@ export default function TraduzioniScreen() {
     } catch (e: any) {
       setExportStatus("error");
       setExportResult(e?.message || "Errore durante l'esportazione");
+    }
+  }
+
+  async function handleDownloadCsv() {
+    setDownloadLoading(true);
+    setDownloadResult(null);
+    try {
+      const langs = exportLangs.length > 0 ? exportLangs : ["en", "de", "es", "fr", "tr"];
+      const url = new URL(
+        `/api/admin/translations/download-csv?langs=${langs.join(",")}`,
+        getApiUrl()
+      );
+
+      if (Platform.OS === "web") {
+        const resp = await fetch(url.toString(), { credentials: "include" });
+        if (!resp.ok) throw new Error("Errore download");
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = `BikerLink_Traduzioni_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(blobUrl);
+        setDownloadResult({ ok: true, msg: "Download avviato" });
+      } else {
+        const resp = await fetch(url.toString(), { credentials: "include" });
+        if (!resp.ok) throw new Error("Errore download");
+        const csvText = await resp.text();
+        const filePath = `${FileSystem.cacheDirectory}BikerLink_Traduzioni.csv`;
+        await FileSystem.writeAsStringAsync(filePath, csvText, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(filePath, {
+            mimeType: "text/csv",
+            dialogTitle: "Salva CSV Traduzioni",
+          });
+          setDownloadResult({ ok: true, msg: "File CSV pronto da condividere" });
+        } else {
+          setDownloadResult({ ok: false, msg: "Condivisione non disponibile su questo dispositivo" });
+        }
+      }
+    } catch (e: any) {
+      setDownloadResult({ ok: false, msg: e?.message || "Errore download" });
+    } finally {
+      setDownloadLoading(false);
+    }
+  }
+
+  async function handleCleanupInline() {
+    setCleanupLoading2(true);
+    setCleanupResult2(null);
+    try {
+      const url = new URL("/api/admin/drive/cleanup-exports", getApiUrl());
+      const resp = await fetch(url.toString(), { method: "DELETE", credentials: "include" });
+      const data = await resp.json();
+      if (!resp.ok) {
+        setCleanupResult2(`Errore: ${data.message ?? "sconosciuto"}`);
+      } else {
+        const mb = data.freed > 0 ? ` (${(data.freed / 1024 / 1024).toFixed(1)} MB liberati)` : "";
+        setCleanupResult2(`OK: eliminati ${data.deleted} file${mb}. Riprova l'esportazione.`);
+      }
+    } catch {
+      setCleanupResult2("Errore di rete");
+    } finally {
+      setCleanupLoading2(false);
     }
   }
 
@@ -920,6 +997,64 @@ export default function TraduzioniScreen() {
             <MaterialIcons name="open-in-new" size={16} color={Colors.accent} />
             <Text style={styles.linkButtonText}>Apri Google Sheet</Text>
           </TouchableOpacity>
+        ) : null}
+
+        <View style={styles.sectionDivider} />
+
+        <TouchableOpacity
+          style={[styles.secondaryButton, downloadLoading && styles.buttonDisabled]}
+          onPress={handleDownloadCsv}
+          disabled={downloadLoading}
+          activeOpacity={0.7}
+        >
+          {downloadLoading ? (
+            <ActivityIndicator color={Colors.accent} size="small" />
+          ) : (
+            <MaterialCommunityIcons name="download" size={16} color={Colors.accent} />
+          )}
+          <Text style={styles.secondaryButtonText}>
+            {downloadLoading ? "Generazione..." : "Scarica CSV direttamente"}
+          </Text>
+        </TouchableOpacity>
+
+        {downloadResult ? (
+          <View style={[styles.inlineHint, downloadResult.ok ? styles.inlineHintOk : styles.inlineHintErr]}>
+            <MaterialCommunityIcons
+              name={downloadResult.ok ? "check-circle-outline" : "alert-circle-outline"}
+              size={14}
+              color={downloadResult.ok ? "#4CAF50" : "#eb5757"}
+            />
+            <Text style={[styles.inlineHintText, { color: downloadResult.ok ? "#4CAF50" : "#eb5757" }]}>
+              {downloadResult.msg}
+            </Text>
+          </View>
+        ) : null}
+
+        {exportStatus === "error" && exportResult.toLowerCase().includes("quota") ? (
+          <View style={styles.quotaBox}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#FFC107" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.quotaText}>
+                Drive pieno. Premi per liberare spazio eliminando i vecchi export, poi riprova:
+              </Text>
+              <TouchableOpacity
+                style={[styles.cleanupButton, cleanupLoading2 && styles.buttonDisabled]}
+                onPress={handleCleanupInline}
+                disabled={cleanupLoading2}
+                activeOpacity={0.7}
+              >
+                {cleanupLoading2 ? (
+                  <ActivityIndicator color="#eb5757" size="small" />
+                ) : (
+                  <MaterialCommunityIcons name="trash-can-outline" size={14} color="#eb5757" />
+                )}
+                <Text style={styles.cleanupButtonText}>Libera spazio Drive</Text>
+              </TouchableOpacity>
+              {cleanupResult2 ? (
+                <Text style={styles.cleanupResultText}>{cleanupResult2}</Text>
+              ) : null}
+            </View>
+          </View>
         ) : null}
       </StepCard>
 
@@ -1464,5 +1599,76 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 3,
     marginTop: 2,
+  },
+  secondaryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  secondaryButtonText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.accent,
+  },
+  inlineHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 10,
+    borderRadius: 8,
+  },
+  inlineHintOk: {
+    backgroundColor: "rgba(76, 175, 80, 0.1)",
+  },
+  inlineHintErr: {
+    backgroundColor: "rgba(244, 67, 54, 0.1)",
+  },
+  inlineHintText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    flex: 1,
+  },
+  quotaBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    backgroundColor: "rgba(255,193,7,0.08)",
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,193,7,0.3)",
+  },
+  quotaText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "#FFC107",
+    lineHeight: 17,
+    marginBottom: 8,
+  },
+  cleanupButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(235,87,87,0.12)",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    alignSelf: "flex-start",
+  },
+  cleanupButtonText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: "#eb5757",
+  },
+  cleanupResultText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 6,
   },
 });

@@ -3463,6 +3463,57 @@ router.post("/translations/export", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/translations/download-csv", async (req: Request, res: Response) => {
+  try {
+    const langsParam = ((req.query.langs as string) || "").trim();
+    const langs = langsParam
+      ? langsParam.split(",").filter((l) => ALLOWED_LANGS.has(l.trim())).map((l) => l.trim())
+      : Array.from(ALLOWED_LANGS);
+
+    const itPath = path.resolve(process.cwd(), "lib/i18n/it.ts");
+    const raw = fs.readFileSync(itPath, "utf-8");
+
+    const keyMap: Record<string, { position: string; it: string }> = {};
+    const lineRegex = /^\s*"([^"]+)":\s*"((?:[^"\\]|\\.)*)"/;
+    for (const line of raw.split("\n")) {
+      const match = line.match(lineRegex);
+      if (match) {
+        const key = match[1];
+        const itText = match[2].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+        keyMap[key] = { position: buildKeyPositionLabel(key), it: itText };
+      }
+    }
+
+    function csvEscape(value: string): string {
+      if (value.includes(",") || value.includes('"') || value.includes("\n") || value.includes("\r")) {
+        return '"' + value.replace(/"/g, '""') + '"';
+      }
+      return value;
+    }
+
+    const csvHeaders = ["Chiave", "Posizione nell'app", "IT (fonte)", ...langs.map((l) => l.toUpperCase())];
+    const csvRows = Object.entries(keyMap).map(([key, val]) => {
+      const row: string[] = [key, val.position, val.it];
+      for (const _l of langs) row.push("");
+      return row;
+    });
+
+    const csvContent =
+      "\uFEFF" +
+      [csvHeaders, ...csvRows]
+        .map((row) => row.map(csvEscape).join(","))
+        .join("\r\n");
+
+    const filename = `BikerLink_Traduzioni_${new Date().toISOString().slice(0, 10)}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.send(csvContent);
+  } catch (error) {
+    console.error("[translations/download-csv] error:", error);
+    return res.status(500).json({ message: "Errore durante il download CSV" });
+  }
+});
+
 function getImportInfo() {
   return {
     exportedFileId: TRANSLATIONS_STAGING.exportedFileId,
