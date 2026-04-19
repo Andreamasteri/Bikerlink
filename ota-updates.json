@@ -3735,7 +3735,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-19T01:05:24.247Z"
+  },
+  {
+    "updateNumber": 111,
+    "version": "1.111.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-111 rv7.0.0: Fix freeze al GO del countdown",
+    "note": "Import statico expo-sensors (rimosso dynamic require che bloccava il JS thread al primo avvio). Accelerometro avviato durante il countdown (warmup) anziche al GO — modulo gia carico alla transizione. Aggiunta guardia accelSubRef.current in beginActiveTracking per non riavviarlo. Riduzione setState accelerometro: ogni 2 campioni anziche ogni campione. Fix: nessun await inside setInterval per countdown tick. CURRENT_OTA_NUMBER=111.",
+    "releaseId": "7b30ed81-23ef-4d30-8bbe-ad2d557e28ac",
+    "bundleUrl": "private/ota/ota-1.111.0-1776561360061.js",
+    "updateGroupId": "73bc95d8-f901-46f5-9b51-a41e37c44498",
+    "androidUpdateId": "019da34f-b761-7085-be88-5fac21ba160c",
+    "iosUpdateId": null,
+    "commitBase": "02b6aefa578b63a7be104c37739a551bd7617378",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/73bc95d8-f901-46f5-9b51-a41e37c44498",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-19T01:16:03.007Z"
   }
 ]

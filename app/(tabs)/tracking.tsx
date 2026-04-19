@@ -34,6 +34,7 @@ import { setTrackingActive, setHandsOffBroadcast, setSprintMeasuringBroadcast } 
 import * as Haptics from "expo-haptics";
 import { logGpsError } from "@/lib/gps-logger";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Accelerometer } from "expo-sensors";
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1090,9 +1091,8 @@ export default function TrackingScreen() {
     if (Platform.OS === "web") return;
     const interval = is0100EnabledRef.current ? 100 : 250;
     try {
-      // Dynamic require inside the function to avoid module-level side effects
-      const { Accelerometer } = require("expo-sensors") as typeof import("expo-sensors");
       Accelerometer.setUpdateInterval(interval);
+      let sampleCount = 0;
       const sub = Accelerometer.addListener(({ x: _x, y, z: _z }) => {
         // Calibration: average first 20 samples to remove gravity offset
         if (accelBaselineRef.current === null) {
@@ -1104,15 +1104,19 @@ export default function TrackingScreen() {
           }
           return;
         }
+        // Only update state every 2 samples to reduce re-render frequency
+        sampleCount++;
         const gLong = y - accelBaselineRef.current;
-        setCurrentG(gLong);
         if (gLong > maxAccelGRef.current) {
           maxAccelGRef.current = gLong;
-          setMaxAccelG(gLong);
         }
         if (-gLong > maxDecelGRef.current) {
           maxDecelGRef.current = -gLong;
-          setMaxDecelG(-gLong);
+        }
+        if (sampleCount % 2 === 0) {
+          setCurrentG(gLong);
+          setMaxAccelG(maxAccelGRef.current);
+          setMaxDecelG(maxDecelGRef.current);
         }
       });
       accelSubRef.current = sub;
@@ -1143,7 +1147,10 @@ export default function TrackingScreen() {
       if (!isPausedRef.current) flushPoints();
     }, BATCH_FLUSH_MS);
 
-    startAccelerometer();
+    // Avvia accelerometro solo se non già attivo (potrebbe essere già partito durante il countdown)
+    if (!accelSubRef.current) {
+      startAccelerometer();
+    }
 
     if (Platform.OS !== "web") {
       const config = getModeConfig(profileRef.current);
@@ -1220,8 +1227,11 @@ export default function TrackingScreen() {
         phaseRef.current = "countdown";
         setPhase("countdown");
 
+        // Avvia accelerometro durante il countdown (warmup) — evita freeze al GO
+        startAccelerometer();
+
         let remaining = secs;
-        const tick = setInterval(async () => {
+        const tick = setInterval(() => {
           remaining -= 1;
           setCountdownValue(remaining);
 
@@ -1239,7 +1249,9 @@ export default function TrackingScreen() {
 
           if (remaining <= 0) {
             clearInterval(tick);
-            await beginActiveTracking();
+            beginActiveTracking().catch((e) => {
+              logGpsError(e, "beginActiveTracking-from-countdown");
+            });
           }
         }, 1000);
         } // end secs > 0 else
@@ -1260,6 +1272,7 @@ export default function TrackingScreen() {
     resetTrackingState,
     clearGpsBuffer,
     beginActiveTracking,
+    startAccelerometer,
     countdownAnim,
   ]);
 
