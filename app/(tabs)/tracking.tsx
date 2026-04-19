@@ -478,6 +478,7 @@ export default function TrackingScreen() {
   const [handsOffActive, setHandsOffActive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [summaryVisible, setSummaryVisible] = useState(false);
+  const [mapModalVisible, setMapModalVisible] = useState(false);
   const [summaryRoutePoints, setSummaryRoutePoints] = useState<Array<{ lat: number; lng: number }>>([]);
   const [routeMapVisible, setRouteMapVisible] = useState(false);
   const [publishRecord, setPublishRecord] = useState<RouteRecord | null>(null);
@@ -559,6 +560,7 @@ export default function TrackingScreen() {
   const sprintPhaseRef = useRef<"waiting" | "measuring" | "done">("waiting");
   const handsOffAnim = useRef(new Animated.Value(1)).current;
   const sprint0to100MsRef = useRef<number | null>(null);
+  const emaSpeedRef = useRef<number>(0);
   const gpsOfflineBufferRef = useRef<GpsPoint[]>([]);
   const gpsOfflineWriteCountRef = useRef(0);
   const bufferWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -856,8 +858,10 @@ export default function TrackingScreen() {
       const { latitude, longitude, altitude, speed, accuracy } = loc.coords;
       const now = loc.timestamp;
       const speedKmh = speed !== null && speed >= 0 ? speed * 3.6 : 0;
+      const smoothedSpeed = emaSpeedRef.current * 0.7 + speedKmh * 0.3;
+      emaSpeedRef.current = smoothedSpeed;
 
-      setCurrentSpeed(speedKmh);
+      setCurrentSpeed(smoothedSpeed);
       setGpsAccuracy(accuracy ?? null);
 
       if (handsOffEnabledRef.current) {
@@ -952,8 +956,10 @@ export default function TrackingScreen() {
       const { latitude, longitude, altitude, speed, accuracy } = pos.coords;
       const speedKmh = speed !== null && speed >= 0 ? speed * 3.6 : 0;
       const now = pos.timestamp;
+      const smoothedSpeed = emaSpeedRef.current * 0.7 + speedKmh * 0.3;
+      emaSpeedRef.current = smoothedSpeed;
 
-      setCurrentSpeed(speedKmh);
+      setCurrentSpeed(smoothedSpeed);
       setGpsAccuracy(accuracy ?? null);
 
       if (handsOffEnabledRef.current) {
@@ -1080,6 +1086,7 @@ export default function TrackingScreen() {
     sprintStartTimeRef.current = null;
     sprintPhaseRef.current = "waiting";
     sprint0to100MsRef.current = null;
+    emaSpeedRef.current = 0;
     pausedMsRef.current = 0;
     isPausedRef.current = false;
     setIsCalibrating(false);
@@ -1224,10 +1231,11 @@ export default function TrackingScreen() {
       // so they don't mix with the new ride's points
       await clearGpsBuffer();
 
-      const route = (await apiRequest("POST", "/api/routes", {
+      const routeRes = await apiRequest("POST", "/api/routes", {
         trackingFrequency: profile === "race" ? 1 : profile === "easy" ? 3 : 2,
         isSprint: is0100EnabledRef.current,
-      })) as unknown as RouteRecord;
+      });
+      const route = (await routeRes.json()) as RouteRecord;
       routeIdRef.current = route.id;
 
       if (countdownEnabled) {
@@ -1562,6 +1570,15 @@ export default function TrackingScreen() {
               <Text style={styles.speedUnit}>{speedUnitLabel(speedUnit)}</Text>
             </View>
 
+            {/* Map (standard mode only) — tap to open fullscreen */}
+            {!is0100Enabled && currentCoord !== null && (
+              <TouchableOpacity activeOpacity={0.95} onPress={() => setMapModalVisible(true)}>
+                <View style={styles.mapCard}>
+                  <TrackingMap points={mapCoords} currentLocation={currentCoord} />
+                </View>
+              </TouchableOpacity>
+            )}
+
             {/* Stats — standard mode */}
             {!is0100Enabled && (
               <View style={styles.statsRow}>
@@ -1724,13 +1741,6 @@ export default function TrackingScreen() {
               </View>
             )}
 
-            {/* Map (standard mode only) */}
-            {!is0100Enabled && currentCoord !== null && (
-              <View style={styles.mapCard}>
-                <TrackingMap points={mapCoords} currentLocation={currentCoord} />
-              </View>
-            )}
-
             {/* Buffer indicator */}
             <View style={styles.bufferRow}>
               <Ionicons name="cloud-upload-outline" size={14} color={Colors.accent} />
@@ -1741,6 +1751,30 @@ export default function TrackingScreen() {
           </ScrollView>
         </View>
       )}
+
+      {/* ── MAP FULLSCREEN MODAL ─────────────────────────────────────────── */}
+      <Modal
+        visible={mapModalVisible}
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setMapModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "#000" }}
+          activeOpacity={1}
+          onPress={() => setMapModalVisible(false)}
+        >
+          {currentCoord !== null && (
+            <TrackingMap points={mapCoords} currentLocation={currentCoord} />
+          )}
+          <View style={styles.mapModalSpeed}>
+            <Text style={styles.mapModalSpeedValue}>
+              {convertSpeed(currentSpeed, speedUnit).toFixed(0)}
+            </Text>
+            <Text style={styles.mapModalSpeedUnit}>{speedUnitLabel(speedUnit)}</Text>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* ── IDLE (pre-start) ─────────────────────────────────────────────── */}
       {phase === "idle" && (
@@ -2492,6 +2526,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     height: 220,
+  },
+
+  // Map fullscreen modal
+  mapModalSpeed: {
+    position: "absolute" as const,
+    bottom: 48,
+    left: 0,
+    right: 0,
+    alignItems: "center" as const,
+  },
+  mapModalSpeedValue: {
+    fontSize: 72,
+    fontFamily: "Inter_700Bold" as const,
+    color: Colors.accent,
+    lineHeight: 80,
+    letterSpacing: -2,
+  },
+  mapModalSpeedUnit: {
+    fontSize: 18,
+    fontFamily: "Inter_600SemiBold" as const,
+    color: Colors.accent,
+    marginTop: -4,
   },
 
   // Buffer

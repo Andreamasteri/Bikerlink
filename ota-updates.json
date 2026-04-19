@@ -3850,7 +3850,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-19T09:18:50.350Z"
+  },
+  {
+    "updateNumber": 116,
+    "version": "1.116.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-116 rv7.0.0: Fix salvataggio giri + EMA velocità + layout mappa + fullscreen mappa + messaggio benvenuto Admin",
+    "note": "Fix critico: apiRequest('POST /api/routes') ritornava Response non JSON, routeIdRef era sempre null → nessun giro veniva salvato. Fix: aggiunto .json() dopo await. EMA smoothing α=0.3 su currentSpeed in onNativeLocation e onWebLocation (emaSpeedRef). Layout attivo riordinato: velocità → mappa → stats. Mappa tappabile → Modal fullscreen con velocità arancione in basso. Messaggio di benvenuto automatico da Admin al nuovo utente registrato. CURRENT_OTA_NUMBER=116.",
+    "releaseId": "10ef99c3-dad2-4a9f-a667-e194142e8ebb",
+    "bundleUrl": "private/ota/ota-1.116.0-1776620390817.js",
+    "updateGroupId": "afd8e024-6287-4514-9fb8-3f0915f2442d",
+    "androidUpdateId": "019da6d4-8fde-7253-8bb9-4d1e4d45ca5e",
+    "iosUpdateId": null,
+    "commitBase": "ec8fc68fc802a631eb2fb576f43907d60ae7df06",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/afd8e024-6287-4514-9fb8-3f0915f2442d",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-19T17:39:53.658Z"
   }
 ]
