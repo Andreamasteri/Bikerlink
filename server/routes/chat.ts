@@ -2,10 +2,11 @@ import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import { storage } from "../storage";
 import { db } from "../db";
-import { motoClubs, motoClubMembers, users } from "@shared/schema";
-import { eq, and, ne } from "drizzle-orm";
+import { motoClubs, motoClubMembers, users, messages, conversationParticipants } from "@shared/schema";
+import { eq, and, ne, inArray, desc } from "drizzle-orm";
 import { sendEmail } from "../email";
 import { uploadBuffer, downloadBuffer } from "../objectStorage";
+import { addSseClient, removeSseClient, notifyChatEvent } from "../chat-sse";
 
 const chatImageUpload = multer({
   storage: multer.memoryStorage(),
@@ -386,6 +387,30 @@ async function filterPhoneNumbers(content: string, conversationId: string, sende
   };
 }
 
+router.get("/stream", (req: Request, res: Response) => {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+
+  res.write("event: connected\ndata: {}\n\n");
+
+  addSseClient(userId, res);
+
+  const heartbeat = setInterval(() => {
+    try { res.write(":heartbeat\n\n"); } catch { clearInterval(heartbeat); }
+  }, 25000);
+
+  req.on("close", () => {
+    clearInterval(heartbeat);
+    removeSseClient(userId);
+  });
+});
+
 router.get("/unread-total", async (req: Request, res: Response) => {
   try {
     const userId = requireAuth(req, res);
@@ -433,49 +458,76 @@ router.get("/conversations", async (req: Request, res: Response) => {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
-    const blockedIds = await storage.getBlockedUserIds(userId);
+    const [blockedIds, convs] = await Promise.all([
+      storage.getBlockedUserIds(userId),
+      storage.getConversations(userId),
+    ]);
     const blockedSet = new Set(blockedIds);
 
-    const convs = await storage.getConversations(userId);
+    if (convs.length === 0) return res.json([]);
 
-    const result = (await Promise.all(
-      convs.map(async (conv) => {
-        const participants = await storage.getConversationParticipants(conv.id);
-        const msgs = await storage.getMessages(conv.id, 1, 0);
-        const lastMessage = msgs[0] || null;
+    const convIds = convs.map(c => c.id);
 
-        const isDirectConv = conv.conversationType === "direct" || conv.conversationType === "private" || conv.conversationType === "contact";
-        if (isDirectConv) {
-          const otherParticipantIds = participants.filter(p => p.userId !== userId).map(p => p.userId);
-          if (otherParticipantIds.some(id => blockedSet.has(id))) {
-            return null;
-          }
-        }
-
-        const participantUsers = await Promise.all(
-          participants.map(async (p) => {
-            const user = await storage.getUser(p.userId);
-            return user
-              ? { id: user.id, nickname: user.nickname, avatarUrl: user.avatarUrl, userType: user.userType, sex: user.sex }
-              : null;
-          })
-        );
-
-        const myParticipant = participants.find((p) => p.userId === userId);
-        const unreadCount = lastMessage && lastMessage.senderId !== userId
-          ? myParticipant?.lastReadAt
-            ? new Date(lastMessage.createdAt) > new Date(myParticipant.lastReadAt) ? 1 : 0
-            : 1
-          : 0;
-
-        return {
-          ...conv,
-          participants: participantUsers.filter(Boolean),
-          lastMessage,
-          unreadCount,
-        };
+    const [allParticipants, lastMsgs] = await Promise.all([
+      db.select().from(conversationParticipants).where(inArray(conversationParticipants.conversationId, convIds)),
+      db.selectDistinctOn([messages.conversationId], {
+        id: messages.id,
+        conversationId: messages.conversationId,
+        senderId: messages.senderId,
+        messageType: messages.messageType,
+        content: messages.content,
+        imageUrl: messages.imageUrl,
+        latitude: messages.latitude,
+        longitude: messages.longitude,
+        isFiltered: messages.isFiltered,
+        createdAt: messages.createdAt,
+        playlistId: messages.playlistId,
       })
-    )).filter(Boolean);
+        .from(messages)
+        .where(inArray(messages.conversationId, convIds))
+        .orderBy(messages.conversationId, desc(messages.createdAt)),
+    ]);
+
+    const allUserIds = [...new Set(allParticipants.map(p => p.userId))];
+    const allUsers = allUserIds.length > 0
+      ? await db.select({ id: users.id, nickname: users.nickname, avatarUrl: users.avatarUrl, userType: users.userType, sex: users.sex })
+          .from(users).where(inArray(users.id, allUserIds))
+      : [];
+    const userMap = new Map(allUsers.map(u => [u.id, u]));
+    const lastMsgMap = new Map(lastMsgs.map(m => [m.conversationId, m]));
+
+    const participantsByConv = new Map<string, typeof allParticipants>();
+    for (const p of allParticipants) {
+      if (!participantsByConv.has(p.conversationId)) participantsByConv.set(p.conversationId, []);
+      participantsByConv.get(p.conversationId)!.push(p);
+    }
+
+    const result = convs.map(conv => {
+      const participants = participantsByConv.get(conv.id) ?? [];
+      const lastMessage = lastMsgMap.get(conv.id) ?? null;
+
+      const isDirectConv = conv.conversationType === "direct" || conv.conversationType === "private" || conv.conversationType === "contact";
+      if (isDirectConv) {
+        const otherIds = participants.filter(p => p.userId !== userId).map(p => p.userId);
+        if (otherIds.some(id => blockedSet.has(id))) return null;
+      }
+
+      const participantUsers = participants.map(p => userMap.get(p.userId) ?? null).filter(Boolean);
+
+      const myParticipant = participants.find(p => p.userId === userId);
+      const unreadCount = lastMessage && lastMessage.senderId !== userId
+        ? myParticipant?.lastReadAt
+          ? new Date(lastMessage.createdAt) > new Date(myParticipant.lastReadAt) ? 1 : 0
+          : 1
+        : 0;
+
+      return {
+        ...conv,
+        participants: participantUsers,
+        lastMessage,
+        unreadCount,
+      };
+    }).filter(Boolean);
 
     return res.json(result);
   } catch (error) {
@@ -671,17 +723,17 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
 
     const msgs = await storage.getMessages(id, limit, offset);
 
-    const result = await Promise.all(
-      msgs.map(async (msg) => {
-        const sender = await storage.getUser(msg.senderId);
-        return {
-          ...msg,
-          sender: sender
-            ? { id: sender.id, nickname: sender.nickname, avatarUrl: sender.avatarUrl, userType: sender.userType, sex: sender.sex }
-            : null,
-        };
-      })
-    );
+    const senderIds = [...new Set(msgs.map(m => m.senderId))];
+    const senderUsers = senderIds.length > 0
+      ? await db.select({ id: users.id, nickname: users.nickname, avatarUrl: users.avatarUrl, userType: users.userType, sex: users.sex })
+          .from(users).where(inArray(users.id, senderIds))
+      : [];
+    const senderMap = new Map(senderUsers.map(u => [u.id, u]));
+
+    const result = msgs.map(msg => ({
+      ...msg,
+      sender: senderMap.get(msg.senderId) ?? null,
+    }));
 
     await storage.updateConversationLastRead(id, userId);
 
@@ -934,12 +986,19 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
 
     const sender = await storage.getUser(userId);
 
-    return res.status(201).json({
+    const messagePayload = {
       ...message,
       sender: sender
         ? { id: sender.id, nickname: sender.nickname, avatarUrl: sender.avatarUrl, userType: sender.userType }
         : null,
-    });
+    };
+
+    notifyChatEvent(
+      participants.map(p => p.userId),
+      { type: "new_message", conversationId: id, message: messagePayload }
+    );
+
+    return res.status(201).json(messagePayload);
   } catch (error) {
     console.error("Send message error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -982,12 +1041,19 @@ router.post("/conversations/:id/images", chatImageUpload.single("image"), async 
     await storage.updateConversationTimestamp(conversationId);
 
     const sender = await storage.getUser(userId);
-    return res.status(201).json({
+    const imagePayload = {
       ...message,
       sender: sender
         ? { id: sender.id, nickname: sender.nickname, avatarUrl: sender.avatarUrl, userType: sender.userType }
         : null,
-    });
+    };
+
+    notifyChatEvent(
+      participants.map(p => p.userId),
+      { type: "new_message", conversationId, message: imagePayload }
+    );
+
+    return res.status(201).json(imagePayload);
   } catch (error) {
     console.error("Chat image upload error:", error);
     return res.status(500).json({ message: "Errore interno del server" });

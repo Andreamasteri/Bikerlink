@@ -13,6 +13,7 @@ import {
   TextInput,
   Alert,
   Switch,
+  AppState,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native";
 import { useRouter } from "expo-router";
@@ -27,6 +28,7 @@ import { useT } from "@/lib/language-context";
 import { getCurrentLocale } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import FavoriteStar from "@/components/FavoriteStar";
+import { useChatSSE } from "@/hooks/useChatSSE";
 
 interface FriendItem {
   id: string;
@@ -194,12 +196,25 @@ export default function ChatScreen() {
 
   const { data: conversations, isLoading } = useQuery<ConversationItem[]>({
     queryKey: ["/api/chat/conversations"],
-    refetchInterval: 10000,
+    refetchInterval: 15000,
   });
 
   const { data: friends } = useQuery<FriendItem[]>({
     queryKey: ["/api/friends"],
   });
+
+  useChatSSE(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+  });
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   useFocusEffect(
     useCallback(() => {

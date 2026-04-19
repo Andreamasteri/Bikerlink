@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useMemo } from "react";
+import React, { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Modal,
   Image,
   Pressable,
+  AppState,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -25,6 +26,7 @@ import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
 import FavoriteStar from "@/components/FavoriteStar";
+import { useChatSSE } from "@/hooks/useChatSSE";
 
 interface MessageSender {
   id: string;
@@ -279,9 +281,26 @@ export default function ChatConversationScreen() {
 
   const { data: messages, isLoading } = useQuery<ChatMessage[]>({
     queryKey: ["/api/chat/conversations", id, "messages"],
-    refetchInterval: 5000,
+    refetchInterval: 15000,
     enabled: !!id,
   });
+
+  useChatSSE((event) => {
+    if (event.conversationId === id) {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", id, "messages"] });
+    }
+    queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+  });
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", id, "messages"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      }
+    });
+    return () => sub.remove();
+  }, [id]);
 
   const activeHashtags = useMemo(() => parseHashtagsFromInput(hashtagInput), [hashtagInput]);
 
