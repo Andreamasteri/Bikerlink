@@ -2236,11 +2236,14 @@ export default function TrackingScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.summaryCloseBtn}
-                onPress={() => {
+                onPress={async () => {
                   if (completedRouteId && rideTitle.trim()) {
-                    apiRequest("PATCH", `/api/routes/${completedRouteId}/title`, {
-                      title: rideTitle.trim(),
-                    }).catch(() => {});
+                    try {
+                      await apiRequest("PATCH", `/api/routes/${completedRouteId}/title`, {
+                        title: rideTitle.trim(),
+                      });
+                      queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
+                    } catch (_) {}
                   }
                   setSummaryVisible(false);
                 }}

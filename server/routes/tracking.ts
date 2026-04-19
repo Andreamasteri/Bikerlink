@@ -316,6 +316,9 @@ router.patch("/:id/title", async (req: Request, res: Response) => {
     if (!title || typeof title !== "string" || title.trim().length === 0) {
       return res.status(400).json({ message: "Titolo non valido" });
     }
+    if (title.trim().length > 200) {
+      return res.status(400).json({ message: "Titolo troppo lungo (max 200 caratteri)" });
+    }
 
     const titleUpdate: Partial<import("../../shared/schema").InsertRoute> = { title: title.trim() };
     await storage.updateRoute(id, titleUpdate);
