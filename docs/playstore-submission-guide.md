@@ -8,7 +8,7 @@ Segui questa checklist nell'ordine indicato. Ogni passo ha le risposte già prec
 
 - [ ] Hai un account Google personale (Gmail) da usare come sviluppatore
 - [ ] Hai €25 disponibili per la quota una-tantum Google Play Developer
-- [ ] Hai l'APK di BikerLink (versionCode 29): https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk
+- [ ] Hai generato l'AAB (versionCode 30) seguendo il PASSO 3 — vedi istruzioni sotto
 - [ ] Hai letto `docs/playstore-listing.md` per i testi pronti
 
 ---
@@ -52,25 +52,22 @@ Clicca **"Crea app"**.
 > - Google Play Store richiede **AAB** (Android App Bundle) per la pubblicazione pubblica
 > - Il codice è già pronto con **versionCode 30** — serve solo avviare il build EAS
 
-### Come generare l'AAB (versionCode 30)
+### AAB pronto — versionCode 30
 
-**Opzione A — Dashboard EAS (consigliata, 1 click):**
+| Campo | Valore |
+|---|---|
+| **Scarica AAB** | https://expo.dev/artifacts/eas/fJ6BA3F6wrhESvmNmqwC1K.aab |
+| Build ID | `7740a399-bdb9-415d-b3d9-d65d09f4be6b` |
+| Dashboard EAS | https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/7740a399-bdb9-415d-b3d9-d65d09f4be6b |
+| versionCode | **30** |
+| Profilo | production |
+| Status | ✅ FINISHED |
 
-1. Vai su: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds
-2. Clicca **"New Build"**
-3. Seleziona:
-   - Platform: **Android**
-   - Profile: **production**
-4. Conferma (potrebbe chiedere di usare minuti pay-as-you-go se il piano mensile è esaurito)
-5. Il build dura ~20-30 minuti — ricevi email a completamento
-6. Scarica il file `.aab` dalla dashboard EAS e caricalo qui su Play Console
+**Passi:**
+1. Scarica il file `.aab` dal link sopra
+2. Caricalo su Play Console
+3. Nel campo **"Note sulla versione"** inserisci:
 
-**Opzione B — Terminale locale:**
-```bash
-EXPO_TOKEN=<il_tuo_token> npx eas build --platform android --profile production
-```
-
-**Note sulla versione da inserire:**
 ```
 Prima versione pubblica di BikerLink.
 Funzionalità: matching tra motociclisti, tracking GPS percorsi, SOS emergenza stradale, MotoClub, Garage, integrazione Spotify/Last.fm, contest fotografici settimanali.
@@ -256,8 +253,8 @@ Le cause più comuni per app social/localizzazione:
 1. Condividi il link Play Store nella community BikerLink
 2. Monitora le recensioni (rispondi entro 24-48h)
 3. Tieni d'occhio il **Android Vitals** nel Play Console (crash rate, ANR)
-4. Per aggiornamenti: bump `versionCode` in `app.json` + nuovo APK EAS
+4. Per aggiornamenti: bump `versionCode` in `app.json` + `android/app/build.gradle` → nuovo AAB EAS (profilo production)
 
 ---
 
-*File generato il 19 aprile 2026 — BikerLink v1.9.3 (versionCode 29)*
+*File generato il 19 aprile 2026 — BikerLink v1.9.4 (versionCode 30) — AAB production*
