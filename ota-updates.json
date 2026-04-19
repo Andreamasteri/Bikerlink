@@ -3873,7 +3873,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-19T17:39:53.658Z"
+  },
+  {
+    "updateNumber": 117,
+    "version": "1.117.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-117 rv7.0.0: Velocità media ogni 6min, speed +25%, GO visibile, 0-100 fix, Hands-Off label volume",
+    "note": "Task #758. Velocità media nel pannello statistiche aggiornata solo ogni 6 minuti (throttle via lastAvgSpeedUpdateRef). Font velocità istantanea +25%: 52→65pt (lineHeight 58→70), sprint 58→73pt. Countdown: dopo arrivo a 0 mostra GO verde per 800ms prima di avviare il tracking. Modalità 0-100: countdown sempre forzato a 10s, Mostra percorso disabilitato e grayed-out. Overlay Hands-Off: aggiunto testo 'Abbassa 5 volte velocemente il volume per disattivare'. CURRENT_OTA_NUMBER=117.",
+    "releaseId": "88d35317-a498-45b1-b4ad-d1de2b22d82f",
+    "bundleUrl": "private/ota/ota-1.117.0-1776623049634.js",
+    "updateGroupId": "5e9728c2-9e00-4814-b254-f1dc9ec6135d",
+    "androidUpdateId": "019da6fd-0fed-7338-87bb-b8d5b4714730",
+    "iosUpdateId": null,
+    "commitBase": "e3db7e8a2c6803255c02f58ec1e0b8be6d7f3677",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/5e9728c2-9e00-4814-b254-f1dc9ec6135d",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-19T18:24:12.309Z"
   }
 ]

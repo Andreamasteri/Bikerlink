@@ -568,11 +568,15 @@ export default function TrackingScreen() {
   const gpsOfflineBufferRef = useRef<GpsPoint[]>([]);
   const gpsOfflineWriteCountRef = useRef(0);
   const bufferWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const lastAvgSpeedUpdateRef = useRef(0);
 
   // Derived
   const isFermo = currentSpeed <= IDLE_THRESHOLD_KMH;
   const netMs = Math.max(totalMs - displayIdleMs, 0);
   const avgSpeedKmh = netMs > 0 ? totalKm / (netMs / 3600000) : 0;
+
+  // Throttled avg speed — updated only every 6 minutes
+  const [avgSpeedDisplayKmh, setAvgSpeedDisplayKmh] = useState(0);
   const accuracyTier = getAccuracyTier(gpsAccuracy);
 
   // ── Records query ──────────────────────────────────────────────────────────
@@ -902,6 +906,17 @@ export default function TrackingScreen() {
       }
       lastPosRef.current = { lat: latitude, lng: longitude, time: now };
 
+      // Throttle avg speed display — update only every 6 minutes
+      const _avgNow = Date.now();
+      if (_avgNow - lastAvgSpeedUpdateRef.current >= 360000) {
+        const _netMs = Math.max(
+          _avgNow - startTimeRef.current - pausedMsRef.current - idleMsRef.current,
+          0
+        );
+        if (_netMs > 0) setAvgSpeedDisplayKmh(totalKmRef.current / (_netMs / 3600000));
+        lastAvgSpeedUpdateRef.current = _avgNow;
+      }
+
       if (speedKmh > maxSpeedRef.current) {
         maxSpeedRef.current = speedKmh;
         setMaxSpeed(speedKmh);
@@ -998,6 +1013,17 @@ export default function TrackingScreen() {
       }
       lastPosRef.current = { lat: latitude, lng: longitude, time: now };
 
+      // Throttle avg speed display — update only every 6 minutes
+      const _avgNowWeb = Date.now();
+      if (_avgNowWeb - lastAvgSpeedUpdateRef.current >= 360000) {
+        const _netMsWeb = Math.max(
+          _avgNowWeb - startTimeRef.current - pausedMsRef.current - idleMsRef.current,
+          0
+        );
+        if (_netMsWeb > 0) setAvgSpeedDisplayKmh(totalKmRef.current / (_netMsWeb / 3600000));
+        lastAvgSpeedUpdateRef.current = _avgNowWeb;
+      }
+
       if (speedKmh > maxSpeedRef.current) {
         maxSpeedRef.current = speedKmh;
         setMaxSpeed(speedKmh);
@@ -1071,6 +1097,7 @@ export default function TrackingScreen() {
     setPointsSent(0);
     setSprintPhase("waiting");
     setSprint0to100Ms(null);
+    setAvgSpeedDisplayKmh(0);
 
     totalKmRef.current = 0;
     maxSpeedRef.current = 0;
@@ -1091,6 +1118,7 @@ export default function TrackingScreen() {
     sprintPhaseRef.current = "waiting";
     sprint0to100MsRef.current = null;
     emaSpeedRef.current = 0;
+    lastAvgSpeedUpdateRef.current = 0;
     pausedMsRef.current = 0;
     isPausedRef.current = false;
     setIsCalibrating(false);
@@ -1242,23 +1270,22 @@ export default function TrackingScreen() {
       const route = (await routeRes.json()) as RouteRecord;
       routeIdRef.current = route.id;
 
-      if (countdownEnabled) {
-        const _parsed = parseInt(countdownSec, 10);
-        const secs = isNaN(_parsed) ? 10 : Math.max(_parsed, 0);
-        if (secs === 0) {
-          // Immediate start — bypass countdown
-          phaseRef.current = "active";
-          setPhase("active");
-          await beginActiveTracking();
-        } else {
-        setCountdownValue(secs);
+      // When 0-100 is active, always force countdown to 10s
+      const effectiveCountdownSecs = is0100Enabled
+        ? 10
+        : countdownEnabled
+        ? Math.max(parseInt(countdownSec, 10) || 0, 0)
+        : 0;
+
+      if (effectiveCountdownSecs > 0) {
+        setCountdownValue(effectiveCountdownSecs);
         phaseRef.current = "countdown";
         setPhase("countdown");
 
         // Avvia accelerometro durante il countdown (warmup) — evita freeze al GO
         startAccelerometer();
 
-        let remaining = secs;
+        let remaining = effectiveCountdownSecs;
         const tick = setInterval(() => {
           remaining -= 1;
           setCountdownValue(remaining);
@@ -1277,12 +1304,14 @@ export default function TrackingScreen() {
 
           if (remaining <= 0) {
             clearInterval(tick);
-            beginActiveTracking().catch((e) => {
-              logGpsError(e, "beginActiveTracking-from-countdown");
-            });
+            // Pause 800ms on "GO" before starting active tracking
+            setTimeout(() => {
+              beginActiveTracking().catch((e) => {
+                logGpsError(e, "beginActiveTracking-from-countdown");
+              });
+            }, 800);
           }
         }, 1000);
-        } // end secs > 0 else
       } else {
         await beginActiveTracking();
       }
@@ -1295,6 +1324,7 @@ export default function TrackingScreen() {
   }, [
     loading,
     profile,
+    is0100Enabled,
     countdownEnabled,
     countdownSec,
     resetTrackingState,
@@ -1469,6 +1499,9 @@ export default function TrackingScreen() {
             <Text style={styles.handsOffSub}>
               Si riattivano quando rallenti
             </Text>
+            <Text style={[styles.handsOffSub, { fontStyle: "italic", marginTop: 12, opacity: 0.7 }]}>
+              Abbassa 5 volte velocemente il volume per disattivare
+            </Text>
           </View>
         </View>
       </Modal>
@@ -1626,7 +1659,7 @@ export default function TrackingScreen() {
                   <StatCard
                     icon="speedometer-outline"
                     color={Colors.success}
-                    value={convertSpeed(avgSpeedKmh, speedUnit).toFixed(2)}
+                    value={convertSpeed(avgSpeedDisplayKmh, speedUnit).toFixed(2)}
                     label={`Vel. media ${speedUnitLabel(speedUnit)}`}
                   />
                   <StatCard
@@ -1854,7 +1887,7 @@ export default function TrackingScreen() {
           {/* Triggers */}
           <View style={styles.triggersSection}>
             {/* Countdown */}
-            <View style={styles.triggerRow}>
+            <View style={[styles.triggerRow, is0100Enabled && { opacity: 0.6 }]}>
               <View style={styles.triggerLeft}>
                 <Ionicons
                   name="timer-outline"
@@ -1866,9 +1899,9 @@ export default function TrackingScreen() {
               <TextInput
                 style={[
                   styles.triggerInput,
-                  !countdownEnabled && { opacity: 0.4 },
+                  !countdownEnabled && !is0100Enabled && { opacity: 0.4 },
                 ]}
-                value={countdownSec}
+                value={is0100Enabled ? "10" : countdownSec}
                 onChangeText={(v) =>
                   setCountdownSec(v.replace(/[^0-9]/g, "").slice(0, 2))
                 }
@@ -1876,13 +1909,14 @@ export default function TrackingScreen() {
                 placeholder="10"
                 placeholderTextColor={Colors.textSecondary}
                 maxLength={2}
-                editable={countdownEnabled}
+                editable={countdownEnabled && !is0100Enabled}
               />
               <Switch
-                value={countdownEnabled}
-                onValueChange={setCountdownEnabled}
+                value={is0100Enabled || countdownEnabled}
+                onValueChange={is0100Enabled ? undefined : setCountdownEnabled}
                 trackColor={{ false: Colors.border, true: Colors.accent + "80" }}
-                thumbColor={countdownEnabled ? Colors.accent : Colors.textSecondary}
+                thumbColor={is0100Enabled || countdownEnabled ? Colors.accent : Colors.textSecondary}
+                disabled={is0100Enabled}
               />
             </View>
 
@@ -1958,23 +1992,25 @@ export default function TrackingScreen() {
 
             {/* Show My Route — toggle reale */}
             <TouchableOpacity
-              style={styles.triggerRow}
-              onPress={() => setShowMyRoute((v) => !v)}
+              style={[styles.triggerRow, is0100Enabled && { opacity: 0.4 }]}
+              onPress={() => !is0100Enabled && setShowMyRoute((v) => !v)}
               activeOpacity={0.7}
+              disabled={is0100Enabled}
             >
               <View style={styles.triggerLeft}>
                 <Ionicons
                   name="map-outline"
                   size={18}
-                  color={showMyRoute ? Colors.accent : Colors.textSecondary}
+                  color={showMyRoute && !is0100Enabled ? Colors.accent : Colors.textSecondary}
                 />
                 <Text style={styles.triggerLabel}>Mostra percorso</Text>
               </View>
               <Switch
-                value={showMyRoute}
-                onValueChange={setShowMyRoute}
+                value={showMyRoute && !is0100Enabled}
+                onValueChange={is0100Enabled ? undefined : setShowMyRoute}
                 trackColor={{ false: Colors.surfaceLight, true: Colors.accent }}
                 thumbColor="#ffffff"
+                disabled={is0100Enabled}
               />
             </TouchableOpacity>
 
@@ -2473,16 +2509,16 @@ const styles = StyleSheet.create({
     color: "#ffffff",
   },
   speedValue: {
-    fontSize: 52,
+    fontSize: 65,
     fontFamily: "Inter_700Bold" as const,
     color: Colors.accent,
     letterSpacing: -2,
-    lineHeight: 58,
+    lineHeight: 70,
     fontVariant: ["tabular-nums" as const],
   },
   speedValueSprint: {
     color: Colors.accentRed,
-    fontSize: 58,
+    fontSize: 73,
   },
   speedUnit: {
     fontSize: 16,
