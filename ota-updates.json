@@ -3896,7 +3896,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-19T18:24:12.309Z"
+  },
+  {
+    "updateNumber": 118,
+    "version": "1.118.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-118 rv7.0.0: Tab Musica — La mia Playlist, fix invio chat, fix Riproduci tutte conflitti audio",
+    "note": "Task #762. Rinominato La mia libreria → La mia Playlist ovunque nella tab Musica. Rimosso pulsante paper-plane (freccia) che crashava l app. Fix handleSendPlaylist: endpoint ora dinamico (apiPrefix) sia per Last.fm che Spotify — playlist non più vuota. Fix Riproduci tutte: dialog di conferma se altra fonte audio attiva (radio/mp3). CURRENT_OTA_NUMBER=118.",
+    "releaseId": "c24d9f6a-18df-418f-9e08-0c5b7daaecdf",
+    "bundleUrl": "private/ota/ota-1.118.0-1776634075558.js",
+    "updateGroupId": "9a0c6777-4c42-4b9c-a063-2a705b9024f8",
+    "androidUpdateId": "019da7a5-6671-72a3-ad63-a39725a5296a",
+    "iosUpdateId": null,
+    "commitBase": "5d69ef299aed20caa3138cf13cc8e4ed21506438",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/9a0c6777-4c42-4b9c-a063-2a705b9024f8",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-19T21:27:58.596Z"
   }
 ]

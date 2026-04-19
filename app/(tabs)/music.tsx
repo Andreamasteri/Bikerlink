@@ -764,7 +764,7 @@ export default function MusicScreen() {
     if (!otherUser) return;
     setSendingToConv(conv.id);
     try {
-      const res = await apiRequest("POST", "/api/lastfm/share-playlist", {
+      const res = await apiRequest("POST", `${apiPrefix}/share-playlist`, {
         toUserId: otherUser.id,
         conversationId: conv.id,
       });
@@ -772,7 +772,7 @@ export default function MusicScreen() {
       if (!res.ok) {
         const msg = (body as { message?: string }).message ?? "Errore";
         if (msg.toLowerCase().includes("nessuna traccia") || msg.toLowerCase().includes("nessun brano")) {
-          Alert.alert("Libreria vuota", "Connetti prima Last.fm e sincronizza i tuoi brani per poterli condividere.");
+          Alert.alert("Playlist vuota", "Connetti prima il tuo account musicale e sincronizza i tuoi brani per poterli condividere.");
         } else {
           Alert.alert("Errore", msg);
         }
@@ -785,7 +785,7 @@ export default function MusicScreen() {
     } finally {
       setSendingToConv(null);
     }
-  }, [currentUser, router]);
+  }, [currentUser, router, apiPrefix]);
 
   const { data: providerData } = useQuery<{ provider: string }>({
     queryKey: ["/api/settings/music-provider"],
@@ -1327,7 +1327,7 @@ export default function MusicScreen() {
                 <Ionicons name="close" size={22} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.sendModalSub}>Scegli una chat a cui inviare la tua libreria musicale</Text>
+            <Text style={styles.sendModalSub}>Scegli una chat a cui inviare la tua Playlist</Text>
             {conversationsQuery.isLoading ? (
               <ActivityIndicator color={Colors.accent} style={{ marginVertical: 24 }} />
             ) : (conversationsQuery.data ?? []).length === 0 ? (
@@ -1421,7 +1421,7 @@ function BraniTab({
   const isLastfm = provider === "lastfm";
   const providerColor = isLastfm ? LASTFM_RED : SPOTIFY_GREEN;
   const providerName = isLastfm ? "Last.fm" : "Spotify";
-  const { playQueue, isAvailable: playerAvailable } = usePlayer();
+  const { playQueue, isAvailable: playerAvailable, currentTrack, isPlaying } = usePlayer();
   const [playAllLoading, setPlayAllLoading] = useState(false);
   const [streamService, setStreamService] = useState<StreamService>("youtube");
 
@@ -1447,36 +1447,53 @@ function BraniTab({
 
   const handlePlayAll = useCallback(async () => {
     if (!playerAvailable || library.length === 0) return;
-    setPlayAllLoading(true);
-    try {
-      const tracksParam = encodeURIComponent(
-        JSON.stringify(library.map((t) => ({ trackName: t.trackName, artistName: t.artistName })))
-      );
-      const url = new URL(`/api/music/radio/preview-playlist?tracks=${tracksParam}`, getApiUrl());
-      const resp = await fetch(url.toString());
-      if (!resp.ok) throw new Error("Errore");
-      const previews: PreviewResult[] = await resp.json();
-      if (!previews || previews.length === 0) {
-        Alert.alert("Nessuna anteprima", "Nessun brano della libreria ha un'anteprima disponibile su iTunes.");
-        return;
+
+    const doPlay = async () => {
+      setPlayAllLoading(true);
+      try {
+        const tracksParam = encodeURIComponent(
+          JSON.stringify(library.map((t) => ({ trackName: t.trackName, artistName: t.artistName })))
+        );
+        const url = new URL(`/api/music/radio/preview-playlist?tracks=${tracksParam}`, getApiUrl());
+        const resp = await fetch(url.toString());
+        if (!resp.ok) throw new Error("Errore");
+        const previews: PreviewResult[] = await resp.json();
+        if (!previews || previews.length === 0) {
+          Alert.alert("Nessuna anteprima", "Nessun brano della playlist ha un'anteprima disponibile su iTunes.");
+          return;
+        }
+        const tracks: PlayerTrack[] = previews.map((p) => ({
+          id: p.trackId,
+          url: p.previewUrl,
+          title: p.trackName,
+          artist: p.artistName,
+          album: p.albumName ?? undefined,
+          artwork: p.artworkUrl ?? undefined,
+          duration: p.durationMs ? p.durationMs / 1000 : 30,
+          source: "preview" as const,
+        }));
+        await playQueue(tracks, 0);
+      } catch {
+        Alert.alert("Errore", "Impossibile caricare le anteprime.");
+      } finally {
+        setPlayAllLoading(false);
       }
-      const tracks: PlayerTrack[] = previews.map((p) => ({
-        id: p.trackId,
-        url: p.previewUrl,
-        title: p.trackName,
-        artist: p.artistName,
-        album: p.albumName ?? undefined,
-        artwork: p.artworkUrl ?? undefined,
-        duration: p.durationMs ? p.durationMs / 1000 : 30,
-        source: "preview" as const,
-      }));
-      await playQueue(tracks, 0);
-    } catch {
-      Alert.alert("Errore", "Impossibile caricare le anteprime.");
-    } finally {
-      setPlayAllLoading(false);
+    };
+
+    if (currentTrack && isPlaying && currentTrack.source !== "preview") {
+      const sourceLabel = currentTrack.source === "radio" ? "la radio" : "un brano";
+      Alert.alert(
+        "Stai già ascoltando",
+        `Stai ascoltando ${sourceLabel}. Vuoi sostituirlo con le anteprime della playlist?`,
+        [
+          { text: "Annulla", style: "cancel" },
+          { text: "Sostituisci", style: "default", onPress: doPlay },
+        ]
+      );
+    } else {
+      await doPlay();
     }
-  }, [library, playQueue, playerAvailable]);
+  }, [library, playQueue, playerAvailable, currentTrack, isPlaying]);
 
   if (isConnected === null) {
     return (
@@ -1516,18 +1533,8 @@ function BraniTab({
       <View style={styles.section}>
         <View style={[styles.sectionHeader, { marginTop: 12 }]}>
           <Text style={styles.sectionTitle}>
-            La mia libreria{library.length > 0 ? ` (${library.length})` : ""}
+            La mia Playlist{library.length > 0 ? ` (${library.length})` : ""}
           </Text>
-          {library.length > 0 && (
-            <TouchableOpacity
-              onPress={() => setSendModalVisible(true)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityLabel="Invia la mia libreria"
-              accessibilityRole="button"
-            >
-              <Ionicons name="paper-plane-outline" size={20} color={Colors.accent} />
-            </TouchableOpacity>
-          )}
           {library.length > 0 && (
             <TouchableOpacity
               style={styles.playAllBtn}
@@ -1644,7 +1651,7 @@ function BraniTab({
         ) : library.length === 0 ? (
           <View style={styles.emptyLibrary}>
             <Ionicons name="musical-notes" size={32} color={Colors.textSecondary} />
-            <Text style={styles.emptyLibraryText}>Cerca un brano e aggiungilo alla tua libreria</Text>
+            <Text style={styles.emptyLibraryText}>Cerca un brano e aggiungilo alla tua Playlist</Text>
           </View>
         ) : (
           library.map((track) => (
@@ -1953,7 +1960,7 @@ function LibraryTrackRow({
         onPress={() => {
           Alert.alert(
             "Rimuovi brano",
-            `Vuoi rimuovere "${track.trackName}" dalla tua libreria?`,
+            `Vuoi rimuovere "${track.trackName}" dalla tua Playlist?`,
             [
               { text: "Annulla", style: "cancel" },
               { text: "Rimuovi", style: "destructive", onPress: () => onRemove(track.spotifyTrackId) },
@@ -2182,7 +2189,7 @@ function SharedPlaylistCard({
   const [expanded, setExpanded] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [downloadingTrack, setDownloadingTrack] = useState<string | null>(null);
-  const { playQueue, isAvailable: playerAvailable } = usePlayer();
+  const { playQueue, isAvailable: playerAvailable, currentTrack, isPlaying } = usePlayer();
 
   const handleDownloadTrack = useCallback(async (track: { trackName: string; artistName: string }) => {
     const trackKey = `${track.trackName}__${track.artistName}`;
@@ -2221,37 +2228,54 @@ function SharedPlaylistCard({
       return;
     }
     if (item.tracks.length === 0) return;
-    setPreviewLoading(true);
-    try {
-      const tracksParam = encodeURIComponent(
-        JSON.stringify(item.tracks.map((t) => ({ trackName: t.trackName, artistName: t.artistName })))
-      );
-      const url = new URL(`/api/music/radio/preview-playlist?tracks=${tracksParam}`, getApiUrl());
-      const resp = await fetch(url.toString());
-      if (!resp.ok) throw new Error("Errore nel caricamento");
-      const previews: PreviewResult[] = await resp.json();
-      if (!previews || previews.length === 0) {
-        Alert.alert("Nessuna anteprima", "Nessun brano di questa playlist ha un'anteprima disponibile.");
-        return;
+
+    const doPlay = async () => {
+      setPreviewLoading(true);
+      try {
+        const tracksParam = encodeURIComponent(
+          JSON.stringify(item.tracks.map((t) => ({ trackName: t.trackName, artistName: t.artistName })))
+        );
+        const url = new URL(`/api/music/radio/preview-playlist?tracks=${tracksParam}`, getApiUrl());
+        const resp = await fetch(url.toString());
+        if (!resp.ok) throw new Error("Errore nel caricamento");
+        const previews: PreviewResult[] = await resp.json();
+        if (!previews || previews.length === 0) {
+          Alert.alert("Nessuna anteprima", "Nessun brano di questa playlist ha un'anteprima disponibile.");
+          return;
+        }
+        const tracks: PlayerTrack[] = previews.map((p) => ({
+          id: p.trackId,
+          url: p.previewUrl,
+          title: p.trackName,
+          artist: p.artistName,
+          album: p.albumName ?? undefined,
+          artwork: p.artworkUrl ?? undefined,
+          duration: p.durationMs ? p.durationMs / 1000 : 30,
+          source: "preview" as const,
+        }));
+        await playQueue(tracks, 0);
+      } catch (err) {
+        console.warn("[music] preview load error:", err);
+        Alert.alert("Errore", "Impossibile caricare le anteprime.");
+      } finally {
+        setPreviewLoading(false);
       }
-      const tracks: PlayerTrack[] = previews.map((p) => ({
-        id: p.trackId,
-        url: p.previewUrl,
-        title: p.trackName,
-        artist: p.artistName,
-        album: p.albumName ?? undefined,
-        artwork: p.artworkUrl ?? undefined,
-        duration: p.durationMs ? p.durationMs / 1000 : 30,
-        source: "preview" as const,
-      }));
-      await playQueue(tracks, 0);
-    } catch (err) {
-      console.warn("[music] preview load error:", err);
-      Alert.alert("Errore", "Impossibile caricare le anteprime.");
-    } finally {
-      setPreviewLoading(false);
+    };
+
+    if (currentTrack && isPlaying && currentTrack.source !== "preview") {
+      const sourceLabel = currentTrack.source === "radio" ? "la radio" : "un brano";
+      Alert.alert(
+        "Stai già ascoltando",
+        `Stai ascoltando ${sourceLabel}. Vuoi sostituirlo con le anteprime di questa playlist?`,
+        [
+          { text: "Annulla", style: "cancel" },
+          { text: "Sostituisci", style: "default", onPress: doPlay },
+        ]
+      );
+    } else {
+      await doPlay();
     }
-  }, [item.tracks, playQueue, playerAvailable]);
+  }, [item.tracks, playQueue, playerAvailable, currentTrack, isPlaying]);
 
   return (
     <View style={styles.playlistCard}>
