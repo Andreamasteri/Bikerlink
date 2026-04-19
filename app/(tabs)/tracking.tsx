@@ -1185,6 +1185,7 @@ export default function TrackingScreen() {
     phaseRef.current = "active";
     setPhase("active");
     startTimeRef.current = Date.now();
+    lastAvgSpeedUpdateRef.current = Date.now(); // first avg update after 6 minutes
 
     timerRef.current = setInterval(() => {
       if (isPausedRef.current) return;
@@ -1499,7 +1500,7 @@ export default function TrackingScreen() {
             <Text style={styles.handsOffSub}>
               Si riattivano quando rallenti
             </Text>
-            <Text style={[styles.handsOffSub, { fontStyle: "italic", marginTop: 12, opacity: 0.7 }]}>
+            <Text style={styles.handsOffHint}>
               Abbassa 5 volte velocemente il volume per disattivare
             </Text>
           </View>
@@ -2916,6 +2917,15 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "center" as const,
     marginTop: 2,
+  },
+  handsOffHint: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular" as const,
+    fontStyle: "italic" as const,
+    color: Colors.textSecondary,
+    textAlign: "center" as const,
+    marginTop: 12,
+    opacity: 0.7,
   },
 
   // Summary
