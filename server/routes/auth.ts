@@ -133,6 +133,25 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
 
     await storage.createUserProfile({ userId: user.id });
 
+    (async () => {
+      try {
+        const adminUser = await storage.getUserByNickname("admin");
+        if (!adminUser) return;
+        const conv = await storage.createConversation({ conversationType: "private" });
+        await storage.addConversationParticipant({ conversationId: conv.id, userId: adminUser.id });
+        await storage.addConversationParticipant({ conversationId: conv.id, userId: user.id });
+        await storage.createMessage({
+          conversationId: conv.id,
+          senderId: adminUser.id,
+          messageType: "text",
+          content: "Ricordati di aggiungere le tue moto al garage, nel tab profilo",
+        });
+        await storage.updateConversationTimestamp(conv.id);
+      } catch (e) {
+        console.warn("[WELCOME] Messaggio admin non inviato:", e);
+      }
+    })();
+
     sendNewUserNotificationEmail(
       {
         nickname: user.nickname,
