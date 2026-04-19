@@ -3919,7 +3919,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-19T21:27:58.596Z"
+  },
+  {
+    "updateNumber": 119,
+    "version": "1.119.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-119 rv7.0.0: Admin toggle Sensori Telefono (G-force beta)",
+    "note": "Task #765. Aggiunto toggle admin per abilitare/nascondere globalmente la riga 'Sensori telefono (G) BETA' in tracking. Endpoint pubblico GET /api/settings/phone-sensors-enabled, mutation PUT /api/admin/settings/phone_sensors_enabled. Default: nascosto. CURRENT_OTA_NUMBER=119.",
+    "releaseId": "bb8ca90f-3fa4-4dc9-88b7-068246ce3782",
+    "bundleUrl": "private/ota/ota-1.119.0-1776638072695.js",
+    "updateGroupId": "9aa7922d-a3ff-49cb-9307-011e6b75e040",
+    "androidUpdateId": "019da7e2-5e56-7c72-93bb-ecf87e088660",
+    "iosUpdateId": null,
+    "commitBase": "7afb88dbf94714cb83bf4d5608403aa640c714f4",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/9aa7922d-a3ff-49cb-9307-011e6b75e040",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-19T22:34:35.553Z"
   }
 ]
