@@ -48,24 +48,35 @@ Clicca **"Crea app"**.
 
 **Menu laterale → "Produzione" → "Versioni" → "Crea nuova versione"**
 
-> ⚠️ **FORMATO FILE — IMPORTANTE:**
-> - **Per test interni / Closed Testing:** puoi usare l'APK EAS (link sotto)
-> - **Per pubblicazione pubblica su Play Store:** Google **richiede** AAB (Android App Bundle)
->   — vedi Task #749 per generare l'AAB con EAS Build (versionCode 30)
+> ℹ️ **FORMATO FILE:**
+> - Google Play Store richiede **AAB** (Android App Bundle) per la pubblicazione pubblica
+> - Il codice è già pronto con **versionCode 30** — serve solo avviare il build EAS
 
-**Per il test interno con APK:**
+### Come generare l'AAB (versionCode 30)
 
-1. Scarica l'APK da questo URL:  
-   `https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk`
-2. Carica il file `.apk` (versionCode 29, versione 1.9.3)
-3. Nel campo **"Note sulla versione"** inserisci:
+**Opzione A — Dashboard EAS (consigliata, 1 click):**
 
+1. Vai su: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds
+2. Clicca **"New Build"**
+3. Seleziona:
+   - Platform: **Android**
+   - Profile: **production**
+4. Conferma (potrebbe chiedere di usare minuti pay-as-you-go se il piano mensile è esaurito)
+5. Il build dura ~20-30 minuti — ricevi email a completamento
+6. Scarica il file `.aab` dalla dashboard EAS e caricalo qui su Play Console
+
+**Opzione B — Terminale locale:**
+```bash
+EXPO_TOKEN=<il_tuo_token> npx eas build --platform android --profile production
+```
+
+**Note sulla versione da inserire:**
 ```
 Prima versione pubblica di BikerLink.
 Funzionalità: matching tra motociclisti, tracking GPS percorsi, SOS emergenza stradale, MotoClub, Garage, integrazione Spotify/Last.fm, contest fotografici settimanali.
 ```
 
-4. Clicca **"Salva"** (non pubblicare ancora — completa prima tutti gli altri passi)
+Clicca **"Salva"** (non pubblicare ancora — completa prima tutti gli altri passi)
 
 ---
 
