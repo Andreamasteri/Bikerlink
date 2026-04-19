@@ -858,7 +858,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
           setTimeout(async () => {
             try {
               const replyText = getFakeBotReply(userContent, convId, fakeCtx);
-              await storage.createMessage({
+              const fakeMsg = await storage.createMessage({
                 conversationId: convId,
                 senderId: fakeUserId,
                 messageType: "text",
@@ -869,6 +869,10 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
                 isFiltered: false,
               });
               await storage.updateConversationTimestamp(convId);
+              notifyChatEvent(
+                participants.map(p => p.userId),
+                { type: "new_message", conversationId: convId, message: { ...fakeMsg, sender: { id: fakeUserId, nickname: targetUser.nickname, avatarUrl: targetUser.avatarUrl, userType: targetUser.userType } } }
+              );
             } catch (err) {
               console.error("Fake bot reply error:", err);
             }
@@ -964,7 +968,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
             setTimeout(async () => {
               try {
                 const replyText = getFakeBotReply(finalContent || "", id, fakeCtx);
-                await storage.createMessage({
+                const fakeMsg = await storage.createMessage({
                   conversationId: id,
                   senderId: fakeUserId,
                   messageType: "text",
@@ -975,6 +979,10 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
                   isFiltered: false,
                 });
                 await storage.updateConversationTimestamp(id);
+                notifyChatEvent(
+                  participants.map(p => p.userId),
+                  { type: "new_message", conversationId: id, message: { ...fakeMsg, sender: { id: fakeUserId, nickname: fakeUser?.nickname, avatarUrl: fakeUser?.avatarUrl, userType: fakeUser?.userType } } }
+                );
               } catch (err) {
                 console.error("Motoclub fake reply error:", err);
               }
