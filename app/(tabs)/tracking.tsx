@@ -1756,7 +1756,7 @@ export default function TrackingScreen() {
         >
           <Ionicons
             name="speedometer"
-            size={48}
+            size={28}
             color={Colors.accent}
             style={styles.headerIcon}
           />
@@ -2359,9 +2359,9 @@ const styles = StyleSheet.create({
 
   activeScroll: {
     paddingHorizontal: 14,
-    paddingTop: 12,
+    paddingTop: 6,
     paddingBottom: 30,
-    gap: 10,
+    gap: 7,
   },
 
   // Speed panel
@@ -2370,8 +2370,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.accent + "40",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     alignItems: "center" as const,
   },
   speedMetaRow: {
@@ -2411,16 +2411,16 @@ const styles = StyleSheet.create({
     color: "#ffffff",
   },
   speedValue: {
-    fontSize: 72,
+    fontSize: 52,
     fontFamily: "Inter_700Bold" as const,
     color: Colors.accent,
     letterSpacing: -2,
-    lineHeight: 80,
+    lineHeight: 58,
     fontVariant: ["tabular-nums" as const],
   },
   speedValueSprint: {
     color: Colors.accentRed,
-    fontSize: 80,
+    fontSize: 58,
   },
   speedUnit: {
     fontSize: 16,
@@ -2432,24 +2432,24 @@ const styles = StyleSheet.create({
   // Stats
   statsRow: {
     flexDirection: "row" as const,
-    gap: 10,
+    gap: 7,
   },
   statsCol: {
     flex: 1,
-    gap: 10,
+    gap: 7,
   },
   statCard: {
     flex: 1,
     backgroundColor: Colors.surface,
     borderRadius: 14,
-    padding: 14,
+    padding: 8,
     borderWidth: 1,
     borderColor: Colors.border,
     alignItems: "center" as const,
-    gap: 4,
+    gap: 2,
   },
   statValue: {
-    fontSize: 20,
+    fontSize: 16,
     fontFamily: "Inter_700Bold" as const,
     color: Colors.text,
     fontVariant: ["tabular-nums" as const],
@@ -2511,22 +2511,22 @@ const styles = StyleSheet.create({
   // Idle scroll
   idleScroll: {
     paddingHorizontal: 14,
-    paddingTop: 8,
-    gap: 14,
+    paddingTop: 2,
+    gap: 8,
   },
   headerIcon: {
     alignSelf: "center" as const,
-    marginBottom: 4,
+    marginBottom: 0,
   },
 
   // Profile
   profileSection: {
     backgroundColor: Colors.surface,
     borderRadius: 16,
-    padding: 16,
+    padding: 10,
     borderWidth: 1,
     borderColor: Colors.border,
-    gap: 12,
+    gap: 6,
   },
   profileTitle: {
     fontSize: 11,
@@ -2543,7 +2543,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.surfaceLight,
     borderRadius: 12,
-    padding: 10,
+    padding: 7,
     alignItems: "center" as const,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -2601,7 +2601,7 @@ const styles = StyleSheet.create({
     flexDirection: "row" as const,
     alignItems: "center" as const,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 9,
     gap: 10,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
@@ -2656,13 +2656,13 @@ const styles = StyleSheet.create({
   // Start button
   startBtnContainer: {
     alignItems: "center" as const,
-    paddingVertical: 8,
-    gap: 12,
+    paddingVertical: 4,
+    gap: 8,
   },
   startBtn: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
     backgroundColor: Colors.success,
     alignItems: "center" as const,
     justifyContent: "center" as const,

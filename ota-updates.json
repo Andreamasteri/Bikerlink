@@ -3804,7 +3804,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-19T01:32:08.944Z"
+  },
+  {
+    "updateNumber": 114,
+    "version": "1.114.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-114 rv7.0.0: Layout tracking compatto — bottone verde e mappa visibili senza scorrere",
+    "note": "Pannello idle: icona 48→28px, gap 14→8, paddingTop 8→2, profileSection padding 16→10 gap 12→6, profileBtn padding 10→7, triggerRow paddingVertical 14→9, startBtn 220→180px, startBtnContainer paddingVertical 8→4. Pannello attivo: speedValue 72→52px lineHeight 80→58, speedPanel padding 16→8, statCard padding 14→8 gap 4→2, statValue 20→16px, statsRow/Col gap 10→7, activeScroll gap 10→7 paddingTop 12→6. CURRENT_OTA_NUMBER=114.",
+    "releaseId": "19c6213f-6e23-4cd5-abc4-11469654e4ab",
+    "bundleUrl": "private/ota/ota-1.114.0-1776581013584.js",
+    "updateGroupId": "0d41c908-33a6-460c-8dfc-9709bd6ae14b",
+    "androidUpdateId": "019da47c-0683-766d-9a85-5c57ffb91ed4",
+    "iosUpdateId": null,
+    "commitBase": "1bc053590441d1b91643ee90fac44bad1d1f0280",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/0d41c908-33a6-460c-8dfc-9709bd6ae14b",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-19T06:43:36.424Z"
   }
 ]
