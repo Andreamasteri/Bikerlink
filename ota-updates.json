@@ -3965,7 +3965,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-19T23:00:43.489Z"
+  },
+  {
+    "updateNumber": 121,
+    "version": "1.121.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-121 rv7.0.0: Chat real-time SSE + fix N+1 + fix Last.fm login",
+    "note": "Task #769: SSE push real-time chat (messaggi in <1s), fix N+1 in GET /conversations (da 40+ a 3 query batch), fix N+1 in GET /messages (batch sender lookup), singleton ChatSseProvider, AppState refetch, refetchInterval 15s fallback. Task #770: fix Last.fm login (syncLastfmTracks in try/catch separato). CURRENT_OTA_NUMBER=121.",
+    "releaseId": "541c9e49-a9eb-419a-a2d8-f0d0a1e755d9",
+    "bundleUrl": "private/ota/ota-1.121.0-1776641657143.js",
+    "updateGroupId": "9740fcae-1767-4514-b231-d4f5e6a71f46",
+    "androidUpdateId": "019da819-0cdc-72cd-b2fe-2f9634c040c9",
+    "iosUpdateId": null,
+    "commitBase": "90070c2570a3eaf9122811e6764ef2c71a73b573",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/9740fcae-1767-4514-b231-d4f5e6a71f46",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-19T23:34:20.281Z"
   }
 ]
