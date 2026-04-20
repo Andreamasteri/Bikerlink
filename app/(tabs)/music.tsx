@@ -16,6 +16,7 @@ import {
   Linking,
   Switch,
 } from "react-native";
+import * as WebBrowser from "expo-web-browser";
 import * as Haptics from "expo-haptics";
 import * as FileSystem from "expo-file-system/legacy";
 import * as MediaLibrary from "expo-media-library";
@@ -715,58 +716,69 @@ interface LastfmLoginModalProps {
   onClose: () => void;
 }
 
+type AuthStep = "idle" | "loading" | "waiting" | "confirming";
+
 const LastfmLoginModal = React.memo(function LastfmLoginModal({ visible, onClose }: LastfmLoginModalProps) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [step, setStep] = useState<AuthStep>("idle");
+  const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!visible) {
-      setUsername("");
-      setPassword("");
+      setStep("idle");
+      setToken(null);
       setError(null);
-      setConnecting(false);
     }
   }, [visible]);
 
   const handleClose = useCallback(() => {
-    if (!connecting) onClose();
-  }, [connecting, onClose]);
+    if (step !== "confirming") onClose();
+  }, [step, onClose]);
 
-  const handleSubmit = useCallback(async () => {
-    if (!username.trim() || !password.trim()) {
-      setError("Inserisci username e password.");
-      return;
-    }
-    setConnecting(true);
+  const handleConnect = useCallback(async () => {
+    setStep("loading");
     setError(null);
     try {
-      const resp = await apiRequest("POST", "/api/lastfm/mobile-auth", {
-        username: username.trim(),
-        password,
-      });
+      const resp = await apiRequest("GET", "/api/lastfm/auth-token");
+      const data = await resp.json() as { token: string; authUrl: string };
+      setToken(data.token);
+      const result = await WebBrowser.openAuthSessionAsync(data.authUrl, "bikerlink://lastfm-callback");
+      if (result.type === "cancel") {
+        setStep("idle");
+        return;
+      }
+      setStep("waiting");
+    } catch (err) {
+      console.error("[Last.fm auth-token]", err);
+      setError((err as Error).message ?? "Errore di connessione a Last.fm.");
+      setStep("idle");
+    }
+  }, []);
+
+  const handleConfirm = useCallback(async () => {
+    if (!token) return;
+    setStep("confirming");
+    setError(null);
+    try {
+      const resp = await apiRequest("POST", "/api/lastfm/auth-session", { token });
       const data = await resp.json() as { connected?: boolean; username?: string; trackCount?: number };
-      onClose();
-      setUsername("");
-      setPassword("");
       queryClient.invalidateQueries({ queryKey: ["/api/lastfm/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/lastfm/tracks"] });
+      onClose();
       const tracksMsg = data.trackCount ? ` ${data.trackCount} brani sincronizzati.` : "";
       Alert.alert(
         "Last.fm Collegato!",
-        data.username
-          ? `Benvenuto, ${data.username}!${tracksMsg}`
-          : `Last.fm collegato con successo!${tracksMsg}`
+        data.username ? `Benvenuto, ${data.username}!${tracksMsg}` : `Collegato con successo!${tracksMsg}`
       );
     } catch (err) {
-      console.error("[Last.fm mobile-auth]", err);
-      setError((err as Error).message ?? "Impossibile connettersi a Last.fm");
-    } finally {
-      setConnecting(false);
+      console.error("[Last.fm auth-session]", err);
+      setError((err as Error).message ?? "Impossibile completare il collegamento.");
+      setStep("waiting");
     }
-  }, [username, password, queryClient, onClose]);
+  }, [token, queryClient, onClose]);
+
+  const isBusy = step === "loading" || step === "confirming";
 
   return (
     <Modal
@@ -775,44 +787,62 @@ const LastfmLoginModal = React.memo(function LastfmLoginModal({ visible, onClose
       animationType="fade"
       onRequestClose={handleClose}
     >
-      <KeyboardAvoidingView
-        style={lastfmModalStyles.modalOverlay}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
+      <View style={lastfmModalStyles.modalOverlay}>
         <View style={lastfmModalStyles.modalCard}>
           <View style={lastfmModalStyles.modalHeader}>
             <Ionicons name="radio" size={28} color={LASTFM_RED} />
-            <Text style={lastfmModalStyles.modalTitle}>Accedi a Last.fm</Text>
+            <Text style={lastfmModalStyles.modalTitle}>Collega Last.fm</Text>
           </View>
-          <Text style={lastfmModalStyles.modalSubtitle}>
-            Inserisci le tue credenziali Last.fm per collegare l'account.
-          </Text>
 
-          <Text style={lastfmModalStyles.modalLabel}>Username</Text>
-          <TextInput
-            style={lastfmModalStyles.modalInput}
-            placeholder="Il tuo username Last.fm"
-            placeholderTextColor={Colors.textSecondary}
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!connecting}
-            returnKeyType="next"
-          />
-
-          <Text style={lastfmModalStyles.modalLabel}>Password</Text>
-          <TextInput
-            style={lastfmModalStyles.modalInput}
-            placeholder="La tua password"
-            placeholderTextColor={Colors.textSecondary}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            editable={!connecting}
-            returnKeyType="done"
-            onSubmitEditing={handleSubmit}
-          />
+          {step === "idle" || step === "loading" ? (
+            <>
+              <Text style={lastfmModalStyles.modalSubtitle}>
+                Verrai reindirizzato alla pagina ufficiale Last.fm per autorizzare l'accesso in modo sicuro.
+              </Text>
+              <TouchableOpacity
+                style={[lastfmModalStyles.modalConnectBtn, isBusy && { opacity: 0.7 }]}
+                onPress={handleConnect}
+                disabled={isBusy}
+              >
+                {step === "loading" ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="open-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
+                    <Text style={lastfmModalStyles.modalConnectBtnText}>Accedi con Last.fm</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={lastfmModalStyles.modalSubtitle}>
+                Hai completato l'accesso su Last.fm? Torna qui e conferma per collegare il tuo account.
+              </Text>
+              <TouchableOpacity
+                style={[lastfmModalStyles.modalConnectBtn, step === "confirming" && { opacity: 0.7 }]}
+                onPress={handleConfirm}
+                disabled={step === "confirming"}
+              >
+                {step === "confirming" ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
+                    <Text style={lastfmModalStyles.modalConnectBtnText}>Ho autorizzato l'accesso</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[lastfmModalStyles.modalConnectBtn, { backgroundColor: "transparent", borderWidth: 1, borderColor: LASTFM_RED, marginTop: 8 }]}
+                onPress={handleConnect}
+                disabled={step === "confirming"}
+              >
+                <Ionicons name="refresh-outline" size={16} color={LASTFM_RED} style={{ marginRight: 6 }} />
+                <Text style={[lastfmModalStyles.modalConnectBtnText, { color: LASTFM_RED }]}>Riapri Last.fm</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
           {error !== null && (
             <View style={lastfmModalStyles.modalErrorBox}>
@@ -821,24 +851,12 @@ const LastfmLoginModal = React.memo(function LastfmLoginModal({ visible, onClose
             </View>
           )}
 
-          <TouchableOpacity
-            style={[lastfmModalStyles.modalConnectBtn, connecting && { opacity: 0.7 }]}
-            onPress={handleSubmit}
-            disabled={connecting}
-          >
-            {connecting ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={lastfmModalStyles.modalConnectBtnText}>Connetti</Text>
-            )}
-          </TouchableOpacity>
-
           <View style={lastfmModalStyles.modalDivider} />
 
           <TouchableOpacity
             style={lastfmModalStyles.modalCreateAccountBtn}
             onPress={() => Linking.openURL("https://www.last.fm/join")}
-            disabled={connecting}
+            disabled={isBusy}
           >
             <Ionicons name="person-add-outline" size={16} color={LASTFM_RED} style={{ marginRight: 6 }} />
             <Text style={lastfmModalStyles.modalCreateAccountText}>Crea nuovo account Last.fm</Text>
@@ -847,12 +865,12 @@ const LastfmLoginModal = React.memo(function LastfmLoginModal({ visible, onClose
           <TouchableOpacity
             style={lastfmModalStyles.modalCancelBtn}
             onPress={handleClose}
-            disabled={connecting}
+            disabled={isBusy}
           >
             <Text style={lastfmModalStyles.modalCancelText}>Annulla</Text>
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 });

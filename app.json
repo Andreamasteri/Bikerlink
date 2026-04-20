@@ -53,7 +53,7 @@
       "intentFilters": [
         {
           "action": "VIEW",
-          "data": [{ "scheme": "bikerlink", "host": "spotify-callback" }],
+          "data": [{ "scheme": "bikerlink", "host": "lastfm-callback" }],
           "category": ["BROWSABLE", "DEFAULT"]
         }
       ]
