@@ -716,53 +716,65 @@ interface LastfmLoginModalProps {
   onClose: () => void;
 }
 
-type AuthStep = "idle" | "busy" | "retrying";
+type AuthStep = "idle" | "loading" | "waiting" | "confirming";
 
 const LastfmLoginModal = React.memo(function LastfmLoginModal({ visible, onClose }: LastfmLoginModalProps) {
   const [step, setStep] = useState<AuthStep>("idle");
+  const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!visible) {
       setStep("idle");
+      setToken(null);
       setError(null);
     }
   }, [visible]);
 
   const handleClose = useCallback(() => {
-    if (step !== "busy") onClose();
+    if (step !== "confirming") onClose();
   }, [step, onClose]);
 
-  const handleConnect = useCallback(async (existingToken?: string) => {
-    setStep("busy");
+  const handleOpenBrowser = useCallback(async () => {
+    setStep("loading");
     setError(null);
     try {
-      let token = existingToken;
-      if (!token) {
-        const resp = await apiRequest("GET", "/api/lastfm/auth-token");
-        const data = await resp.json() as { token: string; authUrl: string };
-        token = data.token;
-        await WebBrowser.openAuthSessionAsync(data.authUrl, "bikerlink://lastfm-callback");
-      }
-      const sessionResp = await apiRequest("POST", "/api/lastfm/auth-session", { token });
-      const sessionData = await sessionResp.json() as { connected?: boolean; username?: string; trackCount?: number };
+      const resp = await apiRequest("GET", "/api/lastfm/auth-token");
+      const data = await resp.json() as { token: string; authUrl: string };
+      setToken(data.token);
+      await WebBrowser.openAuthSessionAsync(data.authUrl, "bikerlink://lastfm-callback");
+      setStep("waiting");
+    } catch (err) {
+      console.error("[Last.fm auth-token]", err);
+      setError((err as Error).message ?? "Errore di connessione a Last.fm.");
+      setStep("idle");
+    }
+  }, []);
+
+  const handleConfirm = useCallback(async () => {
+    if (!token) return;
+    setStep("confirming");
+    setError(null);
+    try {
+      const resp = await apiRequest("POST", "/api/lastfm/auth-session", { token });
+      const data = await resp.json() as { connected?: boolean; username?: string; trackCount?: number };
       queryClient.invalidateQueries({ queryKey: ["/api/lastfm/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/lastfm/tracks"] });
       onClose();
-      const tracksMsg = sessionData.trackCount ? ` ${sessionData.trackCount} brani sincronizzati.` : "";
+      const tracksMsg = data.trackCount ? ` ${data.trackCount} brani sincronizzati.` : "";
       Alert.alert(
         "Last.fm Collegato!",
-        sessionData.username ? `Benvenuto, ${sessionData.username}!${tracksMsg}` : `Collegato con successo!${tracksMsg}`
+        data.username ? `Benvenuto, ${data.username}!${tracksMsg}` : `Collegato con successo!${tracksMsg}`
       );
     } catch (err) {
-      console.error("[Last.fm connect]", err);
-      setError((err as Error).message ?? "Impossibile connettersi a Last.fm.");
-      setStep("retrying");
+      console.error("[Last.fm auth-session]", err);
+      setError((err as Error).message ?? "Autorizzazione non completata. Riprova.");
+      setStep("waiting");
     }
-  }, [queryClient, onClose]);
+  }, [token, queryClient, onClose]);
 
-  const isBusy = step === "busy";
+  const isBusy = step === "loading" || step === "confirming";
 
   return (
     <Modal
@@ -778,28 +790,58 @@ const LastfmLoginModal = React.memo(function LastfmLoginModal({ visible, onClose
             <Text style={lastfmModalStyles.modalTitle}>Collega Last.fm</Text>
           </View>
 
-          <Text style={lastfmModalStyles.modalSubtitle}>
-            {step === "retrying"
-              ? "Non hai autorizzato l'accesso o si è verificato un errore. Riprova."
-              : "Verrai reindirizzato alla pagina ufficiale Last.fm per autorizzare l'accesso."}
-          </Text>
-
-          <TouchableOpacity
-            style={[lastfmModalStyles.modalConnectBtn, isBusy && { opacity: 0.7 }]}
-            onPress={() => handleConnect()}
-            disabled={isBusy}
-          >
-            {isBusy ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="open-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
-                <Text style={lastfmModalStyles.modalConnectBtnText}>
-                  {step === "retrying" ? "Riprova" : "Accedi con Last.fm"}
+          {step === "idle" || step === "loading" ? (
+            <>
+              <Text style={lastfmModalStyles.modalSubtitle}>
+                Verrai reindirizzato alla pagina ufficiale Last.fm per autorizzare l'accesso in modo sicuro.
+              </Text>
+              <TouchableOpacity
+                style={[lastfmModalStyles.modalConnectBtn, isBusy && { opacity: 0.7 }]}
+                onPress={handleOpenBrowser}
+                disabled={isBusy}
+              >
+                {step === "loading" ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="open-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
+                    <Text style={lastfmModalStyles.modalConnectBtnText}>Accedi con Last.fm</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={lastfmModalStyles.modalSubtitle}>
+                {"Hai effettuato l'accesso e autorizzato BikerLink su Last.fm?\n\n"}
+                <Text style={{ color: Colors.textSecondary, fontSize: 13 }}>
+                  {"⚠ Se hai appena creato l'account, verifica prima l'email di Last.fm, poi riapri il browser e autorizza."}
                 </Text>
-              </>
-            )}
-          </TouchableOpacity>
+              </Text>
+              <TouchableOpacity
+                style={[lastfmModalStyles.modalConnectBtn, step === "confirming" && { opacity: 0.7 }]}
+                onPress={handleConfirm}
+                disabled={step === "confirming"}
+              >
+                {step === "confirming" ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
+                    <Text style={lastfmModalStyles.modalConnectBtnText}>Sì, ho autorizzato</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[lastfmModalStyles.modalConnectBtn, { backgroundColor: "transparent", borderWidth: 1, borderColor: LASTFM_RED, marginTop: 8 }]}
+                onPress={handleOpenBrowser}
+                disabled={step === "confirming"}
+              >
+                <Ionicons name="refresh-outline" size={16} color={LASTFM_RED} style={{ marginRight: 6 }} />
+                <Text style={[lastfmModalStyles.modalConnectBtnText, { color: LASTFM_RED }]}>Riapri Last.fm</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
           {error !== null && (
             <View style={lastfmModalStyles.modalErrorBox}>
