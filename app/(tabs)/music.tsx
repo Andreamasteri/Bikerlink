@@ -1060,7 +1060,7 @@ export default function MusicScreen() {
     if (!playlistIdParam) return;
     const numId = parseInt(playlistIdParam, 10);
     if (isNaN(numId)) return;
-    const url = new URL(`/api/spotify/shared-playlists/${numId}`, getApiUrl());
+    const url = new URL(`${apiPrefix}/shared-playlists/${numId}`, getApiUrl());
     fetch(url.toString(), { credentials: "include" })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -1157,7 +1157,7 @@ export default function MusicScreen() {
   });
 
   const sharedPlaylistsQuery = useQuery<{ playlists: SharedPlaylistEntry[] }>({
-    queryKey: ["/api/spotify/shared-playlists"],
+    queryKey: [`${apiPrefix}/shared-playlists`],
     enabled: activeTab === "ricevute",
   });
 
@@ -1193,12 +1193,12 @@ export default function MusicScreen() {
 
   const mergePlaylistMutation = useMutation({
     mutationFn: async (playlistId: number) => {
-      const res = await apiRequest("POST", `/api/spotify/merge-playlist/${playlistId}`, {});
+      const res = await apiRequest("POST", `${apiPrefix}/merge-playlist/${playlistId}`, {});
       return res.json() as Promise<{ newTracksAdded: number }>;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/spotify/shared-playlists"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/spotify/tracks"] });
+      queryClient.invalidateQueries({ queryKey: [`${apiPrefix}/shared-playlists`] });
+      queryClient.invalidateQueries({ queryKey: [`${apiPrefix}/tracks`] });
       Alert.alert("Playlist Aggiunta!", `${data.newTracksAdded ?? 0} nuovi brani aggiunti alla tua Playlist.`);
     },
     onError: (err: Error) => {

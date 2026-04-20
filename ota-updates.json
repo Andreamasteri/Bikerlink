@@ -4034,7 +4034,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-20T07:37:00.000Z"
+  },
+  {
+    "updateNumber": 124,
+    "version": "1.124.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-124 rv7.0.0: Fix tab Ricevute playlist Last.fm",
+    "note": "Task #776: Aggiunto GET /api/lastfm/shared-playlists, GET /api/lastfm/shared-playlists/:id e POST /api/lastfm/merge-playlist/:id sul backend. Fix music.tsx: rimossi 4 URL hardcodate a /api/spotify/, ora usano apiPrefix dinamico (lastfm o spotify in base al provider dell'utente). Il tab Ricevute ora mostra correttamente le playlist ricevute dagli utenti Last.fm. CURRENT_OTA_NUMBER=124.",
+    "releaseId": "5cf1bb0c-43ac-4ed7-be9e-b64d90e44323",
+    "bundleUrl": "private/ota/ota-1.124.0-1776670601308.js",
+    "updateGroupId": "b2ec68bd-47fd-46eb-96cf-5a4ac829aa65",
+    "androidUpdateId": "019da9d2-a03a-7604-9d1f-04cbfb3f076b",
+    "iosUpdateId": null,
+    "commitBase": "0f64fc44047d66c01b67eae3f76169d3f7310240",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/b2ec68bd-47fd-46eb-96cf-5a4ac829aa65",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-20T07:36:44.059Z"
   }
 ]

@@ -7,10 +7,11 @@ import {
   userMusicTracks,
   userPlaylistSnapshots,
   sharedPlaylists,
+  users,
   messages,
   conversationParticipants,
 } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -484,6 +485,141 @@ router.post("/share-playlist", requireAuth, async (req: Request, res: Response) 
   } catch (error) {
     console.error("[Last.fm] share-playlist error:", error);
     return res.status(500).json({ message: "Errore durante la condivisione della libreria" });
+  }
+});
+
+router.get("/shared-playlists", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const playlists = await db
+      .select()
+      .from(sharedPlaylists)
+      .where(eq(sharedPlaylists.toUserId, userId))
+      .orderBy(sql`${sharedPlaylists.sharedAt} DESC`);
+
+    const fromUserIds = [...new Set(playlists.map((p) => p.fromUserId))];
+    const fromUsersData =
+      fromUserIds.length > 0
+        ? await db.select().from(users).where(inArray(users.id, fromUserIds))
+        : [];
+
+    const fromUserMap = new Map(fromUsersData.map((u) => [u.id, u]));
+
+    const result = await Promise.all(
+      playlists.map(async (playlist) => {
+        const fromUser = fromUserMap.get(playlist.fromUserId);
+        const photos = fromUser ? await storage.getUserPhotos(fromUser.id) : [];
+        return {
+          id: playlist.id,
+          fromUser: fromUser
+            ? {
+                id: fromUser.id,
+                nickname: fromUser.nickname,
+                photos: photos.map((p) => p.photoUrl),
+              }
+            : { id: playlist.fromUserId, nickname: "Utente", photos: [] },
+          trackCount: playlist.trackCount,
+          sharedAt: playlist.sharedAt.toISOString(),
+          mergedAt: playlist.mergedAt?.toISOString() ?? null,
+          tracks: playlist.tracksData,
+        };
+      })
+    );
+
+    return res.json({ playlists: result });
+  } catch (error) {
+    console.error("[Last.fm] shared-playlists error:", error);
+    return res.status(500).json({ message: "Errore nel recupero delle playlist ricevute" });
+  }
+});
+
+router.get("/shared-playlists/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const playlistId = parseInt(req.params.id, 10);
+    if (isNaN(playlistId)) {
+      return res.status(400).json({ message: "ID non valido" });
+    }
+
+    const [playlist] = await db
+      .select()
+      .from(sharedPlaylists)
+      .where(and(eq(sharedPlaylists.id, playlistId), eq(sharedPlaylists.toUserId, userId)))
+      .limit(1);
+
+    if (!playlist) {
+      return res.status(404).json({ message: "Playlist non trovata" });
+    }
+
+    const fromUser = await storage.getUser(playlist.fromUserId);
+    return res.json({
+      id: playlist.id,
+      fromUser: { id: playlist.fromUserId, nickname: fromUser?.nickname ?? "Utente" },
+      trackCount: playlist.trackCount,
+      tracks: playlist.tracksData,
+    });
+  } catch (error) {
+    console.error("[Last.fm] shared-playlists/:id error:", error);
+    return res.status(500).json({ message: "Errore nel recupero della playlist" });
+  }
+});
+
+router.post("/merge-playlist/:playlistId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const playlistId = parseInt(req.params.playlistId, 10);
+    if (isNaN(playlistId)) {
+      return res.status(400).json({ message: "ID playlist non valido" });
+    }
+
+    const [playlist] = await db
+      .select()
+      .from(sharedPlaylists)
+      .where(and(eq(sharedPlaylists.id, playlistId), eq(sharedPlaylists.toUserId, userId)))
+      .limit(1);
+
+    if (!playlist) {
+      return res.status(404).json({ message: "Playlist non trovata" });
+    }
+
+    const tracksData = playlist.tracksData as Array<{
+      trackId: string;
+      trackName: string;
+      artistId: string;
+      artistName: string;
+      albumName?: string;
+      genres?: string[];
+    }>;
+
+    let newTracksAdded = 0;
+    for (const track of tracksData) {
+      const result = await db
+        .insert(userMusicTracks)
+        .values({
+          userId,
+          provider: "lastfm",
+          spotifyTrackId: track.trackId ?? track.trackName,
+          trackName: track.trackName.slice(0, 500),
+          artistId: track.artistId ?? track.artistName,
+          artistName: track.artistName.slice(0, 300),
+          albumName: track.albumName?.slice(0, 500) ?? null,
+          genres: track.genres ?? [],
+          popularity: 0,
+        })
+        .onConflictDoNothing()
+        .returning({ id: userMusicTracks.id });
+      if (result.length > 0) newTracksAdded++;
+    }
+
+    await db
+      .update(sharedPlaylists)
+      .set({ mergedAt: new Date() })
+      .where(eq(sharedPlaylists.id, playlistId));
+
+    return res.json({ merged: true, newTracksAdded });
+  } catch (error) {
+    console.error("[Last.fm] merge-playlist error:", error);
+    return res.status(500).json({ message: "Errore durante il merge della playlist" });
   }
 });
 
