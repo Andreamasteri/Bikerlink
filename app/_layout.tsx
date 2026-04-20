@@ -373,7 +373,7 @@ function OtaStartupChecker() {
     } catch (err) {
       failCountRef.current += 1;
       const errMsg = String(err);
-      console.warn(`[OTA] Tentativo ${failCountRef.current} fallito:`, errMsg);
+      if (__DEV__) console.warn(`[OTA] Tentativo ${failCountRef.current} fallito:`, errMsg);
       try {
         fetch(new URL("/api/admin/ota-error", getApiUrl()).toString(), {
           method: "POST",
