@@ -4116,16 +4116,17 @@
     "jsEngine": "hermes",
     "message": "OTA-127 rv7.0.0: Admin sensori, Last.fm reset, Privacy PDF, fix sicurezza",
     "note": "Task #783: Pulizia dati Last.fm utente lello (DB cleanup admin). Task #784: Admin panel tasto Cancella cache Last.fm + endpoint PUT /api/admin/settings/lastfm-reset. Task #787: Privacy Policy export PDF + link dinamico splash screen (/api/privacy/pdf-exists, /api/privacy/export-pdf). Task #788: Pannello Admin → Laboratorio → Sensori (8 SensorPanel espandibili, diagnostics log, disponibilità upfront, ErrorBoundary per card). Task #789: Fix sicurezza follow-redirects 1.16.0, IP rimosso da log client, postMessage documentato con controlli compensativi, bracket notation rimossa proposals.ts, 4 pool.query() migrate a db.execute + RETURNING id per rowCount. CURRENT_OTA_NUMBER=127.",
-    "releaseId": null,
-    "bundleUrl": null,
-    "updateGroupId": null,
-    "androidUpdateId": null,
+    "releaseId": "40089a58-39ac-4394-a3bd-417c98efc9b7",
+    "bundleUrl": "private/ota/ota-1.127.0-1776718775092.js",
+    "updateGroupId": "170f0b7b-a937-49bb-a5d0-42dc6afb4e5b",
+    "androidUpdateId": "019dacb3-185c-7074-a3c7-9152301e2e84",
     "iosUpdateId": null,
-    "commitBase": "373ad2680bcbde5894a2e0da97010e6d9bfcb1ba",
-    "easDashboard": null,
-    "apkBuildId": null,
+    "commitBase": "661cdb53445fec0aaee4e74a9d95f66070ccd976",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/170f0b7b-a937-49bb-a5d0-42dc6afb4e5b",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
-    "apkUrl": null,
-    "status": "pending"
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-20T20:59:48.425Z"
   }
 ]
