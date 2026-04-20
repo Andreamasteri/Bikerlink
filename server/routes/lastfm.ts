@@ -196,6 +196,10 @@ router.post("/mobile-auth", requireAuth, async (req: Request, res: Response) => 
     return res.status(400).json({ message: "Username e password sono obbligatori." });
   }
   const userId = req.session.userId!;
+
+  let sessionKey: string;
+  let lastfmUsername: string;
+
   try {
     const passwordMd5 = crypto.createHash("md5").update(password, "utf8").digest("hex");
     const authToken = crypto.createHash("md5").update(username.toLowerCase() + passwordMd5, "utf8").digest("hex");
@@ -210,12 +214,18 @@ router.post("/mobile-auth", requireAuth, async (req: Request, res: Response) => 
       return res.status(401).json({ message: errMsg });
     }
 
-    const sessionKey = sessionData?.session?.key;
-    const lastfmUsername = sessionData?.session?.name ?? username;
-    if (!sessionKey) {
+    const key = sessionData?.session?.key;
+    if (!key) {
       return res.status(400).json({ message: "Autorizzazione Last.fm fallita. Controlla username e password." });
     }
+    sessionKey = key;
+    lastfmUsername = sessionData?.session?.name ?? username;
+  } catch (err) {
+    console.error("[Last.fm mobile-auth] auth error:", err);
+    return res.status(401).json({ message: (err as Error).message ?? "Errore nella connessione Last.fm. Riprova." });
+  }
 
+  try {
     await db
       .insert(userLastfmSessions)
       .values({ userId, lastfmUsername, sessionKey })
@@ -233,8 +243,8 @@ router.post("/mobile-auth", requireAuth, async (req: Request, res: Response) => 
 
     return res.json({ connected: true, username: lastfmUsername, trackCount });
   } catch (err) {
-    console.error("[Last.fm mobile-auth]", err);
-    return res.status(500).json({ message: "Errore nella connessione Last.fm. Riprova." });
+    console.error("[Last.fm mobile-auth] DB error:", err);
+    return res.status(500).json({ message: "Errore nel salvataggio della sessione Last.fm." });
   }
 });
 
