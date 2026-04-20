@@ -103,18 +103,23 @@ export default function WelcomeScreen() {
   }, [isLoading, isAuthenticated]);
 
   const handlePrivacyPress = async () => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       const ctrl = new AbortController();
-      const timeout = setTimeout(() => ctrl.abort(), 3000);
+      timeout = setTimeout(() => ctrl.abort(), 3000);
       const res = await fetch(new URL("/api/privacy-policy/exists", getApiUrl()).toString(), { signal: ctrl.signal });
-      clearTimeout(timeout);
-      const data = await res.json();
-      if (data?.exists) {
-        const pdfUrl = new URL("/api/privacy-policy/download", getApiUrl()).toString();
-        Linking.openURL(pdfUrl);
-        return;
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.exists) {
+          const pdfUrl = new URL("/api/privacy-policy/download", getApiUrl()).toString();
+          Linking.openURL(pdfUrl);
+          return;
+        }
       }
-    } catch {}
+    } catch {
+    } finally {
+      if (timeout !== undefined) clearTimeout(timeout);
+    }
     router.push("/privacy-policy");
   };
 
