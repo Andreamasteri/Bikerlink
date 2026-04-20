@@ -4103,7 +4103,29 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-20T15:59:06.076Z"
+  },
+  {
+    "updateNumber": 127,
+    "version": "1.127.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-127 rv7.0.0: Admin sensori, Last.fm reset, Privacy PDF, fix sicurezza",
+    "note": "Task #783: Pulizia dati Last.fm utente lello (DB cleanup admin). Task #784: Admin panel tasto Cancella cache Last.fm + endpoint PUT /api/admin/settings/lastfm-reset. Task #787: Privacy Policy export PDF + link dinamico splash screen (/api/privacy/pdf-exists, /api/privacy/export-pdf). Task #788: Pannello Admin → Laboratorio → Sensori (8 SensorPanel espandibili, diagnostics log, disponibilità upfront, ErrorBoundary per card). Task #789: Fix sicurezza follow-redirects 1.16.0, IP rimosso da log client, postMessage documentato con controlli compensativi, bracket notation rimossa proposals.ts, 4 pool.query() migrate a db.execute + RETURNING id per rowCount. CURRENT_OTA_NUMBER=127.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "373ad2680bcbde5894a2e0da97010e6d9bfcb1ba",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 29,
+    "apkUrl": null,
+    "status": "pending"
   }
 ]

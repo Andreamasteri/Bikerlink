@@ -93,10 +93,11 @@ echo ""
 
 # Step 1: Login — extract session cookie from headers (needed for Secure cookies over HTTP)
 echo "[1/7] Login come admin..."
+LOGIN_JSON=$(jq -n --arg e "$ADMIN_EMAIL" --arg p "$ADMIN_PASSWORD" '{"identifier":$e,"password":$p}')
 RAW_LOGIN=$(curl -s -D - -X POST "$BACKEND_URL/api/auth/login" \
   -H "Content-Type: application/json" \
   -H "X-Forwarded-Proto: https" \
-  -d "{\"identifier\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}")
+  -d "$LOGIN_JSON")
 LOGIN_RESPONSE=$(echo "$RAW_LOGIN" | sed '/^\r$/q' | tail -1 && echo "$RAW_LOGIN" | awk 'BEGIN{body=0} /^\r$/{body=1; next} body{print}')
 LOGIN_BODY=$(echo "$RAW_LOGIN" | awk 'BEGIN{body=0} /^\r$/{body=1; next} body{print}')
 if ! echo "$LOGIN_BODY" | jq -e '.id' > /dev/null 2>&1; then
