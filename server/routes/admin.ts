@@ -3475,11 +3475,23 @@ router.post("/translations/export", async (req: Request, res: Response) => {
         fields: "id,name",
       });
     } catch (createErr: any) {
-      const isQuota = createErr?.errors?.some((e: any) => e.reason === "storageQuotaExceeded") ||
+      console.error("[translations/export] Drive create error — code:", createErr?.code, "errors:", JSON.stringify(createErr?.errors ?? []));
+      const isQuota =
+        createErr?.errors?.some((e: any) => e.reason === "storageQuotaExceeded") ||
         createErr?.message?.toLowerCase().includes("quota");
       if (isQuota) {
         return res.status(507).json({
           message: "Quota Drive esaurita. Vai in Admin → Traduzioni → 'Pulisci file Drive' per liberare spazio.",
+        });
+      }
+      const isPermission =
+        createErr?.errors?.some((e: any) =>
+          ["forbidden", "insufficientPermissions", "notFound"].includes(e.reason)
+        ) ||
+        createErr?.code === 403;
+      if (isPermission) {
+        return res.status(403).json({
+          message: "Il Service Account non ha permessi di scrittura sulla cartella Drive. Condividi la cartella con l'email del SA come Editor.",
         });
       }
       throw createErr;
@@ -4230,8 +4242,16 @@ router.get("/drive/storage-info", async (_req: Request, res: Response) => {
       usage: quota.usage ? parseInt(quota.usage) : null,
       usageInDrive: quota.usageInDrive ? parseInt(quota.usageInDrive) : null,
     });
-  } catch (error) {
-    console.error("Drive storage-info error:", error);
+  } catch (error: any) {
+    console.error("Drive storage-info error — code:", error?.code, "errors:", JSON.stringify(error?.errors ?? []), error);
+    const isPermission =
+      error?.code === 403 ||
+      error?.errors?.some((e: any) =>
+        ["forbidden", "insufficientPermissions", "notFound"].includes(e.reason)
+      );
+    if (isPermission) {
+      return res.status(403).json({ message: "Il Service Account non ha permessi di lettura su Drive." });
+    }
     return res.status(500).json({ message: "Errore nel recupero quota Drive" });
   }
 });
@@ -4264,8 +4284,16 @@ router.delete("/drive/cleanup-exports", async (_req: Request, res: Response) => 
       TRANSLATIONS_STAGING.exportedFileId = null;
     }
     return res.json({ deleted, freed, total: files.length });
-  } catch (error) {
-    console.error("Drive cleanup-exports error:", error);
+  } catch (error: any) {
+    console.error("Drive cleanup-exports error — code:", error?.code, "errors:", JSON.stringify(error?.errors ?? []), error);
+    const isPermission =
+      error?.code === 403 ||
+      error?.errors?.some((e: any) =>
+        ["forbidden", "insufficientPermissions", "notFound"].includes(e.reason)
+      );
+    if (isPermission) {
+      return res.status(403).json({ message: "Il Service Account non ha permessi sulla cartella Drive." });
+    }
     return res.status(500).json({ message: "Errore durante la pulizia Drive" });
   }
 });

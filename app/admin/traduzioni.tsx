@@ -771,7 +771,7 @@ export default function TraduzioniScreen() {
         const csvText = await resp.text();
         const filePath = `${FileSystem.cacheDirectory}BikerLink_Traduzioni.csv`;
         await FileSystem.writeAsStringAsync(filePath, csvText, {
-          encoding: FileSystem.EncodingType.UTF8,
+          encoding: 'utf8',
         });
         const canShare = await Sharing.isAvailableAsync();
         if (canShare) {
@@ -1030,6 +1030,14 @@ export default function TraduzioniScreen() {
           </View>
         ) : null}
 
+        {exportStatus === "error" && exportResult.toLowerCase().includes("permessi") ? (
+          <View style={styles.permissionBox}>
+            <MaterialCommunityIcons name="shield-alert-outline" size={16} color="#eb5757" />
+            <Text style={styles.permissionText}>
+              {exportResult}
+            </Text>
+          </View>
+        ) : null}
         {exportStatus === "error" && exportResult.toLowerCase().includes("quota") ? (
           <View style={styles.quotaBox}>
             <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#FFC107" />
@@ -1631,6 +1639,24 @@ const styles = StyleSheet.create({
   inlineHintText: {
     fontFamily: "Inter_400Regular",
     fontSize: 12,
+    flex: 1,
+  },
+  permissionBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    backgroundColor: "rgba(235,87,87,0.08)",
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "rgba(235,87,87,0.3)",
+    marginBottom: 8,
+  },
+  permissionText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "#eb5757",
+    lineHeight: 17,
     flex: 1,
   },
   quotaBox: {
