@@ -359,16 +359,16 @@ function OtaStartupChecker() {
     if (now - lastCheckRef.current < cooldown) return;
     lastCheckRef.current = now;
     try {
-      console.log("[OTA] Checking for update...");
+      if (__DEV__) console.log("[OTA] Checking for update...");
       const check = await Updates.checkForUpdateAsync();
-      console.log("[OTA] isAvailable:", check.isAvailable);
+      if (__DEV__) console.log("[OTA] isAvailable:", check.isAvailable);
       if (!check.isAvailable) {
         failCountRef.current = 0;
         return;
       }
-      console.log("[OTA] Fetching update...");
+      if (__DEV__) console.log("[OTA] Fetching update...");
       await Updates.fetchUpdateAsync();
-      console.log("[OTA] Reloading...");
+      if (__DEV__) console.log("[OTA] Reloading...");
       await Updates.reloadAsync();
     } catch (err) {
       failCountRef.current += 1;

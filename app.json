@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "buildNumber": "1",
+      "buildNumber": "2",
       "bundleIdentifier": "com.bikerlink.app",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "BikerLink usa la tua posizione GPS per mostrare i motociclisti vicini, registrare i tuoi percorsi in moto e ricevere avvisi SOS dalla community.",
@@ -32,7 +32,7 @@
     },
     "android": {
       "package": "com.bikerlink.app",
-      "versionCode": 30,
+      "versionCode": 31,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
