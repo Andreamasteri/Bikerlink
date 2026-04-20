@@ -207,15 +207,23 @@ router.post("/mobile-auth", requireAuth, async (req: Request, res: Response) => 
 
   try {
     const passwordMd5 = crypto.createHash("md5").update(password, "utf8").digest("hex");
-    const authToken = crypto.createHash("md5").update(username.toLowerCase() + passwordMd5, "utf8").digest("hex");
     const sessionData = await lastfmApiCall({
       method: "auth.getMobileSession",
       username,
-      authToken,
+      password: passwordMd5,
     }, "POST") as { session?: { key?: string; name?: string }; error?: number; message?: string };
 
     if (sessionData?.error) {
-      const errMsg = sessionData.message ?? "Credenziali non valide. Riprova.";
+      const code = sessionData.error;
+      console.warn(`[Last.fm mobile-auth] error code=${code} msg=${sessionData.message}`);
+      let errMsg: string;
+      if (code === 4) {
+        errMsg = "Credenziali non valide. Assicurati di usare username e password corretti. Se hai appena creato l'account, verifica prima l'email di conferma che Last.fm ti ha inviato.";
+      } else if (code === 26) {
+        errMsg = "Accesso API Last.fm non autorizzato. Contatta l'assistenza.";
+      } else {
+        errMsg = sessionData.message ?? "Credenziali non valide. Riprova.";
+      }
       return res.status(401).json({ message: errMsg });
     }
 
