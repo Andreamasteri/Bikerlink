@@ -3,6 +3,7 @@
     "name": "BikerLink",
     "slug": "bikerlink",
     "version": "1.9.3",
+    "newArchEnabled": false,
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "bikerlink",
@@ -22,7 +23,8 @@
         "NSLocationAlwaysUsageDescription": "BikerLink usa la posizione in background per il tracciamento percorsi in moto, la funzione SOS d'emergenza e la sicurezza della community.",
         "NSPhotoLibraryUsageDescription": "BikerLink accede alle tue foto per caricare immagini del profilo e delle moto.",
         "NSCameraUsageDescription": "BikerLink accede alla fotocamera per scattare foto del profilo e delle moto.",
-        "UIBackgroundModes": ["location", "fetch", "audio"]
+        "UIBackgroundModes": ["location", "fetch", "audio"],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
