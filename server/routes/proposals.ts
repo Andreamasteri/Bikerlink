@@ -725,10 +725,10 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
     if (b.maxParticipants !== undefined) updateData.maxParticipants = b.maxParticipants;
     if (b.status !== undefined) updateData.status = b.status;
 
-    const dateFields = ["scheduledAt", "departureTimeFrom", "departureTimeTo", "returnDeadline"];
-    for (const f of dateFields) {
-      if (updateData[f]) updateData[f] = new Date(updateData[f] as string);
-    }
+    if (updateData.scheduledAt) updateData.scheduledAt = new Date(updateData.scheduledAt as string);
+    if (updateData.departureTimeFrom) updateData.departureTimeFrom = new Date(updateData.departureTimeFrom as string);
+    if (updateData.departureTimeTo) updateData.departureTimeTo = new Date(updateData.departureTimeTo as string);
+    if (updateData.returnDeadline) updateData.returnDeadline = new Date(updateData.returnDeadline as string);
 
     if (updateData.departureTimeTo) {
       updateData.expiresAt = new Date((updateData.departureTimeTo as Date).getTime() + 2 * 60 * 60 * 1000);

@@ -62,9 +62,11 @@ export default function LeafletPickerMap({
 
   useEffect(() => {
     if (!selectedCoord) return;
+    // targetOrigin "null" è corretto per iframe caricati via srcDoc: il loro origin è opaco (null).
+    // Il contenuto inviato è non-sensibile (coordinate lat/lng) e il sandbox previene injection esterne.
     iframeRef.current?.contentWindow?.postMessage(
       JSON.stringify({ type: "setCoord", lat: selectedCoord.lat, lng: selectedCoord.lng }),
-      "*"
+      "null"
     );
   }, [selectedCoord]);
 

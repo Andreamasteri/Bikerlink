@@ -32,9 +32,11 @@ export default function LeafletTrackingMap({ points, currentLocation }: Tracking
         data.current = { lat: loc.latitude, lng: loc.longitude };
       }
       const jsonStr = JSON.stringify(data);
+      // targetOrigin "null" è corretto per iframe caricati via srcDoc: il loro origin è opaco (null).
+      // Il contenuto inviato è non-sensibile (dati tracking) e il sandbox previene injection esterne.
       iframeRef.current?.contentWindow?.postMessage(
         JSON.stringify({ type: "updateLocation", json: jsonStr }),
-        "*"
+        "null"
       );
     },
     []

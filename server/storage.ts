@@ -1,5 +1,5 @@
 import { eq, and, or, sql, desc, asc, gte, lte, inArray, notInArray } from "drizzle-orm";
-import { db, pool } from "./db";
+import { db } from "./db";
 import {
   users,
   userPhotos,
@@ -1905,17 +1905,15 @@ export class DatabaseStorage implements IStorage {
     const isSupermatch = data.isSupermatch ?? false;
     const status = data.status || "new";
 
-    const result = await pool.query(
-      `INSERT INTO biker_biker_matches (id, biker1_id, biker2_id, motorcycle_brand, motorcycle_model, status, is_supermatch)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6)
-       ON CONFLICT (LEAST(biker1_id, biker2_id), GREATEST(biker1_id, biker2_id), motorcycle_brand, motorcycle_model)
-       DO UPDATE SET
-         status = 'new',
-         is_supermatch = EXCLUDED.is_supermatch
-       WHERE biker_biker_matches.status = 'rejected'
-       RETURNING *`,
-      [idA, idB, data.motorcycleBrand, data.motorcycleModel, status, isSupermatch]
-    );
+    const result = await db.execute(sql`
+      INSERT INTO biker_biker_matches (id, biker1_id, biker2_id, motorcycle_brand, motorcycle_model, status, is_supermatch)
+      VALUES (gen_random_uuid(), ${idA}, ${idB}, ${data.motorcycleBrand}, ${data.motorcycleModel}, ${status}, ${isSupermatch})
+      ON CONFLICT (LEAST(biker1_id, biker2_id), GREATEST(biker1_id, biker2_id), motorcycle_brand, motorcycle_model)
+      DO UPDATE SET
+        status = 'new',
+        is_supermatch = EXCLUDED.is_supermatch
+      WHERE biker_biker_matches.status = 'rejected'
+      RETURNING *`);
 
     if (!result.rows || result.rows.length === 0) return undefined;
     const row = result.rows[0];
@@ -2153,7 +2151,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCoordinateHistoryStats(): Promise<{ totalRecords: number; trackedUsers: number; oldestRecord: string | null; newestRecord: string | null }> {
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       SELECT
         COUNT(*)::int as total_records,
         COUNT(DISTINCT user_id)::int as tracked_users,
@@ -2161,7 +2159,7 @@ export class DatabaseStorage implements IStorage {
         MAX(created_at)::text as newest_record
       FROM coordinate_history
     `);
-    const row = result.rows[0];
+    const row = result.rows[0] as { total_records: number; tracked_users: number; oldest_record: string | null; newest_record: string | null };
     return {
       totalRecords: row.total_records || 0,
       trackedUsers: row.tracked_users || 0,
@@ -2171,7 +2169,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCoordinateHistoryUsers(): Promise<Array<{ userId: string; nickname: string; recordCount: number; lastRecord: string }>> {
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       SELECT ch.user_id, u.nickname,
         COUNT(*)::int as record_count,
         MAX(ch.created_at)::text as last_record
@@ -2180,12 +2178,15 @@ export class DatabaseStorage implements IStorage {
       GROUP BY ch.user_id, u.nickname
       ORDER BY last_record DESC
     `);
-    return result.rows.map((r: any) => ({
-      userId: r.user_id,
-      nickname: r.nickname,
-      recordCount: r.record_count,
-      lastRecord: r.last_record,
-    }));
+    return result.rows.map((r) => {
+      const row = r as { user_id: string; nickname: string; record_count: number; last_record: string };
+      return {
+        userId: row.user_id,
+        nickname: row.nickname,
+        recordCount: row.record_count,
+        lastRecord: row.last_record,
+      };
+    });
   }
 
   async cleanupOldCoordinateHistory(): Promise<number> {
@@ -2194,16 +2195,16 @@ export class DatabaseStorage implements IStorage {
       const maxRecords = maxRecordsSetting?.value ? parseInt(maxRecordsSetting.value, 10) : 60;
       const limit = isNaN(maxRecords) || maxRecords < 1 ? 60 : maxRecords;
 
-      const result = await pool.query(`
+      const result = await db.execute(sql`
         DELETE FROM coordinate_history
         WHERE id IN (
           SELECT id FROM (
             SELECT id, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC) as rn
             FROM coordinate_history
-          ) ranked WHERE rn > $1
+          ) ranked WHERE rn > ${limit}
         )
-      `, [limit]);
-      return result.rowCount || 0;
+      `);
+      return (result as unknown as { rowCount: number | null }).rowCount ?? 0;
     } catch (err) {
       console.error("[CoordinateHistory] cleanup error:", err);
       return 0;

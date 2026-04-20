@@ -1191,7 +1191,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         platform: platform || "unknown",
         appVersion: appVersion || "unknown",
         timestamp: new Date().toISOString(),
-        ip: req.ip,
       }));
       res.json({ received: true });
     } catch {
