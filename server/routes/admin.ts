@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import { uploadBuffer } from "../objectStorage";
 import { storage } from "../storage";
 import { db } from "../db";
-import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings } from "@shared/schema";
+import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots } from "@shared/schema";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { eq, and, ne, desc, sql, count, notExists, inArray, lte, isNull, or, ilike } from "drizzle-orm";
 import { sendEmail } from "../email";
@@ -432,6 +432,39 @@ router.delete("/users/:id", async (req: Request, res: Response) => {
     return res.json({ message: "Utente eliminato con successo" });
   } catch (error) {
     console.error("Admin delete user error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/users/:id/lastfm", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const user = await storage.getUser(id);
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
+    }
+    const [tracks, sessions, snapshots] = await Promise.all([
+      db.delete(userMusicTracks).where(eq(userMusicTracks.userId, id)),
+      db.delete(userLastfmSessions).where(eq(userLastfmSessions.userId, id)),
+      db.delete(userPlaylistSnapshots).where(eq(userPlaylistSnapshots.userId, id)),
+    ]);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "clear_lastfm",
+      targetType: "user",
+      targetId: id,
+      details: `Dati Last.fm cancellati per ${user.nickname}: ${tracks.rowCount ?? 0} tracce, ${sessions.rowCount ?? 0} sessioni, ${snapshots.rowCount ?? 0} snapshot`,
+    });
+    return res.json({
+      message: "Dati Last.fm cancellati",
+      deleted: {
+        tracks: tracks.rowCount ?? 0,
+        sessions: sessions.rowCount ?? 0,
+        snapshots: snapshots.rowCount ?? 0,
+      },
+    });
+  } catch (error) {
+    console.error("Admin clear lastfm error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

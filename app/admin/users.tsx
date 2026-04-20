@@ -163,6 +163,18 @@ export default function AdminUsers() {
     onError: () => Alert.alert("Errore", "Impossibile aggiornare stato Primal"),
   });
 
+  const clearLastfmMutation = useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const res = await apiRequest("DELETE", `/api/admin/users/${id}/lastfm`);
+      return res.json() as Promise<{ message: string; deleted: { tracks: number; sessions: number; snapshots: number } }>;
+    },
+    onSuccess: (data) => {
+      const { tracks, sessions, snapshots } = data.deleted;
+      Alert.alert("Last.fm cancellato", `Rimossi: ${tracks} brani, ${sessions} sessioni, ${snapshots} snapshot`);
+    },
+    onError: () => Alert.alert("Errore", "Impossibile cancellare i dati Last.fm"),
+  });
+
   const filteredUsers = users.filter((u) => {
     if (hideFake && u.isFake === true) return false;
     if (!searchText) return true;
@@ -253,6 +265,21 @@ export default function AdminUsers() {
     );
   }
 
+  function handleClearLastfm(user: AdminUser) {
+    Alert.alert(
+      "Clear Last.fm",
+      `Cancellare tutti i dati Last.fm di ${user.nickname}? (brani, sessione, snapshot)`,
+      [
+        { text: "Annulla", style: "cancel" as const },
+        {
+          text: "Cancella",
+          style: "destructive" as const,
+          onPress: () => clearLastfmMutation.mutate({ id: user.id }),
+        },
+      ]
+    );
+  }
+
   function getStatusColor(status: string) {
     switch (status) {
       case "active": return Colors.success;
@@ -311,6 +338,9 @@ export default function AdminUsers() {
               <Ionicons name="shield-checkmark-outline" size={22} color={Colors.maleIcon} />
             </TouchableOpacity>
           )}
+          <TouchableOpacity onPress={() => handleClearLastfm(item)} style={styles.actionBtn}>
+            <Ionicons name="musical-notes-outline" size={22} color={Colors.textSecondary} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => handleDeleteUser(item)} style={styles.actionBtn}>
             <Ionicons name="trash-outline" size={22} color={Colors.error} />
           </TouchableOpacity>
