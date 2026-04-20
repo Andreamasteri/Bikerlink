@@ -121,7 +121,7 @@ async function syncLastfmTracks(userId: string, sessionKey: string, username: st
         .insert(userMusicTracks)
         .values({
           userId,
-          spotifyTrackId: trackId,
+          lastfmTrackId: trackId,
           trackName,
           artistId: t.artist?.mbid && t.artist.mbid.length > 0 ? t.artist.mbid : artistName,
           artistName,
@@ -146,8 +146,10 @@ async function syncLastfmTracks(userId: string, sessionKey: string, username: st
         .limit(1);
 
       if (snapshot && Array.isArray(snapshot.tracksJson) && (snapshot.tracksJson as unknown[]).length > 0) {
+        // Accept both new (lastfmTrackId) and legacy (spotifyTrackId) snapshot formats
         const snapshotTracks = snapshot.tracksJson as Array<{
-          spotifyTrackId: string;
+          lastfmTrackId?: string;
+          spotifyTrackId?: string; // legacy field name from pre-Task#778 snapshots
           trackName: string;
           artistId: string;
           artistName: string;
@@ -158,12 +160,14 @@ async function syncLastfmTracks(userId: string, sessionKey: string, username: st
           provider?: string;
         }>;
         for (const st of snapshotTracks) {
+          const resolvedTrackId = st.lastfmTrackId ?? st.spotifyTrackId;
+          if (!resolvedTrackId) continue;
           try {
             await db
               .insert(userMusicTracks)
               .values({
                 userId,
-                spotifyTrackId: st.spotifyTrackId,
+                lastfmTrackId: resolvedTrackId,
                 trackName: st.trackName,
                 artistId: st.artistId,
                 artistName: st.artistName,
@@ -317,7 +321,7 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
       const rawImageUrl2 = (t.image ?? []).find((img) => img.size === "medium")?.["#text"] ?? "";
       const imageUrl = rawImageUrl2 && !rawImageUrl2.includes(LASTFM_PLACEHOLDER) ? rawImageUrl2 : null;
       return {
-        spotifyTrackId: trackId,
+        lastfmTrackId: trackId,
         trackName,
         artistId: artistName,
         artistName,
@@ -373,9 +377,9 @@ router.get("/tracks", requireAuth, async (req: Request, res: Response) => {
 
 router.post("/tracks", requireAuth, async (req: Request, res: Response) => {
   const userId = req.session.userId!;
-  const { spotifyTrackId, trackName, artistId, artistName, albumName, imageUrl, genres, popularity } =
+  const { lastfmTrackId, trackName, artistId, artistName, albumName, imageUrl, genres, popularity } =
     req.body as {
-      spotifyTrackId: string;
+      lastfmTrackId: string;
       trackName: string;
       artistId: string;
       artistName: string;
@@ -384,7 +388,7 @@ router.post("/tracks", requireAuth, async (req: Request, res: Response) => {
       genres?: string[];
       popularity?: number;
     };
-  if (!spotifyTrackId || !trackName || !artistName) {
+  if (!lastfmTrackId || !trackName || !artistName) {
     return res.status(400).json({ message: "Dati brano mancanti" });
   }
   try {
@@ -392,7 +396,7 @@ router.post("/tracks", requireAuth, async (req: Request, res: Response) => {
       .insert(userMusicTracks)
       .values({
         userId,
-        spotifyTrackId,
+        lastfmTrackId,
         trackName,
         artistId: artistId || artistName,
         artistName,
@@ -445,7 +449,7 @@ router.post("/share-playlist", requireAuth, async (req: Request, res: Response) 
     }
 
     const tracksData = tracks.map((t) => ({
-      trackId: t.spotifyTrackId,
+      trackId: t.lastfmTrackId,
       trackName: t.trackName,
       artistId: t.artistId,
       artistName: t.artistName,
@@ -598,7 +602,7 @@ router.post("/merge-playlist/:playlistId", requireAuth, async (req: Request, res
         .values({
           userId,
           provider: "lastfm",
-          spotifyTrackId: track.trackId ?? track.trackName,
+          lastfmTrackId: track.trackId ?? track.trackName,
           trackName: track.trackName.slice(0, 500),
           artistId: track.artistId ?? track.artistName,
           artistName: track.artistName.slice(0, 300),
@@ -632,7 +636,7 @@ router.delete("/tracks/:id", requireAuth, async (req: Request, res: Response) =>
       .where(
         and(
           eq(userMusicTracks.userId, userId),
-          eq(userMusicTracks.spotifyTrackId, id),
+          eq(userMusicTracks.lastfmTrackId, id),
           eq(userMusicTracks.provider, "lastfm")
         )
       );

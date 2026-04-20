@@ -26,7 +26,7 @@ export async function handleMusicMatch(req: Request, res: Response) {
     const logic = (req.query.logic as string) === "any" ? "any" : "all";
 
     const myTracks = await db
-      .select({ spotifyTrackId: userMusicTracks.spotifyTrackId, artistId: userMusicTracks.artistId, genres: userMusicTracks.genres })
+      .select({ lastfmTrackId: userMusicTracks.lastfmTrackId, artistId: userMusicTracks.artistId, genres: userMusicTracks.genres })
       .from(userMusicTracks)
       .where(eq(userMusicTracks.userId, userId));
 
@@ -34,7 +34,7 @@ export async function handleMusicMatch(req: Request, res: Response) {
       return res.json({ matches: [] });
     }
 
-    const myTrackIds = new Set(myTracks.map((t) => t.spotifyTrackId));
+    const myTrackIds = new Set(myTracks.map((t) => t.lastfmTrackId));
 
     const myArtistCount = new Map<string, number>();
     for (const t of myTracks) {
@@ -77,13 +77,13 @@ export async function handleMusicMatch(req: Request, res: Response) {
 
     for (const candidate of candidateUsers) {
       const candidateTracks = await db
-        .select({ spotifyTrackId: userMusicTracks.spotifyTrackId, artistId: userMusicTracks.artistId, artistName: userMusicTracks.artistName, genres: userMusicTracks.genres })
+        .select({ lastfmTrackId: userMusicTracks.lastfmTrackId, artistId: userMusicTracks.artistId, artistName: userMusicTracks.artistName, genres: userMusicTracks.genres })
         .from(userMusicTracks)
         .where(eq(userMusicTracks.userId, candidate.id));
 
       if (candidateTracks.length === 0) continue;
 
-      const songsInCommon = candidateTracks.filter((t) => myTrackIds.has(t.spotifyTrackId)).length;
+      const songsInCommon = candidateTracks.filter((t) => myTrackIds.has(t.lastfmTrackId)).length;
 
       const candidateArtistCount = new Map<string, { id: string; name: string; count: number }>();
       for (const t of candidateTracks) {

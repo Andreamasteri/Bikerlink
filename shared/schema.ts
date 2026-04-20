@@ -1086,7 +1086,8 @@ export const otaReleases = pgTable("ota_releases", {
 export type OtaRelease = typeof otaReleases.$inferSelect;
 export type InsertOtaRelease = typeof otaReleases.$inferInsert;
 
-export const userSpotifyTokens = pgTable("user_spotify_tokens", {
+// Renamed from userSpotifyTokens / user_spotify_tokens (legacy Spotify era)
+export const userMusicTokens = pgTable("user_music_tokens", {
   userId: varchar("user_id", { length: 36 })
     .primaryKey()
     .references(() => users.id, { onDelete: "cascade" }),
@@ -1099,15 +1100,20 @@ export const userSpotifyTokens = pgTable("user_spotify_tokens", {
   lastSyncAt: timestamp("last_sync_at"),
 });
 
-export type UserSpotifyToken = typeof userSpotifyTokens.$inferSelect;
-export type InsertUserSpotifyToken = typeof userSpotifyTokens.$inferInsert;
+export type UserMusicToken = typeof userMusicTokens.$inferSelect;
+export type InsertUserMusicToken = typeof userMusicTokens.$inferInsert;
+// Legacy aliases kept for historical reference (renamed from Spotify era)
+export const userSpotifyTokens = userMusicTokens;
+export type UserSpotifyToken = UserMusicToken;
+export type InsertUserSpotifyToken = InsertUserMusicToken;
 
 export const userMusicTracks = pgTable("user_music_tracks", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id", { length: 36 })
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  spotifyTrackId: varchar("spotify_track_id", { length: 200 }).notNull(),
+  // Renamed from spotifyTrackId / spotify_track_id (legacy Spotify era)
+  lastfmTrackId: varchar("lastfm_track_id", { length: 200 }).notNull(),
   trackName: varchar("track_name", { length: 500 }).notNull(),
   artistId: varchar("artist_id", { length: 200 }).notNull(),
   artistName: varchar("artist_name", { length: 300 }).notNull(),
@@ -1118,7 +1124,7 @@ export const userMusicTracks = pgTable("user_music_tracks", {
   provider: varchar("provider", { length: 20 }).notNull().default("lastfm"),
   addedAt: timestamp("added_at").notNull().defaultNow(),
 }, (table) => [
-  uniqueIndex("user_track_uniq").on(table.userId, table.spotifyTrackId, table.provider),
+  uniqueIndex("user_track_uniq").on(table.userId, table.lastfmTrackId, table.provider),
   index("user_music_tracks_user_idx").on(table.userId),
 ]);
 

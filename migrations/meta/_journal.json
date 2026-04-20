@@ -36,6 +36,13 @@
       "when": 1745376000000,
       "tag": "0006_arcade_scores",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1745557200000,
+      "tag": "0009_rename_spotify_identifiers",
+      "breakpoints": true
     }
   ]
 }

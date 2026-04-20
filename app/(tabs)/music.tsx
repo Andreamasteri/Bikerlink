@@ -46,7 +46,7 @@ interface PreviewResult {
 }
 
 interface SearchTrack {
-  spotifyTrackId: string;
+  lastfmTrackId: string;
   trackName: string;
   artistId: string;
   artistName: string;
@@ -58,7 +58,7 @@ interface SearchTrack {
 
 interface LibraryTrack {
   id: number;
-  spotifyTrackId: string;
+  lastfmTrackId: string;
   trackName: string;
   artistName: string;
   albumName?: string | null;
@@ -1052,7 +1052,7 @@ export default function MusicScreen() {
       .then((data: { id: number; fromUser: { nickname: string }; tracks: Array<{ trackId: string; trackName: string; artistName: string; albumName?: string | null; imageUrl?: string | null }> }) => {
         const mapped: LibraryTrack[] = data.tracks.map((t, i) => ({
           id: i,
-          spotifyTrackId: t.trackId,
+          lastfmTrackId: t.trackId,
           trackName: t.trackName,
           artistName: t.artistName,
           albumName: t.albumName ?? null,
@@ -1138,7 +1138,7 @@ export default function MusicScreen() {
 
   const addTrackMutation = useMutation({
     mutationFn: async (track: SearchTrack) => {
-      setPendingAddId(track.spotifyTrackId);
+      setPendingAddId(track.lastfmTrackId);
       const res = await apiRequest("POST", `${apiPrefix}/tracks`, track);
       return res.json();
     },
@@ -1152,9 +1152,9 @@ export default function MusicScreen() {
   });
 
   const removeTrackMutation = useMutation({
-    mutationFn: async (spotifyTrackId: string) => {
-      setPendingRemoveId(spotifyTrackId);
-      const res = await apiRequest("DELETE", `${apiPrefix}/tracks/${encodeURIComponent(spotifyTrackId)}`, {});
+    mutationFn: async (lastfmTrackId: string) => {
+      setPendingRemoveId(lastfmTrackId);
+      const res = await apiRequest("DELETE", `${apiPrefix}/tracks/${encodeURIComponent(lastfmTrackId)}`, {});
       return res.json();
     },
     onSuccess: () => {
@@ -1236,7 +1236,7 @@ export default function MusicScreen() {
     AsyncStorage.setItem("music_match_min_songs", String(v)).catch(() => {});
   }, []);
 
-  const savedIds = new Set((tracksQuery.data?.tracks ?? []).map((t) => t.spotifyTrackId));
+  const savedIds = new Set((tracksQuery.data?.tracks ?? []).map((t) => t.lastfmTrackId));
   const topPadding = insets.top + (Platform.OS === "web" ? 67 : 0);
   const providerColor = LASTFM_RED;
 
@@ -1731,10 +1731,10 @@ function BraniTab({
             ) : (
               searchResults.map((track) => (
                 <SearchTrackRow
-                  key={track.spotifyTrackId}
+                  key={track.lastfmTrackId}
                   track={track}
-                  isAdded={savedIds.has(track.spotifyTrackId)}
-                  isAdding={pendingAddId === track.spotifyTrackId}
+                  isAdded={savedIds.has(track.lastfmTrackId)}
+                  isAdding={pendingAddId === track.lastfmTrackId}
                   onAdd={onAdd}
                 />
               ))
@@ -1758,9 +1758,9 @@ function BraniTab({
         ) : (
           displayedLibrary.map((track) => (
             <LibraryTrackRow
-              key={track.spotifyTrackId}
+              key={track.lastfmTrackId}
               track={track}
-              isRemoving={!playlistOverride && pendingRemoveId === track.spotifyTrackId}
+              isRemoving={!playlistOverride && pendingRemoveId === track.lastfmTrackId}
               onRemove={playlistOverride ? () => {} : onRemove}
               streamService={streamService}
             />
@@ -2065,7 +2065,7 @@ function LibraryTrackRow({
             `Vuoi rimuovere "${track.trackName}" dalla tua Playlist?`,
             [
               { text: "Annulla", style: "cancel" },
-              { text: "Rimuovi", style: "destructive", onPress: () => onRemove(track.spotifyTrackId) },
+              { text: "Rimuovi", style: "destructive", onPress: () => onRemove(track.lastfmTrackId) },
             ]
           );
         }}

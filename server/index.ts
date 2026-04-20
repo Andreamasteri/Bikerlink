@@ -618,8 +618,18 @@ function setupErrorHandler(app: express.Application) {
         }
 
         try {
+          // Rename legacy user_spotify_tokens → user_music_tokens if needed
           await db.execute(sql`
-            CREATE TABLE IF NOT EXISTS user_spotify_tokens (
+            DO $$ BEGIN
+              IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'user_spotify_tokens')
+                AND NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'user_music_tokens')
+              THEN
+                ALTER TABLE user_spotify_tokens RENAME TO user_music_tokens;
+              END IF;
+            END $$
+          `);
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS user_music_tokens (
               user_id VARCHAR(36) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
               spotify_user_id VARCHAR(200) NOT NULL,
               display_name VARCHAR(200),
@@ -631,7 +641,7 @@ function setupErrorHandler(app: express.Application) {
             )
           `);
         } catch (e) {
-          console.warn("[MIGRATION] user_spotify_tokens:", e);
+          console.warn("[MIGRATION] user_music_tokens:", e);
         }
 
         try {
@@ -639,7 +649,7 @@ function setupErrorHandler(app: express.Application) {
             CREATE TABLE IF NOT EXISTS user_music_tracks (
               id SERIAL PRIMARY KEY,
               user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-              spotify_track_id VARCHAR(200) NOT NULL,
+              lastfm_track_id VARCHAR(200) NOT NULL,
               track_name VARCHAR(500) NOT NULL,
               artist_id VARCHAR(200) NOT NULL,
               artist_name VARCHAR(300) NOT NULL,
@@ -649,7 +659,7 @@ function setupErrorHandler(app: express.Application) {
               added_at TIMESTAMP NOT NULL DEFAULT NOW()
             )
           `);
-          await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS user_track_uniq ON user_music_tracks (user_id, spotify_track_id)`);
+          await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS user_track_uniq ON user_music_tracks (user_id, lastfm_track_id)`);
           await db.execute(sql`CREATE INDEX IF NOT EXISTS user_music_tracks_user_idx ON user_music_tracks (user_id)`);
         } catch (e) {
           console.warn("[MIGRATION] user_music_tracks:", e);
@@ -687,9 +697,17 @@ function setupErrorHandler(app: express.Application) {
         }
 
         try {
+          // Rename legacy spotify_track_id → lastfm_track_id if needed
+          await db.execute(sql`
+            DO $$ BEGIN
+              IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_music_tracks' AND column_name = 'spotify_track_id') THEN
+                ALTER TABLE user_music_tracks RENAME COLUMN spotify_track_id TO lastfm_track_id;
+              END IF;
+            END $$
+          `);
           await db.execute(sql`ALTER TABLE user_music_tracks ADD COLUMN IF NOT EXISTS provider VARCHAR(20) NOT NULL DEFAULT 'spotify'`);
           await db.execute(sql`DROP INDEX IF EXISTS user_track_uniq`);
-          await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS user_track_uniq ON user_music_tracks (user_id, spotify_track_id, provider)`);
+          await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS user_track_uniq ON user_music_tracks (user_id, lastfm_track_id, provider)`);
         } catch (e) {
           console.warn("[MIGRATION] user_music_tracks.provider + unique index:", e);
         }
@@ -717,6 +735,26 @@ function setupErrorHandler(app: express.Application) {
           `);
         } catch (e) {
           console.warn("[MIGRATION] user_playlist_snapshots:", e);
+        }
+
+        try {
+          // Normalize legacy snapshot JSON: rename spotifyTrackId → lastfmTrackId
+          await db.execute(sql`
+            UPDATE user_playlist_snapshots
+            SET tracks_json = (
+              SELECT jsonb_agg(
+                CASE
+                  WHEN elem ? 'spotifyTrackId'
+                  THEN jsonb_set(elem - 'spotifyTrackId', '{lastfmTrackId}', elem->'spotifyTrackId')
+                  ELSE elem
+                END
+              )
+              FROM jsonb_array_elements(tracks_json) AS elem
+            )
+            WHERE tracks_json::text LIKE '%spotifyTrackId%'
+          `);
+        } catch (e) {
+          console.warn("[MIGRATION] user_playlist_snapshots normalize spotifyTrackId:", e);
         }
 
         try {
@@ -877,7 +915,7 @@ function setupErrorHandler(app: express.Application) {
                 const tracks = await dbSnap.select().from(umt).where(eqSnap(umt.userId, row.user_id));
                 if (tracks.length === 0) continue;
                 const tracksJson = tracks.map((t) => ({
-                  spotifyTrackId: t.spotifyTrackId,
+                  lastfmTrackId: t.lastfmTrackId,
                   trackName: t.trackName,
                   artistId: t.artistId,
                   artistName: t.artistName,

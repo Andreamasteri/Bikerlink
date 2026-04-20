@@ -1363,7 +1363,7 @@ export default function MatchScreen() {
       ) : (
         <FlatList
           data={currentList}
-          keyExtractor={(item) => item.id?.toString() ?? item.user?.id ?? item.spotifyTrackId ?? String(item.songsInCommon) + (item.user?.id ?? "")}
+          keyExtractor={(item) => item.id?.toString() ?? item.user?.id ?? item.lastfmTrackId ?? String(item.songsInCommon) + (item.user?.id ?? "")}
           renderItem={renderItem}
           extraData={[currentList, activeTab]}
           contentContainerStyle={styles.list}
