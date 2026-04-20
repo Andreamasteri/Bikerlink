@@ -164,9 +164,10 @@ type SensorPanelInnerProps = {
   def: SensorDef;
   isOpen: boolean;
   addLog: AddLogFn;
+  onAvailabilityChange: (v: boolean | null) => void;
 };
 
-function SensorPanelInner({ def, isOpen, addLog }: SensorPanelInnerProps) {
+function SensorPanelInner({ def, isOpen, addLog, onAvailabilityChange }: SensorPanelInnerProps) {
   const [available, setAvailable] = useState<boolean | null>(null);
   const [liveData, setLiveData] = useState<string | null>(null);
   const subscriptionRef = useRef<Subscription | null>(null);
@@ -190,6 +191,7 @@ function SensorPanelInner({ def, isOpen, addLog }: SensorPanelInnerProps) {
       const label = def.platformOnly === "android" ? "Android" : "iOS";
       addLog(def.name, "error", `non disponibile — solo ${label}`);
       setAvailable(false);
+      onAvailabilityChange(false);
       return;
     }
     let cancelled = false;
@@ -198,6 +200,7 @@ function SensorPanelInner({ def, isOpen, addLog }: SensorPanelInnerProps) {
         const ok = await checkSensorAvailable(def.key);
         if (cancelled) return;
         setAvailable(ok);
+        onAvailabilityChange(ok);
         if (ok) {
           addLog(def.name, "success", `disponibile su questo dispositivo`);
         } else {
@@ -208,6 +211,7 @@ function SensorPanelInner({ def, isOpen, addLog }: SensorPanelInnerProps) {
         const msg = e instanceof Error ? e.message : String(e);
         addLog(def.name, "error", `errore verifica disponibilità: ${msg}`);
         setAvailable(false);
+        onAvailabilityChange(false);
       }
     })();
     return () => {
@@ -281,7 +285,9 @@ function SensorPanelInner({ def, isOpen, addLog }: SensorPanelInnerProps) {
         {def.platformOnly && (
           <View style={[sensorStyles.badge, { backgroundColor: Colors.warning + "22" }]}>
             <Text style={[sensorStyles.badgeText, { color: Colors.warning }]}>
-              {def.platformOnly === "android" ? "Android only" : "iOS only"}
+              {def.platformOnly === "android"
+                ? `Non disponibile su ${Platform.OS === "ios" ? "iOS" : "questa piattaforma"}`
+                : `Non disponibile su ${Platform.OS === "android" ? "Android" : "questa piattaforma"}`}
             </Text>
           </View>
         )}
@@ -304,9 +310,14 @@ type SensorPanelProps = {
 };
 
 function SensorPanel({ def, isOpen, onPress, addLog }: SensorPanelProps) {
+  const [available, setAvailable] = useState<boolean | null>(null);
+
   const handleCrash = useCallback((sensor: string, message: string) => {
     addLog(sensor, "error", `crash catturato dall'ErrorBoundary: ${message}`);
   }, [addLog]);
+
+  const dotColor =
+    available === null ? Colors.textSecondary : available ? Colors.success : Colors.error;
 
   return (
     <View style={sensorStyles.card}>
@@ -319,16 +330,24 @@ function SensorPanel({ def, isOpen, onPress, addLog }: SensorPanelProps) {
           />
           <Text style={[sensorStyles.title, isOpen && { color: Colors.accent }]}>{def.name}</Text>
         </View>
-        <Ionicons
-          name={isOpen ? "chevron-up" : "chevron-down"}
-          size={20}
-          color={Colors.textSecondary}
-        />
+        <View style={sensorStyles.headerRight}>
+          <View style={[sensorStyles.availDot, { backgroundColor: dotColor }]} />
+          <Ionicons
+            name={isOpen ? "chevron-up" : "chevron-down"}
+            size={20}
+            color={Colors.textSecondary}
+          />
+        </View>
       </TouchableOpacity>
 
       <SensorErrorBoundary sensor={def.name} onCrash={handleCrash}>
         <View style={isOpen ? undefined : sensorStyles.hidden}>
-          <SensorPanelInner def={def} isOpen={isOpen} addLog={addLog} />
+          <SensorPanelInner
+            def={def}
+            isOpen={isOpen}
+            addLog={addLog}
+            onAvailabilityChange={setAvailable}
+          />
         </View>
       </SensorErrorBoundary>
     </View>
@@ -358,6 +377,16 @@ const sensorStyles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  availDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   title: {
     fontFamily: "Inter_600SemiBold",
@@ -439,7 +468,7 @@ function DiagnosticsLog({ logs, onClear }: DiagnosticsLogProps) {
   return (
     <View style={logStyles.container}>
       <View style={logStyles.header}>
-        <Text style={logStyles.title}>Log Diagnostica</Text>
+        <Text style={logStyles.title}>Log Diagnostica <Text style={logStyles.titleHint}>(più recenti in alto)</Text></Text>
         <TouchableOpacity onPress={onClear} style={logStyles.clearBtn}>
           <Ionicons name="trash-outline" size={16} color={Colors.textSecondary} />
           <Text style={logStyles.clearText}>Svuota</Text>
@@ -491,6 +520,11 @@ const logStyles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 14,
     color: Colors.text,
+  },
+  titleHint: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
   },
   clearBtn: {
     flexDirection: "row",
