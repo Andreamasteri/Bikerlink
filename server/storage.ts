@@ -2203,8 +2203,9 @@ export class DatabaseStorage implements IStorage {
             FROM coordinate_history
           ) ranked WHERE rn > ${limit}
         )
+        RETURNING id
       `);
-      return (result as unknown as { rowCount: number | null }).rowCount ?? 0;
+      return result.rows.length;
     } catch (err) {
       console.error("[CoordinateHistory] cleanup error:", err);
       return 0;
