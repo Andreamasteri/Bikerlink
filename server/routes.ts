@@ -38,6 +38,7 @@ import errorsRoutes from "./routes/errors";
 import { triggerMatchingRun, triggerMatchingForUser } from "./matching-engine";
 import { db } from "./db";
 import { users, userFavorites } from "@shared/schema";
+import { PRIVACY_POLICY_IT } from "@shared/privacy-policy-it";
 import { ilike, eq, and } from "drizzle-orm";
 import { onlineTracker } from "./online-tracker";
 
@@ -917,102 +918,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ exists: fs.existsSync(PRIVACY_PDF_PATH) });
   });
 
-  app.get("/api/privacy-policy/export", (_req, res) => {
+  const PRIVACY_EXPORT_PDF_PATH = path.resolve(process.cwd(), "server/public/bikerlink-privacy-policy-export.pdf");
+
+  app.get("/api/privacy-policy/export", async (_req, res) => {
     try {
       const PDFDocument = require("pdfkit") as typeof import("pdfkit");
-      const doc = new PDFDocument({ margin: 50, size: "A4" });
-      res.setHeader("Content-Type", "application/pdf");
+      const publicDir = path.dirname(PRIVACY_EXPORT_PDF_PATH);
+      if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });
+
+      await new Promise<void>((resolve, reject) => {
+        const doc = new PDFDocument({ margin: 50, size: "A4" });
+        const writeStream = fs.createWriteStream(PRIVACY_EXPORT_PDF_PATH);
+        doc.pipe(writeStream);
+
+        const lines = PRIVACY_POLICY_IT.split("\n");
+        const titleLine = lines[0];
+        const dateLine = lines[2];
+        const bodyText = lines.slice(4).join("\n");
+
+        doc.fontSize(16).font("Helvetica-Bold").text(titleLine, { align: "center" });
+        doc.moveDown(0.4);
+        doc.fontSize(10).font("Helvetica").text(dateLine, { align: "center" });
+        doc.moveDown(1.2);
+        doc.fontSize(10).font("Helvetica").text(bodyText, { align: "left", lineGap: 3 });
+
+        doc.end();
+        writeStream.on("finish", resolve);
+        writeStream.on("error", reject);
+      });
+
       res.setHeader("Content-Disposition", 'attachment; filename="BikerLink-PrivacyPolicy-Export.pdf"');
-      doc.pipe(res);
-
-      const italianText = `INFORMATIVA SULLA PRIVACY
-
-Ultimo aggiornamento: 20/03/2026
-
-1. TITOLARE DEL TRATTAMENTO
-
-Il titolare del trattamento dei dati personali e' BikerLink. Per qualsiasi domanda relativa al trattamento dei tuoi dati personali, puoi contattarci all'indirizzo email: privacy@bikerlink.app
-
-2. DATI RACCOLTI
-
-Nell'ambito dell'utilizzo dell'applicazione BikerLink, raccogliamo le seguenti categorie di dati personali:
-
-- Indirizzo email
-- Numero di telefono
-- Nickname (nome utente)
-- Anno di nascita
-- Paese di residenza
-- Regione di residenza
-- Tipo utente (biker, zavorrina/o, coppia)
-- Fotografie caricate dall'utente
-- Posizione GPS (dati di geolocalizzazione)
-
-3. FINALITA' DEL TRATTAMENTO
-
-I dati personali raccolti vengono trattati per le seguenti finalita':
-
-- Funzionamento dell'applicazione: garantire il corretto funzionamento delle funzionalita' dell'app.
-- Matching: permettere la connessione tra utenti con interessi simili.
-- Chat: abilitare la comunicazione tra utenti all'interno dell'app.
-- Contest: gestire la partecipazione a concorsi e competizioni organizzate tramite l'app.
-
-4. BASE GIURIDICA DEL TRATTAMENTO
-
-La base giuridica per il trattamento dei tuoi dati personali e' il consenso espresso dall'utente al momento della registrazione e dell'utilizzo dell'applicazione, ai sensi dell'art. 6, par. 1, lett. a) del Regolamento (UE) 2016/679 (GDPR).
-
-5. CONSERVAZIONE DEI DATI
-
-I dati personali saranno conservati per il tempo strettamente necessario al perseguimento delle finalita' per cui sono stati raccolti. In caso di cancellazione dell'account, i dati personali saranno eliminati entro 30 giorni, salvo obblighi di legge che ne impongano una conservazione piu' lunga.
-
-6. CONDIVISIONE CON TERZI
-
-I tuoi dati personali potranno essere condivisi con:
-
-- Syneco, in qualita' di sponsor dell'applicazione, per finalita' promozionali e di marketing legate ai servizi offerti tramite BikerLink.
-
-I dati possono essere elaborati su infrastruttura cloud che puo' essere situata al di fuori dello Spazio Economico Europeo. In tali casi, il trasferimento e' regolato dalle Clausole Contrattuali Standard approvate dalla Commissione Europea ai sensi dell'art. 46 GDPR.
-
-7. DIRITTI DELL'UTENTE
-
-Ai sensi del GDPR, hai il diritto di:
-
-- Accesso: ottenere la conferma dell'esistenza di un trattamento di dati personali che ti riguardano e accedere a tali dati.
-- Rettifica: ottenere la rettifica dei dati personali inesatti che ti riguardano.
-- Cancellazione: ottenere la cancellazione dei dati personali che ti riguardano ("diritto all'oblio").
-- Portabilita': ricevere i dati personali che ti riguardano in un formato strutturato, di uso comune e leggibile da dispositivo automatico.
-- Opposizione: opporti in qualsiasi momento al trattamento dei dati personali che ti riguardano.
-
-8. COME ESERCITARE I TUOI DIRITTI
-
-Per esercitare i diritti sopra elencati, puoi inviare una richiesta all'indirizzo email: privacy@bikerlink.app
-
-Risponderemo alla tua richiesta entro 30 giorni dal ricevimento.
-
-9. COOKIE E SESSIONI
-
-L'applicazione BikerLink utilizza cookie tecnici e di sessione necessari per il corretto funzionamento dell'app. Questi cookie non vengono utilizzati per finalita' di profilazione o marketing. I cookie di sessione vengono eliminati automaticamente alla chiusura dell'applicazione.
-
-10. MODIFICHE ALLA POLICY
-
-BikerLink si riserva il diritto di modificare la presente informativa sulla privacy in qualsiasi momento. Le modifiche saranno comunicate agli utenti tramite notifica nell'applicazione o mediante pubblicazione della versione aggiornata. L'uso continuato dell'applicazione dopo la pubblicazione delle modifiche costituisce accettazione delle stesse.
-
-Per qualsiasi domanda o chiarimento, non esitare a contattarci all'indirizzo: privacy@bikerlink.app`;
-
-      doc
-        .fontSize(16)
-        .font("Helvetica-Bold")
-        .text("INFORMATIVA SULLA PRIVACY", { align: "center" });
-      doc.moveDown(0.4);
-      doc
-        .fontSize(10)
-        .font("Helvetica")
-        .text("Ultimo aggiornamento: 20/03/2026", { align: "center" });
-      doc.moveDown(1.2);
-
-      const bodyText = italianText.split("\n").slice(4).join("\n");
-      doc.fontSize(10).font("Helvetica").text(bodyText, { align: "left", lineGap: 3 });
-
-      doc.end();
+      res.setHeader("Content-Type", "application/pdf");
+      const stream = fs.createReadStream(PRIVACY_EXPORT_PDF_PATH);
+      stream.on("error", (err) => {
+        console.error("Privacy export stream error:", err);
+        if (!res.headersSent) res.status(500).json({ message: "Errore lettura file" });
+        else res.end();
+      });
+      stream.pipe(res);
     } catch (err) {
       console.error("Privacy Policy PDF export error:", err);
       if (!res.headersSent) res.status(500).json({ message: "Errore generazione PDF" });

@@ -91,7 +91,7 @@ if needs_rebuild; then
   BUILD_OK=0
   for build_try in $(seq 1 $BUILD_MAX_RETRIES); do
     echo "Compilazione TypeScript server (tentativo $build_try/$BUILD_MAX_RETRIES)..."
-    npx esbuild server/index.ts --platform=node --packages=external --bundle --format=cjs --outdir=server_dist --alias:@shared/schema=./shared/schema
+    npx esbuild server/index.ts --platform=node --packages=external --bundle --format=cjs --outdir=server_dist --alias:@shared/schema=./shared/schema --alias:@shared/privacy-policy-it=./shared/privacy-policy-it
     if [ $? -eq 0 ]; then
       BUILD_OK=1
       break
