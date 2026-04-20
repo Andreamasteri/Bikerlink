@@ -4011,7 +4011,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-19T23:55:14.280Z"
+  },
+  {
+    "updateNumber": 123,
+    "version": "1.123.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-123 rv7.0.0: Fix crash login Last.fm + SSE heartbeat stabile",
+    "note": "Fix crash: apiRequest non chiama più handleUnauthorized() su 401 da /api/lastfm/ e /api/spotify/ — il 401 'credenziali Last.fm errate' veniva scambiato per sessione scaduta BikerLink → app crashava allo splash. Fix SSE: heartbeat ridotto da 25s a 4s per mantenere connessione stabile su proxy Replit. CURRENT_OTA_NUMBER=123.",
+    "releaseId": "2a811897-bc8c-41f4-96b3-b899699034e3",
+    "bundleUrl": "private/ota/ota-1.123.0-1776669386032.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "a9af12f1c185f441a668f15c3c766f1d51b88e78",
+    "easDashboard": null,
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-20T07:37:00.000Z"
   }
 ]

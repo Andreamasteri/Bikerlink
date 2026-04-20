@@ -403,7 +403,7 @@ router.get("/stream", (req: Request, res: Response) => {
 
   const heartbeat = setInterval(() => {
     try { res.write(":heartbeat\n\n"); } catch { clearInterval(heartbeat); }
-  }, 25000);
+  }, 4000);
 
   req.on("close", () => {
     clearInterval(heartbeat);
