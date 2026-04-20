@@ -84,6 +84,14 @@ const adminGroups: AdminGroup[] = [
       { key: "traduzioni", label: "Traduzioni", icon: "translate", iconSet: "MaterialIcons", route: "/admin/traduzioni", accentColor: "#9C27B0" },
     ],
   },
+  {
+    title: "Laboratorio",
+    headerIcon: "flask",
+    headerIconSet: "MaterialCommunityIcons",
+    items: [
+      { key: "sensors", label: "Sensori", icon: "chip", iconSet: "MaterialCommunityIcons", route: "/admin/sensors", accentColor: "#FF9800" },
+    ],
+  },
 ];
 
 function renderIcon(item: AdminItem, size = 28, color = Colors.accent) {
