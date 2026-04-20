@@ -8,6 +8,7 @@ import {
   Platform,
   ImageBackground,
   StatusBar,
+  Linking,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
@@ -101,6 +102,22 @@ export default function WelcomeScreen() {
     ]).start();
   }, [isLoading, isAuthenticated]);
 
+  const handlePrivacyPress = async () => {
+    try {
+      const ctrl = new AbortController();
+      const timeout = setTimeout(() => ctrl.abort(), 3000);
+      const res = await fetch(new URL("/api/privacy-policy/exists", getApiUrl()).toString(), { signal: ctrl.signal });
+      clearTimeout(timeout);
+      const data = await res.json();
+      if (data?.exists) {
+        const pdfUrl = new URL("/api/privacy-policy/download", getApiUrl()).toString();
+        Linking.openURL(pdfUrl);
+        return;
+      }
+    } catch {}
+    router.push("/privacy-policy");
+  };
+
   if (isLoading) {
     return (
       <View style={[styles.container, { paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
@@ -164,7 +181,7 @@ export default function WelcomeScreen() {
             })}
           </View>
 
-          <Pressable onPress={() => router.push("/privacy-policy")}>
+          <Pressable onPress={handlePrivacyPress}>
             <Text style={styles.privacyLink}>Privacy Policy</Text>
           </Pressable>
         </Animated.View>
