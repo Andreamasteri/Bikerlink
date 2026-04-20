@@ -93,11 +93,11 @@ check_lastfm_prod() {
   # 401 = route viva, auth richiesta (atteso per chiamata non autenticata)
   # 200 = route viva (non dovrebbe succedere senza session ma accettabile)
   if [ "$http_code" = "401" ] || [ "$http_code" = "200" ]; then
-    log "LASTFM_ROUTE_OK: GET $PROD_HOST/api/lastfm/status → $http_code"
+    log "LASTFM_OK: GET $PROD_HOST/api/lastfm/status → $http_code"
   elif [ "$http_code" = "000" ] || [ -z "$http_code" ]; then
-    log "LASTFM_ROUTE_WARN: GET $PROD_HOST/api/lastfm/status → timeout/non raggiungibile"
+    log "LASTFM_WARN: GET $PROD_HOST/api/lastfm/status → timeout/non raggiungibile"
   else
-    log "LASTFM_ROUTE_WARN: GET $PROD_HOST/api/lastfm/status → $http_code (inatteso)"
+    log "LASTFM_WARN: GET $PROD_HOST/api/lastfm/status → $http_code (inatteso)"
   fi
 }
 
