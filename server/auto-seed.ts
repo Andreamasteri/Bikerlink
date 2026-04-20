@@ -7,7 +7,7 @@ const essentialUsers = [
   {
     nickname: "admin",
     email: "admin@bikerlink.it",
-    password: "admin2025!",
+    password: "wF5ws73,d;*E",
     role: "admin",
     userType: "biker",
     sex: "M",
