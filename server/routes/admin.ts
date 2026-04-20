@@ -252,7 +252,18 @@ router.post("/verify-password", async (req: Request, res: Response) => {
 router.get("/users", async (_req: Request, res: Response) => {
   try {
     const users = await storage.getAllUsers();
-    const safeUsers = users.map(({ password, ...u }) => u);
+    const [sessionsRows, tracksRows] = await Promise.all([
+      db.select({ userId: userLastfmSessions.userId }).from(userLastfmSessions),
+      db.selectDistinct({ userId: userMusicTracks.userId }).from(userMusicTracks),
+    ]);
+    const lastfmUserIds = new Set([
+      ...sessionsRows.map((r) => r.userId),
+      ...tracksRows.map((r) => r.userId),
+    ]);
+    const safeUsers = users.map(({ password, ...u }) => ({
+      ...u,
+      hasLastfmData: lastfmUserIds.has(u.id),
+    }));
     return res.json(safeUsers);
   } catch (error) {
     console.error("Admin get users error:", error);

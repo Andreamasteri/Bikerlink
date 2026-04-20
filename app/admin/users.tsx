@@ -18,6 +18,7 @@ interface AdminUser {
   lastLoginAt?: string | null;
   isFake?: boolean;
   isPrimal?: boolean;
+  hasLastfmData?: boolean;
 }
 
 interface UserStats {
@@ -169,6 +170,7 @@ export default function AdminUsers() {
       return res.json() as Promise<{ message: string; deleted: { tracks: number; sessions: number; snapshots: number } }>;
     },
     onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       const { tracks, sessions, snapshots } = data.deleted;
       Alert.alert("Last.fm cancellato", `Rimossi: ${tracks} brani, ${sessions} sessioni, ${snapshots} snapshot`);
     },
@@ -338,9 +340,19 @@ export default function AdminUsers() {
               <Ionicons name="shield-checkmark-outline" size={22} color={Colors.maleIcon} />
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={() => handleClearLastfm(item)} style={styles.actionBtn}>
-            <Ionicons name="musical-notes-outline" size={22} color={Colors.textSecondary} />
-          </TouchableOpacity>
+          {item.hasLastfmData && (
+            <TouchableOpacity
+              onPress={() => handleClearLastfm(item)}
+              style={styles.actionBtn}
+              disabled={clearLastfmMutation.isPending}
+            >
+              <Ionicons
+                name="musical-notes-outline"
+                size={22}
+                color={clearLastfmMutation.isPending ? Colors.border : "#E31005"}
+              />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity onPress={() => handleDeleteUser(item)} style={styles.actionBtn}>
             <Ionicons name="trash-outline" size={22} color={Colors.error} />
           </TouchableOpacity>
