@@ -4057,7 +4057,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-20T07:36:44.059Z"
+  },
+  {
+    "updateNumber": 125,
+    "version": "1.125.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-125 rv7.0.0: Rimozione Spotify + cleanup DB + card coming soon",
+    "note": "Task #777: Rimozione completa Spotify da music.tsx, chat/[id].tsx, admin/settings.tsx, query-client.ts, 6 file i18n. Task #778: Rinominato spotifyTrackId→lastfmTrackId in music.tsx e match.tsx. Task #780: Aggiunge card Spotify/YouTube in sezione Funzionalità in arrivo (feature.tsx). CURRENT_OTA_NUMBER=125.",
+    "releaseId": "f6cae808-30e4-4053-b34c-ef35abfef2df",
+    "bundleUrl": "private/ota/ota-1.125.0-1776695693053.js",
+    "updateGroupId": "e8ff6372-f487-4fc6-ab19-2b543d601568",
+    "androidUpdateId": "019dab51-dfab-7bd8-b849-80a7608e70ae",
+    "iosUpdateId": null,
+    "commitBase": "a1d2ea12b6c0b006f7286d5c07b8cd3b109576c5",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/e8ff6372-f487-4fc6-ab19-2b543d601568",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-20T14:34:56.063Z"
   }
 ]
