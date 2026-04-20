@@ -123,5 +123,9 @@
         ]
       }
     }
+  },
+  "overrides": {
+    "esbuild": "0.27.2",
+    "@tootallnate/once": "^3.0.1"
   }
 }
