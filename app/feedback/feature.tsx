@@ -129,6 +129,26 @@ export default function FeatureRequestScreen() {
               <Text style={styles.plannedBadgeText}>Pianificato</Text>
             </View>
           </View>
+          <View style={styles.plannedCard}>
+            <Ionicons name="logo-spotify" size={20} color="#1DB954" />
+            <View style={styles.plannedInfo}>
+              <Text style={styles.plannedName}>Integrazione playlist Spotify</Text>
+              <Text style={styles.plannedDesc}>Condividi e scopri playlist con altri biker</Text>
+            </View>
+            <View style={styles.plannedBadge}>
+              <Text style={styles.plannedBadgeText}>Pianificato</Text>
+            </View>
+          </View>
+          <View style={styles.plannedCard}>
+            <Ionicons name="logo-youtube" size={20} color="#FF0000" />
+            <View style={styles.plannedInfo}>
+              <Text style={styles.plannedName}>Integrazione playlist YouTube</Text>
+              <Text style={styles.plannedDesc}>Condividi video e playlist musicali</Text>
+            </View>
+            <View style={styles.plannedBadge}>
+              <Text style={styles.plannedBadgeText}>Pianificato</Text>
+            </View>
+          </View>
         </View>
 
         <Text style={styles.sectionLabel}>Titolo della richiesta</Text>
