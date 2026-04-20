@@ -22,12 +22,7 @@
         "NSLocationAlwaysUsageDescription": "BikerLink usa la posizione in background per il tracciamento percorsi in moto, la funzione SOS d'emergenza e la sicurezza della community.",
         "NSPhotoLibraryUsageDescription": "BikerLink accede alle tue foto per caricare immagini del profilo e delle moto.",
         "NSCameraUsageDescription": "BikerLink accede alla fotocamera per scattare foto del profilo e delle moto.",
-        "NSMusicUsageDescription": "BikerLink accede alla tua libreria musicale per riprodurre brani in-app.",
-        "NSAppleMusicUsageDescription": "BikerLink accede ad Apple Music per mostrare e riprodurre brani.",
-        "UIBackgroundModes": ["location", "fetch", "audio"],
-        "NSAppTransportSecurity": {
-          "NSAllowsArbitraryLoads": true
-        }
+        "UIBackgroundModes": ["location", "fetch", "audio"]
       }
     },
     "android": {
@@ -88,8 +83,8 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "BikerLink accede alla libreria musicale per riprodurre brani.",
-          "savePhotosPermission": "BikerLink salva brani nella libreria musicale.",
+          "photosPermission": "BikerLink accede ai tuoi file audio e foto per riprodurre brani offline e caricare immagini del profilo.",
+          "savePhotosPermission": "BikerLink salva i tuoi percorsi e foto nella libreria del dispositivo.",
           "isAccessMediaLocationEnabled": true
         }
       ],
