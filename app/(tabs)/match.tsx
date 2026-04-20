@@ -558,18 +558,18 @@ export default function MatchScreen() {
     refetchOnMount: true,
   });
 
-  const { data: spotifyStatus } = useQuery<{ connected: boolean }>({
-    queryKey: ["/api/spotify/status"],
+  const { data: lastfmStatus } = useQuery<{ connected: boolean }>({
+    queryKey: ["/api/lastfm/status"],
     enabled: !!user && activeTab === "music",
   });
 
   const { data: musicMatchData, isLoading: musicLoading, isRefetching: musicRefetching, refetch: musicRefetch } = useQuery<{ matches: any[] }>({
-    queryKey: ["/api/spotify/match/music", distanceMode, distanceKm, musicCriteria, musicLogic, musicMinSongs],
+    queryKey: ["/api/match/music", distanceMode, distanceKm, musicCriteria, musicLogic, musicMinSongs],
     queryFn: async () => {
       const parsedKmLocal = parseFloat(distanceKm);
       const kmLimitLocal = Number.isFinite(parsedKmLocal) && parsedKmLocal > 0 ? parsedKmLocal : 50;
       const maxKm = distanceMode === "km" ? kmLimitLocal : 500;
-      const url = new URL("/api/spotify/match/music", getApiUrl());
+      const url = new URL("/api/match/music", getApiUrl());
       url.searchParams.set("criteria", musicCriteria);
       url.searchParams.set("maxKm", String(maxKm));
       url.searchParams.set("logic", musicLogic === "tutti" ? "all" : "any");
@@ -578,7 +578,7 @@ export default function MatchScreen() {
       if (!res.ok) throw new Error(`${res.status}`);
       return res.json();
     },
-    enabled: !!user && activeTab === "music" && spotifyStatus?.connected === true,
+    enabled: !!user && activeTab === "music" && lastfmStatus?.connected === true,
   });
 
   const musicMatches = musicMatchData?.matches ?? [];
@@ -1171,7 +1171,7 @@ export default function MatchScreen() {
   const getEmptyTitle = () => {
     if (activeTab === "zavorrine") return t("match.emptyZavorrinaTitle");
     if (activeTab === "biker") return t("match.emptyBikerTitle");
-    if (activeTab === "music") return t("match.emptyMusicTitle");
+    if (activeTab === "music") return t("match.emptyMusicNoMatchTitle");
     if (activeTab === "accepted") return t("match.emptyAcceptedTitle");
     if (activeTab === "blacklist") return t("match.emptyBlacklistTitle");
     return t("match.emptyProposalsTitle");
@@ -1180,7 +1180,7 @@ export default function MatchScreen() {
   const getEmptyDesc = () => {
     if (activeTab === "zavorrine") return t("match.emptyZavorrinaDesc");
     if (activeTab === "biker") return t("match.emptyBikerDesc");
-    if (activeTab === "music") return t("match.emptyMusicDesc");
+    if (activeTab === "music") return t("match.emptyMusicNoMatchDesc");
     if (activeTab === "accepted") return t("match.emptyAcceptedDesc");
     if (activeTab === "blacklist") return t("match.emptyBlacklistDesc");
     return t("match.emptyProposalsDesc");
@@ -1334,7 +1334,7 @@ export default function MatchScreen() {
         </View>
       )}
 
-      {activeTab === "music" && spotifyStatus?.connected === true && (
+      {activeTab === "music" && lastfmStatus?.connected === true && (
         <View style={styles.musicCriteriaChip}>
           <Ionicons name="musical-notes" size={13} color={Colors.accent} />
           <Text style={styles.musicCriteriaText}>
@@ -1350,11 +1350,11 @@ export default function MatchScreen() {
         </View>
       )}
 
-      {activeTab === "music" && spotifyStatus?.connected !== true ? (
+      {activeTab === "music" && lastfmStatus?.connected !== true ? (
         <View style={styles.empty}>
           <Ionicons name="musical-notes-outline" size={48} color={Colors.textSecondary} />
           <Text style={styles.emptyTitle}>{t("match.emptyMusicTitle")}</Text>
-          <Text style={styles.emptyDesc}>{t("match.emptyMusicSpotifyDesc")}</Text>
+          <Text style={styles.emptyDesc}>{t("match.emptyMusicDesc")}</Text>
         </View>
       ) : isLoading ? (
         <View style={styles.loading}>

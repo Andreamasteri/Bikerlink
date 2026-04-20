@@ -64,7 +64,7 @@ export async function apiRequest(
     credentials: "include",
   });
 
-  if (res.status === 401 && !route.includes("/api/auth/") && !route.includes("/api/lastfm/") && !route.includes("/api/spotify/")) {
+  if (res.status === 401 && !route.includes("/api/auth/") && !route.includes("/api/lastfm/")) {
     handleUnauthorized();
   }
 

@@ -51,7 +51,7 @@ interface ChatMessage {
   playlistId?: number | null;
 }
 
-const SPOTIFY_GREEN = "#1DB954";
+const MUSIC_ACCENT = "#2196F3";
 
 interface ConversationDetail {
   id: string;
@@ -132,7 +132,7 @@ function PlaylistBubble({ message, isOwn }: { message: ChatMessage; isOwn: boole
     }
   } catch {}
 
-  const iconColor = isOwn ? "#fff" : SPOTIFY_GREEN;
+  const iconColor = isOwn ? "#fff" : MUSIC_ACCENT;
   const textColor = isOwn ? "#fff" : Colors.text;
 
   const handlePress = () => {
@@ -347,23 +347,17 @@ export default function ChatConversationScreen() {
     },
   });
 
-  const { data: spotifyStatus } = useQuery<{ connected: boolean; trackCount?: number }>({
-    queryKey: ["/api/spotify/status"],
-    retry: false,
-  });
-
   const { data: lastfmStatus } = useQuery<{ connected: boolean; trackCount?: number }>({
     queryKey: ["/api/lastfm/status"],
     retry: false,
   });
 
-  const musicProvider = spotifyStatus?.connected ? "spotify" : lastfmStatus?.connected ? "lastfm" : null;
-  const musicTrackCount = spotifyStatus?.trackCount ?? lastfmStatus?.trackCount ?? 0;
+  const musicConnected = lastfmStatus?.connected ?? false;
+  const musicTrackCount = lastfmStatus?.trackCount ?? 0;
 
   const sharePlaylistMutation = useMutation({
     mutationFn: async ({ toUserId }: { toUserId: string }) => {
-      const endpoint = musicProvider === "lastfm" ? "/api/lastfm/share-playlist" : "/api/spotify/share-playlist";
-      const res = await apiRequest("POST", endpoint, {
+      const res = await apiRequest("POST", "/api/lastfm/share-playlist", {
         toUserId,
         conversationId: id,
       });
@@ -382,15 +376,14 @@ export default function ChatConversationScreen() {
   const isPrivateChat = !isMotoclub && conversation?.participants.length === 2;
 
   const handleSharePlaylist = useCallback(() => {
-    if (!musicProvider) {
-      Alert.alert("Musica non connessa", "Collega Last.fm o Spotify nel tab Musica.");
+    if (!musicConnected) {
+      Alert.alert("Musica non connessa", "Collega Last.fm nel tab Musica.");
       return;
     }
     if (!isPrivateChat || !otherParticipant) return;
-    const providerName = musicProvider === "lastfm" ? "Last.fm" : "Spotify";
     Alert.alert(
       "Invia libreria",
-      `Invia la tua libreria ${providerName} (${musicTrackCount} brani) a ${otherParticipant.nickname}?`,
+      `Invia la tua libreria Last.fm (${musicTrackCount} brani) a ${otherParticipant.nickname}?`,
       [
         { text: "Annulla", style: "cancel" },
         {
@@ -399,7 +392,7 @@ export default function ChatConversationScreen() {
         },
       ]
     );
-  }, [musicProvider, musicTrackCount, isPrivateChat, otherParticipant, sharePlaylistMutation]);
+  }, [musicConnected, musicTrackCount, isPrivateChat, otherParticipant, sharePlaylistMutation]);
 
   const handleDeleteConversation = useCallback(() => {
     Alert.alert(
@@ -723,7 +716,7 @@ export default function ChatConversationScreen() {
             <Ionicons
               name="musical-notes-outline"
               size={24}
-              color={musicProvider ? Colors.accent : Colors.textSecondary}
+              color={musicConnected ? Colors.accent : Colors.textSecondary}
             />
           </TouchableOpacity>
         )}

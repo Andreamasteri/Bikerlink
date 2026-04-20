@@ -29,7 +29,7 @@ import customRoutesRouter from "./routes/custom-routes";
 import sosRoutes from "./routes/sos";
 import motoclubsRoutes from "./routes/motoclubs";
 import friendsRoutes from "./routes/friends";
-import spotifyRoutes, { handleMusicMatch } from "./routes/spotify";
+import { handleMusicMatch } from "./routes/music-match";
 import lastfmRoutes from "./routes/lastfm";
 import radioRoutes from "./routes/radio";
 import eventsRoutes from "./routes/events";
@@ -130,7 +130,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/sos", sosRoutes);
   app.use("/api/motoclubs", motoclubsRoutes);
   app.use("/api/friends", friendsRoutes);
-  app.use("/api/spotify", spotifyRoutes);
   app.use("/api/lastfm", lastfmRoutes);
   app.use("/api/music/radio", radioRoutes);
   app.use("/api/events", eventsRoutes);
@@ -180,14 +179,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/settings/music-provider", async (_req: Request, res: Response) => {
-    try {
-      const setting = await storage.getAppSetting("music_provider");
-      const provider = (setting?.value as "lastfm" | "spotify") ?? "lastfm";
-      return res.json({ provider });
-    } catch {
-      return res.json({ provider: "lastfm" });
-    }
+  app.get("/api/settings/music-provider", (_req: Request, res: Response) => {
+    return res.json({ provider: "lastfm" });
   });
 
   app.get("/api/match/music", (req: Request, res: Response) => {
@@ -312,16 +305,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/settings/phone-sensors-enabled", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("phone_sensors_enabled");
-      const enabled = setting?.value === "true";
-      res.json({ enabled });
-    } catch {
-      res.json({ enabled: false });
-    }
-  });
-
-  app.get("/api/settings/spotify-coming-soon", async (_req, res) => {
-    try {
-      const setting = await storage.getAppSetting("spotify_coming_soon");
       const enabled = setting?.value === "true";
       res.json({ enabled });
     } catch {

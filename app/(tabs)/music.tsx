@@ -17,7 +17,6 @@ import {
   Switch,
 } from "react-native";
 import * as Haptics from "expo-haptics";
-import * as WebBrowser from "expo-web-browser";
 import * as FileSystem from "expo-file-system/legacy";
 import * as MediaLibrary from "expo-media-library";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -31,16 +30,6 @@ import { usePlayer, PlayerTrack, RadioStation } from "@/lib/player-context";
 import { FullPlayerModal, InlineMiniPlayer } from "@/components/MiniPlayer";
 import { useAuth } from "@/lib/auth-context";
 
-WebBrowser.maybeCompleteAuthSession();
-
-function getSpotifyRedirectUri(): string {
-  if (Platform.OS === "web") {
-    return "/spotify-callback";
-  }
-  return "bikerlink://spotify-callback";
-}
-
-const SPOTIFY_GREEN = "#1DB954";
 const LASTFM_RED = "#D51007";
 
 type Tab = "brani" | "match" | "ricevute" | "radio" | "telefono";
@@ -1003,17 +992,11 @@ export default function MusicScreen() {
   const { user: currentUser } = useAuth();
   const router = useRouter();
 
-  const { data: providerData } = useQuery<{ provider: string }>({
-    queryKey: ["/api/settings/music-provider"],
-    staleTime: 120_000,
-  });
-  const musicProvider: "lastfm" | "spotify" = (providerData?.provider as "lastfm" | "spotify") ?? "lastfm";
-  const apiPrefix = musicProvider === "lastfm" ? "/api/lastfm" : "/api/spotify";
+  const apiPrefix = "/api/lastfm";
 
   const statusQuery = useQuery<{ connected: boolean; displayName?: string; username?: string; trackCount: number }>({
     queryKey: [`${apiPrefix}/status`],
     staleTime: 60_000,
-    enabled: !!providerData,
   });
 
   const conversationsQuery = useQuery<ChatConversation[]>({
@@ -1114,37 +1097,29 @@ export default function MusicScreen() {
       const res = await fetch(url.toString(), { credentials: "include" });
       if (!res.ok) {
         let msg = `${res.status}`;
-        let needsAuth = false;
         try {
           const body = await res.json();
           if (typeof body.message === "string") msg = body.message;
-          if (body.needsSpotifyAuth === true) needsAuth = true;
         } catch (e) {
           console.warn("[music] search error body parse:", e);
-        }
-        if (needsAuth) {
-          setSearchNeedsReconnect(true);
         }
         throw new Error(msg);
       }
       setSearchNeedsReconnect(false);
       return res.json();
     },
-    enabled: debouncedQuery.length >= 2 && activeTab === "brani" && (
-      musicProvider === "lastfm" ? true : statusQuery.data?.connected === true
-    ),
+    enabled: debouncedQuery.length >= 2 && activeTab === "brani",
     staleTime: 30_000,
   });
 
   const tracksQuery = useQuery<{ tracks: LibraryTrack[] }>({
     queryKey: [`${apiPrefix}/tracks`],
-    enabled: !!providerData,
   });
 
   const matchQuery = useQuery<{ matches: MusicMatch[] }>({
-    queryKey: ["/api/spotify/match/music"],
+    queryKey: ["/api/match/music"],
     queryFn: async () => {
-      const url = new URL("/api/spotify/match/music", getApiUrl());
+      const url = new URL("/api/match/music", getApiUrl());
       url.searchParams.set("criteria", matchCriteria.join(","));
       url.searchParams.set("maxKm", String(matchMaxKm));
       url.searchParams.set("logic", matchLogic === "tutti" ? "all" : "any");
@@ -1206,78 +1181,6 @@ export default function MusicScreen() {
     },
   });
 
-  const connectSpotify = useCallback(async () => {
-    if (Platform.OS === "web") {
-      Alert.alert("Info", "Collega Spotify dall'app mobile BikerLink.");
-      return;
-    }
-    setIsConnecting(true);
-    try {
-      const redirectUri = getSpotifyRedirectUri();
-
-      const urlObj = new URL("/api/spotify/auth-url", getApiUrl());
-      urlObj.searchParams.set("redirectUri", redirectUri);
-      const resp = await fetch(urlObj.toString(), { credentials: "include" });
-      if (!resp.ok) {
-        const body = await resp.json().catch(() => ({})) as { message?: string };
-        throw new Error(body.message ?? "Errore nell'avvio della connessione Spotify");
-      }
-      const { authUrl } = await resp.json() as { authUrl: string };
-
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
-
-      if (result.type === "success") {
-        const resultUrl = new URL(result.url);
-        const code = resultUrl.searchParams.get("code") ?? undefined;
-        const state = resultUrl.searchParams.get("state") ?? undefined;
-        const oauthError = resultUrl.searchParams.get("error") ?? undefined;
-
-        if (oauthError) {
-          Alert.alert(
-            "Connessione Spotify",
-            oauthError === "access_denied"
-              ? "Accesso negato. Riprova quando vuoi."
-              : `Errore Spotify: ${oauthError}`
-          );
-          return;
-        }
-        if (!code) {
-          Alert.alert("Errore", "Codice di autorizzazione mancante. Riprova.");
-          return;
-        }
-
-        const callbackResp = await apiRequest("POST", "/api/spotify/callback", {
-          code,
-          redirectUri,
-          state,
-        });
-        const callbackData = await callbackResp.json() as { connected?: boolean; displayName?: string | null; trackCount?: number; message?: string };
-
-        if (!callbackResp.ok) {
-          Alert.alert("Errore", callbackData.message ?? "Errore durante la connessione Spotify");
-          return;
-        }
-
-        setSearchNeedsReconnect(false);
-        queryClient.invalidateQueries({ queryKey: ["/api/spotify/status"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/spotify/tracks"] });
-
-        const tracksMsg = callbackData.trackCount ? ` ${callbackData.trackCount} brani sincronizzati.` : "";
-        Alert.alert(
-          "Spotify Collegato!",
-          callbackData.displayName
-            ? `Benvenuto, ${callbackData.displayName}!${tracksMsg}`
-            : `Spotify collegato con successo!${tracksMsg}`
-        );
-      }
-    } catch (err) {
-      console.error("[Spotify connect]", err);
-      Alert.alert("Errore", (err as Error).message ?? "Impossibile connettersi a Spotify");
-    } finally {
-      setIsConnecting(false);
-    }
-  }, [queryClient]);
-
   const connectLastfm = useCallback(() => {
     setLastfmModalVisible(true);
   }, []);
@@ -1287,12 +1190,8 @@ export default function MusicScreen() {
   }, []);
 
   const handleConnect = useCallback(() => {
-    if (musicProvider === "lastfm") {
-      connectLastfm();
-    } else {
-      connectSpotify();
-    }
-  }, [musicProvider, connectLastfm, connectSpotify]);
+    connectLastfm();
+  }, [connectLastfm]);
 
   const disconnectMutation = useMutation({
     mutationFn: async () => {
@@ -1309,16 +1208,15 @@ export default function MusicScreen() {
   });
 
   const handleDisconnect = useCallback(() => {
-    const providerName = musicProvider === "lastfm" ? "Last.fm" : "Spotify";
     Alert.alert(
-      `Disconnetti ${providerName}`,
-      `Rimuovere la connessione ${providerName}? I brani salvati verranno eliminati.`,
+      "Disconnetti Last.fm",
+      "Rimuovere la connessione Last.fm? I brani salvati verranno eliminati.",
       [
         { text: "Annulla", style: "cancel" },
         { text: "Disconnetti", style: "destructive", onPress: () => disconnectMutation.mutate() },
       ]
     );
-  }, [disconnectMutation, musicProvider]);
+  }, [disconnectMutation]);
 
   const toggleCriteria = useCallback((c: string) => {
     setMatchCriteria((prev) => {
@@ -1340,10 +1238,10 @@ export default function MusicScreen() {
 
   const savedIds = new Set((tracksQuery.data?.tracks ?? []).map((t) => t.spotifyTrackId));
   const topPadding = insets.top + (Platform.OS === "web" ? 67 : 0);
-  const providerColor = musicProvider === "lastfm" ? LASTFM_RED : SPOTIFY_GREEN;
+  const providerColor = LASTFM_RED;
 
   const isConnected = statusQuery.isLoading ? null : (statusQuery.data?.connected ?? false);
-  const isLastfmConnected = musicProvider === "lastfm" && isConnected === true;
+  const isLastfmConnected = isConnected === true;
 
   const tabItems = (["brani", "match", "ricevute", "radio", "telefono"] as Tab[]).map((tab) => (
     <TouchableOpacity
@@ -1404,7 +1302,7 @@ export default function MusicScreen() {
             {tabItems}
           </ScrollView>
 
-          {musicProvider === "lastfm" && isConnected === false && (
+          {isConnected === false && (
             <View style={lastfmBannerStyles.banner}>
               <Ionicons name="warning-outline" size={18} color="#92400e" style={{ marginRight: 8, flexShrink: 0 }} />
               <Text style={lastfmBannerStyles.text}>
@@ -1417,7 +1315,7 @@ export default function MusicScreen() {
 
       {activeTab === "brani" && (
         <BraniTab
-          provider={musicProvider}
+          provider="lastfm"
           isConnected={isConnected}
           isConnecting={isConnecting}
           onConnect={handleConnect}
@@ -1569,7 +1467,7 @@ function BraniTab({
   playlistOverride,
   onResetPlaylist,
 }: {
-  provider: "lastfm" | "spotify";
+  provider: "lastfm";
   isConnected: boolean | null;
   isConnecting: boolean;
   onConnect: () => void;
@@ -1592,9 +1490,8 @@ function BraniTab({
   onDisconnect: () => void;
   onShare: () => void;
 }) {
-  const isLastfm = provider === "lastfm";
-  const providerColor = isLastfm ? LASTFM_RED : SPOTIFY_GREEN;
-  const providerName = isLastfm ? "Last.fm" : "Spotify";
+  const providerColor = LASTFM_RED;
+  const providerName = "Last.fm";
   const { playQueue, isAvailable: playerAvailable, currentTrack, isPlaying } = usePlayer();
   const [playAllLoading, setPlayAllLoading] = useState(false);
   const [streamService, setStreamService] = useState<StreamService>("youtube");
@@ -1682,12 +1579,10 @@ function BraniTab({
   if (!isConnected) {
     return (
       <View style={styles.connectContainer}>
-        <Ionicons name={isLastfm ? "radio" : "musical-notes"} size={52} color={providerColor} />
+        <Ionicons name="radio" size={52} color={providerColor} />
         <Text style={styles.connectTitle}>Collega {providerName}</Text>
         <Text style={styles.connectDesc}>
-          {isLastfm
-            ? "Collega il tuo account Last.fm per sincronizzare i tuoi brani più ascoltati con i bikers."
-            : "Collega il tuo account Spotify per cercare brani e costruire il tuo profilo musicale con i bikers."}
+          Collega il tuo account Last.fm per sincronizzare i tuoi brani più ascoltati con i bikers.
         </Text>
         <TouchableOpacity
           style={[styles.connectBtn, { backgroundColor: providerColor }, isConnecting && styles.connectBtnDisabled]}
@@ -1792,7 +1687,7 @@ function BraniTab({
           <Ionicons name="search" size={18} color={Colors.textSecondary} style={{ marginRight: 8 }} />
           <TextInput
             style={styles.searchInput}
-            placeholder={isLastfm ? "Ricerca Brani su Lastfm" : "Ricerca Brani su Spotify"}
+            placeholder="Ricerca Brani su Last.fm"
             placeholderTextColor={Colors.textSecondary}
             value={searchInput}
             onChangeText={onSearchChange}
@@ -1815,7 +1710,7 @@ function BraniTab({
               <ActivityIndicator color={Colors.accent} style={{ marginVertical: 20 }} />
             ) : searchNeedsReconnect ? (
               <View style={styles.reconnectBox}>
-                <Ionicons name={isLastfm ? "radio" : "musical-notes"} size={32} color={providerColor} style={{ marginBottom: 8 }} />
+                <Ionicons name="radio" size={32} color={providerColor} style={{ marginBottom: 8 }} />
                 <Text style={styles.reconnectText}>La sessione {providerName} è scaduta.</Text>
                 <TouchableOpacity
                   style={[styles.connectBtn, { backgroundColor: providerColor, marginTop: 12 }]}
@@ -1847,11 +1742,9 @@ function BraniTab({
           </View>
         )}
 
-        {isLastfm && (
-          <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic", paddingHorizontal: 12, paddingVertical: 4 }}>
-            {`Last.fm fornisce anteprime di 30\u2033; per le versioni intere, aprili con YouTube / Google`}
-          </Text>
-        )}
+        <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic", paddingHorizontal: 12, paddingVertical: 4 }}>
+          {`Last.fm fornisce anteprime di 30\u2033; per le versioni intere, aprili con YouTube / Google`}
+        </Text>
 
         {libraryLoading && !playlistOverride ? (
           <ActivityIndicator color={Colors.accent} style={{ marginVertical: 20 }} />
@@ -2342,7 +2235,7 @@ function MatchCard({ match }: { match: MusicMatch }) {
         <View style={styles.matchBadges}>
           {match.songsInCommon > 0 && (
             <View style={styles.badge}>
-              <Ionicons name="musical-note" size={11} color={SPOTIFY_GREEN} />
+              <Ionicons name="musical-note" size={11} color={Colors.accent} />
               <Text style={styles.badgeText}>{match.songsInCommon} brani</Text>
             </View>
           )}
@@ -2508,7 +2401,7 @@ function SharedPlaylistCard({
         />
         {item.mergedAt ? (
           <View style={styles.mergedBadge}>
-            <Ionicons name="checkmark" size={14} color={SPOTIFY_GREEN} />
+            <Ionicons name="checkmark" size={14} color={Colors.accent} />
             <Text style={styles.mergedText}>Aggiunta</Text>
           </View>
         ) : (
@@ -2782,7 +2675,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: SPOTIFY_GREEN,
+    backgroundColor: Colors.accent,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2969,10 +2862,10 @@ const styles = StyleSheet.create({
   mergedText: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
-    color: SPOTIFY_GREEN,
+    color: Colors.accent,
   },
   mergeBtn: {
-    backgroundColor: SPOTIFY_GREEN,
+    backgroundColor: Colors.accent,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
@@ -2984,7 +2877,7 @@ const styles = StyleSheet.create({
   },
   searchBtn: {
     marginTop: 12,
-    backgroundColor: SPOTIFY_GREEN,
+    backgroundColor: Colors.accent,
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: "center" as const,
@@ -3050,7 +2943,7 @@ const styles = StyleSheet.create({
   },
   connectBtn: {
     marginTop: 8,
-    backgroundColor: SPOTIFY_GREEN,
+    backgroundColor: LASTFM_RED,
     paddingHorizontal: 36,
     paddingVertical: 14,
     borderRadius: 28,

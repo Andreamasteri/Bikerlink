@@ -1115,7 +1115,7 @@ export const userMusicTracks = pgTable("user_music_tracks", {
   imageUrl: varchar("image_url", { length: 500 }),
   genres: text("genres").array().default([]),
   popularity: integer("popularity").default(0),
-  provider: varchar("provider", { length: 20 }).notNull().default("spotify"),
+  provider: varchar("provider", { length: 20 }).notNull().default("lastfm"),
   addedAt: timestamp("added_at").notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("user_track_uniq").on(table.userId, table.spotifyTrackId, table.provider),

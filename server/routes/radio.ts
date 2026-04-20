@@ -558,8 +558,8 @@ router.get("/suggested-genres", requireAuth, async (req: Request, res: Response)
         .where(eq(userMusicTracks.userId, userId))
         .limit(50);
 
-      const spotifyTracks = savedTracks.filter((t) => t.provider === "spotify");
-      for (const track of spotifyTracks) {
+      const legacyTracks = savedTracks.filter((t) => t.provider !== "lastfm");
+      for (const track of legacyTracks) {
         for (const genre of (track.genres ?? [])) {
           const mapped = LASTFM_TO_GENRE[genre.toLowerCase().trim()];
           if (mapped) {

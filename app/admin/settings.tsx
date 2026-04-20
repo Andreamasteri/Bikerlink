@@ -614,11 +614,6 @@ export default function AdminSettings() {
   });
   const musicImportEnabled = musicImportData?.enabled !== false;
 
-  const { data: musicProviderData } = useQuery<{ provider: string }>({
-    queryKey: ["/api/settings/music-provider"],
-  });
-  const musicProvider = musicProviderData?.provider ?? "lastfm";
-
   const { data: homeMessageData } = useQuery<{ enabled: boolean; text: string }>({
     queryKey: ["/api/settings/home-message"],
   });
@@ -757,24 +752,6 @@ export default function AdminSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/music-import-playlist"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-    },
-  });
-
-  const musicProviderMutation = useMutation({
-    mutationFn: async (provider: "lastfm") => {
-      const baseUrl = getApiUrl();
-      const url = new URL("/api/admin/settings/music_provider", baseUrl);
-      const res = await globalThis.fetch(url.toString(), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value: provider }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/music-provider"] });
     },
   });
 

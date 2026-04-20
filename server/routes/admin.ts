@@ -1173,8 +1173,8 @@ router.put("/settings/maps_provider", async (req: Request, res: Response) => {
 router.put("/settings/music_provider", async (req: Request, res: Response) => {
   try {
     const { value } = req.body as { value: string };
-    if (value !== "lastfm" && value !== "spotify") {
-      return res.status(400).json({ message: "Provider non valido: usare 'lastfm' o 'spotify'" });
+    if (value !== "lastfm") {
+      return res.status(400).json({ message: "Provider non valido: usare 'lastfm'" });
     }
     const setting = await storage.upsertAppSetting("music_provider", value);
     await storage.createModeratorLog({
