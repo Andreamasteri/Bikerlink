@@ -813,9 +813,9 @@ const LastfmLoginModal = React.memo(function LastfmLoginModal({ visible, onClose
           ) : (
             <>
               <Text style={lastfmModalStyles.modalSubtitle}>
-                {"Hai effettuato l'accesso e autorizzato BikerLink su Last.fm?\n\n"}
+                {"Hai autorizzato BikerLink su Last.fm?\n\n"}
                 <Text style={{ color: Colors.textSecondary, fontSize: 13 }}>
-                  {"⚠ Se hai appena creato l'account, verifica prima l'email di Last.fm, poi riapri il browser e autorizza."}
+                  {"📧 Se hai appena creato l'account: Last.fm ti ha inviato un'email di verifica. Aprila, clicca il link di conferma, poi torna su Last.fm per autorizzare l'accesso e infine tocca \"Sì, ho autorizzato\" qui sotto."}
                 </Text>
               </Text>
               <TouchableOpacity
