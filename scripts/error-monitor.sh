@@ -83,6 +83,24 @@ check_recent_crashes() {
   touch /tmp/em_last_crash_check 2>/dev/null
 }
 
+# ── Check 3: Last.fm route produzione (ogni 10 cicli, ~5 min) ─────────────────
+check_lastfm_prod() {
+  local http_code
+  http_code=$(curl -s --max-time 8 --connect-timeout 5 \
+    -o /dev/null -w "%{http_code}" \
+    "$PROD_HOST/api/lastfm/status" 2>/dev/null)
+
+  # 401 = route viva, auth richiesta (atteso per chiamata non autenticata)
+  # 200 = route viva (non dovrebbe succedere senza session ma accettabile)
+  if [ "$http_code" = "401" ] || [ "$http_code" = "200" ]; then
+    log "LASTFM_ROUTE_OK: GET $PROD_HOST/api/lastfm/status → $http_code"
+  elif [ "$http_code" = "000" ] || [ -z "$http_code" ]; then
+    log "LASTFM_ROUTE_WARN: GET $PROD_HOST/api/lastfm/status → timeout/non raggiungibile"
+  else
+    log "LASTFM_ROUTE_WARN: GET $PROD_HOST/api/lastfm/status → $http_code (inatteso)"
+  fi
+}
+
 # ── Ciclo principale ─────────────────────────────────────────────────────────
 run_all_checks() {
   check_backend
@@ -98,6 +116,7 @@ log "  Produzione:   $PROD_HOST"
 log "  Intervallo:   ${CHECK_INTERVAL}s"
 log "  Log:          $LOG_FILE"
 log "  Checks/ciclo: backend, backend-crashes"
+log "  Check Last.fm produzione: ogni 10 cicli (~5 min)"
 log "============================================"
 
 run_all_checks
@@ -108,6 +127,10 @@ while true; do
   CYCLE=$((CYCLE + 1))
 
   run_all_checks
+
+  if [ $((CYCLE % 10)) -eq 0 ]; then
+    check_lastfm_prod
+  fi
 
   if [ $((CYCLE % 20)) -eq 0 ]; then
     rotate_log
