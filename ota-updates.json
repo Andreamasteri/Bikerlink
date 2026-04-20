@@ -4126,7 +4126,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-20T20:59:48.425Z"
+  },
+  {
+    "updateNumber": 128,
+    "version": "1.128.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-128 rv7.0.0: Fix password admin",
+    "note": "Task #796: Fix credenziali utente admin nel database. CURRENT_OTA_NUMBER=128.",
+    "releaseId": "b5ef8f46-db2b-47f4-b8bc-9d505e10c988",
+    "bundleUrl": "private/ota/ota-1.128.0-1776720142756.js",
+    "updateGroupId": "895edb61-afd7-4dea-b883-22c7dad29756",
+    "androidUpdateId": "019dacc6-ef3a-75eb-807f-6003d5d5949b",
+    "iosUpdateId": null,
+    "commitBase": "db064cf0e169e4a297bf3106ec506130fad0219b",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/895edb61-afd7-4dea-b883-22c7dad29756",
+    "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
+    "apkVersionCode": 29,
+    "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
+    "status": "published",
+    "publishedAt": "2026-04-20T21:22:25.119Z"
   }
 ]
