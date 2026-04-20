@@ -11,6 +11,7 @@ import {
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import type { Subscription } from "expo-sensors";
 import {
   Accelerometer,
   Gyroscope,
@@ -43,53 +44,72 @@ const SENSORS: SensorDef[] = [
   { name: "Accelerometer", key: "accelerometer" },
   { name: "Gyroscope", key: "gyroscope" },
   { name: "Magnetometer", key: "magnetometer" },
-  { name: "MagnetometerUncalibrated", key: "magnetometerUncalibrated" },
+  { name: "MagnetometerUncalibrated", key: "magnetometerUncalibrated", platformOnly: "android" },
   { name: "Barometer", key: "barometer" },
   { name: "DeviceMotion", key: "deviceMotion" },
   { name: "Pedometer", key: "pedometer" },
   { name: "LightSensor", key: "lightSensor", platformOnly: "android" },
 ];
 
-function getSensorModule(key: string) {
+function xyzFormat(d: { x: number; y: number; z: number }): string {
+  return `x: ${d.x.toFixed(3)}, y: ${d.y.toFixed(3)}, z: ${d.z.toFixed(3)}`;
+}
+
+function checkSensorAvailable(key: string): Promise<boolean> {
   switch (key) {
-    case "accelerometer": return Accelerometer;
-    case "gyroscope": return Gyroscope;
-    case "magnetometer": return Magnetometer;
-    case "magnetometerUncalibrated": return MagnetometerUncalibrated;
-    case "barometer": return Barometer;
-    case "deviceMotion": return DeviceMotion;
-    case "pedometer": return Pedometer;
-    case "lightSensor": return LightSensor;
-    default: return null;
+    case "accelerometer": return Accelerometer.isAvailableAsync();
+    case "gyroscope": return Gyroscope.isAvailableAsync();
+    case "magnetometer": return Magnetometer.isAvailableAsync();
+    case "magnetometerUncalibrated": return MagnetometerUncalibrated.isAvailableAsync();
+    case "barometer": return Barometer.isAvailableAsync();
+    case "deviceMotion": return DeviceMotion.isAvailableAsync();
+    case "pedometer": return Pedometer.isAvailableAsync();
+    case "lightSensor": return LightSensor.isAvailableAsync();
+    default: return Promise.resolve(false);
   }
 }
 
-function formatSensorData(key: string, data: any): string {
-  if (!data) return "null";
-  try {
-    switch (key) {
-      case "accelerometer":
-      case "gyroscope":
-      case "magnetometer":
-      case "magnetometerUncalibrated":
-        return `x: ${(data.x ?? 0).toFixed(3)}, y: ${(data.y ?? 0).toFixed(3)}, z: ${(data.z ?? 0).toFixed(3)}`;
-      case "barometer":
-        return `pressure: ${(data.pressure ?? 0).toFixed(2)} hPa${data.relativeAltitude != null ? `, alt: ${data.relativeAltitude.toFixed(1)} m` : ""}`;
-      case "deviceMotion": {
-        const a = data.acceleration;
-        return a
-          ? `accel: { x: ${(a.x ?? 0).toFixed(3)}, y: ${(a.y ?? 0).toFixed(3)}, z: ${(a.z ?? 0).toFixed(3)} }`
-          : JSON.stringify(data).slice(0, 80);
-      }
-      case "pedometer":
-        return `steps: ${data.steps ?? 0}`;
-      case "lightSensor":
-        return `illuminance: ${(data.illuminance ?? 0).toFixed(1)} lux`;
-      default:
-        return JSON.stringify(data).slice(0, 80);
-    }
-  } catch {
-    return String(data);
+function startSensorSubscription(
+  key: string,
+  onData: (formatted: string) => void,
+): Subscription | null {
+  switch (key) {
+    case "accelerometer":
+      Accelerometer.setUpdateInterval(500);
+      return Accelerometer.addListener((d) => onData(xyzFormat(d)));
+    case "gyroscope":
+      Gyroscope.setUpdateInterval(500);
+      return Gyroscope.addListener((d) => onData(xyzFormat(d)));
+    case "magnetometer":
+      Magnetometer.setUpdateInterval(500);
+      return Magnetometer.addListener((d) => onData(xyzFormat(d)));
+    case "magnetometerUncalibrated":
+      MagnetometerUncalibrated.setUpdateInterval(500);
+      return MagnetometerUncalibrated.addListener((d) =>
+        onData(`x: ${d.x.toFixed(3)}, y: ${d.y.toFixed(3)}, z: ${d.z.toFixed(3)}, bx: ${d.biasX?.toFixed(3) ?? "—"}, by: ${d.biasY?.toFixed(3) ?? "—"}, bz: ${d.biasZ?.toFixed(3) ?? "—"}`)
+      );
+    case "barometer":
+      Barometer.setUpdateInterval(500);
+      return Barometer.addListener((d) =>
+        onData(`pressure: ${d.pressure?.toFixed(2) ?? "—"} hPa${d.relativeAltitude != null ? `, alt: ${d.relativeAltitude.toFixed(1)} m` : ""}`)
+      );
+    case "deviceMotion":
+      DeviceMotion.setUpdateInterval(500);
+      return DeviceMotion.addListener((d) => {
+        const a = d.acceleration;
+        if (a) {
+          onData(`accel: { x: ${(a.x ?? 0).toFixed(3)}, y: ${(a.y ?? 0).toFixed(3)}, z: ${(a.z ?? 0).toFixed(3)} }`);
+        } else {
+          onData("accel: (nessun dato)");
+        }
+      });
+    case "pedometer":
+      return Pedometer.watchStepCount((d) => onData(`steps: ${d.steps}`));
+    case "lightSensor":
+      LightSensor.setUpdateInterval(500);
+      return LightSensor.addListener((d) => onData(`illuminance: ${d.illuminance.toFixed(1)} lux`));
+    default:
+      return null;
   }
 }
 
@@ -149,7 +169,7 @@ type SensorPanelInnerProps = {
 function SensorPanelInner({ def, isOpen, addLog }: SensorPanelInnerProps) {
   const [available, setAvailable] = useState<boolean | null>(null);
   const [liveData, setLiveData] = useState<string | null>(null);
-  const subscriptionRef = useRef<{ remove(): void } | null>(null);
+  const subscriptionRef = useRef<Subscription | null>(null);
   const firstDataRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wasListeningRef = useRef(false);
@@ -172,27 +192,28 @@ function SensorPanelInner({ def, isOpen, addLog }: SensorPanelInnerProps) {
       setAvailable(false);
       return;
     }
-    const mod = getSensorModule(def.key);
-    if (!mod) {
-      addLog(def.name, "error", `modulo non trovato`);
-      setAvailable(false);
-      return;
-    }
+    let cancelled = false;
     (async () => {
       try {
-        const ok = await (mod as any).isAvailableAsync();
+        const ok = await checkSensorAvailable(def.key);
+        if (cancelled) return;
         setAvailable(ok);
         if (ok) {
           addLog(def.name, "success", `disponibile su questo dispositivo`);
         } else {
           addLog(def.name, "error", `non disponibile su questo dispositivo`);
         }
-      } catch (e: any) {
-        addLog(def.name, "error", `errore verifica disponibilità: ${e?.message ?? e}`);
+      } catch (e: unknown) {
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : String(e);
+        addLog(def.name, "error", `errore verifica disponibilità: ${msg}`);
         setAvailable(false);
       }
     })();
-    return () => { stopSub(); };
+    return () => {
+      cancelled = true;
+      stopSub();
+    };
   }, []);
 
   useEffect(() => {
@@ -208,35 +229,31 @@ function SensorPanelInner({ def, isOpen, addLog }: SensorPanelInnerProps) {
 
     if (available !== true) return;
 
-    const mod = getSensorModule(def.key);
-    if (!mod) return;
-
     firstDataRef.current = false;
 
-    const handleData = (data: any) => {
-      const formatted = formatSensorData(def.key, data);
-      setLiveData(formatted);
-      if (!firstDataRef.current) {
-        firstDataRef.current = true;
-        addLog(def.name, "success", `primo dato ricevuto: { ${formatted} }`);
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
-      }
-    };
-
     try {
-      if (def.key === "pedometer") {
-        subscriptionRef.current = Pedometer.watchStepCount(handleData);
-      } else {
-        (mod as any).setUpdateInterval?.(500);
-        subscriptionRef.current = (mod as any).addListener(handleData);
+      subscriptionRef.current = startSensorSubscription(def.key, (formatted) => {
+        setLiveData(formatted);
+        if (!firstDataRef.current) {
+          firstDataRef.current = true;
+          addLog(def.name, "success", `primo dato ricevuto: { ${formatted} }`);
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+        }
+      });
+
+      if (!subscriptionRef.current) {
+        addLog(def.name, "error", `sensore non riconosciuto`);
+        return;
       }
+
       wasListeningRef.current = true;
       addLog(def.name, "success", `subscription avviata con successo`);
-    } catch (e: any) {
-      addLog(def.name, "error", `errore avvio subscription: ${e?.message ?? e}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      addLog(def.name, "error", `errore avvio subscription: ${msg}`);
       return;
     }
 
@@ -308,11 +325,12 @@ function SensorPanel({ def, isOpen, onPress, addLog }: SensorPanelProps) {
           color={Colors.textSecondary}
         />
       </TouchableOpacity>
-      {isOpen && (
-        <SensorErrorBoundary sensor={def.name} onCrash={handleCrash}>
+
+      <SensorErrorBoundary sensor={def.name} onCrash={handleCrash}>
+        <View style={isOpen ? undefined : sensorStyles.hidden}>
           <SensorPanelInner def={def} isOpen={isOpen} addLog={addLog} />
-        </SensorErrorBoundary>
-      )}
+        </View>
+      </SensorErrorBoundary>
     </View>
   );
 }
@@ -324,6 +342,10 @@ const sensorStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     marginBottom: 10,
+    overflow: "hidden",
+  },
+  hidden: {
+    height: 0,
     overflow: "hidden",
   },
   header: {
