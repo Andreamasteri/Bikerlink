@@ -32,6 +32,16 @@ export async function autoSeedEssentialUsers() {
         .limit(1);
 
       if (existing.length > 0) {
+        const existingUser = existing[0];
+        const passwordMatches = await bcrypt.compare(userData.password, existingUser.password);
+        if (!passwordMatches) {
+          const hashedPassword = await bcrypt.hash(userData.password, 12);
+          await db
+            .update(users)
+            .set({ password: hashedPassword })
+            .where(eq(users.email, userData.email));
+          console.log(`Auto-reconciled password for essential user: ${userData.nickname}`);
+        }
         continue;
       }
 
