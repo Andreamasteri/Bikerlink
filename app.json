@@ -22,6 +22,7 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "BikerLink ha bisogno di accedere alla posizione anche in background per tre motivi: (1) registrare il percorso in moto senza interruzioni anche quando l'app è minimizzata, (2) inviare la tua posizione al server durante un'emergenza SOS anche con lo schermo spento, (3) ricevere e inviare avvisi SOS alla community in tempo reale. Senza questo permesso il tracciamento si interromperà ogni volta che passi ad un'altra app.",
         "NSLocationAlwaysUsageDescription": "BikerLink usa la posizione in background per il tracciamento percorsi in moto, la funzione SOS d'emergenza e la sicurezza della community.",
         "NSPhotoLibraryUsageDescription": "BikerLink accede alle tue foto per caricare immagini del profilo e delle moto.",
+        "NSPhotoLibraryAddUsageDescription": "BikerLink salva le foto scattate nella tua libreria fotografica.",
         "NSCameraUsageDescription": "BikerLink accede alla fotocamera per scattare foto del profilo e delle moto.",
         "UIBackgroundModes": ["location", "fetch", "audio"],
         "ITSAppUsesNonExemptEncryption": false
