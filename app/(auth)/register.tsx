@@ -12,6 +12,7 @@ import {
   Modal,
   FlatList,
   Alert,
+  Linking,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -934,6 +935,12 @@ export default function RegisterScreen() {
         <ScrollView style={styles.eulaScroll} nestedScrollEnabled>
           <Text style={styles.eulaText}>{EULA_TEXTS[getAppLanguage()] ?? EULA_TEXTS.it}</Text>
         </ScrollView>
+        <TouchableOpacity
+          onPress={() => Linking.openURL(new URL("/terms", getApiUrl()).toString())}
+          style={styles.termsLinkRow}
+        >
+          <Text style={styles.termsLinkText}>Leggi i Termini di Servizio completi →</Text>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity
@@ -1440,6 +1447,17 @@ const styles = StyleSheet.create({
     flexDirection: "row" as const,
     flexWrap: "wrap" as const,
     alignItems: "center" as const,
+  },
+  termsLinkRow: {
+    paddingVertical: 8,
+    alignItems: "flex-end" as const,
+    paddingRight: 4,
+  },
+  termsLinkText: {
+    fontSize: 12,
+    color: Colors.accent,
+    textDecorationLine: "underline" as const,
+    fontFamily: "Inter_500Medium",
   },
   inviteSection: {
     marginTop: 8,

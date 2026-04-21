@@ -186,9 +186,15 @@ export default function WelcomeScreen() {
             })}
           </View>
 
-          <Pressable onPress={handlePrivacyPress}>
-            <Text style={styles.privacyLink}>Privacy Policy</Text>
-          </Pressable>
+          <View style={styles.legalLinks}>
+            <Pressable onPress={handlePrivacyPress}>
+              <Text style={styles.privacyLink}>Privacy Policy</Text>
+            </Pressable>
+            <Text style={styles.legalSeparator}> · </Text>
+            <Pressable onPress={() => Linking.openURL(new URL("/terms", getApiUrl()).toString())}>
+              <Text style={styles.privacyLink}>Termini di Servizio</Text>
+            </Pressable>
+          </View>
         </Animated.View>
       </View>
     </ImageBackground>
@@ -275,11 +281,21 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "center",
   },
-  privacyLink: {
+  legalLinks: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
     marginTop: 12,
+    flexWrap: "wrap" as const,
+  },
+  legalSeparator: {
     fontSize: 12,
     color: Colors.textSecondary,
-    textAlign: "center",
+  },
+  privacyLink: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    textAlign: "center" as const,
     textDecorationLine: "underline" as const,
   },
   langBar: {
