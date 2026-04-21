@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * BikerLink — App Store Screenshot Generator
- * Generates 3 screens x 2 sizes = 6 PNG screenshots
- * Sizes: iPhone 6.5" (1284x2778) and iPhone 5.5" (1242x2208)
+ * Generates 3 screens x 3 sizes = 9 PNG screenshots
+ * Sizes: iPhone 6.5" (1284x2778), iPhone 5.5" (1242x2208), iPad 12.9" (2048x2732)
  * NOTE: No emoji used — relies only on vector shapes + Latin text for
  *       compatibility with the libvips/pango headless renderer.
  */
@@ -17,6 +17,7 @@ fs.mkdirSync(OUT_DIR, { recursive: true });
 const SIZES = [
   { name: '6.5inch', w: 1284, h: 2778 },
   { name: '5.5inch', w: 1242, h: 2208 },
+  { name: 'ipad-12.9inch', w: 2048, h: 2732 },
 ];
 
 const C = {
