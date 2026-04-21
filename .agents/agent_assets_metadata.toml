@@ -29,3 +29,9 @@ id = "kkQudZ8ML8pkh1VpW6DY4"
 uri = "file://.local/tasks/testi-italiani-completi.md"
 type = "text"
 title = "Tutti i testi italiani — BikerLink"
+
+[[outputs]]
+id = "IcquHso74nCLt8hcoNy4r"
+uri = "file://docs/app-store-connect-checklist.md"
+type = "text"
+title = "Checklist App Store Connect — BikerLink"
