@@ -222,6 +222,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.sendFile(templatePath);
   });
 
+  app.get(["/terms", "/tos"], (_req, res) => {
+    const templatePath = path.resolve(
+      process.cwd(),
+      "server",
+      "templates",
+      "terms.html",
+    );
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.sendFile(templatePath);
+  });
+
   app.get("/apple-review", (_req, res) => {
     const templatePath = path.resolve(
       process.cwd(),
