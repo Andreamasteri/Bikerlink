@@ -4218,7 +4218,30 @@
     "apkBuildId": null,
     "apkVersionCode": 29,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-22T13:01:06.970Z"
+  },
+  {
+    "updateNumber": 132,
+    "version": "1.132.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-132 rv7.0.0: Pannello Moderatore — Campagne, Bug/Feature, Log Admin",
+    "note": "Task #822: pannello moderatore con sezione Campagne (GET/POST/PUT senza DELETE), sezione Bug/Feature (lista ticket feedback con aggiornamento status + nota interna), log visualizzazione profilo utenti da moderatori, schermata Log Moderatori nell'admin panel (con join nickname moderatore e utente target). Nuovo campo internalNote in feedback_tickets. Route /api/moderator/advertisements, /api/moderator/log-profile-view, /api/admin/moderator-logs. CURRENT_OTA_NUMBER=132.",
+    "releaseId": "ab7d0b77-4d16-45ce-bf5b-c6f5468cdbf6",
+    "bundleUrl": "private/ota/ota-1.132.0-1776867184247.js",
+    "updateGroupId": "082fbe86-0af9-47ce-b22c-7205205cb042",
+    "androidUpdateId": "019db58a-4efe-72c7-89db-043ddb25dc6d",
+    "iosUpdateId": null,
+    "commitBase": "40d8fb41d3937e05ba2cf8624e7797f7de623279",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/082fbe86-0af9-47ce-b22c-7205205cb042",
+    "apkBuildId": null,
+    "apkVersionCode": 29,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-22T14:13:07.088Z"
   }
 ]
