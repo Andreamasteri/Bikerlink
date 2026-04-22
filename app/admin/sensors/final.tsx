@@ -146,9 +146,9 @@ export default function SensorsFinal() {
     { label: "acceleration.x", value: fmt(raw.ax) },
     { label: "acceleration.y", value: fmt(raw.ay) },
     { label: "acceleration.z", value: fmt(raw.az) },
-    { label: "accInclGravity.x", value: fmt(raw.igx) },
-    { label: "accInclGravity.y", value: fmt(raw.igy) },
-    { label: "accInclGravity.z", value: fmt(raw.igz) },
+    { label: "accelerationIncludingGravity.x", value: fmt(raw.igx) },
+    { label: "accelerationIncludingGravity.y", value: fmt(raw.igy) },
+    { label: "accelerationIncludingGravity.z", value: fmt(raw.igz) },
     { label: "rotation.alpha", value: fmt(raw.rAlpha) },
     { label: "rotation.beta", value: fmt(raw.rBeta) },
     { label: "rotation.gamma", value: fmt(raw.rGamma) },
@@ -186,6 +186,11 @@ export default function SensorsFinal() {
       {/* Raw values panel */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Valori Grezzi DeviceMotion</Text>
+        {!isRunning && (
+          <Text style={styles.rawHint}>
+            Attiva almeno una metrica qui sotto per avviare il flusso dati
+          </Text>
+        )}
         <View style={styles.rawPanel}>
           {rawRows.map((row, i) => (
             <View
@@ -295,6 +300,12 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textTransform: "uppercase",
     letterSpacing: 0.5,
+  },
+  rawHint: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    fontStyle: "italic",
   },
   rawPanel: {
     backgroundColor: Colors.surface,
