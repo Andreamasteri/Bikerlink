@@ -618,6 +618,12 @@ function setupErrorHandler(app: express.Application) {
         }
 
         try {
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS gps_precision INTEGER NOT NULL DEFAULT 100`);
+        } catch (e) {
+          console.warn("[MIGRATION] user_profiles gps_precision:", e);
+        }
+
+        try {
           // Rename legacy user_spotify_tokens → user_music_tokens if needed
           await db.execute(sql`
             DO $$ BEGIN
