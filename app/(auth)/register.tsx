@@ -939,7 +939,7 @@ export default function RegisterScreen() {
           onPress={() => Linking.openURL(new URL("/terms", getApiUrl()).toString())}
           style={styles.termsLinkRow}
         >
-          <Text style={styles.termsLinkText}>Leggi i Termini di Servizio completi →</Text>
+          <Text style={styles.termsLinkText}>{t("register.step4.tosLink")}</Text>
         </TouchableOpacity>
       </View>
 

@@ -18,7 +18,7 @@ import Colors from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { pickSplashMessage } from "@/lib/splash-utils";
 import { useLanguage } from "@/lib/language-context";
-import { type AppLanguage } from "@/lib/i18n";
+import { t, type AppLanguage } from "@/lib/i18n";
 
 const LANGUAGES: { code: AppLanguage; flag: string; label: string }[] = [
   { code: "it", flag: "🇮🇹", label: "Italiano" },
@@ -157,13 +157,13 @@ export default function WelcomeScreen() {
             style={styles.loginButton}
             onPress={() => router.push("/(auth)/login")}
           >
-            <Text style={styles.loginText}>Accedi</Text>
+            <Text style={styles.loginText}>{t("auth.login")}</Text>
           </Pressable>
           <Pressable
             style={styles.registerButton}
             onPress={() => router.push("/(auth)/register")}
           >
-            <Text style={styles.registerText}>Registrati</Text>
+            <Text style={styles.registerText}>{t("auth.register")}</Text>
           </Pressable>
           {synecoVisible && (
             <Text style={styles.sponsorText}>powered by Syneco Lubrificanti</Text>
@@ -188,11 +188,11 @@ export default function WelcomeScreen() {
 
           <View style={styles.legalLinks}>
             <Pressable onPress={handlePrivacyPress}>
-              <Text style={styles.privacyLink}>Privacy Policy</Text>
+              <Text style={styles.privacyLink}>{t("welcome.privacyLink")}</Text>
             </Pressable>
             <Text style={styles.legalSeparator}> · </Text>
             <Pressable onPress={() => Linking.openURL(new URL("/terms", getApiUrl()).toString())}>
-              <Text style={styles.privacyLink}>Termini di Servizio</Text>
+              <Text style={styles.privacyLink}>{t("welcome.tosLink")}</Text>
             </Pressable>
           </View>
         </Animated.View>
