@@ -4287,7 +4287,30 @@
     "apkBuildId": null,
     "apkVersionCode": 29,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-22T14:41:34.271Z"
+  },
+  {
+    "updateNumber": 135,
+    "version": "1.135.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-135 rv7.0.0: Sensori — Hub + Dati Finali DeviceMotion",
+    "note": "Task #828: aggiunto hub navigabile alla sezione admin Sensori con due card: 'Dati Grezzi' (chip, accent) → /admin/sensors/raw e 'Dati Finali' (analytics-outline, #FF9800) → /admin/sensors/final. raw.tsx = lift-and-shift del precedente index.tsx (lista 8 sensori). final.tsx: pannello valori grezzi DeviceMotion sempre visibile (10 campi: acceleration.x/y/z, accelerationIncludingGravity.x/y/z, rotation.alpha/beta/gamma, orientation; font 15-16pt). 4 caselle toggle indipendenti (default OFF): Accelerazione G (acc.y>0), Frenata G (|acc.y| quando <0), G Laterale (acc.x), Angolo Inclinazione (rotation.gamma in gradi). Listener DeviceMotion avviato solo se ≥1 casella attiva, fermato quando tutte OFF. Hint UI quando listener fermo. Guard anti-doppio avvio. CURRENT_OTA_NUMBER=135.",
+    "releaseId": "0fcd0fb9-a865-4507-942a-b90cc8fbaba4",
+    "bundleUrl": "private/ota/ota-1.135.0-1776869923726.js",
+    "updateGroupId": "a80ee21d-070f-40bb-a0bd-06cf15465da5",
+    "androidUpdateId": "019db5b4-1a3a-74e5-8f34-070a6af38f5c",
+    "iosUpdateId": null,
+    "commitBase": "5c417e825d33508cc65eef94536d37cc51059733",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/a80ee21d-070f-40bb-a0bd-06cf15465da5",
+    "apkBuildId": null,
+    "apkVersionCode": 29,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-22T14:58:46.661Z"
   }
 ]
