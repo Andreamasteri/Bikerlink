@@ -55,4 +55,6 @@ dist-ota/
 # Compiled server
 server_dist/
 server_dist/index.js
-android/
+# android/ NON è ignorato — android/.gitignore gestisce i build artifacts
+# I file critici (build.gradle, AndroidManifest.xml, adi-registration.properties)
+# devono rimanere tracciati in git per le build EAS/Play Console
