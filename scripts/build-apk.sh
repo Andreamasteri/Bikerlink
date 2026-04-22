@@ -92,9 +92,9 @@ fi
 echo "  ✔  versionCode sincronizzato e verificato: $VERSION_CODE (app.json → build.gradle)"
 
 # ── 3. Validazione profilo ──────────────────────────────────────────────────
-if [[ "$PROFILE" != "preview" && "$PROFILE" != "production" ]]; then
+if [[ "$PROFILE" != "preview" && "$PROFILE" != "production" && "$PROFILE" != "release-apk" ]]; then
   echo "  ✖  Profilo non valido: '$PROFILE'"
-  echo "  Usa: bash scripts/build-apk.sh [preview|production]"
+  echo "  Usa: bash scripts/build-apk.sh [preview|production|release-apk]"
   exit 1
 fi
 
@@ -126,15 +126,16 @@ npx eas-cli@16 build \
   --platform android \
   --profile "$PROFILE" \
   --clear-cache \
-  --non-interactive
+  --non-interactive \
+  --no-wait
 BUILD_EXIT=$?
 set -e
 
 # ── 7. Log risultato ─────────────────────────────────────────────────────────
 if [ $BUILD_EXIT -eq 0 ]; then
-  echo "$TIMESTAMP  APK BUILD COMPLETATA — profilo=$PROFILE commit=$COMMIT utente=$AUTHORIZED_BY" >> "$LOG_FILE"
+  echo "$TIMESTAMP  APK BUILD INVIATA (--no-wait) — profilo=$PROFILE commit=$COMMIT utente=$AUTHORIZED_BY" >> "$LOG_FILE"
   echo ""
-  echo "  ✅ Build completata con successo."
+  echo "  ✅ Build inviata ai server EAS — controlla https://expo.dev per lo stato."
 else
   echo "$TIMESTAMP  APK BUILD FALLITA (exit=$BUILD_EXIT) — profilo=$PROFILE commit=$COMMIT utente=$AUTHORIZED_BY" >> "$LOG_FILE"
   echo ""
