@@ -88,7 +88,7 @@ export default function ModeratorFeedback() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, status, internalNote }: { id: string; status?: string; internalNote?: string }) => {
-      const body: any = {};
+      const body: Partial<{ status: string; internalNote: string }> = {};
       if (status !== undefined) body.status = status;
       if (internalNote !== undefined) body.internalNote = internalNote;
       const res = await apiRequest("PATCH", `/api/feedback/${id}`, body);
