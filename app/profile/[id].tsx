@@ -50,6 +50,7 @@ export default function PublicProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const baseUrl = getApiUrl();
+  const hasLoggedView = React.useRef(false);
 
   const { data: marketplaceData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/marketplace-enabled"],
@@ -80,6 +81,16 @@ export default function PublicProfileScreen() {
     },
     enabled: !!id,
   });
+
+  React.useEffect(() => {
+    if (!profile || !user || !id) return;
+    if (user.id === id) return;
+    const role = (user as any).role as string | undefined;
+    if (role !== "moderator" && role !== "admin") return;
+    if (hasLoggedView.current) return;
+    hasLoggedView.current = true;
+    apiRequest("POST", "/api/moderator/log-profile-view", { targetUserId: id }).catch(() => {});
+  }, [profile, user, id]);
 
   const getUserColor = (userType: string) => {
     if (userType === "biker") return Colors.maleIcon;

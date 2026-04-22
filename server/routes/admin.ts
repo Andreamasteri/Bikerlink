@@ -1645,6 +1645,34 @@ router.get("/logs", async (_req: Request, res: Response) => {
   }
 });
 
+router.get("/moderator-logs", async (_req: Request, res: Response) => {
+  try {
+    const rawLogs = await storage.getModeratorLogs();
+    const allUserIds = new Set<string>();
+    for (const log of rawLogs) {
+      allUserIds.add(log.moderatorId);
+      if (log.targetType === "user" && log.targetId) allUserIds.add(log.targetId);
+    }
+    const userMap = new Map<string, { id: string; nickname: string }>();
+    if (allUserIds.size > 0) {
+      const ids = [...allUserIds];
+      for (const id of ids) {
+        const u = await storage.getUser(id);
+        if (u) userMap.set(u.id, { id: u.id, nickname: u.nickname });
+      }
+    }
+    const enriched = rawLogs.map((log) => ({
+      ...log,
+      moderatorNickname: userMap.get(log.moderatorId)?.nickname ?? log.moderatorId,
+      targetUserNickname: log.targetType === "user" && log.targetId ? (userMap.get(log.targetId)?.nickname ?? log.targetId) : null,
+    }));
+    return res.json(enriched);
+  } catch (error) {
+    console.error("Admin moderator-logs error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.get("/stregatti", async (req: Request, res: Response) => {
   try {
     const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10) || 50, 200);

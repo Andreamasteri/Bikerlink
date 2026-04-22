@@ -256,6 +256,7 @@ export interface IStorage {
 
   getFeedbackTickets(): Promise<FeedbackTicket[]>;
   createFeedbackTicket(ticket: InsertFeedbackTicket): Promise<FeedbackTicket>;
+  updateFeedbackTicket(id: string, updates: { status?: string; internalNote?: string }): Promise<FeedbackTicket | undefined>;
 
   getAppSetting(key: string): Promise<AppSetting | undefined>;
   upsertAppSetting(key: string, value?: string, valueJson?: unknown): Promise<AppSetting>;
@@ -1008,6 +1009,14 @@ export class DatabaseStorage implements IStorage {
 
   async createFeedbackTicket(data: InsertFeedbackTicket): Promise<FeedbackTicket> {
     const [ticket] = await db.insert(feedbackTickets).values(data).returning();
+    return ticket;
+  }
+
+  async updateFeedbackTicket(id: string, updates: { status?: string; internalNote?: string }): Promise<FeedbackTicket | undefined> {
+    const [ticket] = await db.update(feedbackTickets)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(feedbackTickets.id, id))
+      .returning();
     return ticket;
   }
 

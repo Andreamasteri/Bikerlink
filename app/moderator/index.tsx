@@ -149,9 +149,17 @@ export default function ModeratorPhotosScreen() {
             <Ionicons name="arrow-back" size={24} color={Colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Moderazione Foto</Text>
-          <TouchableOpacity onPress={() => router.push("/moderator/logs")}>
-            <MaterialCommunityIcons name="clipboard-text-outline" size={24} color={Colors.accent} />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity onPress={() => router.push("/moderator/feedback" as any)} style={styles.headerActionBtn}>
+              <MaterialCommunityIcons name="bug-outline" size={22} color={Colors.accent} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push("/moderator/campaigns" as any)} style={styles.headerActionBtn}>
+              <MaterialCommunityIcons name="bullhorn-outline" size={22} color={Colors.accent} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push("/moderator/logs")} style={styles.headerActionBtn}>
+              <MaterialCommunityIcons name="clipboard-text-outline" size={22} color={Colors.accent} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {isLoading ? (
@@ -196,6 +204,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
+  },
+  headerActions: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  headerActionBtn: {
+    padding: 4,
   },
   center: {
     flex: 1,

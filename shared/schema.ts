@@ -599,6 +599,7 @@ export const feedbackTickets = pgTable("feedback_tickets", {
   subject: varchar("subject", { length: 200 }).notNull(),
   message: text("message").notNull(),
   status: varchar("status", { length: 20 }).notNull().default("open"),
+  internalNote: text("internal_note"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

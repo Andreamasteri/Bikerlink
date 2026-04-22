@@ -97,4 +97,28 @@ router.get("/", async (req: Request, res: Response) => {
   }
 });
 
+router.patch("/:id", async (req: Request, res: Response) => {
+  try {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Non autenticato" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "admin" && user.role !== "moderator")) {
+      return res.status(403).json({ message: "Accesso negato" });
+    }
+    const { status, internalNote } = req.body;
+    const updates: { status?: string; internalNote?: string } = {};
+    if (status !== undefined) updates.status = status;
+    if (internalNote !== undefined) updates.internalNote = internalNote;
+    const ticket = await storage.updateFeedbackTicket(req.params.id, updates);
+    if (!ticket) {
+      return res.status(404).json({ message: "Ticket non trovato" });
+    }
+    return res.json(ticket);
+  } catch (error) {
+    console.error("Feedback update error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 export default router;
