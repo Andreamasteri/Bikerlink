@@ -32,13 +32,21 @@ interface FeedbackTicket {
 }
 
 type FilterStatus = "all" | "open" | "in_progress" | "resolved" | "closed";
+type FilterType = "all" | "bug" | "feature" | "feedback";
 
-const FILTERS: { key: FilterStatus; label: string }[] = [
+const STATUS_FILTERS: { key: FilterStatus; label: string }[] = [
   { key: "all", label: "Tutti" },
   { key: "open", label: "Aperti" },
   { key: "in_progress", label: "In corso" },
   { key: "resolved", label: "Risolti" },
   { key: "closed", label: "Chiusi" },
+];
+
+const TYPE_FILTERS: { key: FilterType; label: string; icon: string }[] = [
+  { key: "all", label: "Tutti", icon: "📋" },
+  { key: "bug", label: "Bug", icon: "🐛" },
+  { key: "feature", label: "Feature", icon: "✨" },
+  { key: "feedback", label: "Feedback", icon: "💬" },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
@@ -76,7 +84,8 @@ function TicketCard({ ticket, onOpen }: { ticket: FeedbackTicket; onOpen: (t: Fe
 export default function ModeratorFeedback() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [filter, setFilter] = useState<FilterStatus>("open");
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>("open");
+  const [filterType, setFilterType] = useState<FilterType>("all");
   const [selected, setSelected] = useState<FeedbackTicket | null>(null);
   const [note, setNote] = useState("");
 
@@ -84,7 +93,11 @@ export default function ModeratorFeedback() {
     queryKey: ["/api/feedback"],
   });
 
-  const tickets = filter === "all" ? allTickets : allTickets.filter((t) => t.status === filter);
+  const tickets = allTickets.filter((t) => {
+    const statusOk = filterStatus === "all" || t.status === filterStatus;
+    const typeOk = filterType === "all" || t.ticketType === filterType;
+    return statusOk && typeOk;
+  });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, status, internalNote }: { id: string; status?: string; internalNote?: string }) => {
@@ -131,13 +144,26 @@ export default function ModeratorFeedback() {
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
-        {FILTERS.map((f) => (
+        {TYPE_FILTERS.map((f) => (
           <TouchableOpacity
             key={f.key}
-            style={[styles.filterBtn, filter === f.key && styles.filterBtnActive]}
-            onPress={() => setFilter(f.key)}
+            style={[styles.filterBtn, filterType === f.key && styles.filterBtnActive]}
+            onPress={() => setFilterType(f.key)}
           >
-            <Text style={[styles.filterText, filter === f.key && styles.filterTextActive]}>{f.label}</Text>
+            <Text style={styles.filterIcon}>{f.icon}</Text>
+            <Text style={[styles.filterText, filterType === f.key && styles.filterTextActive]}>{f.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.filters, { paddingTop: 0 }]}>
+        {STATUS_FILTERS.map((f) => (
+          <TouchableOpacity
+            key={f.key}
+            style={[styles.filterBtn, filterStatus === f.key && styles.filterBtnStatusActive]}
+            onPress={() => setFilterStatus(f.key)}
+          >
+            <Text style={[styles.filterText, filterStatus === f.key && styles.filterTextStatusActive]}>{f.label}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -243,6 +269,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
   },
   filterBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 20,
@@ -254,8 +283,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent + "22",
     borderColor: Colors.accent,
   },
+  filterBtnStatusActive: {
+    backgroundColor: Colors.warning + "22",
+    borderColor: Colors.warning,
+  },
+  filterIcon: { fontSize: 14 },
   filterText: { fontSize: 13, fontFamily: "Inter_500Medium", color: Colors.textSecondary },
   filterTextActive: { color: Colors.accent },
+  filterTextStatusActive: { color: Colors.warning },
   center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
   emptyText: { fontSize: 15, color: Colors.textSecondary, fontFamily: "Inter_500Medium" },
   list: { padding: 16, gap: 12 },

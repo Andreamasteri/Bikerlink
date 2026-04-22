@@ -135,9 +135,13 @@ router.put("/photos/:id/reject", async (req: Request, res: Response) => {
 
 router.get("/logs", async (req: Request, res: Response) => {
   try {
-    const userId = await requireModerator(req, res);
-    if (!userId) return;
-
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Non autenticato" });
+    }
+    const caller = await storage.getUser(req.session.userId);
+    if (!caller || caller.role !== "admin") {
+      return res.status(403).json({ message: "Accesso riservato agli amministratori" });
+    }
     const logs = await storage.getModeratorLogs();
     return res.json(logs);
   } catch (error) {
