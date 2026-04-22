@@ -105,12 +105,18 @@ android {
             keyPassword 'android'
         }
         release {
-            if (project.hasProperty('android.storeFile')) {
-                storeFile file(findProperty('android.storeFile'))
-                storePassword findProperty('android.storePassword')
-                keyAlias findProperty('android.keyAlias')
-                keyPassword findProperty('android.keyPassword')
+            // EAS Build inietta le credenziali via -P flags o env vars
+            def ksFile = findProperty('android.storeFile') ?: System.getenv('KEYSTORE_PATH')
+            def ksPassword = findProperty('android.storePassword') ?: System.getenv('KEYSTORE_PASSWORD')
+            def kAlias = findProperty('android.keyAlias') ?: System.getenv('KEY_ALIAS')
+            def kPassword = findProperty('android.keyPassword') ?: System.getenv('KEY_PASSWORD')
+            if (ksFile) {
+                storeFile file(ksFile)
+                storePassword ksPassword
+                keyAlias kAlias
+                keyPassword kPassword
             } else {
+                // Fallback solo per build locali — EAS sovrascrive sempre
                 storeFile file('debug.keystore')
                 storePassword 'android'
                 keyAlias 'androiddebugkey'

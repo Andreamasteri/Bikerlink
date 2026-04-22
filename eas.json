@@ -7,6 +7,7 @@
     "preview": {
       "channel": "preview",
       "distribution": "internal",
+      "credentialsSource": "remote",
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease"
@@ -18,6 +19,7 @@
     "production": {
       "channel": "production",
       "distribution": "store",
+      "credentialsSource": "remote",
       "android": {
         "buildType": "app-bundle",
         "gradleCommand": ":app:bundleRelease"
