@@ -150,14 +150,11 @@ export default function ModeratorPhotosScreen() {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Moderazione Foto</Text>
           <View style={styles.headerActions}>
-            <TouchableOpacity onPress={() => router.push("/moderator/feedback" as any)} style={styles.headerActionBtn}>
+            <TouchableOpacity onPress={() => router.push("/moderator/feedback")} style={styles.headerActionBtn}>
               <MaterialCommunityIcons name="bug-outline" size={22} color={Colors.accent} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push("/moderator/campaigns" as any)} style={styles.headerActionBtn}>
+            <TouchableOpacity onPress={() => router.push("/moderator/campaigns")} style={styles.headerActionBtn}>
               <MaterialCommunityIcons name="bullhorn-outline" size={22} color={Colors.accent} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push("/moderator/logs")} style={styles.headerActionBtn}>
-              <MaterialCommunityIcons name="clipboard-text-outline" size={22} color={Colors.accent} />
             </TouchableOpacity>
           </View>
         </View>

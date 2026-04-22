@@ -42,6 +42,12 @@ interface Campaign {
 
 type TabKey = "biker" | "zavorrina" | "coppia" | "tutti";
 
+interface RNFileForUpload {
+  uri: string;
+  name: string;
+  type: string;
+}
+
 const TABS: { key: TabKey; label: string; icon: string; iconSet: "material" | "community" | "ionicons"; color: string }[] = [
   { key: "tutti", label: "Tutti", icon: "people-outline", iconSet: "ionicons", color: Colors.textSecondary },
   { key: "biker", label: "Biker", icon: "motorcycle", iconSet: "material", color: Colors.accent },
@@ -55,9 +61,11 @@ const webBottomInset = Platform.OS === "web" ? 34 : 0;
 function CampaignCard({
   item,
   onToggle,
+  onEdit,
 }: {
   item: Campaign;
   onToggle: (id: string, isActive: boolean) => void;
+  onEdit: (item: Campaign) => void;
 }) {
   const imageUri = item.imageUrl
     ? (() => {
@@ -102,6 +110,9 @@ function CampaignCard({
               <MaterialIcons name="play-circle-filled" size={28} color={Colors.success} />
             </TouchableOpacity>
           )}
+          <TouchableOpacity onPress={() => onEdit(item)} style={styles.actionBtn}>
+            <MaterialIcons name="edit" size={24} color={Colors.accent} />
+          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -113,6 +124,7 @@ export default function ModeratorCampaigns() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>("tutti");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
 
   const [formName, setFormName] = useState("");
   const [formLinkUrl, setFormLinkUrl] = useState("");
@@ -138,7 +150,7 @@ export default function ModeratorCampaigns() {
         const text = await res.text();
         throw new Error(`${res.status}: ${text}`);
       }
-      return res.json();
+      return res.json() as Promise<Campaign>;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/moderator/advertisements"] });
@@ -146,15 +158,37 @@ export default function ModeratorCampaigns() {
       setShowCreateModal(false);
       resetForm();
     },
-    onError: (err: Error) => {
-      Alert.alert("Errore", err.message);
+    onError: (err: Error) => Alert.alert("Errore", err.message),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, formData }: { id: string; formData: FormData }) => {
+      const baseUrl = getApiUrl();
+      const url = new URL(`/api/moderator/advertisements/${id}`, baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text}`);
+      }
+      return res.json() as Promise<Campaign>;
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/moderator/advertisements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
+      setEditingCampaign(null);
+      resetForm();
+    },
+    onError: (err: Error) => Alert.alert("Errore", err.message),
   });
 
   const toggleMutation = useMutation({
     mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
       const res = await apiRequest("PUT", `/api/moderator/advertisements/${id}`, { isActive });
-      return res.json();
+      return res.json() as Promise<Campaign>;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/moderator/advertisements"] });
@@ -169,34 +203,47 @@ export default function ModeratorCampaigns() {
     setFormImageUri(null);
   }
 
+  function openEdit(campaign: Campaign) {
+    setFormName(campaign.name);
+    setFormLinkUrl(campaign.linkUrl ?? "");
+    setFormDescription(campaign.description ?? "");
+    setFormImageUri(null);
+    setEditingCampaign(campaign);
+  }
+
   const pickImage = useCallback(() => {
     showImagePickerMenu(
-      (uri) => {
-        setFormImageUri(uri);
-      },
+      (uri) => setFormImageUri(uri),
       { quality: 0.8, aspect: [16, 11] }
     );
   }, []);
 
-  function handleCreate() {
-    if (!formName.trim()) return;
+  function buildFormData(targetUserType: string): FormData {
     const formData = new FormData();
     formData.append("name", formName.trim());
-    formData.append("targetUserType", activeTab === "tutti" ? "biker" : activeTab);
+    formData.append("targetUserType", targetUserType);
     formData.append("placement", "home");
     if (formLinkUrl.trim()) formData.append("linkUrl", formLinkUrl.trim());
     if (formDescription.trim()) formData.append("description", formDescription.trim());
     if (formImageUri) {
-      const filename = formImageUri.split("/").pop() || "image.jpg";
+      const filename = formImageUri.split("/").pop() ?? "image.jpg";
       const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : "image/jpeg";
-      formData.append("image", {
-        uri: formImageUri,
-        name: filename,
-        type,
-      } as any);
+      const mimeType = match ? `image/${match[1]}` : "image/jpeg";
+      const file: RNFileForUpload = { uri: formImageUri, name: filename, type: mimeType };
+      formData.append("image", file as unknown as Blob);
     }
-    createMutation.mutate(formData);
+    return formData;
+  }
+
+  function handleCreate() {
+    if (!formName.trim()) return;
+    const target = activeTab === "tutti" ? "biker" : activeTab;
+    createMutation.mutate(buildFormData(target));
+  }
+
+  function handleUpdate() {
+    if (!editingCampaign || !formName.trim()) return;
+    updateMutation.mutate({ id: editingCampaign.id, formData: buildFormData(editingCampaign.targetUserType) });
   }
 
   const renderTab = ({ key, label, icon, iconSet, color }: (typeof TABS)[0]) => {
@@ -208,11 +255,15 @@ export default function ModeratorCampaigns() {
         style={[styles.tabBtn, active && { borderBottomColor: color, borderBottomWidth: 2 }]}
         onPress={() => setActiveTab(key)}
       >
-        <IconComp name={icon as any} size={18} color={active ? color : Colors.textSecondary} />
+        <IconComp name={icon as "motorcycle"} size={18} color={active ? color : Colors.textSecondary} />
         <Text style={[styles.tabLabel, { color: active ? color : Colors.textSecondary }]}>{label}</Text>
       </TouchableOpacity>
     );
   };
+
+  const isEditing = !!editingCampaign;
+  const showModal = showCreateModal || isEditing;
+  const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
@@ -245,48 +296,31 @@ export default function ModeratorCampaigns() {
             data={campaigns}
             keyExtractor={(c) => c.id}
             renderItem={({ item }) => (
-              <CampaignCard item={item} onToggle={(id, v) => toggleMutation.mutate({ id, isActive: v })} />
+              <CampaignCard
+                item={item}
+                onToggle={(id, v) => toggleMutation.mutate({ id, isActive: v })}
+                onEdit={openEdit}
+              />
             )}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           />
         )}
 
-        <Modal visible={showCreateModal} transparent animationType="slide">
+        <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => { setShowCreateModal(false); setEditingCampaign(null); resetForm(); }}>
           <View style={styles.modalOverlay}>
             <KeyboardAvoidingView behavior="padding" style={{ width: "100%" }}>
               <ScrollView style={styles.modalBox} keyboardShouldPersistTaps="handled">
-                <Text style={styles.modalTitle}>Nuova Campagna</Text>
+                <Text style={styles.modalTitle}>{isEditing ? "Modifica Campagna" : "Nuova Campagna"}</Text>
 
                 <Text style={styles.fieldLabel}>Nome *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formName}
-                  onChangeText={setFormName}
-                  placeholder="Nome campagna"
-                  placeholderTextColor={Colors.textSecondary}
-                />
+                <TextInput style={styles.input} value={formName} onChangeText={setFormName} placeholder="Nome campagna" placeholderTextColor={Colors.textSecondary} />
 
                 <Text style={styles.fieldLabel}>Link URL</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formLinkUrl}
-                  onChangeText={setFormLinkUrl}
-                  placeholder="https://..."
-                  placeholderTextColor={Colors.textSecondary}
-                  keyboardType="url"
-                  autoCapitalize="none"
-                />
+                <TextInput style={styles.input} value={formLinkUrl} onChangeText={setFormLinkUrl} placeholder="https://..." placeholderTextColor={Colors.textSecondary} keyboardType="url" autoCapitalize="none" />
 
                 <Text style={styles.fieldLabel}>Descrizione</Text>
-                <TextInput
-                  style={[styles.input, { height: 80 }]}
-                  value={formDescription}
-                  onChangeText={setFormDescription}
-                  placeholder="Descrizione breve"
-                  placeholderTextColor={Colors.textSecondary}
-                  multiline
-                />
+                <TextInput style={[styles.input, { height: 80 }]} value={formDescription} onChangeText={setFormDescription} placeholder="Descrizione breve" placeholderTextColor={Colors.textSecondary} multiline />
 
                 <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
                   {formImageUri ? (
@@ -294,23 +328,23 @@ export default function ModeratorCampaigns() {
                   ) : (
                     <>
                       <MaterialIcons name="add-photo-alternate" size={28} color={Colors.accent} />
-                      <Text style={styles.imagePickerLabel}>Aggiungi immagine</Text>
+                      <Text style={styles.imagePickerLabel}>{isEditing ? "Cambia immagine" : "Aggiungi immagine"}</Text>
                     </>
                   )}
                 </TouchableOpacity>
 
                 <View style={styles.modalActions}>
-                  <TouchableOpacity style={styles.cancelBtn} onPress={() => { setShowCreateModal(false); resetForm(); }}>
+                  <TouchableOpacity style={styles.cancelBtn} onPress={() => { setShowCreateModal(false); setEditingCampaign(null); resetForm(); }}>
                     <Text style={styles.cancelText}>Annulla</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.createBtn, (!formName.trim() || createMutation.isPending) && { opacity: 0.5 }]}
-                    onPress={handleCreate}
-                    disabled={!formName.trim() || createMutation.isPending}
+                    style={[styles.createBtn, (!formName.trim() || isPending) && { opacity: 0.5 }]}
+                    onPress={isEditing ? handleUpdate : handleCreate}
+                    disabled={!formName.trim() || isPending}
                   >
-                    {createMutation.isPending
+                    {isPending
                       ? <ActivityIndicator size="small" color="#fff" />
-                      : <Text style={styles.createText}>Crea</Text>
+                      : <Text style={styles.createText}>{isEditing ? "Salva" : "Crea"}</Text>
                     }
                   </TouchableOpacity>
                 </View>
@@ -336,28 +370,13 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold", color: Colors.text },
   addBtn: { padding: 4 },
-  tabs: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    paddingHorizontal: 8,
-  },
-  tabBtn: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 10,
-    gap: 2,
-  },
+  tabs: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: Colors.border, paddingHorizontal: 8 },
+  tabBtn: { flex: 1, alignItems: "center", paddingVertical: 10, gap: 2 },
   tabLabel: { fontSize: 11, fontFamily: "Inter_500Medium" },
   center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
   emptyText: { fontSize: 15, color: Colors.textSecondary, fontFamily: "Inter_500Medium" },
   list: { padding: 16, gap: 12 },
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    overflow: "hidden",
-    marginBottom: 12,
-  },
+  card: { backgroundColor: Colors.surface, borderRadius: 14, overflow: "hidden", marginBottom: 12 },
   cardImage: { width: "100%", height: 160 },
   cardBody: { flexDirection: "row", alignItems: "center", padding: 12, gap: 12 },
   cardInfo: { flex: 1, gap: 4 },
@@ -370,43 +389,18 @@ const styles = StyleSheet.create({
   cardImpressions: { fontSize: 11, color: Colors.textSecondary, fontFamily: "Inter_400Regular" },
   cardActions: { gap: 4 },
   actionBtn: { padding: 4 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "flex-end",
-    alignItems: "center",
-  },
-  modalBox: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
-    maxHeight: "90%",
-  },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end", alignItems: "center" },
+  modalBox: { backgroundColor: Colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, maxHeight: "90%" },
   modalTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold", color: Colors.text, marginBottom: 16 },
   fieldLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary, marginBottom: 6 },
   input: {
-    backgroundColor: Colors.surfaceLight,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    color: Colors.text,
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    marginBottom: 14,
+    backgroundColor: Colors.surfaceLight, borderRadius: 10, paddingHorizontal: 14,
+    paddingVertical: 10, color: Colors.text, fontFamily: "Inter_400Regular", fontSize: 14, marginBottom: 14,
   },
   imagePickerBtn: {
-    height: 120,
-    backgroundColor: Colors.surfaceLight,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderStyle: "dashed",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
-    gap: 8,
-    overflow: "hidden",
+    height: 120, backgroundColor: Colors.surfaceLight, borderRadius: 12,
+    borderWidth: 1, borderColor: Colors.border, borderStyle: "dashed",
+    justifyContent: "center", alignItems: "center", marginBottom: 20, gap: 8, overflow: "hidden",
   },
   imagePickerLabel: { fontSize: 14, color: Colors.accent, fontFamily: "Inter_500Medium" },
   previewImage: { width: "100%", height: "100%" },

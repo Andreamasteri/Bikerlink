@@ -1645,28 +1645,58 @@ router.get("/logs", async (_req: Request, res: Response) => {
   }
 });
 
-router.get("/moderator-logs", async (_req: Request, res: Response) => {
+router.get("/moderator-logs", async (req: Request, res: Response) => {
   try {
+    const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? "50"), 10) || 50));
+    const filterModeratorId = req.query.moderatorId ? String(req.query.moderatorId) : undefined;
+    const filterAction = req.query.action ? String(req.query.action) : undefined;
+
     const rawLogs = await storage.getModeratorLogs();
+
+    let filtered = rawLogs;
+    if (filterModeratorId) filtered = filtered.filter((l) => l.moderatorId === filterModeratorId);
+    if (filterAction) filtered = filtered.filter((l) => l.action === filterAction);
+
+    const total = filtered.length;
+    const offset = (page - 1) * limit;
+    const paginated = filtered.slice(offset, offset + limit);
+
     const allUserIds = new Set<string>();
-    for (const log of rawLogs) {
+    for (const log of paginated) {
       allUserIds.add(log.moderatorId);
       if (log.targetType === "user" && log.targetId) allUserIds.add(log.targetId);
     }
     const userMap = new Map<string, { id: string; nickname: string }>();
-    if (allUserIds.size > 0) {
-      const ids = [...allUserIds];
-      for (const id of ids) {
-        const u = await storage.getUser(id);
-        if (u) userMap.set(u.id, { id: u.id, nickname: u.nickname });
-      }
+    for (const id of allUserIds) {
+      const u = await storage.getUser(id);
+      if (u) userMap.set(u.id, { id: u.id, nickname: u.nickname });
     }
-    const enriched = rawLogs.map((log) => ({
+
+    const enriched = paginated.map((log) => ({
       ...log,
       moderatorNickname: userMap.get(log.moderatorId)?.nickname ?? log.moderatorId,
       targetUserNickname: log.targetType === "user" && log.targetId ? (userMap.get(log.targetId)?.nickname ?? log.targetId) : null,
     }));
-    return res.json(enriched);
+
+    const allModerators = [...new Map(rawLogs.map((l) => [l.moderatorId, l.moderatorId])).keys()];
+    const moderatorProfiles = await Promise.all(
+      allModerators.map(async (id) => {
+        const u = await storage.getUser(id);
+        return u ? { id: u.id, nickname: u.nickname } : { id, nickname: id };
+      })
+    );
+    const allActions = [...new Set(rawLogs.map((l) => l.action))];
+
+    return res.json({
+      logs: enriched,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      moderators: moderatorProfiles,
+      actions: allActions,
+    });
   } catch (error) {
     console.error("Admin moderator-logs error:", error);
     return res.status(500).json({ message: "Errore interno del server" });

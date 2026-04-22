@@ -85,7 +85,7 @@ export default function PublicProfileScreen() {
   React.useEffect(() => {
     if (!profile || !user || !id) return;
     if (user.id === id) return;
-    const role = (user as any).role as string | undefined;
+    const role = user.role;
     if (role !== "moderator" && role !== "admin") return;
     if (hasLoggedView.current) return;
     hasLoggedView.current = true;

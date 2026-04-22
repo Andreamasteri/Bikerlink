@@ -13,6 +13,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { apiRequest } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 
 interface ModeratorLog {
@@ -27,6 +28,21 @@ interface ModeratorLog {
   createdAt: string;
 }
 
+interface ModeratorProfile {
+  id: string;
+  nickname: string;
+}
+
+interface LogsResponse {
+  logs: ModeratorLog[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  moderators: ModeratorProfile[];
+  actions: string[];
+}
+
 const ACTION_ICONS: Record<string, { icon: string; color: string }> = {
   view_profile: { icon: "eye-outline", color: Colors.accent },
   create_advertisement: { icon: "plus-circle-outline", color: Colors.success },
@@ -37,7 +53,6 @@ const ACTION_ICONS: Record<string, { icon: string; color: string }> = {
   reject_photo: { icon: "close-circle-outline", color: Colors.error },
 };
 
-const webTopInset = Platform.OS === "web" ? 67 : 0;
 const webBottomInset = Platform.OS === "web" ? 34 : 0;
 
 function LogRow({ log }: { log: ModeratorLog }) {
@@ -50,7 +65,7 @@ function LogRow({ log }: { log: ModeratorLog }) {
   return (
     <View style={styles.row}>
       <View style={[styles.iconCircle, { backgroundColor: iconInfo.color + "18" }]}>
-        <MaterialCommunityIcons name={iconInfo.icon as any} size={20} color={iconInfo.color} />
+        <MaterialCommunityIcons name={iconInfo.icon as "information-outline"} size={20} color={iconInfo.color} />
       </View>
       <View style={styles.rowContent}>
         <View style={styles.rowTop}>
@@ -73,11 +88,29 @@ function LogRow({ log }: { log: ModeratorLog }) {
 
 export default function AdminModeratorLogs() {
   const insets = useSafeAreaInsets();
+  const [page, setPage] = useState(1);
+  const [moderatorId, setModeratorId] = useState<string>("");
+  const [action, setAction] = useState<string>("");
   const [search, setSearch] = useState("");
+  const LIMIT = 50;
 
-  const { data: logs = [], isLoading } = useQuery<ModeratorLog[]>({
-    queryKey: ["/api/admin/moderator-logs"],
+  const { data, isLoading, isFetching } = useQuery<LogsResponse>({
+    queryKey: ["/api/admin/moderator-logs", page, moderatorId, action],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("limit", String(LIMIT));
+      if (moderatorId) params.set("moderatorId", moderatorId);
+      if (action) params.set("action", action);
+      const res = await apiRequest("GET", `/api/admin/moderator-logs?${params.toString()}`);
+      return res.json();
+    },
   });
+
+  const logs = data?.logs ?? [];
+  const totalPages = data?.totalPages ?? 1;
+  const moderators = data?.moderators ?? [];
+  const actions = data?.actions ?? [];
 
   const filtered = search.trim()
     ? logs.filter((l) =>
@@ -88,23 +121,70 @@ export default function AdminModeratorLogs() {
       )
     : logs;
 
+  function handleResetFilters() {
+    setModeratorId("");
+    setAction("");
+    setSearch("");
+    setPage(1);
+  }
+
+  const hasFilters = !!(moderatorId || action || search);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: webBottomInset }]}>
       <View style={styles.searchBar}>
-        <Ionicons name="search-outline" size={18} color={Colors.textSecondary} style={styles.searchIcon} />
+        <Ionicons name="search-outline" size={18} color={Colors.textSecondary} />
         <TextInput
           style={styles.searchInput}
           value={search}
           onChangeText={setSearch}
-          placeholder="Cerca moderatore, azione, utente…"
+          placeholder="Cerca in questa pagina…"
           placeholderTextColor={Colors.textSecondary}
         />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch("")}>
+        {hasFilters && (
+          <TouchableOpacity onPress={handleResetFilters}>
             <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersRow}>
+        <Text style={styles.filterLabel}>Moderatore:</Text>
+        <TouchableOpacity
+          style={[styles.filterChip, !moderatorId && styles.filterChipActive]}
+          onPress={() => { setModeratorId(""); setPage(1); }}
+        >
+          <Text style={[styles.filterChipText, !moderatorId && styles.filterChipTextActive]}>Tutti</Text>
+        </TouchableOpacity>
+        {moderators.map((m) => (
+          <TouchableOpacity
+            key={m.id}
+            style={[styles.filterChip, moderatorId === m.id && styles.filterChipActive]}
+            onPress={() => { setModeratorId(m.id); setPage(1); }}
+          >
+            <Text style={[styles.filterChipText, moderatorId === m.id && styles.filterChipTextActive]}>{m.nickname}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersRow}>
+        <Text style={styles.filterLabel}>Azione:</Text>
+        <TouchableOpacity
+          style={[styles.filterChip, !action && styles.filterChipActive]}
+          onPress={() => { setAction(""); setPage(1); }}
+        >
+          <Text style={[styles.filterChipText, !action && styles.filterChipTextActive]}>Tutte</Text>
+        </TouchableOpacity>
+        {actions.map((a) => (
+          <TouchableOpacity
+            key={a}
+            style={[styles.filterChip, action === a && styles.filterChipActive]}
+            onPress={() => { setAction(a); setPage(1); }}
+          >
+            <Text style={[styles.filterChipText, action === a && styles.filterChipTextActive]}>{a.replace(/_/g, " ")}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
       {isLoading ? (
         <View style={styles.center}>
@@ -113,7 +193,7 @@ export default function AdminModeratorLogs() {
       ) : filtered.length === 0 ? (
         <View style={styles.center}>
           <MaterialCommunityIcons name="shield-account-outline" size={56} color={Colors.textSecondary} />
-          <Text style={styles.emptyText}>{search ? "Nessun risultato" : "Nessun log disponibile"}</Text>
+          <Text style={styles.emptyText}>Nessun log</Text>
         </View>
       ) : (
         <FlatList
@@ -123,7 +203,26 @@ export default function AdminModeratorLogs() {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
-            <Text style={styles.count}>{filtered.length} log{filtered.length !== 1 ? "s" : ""}</Text>
+            <Text style={styles.count}>{data?.total ?? 0} log totali • pagina {page}/{totalPages}</Text>
+          }
+          ListFooterComponent={
+            <View style={styles.pagination}>
+              <TouchableOpacity
+                style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
+                onPress={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1 || isFetching}
+              >
+                <Ionicons name="chevron-back" size={18} color={page <= 1 ? Colors.border : Colors.accent} />
+              </TouchableOpacity>
+              <Text style={styles.pageText}>{page} / {totalPages}</Text>
+              <TouchableOpacity
+                style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
+                onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages || isFetching}
+              >
+                <Ionicons name="chevron-forward" size={18} color={page >= totalPages ? Colors.border : Colors.accent} />
+              </TouchableOpacity>
+            </View>
           }
         />
       )}
@@ -138,6 +237,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: Colors.surface,
     margin: 16,
+    marginBottom: 8,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -145,22 +245,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  searchIcon: { flexShrink: 0 },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: Colors.text,
+  searchInput: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.text },
+  filtersRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
   },
+  filterLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  filterChipActive: { backgroundColor: Colors.accent + "22", borderColor: Colors.accent },
+  filterChipText: { fontSize: 12, fontFamily: "Inter_500Medium", color: Colors.textSecondary },
+  filterChipTextActive: { color: Colors.accent },
   center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
   emptyText: { fontSize: 15, color: Colors.textSecondary, fontFamily: "Inter_500Medium" },
   list: { paddingHorizontal: 16, paddingBottom: 24 },
-  count: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontFamily: "Inter_500Medium",
-    marginBottom: 12,
-  },
+  count: { fontSize: 12, color: Colors.textSecondary, fontFamily: "Inter_500Medium", marginBottom: 8, marginTop: 8 },
   row: {
     flexDirection: "row",
     gap: 12,
@@ -179,13 +287,24 @@ const styles = StyleSheet.create({
   rowContent: { flex: 1, gap: 3 },
   rowTop: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
   modName: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: Colors.text },
-  action: {
-    fontSize: 12,
-    color: Colors.accent,
-    fontFamily: "Inter_500Medium",
-    textTransform: "capitalize",
-  },
+  action: { fontSize: 12, color: Colors.accent, fontFamily: "Inter_500Medium", textTransform: "capitalize" },
   target: { fontSize: 12, color: Colors.textSecondary, fontFamily: "Inter_400Regular" },
   details: { fontSize: 12, color: Colors.textSecondary, fontFamily: "Inter_400Regular", fontStyle: "italic" },
   date: { fontSize: 11, color: Colors.textSecondary, fontFamily: "Inter_400Regular" },
+  pagination: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 24,
+    paddingVertical: 16,
+  },
+  pageBtn: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  pageBtnDisabled: { opacity: 0.4 },
+  pageText: { fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.text },
 });

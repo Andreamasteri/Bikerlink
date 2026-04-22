@@ -10,7 +10,6 @@ export default function ModeratorLayout() {
       }}
     >
       <Stack.Screen name="index" />
-      <Stack.Screen name="logs" />
       <Stack.Screen name="campaigns" />
       <Stack.Screen name="feedback" />
     </Stack>

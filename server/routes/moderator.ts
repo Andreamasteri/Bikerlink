@@ -218,17 +218,22 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
     const moderatorId = await requireModerator(req, res);
     if (!moderatorId) return;
     const id = req.params.id as string;
-    const updates: any = {};
-    if (req.body.name !== undefined) updates.name = req.body.name;
-    if (req.body.sponsor !== undefined) updates.sponsor = req.body.sponsor;
-    if (req.body.linkUrl !== undefined) updates.linkUrl = req.body.linkUrl;
-    if (req.body.description !== undefined) updates.description = req.body.description;
+    const updates: Partial<{
+      name: string; sponsor: string; linkUrl: string | null; description: string | null;
+      isActive: boolean; targetUserType: string; rotationDuration: number;
+      rotationMode: string; sortOrder: number; placement: string;
+      imageUrl: string; imageVersion: number;
+    }> = {};
+    if (req.body.name !== undefined) updates.name = req.body.name as string;
+    if (req.body.sponsor !== undefined) updates.sponsor = req.body.sponsor as string;
+    if (req.body.linkUrl !== undefined) updates.linkUrl = req.body.linkUrl as string;
+    if (req.body.description !== undefined) updates.description = req.body.description as string;
     if (req.body.isActive !== undefined) updates.isActive = req.body.isActive === true || req.body.isActive === "true";
-    if (req.body.targetUserType !== undefined) updates.targetUserType = req.body.targetUserType;
-    if (req.body.rotationDuration !== undefined) updates.rotationDuration = parseInt(req.body.rotationDuration);
-    if (req.body.rotationMode !== undefined) updates.rotationMode = req.body.rotationMode;
-    if (req.body.sortOrder !== undefined) updates.sortOrder = parseInt(req.body.sortOrder);
-    if (req.body.placement !== undefined) updates.placement = req.body.placement;
+    if (req.body.targetUserType !== undefined) updates.targetUserType = req.body.targetUserType as string;
+    if (req.body.rotationDuration !== undefined) updates.rotationDuration = parseInt(req.body.rotationDuration as string);
+    if (req.body.rotationMode !== undefined) updates.rotationMode = req.body.rotationMode as string;
+    if (req.body.sortOrder !== undefined) updates.sortOrder = parseInt(req.body.sortOrder as string);
+    if (req.body.placement !== undefined) updates.placement = req.body.placement as string;
     if (req.file) {
       updates.imageUrl = await uploadAdImage(req.file.buffer, req.file.originalname, req.file.mimetype);
       const existing = await storage.getAdCampaign(id);
