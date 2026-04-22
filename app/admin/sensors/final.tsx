@@ -1,0 +1,406 @@
+import React, { useState, useRef, useCallback, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Platform,
+} from "react-native";
+import { DeviceMotion } from "expo-sensors";
+import type { DeviceMotionMeasurement } from "expo-sensors";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import Colors from "@/constants/colors";
+
+type Subscription = ReturnType<typeof DeviceMotion.addListener>;
+
+type ToggleKey = "accelG" | "brakeG" | "lateralG" | "tiltAngle";
+
+const TOGGLE_DEFS: { key: ToggleKey; label: string; description: string; unit: string }[] = [
+  {
+    key: "accelG",
+    label: "Accelerazione G",
+    description: "acceleration.y quando positivo (accelerazione in avanti)",
+    unit: "m/s²",
+  },
+  {
+    key: "brakeG",
+    label: "Frenata G",
+    description: "acceleration.y quando negativo (mostrato come positivo)",
+    unit: "m/s²",
+  },
+  {
+    key: "lateralG",
+    label: "G Laterale",
+    description: "acceleration.x (forza in curva)",
+    unit: "m/s²",
+  },
+  {
+    key: "tiltAngle",
+    label: "Angolo Inclinazione",
+    description: "rotation.gamma in gradi",
+    unit: "°",
+  },
+];
+
+type RawValues = {
+  ax: number; ay: number; az: number;
+  igx: number; igy: number; igz: number;
+  rAlpha: number; rBeta: number; rGamma: number;
+  orientation: number;
+};
+
+function fmt(v: number | null | undefined, decimals = 3): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  return v.toFixed(decimals);
+}
+
+function computeToggleValue(key: ToggleKey, raw: RawValues): number | null {
+  switch (key) {
+    case "accelG":
+      return raw.ay > 0 ? raw.ay : null;
+    case "brakeG":
+      return raw.ay < 0 ? Math.abs(raw.ay) : null;
+    case "lateralG":
+      return raw.ax;
+    case "tiltAngle": {
+      const deg = (raw.rGamma * 180) / Math.PI;
+      return deg;
+    }
+  }
+}
+
+export default function SensorsFinal() {
+  const insets = useSafeAreaInsets();
+
+  const [raw, setRaw] = useState<RawValues>({
+    ax: 0, ay: 0, az: 0,
+    igx: 0, igy: 0, igz: 0,
+    rAlpha: 0, rBeta: 0, rGamma: 0,
+    orientation: 0,
+  });
+  const [active, setActive] = useState<Record<ToggleKey, boolean>>({
+    accelG: false,
+    brakeG: false,
+    lateralG: false,
+    tiltAngle: false,
+  });
+  const [isRunning, setIsRunning] = useState(false);
+  const [available, setAvailable] = useState<boolean | null>(null);
+
+  const subRef = useRef<Subscription | null>(null);
+
+  const anyActive = Object.values(active).some(Boolean);
+
+  const startListener = useCallback(() => {
+    if (subRef.current) return;
+    DeviceMotion.setUpdateInterval(100);
+    subRef.current = DeviceMotion.addListener((data: DeviceMotionMeasurement) => {
+      setRaw({
+        ax: data.acceleration?.x ?? 0,
+        ay: data.acceleration?.y ?? 0,
+        az: data.acceleration?.z ?? 0,
+        igx: data.accelerationIncludingGravity?.x ?? 0,
+        igy: data.accelerationIncludingGravity?.y ?? 0,
+        igz: data.accelerationIncludingGravity?.z ?? 0,
+        rAlpha: data.rotation?.alpha ?? 0,
+        rBeta: data.rotation?.beta ?? 0,
+        rGamma: data.rotation?.gamma ?? 0,
+        orientation: data.orientation ?? 0,
+      });
+    });
+    setIsRunning(true);
+  }, []);
+
+  const stopListener = useCallback(() => {
+    subRef.current?.remove();
+    subRef.current = null;
+    setIsRunning(false);
+  }, []);
+
+  useEffect(() => {
+    DeviceMotion.isAvailableAsync().then((v) => setAvailable(v)).catch(() => setAvailable(false));
+  }, []);
+
+  useEffect(() => {
+    if (anyActive && available) {
+      startListener();
+    } else if (!anyActive) {
+      stopListener();
+    }
+  }, [anyActive, available, startListener, stopListener]);
+
+  useEffect(() => {
+    return () => {
+      subRef.current?.remove();
+      subRef.current = null;
+    };
+  }, []);
+
+  function toggleKey(key: ToggleKey) {
+    setActive((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  const rawRows: { label: string; value: string }[] = [
+    { label: "acceleration.x", value: fmt(raw.ax) },
+    { label: "acceleration.y", value: fmt(raw.ay) },
+    { label: "acceleration.z", value: fmt(raw.az) },
+    { label: "accInclGravity.x", value: fmt(raw.igx) },
+    { label: "accInclGravity.y", value: fmt(raw.igy) },
+    { label: "accInclGravity.z", value: fmt(raw.igz) },
+    { label: "rotation.alpha", value: fmt(raw.rAlpha) },
+    { label: "rotation.beta", value: fmt(raw.rBeta) },
+    { label: "rotation.gamma", value: fmt(raw.rGamma) },
+    { label: "orientation", value: String(raw.orientation) },
+  ];
+
+  return (
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={[
+        styles.content,
+        {
+          paddingBottom: insets.bottom + 24,
+          paddingTop: Platform.OS === "web" ? 67 : 16,
+        },
+      ]}
+    >
+      {available === false && (
+        <View style={styles.warningBanner}>
+          <Ionicons name="warning-outline" size={16} color="#FF9800" />
+          <Text style={styles.warningText}>
+            DeviceMotion non disponibile su questo dispositivo o piattaforma
+          </Text>
+        </View>
+      )}
+
+      {/* Status badge */}
+      <View style={styles.statusRow}>
+        <View style={[styles.statusDot, { backgroundColor: isRunning ? "#4CAF50" : Colors.textSecondary }]} />
+        <Text style={styles.statusText}>
+          {isRunning ? "DeviceMotion in ascolto" : "In attesa — attiva almeno una casella"}
+        </Text>
+      </View>
+
+      {/* Raw values panel */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Valori Grezzi DeviceMotion</Text>
+        <View style={styles.rawPanel}>
+          {rawRows.map((row, i) => (
+            <View
+              key={row.label}
+              style={[styles.rawRow, i < rawRows.length - 1 && styles.rawRowBorder]}
+            >
+              <Text style={styles.rawLabel}>{row.label}</Text>
+              <Text style={styles.rawValue}>{row.value}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Toggle metrics */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Metriche Elaborazione</Text>
+        {TOGGLE_DEFS.map((def) => {
+          const isActive = active[def.key];
+          const liveVal = isActive && isRunning ? computeToggleValue(def.key, raw) : null;
+          return (
+            <View key={def.key} style={[styles.metricCard, isActive && styles.metricCardActive]}>
+              <View style={styles.metricHeader}>
+                <View style={styles.metricTitleRow}>
+                  <Text style={[styles.metricLabel, isActive && styles.metricLabelActive]}>
+                    {def.label}
+                  </Text>
+                  <Text style={styles.metricDesc}>{def.description}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.toggle, isActive && styles.toggleActive]}
+                  onPress={() => toggleKey(def.key)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.toggleKnob, isActive && styles.toggleKnobActive]} />
+                </TouchableOpacity>
+              </View>
+
+              {isActive && (
+                <View style={styles.liveValueRow}>
+                  {liveVal != null ? (
+                    <>
+                      <Text style={styles.liveValue}>{liveVal.toFixed(3)}</Text>
+                      <Text style={styles.liveUnit}>{def.unit}</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.liveValueNull}>
+                      {isRunning ? "— fuori soglia" : "in attesa..."}
+                    </Text>
+                  )}
+                </View>
+              )}
+            </View>
+          );
+        })}
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  content: {
+    padding: 16,
+    gap: 16,
+  },
+  warningBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FF9800" + "18",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#FF9800" + "55",
+    padding: 12,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "#FF9800",
+    lineHeight: 18,
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+  },
+  section: {
+    gap: 10,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  rawPanel: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: "hidden",
+  },
+  rawRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  rawRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  rawLabel: {
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+  },
+  rawValue: {
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+    minWidth: 90,
+    textAlign: "right",
+  },
+  metricCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 14,
+    gap: 10,
+  },
+  metricCardActive: {
+    borderColor: Colors.accent + "66",
+    backgroundColor: Colors.accent + "0A",
+  },
+  metricHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  metricTitleRow: {
+    flex: 1,
+    gap: 4,
+  },
+  metricLabel: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
+  metricLabelActive: {
+    color: Colors.accent,
+  },
+  metricDesc: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    lineHeight: 17,
+  },
+  toggle: {
+    width: 44,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: Colors.border,
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  toggleActive: {
+    backgroundColor: Colors.accent,
+  },
+  toggleKnob: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    alignSelf: "flex-start",
+  },
+  toggleKnobActive: {
+    alignSelf: "flex-end",
+  },
+  liveValueRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 6,
+  },
+  liveValue: {
+    fontSize: 28,
+    fontFamily: "Inter_700Bold",
+    color: Colors.accent,
+  },
+  liveUnit: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+  },
+  liveValueNull: {
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    fontStyle: "italic",
+  },
+});

@@ -2,108 +2,53 @@ import React from "react";
 import {
   View,
   Text,
-  ScrollView,
-  TouchableOpacity,
   StyleSheet,
+  TouchableOpacity,
+  ScrollView,
   Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
-type SensorEntry = {
-  name: string;
-  route: string;
-  platform: "android" | "ios" | "cross";
+type HubCard = {
+  key: string;
+  title: string;
   description: string;
-  defaultConfig: string;
+  route: string;
+  accentColor: string;
+  icon: React.ReactNode;
 };
 
-const SENSORS: SensorEntry[] = [
-  {
-    name: "Accelerometer",
-    route: "accelerometer",
-    platform: "cross",
-    description: "Forza d'accelerazione su 3 assi (x, y, z)",
-    defaultConfig: '{"interval": 500}',
-  },
-  {
-    name: "Gyroscope",
-    route: "gyroscope",
-    platform: "cross",
-    description: "Velocità di rotazione su 3 assi",
-    defaultConfig: '{"interval": 500}',
-  },
-  {
-    name: "Magnetometer",
-    route: "magnetometer",
-    platform: "cross",
-    description: "Campo magnetico calibrato su 3 assi (µT)",
-    defaultConfig: '{"interval": 500}',
-  },
-  {
-    name: "Magnetometer Uncalibrated",
-    route: "magnetometer-uncalibrated",
-    platform: "android",
-    description: "Campo magnetico grezzo con bias — solo Android",
-    defaultConfig: '{"interval": 500}',
-  },
-  {
-    name: "Barometer",
-    route: "barometer",
-    platform: "cross",
-    description: "Pressione atmosferica (hPa) e altitudine relativa",
-    defaultConfig: '{"interval": 500}',
-  },
-  {
-    name: "DeviceMotion",
-    route: "device-motion",
-    platform: "cross",
-    description: "Accelerazione, giroscopio, orientamento fusi",
-    defaultConfig: '{"interval": 500}',
-  },
-  {
-    name: "Pedometer",
-    route: "pedometer",
-    platform: "cross",
-    description: "Contatore passi in tempo reale",
-    defaultConfig: "{}",
-  },
-  {
-    name: "LightSensor",
-    route: "light-sensor",
-    platform: "android",
-    description: "Intensità luminosa (lux) — solo Android",
-    defaultConfig: '{"interval": 500}',
-  },
-];
-
-function PlatformBadge({ platform }: { platform: "android" | "ios" | "cross" }) {
-  if (platform === "android") {
-    return (
-      <View style={[styles.badge, { backgroundColor: "#3ddc84" + "22" }]}>
-        <Text style={[styles.badgeText, { color: "#3ddc84" }]}>Android</Text>
-      </View>
-    );
-  }
-  if (platform === "ios") {
-    return (
-      <View style={[styles.badge, { backgroundColor: "#007aff" + "22" }]}>
-        <Text style={[styles.badgeText, { color: "#007aff" }]}>iOS</Text>
-      </View>
-    );
-  }
-  return (
-    <View style={[styles.badge, { backgroundColor: Colors.textSecondary + "22" }]}>
-      <Text style={[styles.badgeText, { color: Colors.textSecondary }]}>Android · iOS</Text>
-    </View>
-  );
-}
-
-export default function SensorsIndex() {
+export default function SensorsHub() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+
+  const cards: HubCard[] = [
+    {
+      key: "raw",
+      title: "Dati Grezzi",
+      description:
+        "Tutti i sensori hardware: accelerometro, giroscopio, magnetometro, barometro, pedometro e altro. Avvia ogni sensore manualmente e ispeziona i dati in tempo reale.",
+      route: "/admin/sensors/raw",
+      accentColor: Colors.accent,
+      icon: (
+        <MaterialCommunityIcons name="chip" size={32} color={Colors.accent} />
+      ),
+    },
+    {
+      key: "final",
+      title: "Dati Finali",
+      description:
+        "Elaborazioni DeviceMotion: accelerazione G, frenata, forza laterale e angolo di inclinazione. Attiva singolarmente solo i valori che vuoi monitorare.",
+      route: "/admin/sensors/final",
+      accentColor: "#FF9800",
+      icon: (
+        <Ionicons name="analytics-outline" size={32} color="#FF9800" />
+      ),
+    },
+  ];
 
   return (
     <ScrollView
@@ -116,30 +61,28 @@ export default function SensorsIndex() {
         },
       ]}
     >
-      <View style={styles.infoCard}>
-        <Ionicons name="information-circle-outline" size={18} color={Colors.accent} />
-        <Text style={styles.infoText}>
-          Nessun sensore si avvia automaticamente. Apri un sensore, configura i parametri e premi{" "}
-          <Text style={styles.infoEmphasis}>Avvia</Text> per iniziare la lettura.
+      <View style={styles.headerNote}>
+        <Ionicons name="flask-outline" size={16} color={Colors.textSecondary} />
+        <Text style={styles.headerNoteText}>
+          Area diagnostica — nessun dato viene inviato al server
         </Text>
       </View>
 
-      {SENSORS.map((sensor) => (
+      {cards.map((card) => (
         <TouchableOpacity
-          key={sensor.route}
+          key={card.key}
           style={styles.card}
-          onPress={() => router.push(`/admin/sensors/${sensor.route}` as never)}
+          onPress={() => router.push(card.route as never)}
           activeOpacity={0.7}
         >
-          <View style={styles.cardLeft}>
-            <Ionicons name="hardware-chip-outline" size={22} color={Colors.accent} />
-            <View style={styles.cardInfo}>
-              <Text style={styles.cardName}>{sensor.name}</Text>
-              <Text style={styles.cardDesc}>{sensor.description}</Text>
-              <PlatformBadge platform={sensor.platform} />
-            </View>
+          <View style={[styles.iconBox, { backgroundColor: card.accentColor + "18" }]}>
+            {card.icon}
           </View>
-          <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
+          <View style={styles.cardBody}>
+            <Text style={styles.cardTitle}>{card.title}</Text>
+            <Text style={styles.cardDesc}>{card.description}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
       ))}
     </ScrollView>
@@ -153,71 +96,49 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    gap: 10,
+    gap: 14,
   },
-  infoCard: {
+  headerNote: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    backgroundColor: Colors.accent + "11",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.accent + "33",
-    padding: 12,
+    alignItems: "center",
+    gap: 8,
     marginBottom: 6,
   },
-  infoText: {
-    flex: 1,
+  headerNoteText: {
     fontSize: 13,
-    color: Colors.text,
     fontFamily: "Inter_400Regular",
-    lineHeight: 19,
-  },
-  infoEmphasis: {
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.accent,
+    color: Colors.textSecondary,
   },
   card: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     backgroundColor: Colors.surface,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.border,
-    padding: 14,
-    gap: 12,
+    padding: 16,
+    gap: 14,
   },
-  cardLeft: {
+  iconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardBody: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
+    gap: 6,
   },
-  cardInfo: {
-    flex: 1,
-    gap: 4,
-  },
-  cardName: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
+  cardTitle: {
+    fontSize: 17,
+    fontFamily: "Inter_700Bold",
     color: Colors.text,
   },
   cardDesc: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
-    lineHeight: 17,
-  },
-  badge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 20,
-    marginTop: 2,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
+    lineHeight: 19,
   },
 });

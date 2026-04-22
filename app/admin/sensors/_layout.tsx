@@ -14,6 +14,8 @@ export default function SensorsLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ title: "Sensori — Diagnostica" }} />
+      <Stack.Screen name="raw" options={{ title: "Dati Grezzi" }} />
+      <Stack.Screen name="final" options={{ title: "Dati Finali" }} />
       <Stack.Screen name="accelerometer" options={{ title: "Accelerometer" }} />
       <Stack.Screen name="gyroscope" options={{ title: "Gyroscope" }} />
       <Stack.Screen name="magnetometer" options={{ title: "Magnetometer" }} />
