@@ -32,7 +32,7 @@ interface FeedbackTicket {
 }
 
 type FilterStatus = "all" | "open" | "in_progress" | "resolved" | "closed";
-type FilterType = "all" | "bug" | "feature" | "feedback";
+type FilterType = "all" | "bug" | "feature";
 
 const STATUS_FILTERS: { key: FilterStatus; label: string }[] = [
   { key: "all", label: "Tutti" },
@@ -45,9 +45,15 @@ const STATUS_FILTERS: { key: FilterStatus; label: string }[] = [
 const TYPE_FILTERS: { key: FilterType; label: string; icon: string }[] = [
   { key: "all", label: "Tutti", icon: "📋" },
   { key: "bug", label: "Bug", icon: "🐛" },
-  { key: "feature", label: "Feature", icon: "✨" },
-  { key: "feedback", label: "Feedback", icon: "💬" },
+  { key: "feature", label: "Richieste", icon: "✨" },
 ];
+
+function matchesType(ticketType: string, filter: FilterType): boolean {
+  if (filter === "all") return true;
+  if (filter === "bug") return ticketType === "bug";
+  if (filter === "feature") return ticketType === "feature" || ticketType === "feedback";
+  return false;
+}
 
 const STATUS_COLORS: Record<string, string> = {
   open: Colors.warning,
@@ -95,7 +101,7 @@ export default function ModeratorFeedback() {
 
   const tickets = allTickets.filter((t) => {
     const statusOk = filterStatus === "all" || t.status === filterStatus;
-    const typeOk = filterType === "all" || t.ticketType === filterType;
+    const typeOk = matchesType(t.ticketType, filterType);
     return statusOk && typeOk;
   });
 

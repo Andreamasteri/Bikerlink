@@ -29,7 +29,7 @@ export default function FeatureRequestScreen() {
       const res = await globalThis.fetch(url.toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticketType: "feedback", subject, message }),
+        body: JSON.stringify({ ticketType: "feature", subject, message }),
         credentials: "include",
       });
       if (!res.ok) {

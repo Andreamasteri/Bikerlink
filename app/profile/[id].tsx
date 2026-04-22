@@ -50,7 +50,7 @@ export default function PublicProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const baseUrl = getApiUrl();
-  const hasLoggedView = React.useRef(false);
+  const loggedViewIds = React.useRef<Set<string>>(new Set());
 
   const { data: marketplaceData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/marketplace-enabled"],
@@ -87,8 +87,8 @@ export default function PublicProfileScreen() {
     if (user.id === id) return;
     const role = user.role;
     if (role !== "moderator" && role !== "admin") return;
-    if (hasLoggedView.current) return;
-    hasLoggedView.current = true;
+    if (loggedViewIds.current.has(id)) return;
+    loggedViewIds.current.add(id);
     apiRequest("POST", "/api/moderator/log-profile-view", { targetUserId: id }).catch(() => {});
   }, [profile, user, id]);
 

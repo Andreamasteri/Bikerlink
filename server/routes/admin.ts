@@ -1667,9 +1667,12 @@ router.get("/moderator-logs", async (req: Request, res: Response) => {
       allUserIds.add(log.moderatorId);
       if (log.targetType === "user" && log.targetId) allUserIds.add(log.targetId);
     }
+    const allModeratorsInFull = [...new Set(rawLogs.map((l) => l.moderatorId))];
+    for (const id of allModeratorsInFull) allUserIds.add(id);
+
+    const resolvedUsers = await Promise.all([...allUserIds].map((id) => storage.getUser(id)));
     const userMap = new Map<string, { id: string; nickname: string }>();
-    for (const id of allUserIds) {
-      const u = await storage.getUser(id);
+    for (const u of resolvedUsers) {
       if (u) userMap.set(u.id, { id: u.id, nickname: u.nickname });
     }
 
@@ -1679,13 +1682,8 @@ router.get("/moderator-logs", async (req: Request, res: Response) => {
       targetUserNickname: log.targetType === "user" && log.targetId ? (userMap.get(log.targetId)?.nickname ?? log.targetId) : null,
     }));
 
-    const allModerators = [...new Map(rawLogs.map((l) => [l.moderatorId, l.moderatorId])).keys()];
-    const moderatorProfiles = await Promise.all(
-      allModerators.map(async (id) => {
-        const u = await storage.getUser(id);
-        return u ? { id: u.id, nickname: u.nickname } : { id, nickname: id };
-      })
-    );
+    const moderatorProfiles = allModeratorsInFull
+      .map((id) => userMap.get(id) ?? { id, nickname: id });
     const allActions = [...new Set(rawLogs.map((l) => l.action))];
 
     return res.json({
