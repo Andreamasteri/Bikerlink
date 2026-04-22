@@ -16,6 +16,8 @@ import Colors from "@/constants/colors";
 type Subscription = ReturnType<typeof DeviceMotion.addListener>;
 
 type ToggleKey = "accelG" | "brakeG" | "lateralG" | "tiltAngle";
+type GKey = "accelG" | "brakeG" | "lateralG";
+const G_KEYS: GKey[] = ["accelG", "brakeG", "lateralG"];
 
 const TOGGLE_DEFS: { key: ToggleKey; label: string; description: string; unit: string }[] = [
   {
@@ -129,6 +131,8 @@ export default function SensorsFinal() {
   const [isRunning, setIsRunning] = useState(false);
   const [available, setAvailable] = useState<boolean | null>(null);
 
+  const [peaks, setPeaks] = useState<Partial<Record<GKey, number>>>({});
+
   const subRef = useRef<Subscription | null>(null);
 
   const anyActive = Object.values(active).some(Boolean);
@@ -178,8 +182,37 @@ export default function SensorsFinal() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isRunning) return;
+    setPeaks((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const key of G_KEYS) {
+        if (!active[key]) continue;
+        const val = computeToggleValue(key, raw);
+        if (val != null) {
+          const magnitude = Math.abs(val);
+          const current = prev[key] ?? 0;
+          if (magnitude > current) {
+            next[key] = magnitude;
+            changed = true;
+          }
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [raw, isRunning, active]);
+
   function toggleKey(key: ToggleKey) {
+    const wasActive = active[key];
     setActive((prev) => ({ ...prev, [key]: !prev[key] }));
+    if (wasActive && key !== "tiltAngle") {
+      setPeaks((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
   }
 
   const rawRows: { label: string; value: string }[] = [
@@ -281,6 +314,32 @@ export default function SensorsFinal() {
                     <Text style={styles.liveValueNull}>
                       {isRunning ? " -- " : "in attesa..."}
                     </Text>
+                  )}
+                </View>
+              )}
+
+              {isActive && !isTilt && (
+                <View style={styles.peakRow}>
+                  <Text style={styles.peakLabel}>
+                    Picco:{" "}
+                    {peaks[def.key as GKey] != null
+                      ? peaks[def.key as GKey]!.toFixed(1) + " " + def.unit
+                      : "—"}
+                  </Text>
+                  {peaks[def.key as GKey] != null && (
+                    <TouchableOpacity
+                      style={styles.peakResetBtn}
+                      onPress={() =>
+                        setPeaks((prev) => {
+                          const next = { ...prev };
+                          delete next[def.key as GKey];
+                          return next;
+                        })
+                      }
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="trash-outline" size={14} color={Colors.textSecondary} />
+                    </TouchableOpacity>
                   )}
                 </View>
               )}
@@ -459,6 +518,19 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     fontStyle: "italic",
+  },
+  peakRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  peakLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+  },
+  peakResetBtn: {
+    padding: 2,
   },
 });
 
