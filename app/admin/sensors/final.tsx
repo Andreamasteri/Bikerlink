@@ -22,19 +22,19 @@ const TOGGLE_DEFS: { key: ToggleKey; label: string; description: string; unit: s
     key: "accelG",
     label: "Accelerazione G",
     description: "acceleration.y quando positivo (accelerazione in avanti)",
-    unit: "m/s²",
+    unit: "G",
   },
   {
     key: "brakeG",
     label: "Frenata G",
     description: "acceleration.y quando negativo (mostrato come positivo)",
-    unit: "m/s²",
+    unit: "G",
   },
   {
     key: "lateralG",
     label: "G Laterale",
     description: "acceleration.x (forza in curva)",
-    unit: "m/s²",
+    unit: "G",
   },
   {
     key: "tiltAngle",
@@ -69,6 +69,46 @@ function computeToggleValue(key: ToggleKey, raw: RawValues): number | null {
       return deg;
     }
   }
+}
+
+function TiltCard({ isActive, isRunning, tiltDeg }: {
+  isActive: boolean;
+  isRunning: boolean;
+  tiltDeg: number | null;
+}) {
+  if (!isActive) return null;
+
+  const neutral = tiltDeg == null || (tiltDeg >= -1 && tiltDeg <= 1);
+  const leanLeft = tiltDeg != null && tiltDeg < -1;
+  const leanRight = tiltDeg != null && tiltDeg > 1;
+
+  const leftText = leanLeft ? Math.abs(tiltDeg!).toFixed(1) + "°" : " -- ";
+  const rightText = leanRight ? tiltDeg!.toFixed(1) + "°" : " -- ";
+  const centerText = neutral ? "0" : " -- ";
+
+  return (
+    <View style={tiltStyles.row}>
+      <View style={[tiltStyles.box, tiltStyles.boxLeft]}>
+        <Text style={[tiltStyles.boxValue, tiltStyles.boxValueLeft]}>
+          {isRunning ? leftText : "..."}
+        </Text>
+        <Text style={tiltStyles.boxLabel}>SX</Text>
+      </View>
+
+      <View style={tiltStyles.center}>
+        <Text style={tiltStyles.centerValue}>
+          {isRunning ? centerText : "..."}
+        </Text>
+      </View>
+
+      <View style={[tiltStyles.box, tiltStyles.boxRight]}>
+        <Text style={[tiltStyles.boxValue, tiltStyles.boxValueRight]}>
+          {isRunning ? rightText : "..."}
+        </Text>
+        <Text style={tiltStyles.boxLabel}>DX</Text>
+      </View>
+    </View>
+  );
 }
 
 export default function SensorsFinal() {
@@ -210,6 +250,8 @@ export default function SensorsFinal() {
         {TOGGLE_DEFS.map((def) => {
           const isActive = active[def.key];
           const liveVal = isActive && isRunning ? computeToggleValue(def.key, raw) : null;
+          const isTilt = def.key === "tiltAngle";
+
           return (
             <View key={def.key} style={[styles.metricCard, isActive && styles.metricCardActive]}>
               <View style={styles.metricHeader}>
@@ -228,19 +270,23 @@ export default function SensorsFinal() {
                 </TouchableOpacity>
               </View>
 
-              {isActive && (
+              {isActive && !isTilt && (
                 <View style={styles.liveValueRow}>
                   {liveVal != null ? (
                     <>
-                      <Text style={styles.liveValue}>{liveVal.toFixed(3)}</Text>
+                      <Text style={styles.liveValue}>{liveVal.toFixed(1)}</Text>
                       <Text style={styles.liveUnit}>{def.unit}</Text>
                     </>
                   ) : (
                     <Text style={styles.liveValueNull}>
-                      {isRunning ? "— fuori soglia" : "in attesa..."}
+                      {isRunning ? " -- " : "in attesa..."}
                     </Text>
                   )}
                 </View>
+              )}
+
+              {isTilt && (
+                <TiltCard isActive={isActive} isRunning={isRunning} tiltDeg={liveVal} />
               )}
             </View>
           );
@@ -399,7 +445,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   liveValue: {
-    fontSize: 28,
+    fontSize: 34,
     fontFamily: "Inter_700Bold",
     color: Colors.accent,
   },
@@ -413,5 +459,57 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     fontStyle: "italic",
+  },
+});
+
+const tiltStyles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  box: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    gap: 4,
+  },
+  boxLeft: {
+    borderColor: "#F4433666",
+    backgroundColor: "#F4433310",
+  },
+  boxRight: {
+    borderColor: "#4CAF5066",
+    backgroundColor: "#4CAF5010",
+  },
+  boxValue: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+  },
+  boxValueLeft: {
+    color: "#F44336",
+  },
+  boxValueRight: {
+    color: "#4CAF50",
+  },
+  boxLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  center: {
+    width: 40,
+    alignItems: "center",
+  },
+  centerValue: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+    textAlign: "center",
   },
 });
