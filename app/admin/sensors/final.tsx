@@ -24,23 +24,25 @@ type ToggleKey = "accelG" | "brakeG" | "lateralG" | "tiltAngle";
 type GKey = "accelG" | "brakeG" | "lateralG";
 const G_KEYS: GKey[] = ["accelG", "brakeG", "lateralG"];
 
+const G_MS2 = 9.81;
+
 const TOGGLE_DEFS: { key: ToggleKey; label: string; description: string; unit: string }[] = [
   {
     key: "accelG",
     label: "Accelerazione G",
-    description: "acceleration.y quando positivo (accelerazione in avanti)",
+    description: "acc.y ÷ 9.81 — positivo (in avanti). Soglia min: 0.05 G",
     unit: "G",
   },
   {
     key: "brakeG",
     label: "Frenata G",
-    description: "acceleration.y quando negativo (mostrato come positivo)",
+    description: "acc.y ÷ 9.81 — negativo (frenata). Soglia min: 0.05 G",
     unit: "G",
   },
   {
     key: "lateralG",
     label: "G Laterale",
-    description: "acceleration.x (forza in curva)",
+    description: "acc.x ÷ 9.81 — forza in curva. Zona morta: ±0.1 G",
     unit: "G",
   },
   {
@@ -72,12 +74,18 @@ function fmt(v: number | null | undefined, decimals = 3): string {
 
 function computeToggleValue(key: ToggleKey, raw: RawValues): number | null {
   switch (key) {
-    case "accelG":
-      return raw.ay > 0 ? raw.ay : null;
-    case "brakeG":
-      return raw.ay < 0 ? Math.abs(raw.ay) : null;
-    case "lateralG":
-      return raw.ax;
+    case "accelG": {
+      const g = raw.ay / G_MS2;
+      return g >= 0.05 ? g : null;
+    }
+    case "brakeG": {
+      const g = raw.ay / G_MS2;
+      return g <= -0.05 ? Math.abs(g) : null;
+    }
+    case "lateralG": {
+      const g = raw.ax / G_MS2;
+      return Math.abs(g) >= 0.1 ? g : null;
+    }
     case "tiltAngle": {
       const deg = (raw.rGamma * 180) / Math.PI;
       return deg;
