@@ -3,7 +3,6 @@
     "name": "BikerLink",
     "slug": "bikerlink",
     "version": "1.9.3",
-    "newArchEnabled": false,
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "bikerlink",
