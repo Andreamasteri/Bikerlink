@@ -4149,7 +4149,30 @@
     "apkBuildId": "2680c671-a1d5-494b-943b-7d0bccc96725",
     "apkVersionCode": 29,
     "apkUrl": "https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-20T21:22:25.119Z"
+  },
+  {
+    "updateNumber": 129,
+    "version": "1.129.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-129 rv7.0.0: ToS link + fix assets Android",
+    "note": "Task #812: link Termini di Servizio in registrazione e welcome. Task #817: adi-registration.properties per verifica pacchetto Google Play. CURRENT_OTA_NUMBER=129.",
+    "releaseId": "1fa624c9-f676-44ec-8d15-8584a3b6d489",
+    "bundleUrl": "private/ota/ota-1.129.0-1776860893728.js",
+    "updateGroupId": "5c7febda-75f9-44e6-96d9-71f0900fefd5",
+    "androidUpdateId": "019db52a-6eb8-7e9c-b5d6-b7db78fbe29e",
+    "iosUpdateId": null,
+    "commitBase": "36df1494e2432889d90c638e53f6a2c952ce97d1",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/5c7febda-75f9-44e6-96d9-71f0900fefd5",
+    "apkBuildId": null,
+    "apkVersionCode": 29,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-22T12:28:16.527Z"
   }
 ]
