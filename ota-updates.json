@@ -4310,7 +4310,29 @@
     "apkBuildId": null,
     "apkVersionCode": 29,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-22T14:58:46.661Z"
+  },
+  {
+    "updateNumber": 136,
+    "version": "1.136.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-136 rv7.0.0: Sensori — Restyling, picchi G, cronologia sessioni",
+    "note": "Task #830: restyling Dati Finali — unità G (non m/s²), 1 decimale, font +20% (28→34px), '-- ' fuori soglia. Card Angolo Inclinazione ridisegnata: 3 elementi affiancati (SX rosso / centro / DX verde) con soglia ±1°. Task #832: versionCode 32 + versionName 2.0.0 (build config). Task #834: peak tracking per Accelerazione G, Frenata G, G Laterale — riga 'Picco: X.X G' sotto il valore live, pulsante reset per metrica, azzeramento auto a toggle off. Task #835: sessioni G salvate su AsyncStorage (max 50), auto-save quando tutti i sensori si disattivano o all'unmount, SessionCard con data/ora/durata/chip metriche, Sessioni Precedenti con delete per sessione e Cancella tutto. CURRENT_OTA_NUMBER=136.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "5e18353d398e60d26d77275df08f218924420270",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 32,
+    "apkUrl": null,
+    "status": "pending"
   }
 ]
