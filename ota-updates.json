@@ -4264,7 +4264,30 @@
     "apkBuildId": null,
     "apkVersionCode": 29,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-22T14:34:26.871Z"
+  },
+  {
+    "updateNumber": 134,
+    "version": "1.134.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-134 rv7.0.0: Sensori sandbox — lazy init, config string, no crash",
+    "note": "Task #824: ristruttura schermata Sensori in folder con Stack navigator. app/admin/sensors/_layout.tsx + index.tsx (lista 8 card con badge piattaforma, zero sensor code). Ogni sotto-schermata è indipendente: config string editabile (JSON, es. {\"interval\":500}), pulsante Avvia (lazy-load sensore solo su richiesta), Ferma, dati live, log diagnostica, campo note con debounce AsyncStorage. ErrorBoundary per-schermata. LightSensor e MagnetometerUncalibrated (Android-only) mostrano warning ma non crashano. app/admin/_layout.tsx: sensors con headerShown:false. Rimosso app/admin/sensors.tsx. CURRENT_OTA_NUMBER=134.",
+    "releaseId": "e818e192-0b3a-4c52-905b-1966bc713b5f",
+    "bundleUrl": "private/ota/ota-1.134.0-1776868891299.js",
+    "updateGroupId": "bdfddd08-941f-4f40-be66-14a66f1bbc22",
+    "androidUpdateId": "019db5a4-58b7-7edb-91e0-bf8c7460691e",
+    "iosUpdateId": null,
+    "commitBase": "2f435d157a3b9fdc598698b10b953effb7a8105e",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/bdfddd08-941f-4f40-be66-14a66f1bbc22",
+    "apkBuildId": null,
+    "apkVersionCode": 29,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-22T14:41:34.271Z"
   }
 ]
