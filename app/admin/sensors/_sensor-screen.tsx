@@ -183,16 +183,11 @@ function PlatformBadge({ platform }: { platform: "android" | "ios" | "cross" }) 
   );
 }
 
-function SensorBody({
-  def,
-  onCrash,
-}: {
-  def: SensorDefinition;
-  onCrash: (msg: string) => void;
-}) {
+function SensorBody({ def }: { def: SensorDefinition }) {
   const [configStr, setConfigStr] = useState(def.defaultConfig);
   const [notes, setNotes] = useState("");
   const [isRunning, setIsRunning] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
   const [liveData, setLiveData] = useState<string | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const subRef = useRef<Subscription | null>(null);
@@ -233,11 +228,15 @@ function SensorBody({
   );
 
   const handleStart = useCallback(async () => {
+    if (isRunning || isStarting) return;
+    setIsStarting(true);
+
     let cfg: Record<string, number> = {};
     try {
       cfg = JSON.parse(configStr);
     } catch {
       addLog("error", "Config JSON non valida — es. {\"interval\": 500}");
+      setIsStarting(false);
       return;
     }
 
@@ -248,11 +247,13 @@ function SensorBody({
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       addLog("error", `Errore verifica disponibilità: ${msg}`);
+      setIsStarting(false);
       return;
     }
 
     if (!available) {
       addLog("error", "Sensore non disponibile su questo dispositivo o piattaforma");
+      setIsStarting(false);
       return;
     }
 
@@ -260,6 +261,7 @@ function SensorBody({
       const sub = startSensorSub(def.key, cfg, (formatted) => setLiveData(formatted));
       if (!sub) {
         addLog("error", "Impossibile avviare la subscription");
+        setIsStarting(false);
         return;
       }
       subRef.current = sub;
@@ -269,8 +271,10 @@ function SensorBody({
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       addLog("error", `Errore avvio sensore: ${msg}`);
+    } finally {
+      setIsStarting(false);
     }
-  }, [configStr, def.key, addLog]);
+  }, [isRunning, isStarting, configStr, def.key, addLog]);
 
   const handleStop = useCallback(() => {
     subRef.current?.remove();
@@ -304,13 +308,15 @@ function SensorBody({
 
       <View style={ss.btnRow}>
         <TouchableOpacity
-          style={[ss.btn, isRunning ? ss.btnDisabled : ss.btnPrimary]}
+          style={[ss.btn, (isRunning || isStarting) ? ss.btnDisabled : ss.btnPrimary]}
           onPress={handleStart}
-          disabled={isRunning}
+          disabled={isRunning || isStarting}
           activeOpacity={0.7}
         >
-          <Ionicons name="play" size={16} color={isRunning ? Colors.textSecondary : "#fff"} />
-          <Text style={[ss.btnText, isRunning && ss.btnTextDisabled]}>Avvia sensore</Text>
+          <Ionicons name={isStarting ? "hourglass-outline" : "play"} size={16} color={(isRunning || isStarting) ? Colors.textSecondary : "#fff"} />
+          <Text style={[ss.btnText, (isRunning || isStarting) && ss.btnTextDisabled]}>
+            {isStarting ? "Avvio..." : "Avvia sensore"}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[ss.btn, !isRunning ? ss.btnDisabled : ss.btnStop]}
@@ -427,7 +433,7 @@ export function SensorScreen({ def }: { def: SensorDefinition }) {
               <Text style={bs.msg}>{crashMsg}</Text>
             </View>
           ) : (
-            <SensorBody def={def} onCrash={handleCrash} />
+            <SensorBody def={def} />
           )}
         </SensorBoundary>
       </ScrollView>
