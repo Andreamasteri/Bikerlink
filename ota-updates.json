@@ -4241,7 +4241,30 @@
     "apkBuildId": null,
     "apkVersionCode": 29,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-22T14:13:07.088Z"
+  },
+  {
+    "updateNumber": 133,
+    "version": "1.133.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-133 rv7.0.0: Pannello Moderatore — fix accesso log, filtro tipo ticket, logging profilo per-ID",
+    "note": "Task #822 fix finali: /api/moderator/logs ora admin-only (403 per moderatori), app/moderator/logs.tsx reindirizza admin a /admin/moderator-logs. feedback.tsx: doppio filtro tipo (Bug/Richieste con retrocompat 'feedback'→'feature') + status. feature.tsx: ticketType ora 'feature' (era 'feedback'). Profile logging: Set<string> per-ID invece di ref booleana. Admin moderator-logs: batch Promise.all utenti (no N+1). CURRENT_OTA_NUMBER=133.",
+    "releaseId": "b1b7884d-7683-4f66-aa32-ad09e039dbe1",
+    "bundleUrl": "private/ota/ota-1.133.0-1776868463555.js",
+    "updateGroupId": "311324c2-dab0-4149-b013-ad091769a027",
+    "androidUpdateId": "019db59d-cdb3-76fc-a16e-b3f6fc92fc6a",
+    "iosUpdateId": null,
+    "commitBase": "0fedff91f05685eb9e9bedfe60011faadfc8054c",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/311324c2-dab0-4149-b013-ad091769a027",
+    "apkBuildId": null,
+    "apkVersionCode": 29,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-22T14:34:26.871Z"
   }
 ]
