@@ -743,6 +743,19 @@ export function startMatchingEngine(): void {
     } catch (err) {
       console.error("[Cleanup] Errore pulizia oraria:", err);
     }
+
+    // Purga lastUserMatchingAt: rimuovi entry inattive da più di 2 ore
+    const cutoff = Date.now() - 2 * 60 * 60 * 1000;
+    let purgati = 0;
+    for (const [uid, ts] of lastUserMatchingAt) {
+      if (ts < cutoff) { lastUserMatchingAt.delete(uid); purgati++; }
+    }
+
+    // Log diagnostico memoria
+    const memMb = Math.round(process.memoryUsage().rss / 1024 / 1024);
+    console.log(
+      `[MemDiag] rss=${memMb}MB | lastUserMatchingAt=${lastUserMatchingAt.size} (purgati=${purgati}) | ora=${new Date().toISOString()}`
+    );
   }, 60 * 60 * 1000));
   console.log("[Matching] Cleanup orario proposte scadute avviato");
 }

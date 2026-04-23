@@ -78,6 +78,15 @@ export function initUptimeTracking() {
   });
 }
 
+let _metroInterval: ReturnType<typeof setInterval> | null = null;
+
+export function stopMetroMonitor(): void {
+  if (_metroInterval !== null) {
+    clearInterval(_metroInterval);
+    _metroInterval = null;
+  }
+}
+
 export function startMetroMonitor() {
   const METRO_PORT = 8081;
   const INTERVAL_MS = 30_000;
@@ -122,6 +131,6 @@ export function startMetroMonitor() {
     req.on("timeout", () => { req.destroy(); });
   };
 
-  setInterval(checkMetro, INTERVAL_MS);
+  _metroInterval = setInterval(checkMetro, INTERVAL_MS);
   setTimeout(checkMetro, 5000);
 }

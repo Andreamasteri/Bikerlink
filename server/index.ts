@@ -11,7 +11,7 @@ import { motoClubs, motoClubMembers, conversations, conversationParticipants } f
 import { seedMotoclubs } from "./routes/motoclubs";
 import * as fs from "fs";
 import * as path from "path";
-import { initUptimeTracking, startMetroMonitor } from "./uptime";
+import { initUptimeTracking, startMetroMonitor, stopMetroMonitor } from "./uptime";
 
 const app = express();
 const log = console.log;
@@ -470,6 +470,7 @@ function setupErrorHandler(app: express.Application) {
     _shuttingDown = true;
     console.log(`[Shutdown] ${signal} ricevuto — chiusura pulita in corso...`);
     stopMatchingEngine();
+    stopMetroMonitor();
 
     // Destroy all active sockets so server.close() finishes immediately
     for (const socket of activeConnections) {
@@ -790,6 +791,26 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] custom_routes.visibility backfill:", e);
         }
 
+        // Autovacuum aggressivo sulle tabelle soggette a bloat da DELETE massivi
+        // (default PostgreSQL: 20% dead rows — troppo alto per tabelle con pochi record reali)
+        try {
+          const vacuumTables = [
+            "biker_biker_matches",
+            "biker_zavorrina_matches",
+            "user_profiles",
+            "user_playlist_snapshots",
+            "conversations",
+          ];
+          for (const t of vacuumTables) {
+            await db.execute(sql.raw(
+              `ALTER TABLE ${t} SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_threshold = 10)`
+            ));
+          }
+          console.log("[MIGRATION] Autovacuum aggressivo configurato su tabelle critiche (scale_factor=0.05, threshold=10)");
+        } catch (e) {
+          console.warn("[MIGRATION] autovacuum tuning:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 
@@ -808,6 +829,41 @@ function setupErrorHandler(app: express.Application) {
         await delay(2_000);
         startMatchingEngine();
         console.log("[INIT] Phase 2 matching engine started");
+
+        // Phase 2.5: VACUUM FULL deferred (60s dopo avvio)
+        // Recupera lo spazio fisico lasciato dai DELETE massivi degli utenti fittizi.
+        // Usa raw pool client — VACUUM FULL non può girare dentro una transazione.
+        // Si esegue UNA SOLA VOLTA (flag db_vacuum_full_v2 in app_settings).
+        setTimeout(async () => {
+          let client: import("pg").PoolClient | null = null;
+          try {
+            const { storage: stVac } = await import("./storage");
+            const done = await stVac.getAppSetting("db_vacuum_full_v2");
+            if (done?.value === "done") {
+              console.log("[VACUUM] Già eseguito in precedenza — skip.");
+              return;
+            }
+            client = await pool.connect();
+            const vacTables = [
+              "biker_biker_matches",
+              "biker_zavorrina_matches",
+              "user_profiles",
+              "user_playlist_snapshots",
+              "conversations",
+            ];
+            for (const t of vacTables) {
+              const t0 = Date.now();
+              await client.query(`VACUUM FULL ANALYZE ${t}`);
+              console.log(`[VACUUM] VACUUM FULL ${t} completato in ${Date.now() - t0}ms`);
+            }
+            await stVac.upsertAppSetting("db_vacuum_full_v2", "done");
+            console.log("[VACUUM] Tutti i VACUUM FULL completati — spazio recuperato.");
+          } catch (e) {
+            console.warn("[VACUUM] Errore durante VACUUM FULL:", e);
+          } finally {
+            if (client) client.release();
+          }
+        }, 60_000);
 
         // Phase 3: seed essential users + splash settings
         await delay(2_000);
