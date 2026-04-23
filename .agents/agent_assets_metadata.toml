@@ -84,6 +84,12 @@ uri = "file://attached_assets/guide/13-music.png"
 type = "image"
 title = "music guide card"
 
+[[generated]]
+id = "2dXNbOVuL3OgHqKlvZ5AD"
+uri = "file://attached_assets/test-campagna-banner.png"
+type = "image"
+title = "test campagna moto banner"
+
 [[outputs]]
 id = "4Y78ngKHwO0VLy8lAIKVp"
 uri = "file://manuale-utente-bikerlink.docx"
@@ -197,3 +203,9 @@ id = "XQDCwB4SCXrS8GIvWpgUJ"
 uri = "file://attached_assets/guide/13-music.jpg"
 type = "image"
 title = "13 — Music / Radio Biker"
+
+[[outputs]]
+id = "OPehmRECI2yIWtujXFe2T"
+uri = "file://attached_assets/test-campagna-1600x1100.png"
+type = "image"
+title = "Test banner campagna — 1600×1100 px"
