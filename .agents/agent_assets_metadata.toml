@@ -90,6 +90,186 @@ uri = "file://attached_assets/test-campagna-banner.png"
 type = "image"
 title = "test campagna moto banner"
 
+[[generated]]
+id = "pHlLavM5hvU_ZA7a30zlW"
+uri = "file://exports/feature-images/01-posizione-fake-intro.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "9hFklHPSpVnuslqi_D3tr"
+uri = "file://exports/feature-images/02-posizione-fake-attivazione.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "qBr4DihRhmZaWHc9IxlYb"
+uri = "file://exports/feature-images/03-posizione-fake-quando.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "aso4anj9sHXQ47rzX9p2i"
+uri = "file://exports/feature-images/04-posizione-fake-privacy.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "yO_CzxFYlIeE6a9nZHkA5"
+uri = "file://exports/feature-images/05-garage-intro.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "LvPdB9EusjPGuFyt3PQUB"
+uri = "file://exports/feature-images/06-garage-inserisci-moto.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "h0MctynZyia8-zGtYQZ83"
+uri = "file://exports/feature-images/07-wishlist-intro.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "IsgnXB0hFY8suGD0neQqv"
+uri = "file://exports/feature-images/08-wishlist-aggiungi.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "p4X-arw7mfwztqGM1uzgk"
+uri = "file://exports/feature-images/09-registra-giro-intro.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "8AhlqiD2SdaSmONNsF9Zb"
+uri = "file://exports/feature-images/10-registra-giro-avvio.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "nNW76TU2gM2fBEdE9LGiC"
+uri = "file://exports/feature-images/11-registra-giro-dati.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "gnCIS69JOjMe6GQtTXDDB"
+uri = "file://exports/feature-images/12-registra-giro-condividi.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "a0ADfd3bkVhFwABONMPSA"
+uri = "file://exports/feature-images/13-matching-biker-intro.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "SVwU_qX0sM0popJLfj6a-"
+uri = "file://exports/feature-images/14-matching-biker-dati.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "ZMOAztGMX7Y1CJEfJJ4xe"
+uri = "file://exports/feature-images/15-matching-biker-risultato.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "7JHrtkn_axyKX6bF7jxMc"
+uri = "file://exports/feature-images/16-matching-biker-profilo.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "Z8eEPggDWXGlpLzV6PU02"
+uri = "file://exports/feature-images/17-matching-musicale-intro.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "viZiTM5aOZ9i3ofRvYAaz"
+uri = "file://exports/feature-images/18-lastfm-registrazione.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "PwvxeUJhE-HkKrz5F_Z6O"
+uri = "file://exports/feature-images/19-lastfm-collegamento.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "F17x2XHeQ39W657gaKhII"
+uri = "file://exports/feature-images/20-matching-musicale-sblocca.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "otM5ZPQg6zE2JnMYO7uKG"
+uri = "file://exports/feature-images/21-mappa-live.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "bLFFjJ18SP3fdXzv_oxFb"
+uri = "file://exports/feature-images/22-motoclub-intro.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "unO7fa18HmMqFao-2cZWq"
+uri = "file://exports/feature-images/23-motoclub-unisciti.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "_cQHhtDzDDD-zHkAdwZs9"
+uri = "file://exports/feature-images/24-sos-emergenza.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "sjJvYfkd57ikcyia4tiac"
+uri = "file://exports/feature-images/25-chat-biker.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "XC_9SzdqvO133JH2yXawx"
+uri = "file://exports/feature-images/26-profilo-biker.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "iOJ1Iios_r2jgB4h3ZJ8C"
+uri = "file://exports/feature-images/27-notifiche-push.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "O3PO3Eqwy-selSolyrDeJ"
+uri = "file://exports/feature-images/28-hashtag-chat.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "_BwWmqRI9Q4EXqriHafkV"
+uri = "file://exports/feature-images/29-codici-invito.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "KHYhoPaOgPIhzZKRwIbk2"
+uri = "file://exports/feature-images/30-bikerlink-benvenuto.png"
+type = "image"
+title = "generated_image"
+
 [[outputs]]
 id = "4Y78ngKHwO0VLy8lAIKVp"
 uri = "file://manuale-utente-bikerlink.docx"
@@ -209,3 +389,9 @@ id = "OPehmRECI2yIWtujXFe2T"
 uri = "file://attached_assets/test-campagna-1600x1100.png"
 type = "image"
 title = "Test banner campagna — 1600×1100 px"
+
+[[outputs]]
+id = "Dmc9RLNr0pKZ-zLG9rkwY"
+uri = "file://exports/bikerlink-onboarding-images.zip"
+type = "unspecified"
+title = "BikerLink Onboarding — 30 immagini 1600×1100 px"
