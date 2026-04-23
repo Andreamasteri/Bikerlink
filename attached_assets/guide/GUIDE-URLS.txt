@@ -1,0 +1,24 @@
+BikerLink — Guida Utente: URL e percorsi immagini
+==================================================
+
+ZIP DOWNLOAD (pubblico, diretto):
+  https://biker-link.replit.app/uploads/bikerlink-guida.zip
+
+Object Storage path:
+  public/guide/bikerlink-guida.zip
+
+Immagini campagne (13 JPG, 1080x1350px):
+  Servite via: https://biker-link.replit.app/api/ads/images/{filename}
+  Object storage prefix: public/ads/guide1080v2-*
+
+Campagne DB (ad_campaigns):
+  Sort 1: Guida: Posizione Personalizzata  [evidenziata ⭐]
+  Sort 2: Guida: Aggiungi la Tua Moto       [evidenziata ⭐]
+  Sort 3: Guida: Collega Last.fm            [evidenziata ⭐]
+  Sort 4-13: profilo, mappa, match, ride, chat, motoclub, tracking, trip, eventi, music
+
+Account test:
+  nickname: mendo
+  email: mendo@bikerlink.it
+  password: Mendo2024!
+  moto: Ducati Monster 937 (2022)
