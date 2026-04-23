@@ -96,7 +96,8 @@
         {
           "color": "#FF6600"
         }
-      ]
+      ],
+      "./plugins/withAdiRegistration"
     ],
     "experiments": {
       "typedRoutes": true

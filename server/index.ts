@@ -771,6 +771,18 @@ function setupErrorHandler(app: express.Application) {
         }
 
         try {
+          await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_logout_at TIMESTAMP`);
+        } catch (e) {
+          console.warn("[MIGRATION] users.last_logout_at:", e);
+        }
+
+        try {
+          await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_app_close_at TIMESTAMP`);
+        } catch (e) {
+          console.warn("[MIGRATION] users.last_app_close_at:", e);
+        }
+
+        try {
           await db.execute(sql`
             ALTER TABLE custom_routes
               ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) NOT NULL DEFAULT 'public'
