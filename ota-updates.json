@@ -4377,6 +4377,28 @@
     "apkBuildId": null,
     "apkVersionCode": 29,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 139,
+    "version": "1.139.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-139 rv7.0.0: Nickname unico case-insensitive + Apertura mappa veloce + Tracciato colorato per velocità",
+    "note": "Task #863: Unicità nickname case-insensitive — indice UNIQUE su LOWER(nickname), check in rotta admin /stregatti. Task #864: Decimazione RDP lato server (max 450 punti), skeleton+fade-in mappa, memo stabilizzato, staleTime React Query 10min. Task #867: Tracciato colorato per velocità nel giro salvato — verde<60, giallo 60-100, arancio 100-130, rosso>130 km/h — legenda visibile su mappa — parità mobile/web. CURRENT_OTA_NUMBER=139.",
+    "releaseId": "5b117f9d-6ca7-45f7-8177-ef347eab7095",
+    "bundleUrl": "private/ota/ota-1.139.0-1776960730789.js",
+    "updateGroupId": "308e1c64-a8e0-4ba5-8b21-08ce49bf17d7",
+    "androidUpdateId": "019dbb1e-3df6-71fa-9828-18439637d087",
+    "iosUpdateId": null,
+    "commitBase": "ca01d3a93e6c3f6636e503d271b83d2bf078d079",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/308e1c64-a8e0-4ba5-8b21-08ce49bf17d7",
+    "apkBuildId": null,
+    "apkVersionCode": 35,
+    "apkUrl": null,
     "status": "published"
   }
 ]
