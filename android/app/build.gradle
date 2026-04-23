@@ -147,11 +147,6 @@ android {
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
     }
-    sourceSets {
-        main {
-            assets.srcDirs += ['src/main/protected-assets']
-        }
-    }
 }
 
 // Apply static values from `gradle.properties` to the `android.packagingOptions`
@@ -203,5 +198,3 @@ dependencies {
     }
 }
 
-// adi-registration.properties è incluso tramite sourceSets.main.assets.srcDirs
-// (vedi blocco android.sourceSets sopra) — approccio nativo Gradle, immune a export:embed.
