@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  ScrollView,
   TouchableOpacity,
   Alert,
   TextInput,
@@ -17,7 +18,7 @@ import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollV
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialIcons, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { showImagePickerMenu } from "@/lib/image-picker-utils";
+import { showImagePickerMenu, pickMultipleImages, BulkImageAsset } from "@/lib/image-picker-utils";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 
@@ -148,6 +149,13 @@ export default function AdminAds() {
   const [formLinkUrl, setFormLinkUrl] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formImageUri, setFormImageUri] = useState<string | null>(null);
+
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkBaseName, setBulkBaseName] = useState("");
+  const [bulkTarget, setBulkTarget] = useState<TabKey>("tutti");
+  const [bulkImages, setBulkImages] = useState<BulkImageAsset[]>([]);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
 
   const [settingsDuration, setSettingsDuration] = useState("10");
   const [settingsMode, setSettingsMode] = useState<"sequential" | "random">("sequential");
@@ -281,6 +289,75 @@ export default function AdminAds() {
       { quality: 0.8, aspect: [16, 11] }
     );
   }, []);
+
+  async function handlePickBulkImages() {
+    const assets = await pickMultipleImages({ quality: 0.8, selectionLimit: 50 });
+    if (assets.length > 0) {
+      setBulkImages((prev) => {
+        const existingUris = new Set(prev.map((a) => a.uri));
+        const newOnes = assets.filter((a) => !existingUris.has(a.uri));
+        return [...prev, ...newOnes];
+      });
+    }
+  }
+
+  async function handleBulkCreate() {
+    if (!bulkBaseName.trim() || bulkImages.length === 0 || bulkUploading) return;
+    setBulkUploading(true);
+    setBulkProgress({ current: 0, total: bulkImages.length });
+
+    let created = 0;
+    let failed = 0;
+    const baseUrl = getApiUrl();
+    const url = new URL("/api/admin/advertisements", baseUrl).toString();
+
+    for (let i = 0; i < bulkImages.length; i++) {
+      const img = bulkImages[i];
+      const campaignName =
+        bulkImages.length === 1
+          ? bulkBaseName.trim()
+          : `${bulkBaseName.trim()} #${i + 1}`;
+      try {
+        const formData = new FormData();
+        formData.append("name", campaignName);
+        formData.append("targetUserType", bulkTarget);
+        formData.append("placement", "home");
+        const rawFilename = img.uri.split("/").pop() || "image.jpg";
+        const match = /\.(\w+)$/.exec(rawFilename);
+        const mimeType = match ? `image/${match[1].toLowerCase()}` : "image/jpeg";
+        formData.append("image", { uri: img.uri, name: rawFilename, type: mimeType } as any);
+        const res = await globalThis.fetch(url, {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        if (res.ok) {
+          created++;
+        } else {
+          failed++;
+        }
+      } catch {
+        failed++;
+      }
+      setBulkProgress({ current: i + 1, total: bulkImages.length });
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/ads/my-ads"] });
+    setBulkUploading(false);
+    setBulkProgress(null);
+    setShowBulkModal(false);
+    setBulkBaseName("");
+    setBulkImages([]);
+    setBulkTarget("tutti");
+
+    Alert.alert(
+      "Upload completato",
+      `${created} campagn${created === 1 ? "a" : "e"} creat${created === 1 ? "a" : "e"}` +
+        (failed > 0 ? `, ${failed} fallite.` : ".")
+    );
+  }
 
   function handleCreate() {
     if (!formName.trim() || !formImageUri) return;
@@ -443,6 +520,13 @@ export default function AdminAds() {
       )}
 
       <TouchableOpacity
+        style={[styles.fab, styles.fabFolder, { bottom: insets.bottom + 16 }]}
+        onPress={() => setShowBulkModal(true)}
+      >
+        <MaterialIcons name="folder-open" size={24} color={Colors.accent} />
+      </TouchableOpacity>
+
+      <TouchableOpacity
         style={[styles.fab, { backgroundColor: currentTab.color, bottom: insets.bottom + 16 }]}
         onPress={() => setShowCreateModal(true)}
       >
@@ -507,6 +591,119 @@ export default function AdminAds() {
               )}
             </TouchableOpacity>
           </KeyboardAwareScrollViewCompat>
+        </View>
+      </Modal>
+
+      <Modal visible={showBulkModal} animationType="slide">
+        <View style={[styles.createModalContainer, { paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Carica cartella</Text>
+            <TouchableOpacity onPress={() => { if (!bulkUploading) { setShowBulkModal(false); setBulkBaseName(""); setBulkImages([]); setBulkTarget("tutti"); } }}>
+              <MaterialIcons name="close" size={24} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+            <TextInput
+              style={styles.input}
+              placeholder="Nome base campagna *  (es. Estate 2026)"
+              placeholderTextColor={Colors.textSecondary}
+              value={bulkBaseName}
+              onChangeText={setBulkBaseName}
+              editable={!bulkUploading}
+            />
+
+            <Text style={styles.settingsLabel}>Target utenti</Text>
+            <View style={styles.targetRow}>
+              {TABS.map((tab) => (
+                <TouchableOpacity
+                  key={tab.key}
+                  style={[styles.targetChip, bulkTarget === tab.key && { borderColor: tab.color, backgroundColor: tab.color + "22" }]}
+                  onPress={() => !bulkUploading && setBulkTarget(tab.key)}
+                >
+                  {tab.iconSet === "community" ? (
+                    <MaterialCommunityIcons name={tab.icon as any} size={14} color={bulkTarget === tab.key ? tab.color : Colors.textSecondary} />
+                  ) : tab.iconSet === "ionicons" ? (
+                    <Ionicons name={tab.icon as any} size={14} color={bulkTarget === tab.key ? tab.color : Colors.textSecondary} />
+                  ) : (
+                    <MaterialIcons name={tab.icon as any} size={14} color={bulkTarget === tab.key ? tab.color : Colors.textSecondary} />
+                  )}
+                  <Text style={[styles.targetChipText, bulkTarget === tab.key && { color: tab.color }]}>{tab.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.pickImagesBtn, bulkUploading && { opacity: 0.5 }]}
+              onPress={handlePickBulkImages}
+              disabled={bulkUploading}
+            >
+              <MaterialIcons name="add-photo-alternate" size={22} color={Colors.accent} />
+              <Text style={styles.pickImagesBtnText}>
+                {bulkImages.length === 0 ? "Scegli immagini" : `Aggiungi immagini (${bulkImages.length} selezionate)`}
+              </Text>
+            </TouchableOpacity>
+
+            {bulkImages.length > 0 && (
+              <View style={styles.thumbnailGrid}>
+                {bulkImages.map((img, idx) => (
+                  <View key={img.uri + idx} style={styles.thumbnailWrap}>
+                    <Image source={{ uri: img.uri }} style={styles.thumbnail} resizeMode="cover" />
+                    {!bulkUploading && (
+                      <TouchableOpacity
+                        style={styles.thumbnailRemove}
+                        onPress={() => setBulkImages((prev) => prev.filter((_, i) => i !== idx))}
+                      >
+                        <MaterialIcons name="close" size={12} color="#fff" />
+                      </TouchableOpacity>
+                    )}
+                    <View style={styles.thumbnailIndex}>
+                      <Text style={styles.thumbnailIndexText}>#{idx + 1}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {bulkProgress && (
+              <View style={styles.progressContainer}>
+                <View style={styles.progressBar}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      { width: `${Math.round((bulkProgress.current / bulkProgress.total) * 100)}%` as any },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.progressText}>
+                  {bulkProgress.current}/{bulkProgress.total} campagne create…
+                </Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[
+                styles.submitBtn,
+                {
+                  backgroundColor: Colors.accent,
+                  opacity: !bulkBaseName.trim() || bulkImages.length === 0 || bulkUploading ? 0.4 : 1,
+                  marginTop: 20,
+                },
+              ]}
+              disabled={!bulkBaseName.trim() || bulkImages.length === 0 || bulkUploading}
+              onPress={handleBulkCreate}
+            >
+              {bulkUploading ? (
+                <ActivityIndicator color={Colors.background} />
+              ) : (
+                <Text style={styles.submitBtnText}>
+                  {bulkImages.length === 0
+                    ? "Carica immagini"
+                    : `Carica ${bulkImages.length} immagin${bulkImages.length === 1 ? "e" : "i"}`}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </ScrollView>
         </View>
       </Modal>
 
@@ -859,5 +1056,115 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 16,
     color: Colors.background,
+  },
+  fabFolder: {
+    right: 88,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  targetRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 20,
+  },
+  targetChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.background,
+  },
+  targetChipText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  pickImagesBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.accent,
+    borderStyle: "dashed",
+    borderRadius: 12,
+    padding: 18,
+    marginBottom: 16,
+    backgroundColor: Colors.accent + "0A",
+  },
+  pickImagesBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: Colors.accent,
+  },
+  thumbnailGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 16,
+  },
+  thumbnailWrap: {
+    width: "30%",
+    aspectRatio: 1,
+    borderRadius: 10,
+    overflow: "hidden",
+    position: "relative",
+    backgroundColor: Colors.surfaceLight,
+  },
+  thumbnail: {
+    width: "100%",
+    height: "100%",
+  },
+  thumbnailRemove: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  thumbnailIndex: {
+    position: "absolute",
+    bottom: 4,
+    left: 4,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  thumbnailIndexText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: "#fff",
+  },
+  progressContainer: {
+    marginBottom: 16,
+    gap: 8,
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: Colors.border,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: Colors.accent,
+    borderRadius: 3,
+  },
+  progressText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: "center",
   },
 });

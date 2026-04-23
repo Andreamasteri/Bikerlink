@@ -1,6 +1,31 @@
 import * as ImagePicker from "expo-image-picker";
 import { Alert, Platform, ActionSheetIOS } from "react-native";
 
+export interface BulkImageAsset {
+  uri: string;
+  fileName: string;
+}
+
+export async function pickMultipleImages(
+  options: { quality?: number; selectionLimit?: number } = {}
+): Promise<BulkImageAsset[]> {
+  const { quality = 0.8, selectionLimit = 50 } = options;
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsMultipleSelection: true,
+    allowsEditing: false,
+    quality,
+    selectionLimit,
+  });
+  if (!result.canceled && result.assets.length > 0) {
+    return result.assets.map((a, i) => ({
+      uri: a.uri,
+      fileName: a.fileName || `image_${i + 1}.jpg`,
+    }));
+  }
+  return [];
+}
+
 let cameraPermissionAsked = false;
 
 async function ensureCameraPermission(): Promise<boolean> {
