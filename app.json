@@ -29,7 +29,7 @@
     },
     "android": {
       "package": "com.bikerlink.app",
-      "versionCode": 35,
+      "versionCode": 36,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -96,8 +96,7 @@
         {
           "color": "#FF6600"
         }
-      ],
-      "./plugins/withAdiRegistration"
+      ]
     ],
     "experiments": {
       "typedRoutes": true
