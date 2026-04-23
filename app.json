@@ -29,7 +29,7 @@
     },
     "android": {
       "package": "com.bikerlink.app",
-      "versionCode": 34,
+      "versionCode": 35,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",

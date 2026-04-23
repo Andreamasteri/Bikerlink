@@ -92,7 +92,7 @@ android {
         applicationId 'com.bikerlink.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 34
+        versionCode 35
         versionName "2.2.0"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
@@ -147,6 +147,11 @@ android {
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
     }
+    sourceSets {
+        main {
+            assets.srcDirs += ['src/main/protected-assets']
+        }
+    }
 }
 
 // Apply static values from `gradle.properties` to the `android.packagingOptions`
@@ -198,23 +203,5 @@ dependencies {
     }
 }
 
-// Fix: inietta adi-registration.properties nell'output finale di mergeAssets.
-// Il processo Expo/RN (export:embed) sovrascrive src/main/assets/ durante la build —
-// questo hook bypassa il problema iniettando il file DOPO il merge, come fa il
-// plugin expo-updates per expo-root.pem.
-// Il valore del token è letto dal file committato in src/main/assets/.
-afterEvaluate {
-    tasks.matching { it.name.matches("merge(Release|Debug)Assets") }.configureEach { mergeTask ->
-        mergeTask.doLast {
-            def snippetSrc = new File(projectDir, 'src/main/assets/adi-registration.properties')
-            def outDir = mergeTask.outputs.files.first()
-            if (snippetSrc.exists() && outDir != null && outDir.exists()) {
-                def dest = new File(outDir, 'adi-registration.properties')
-                dest.text = snippetSrc.text
-                println "✓ adi-registration.properties -> ${dest.absolutePath}"
-            } else {
-                println "⚠ adi-registration: snippetSrc=${snippetSrc.exists()} outDir=${outDir?.exists()}"
-            }
-        }
-    }
-}
+// adi-registration.properties è incluso tramite sourceSets.main.assets.srcDirs
+// (vedi blocco android.sourceSets sopra) — approccio nativo Gradle, immune a export:embed.
