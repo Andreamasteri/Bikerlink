@@ -4477,16 +4477,16 @@
     "jsEngine": "hermes",
     "message": "OTA-143 rv7.0.0: Upload batch campagne + fix feature graphic Play Store",
     "note": "Task #886: Upload cartella campagne batch dal pannello admin (loop per-immagine, progress bar X/Y, failedNames nel riepilogo). Task #887: Feature graphic Play Store — rimosso '#1A1A2E', aggiunta catena tra Biker e Link. CURRENT_OTA_NUMBER=143.",
-    "releaseId": null,
-    "bundleUrl": null,
-    "updateGroupId": null,
-    "androidUpdateId": null,
+    "releaseId": "8c7684da-44da-4312-b595-9d763719404b",
+    "bundleUrl": "private/ota/ota-1.143.0-1776974480715.js",
+    "updateGroupId": "9d2d0f5c-941e-45cb-a2bd-7bd5861f03e1",
+    "androidUpdateId": "019dbbef-9712-7197-86ce-6ad64fde9b64",
     "iosUpdateId": null,
     "commitBase": "c46023b182e88a39ded198c7b476371d1f24ee2a",
-    "easDashboard": null,
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/9d2d0f5c-941e-45cb-a2bd-7bd5861f03e1",
     "apkBuildId": null,
     "apkVersionCode": 35,
     "apkUrl": null,
-    "status": "pending"
+    "status": "published"
   }
 ]
