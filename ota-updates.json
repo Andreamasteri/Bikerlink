@@ -4345,16 +4345,16 @@
     "jsEngine": "hermes",
     "message": "OTA-137 rv7.0.0: Fix logout involontario + sessioni non scadono",
     "note": "Task #841: rimossa handleUnauthorized() da endpoint non-auth in lib/query-client.ts; aggiunto scheduleAuthRecheck() debounced 300ms; retry backoff 2s/5s/10s su /api/auth/me in lib/auth-context.tsx; stato sessionExpired + banner Sessione scaduta in app/welcome.tsx. Task #840: fix memory leak backend (stopMetroMonitor, purga lastUserMatchingAt, VACUUM FULL). Task #844: sessioni utente non scadono mai — rolling:true, maxAge 1 anno, PgStore ttl 1 anno. CURRENT_OTA_NUMBER=137.",
-    "releaseId": null,
-    "bundleUrl": null,
-    "updateGroupId": null,
-    "androidUpdateId": null,
+    "releaseId": "e62dd153-702d-45ad-9013-be8452cc9af4",
+    "bundleUrl": "private/ota/ota-1.137.0-1776925061590.js",
+    "updateGroupId": "503ffb6d-fdbd-49cc-879c-dab93d442dc7",
+    "androidUpdateId": "019db8fd-c929-7094-b5c8-1f0d342dd3e2",
     "iosUpdateId": null,
-    "commitBase": "d6309f8d0aa5cf6852598a464affdde929a6e6c6",
-    "easDashboard": null,
+    "commitBase": "bbb47cadfbd943c0a99b455c57b4eda76ca245af",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/503ffb6d-fdbd-49cc-879c-dab93d442dc7",
     "apkBuildId": null,
     "apkVersionCode": 29,
     "apkUrl": null,
-    "status": "pending"
+    "status": "published"
   }
 ]
