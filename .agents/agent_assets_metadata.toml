@@ -10,19 +10,19 @@ title = "generated_image"
 id = "hpwtl_XU1y7v_Bi2Hwja6"
 uri = "file://attached_assets/guide/01-fake-position.png"
 type = "image"
-title = "fake position guide card"
+title = "fake position card with navigation path"
 
 [[generated]]
 id = "KPqPnz6u3Xp3PTbBt1Jod"
 uri = "file://attached_assets/guide/02-garage-moto.png"
 type = "image"
-title = "garage moto guide card fixed"
+title = "garage prerequisite card with steps"
 
 [[generated]]
 id = "ZnoORvc_Ui4eAQj472uRw"
 uri = "file://attached_assets/guide/03-lastfm.png"
 type = "image"
-title = "lastfm guide card"
+title = "lastfm card clean no typos"
 
 [[generated]]
 id = "YqB1w2jnOGscaArvoJ3S8"
