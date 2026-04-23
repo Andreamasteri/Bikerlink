@@ -1450,14 +1450,6 @@ router.get("/advertisements", async (_req: Request, res: Response) => {
 
 const BULK_AD_MAX_FILE_SIZE = 5 * 1024 * 1024;
 
-const bulkAdUpload = multer({
-  storage: multer.memoryStorage(),
-  fileFilter: (_req, file, cb) => {
-    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-    cb(null, allowed.includes(file.mimetype));
-  },
-});
-
 interface BulkCampaignResult {
   id: string;
   name: string;
@@ -1466,7 +1458,7 @@ interface BulkCampaignResult {
   isActive: boolean;
 }
 
-router.post("/advertisements/bulk", bulkAdUpload.array("images", 50), async (req: Request, res: Response) => {
+router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Request, res: Response) => {
   try {
     const files = req.files as Express.Multer.File[] | undefined;
     if (!files || files.length === 0) {
