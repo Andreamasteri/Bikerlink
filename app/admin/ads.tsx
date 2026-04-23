@@ -321,6 +321,7 @@ export default function AdminAds() {
     setBulkProgress({ current: 0, total: bulkImages.length });
     let created = 0;
     let failed = 0;
+    const failedNames: string[] = [];
     const bulkUrl = new URL("/api/admin/advertisements/bulk", getApiUrl()).toString();
     const duration = String(parseInt(bulkDuration) || 10);
     for (let i = 0; i < bulkImages.length; i++) {
@@ -344,14 +345,17 @@ export default function AdminAds() {
         if (!res.ok) {
           console.warn(`[bulk] #${i + 1} http ${res.status}`);
           failed++;
+          failedNames.push(campaignName);
         } else {
           const data: BulkUploadResponse = await res.json();
           created += data.created ?? 1;
           failed += data.failed ?? 0;
+          if (data.failedFiles?.length) failedNames.push(...data.failedFiles);
         }
       } catch (err) {
         console.error(`[bulk] #${i + 1}`, err);
         failed++;
+        failedNames.push(campaignName);
       }
       setBulkProgress({ current: i + 1, total: bulkImages.length });
     }
@@ -365,10 +369,12 @@ export default function AdminAds() {
     setBulkImages([]);
     setBulkTarget("tutti");
     setBulkDuration("10");
-    const summary =
+    const summaryMsg =
       `${created} campagn${created === 1 ? "a" : "e"} creat${created === 1 ? "a" : "e"}` +
-      (failed > 0 ? `, ${failed} fallite.` : ".");
-    Alert.alert("Upload completato", summary);
+      (failed > 0
+        ? `, ${failed} fallite${failedNames.length ? `: ${failedNames.slice(0, 3).join(", ")}${failedNames.length > 3 ? `… (+${failedNames.length - 3})` : ""}` : ""}.`
+        : ".");
+    Alert.alert("Upload completato", summaryMsg);
   }
 
   function handleCreate() {
