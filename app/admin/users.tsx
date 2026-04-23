@@ -62,19 +62,6 @@ function formatDateIT(dateStr: string | null): string {
   return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function timeAgo(dateStr: string | null): string {
-  if (!dateStr) return "Mai connesso";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Adesso";
-  if (mins < 60) return `${mins} min fa`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h fa`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}gg fa`;
-  const months = Math.floor(days / 30);
-  return `${months} mesi fa`;
-}
 
 export default function AdminUsers() {
   const rawInsets = useSafeAreaInsets();
@@ -376,9 +363,6 @@ export default function AdminUsers() {
     if (!s) return null;
 
     const u = s.user;
-    const registrationDate = new Date(u.createdAt);
-    const daysSinceRegistration = Math.floor((Date.now() - registrationDate.getTime()) / (1000 * 60 * 60 * 24));
-
     return (
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}>
         <View style={statsStyles.section}>
@@ -418,15 +402,15 @@ export default function AdminUsers() {
             <Text style={statsStyles.value}>{formatDateIT(u.createdAt)}</Text>
           </View>
           <View style={statsStyles.row}>
-            <Text style={statsStyles.label}>Ultimo log in</Text>
+            <Text style={statsStyles.label}>Data e ora ultimo log in</Text>
             <Text style={statsStyles.value}>{formatDateIT(u.lastLoginAt)}</Text>
           </View>
           <View style={statsStyles.row}>
-            <Text style={statsStyles.label}>Ultimo log out</Text>
+            <Text style={statsStyles.label}>Data e ora ultimo log out</Text>
             <Text style={statsStyles.value}>{formatDateIT(u.lastLogoutAt)}</Text>
           </View>
           <View style={statsStyles.row}>
-            <Text style={statsStyles.label}>Chiusura app</Text>
+            <Text style={statsStyles.label}>Data e ora chiusura app</Text>
             <Text style={statsStyles.value}>{formatDateIT(u.lastAppCloseAt)}</Text>
           </View>
           <View style={statsStyles.row}>
@@ -438,11 +422,17 @@ export default function AdminUsers() {
           </View>
           <View style={statsStyles.row}>
             <Text style={statsStyles.label}>Disponibile</Text>
-            <MaterialIcons name={u.isAvailable ? "check-circle" : "cancel"} size={18} color={u.isAvailable ? Colors.success : Colors.error} />
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <MaterialIcons name={u.isAvailable ? "check-circle" : "cancel"} size={16} color={u.isAvailable ? Colors.success : Colors.error} />
+              <Text style={[statsStyles.value, { color: u.isAvailable ? Colors.success : Colors.error }]}>{u.isAvailable ? "Sì" : "No"}</Text>
+            </View>
           </View>
           <View style={statsStyles.row}>
-            <Text style={statsStyles.label}>Ghost mode</Text>
-            <MaterialIcons name={u.ghostMode ? "check-circle" : "cancel"} size={18} color={u.ghostMode ? Colors.warning : Colors.textSecondary} />
+            <Text style={statsStyles.label}>Ghost mode all'uscita app</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <MaterialIcons name={u.ghostMode ? "check-circle" : "cancel"} size={16} color={u.ghostMode ? Colors.warning : Colors.textSecondary} />
+              <Text style={[statsStyles.value, { color: u.ghostMode ? Colors.warning : Colors.textSecondary }]}>{u.ghostMode ? "Sì" : "No"}</Text>
+            </View>
           </View>
         </View>
 
