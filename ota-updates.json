@@ -4355,6 +4355,28 @@
     "apkBuildId": null,
     "apkVersionCode": 29,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 138,
+    "version": "1.138.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-138 rv7.0.0: Admin connessione utente + Tracking GPS 30s + modal alto + auto-save titolo",
+    "note": "Task #855: Admin scheda utente sezione Connessione — colonne last_logout_at e last_app_close_at aggiunte al DB; logout salva last_logout_at; route POST /api/users/app-close aggiunta; admin mostra 7 campi con label esatte, icone, Si/No. Task #856: BATCH_FLUSH_MS 20000→30000; gpsHeartbeatTimerRef — timer 30s separato garantisce punto GPS ogni 30s; modal riepilogo spostato in alto (flex-start, border radius in basso, paddingTop insets.top+16); Pubblica su Pic! ora salva titolo via PATCH prima di aprire modal pubblicazione. CURRENT_OTA_NUMBER=138.",
+    "releaseId": "0a80e6fa-c046-4468-b89b-4e7277552f1d",
+    "bundleUrl": "private/ota/ota-1.138.0-1776952260113.js",
+    "updateGroupId": "d1b74b45-cd31-43f9-b806-0af78eeeff1a",
+    "androidUpdateId": "019dba9c-6f0d-73d2-a562-93ce2af13886",
+    "iosUpdateId": null,
+    "commitBase": "ba7de7e544dbb58a6c48c099142783af194e6cbf",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/d1b74b45-cd31-43f9-b806-0af78eeeff1a",
+    "apkBuildId": null,
+    "apkVersionCode": 29,
+    "apkUrl": null,
     "status": "published"
   }
 ]
