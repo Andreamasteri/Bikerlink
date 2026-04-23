@@ -183,6 +183,10 @@ function AppStateHandler() {
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       const prev = appStateRef.current;
 
+      if (nextAppState.match(/inactive|background/) && prev === "active") {
+        apiRequest("POST", "/api/users/app-close").catch(() => {});
+      }
+
       if (prev.match(/inactive|background/) && nextAppState === "active") {
         sendHeartbeat();
         queryClient.invalidateQueries({ queryKey: ["/api/users/profile"] });

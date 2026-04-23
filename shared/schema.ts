@@ -47,6 +47,8 @@ export const users = pgTable("users", {
   ghostMode: boolean("ghost_mode").notNull().default(false),
   floatingWidgetEnabled: boolean("floating_widget_enabled").notNull().default(true),
   lastLoginAt: timestamp("last_login_at"),
+  lastLogoutAt: timestamp("last_logout_at"),
+  lastAppCloseAt: timestamp("last_app_close_at"),
   firstLoginAt: timestamp("first_login_at"),
   firstLoginLat: doublePrecision("first_login_lat"),
   firstLoginLng: doublePrecision("first_login_lng"),

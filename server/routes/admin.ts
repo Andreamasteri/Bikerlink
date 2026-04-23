@@ -1951,6 +1951,8 @@ router.get("/users/:id/stats", async (req: Request, res: Response) => {
     const userResult = await pool.query(
       `SELECT u.id, u.nickname, u.email, u.user_type as "userType", u.role, u.status,
               u.created_at as "createdAt", u.last_login_at as "lastLoginAt",
+              u.last_logout_at as "lastLogoutAt", u.last_app_close_at as "lastAppCloseAt",
+              u.ghost_mode as "ghostMode",
               u.is_fake as "isFake", u.is_primal as "isPrimal",
               up.total_km as "totalKm", up.total_rides as "totalRides",
               up.is_available as "isAvailable", up.bio,
@@ -2012,8 +2014,9 @@ router.get("/users/:id/stats", async (req: Request, res: Response) => {
       [userId]
     );
 
+    const { onlineTracker } = await import("../online-tracker");
     return res.json({
-      user,
+      user: { ...user, isOnline: onlineTracker.isOnline(userId) },
       stats: {
         proposalsCreated: proposalsResult.rows[0]?.count ?? 0,
         conversationsCount: conversationsResult.rows[0]?.count ?? 0,

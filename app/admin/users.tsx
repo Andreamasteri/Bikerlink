@@ -31,6 +31,10 @@ interface UserStats {
     status: string;
     createdAt: string;
     lastLoginAt: string | null;
+    lastLogoutAt: string | null;
+    lastAppCloseAt: string | null;
+    ghostMode: boolean;
+    isOnline: boolean;
     isFake: boolean;
     isPrimal: boolean;
     totalKm: number | null;
@@ -410,24 +414,35 @@ export default function AdminUsers() {
         <View style={statsStyles.section}>
           <Text style={statsStyles.sectionTitle}>Connessione</Text>
           <View style={statsStyles.row}>
-            <Text style={statsStyles.label}>Ultimo accesso</Text>
-            <Text style={statsStyles.value}>{timeAgo(u.lastLoginAt)}</Text>
-          </View>
-          <View style={statsStyles.row}>
-            <Text style={statsStyles.label}>Data ultimo accesso</Text>
-            <Text style={statsStyles.value}>{formatDateIT(u.lastLoginAt)}</Text>
-          </View>
-          <View style={statsStyles.row}>
             <Text style={statsStyles.label}>Registrazione</Text>
             <Text style={statsStyles.value}>{formatDateIT(u.createdAt)}</Text>
           </View>
           <View style={statsStyles.row}>
-            <Text style={statsStyles.label}>Giorni dall'iscrizione</Text>
-            <Text style={statsStyles.value}>{daysSinceRegistration}</Text>
+            <Text style={statsStyles.label}>Ultimo log in</Text>
+            <Text style={statsStyles.value}>{formatDateIT(u.lastLoginAt)}</Text>
+          </View>
+          <View style={statsStyles.row}>
+            <Text style={statsStyles.label}>Ultimo log out</Text>
+            <Text style={statsStyles.value}>{formatDateIT(u.lastLogoutAt)}</Text>
+          </View>
+          <View style={statsStyles.row}>
+            <Text style={statsStyles.label}>Chiusura app</Text>
+            <Text style={statsStyles.value}>{formatDateIT(u.lastAppCloseAt)}</Text>
+          </View>
+          <View style={statsStyles.row}>
+            <Text style={statsStyles.label}>Status</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <MaterialIcons name={u.isOnline ? "wifi" : "wifi-off"} size={16} color={u.isOnline ? Colors.success : Colors.error} />
+              <Text style={[statsStyles.value, { color: u.isOnline ? Colors.success : Colors.error }]}>{u.isOnline ? "Online" : "Offline"}</Text>
+            </View>
           </View>
           <View style={statsStyles.row}>
             <Text style={statsStyles.label}>Disponibile</Text>
             <MaterialIcons name={u.isAvailable ? "check-circle" : "cancel"} size={18} color={u.isAvailable ? Colors.success : Colors.error} />
+          </View>
+          <View style={statsStyles.row}>
+            <Text style={statsStyles.label}>Ghost mode</Text>
+            <MaterialIcons name={u.ghostMode ? "check-circle" : "cancel"} size={18} color={u.ghostMode ? Colors.warning : Colors.textSecondary} />
           </View>
         </View>
 

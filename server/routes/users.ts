@@ -317,6 +317,17 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
   }
 });
 
+router.post("/app-close", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    await storage.updateUser(userId, { lastAppCloseAt: new Date() } as any);
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("App close error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/me/ghost-mode", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;

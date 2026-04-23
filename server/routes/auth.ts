@@ -305,11 +305,14 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
 
 router.post("/logout", (req: Request, res: Response) => {
   const userId = req.session?.userId;
-  req.session.destroy((err) => {
+  req.session.destroy(async (err) => {
     if (err) {
       return res.status(500).json({ message: "Errore durante il logout" });
     }
-    if (userId) onlineTracker.setOffline(userId);
+    if (userId) {
+      onlineTracker.setOffline(userId);
+      storage.updateUser(userId, { lastLogoutAt: new Date() } as any).catch(() => {});
+    }
     res.clearCookie("connect.sid");
     return res.json({ message: "Logout effettuato" });
   });
