@@ -114,9 +114,10 @@ async function seed() {
     const exists = existing.rows.find((r) => r.sort_order === c.sort);
     if (exists) continue;
 
-    // Images are uploaded to object storage at public/ads/ and served via /api/ads/images/
-    // Run scripts/upload-guide-to-storage.js first to get the actual filenames
-    const imageUrl = `/api/ads/images/guide1080-${c.imageFile}`;
+    // Images uploaded to object storage at public/ads/guide-{name}.jpg
+    // Run scripts/upload-guide-to-storage.js first if images don't exist
+    // Filenames are deterministic: guide-{NN}-{slug}.jpg (no timestamp)
+    const imageUrl = `/api/ads/images/guide-${c.imageFile}`;
 
     await pool.query(
       `INSERT INTO ad_campaigns 

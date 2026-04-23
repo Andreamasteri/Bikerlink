@@ -1,24 +1,35 @@
-BikerLink — Guida Utente: URL e percorsi immagini
-==================================================
+=== BikerLink Guide — Download URLs ===
 
-ZIP DOWNLOAD (pubblico, diretto):
+ZIP completo della guida (13 card JPG 1080x1350px):
+
+  PRIMARY (object storage via API):
+  https://biker-link.replit.app/api/ads/guide-zip   ← route Express che serve da object storage
+  HTTP GET → 200 OK, Content-Type: application/zip, 2.29MB
+
+  FALLBACK (static hosting):
   https://biker-link.replit.app/uploads/bikerlink-guida.zip
+  HTTP GET → 200 OK
 
-Object Storage path:
-  public/guide/bikerlink-guida.zip
+Object Storage paths (public/):
+  public/guide/bikerlink-guida.zip     ← ZIP (2.29MB)
+  public/ads/guide-01-fake-position.jpg
+  public/ads/guide-02-garage-moto.jpg
+  public/ads/guide-03-lastfm.jpg
+  public/ads/guide-04-profilo.jpg
+  public/ads/guide-05-mappa.jpg
+  public/ads/guide-06-match.jpg
+  public/ads/guide-07-ride.jpg
+  public/ads/guide-08-chat.jpg
+  public/ads/guide-09-motoclub.jpg
+  public/ads/guide-10-tracking.jpg
+  public/ads/guide-11-trip.jpg
+  public/ads/guide-12-eventi.jpg
+  public/ads/guide-13-music.jpg
 
-Immagini campagne (13 JPG, 1080x1350px):
-  Servite via: https://biker-link.replit.app/api/ads/images/{filename}
-  Object storage prefix: public/ads/guide1080v2-*
+API routes immagini (serve da object storage):
+  GET /api/ads/images/guide-{NN}-{nome}.jpg → 200 image/jpeg (31536000s cache)
 
-Campagne DB (ad_campaigns):
-  Sort 1: Guida: Posizione Personalizzata  [evidenziata ⭐]
-  Sort 2: Guida: Aggiungi la Tua Moto       [evidenziata ⭐]
-  Sort 3: Guida: Collega Last.fm            [evidenziata ⭐]
-  Sort 4-13: profilo, mappa, match, ride, chat, motoclub, tracking, trip, eventi, music
-
-Account test:
-  nickname: mendo
-  email: mendo@bikerlink.it
-  password: Mendo2024!
-  moto: Ducati Monster 937 (2022)
+Campagne DB:
+  13 record in ad_campaigns con is_active=true, target_user_type='tutti'
+  sort_order: 1-13, placement: 'all', rotation_duration: 15s, rotation_mode: 'sequential'
+  Export auditabile: attached_assets/guide/ad-campaigns-export.json

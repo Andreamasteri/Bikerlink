@@ -64,8 +64,8 @@ async function run() {
       continue;
     }
     const buf = fs.readFileSync(fp);
-    const ts = Date.now();
-    const newName = `guide1080-${ts}-${c.file}`;
+    // Deterministic filename — no timestamp, always overwrite
+    const newName = `guide-${c.file}`;
     const objPath = `public/ads/${newName}`;
     const result = await client.uploadFromBytes(objPath, buf, {
       headers: { "Content-Type": "image/jpeg" },

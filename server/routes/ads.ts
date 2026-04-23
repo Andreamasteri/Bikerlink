@@ -126,6 +126,27 @@ router.get("/placement/:placement", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/ads/guide-zip
+ * Scarica il file ZIP della guida utente BikerLink da object storage.
+ * Endpoint pubblico — nessuna autenticazione richiesta.
+ */
+router.get("/guide-zip", async (_req: Request, res: Response) => {
+  try {
+    const zipBuffer = await downloadBuffer("public/guide/bikerlink-guida.zip");
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="bikerlink-guida.zip"'
+    );
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    return res.send(zipBuffer);
+  } catch (error) {
+    console.error("Guide ZIP serve error:", error);
+    return res.status(404).json({ message: "File guida non disponibile" });
+  }
+});
+
 router.post("/:id/click", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
