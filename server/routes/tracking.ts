@@ -289,7 +289,9 @@ router.get("/:id", async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Non autorizzato" });
     }
 
-    const points = await storage.getRoutePoints(id);
+    const rawPoints = await storage.getRoutePoints(id);
+    const simplified = req.query.simplified !== "false";
+    const points = simplified ? decimateRoutePoints(rawPoints, 450) : rawPoints;
     return res.json({ ...route, points });
   } catch (error) {
     console.error("Get route error:", error);
@@ -374,6 +376,57 @@ router.post("/:id/like", async (req: Request, res: Response) => {
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
+
+type RawPoint = { latitude: number; longitude: number; [key: string]: any };
+
+function perpendicularDistance(p: RawPoint, a: RawPoint, b: RawPoint): number {
+  const dx = b.longitude - a.longitude;
+  const dy = b.latitude - a.latitude;
+  if (dx === 0 && dy === 0) {
+    return Math.sqrt((p.longitude - a.longitude) ** 2 + (p.latitude - a.latitude) ** 2);
+  }
+  const t = ((p.longitude - a.longitude) * dx + (p.latitude - a.latitude) * dy) / (dx * dx + dy * dy);
+  const closestLng = a.longitude + t * dx;
+  const closestLat = a.latitude + t * dy;
+  return Math.sqrt((p.longitude - closestLng) ** 2 + (p.latitude - closestLat) ** 2);
+}
+
+function rdp(points: RawPoint[], epsilon: number): RawPoint[] {
+  if (points.length < 3) return points;
+  let maxDist = 0;
+  let maxIdx = 0;
+  const first = points[0];
+  const last = points[points.length - 1];
+  for (let i = 1; i < points.length - 1; i++) {
+    const d = perpendicularDistance(points[i], first, last);
+    if (d > maxDist) { maxDist = d; maxIdx = i; }
+  }
+  if (maxDist > epsilon) {
+    const left = rdp(points.slice(0, maxIdx + 1), epsilon);
+    const right = rdp(points.slice(maxIdx), epsilon);
+    return [...left.slice(0, -1), ...right];
+  }
+  return [first, last];
+}
+
+function decimateRoutePoints(points: RawPoint[], maxPoints: number): RawPoint[] {
+  if (points.length <= maxPoints) return points;
+  const EPSILON_START = 0.0001;
+  let epsilon = EPSILON_START;
+  let result = rdp(points, epsilon);
+  while (result.length > maxPoints && epsilon < 0.1) {
+    epsilon *= 1.5;
+    result = rdp(points, epsilon);
+  }
+  if (result.length > maxPoints) {
+    const step = (result.length - 1) / (maxPoints - 1);
+    const sampled: RawPoint[] = [result[0]];
+    for (let i = 1; i < maxPoints - 1; i++) sampled.push(result[Math.round(i * step)]);
+    sampled.push(result[result.length - 1]);
+    return sampled;
+  }
+  return result;
+}
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;

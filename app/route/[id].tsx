@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -53,6 +53,8 @@ export default function RouteDetailScreen() {
   const { data: route, isLoading } = useQuery<RouteDetail>({
     queryKey: ["/api/routes", id],
     queryFn: getQueryFn({ on401: "throw" }),
+    staleTime: 10 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const likeMutation = useMutation({
@@ -102,6 +104,11 @@ export default function RouteDetailScreen() {
   const pts = route.points || [];
   const hasPoints = pts.length > 0;
 
+  const mappedPoints = useMemo(
+    () => pts.map((p) => ({ latitude: p.latitude, longitude: p.longitude })),
+    [pts]
+  );
+
   const region = hasPoints
     ? {
         latitude: pts[Math.floor(pts.length / 2)].latitude,
@@ -117,7 +124,7 @@ export default function RouteDetailScreen() {
       contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
     >
       <RouteMap
-        points={pts.map((p) => ({ latitude: p.latitude, longitude: p.longitude }))}
+        points={mappedPoints}
         height={260}
         showMarkers={true}
       />

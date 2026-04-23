@@ -1,5 +1,6 @@
-import React, { useMemo } from "react";
-import { View, StyleSheet } from "react-native";
+import React, { useMemo, useState, useEffect, useRef } from "react";
+import { View, StyleSheet, Animated } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import WebView from "react-native-webview";
 import { useMapConfig } from "@/lib/map-context";
 import { getTileConfig } from "@/lib/map-tiles";
@@ -23,22 +24,46 @@ export default function LeafletRouteMap({ waypoints, height, typeColors, showMar
     [tileConfig.urlTemplate, tileConfig.maximumZ, waypoints, typeColors, showMarkers, trackPoints]
   );
 
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [skeletonVisible, setSkeletonVisible] = useState(true);
+
+  useEffect(() => {
+    fadeAnim.setValue(0);
+    setSkeletonVisible(true);
+  }, [html]);
+
+  const handleLoadEnd = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => setSkeletonVisible(false));
+  };
+
   const containerStyle = height != null ? [styles.wrapper, { height }] : styles.fill;
 
   return (
     <View style={containerStyle}>
-      <WebView
-        source={{ html, baseUrl: "" }}
-        style={styles.map}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        originWhitelist={["https://*", "http://*", "about:*"]}
-        scrollEnabled={false}
-        bounces={false}
-        overScrollMode="never"
-        cacheEnabled={true}
-        startInLoadingState={false}
-      />
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}>
+        <WebView
+          source={{ html, baseUrl: "" }}
+          style={styles.map}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          originWhitelist={["https://*", "http://*", "about:*"]}
+          scrollEnabled={false}
+          bounces={false}
+          overScrollMode="never"
+          cacheEnabled={true}
+          startInLoadingState={false}
+          onLoadEnd={handleLoadEnd}
+        />
+      </Animated.View>
+      {skeletonVisible && (
+        <View style={[StyleSheet.absoluteFill, styles.skeleton]}>
+          <MaterialCommunityIcons name="map-outline" size={48} color={Colors.textSecondary} />
+        </View>
+      )}
     </View>
   );
 }
@@ -47,4 +72,9 @@ const styles = StyleSheet.create({
   wrapper: { overflow: "hidden" },
   fill: { flex: 1 },
   map: { flex: 1, backgroundColor: "#1a1a1a" },
+  skeleton: {
+    backgroundColor: "#1e1e1e",
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });
