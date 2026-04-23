@@ -133,6 +133,38 @@ else
   fail "Impossibile analizzare ota-updates.json per il controllo PENDING globale."
 fi
 
+# ── 4c. IDS EAS NULL in entry published del ciclo corrente ──
+NULL_EAS_IDS=$(node -e "
+  const appJson = JSON.parse(require('fs').readFileSync('app.json','utf8'));
+  const rv = appJson?.expo?.runtimeVersion ?? null;
+  const data = JSON.parse(require('fs').readFileSync('ota-updates.json','utf8'));
+  const cycle = data.filter(e => typeof e.updateNumber === 'number' && e.runtimeVersion === rv);
+  const published = cycle.filter(e => e.status === 'published');
+  const warnings = [];
+  for (const e of published) {
+    const missing = [];
+    if (e.updateGroupId === null || e.updateGroupId === undefined) missing.push('updateGroupId');
+    if (e.androidUpdateId === null || e.androidUpdateId === undefined) missing.push('androidUpdateId');
+    if (missing.length > 0) warnings.push('OTA-' + e.updateNumber + ':' + missing.join('+'));
+  }
+  if (warnings.length === 0) { console.log('OK'); }
+  else { console.log('NULL_IDS:' + warnings.join(',')); }
+" 2>/dev/null || echo "ERROR")
+
+if [ "$NULL_EAS_IDS" = "OK" ]; then
+  ok "ota-updates.json: tutti gli IDs EAS presenti nelle entry published del ciclo corrente"
+elif [[ "$NULL_EAS_IDS" == NULL_IDS:* ]]; then
+  ENTRIES="${NULL_EAS_IDS#NULL_IDS:}"
+  IFS=',' read -ra ENTRY_LIST <<< "$ENTRIES"
+  for ENTRY in "${ENTRY_LIST[@]}"; do
+    OTA_NUM="${ENTRY%%:*}"
+    FIELDS="${ENTRY#*:}"
+    warn "$OTA_NUM ha IDs EAS null: ${FIELDS/+/, }. La pubblicazione EAS potrebbe non essere stata completata o i metadati non sono stati recuperati."
+  done
+elif [ "$NULL_EAS_IDS" = "ERROR" ]; then
+  warn "Impossibile verificare gli IDs EAS nelle entry published di ota-updates.json."
+fi
+
 # ── 5. COMMITBASE HASH VALIDO nell'ultima entry del ciclo ────
 COMMITBASE_CHECK=$(node -e "
   const appJson = JSON.parse(require('fs').readFileSync('app.json','utf8'));
