@@ -39,6 +39,12 @@ interface Campaign {
   imageVersion: number;
 }
 
+interface ImageHealthData {
+  brokenIds: string[];
+  checkedAt: string | null;
+  isRunning: boolean;
+}
+
 type TabKey = "biker" | "zavorrina" | "coppia" | "tutti";
 
 const TABS: { key: TabKey; label: string; icon: string; iconSet: "material" | "community" | "ionicons"; color: string }[] = [
@@ -53,10 +59,12 @@ function CampaignCard({
   item,
   onToggle,
   onDelete,
+  isBroken,
 }: {
   item: Campaign;
   onToggle: (id: string, isActive: boolean) => void;
   onDelete: (item: Campaign) => void;
+  isBroken?: boolean;
 }) {
   const [imageError, setImageError] = useState(false);
 
@@ -71,7 +79,7 @@ function CampaignCard({
     : null;
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, isBroken && styles.cardBroken]}>
       {imageUri && !imageError ? (
         <Image
           source={{ uri: imageUri }}
@@ -79,10 +87,10 @@ function CampaignCard({
           resizeMode="cover"
           onError={() => setImageError(true)}
         />
-      ) : imageUri && imageError ? (
+      ) : imageUri && (imageError || isBroken) ? (
         <View style={[styles.cardImage, styles.imageFallback]}>
-          <MaterialIcons name="broken-image" size={28} color={Colors.textSecondary} />
-          <Text style={styles.imageFallbackText}>Immagine non disponibile</Text>
+          <MaterialIcons name="broken-image" size={28} color={Colors.error} />
+          <Text style={[styles.imageFallbackText, { color: Colors.error }]}>Immagine non raggiungibile</Text>
         </View>
       ) : null}
       <View style={styles.cardBody}>
@@ -100,6 +108,12 @@ function CampaignCard({
                 {item.isActive ? "Attiva" : "Disattiva"}
               </Text>
             </View>
+            {isBroken && (
+              <View style={[styles.badge, { backgroundColor: Colors.error + "22" }]}>
+                <MaterialIcons name="broken-image" size={11} color={Colors.error} style={{ marginRight: 2 }} />
+                <Text style={[styles.badgeText, { color: Colors.error }]}>Immagine rotta</Text>
+              </View>
+            )}
             <Text style={styles.cardImpressions}>{item.impressions} impressioni</Text>
           </View>
         </View>
@@ -142,7 +156,27 @@ export default function AdminAds() {
     queryKey: ["/api/admin/advertisements"],
   });
 
+  const { data: imageHealth } = useQuery<ImageHealthData>({
+    queryKey: ["/api/admin/advertisements/image-health"],
+    refetchInterval: 60_000,
+  });
+
+  const [healthBannerDismissed, setHealthBannerDismissed] = useState(false);
+
+  async function handleCheckImages() {
+    try {
+      await apiRequest("POST", "/api/admin/advertisements/image-health/check");
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements/image-health"] });
+      }, 3000);
+    } catch {
+    }
+  }
+
   const campaigns = activeTab === "tutti" ? allCampaigns : allCampaigns.filter((c) => c.targetUserType === activeTab);
+
+  const brokenIdSet = new Set<string>(imageHealth?.brokenIds ?? []);
+  const brokenInView = campaigns.filter((c) => brokenIdSet.has(c.id));
 
   const createMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -327,8 +361,31 @@ export default function AdminAds() {
         })}
       </View>
 
+      {brokenInView.length > 0 && !healthBannerDismissed && (
+        <View style={styles.brokenBanner}>
+          <MaterialIcons name="warning" size={16} color={Colors.error} />
+          <Text style={styles.brokenBannerText} numberOfLines={2}>
+            {brokenInView.length === 1
+              ? `1 campagna ha un'immagine non raggiungibile`
+              : `${brokenInView.length} campagne hanno immagini non raggiungibili`}
+          </Text>
+          <TouchableOpacity onPress={() => setHealthBannerDismissed(true)} style={styles.brokenBannerClose}>
+            <MaterialIcons name="close" size={16} color={Colors.error} />
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.toolbar}>
-        <Text style={styles.countText}>{campaigns.length} campagn{campaigns.length === 1 ? "a" : "e"}</Text>
+        <View>
+          <Text style={styles.countText}>{campaigns.length} campagn{campaigns.length === 1 ? "a" : "e"}</Text>
+          {imageHealth?.checkedAt ? (
+            <Text style={styles.checkedAtText}>
+              {imageHealth.isRunning ? "Verifica in corso…" : `Verifica: ${new Date(imageHealth.checkedAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`}
+            </Text>
+          ) : imageHealth?.isRunning ? (
+            <Text style={styles.checkedAtText}>Verifica in corso…</Text>
+          ) : null}
+        </View>
         <View style={styles.toolbarActions}>
           <TouchableOpacity
             onPress={handleRestartAll}
@@ -342,7 +399,11 @@ export default function AdminAds() {
             )}
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] })}
+            onPress={() => {
+              queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+              handleCheckImages();
+              setHealthBannerDismissed(false);
+            }}
             style={styles.toolbarBtn}
           >
             <MaterialIcons name="refresh" size={20} color={Colors.textSecondary} />
@@ -367,6 +428,7 @@ export default function AdminAds() {
               item={item}
               onToggle={(id, isActive) => toggleMutation.mutate({ id, isActive })}
               onDelete={handleDelete}
+              isBroken={brokenIdSet.has(item.id)}
             />
           )}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 80 }}
@@ -541,6 +603,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textSecondary,
   },
+  checkedAtText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    opacity: 0.7,
+    marginTop: 1,
+  },
   toolbarBtn: {
     padding: 4,
   },
@@ -557,6 +626,29 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  cardBroken: {
+    borderColor: Colors.error,
+    borderWidth: 1.5,
+  },
+  brokenBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.error + "18",
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.error + "44",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  brokenBannerText: {
+    flex: 1,
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.error,
+  },
+  brokenBannerClose: {
+    padding: 2,
   },
   cardImage: {
     width: "100%",
@@ -603,6 +695,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   badge: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,

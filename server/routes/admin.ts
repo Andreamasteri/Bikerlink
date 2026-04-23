@@ -3,7 +3,7 @@ import multer from "multer";
 import fs from "fs";
 import path from "path";
 import bcrypt from "bcryptjs";
-import { uploadBuffer } from "../objectStorage";
+import { uploadBuffer, objectExists } from "../objectStorage";
 import { storage } from "../storage";
 import { db } from "../db";
 import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots } from "@shared/schema";
@@ -1544,6 +1544,72 @@ router.delete("/advertisements/:id", async (req: Request, res: Response) => {
     console.error("Admin delete advertisement error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
+});
+
+interface AdImageHealthState {
+  brokenIds: string[];
+  checkedAt: number | null;
+  isRunning: boolean;
+}
+
+const adImageHealth: AdImageHealthState = {
+  brokenIds: [],
+  checkedAt: null,
+  isRunning: false,
+};
+
+const AD_IMAGE_HEALTH_INTERVAL_MS = 15 * 60 * 1000;
+
+async function runAdImageHealthCheck(): Promise<void> {
+  if (adImageHealth.isRunning) return;
+  adImageHealth.isRunning = true;
+  console.log("[AdImageHealth] Avvio controllo immagini campagne attive...");
+  try {
+    const campaigns = await storage.getActiveCampaigns();
+    const brokenIds: string[] = [];
+    let checked = 0;
+    for (const campaign of campaigns) {
+      if (!campaign.imageUrl) continue;
+      const match = campaign.imageUrl.match(/\/api\/ads\/images\/(.+)$/);
+      if (!match) continue;
+      const filename = match[1];
+      checked++;
+      const localPath = path.resolve(process.cwd(), "uploads", "ads", filename);
+      const localExists = fs.existsSync(localPath);
+      if (localExists) continue;
+      const storageOk = await objectExists(`public/ads/${filename}`);
+      if (!storageOk) {
+        brokenIds.push(campaign.id);
+        console.warn(`[AdImageHealth] Immagine rotta per campagna "${campaign.name}" (${campaign.id}): ${filename}`);
+      }
+    }
+    adImageHealth.brokenIds = brokenIds;
+    adImageHealth.checkedAt = Date.now();
+    console.log(`[AdImageHealth] Controllo completato: ${brokenIds.length} immagini rotte su ${checked} campagne attive con immagine.`);
+  } catch (err) {
+    console.error("[AdImageHealth] Errore durante il controllo immagini:", err);
+  } finally {
+    adImageHealth.isRunning = false;
+  }
+}
+
+setTimeout(() => { runAdImageHealthCheck().catch(() => {}); }, 30_000);
+setInterval(() => { runAdImageHealthCheck().catch(() => {}); }, AD_IMAGE_HEALTH_INTERVAL_MS);
+
+router.get("/advertisements/image-health", async (_req: Request, res: Response) => {
+  return res.json({
+    brokenIds: adImageHealth.brokenIds,
+    checkedAt: adImageHealth.checkedAt ? new Date(adImageHealth.checkedAt).toISOString() : null,
+    isRunning: adImageHealth.isRunning,
+  });
+});
+
+router.post("/advertisements/image-health/check", async (_req: Request, res: Response) => {
+  if (adImageHealth.isRunning) {
+    return res.json({ message: "Controllo già in corso", isRunning: true });
+  }
+  runAdImageHealthCheck().catch(() => {});
+  return res.json({ message: "Controllo avviato", isRunning: true });
 });
 
 const eulaUpload = multer({
