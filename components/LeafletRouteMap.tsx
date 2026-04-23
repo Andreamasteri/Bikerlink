@@ -12,7 +12,7 @@ interface LeafletRouteMapProps {
   height?: number;
   typeColors?: Record<string, string>;
   showMarkers?: boolean;
-  trackPoints?: Array<{ lat: number; lng: number }>;
+  trackPoints?: Array<{ lat: number; lng: number; speedKmh?: number | null }>;
 }
 
 export default function LeafletRouteMap({ waypoints, height, typeColors, showMarkers = true, trackPoints }: LeafletRouteMapProps) {

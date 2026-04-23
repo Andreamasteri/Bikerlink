@@ -105,7 +105,7 @@ export default function RouteDetailScreen() {
   const hasPoints = pts.length > 0;
 
   const mappedPoints = useMemo(
-    () => pts.map((p) => ({ latitude: p.latitude, longitude: p.longitude })),
+    () => pts.map((p) => ({ latitude: p.latitude, longitude: p.longitude, speedKmh: p.speedKmh ?? null })),
     [pts]
   );
 

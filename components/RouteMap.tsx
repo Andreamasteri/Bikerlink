@@ -3,7 +3,7 @@ import LeafletRouteMap from "@/components/LeafletRouteMap";
 import type { RouteWaypoint } from "@/lib/leaflet-route-map-html";
 
 interface RouteMapProps {
-  points: Array<{ latitude: number; longitude: number }>;
+  points: Array<{ latitude: number; longitude: number; speedKmh?: number | null }>;
   height?: number;
   showMarkers?: boolean;
 }
@@ -23,7 +23,7 @@ export default function RouteMap({ points, height = 260, showMarkers = true }: R
   }, [points]);
 
   const trackPoints = useMemo(
-    () => points.map((p) => ({ lat: p.latitude, lng: p.longitude })),
+    () => points.map((p) => ({ lat: p.latitude, lng: p.longitude, speedKmh: p.speedKmh ?? null })),
     [points]
   );
 
