@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <title>Elimina Account — BikerLink</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #0D0D0D;
+        color: #E8E8E8;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .header {
+        width: 100%;
+        max-width: 760px;
+        padding: 32px 24px 16px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        border-bottom: 1px solid #1E1E2E;
+      }
+      .logo { font-size: 22px; color: #D4A017; font-weight: 800; letter-spacing: -0.5px; }
+      .content {
+        width: 100%;
+        max-width: 760px;
+        padding: 40px 24px 80px;
+      }
+      h1 { font-size: 26px; font-weight: 800; color: #D4A017; margin-bottom: 8px; }
+      .subtitle { font-size: 14px; color: #888; margin-bottom: 40px; }
+      .card {
+        background: #1A1A2E;
+        border: 1px solid #2A2A3E;
+        border-radius: 12px;
+        padding: 28px;
+        margin-bottom: 20px;
+      }
+      .card-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #D4A017;
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .badge {
+        background: #D4A017;
+        color: #0D0D0D;
+        font-size: 11px;
+        font-weight: 800;
+        padding: 2px 8px;
+        border-radius: 20px;
+        letter-spacing: 0.5px;
+      }
+      .badge-alt {
+        background: #2A2A3E;
+        color: #888;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 20px;
+        letter-spacing: 0.5px;
+      }
+      p { font-size: 14px; color: #BBBBBB; line-height: 1.7; margin-bottom: 12px; }
+      p:last-child { margin-bottom: 0; }
+      .steps {
+        list-style: none;
+        margin: 14px 0 0;
+      }
+      .steps li {
+        font-size: 14px;
+        color: #CCCCCC;
+        padding: 7px 0 7px 28px;
+        position: relative;
+        border-bottom: 1px solid #2A2A3E;
+        line-height: 1.5;
+      }
+      .steps li:last-child { border-bottom: none; }
+      .steps li::before {
+        content: attr(data-n);
+        position: absolute;
+        left: 0;
+        top: 7px;
+        width: 20px;
+        height: 20px;
+        background: #D4A017;
+        color: #0D0D0D;
+        font-size: 11px;
+        font-weight: 800;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        line-height: 20px;
+      }
+      .btn-email {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 16px;
+        padding: 12px 22px;
+        background: #D4A017;
+        color: #0D0D0D;
+        font-size: 14px;
+        font-weight: 700;
+        border-radius: 8px;
+        text-decoration: none;
+        transition: opacity 0.15s;
+      }
+      .btn-email:hover { opacity: 0.85; }
+      .info-box {
+        background: #12121F;
+        border: 1px solid #2A2A3E;
+        border-left: 3px solid #D4A017;
+        border-radius: 8px;
+        padding: 14px 18px;
+        margin-top: 28px;
+        font-size: 13px;
+        color: #888;
+        line-height: 1.6;
+      }
+      .info-box strong { color: #BBBBBB; }
+      footer {
+        width: 100%;
+        max-width: 760px;
+        padding: 20px 24px;
+        border-top: 1px solid #1E1E2E;
+        font-size: 12px;
+        color: #444;
+        text-align: center;
+      }
+      footer a { color: #666; text-decoration: none; }
+      footer a:hover { color: #D4A017; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <span class="logo">🏍 BikerLink</span>
+    </div>
+
+    <div class="content">
+      <h1>Elimina il tuo account</h1>
+      <p class="subtitle">Puoi richiedere la cancellazione del tuo account e di tutti i dati associati in qualsiasi momento.</p>
+
+      <div class="card">
+        <div class="card-title">
+          Dall'app
+          <span class="badge">CONSIGLIATO</span>
+        </div>
+        <p>Se hai BikerLink installato sul tuo dispositivo, puoi eliminare il tuo account direttamente dall'app seguendo questi passaggi:</p>
+        <ol class="steps">
+          <li data-n="1">Apri BikerLink e accedi al tuo account</li>
+          <li data-n="2">Vai alla scheda <strong>Profilo</strong> (icona in basso a destra)</li>
+          <li data-n="3">Scorri fino in fondo e tocca <strong>"Modifica profilo"</strong></li>
+          <li data-n="4">Scorri fino in fondo e tocca <strong>"Elimina account"</strong></li>
+          <li data-n="5">Conferma la richiesta — l'account sarà eliminato entro 30 giorni</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          Via email
+          <span class="badge-alt">ALTERNATIVA</span>
+        </div>
+        <p>Se non hai più accesso all'app, puoi richiedere la cancellazione inviando un'email a <strong>privacy@bikerlink.app</strong> con:</p>
+        <ul class="steps">
+          <li data-n="·">Il <strong>nickname</strong> del tuo account BikerLink</li>
+          <li data-n="·">L'<strong>email</strong> con cui ti sei registrato</li>
+          <li data-n="·">La richiesta esplicita di eliminazione dell'account</li>
+        </ul>
+        <a class="btn-email" href="mailto:privacy@bikerlink.app?subject=Richiesta%20eliminazione%20account&body=Salve%2C%0A%0Arichiedo%20l%27eliminazione%20del%20mio%20account%20BikerLink.%0A%0ANickname%3A%20%5Binserisci%20nickname%5D%0AEmail%20registrata%3A%20%5Binserisci%20email%5D%0A%0AGrazie.">
+          ✉ Scrivi a privacy@bikerlink.app
+        </a>
+      </div>
+
+      <div class="info-box">
+        <strong>Tempi di cancellazione:</strong> una volta ricevuta la richiesta, il tuo account e tutti i dati associati (messaggi, foto, moto, preferenze) verranno eliminati entro <strong>30 giorni</strong>. Puoi annullare la richiesta entro questo periodo accedendo all'app.
+      </div>
+    </div>
+
+    <footer>
+      <a href="/privacy">Privacy Policy</a> &nbsp;·&nbsp;
+      <a href="/terms">Termini di Servizio</a> &nbsp;·&nbsp;
+      © 2025 BikerLink
+    </footer>
+  </body>
+</html>
