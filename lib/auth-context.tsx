@@ -1,14 +1,22 @@
-import React, { createContext, useContext, useMemo, ReactNode } from "react";
+import React, { createContext, useContext, useMemo, useState, useEffect, useRef, ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest, getQueryFn, getApiUrl, setLoggingIn } from "@/lib/query-client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { queryClient, apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import type { User } from "@shared/schema";
 
 type SafeUser = Omit<User, "password">;
+
+const HAD_SESSION_KEY = "@bikerlink/had_session";
+
+// Retry delays: 2s, 5s, 10s
+const RETRY_DELAYS = [2000, 5000, 10000];
 
 interface AuthContextValue {
   user: SafeUser | null | undefined;
   isLoading: boolean;
   isAuthenticated: boolean;
+  sessionExpired: boolean;
+  isReconnecting: boolean;
   loginMutation: ReturnType<typeof useLoginMutation>;
   registerMutation: ReturnType<typeof useRegisterMutation>;
   logoutMutation: ReturnType<typeof useLogoutMutation>;
@@ -17,12 +25,12 @@ interface AuthContextValue {
 function useLoginMutation() {
   return useMutation({
     mutationFn: async (data: { identifier: string; password: string; latitude?: number; longitude?: number }) => {
-      setLoggingIn(true);
       const res = await apiRequest("POST", "/api/auth/login", data);
       return await res.json();
     },
     onSuccess: (user: SafeUser) => {
       queryClient.setQueryData(["/api/auth/me"], user);
+      AsyncStorage.setItem(HAD_SESSION_KEY, "true").catch(() => {});
       queryClient.invalidateQueries({
         predicate: (query) => {
           const key = query.queryKey[0] as string;
@@ -63,9 +71,6 @@ function useLoginMutation() {
         apiRequest("POST", "/api/matching/trigger").catch(() => {});
       })();
     },
-    onSettled: () => {
-      setLoggingIn(false);
-    },
   });
 }
 
@@ -90,6 +95,7 @@ function useRegisterMutation() {
     onSuccess: (response: any) => {
       if (!response?.requiresEmailVerification) {
         queryClient.setQueryData(["/api/auth/me"], response);
+        AsyncStorage.setItem(HAD_SESSION_KEY, "true").catch(() => {});
       }
     },
   });
@@ -102,6 +108,7 @@ function useLogoutMutation() {
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/auth/me"], null);
+      AsyncStorage.removeItem(HAD_SESSION_KEY).catch(() => {});
     },
     onError: () => {},
   });
@@ -110,12 +117,80 @@ function useLogoutMutation() {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const [sessionExpired, setSessionExpired] = useState(false);
+  // true while we're loading AND we know the user had a session before
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const hadSessionRef = useRef<boolean>(false);
+
+  // Prefetch the AsyncStorage "had session" marker before enabling the query
+  const [storageChecked, setStorageChecked] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(HAD_SESSION_KEY)
+      .then((val) => {
+        hadSessionRef.current = val === "true";
+        setStorageChecked(true);
+      })
+      .catch(() => {
+        hadSessionRef.current = false;
+        setStorageChecked(true);
+      });
+  }, []);
+
+  // Custom queryFn: returns null on 401 (triggers no retry), throws on network errors (triggers retry)
+  const authQueryFn = async ({ signal }: { signal?: AbortSignal }) => {
+    const baseUrl = getApiUrl();
+    const url = new URL("/api/auth/me", baseUrl);
+
+    let res: Response;
+    try {
+      res = await fetch(url.toString(), { credentials: "include", signal });
+    } catch (err: unknown) {
+      // AbortError = query was cancelled, re-throw as-is
+      if (err instanceof Error && err.name === "AbortError") throw err;
+      // Network error / ECONNREFUSED / timeout → throw to trigger React Query retry
+      throw new Error("network_unavailable");
+    }
+
+    if (res.status === 401) {
+      // Session expired or never logged in — return null (no retry needed)
+      if (hadSessionRef.current) {
+        setSessionExpired(true);
+      }
+      return null;
+    }
+
+    if (!res.ok) {
+      // 5xx or other server errors → throw to trigger retry
+      throw new Error(`server_error_${res.status}`);
+    }
+
+    const user = await res.json();
+    // Successful auth — save marker and clear any expired flag
+    hadSessionRef.current = true;
+    AsyncStorage.setItem(HAD_SESSION_KEY, "true").catch(() => {});
+    setSessionExpired(false);
+    return user as SafeUser;
+  };
+
   const userQuery = useQuery<SafeUser | null>({
     queryKey: ["/api/auth/me"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
+    queryFn: authQueryFn,
     staleTime: Infinity,
-    retry: false,
+    enabled: storageChecked,
+    // Only retry if the user had a previous session (don't make new users wait)
+    retry: (failureCount, error) => {
+      if (error instanceof Error && error.name === "AbortError") return false;
+      if (!hadSessionRef.current) return false;
+      return failureCount < 3;
+    },
+    retryDelay: (attempt) => RETRY_DELAYS[attempt] ?? 10000,
   });
+
+  // isReconnecting is true only during the INITIAL auth check when the user had a previous session.
+  // Background refetches (triggered by scheduleAuthRecheck) don't set this flag.
+  useEffect(() => {
+    setIsReconnecting(userQuery.isLoading && hadSessionRef.current && storageChecked);
+  }, [userQuery.isLoading, storageChecked]);
 
   const loginMutation = useLoginMutation();
   const registerMutation = useRegisterMutation();
@@ -124,13 +199,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       user: userQuery.data,
-      isLoading: userQuery.isLoading,
+      isLoading: userQuery.isLoading || !storageChecked,
       isAuthenticated: !!userQuery.data,
+      sessionExpired,
+      isReconnecting,
       loginMutation,
       registerMutation,
       logoutMutation,
     }),
-    [userQuery.data, userQuery.isLoading, loginMutation, registerMutation, logoutMutation]
+    [userQuery.data, userQuery.isLoading, storageChecked, sessionExpired, isReconnecting, loginMutation, registerMutation, logoutMutation]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

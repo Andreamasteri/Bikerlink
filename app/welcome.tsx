@@ -9,6 +9,7 @@ import {
   ImageBackground,
   StatusBar,
   Linking,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
@@ -33,7 +34,7 @@ const loginBg = require("@/assets/images/splash-bg.jpg");
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, sessionExpired, isReconnecting } = useAuth();
   const synecoVisible = useSynecoVisible();
   const insets = useSafeAreaInsets();
   const [dynamicTagline, setDynamicTagline] = useState<string | null>(null);
@@ -125,8 +126,14 @@ export default function WelcomeScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, { paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
+      <View style={[styles.container, styles.loadingContainer, { paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
         <StatusBar barStyle="light-content" />
+        {isReconnecting && (
+          <View style={styles.reconnectBox}>
+            <ActivityIndicator size="small" color={Colors.accent} style={{ marginBottom: 8 }} />
+            <Text style={styles.reconnectText}>Connessione in corso...</Text>
+          </View>
+        )}
       </View>
     );
   }
@@ -135,6 +142,13 @@ export default function WelcomeScreen() {
     <ImageBackground source={loginBg} style={styles.container} resizeMode="cover">
       <StatusBar barStyle="light-content" />
       <View style={[styles.overlay, { paddingTop: Platform.OS === "web" ? 67 : insets.top, paddingBottom: Platform.OS === "web" ? 34 : insets.bottom }]}>
+        {sessionExpired && (
+          <View style={styles.sessionExpiredBanner}>
+            <Text style={styles.sessionExpiredText}>
+              Sessione scaduta — accedi di nuovo
+            </Text>
+          </View>
+        )}
         <View style={styles.content}>
           <Animated.Text style={[styles.title, { opacity: titleOpacity }]}>
             BikerLink
@@ -334,5 +348,33 @@ const styles = StyleSheet.create({
   langLabelActive: {
     color: Colors.accent,
     fontFamily: "Inter_600SemiBold",
+  },
+  loadingContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: Colors.background,
+  },
+  reconnectBox: {
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  reconnectText: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.7)",
+    textAlign: "center",
+  },
+  sessionExpiredBanner: {
+    width: "100%",
+    backgroundColor: "rgba(255, 160, 0, 0.85)",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    alignItems: "center",
+  },
+  sessionExpiredText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: "#1a1a1a",
+    textAlign: "center",
   },
 });

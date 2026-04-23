@@ -12,22 +12,17 @@ export function getApiUrl(): string {
   return url.href.replace(/\/$/, "");
 }
 
-let _isLoggingOut = false;
-let _isLoggingIn = false;
-
-export function setLoggingOut(val: boolean) {
-  _isLoggingOut = val;
-}
-
-export function setLoggingIn(val: boolean) {
-  _isLoggingIn = val;
-}
-
-function handleUnauthorized() {
-  if (_isLoggingIn || _isLoggingOut) {
-    return;
-  }
-  queryClient.setQueryData(["/api/auth/me"], null);
+// When any non-auth endpoint receives a 401, silently re-check /api/auth/me.
+// React Query deduplicates concurrent refetches — only one HTTP request is made.
+// If the session is truly gone, auth-context will set sessionExpired and redirect.
+let _recheckScheduled = false;
+function scheduleAuthRecheck() {
+  if (_recheckScheduled) return;
+  _recheckScheduled = true;
+  setTimeout(() => {
+    _recheckScheduled = false;
+    queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+  }, 300);
 }
 
 async function throwIfResNotOk(res: Response) {
@@ -64,8 +59,8 @@ export async function apiRequest(
     credentials: "include",
   });
 
-  if (res.status === 401 && !route.includes("/api/auth/") && !route.includes("/api/lastfm/")) {
-    handleUnauthorized();
+  if (res.status === 401 && !route.includes("/api/auth/")) {
+    scheduleAuthRecheck();
   }
 
   await throwIfResNotOk(res);
@@ -89,7 +84,7 @@ export const getQueryFn: <T>(options: {
     if (res.status === 401) {
       const isAuthQuery = (queryKey[0] as string)?.includes("/api/auth/");
       if (!isAuthQuery) {
-        handleUnauthorized();
+        scheduleAuthRecheck();
       }
       if (unauthorizedBehavior === "returnNull") {
         return null;
