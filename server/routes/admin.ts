@@ -1720,6 +1720,10 @@ router.post("/stregatti", async (req: Request, res: Response) => {
     if (!nickname || !userType) {
       return res.status(400).json({ message: "Nickname e tipo utente obbligatori" });
     }
+    const existingNickname = await storage.getUserByNickname(nickname);
+    if (existingNickname) {
+      return res.status(409).json({ message: "Nickname già in uso" });
+    }
     const email = `fake_${nickname.toLowerCase().replace(/[^a-z0-9]/g, "")}@fakeuser.bikerlink.it`;
     const hashedPassword = await bcrypt.hash("fakeuser2025!", 10);
     const country = req.body.country || "IT";

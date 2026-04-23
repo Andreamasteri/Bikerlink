@@ -803,6 +803,15 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] custom_routes.visibility backfill:", e);
         }
 
+        try {
+          await db.execute(sql`
+            CREATE UNIQUE INDEX IF NOT EXISTS users_nickname_lower_unique_idx ON users (LOWER(nickname))
+          `);
+          console.log("[MIGRATION] Indice UNIQUE case-insensitive su users.nickname creato/già esistente");
+        } catch (e) {
+          console.warn("[MIGRATION] users nickname lower unique index:", e);
+        }
+
         // Autovacuum aggressivo sulle tabelle soggette a bloat da DELETE massivi
         // (default PostgreSQL: 20% dead rows — troppo alto per tabelle con pochi record reali)
         try {
