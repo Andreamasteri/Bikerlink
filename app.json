@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "buildNumber": "2",
+      "buildNumber": "34",
       "bundleIdentifier": "com.bikerlink.app",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "BikerLink usa la tua posizione GPS per mostrare i motociclisti vicini, registrare i tuoi percorsi in moto e ricevere avvisi SOS dalla community.",
@@ -23,7 +23,7 @@
         "NSPhotoLibraryUsageDescription": "BikerLink accede alle tue foto per caricare immagini del profilo e delle moto.",
         "NSPhotoLibraryAddUsageDescription": "BikerLink salva le foto scattate nella tua libreria fotografica.",
         "NSCameraUsageDescription": "BikerLink accede alla fotocamera per scattare foto del profilo e delle moto.",
-        "UIBackgroundModes": ["location", "fetch", "audio"],
+        "UIBackgroundModes": ["location", "audio"],
         "ITSAppUsesNonExemptEncryption": false
       }
     },
