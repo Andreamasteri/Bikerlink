@@ -1419,7 +1419,9 @@ async function uploadAdImageToObjectStorage(buffer: Buffer, originalname: string
   const uniqueSuffix = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
   const filename = uniqueSuffix + path.extname(originalname);
   const objectPath = `public/ads/${filename}`;
+  console.log(`[uploadAdImageToObjectStorage] Uploading "${originalname}" → ${objectPath} (${buffer.length} bytes, ${mimetype})`);
   await uploadBuffer(objectPath, buffer, mimetype);
+  console.log(`[uploadAdImageToObjectStorage] Upload OK → /api/ads/images/${filename}`);
   return `/api/ads/images/${filename}`;
 }
 

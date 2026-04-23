@@ -30,6 +30,7 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
     return res.send(imageBuffer);
   } catch (error) {
     console.error("Ad image serve error:", error);
+    res.setHeader("Cache-Control", "no-store");
     return res.status(404).json({ message: "Immagine non trovata" });
   }
 });

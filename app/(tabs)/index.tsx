@@ -20,7 +20,7 @@ import { useRouter } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, getApiUrl } from "@/lib/query-client";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useColors } from "@/hooks/useColors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -85,6 +85,7 @@ export default function MapScreen() {
   const [showZavorrinaList, setShowZavorrinaList] = useState(false);
   const [adIndex, setAdIndex] = useState(0);
   const [adImageError, setAdImageError] = useState<string | null>(null);
+  const [adImageRetried, setAdImageRetried] = useState<Set<string>>(new Set());
   const [showOfflineOnline, setShowOfflineOnline] = useState(false);
   const [showSosDetail, setShowSosDetail] = useState(false);
   const [offlineCountdown, setOfflineCountdown] = useState<{ online: number }>({ online: 0 });
@@ -1169,10 +1170,22 @@ export default function MapScreen() {
                 source={{ uri: (() => { const ad = myAds[adIndex % myAds.length] as any; const v = ad.imageVersion ?? 0; const base = ad.imageUrl.startsWith("http") ? ad.imageUrl : `${getApiUrl().replace(/\/$/, "")}${ad.imageUrl}`; return `${base}${base.includes("?") ? "&" : "?"}v=${v}`; })() }}
                 style={styles.adImage}
                 resizeMode="cover"
-                onError={() => setAdImageError((myAds[adIndex % myAds.length] as any)?.id)}
+                onError={() => {
+                  const ad = myAds[adIndex % myAds.length] as any;
+                  const id = ad?.id;
+                  if (!id) return;
+                  setAdImageError(id);
+                  if (!adImageRetried.has(id)) {
+                    setTimeout(() => {
+                      setAdImageRetried((prev) => new Set([...prev, id]));
+                      setAdImageError(null);
+                    }, 3000);
+                  }
+                }}
               />
             ) : (
               <View style={styles.adPlaceholder}>
+                <MaterialIcons name="broken-image" size={28} color={Colors.textSecondary} />
                 <Text style={styles.adText}>{(myAds[adIndex % myAds.length] as any)?.name}</Text>
                 {(myAds[adIndex % myAds.length] as any)?.description && (
                   <Text style={styles.adSubText}>{(myAds[adIndex % myAds.length] as any).description}</Text>
@@ -1882,11 +1895,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   adPlaceholder: {
-    backgroundColor: Colors.accent + "15",
+    backgroundColor: Colors.surfaceLight,
     padding: 16,
     height: 240,
     alignItems: "center",
     justifyContent: "center",
+    gap: 8,
   },
   adText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: Colors.accent },
   adSubText: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 4 },

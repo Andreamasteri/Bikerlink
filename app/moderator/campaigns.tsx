@@ -67,6 +67,8 @@ function CampaignCard({
   onToggle: (id: string, isActive: boolean) => void;
   onEdit: (item: Campaign) => void;
 }) {
+  const [imageError, setImageError] = useState(false);
+
   const imageUri = item.imageUrl
     ? (() => {
         const v = item.imageVersion ?? 0;
@@ -79,9 +81,19 @@ function CampaignCard({
 
   return (
     <View style={styles.card}>
-      {imageUri && (
-        <Image source={{ uri: imageUri }} style={styles.cardImage} resizeMode="cover" />
-      )}
+      {imageUri && !imageError ? (
+        <Image
+          source={{ uri: imageUri }}
+          style={styles.cardImage}
+          resizeMode="cover"
+          onError={() => setImageError(true)}
+        />
+      ) : imageUri && imageError ? (
+        <View style={[styles.cardImage, styles.imageFallback]}>
+          <MaterialIcons name="broken-image" size={28} color={Colors.textSecondary} />
+          <Text style={styles.imageFallbackText}>Immagine non disponibile</Text>
+        </View>
+      ) : null}
       <View style={styles.cardBody}>
         <View style={styles.cardInfo}>
           <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
@@ -377,7 +389,9 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 15, color: Colors.textSecondary, fontFamily: "Inter_500Medium" },
   list: { padding: 16, gap: 12 },
   card: { backgroundColor: Colors.surface, borderRadius: 14, overflow: "hidden", marginBottom: 12 },
-  cardImage: { width: "100%", height: 160 },
+  cardImage: { width: "100%", height: 160, backgroundColor: Colors.surfaceLight },
+  imageFallback: { alignItems: "center", justifyContent: "center", gap: 6 },
+  imageFallbackText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
   cardBody: { flexDirection: "row", alignItems: "center", padding: 12, gap: 12 },
   cardInfo: { flex: 1, gap: 4 },
   cardName: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.text },

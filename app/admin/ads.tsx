@@ -58,6 +58,8 @@ function CampaignCard({
   onToggle: (id: string, isActive: boolean) => void;
   onDelete: (item: Campaign) => void;
 }) {
+  const [imageError, setImageError] = useState(false);
+
   const imageUri = item.imageUrl
     ? (() => {
         const v = item.imageVersion ?? 0;
@@ -70,9 +72,19 @@ function CampaignCard({
 
   return (
     <View style={styles.card}>
-      {imageUri && (
-        <Image source={{ uri: imageUri }} style={styles.cardImage} resizeMode="cover" />
-      )}
+      {imageUri && !imageError ? (
+        <Image
+          source={{ uri: imageUri }}
+          style={styles.cardImage}
+          resizeMode="cover"
+          onError={() => setImageError(true)}
+        />
+      ) : imageUri && imageError ? (
+        <View style={[styles.cardImage, styles.imageFallback]}>
+          <MaterialIcons name="broken-image" size={28} color={Colors.textSecondary} />
+          <Text style={styles.imageFallbackText}>Immagine non disponibile</Text>
+        </View>
+      ) : null}
       <View style={styles.cardBody}>
         <View style={styles.cardInfo}>
           <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
@@ -237,7 +249,7 @@ export default function AdminAds() {
   }, []);
 
   function handleCreate() {
-    if (!formName.trim()) return;
+    if (!formName.trim() || !formImageUri) return;
 
     const formData = new FormData();
     formData.append("name", formName.trim());
@@ -422,8 +434,8 @@ export default function AdminAds() {
             />
 
             <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: currentTab.color }, !formName.trim() && styles.submitBtnDisabled]}
-              disabled={!formName.trim() || createMutation.isPending}
+              style={[styles.submitBtn, { backgroundColor: Colors.accent, opacity: (!formName.trim() || !formImageUri) ? 0.4 : 1 }]}
+              disabled={!formName.trim() || !formImageUri || createMutation.isPending}
               onPress={handleCreate}
             >
               {createMutation.isPending ? (
@@ -550,6 +562,16 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 140,
     backgroundColor: Colors.surfaceLight,
+  },
+  imageFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  imageFallbackText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
   },
   cardBody: {
     flexDirection: "row",
