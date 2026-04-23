@@ -496,6 +496,7 @@ function RootLayoutNav() {
       }}
     >
       <Stack.Screen name="welcome" />
+      <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false, animation: "fade" }} />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="proposals" options={{ headerShown: false }} />
