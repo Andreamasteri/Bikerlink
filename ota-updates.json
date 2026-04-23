@@ -4465,6 +4465,28 @@
     "apkBuildId": null,
     "apkVersionCode": 35,
     "apkUrl": null,
-    "status": "published"
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 143,
+    "version": "1.143.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-143 rv7.0.0: Upload batch campagne + fix feature graphic Play Store",
+    "note": "Task #886: Upload cartella campagne batch dal pannello admin (loop per-immagine, progress bar X/Y, failedNames nel riepilogo). Task #887: Feature graphic Play Store — rimosso '#1A1A2E', aggiunta catena tra Biker e Link. CURRENT_OTA_NUMBER=143.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "c46023b182e88a39ded198c7b476371d1f24ee2a",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 35,
+    "apkUrl": null,
+    "status": "pending"
   }
 ]
