@@ -4487,6 +4487,28 @@
     "apkBuildId": null,
     "apkVersionCode": 35,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 144,
+    "version": "1.144.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-144 rv7.0.0: Fix testi slide onboarding 03 (posizione fake)",
+    "note": "Task #894: corretti i 3 testi errati nella slide onboarding 03-posizione-fake-quando.png. Col1: 'Usa la posizione Fake per proteggere la privacy della tua casa, Ufficio e Luoghi Sensibili'. Col2: 'Non far sapere agli altri dove vivi'. Col3: 'Ricordati di disattivarla quando esci per un giro!'. CURRENT_OTA_NUMBER=144.",
+    "releaseId": "d00bf2ab-88c2-4414-8c95-cf6bc4f4923f",
+    "bundleUrl": "private/ota/ota-1.144.0-1776979501981.js",
+    "updateGroupId": "4edb3db6-e05f-481d-bf36-1b2d92bafe5d",
+    "androidUpdateId": "019dbc3c-32c4-7cd0-815d-b3a9b7835d94",
+    "iosUpdateId": null,
+    "commitBase": "fe28dd69afb88a063a3e46bdd156a706cb32a5de",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/4edb3db6-e05f-481d-bf36-1b2d92bafe5d",
+    "apkBuildId": null,
+    "apkVersionCode": 35,
+    "apkUrl": null,
     "status": "published"
   }
 ]
