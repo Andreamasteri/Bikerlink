@@ -153,6 +153,7 @@ export default function AdminAds() {
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkBaseName, setBulkBaseName] = useState("");
   const [bulkTarget, setBulkTarget] = useState<TabKey>("tutti");
+  const [bulkDuration, setBulkDuration] = useState("10");
   const [bulkImages, setBulkImages] = useState<BulkImageAsset[]>([]);
   const [bulkUploading, setBulkUploading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
@@ -291,13 +292,19 @@ export default function AdminAds() {
   }, []);
 
   async function handlePickBulkImages() {
-    const assets = await pickMultipleImages({ quality: 0.8, selectionLimit: 50 });
+    const { assets, skipped } = await pickMultipleImages({ quality: 0.8, selectionLimit: 50 });
     if (assets.length > 0) {
       setBulkImages((prev) => {
         const existingUris = new Set(prev.map((a) => a.uri));
         const newOnes = assets.filter((a) => !existingUris.has(a.uri));
         return [...prev, ...newOnes];
       });
+    }
+    if (skipped > 0) {
+      Alert.alert(
+        "Immagini troppo grandi",
+        `${skipped} immagin${skipped === 1 ? "e è stata ignorata" : "i sono state ignorate"} perché supera${skipped === 1 ? "" : "no"} il limite di 5 MB.`
+      );
     }
   }
 
@@ -308,8 +315,10 @@ export default function AdminAds() {
 
     let created = 0;
     let failed = 0;
+    const failedNames: string[] = [];
     const baseUrl = getApiUrl();
-    const url = new URL("/api/admin/advertisements", baseUrl).toString();
+    const bulkUrl = new URL("/api/admin/advertisements/bulk", baseUrl).toString();
+    const duration = parseInt(bulkDuration) || 10;
 
     for (let i = 0; i < bulkImages.length; i++) {
       const img = bulkImages[i];
@@ -319,25 +328,30 @@ export default function AdminAds() {
           : `${bulkBaseName.trim()} #${i + 1}`;
       try {
         const formData = new FormData();
-        formData.append("name", campaignName);
+        formData.append("baseName", campaignName);
         formData.append("targetUserType", bulkTarget);
-        formData.append("placement", "home");
+        formData.append("displayDuration", String(duration));
         const rawFilename = img.uri.split("/").pop() || "image.jpg";
         const match = /\.(\w+)$/.exec(rawFilename);
         const mimeType = match ? `image/${match[1].toLowerCase()}` : "image/jpeg";
-        formData.append("image", { uri: img.uri, name: rawFilename, type: mimeType } as any);
-        const res = await globalThis.fetch(url, {
+        formData.append("images", { uri: img.uri, name: rawFilename, type: mimeType } as any);
+        const res = await globalThis.fetch(bulkUrl, {
           method: "POST",
           body: formData,
           credentials: "include",
         });
         if (res.ok) {
-          created++;
+          const data = await res.json();
+          created += data.created ?? 1;
+          failed += data.failed ?? 0;
+          if (data.failedFiles?.length) failedNames.push(...data.failedFiles);
         } else {
           failed++;
+          failedNames.push(campaignName);
         }
       } catch {
         failed++;
+        failedNames.push(campaignName);
       }
       setBulkProgress({ current: i + 1, total: bulkImages.length });
     }
@@ -351,12 +365,12 @@ export default function AdminAds() {
     setBulkBaseName("");
     setBulkImages([]);
     setBulkTarget("tutti");
+    setBulkDuration("10");
 
-    Alert.alert(
-      "Upload completato",
+    const summary =
       `${created} campagn${created === 1 ? "a" : "e"} creat${created === 1 ? "a" : "e"}` +
-        (failed > 0 ? `, ${failed} fallite.` : ".")
-    );
+      (failed > 0 ? `, ${failed} fallite.` : ".");
+    Alert.alert("Upload completato", summary);
   }
 
   function handleCreate() {
@@ -632,6 +646,17 @@ export default function AdminAds() {
                 </TouchableOpacity>
               ))}
             </View>
+
+            <Text style={styles.settingsLabel}>Durata rotazione (secondi)</Text>
+            <TextInput
+              style={[styles.input, { marginBottom: 20 }]}
+              placeholder="10"
+              placeholderTextColor={Colors.textSecondary}
+              value={bulkDuration}
+              onChangeText={setBulkDuration}
+              keyboardType="number-pad"
+              editable={!bulkUploading}
+            />
 
             <TouchableOpacity
               style={[styles.pickImagesBtn, bulkUploading && { opacity: 0.5 }]}

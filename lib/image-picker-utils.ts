@@ -4,11 +4,14 @@ import { Alert, Platform, ActionSheetIOS } from "react-native";
 export interface BulkImageAsset {
   uri: string;
   fileName: string;
+  fileSize?: number;
 }
+
+const MAX_BULK_FILE_SIZE = 5 * 1024 * 1024;
 
 export async function pickMultipleImages(
   options: { quality?: number; selectionLimit?: number } = {}
-): Promise<BulkImageAsset[]> {
+): Promise<{ assets: BulkImageAsset[]; skipped: number }> {
   const { quality = 0.8, selectionLimit = 50 } = options;
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -18,12 +21,16 @@ export async function pickMultipleImages(
     selectionLimit,
   });
   if (!result.canceled && result.assets.length > 0) {
-    return result.assets.map((a, i) => ({
+    const all = result.assets.map((a, i) => ({
       uri: a.uri,
       fileName: a.fileName || `image_${i + 1}.jpg`,
+      fileSize: a.fileSize,
     }));
+    const valid = all.filter((a) => !a.fileSize || a.fileSize <= MAX_BULK_FILE_SIZE);
+    const skipped = all.length - valid.length;
+    return { assets: valid, skipped };
   }
-  return [];
+  return { assets: [], skipped: 0 };
 }
 
 let cameraPermissionAsked = false;

@@ -1448,6 +1448,66 @@ router.get("/advertisements", async (_req: Request, res: Response) => {
   }
 });
 
+router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Request, res: Response) => {
+  try {
+    const files = req.files as Express.Multer.File[] | undefined;
+    if (!files || files.length === 0) {
+      return res.status(400).json({ message: "Nessuna immagine ricevuta" });
+    }
+    const { baseName, targetUserType, displayDuration } = req.body;
+    if (!baseName || !baseName.trim()) {
+      return res.status(400).json({ message: "Nome base campagna obbligatorio" });
+    }
+    const duration = parseInt(displayDuration) || 10;
+    const created: any[] = [];
+    let failed = 0;
+    const failedFiles: string[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const campaignName =
+        files.length === 1
+          ? baseName.trim()
+          : `${baseName.trim()} #${i + 1}`;
+      try {
+        const imageUrl = await uploadAdImageToObjectStorage(file.buffer, file.originalname, file.mimetype);
+        const campaign = await storage.createAdCampaign({
+          name: campaignName,
+          sponsor: "Syneco Lubrificanti",
+          imageUrl,
+          linkUrl: null,
+          displayMode: "banner",
+          description: null,
+          targetUserType: targetUserType || "biker",
+          rotationDuration: duration,
+          rotationMode: "sequential",
+          sortOrder: 0,
+          startDate: null,
+          endDate: null,
+          placement: "home",
+        });
+        await storage.createModeratorLog({
+          moderatorId: req.session.userId!,
+          action: "create_advertisement",
+          targetType: "campaign",
+          targetId: campaign.id,
+          details: `Bulk upload: ${campaign.name} (${targetUserType || "biker"})`,
+        });
+        created.push(campaign);
+      } catch (err) {
+        console.error(`[bulk ad] Failed for file ${file.originalname}:`, err);
+        failed++;
+        failedFiles.push(file.originalname);
+      }
+    }
+
+    return res.status(201).json({ created: created.length, failed, campaigns: created, failedFiles });
+  } catch (error) {
+    console.error("Admin bulk advertisement error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.post("/advertisements", adUpload.single("image"), async (req: Request, res: Response) => {
   try {
     const { name, sponsor, linkUrl, description, targetUserType, rotationDuration, rotationMode, sortOrder, startDate, endDate, placement } = req.body;
