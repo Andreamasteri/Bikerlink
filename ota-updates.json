@@ -4455,16 +4455,16 @@
     "jsEngine": "hermes",
     "message": "OTA-142 rv7.0.0: Fix campagne (pulsante, immagini nere, health check immagini rotte)",
     "note": "Task #881: Fix pulsante Crea Campagna, fallback immagini nere admin/moderator/home. Task #883: Health check backend immagini rotte (ogni 15min), warning UI admin con badge e banner, endpoint /api/admin/advertisements/image-health. CURRENT_OTA_NUMBER=142.",
-    "releaseId": null,
-    "bundleUrl": null,
-    "updateGroupId": null,
-    "androidUpdateId": null,
+    "releaseId": "3004e9bb-e7ef-4970-af14-3e1fe7eb7a26",
+    "bundleUrl": "private/ota/ota-1.142.0-1776970357969.js",
+    "updateGroupId": "3e794f76-b13a-4cfb-a72c-bbfb17bb7e29",
+    "androidUpdateId": "019dbbb0-98b3-7692-8739-634eadb3bbbe",
     "iosUpdateId": null,
-    "commitBase": "43dc261db1c838374275b3c52eb2570868731ac0",
-    "easDashboard": null,
+    "commitBase": "489d0a010ad5e891ebf37b444191b60bb5265cdc",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/3e794f76-b13a-4cfb-a72c-bbfb17bb7e29",
     "apkBuildId": null,
     "apkVersionCode": 35,
     "apkUrl": null,
-    "status": "pending"
+    "status": "published"
   }
 ]
