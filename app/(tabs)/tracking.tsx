@@ -1265,8 +1265,6 @@ export default function TrackingScreen() {
       if (isPausedRef.current || phaseRef.current !== "active") return;
       const pos = lastPosRef.current;
       if (!pos) return;
-      // Solo se il buffer è vuoto o l'ultimo flush è avvenuto più di 20s fa
-      // (evita punti doppi se il flush normale ha già inviato recentemente)
       const point: GpsPoint = {
         latitude: pos.lat,
         longitude: pos.lng,
