@@ -94,7 +94,7 @@ export function buildLeafletRouteMapHtml(
   accentColor: string = "#FF6600",
   typeColors?: Record<string, string>,
   showMarkers: boolean = true,
-  trackPoints?: Array<{ lat: number; lng: number }>
+  trackPoints?: Array<{ lat: number; lng: number; speedKmh?: number | null }>
 ): string {
   const waypointsJson = JSON.stringify(waypoints);
   const resolvedTypeColors: Record<string, string> = {};
@@ -119,6 +119,42 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 .leaflet-container { background: #1a1a1a !important; }
 .leaflet-control-zoom { display: none !important; }
 .leaflet-control-attribution { font-size: 8px !important; opacity: 0.4; }
+.speed-legend {
+  position: absolute;
+  bottom: 20px;
+  left: 10px;
+  background: rgba(0,0,0,0.72);
+  border-radius: 8px;
+  padding: 7px 10px;
+  z-index: 1000;
+  font-family: sans-serif;
+  pointer-events: none;
+}
+.speed-legend-title {
+  font-size: 9px;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 5px;
+}
+.speed-legend-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 3px;
+}
+.speed-legend-row:last-child { margin-bottom: 0; }
+.speed-legend-dot {
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+.speed-legend-label {
+  font-size: 10px;
+  color: #e5e5e5;
+  white-space: nowrap;
+}
 </style>
 </head>
 <body>
@@ -140,10 +176,41 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 
   L.tileLayer(${JSON.stringify(tileUrl)}, { maxZoom: ${tileMaxZoom}, attribution: "" }).addTo(map);
 
+  function speedColor(kmh) {
+    if (kmh == null || kmh < 0) return null;
+    if (kmh < 60)  return "#22c55e";
+    if (kmh < 100) return "#eab308";
+    if (kmh < 130) return "#f97316";
+    return "#ef4444";
+  }
+
   if (polylinePoints.length > 0) {
     if (polylinePoints.length > 1) {
-      var latlngs = polylinePoints.map(function(p) { return [p.lat, p.lng]; });
-      L.polyline(latlngs, { color: accentColor, weight: 3, dashArray: "6 3", opacity: 0.9 }).addTo(map);
+      var hasSpeed = polylinePoints.some(function(p) { return p.speedKmh != null; });
+
+      if (hasSpeed) {
+        for (var i = 0; i < polylinePoints.length - 1; i++) {
+          var color = speedColor(polylinePoints[i].speedKmh) || accentColor;
+          L.polyline(
+            [[polylinePoints[i].lat, polylinePoints[i].lng],
+             [polylinePoints[i+1].lat, polylinePoints[i+1].lng]],
+            { color: color, weight: 4, opacity: 0.9, lineCap: "round", lineJoin: "round" }
+          ).addTo(map);
+        }
+
+        var legend = document.createElement("div");
+        legend.className = "speed-legend";
+        legend.innerHTML =
+          "<div class=\\"speed-legend-title\\">Velocit\\u00e0 km/h</div>" +
+          "<div class=\\"speed-legend-row\\"><div class=\\"speed-legend-dot\\" style=\\"background:#22c55e\\"></div><span class=\\"speed-legend-label\\">&lt; 60</span></div>" +
+          "<div class=\\"speed-legend-row\\"><div class=\\"speed-legend-dot\\" style=\\"background:#eab308\\"></div><span class=\\"speed-legend-label\\">60 – 100</span></div>" +
+          "<div class=\\"speed-legend-row\\"><div class=\\"speed-legend-dot\\" style=\\"background:#f97316\\"></div><span class=\\"speed-legend-label\\">100 – 130</span></div>" +
+          "<div class=\\"speed-legend-row\\"><div class=\\"speed-legend-dot\\" style=\\"background:#ef4444\\"></div><span class=\\"speed-legend-label\\">&gt; 130</span></div>";
+        document.body.appendChild(legend);
+      } else {
+        var latlngs = polylinePoints.map(function(p) { return [p.lat, p.lng]; });
+        L.polyline(latlngs, { color: accentColor, weight: 3, dashArray: "6 3", opacity: 0.9 }).addTo(map);
+      }
     }
 
     if (${showMarkersJs}) {
