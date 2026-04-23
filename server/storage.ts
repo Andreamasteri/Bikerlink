@@ -543,7 +543,7 @@ export class DatabaseStorage implements IStorage {
           sql`${proposals.departureLatitude} IS NOT NULL`,
           sql`${proposals.departureLongitude} IS NOT NULL`,
           sql`${proposals.searchType} IS NOT NULL`,
-          notInArray(users.role, ["admin", "moderator", "moderatore"])
+          notInArray(users.role, ["admin"])
         )
       );
     return results.map(r => r.proposal);
@@ -1042,7 +1042,7 @@ export class DatabaseStorage implements IStorage {
     const conditions = [
       eq(users.status, "active"),
       eq(users.ghostMode, false),
-      notInArray(users.role, ["admin", "moderator", "moderatore"]),
+      notInArray(users.role, ["admin"]),
       sql`${userProfiles.latitude} IS NOT NULL`,
       sql`${userProfiles.longitude} IS NOT NULL`,
     ];
@@ -1131,7 +1131,7 @@ export class DatabaseStorage implements IStorage {
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
-    const conditions: any[] = [eq(users.status, "active"), eq(users.ghostMode, false), notInArray(users.role, ["admin", "moderator", "moderatore"])];
+    const conditions: any[] = [eq(users.status, "active"), eq(users.ghostMode, false), notInArray(users.role, ["admin"])];
     if (onlineIds && onlineIds.length > 0) {
       conditions.push(inArray(users.id, onlineIds));
     } else if (!onlineIds) {
@@ -1157,7 +1157,7 @@ export class DatabaseStorage implements IStorage {
       .select({ user: users, profile: userProfiles, distance: distanceExpr })
       .from(userProfiles)
       .innerJoin(users, eq(users.id, userProfiles.userId))
-      .where(and(eq(users.status, "active"), eq(userProfiles.isAvailable, true), eq(users.ghostMode, false), notInArray(users.role, ["admin", "moderator", "moderatore"])))
+      .where(and(eq(users.status, "active"), eq(userProfiles.isAvailable, true), eq(users.ghostMode, false), notInArray(users.role, ["admin"])))
       .orderBy(sql`distance`);
     return results;
   }
@@ -1427,7 +1427,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllWishlistMotosWithUsers(countries?: string[]): Promise<{ wishlistMoto: any; userId: string }[]> {
-    const baseCondition = notInArray(users.role, ["admin", "moderator", "moderatore"]);
+    const baseCondition = notInArray(users.role, ["admin"]);
     const condition = countries && countries.length > 0
       ? and(baseCondition, inArray(users.country, countries))
       : baseCondition;
@@ -1443,7 +1443,7 @@ export class DatabaseStorage implements IStorage {
   async getAllBikerMotorcyclesWithUsers(countries?: string[]): Promise<{ motorcycle: any; userId: string }[]> {
     const baseCondition = and(
       or(eq(users.userType, "biker"), eq(users.userType, "coppia"))!,
-      notInArray(users.role, ["admin", "moderator", "moderatore"])
+      notInArray(users.role, ["admin"])
     )!;
     const condition = countries && countries.length > 0
       ? and(baseCondition, inArray(users.country, countries))
@@ -1503,7 +1503,7 @@ export class DatabaseStorage implements IStorage {
       eq(userProfiles.isAvailable, true),
       or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
       eq(users.ghostMode, false),
-      notInArray(users.role, ["admin", "moderator", "moderatore"]),
+      notInArray(users.role, ["admin"]),
       gte(users.lastLoginAt, fifteenMinutesAgo),
     ];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
@@ -1521,7 +1521,7 @@ export class DatabaseStorage implements IStorage {
       eq(userProfiles.isAvailable, true),
       eq(users.userType, "zavorrina"),
       eq(users.ghostMode, false),
-      notInArray(users.role, ["admin", "moderator", "moderatore"]),
+      notInArray(users.role, ["admin"]),
       gte(users.lastLoginAt, fifteenMinutesAgo),
     ];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
@@ -1541,7 +1541,7 @@ export class DatabaseStorage implements IStorage {
       eq(userProfiles.isAvailable, true),
       or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
       eq(users.ghostMode, false),
-      notInArray(users.role, ["admin", "moderator", "moderatore"]),
+      notInArray(users.role, ["admin"]),
     ];
     if (onlineIds && onlineIds.length > 0) {
       conditions.push(inArray(users.id, onlineIds));
@@ -1566,7 +1566,7 @@ export class DatabaseStorage implements IStorage {
       eq(userProfiles.isAvailable, true),
       eq(users.userType, "zavorrina"),
       eq(users.ghostMode, false),
-      notInArray(users.role, ["admin", "moderator", "moderatore"]),
+      notInArray(users.role, ["admin"]),
     ];
     if (onlineIds && onlineIds.length > 0) {
       conditions.push(inArray(users.id, onlineIds));
@@ -2081,14 +2081,14 @@ export class DatabaseStorage implements IStorage {
   async cleanupAdminMatches(): Promise<{ bikerZavarrina: number; bikerBiker: number }> {
     const adminUsers = await db.select({ id: users.id })
       .from(users)
-      .where(inArray(users.role, ["admin", "moderator", "moderatore"]));
+      .where(inArray(users.role, ["admin"]));
 
     if (adminUsers.length === 0) {
       return { bikerZavarrina: 0, bikerBiker: 0 };
     }
 
     const adminIds = adminUsers.map(u => u.id);
-    console.log(`[AdminCleanup] Trovati ${adminIds.length} utenti admin/moderator da escludere dai match`);
+    console.log(`[AdminCleanup] Trovati ${adminIds.length} utenti admin da escludere dai match`);
 
     let bzDeleted = 0;
     let bbDeleted = 0;
@@ -2111,7 +2111,7 @@ export class DatabaseStorage implements IStorage {
       bbDeleted += bbResult.length;
     }
 
-    console.log(`[AdminCleanup] Rimossi ${bzDeleted} match biker-zavorrina e ${bbDeleted} match biker-biker con admin/moderator`);
+    console.log(`[AdminCleanup] Rimossi ${bzDeleted} match biker-zavorrina e ${bbDeleted} match biker-biker con admin`);
     return { bikerZavarrina: bzDeleted, bikerBiker: bbDeleted };
   }
 

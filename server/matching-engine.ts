@@ -87,7 +87,7 @@ function areCompatible(p1: Proposal, p2: Proposal): boolean {
 async function runMatching(): Promise<number> {
   try {
     const activeProposals = await storage.getActiveProposalsWithLocation();
-    console.log(`[ProposalMatching] proposte attive: ${activeProposals.length} (admin/moderator esclusi)`);
+    console.log(`[ProposalMatching] proposte attive: ${activeProposals.length} (admin esclusi)`);
     if (activeProposals.length < 2) return 0;
 
     const existingKeys = await storage.getAllExistingProposalMatchKeys();
@@ -159,7 +159,7 @@ export async function runWishlistMatching(): Promise<number> {
     const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers(matchingCountries);
     const shuffledBikers = [...bikerMotorcycles].sort(() => Math.random() - 0.5);
 
-    console.log(`[WishlistMatching] wishlist entries: ${wishlistMotos.length}, biker motorcycles: ${bikerMotorcycles.length} (admin/moderator esclusi da entrambi i pool)`);
+    console.log(`[WishlistMatching] wishlist entries: ${wishlistMotos.length}, biker motorcycles: ${bikerMotorcycles.length} (admin esclusi da entrambi i pool)`);
 
     if (wishlistMotos.length === 0 || bikerMotorcycles.length === 0) {
       if (wishlistMotos.length === 0) console.warn("[WishlistMatching] WARN: nessuna wishlist trovata");
@@ -260,7 +260,7 @@ export async function runBikerBikerMatching(): Promise<number> {
     }
 
     const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers(matchingCountries);
-    console.log(`[BikerBikerMatching] moto biker trovate: ${bikerMotorcycles.length} (admin/moderator esclusi dal pool)`);
+    console.log(`[BikerBikerMatching] moto biker trovate: ${bikerMotorcycles.length} (admin esclusi dal pool)`);
     if (bikerMotorcycles.length < 2) {
       console.warn("[BikerBikerMatching] WARN: meno di 2 moto biker trovate, matching impossibile");
       return 0;

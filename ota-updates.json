@@ -4399,6 +4399,28 @@
     "apkBuildId": null,
     "apkVersionCode": 35,
     "apkUrl": null,
-    "status": "published"
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 140,
+    "version": "1.140.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-140 rv7.0.0: Fix visibilità moderatori — online list, mappa, matching",
+    "note": "Task #872: Rimosso filtro role='moderator' da tutte le query social (online-list, biker/zavorrine-list, nearby, proposals, matching). Solo role='admin' resta escluso. Ghost_mode=true su bot 'moderatore' via migration startup. CURRENT_OTA_NUMBER=140.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": null,
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 35,
+    "apkUrl": null,
+    "status": "pending"
   }
 ]

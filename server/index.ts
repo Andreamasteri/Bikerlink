@@ -1001,6 +1001,17 @@ function setupErrorHandler(app: express.Application) {
         }
         console.log("[INIT] Phase 6 club conversation sync done");
 
+        // Phase 6b: ghost_mode fix per account bot "moderatore"
+        try {
+          await db.execute(sql`
+            UPDATE users SET ghost_mode = true
+            WHERE nickname = 'moderatore' AND role = 'moderator' AND ghost_mode = false
+          `);
+          console.log("[INIT] Phase 6b: ghost_mode=true applicato all'account bot 'moderatore'");
+        } catch (e) {
+          console.warn("[INIT] Phase 6b ghost_mode fix error:", e);
+        }
+
         // Phase 7: start 6h playlist snapshot job
         const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
         const runPlaylistSnapshot = async () => {
