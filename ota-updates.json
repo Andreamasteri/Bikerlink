@@ -4509,6 +4509,27 @@
     "apkBuildId": null,
     "apkVersionCode": 35,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 145,
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-145 rv7.0.0: Fix testi slide onboarding 03 (posizione fake) v2",
+    "note": "Task #894 v2: nuovo approccio inpaint (interpolazione lineare da righe clean y=580/y=875) per eliminare artifact orizzontale. Col1: 'Usa la posizione Fake per proteggere la privacy della tua casa, Ufficio e Luoghi Sensibili'. Col2: 'Non far sapere agli altri dove vivi'. Col3: 'Ricordati di disattivarla quando esci per un giro!'. CURRENT_OTA_NUMBER=145.",
+    "releaseId": "32b528bd-3ee5-4ec4-931a-c69960f89738",
+    "bundleUrl": "private/ota/ota-1.145.0-1776981821499.js",
+    "updateGroupId": "ba5d102b-790b-43a9-9fe6-93fab5d44a83",
+    "androidUpdateId": "019dbc5f-62c3-7692-a186-7c7cf32c8fef",
+    "iosUpdateId": null,
+    "commitBase": "44be57a44a3a1bafcb2fbb2b9e75d60beee65c68",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/ba5d102b-790b-43a9-9fe6-93fab5d44a83",
+    "apkBuildId": null,
+    "apkVersionCode": 35,
+    "apkUrl": null,
     "status": "published"
   }
 ]
