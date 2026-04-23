@@ -1258,7 +1258,9 @@ export default function TrackingScreen() {
       if (!isPausedRef.current) flushPoints();
     }, BATCH_FLUSH_MS);
 
-    // Heartbeat GPS: garantisce almeno un punto salvato ogni 30 secondi
+    // Heartbeat GPS — Task #856: garantisce almeno 1 punto GPS inviato al server ogni 30s.
+    // Evita linea dritta nel percorso in caso di connessione instabile durante il giro.
+    // Usa lastPosRef (aggiornato da ogni evento Location) come posizione corrente.
     gpsHeartbeatTimerRef.current = setInterval(() => {
       if (isPausedRef.current || phaseRef.current !== "active") return;
       const pos = lastPosRef.current;
