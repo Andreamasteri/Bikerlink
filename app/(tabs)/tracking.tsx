@@ -77,7 +77,7 @@ interface LocalRouteRecord extends RouteRecord {
 
 const IDLE_THRESHOLD_KMH = 2;
 const BATCH_SIZE = 10;
-const BATCH_FLUSH_MS = 20000;
+const BATCH_FLUSH_MS = 30000;
 const GPS_BUFFER_SEGCOUNT_KEY = "@bikerlink/gps_buffer_segcount";
 const GPS_BUFFER_SEG_KEY = (n: number) => `@bikerlink/gps_buffer_seg_${n}`;
 const GPS_BUFFER_WRITE_EVERY = 5;
@@ -541,6 +541,7 @@ export default function TrackingScreen() {
   const accelSubRef = useRef<{ remove: () => void } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const flushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const gpsHeartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef(0);
   const pausedMsRef = useRef(0);
   const pauseStartRef = useRef(0);
@@ -1112,6 +1113,10 @@ export default function TrackingScreen() {
       clearInterval(flushTimerRef.current);
       flushTimerRef.current = null;
     }
+    if (gpsHeartbeatTimerRef.current) {
+      clearInterval(gpsHeartbeatTimerRef.current);
+      gpsHeartbeatTimerRef.current = null;
+    }
     if (watchSubRef.current) {
       watchSubRef.current.remove();
       watchSubRef.current = null;
@@ -1252,6 +1257,23 @@ export default function TrackingScreen() {
     flushTimerRef.current = setInterval(() => {
       if (!isPausedRef.current) flushPoints();
     }, BATCH_FLUSH_MS);
+
+    // Heartbeat GPS: garantisce almeno un punto salvato ogni 30 secondi
+    gpsHeartbeatTimerRef.current = setInterval(() => {
+      if (isPausedRef.current || phaseRef.current !== "active") return;
+      const pos = lastPosRef.current;
+      if (!pos) return;
+      const point: GpsPoint = {
+        latitude: pos.lat,
+        longitude: pos.lng,
+        altitude: 0,
+        speedKmh: 0,
+        timestamp: new Date().toISOString(),
+      };
+      pointsBufferRef.current.push(point);
+      setPointsBuffered(pointsBufferRef.current.length);
+      flushPoints();
+    }, 30000);
 
     // Avvia accelerometro solo se non già attivo (potrebbe essere già partito durante il countdown)
     if (!accelSubRef.current) {
@@ -2199,7 +2221,7 @@ export default function TrackingScreen() {
         onRequestClose={() => setSummaryVisible(false)}
       >
         <View style={styles.summaryOverlay}>
-          <View style={styles.summaryModal}>
+          <View style={[styles.summaryModal, { paddingTop: insets.top + 16 }]}>
             <View style={styles.summaryTitleRow}>
               <Ionicons name="flag-outline" size={24} color={Colors.success} />
               <Text style={styles.summaryTitle}>Giro completato!</Text>
@@ -2281,7 +2303,15 @@ export default function TrackingScreen() {
             <View style={styles.summaryActions}>
               <TouchableOpacity
                 style={styles.summaryPublishBtn}
-                onPress={() => {
+                onPress={async () => {
+                  if (completedRouteId && rideTitle.trim()) {
+                    try {
+                      await apiRequest("PATCH", `/api/routes/${completedRouteId}/title`, {
+                        title: rideTitle.trim(),
+                      });
+                      queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
+                    } catch (_) {}
+                  }
                   setSummaryVisible(false);
                   const last = completedRecords[0];
                   if (last) {
@@ -2984,15 +3014,16 @@ const styles = StyleSheet.create({
   summaryOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.75)",
-    justifyContent: "flex-end" as const,
+    justifyContent: "flex-start" as const,
   },
   summaryModal: {
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     padding: 24,
+    paddingTop: 16,
     gap: 12,
-    borderTopWidth: 1,
+    borderBottomWidth: 1,
     borderColor: Colors.border,
   },
   summaryTitleRow: {
