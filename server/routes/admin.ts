@@ -1448,23 +1448,55 @@ router.get("/advertisements", async (_req: Request, res: Response) => {
   }
 });
 
-router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Request, res: Response) => {
+const BULK_AD_MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+const bulkAdUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Solo immagini JPEG, PNG, WebP o GIF"));
+    }
+  },
+});
+
+interface BulkCampaignResult {
+  id: string;
+  name: string;
+  imageUrl: string | null;
+  targetUserType: string;
+  isActive: boolean;
+}
+
+router.post("/advertisements/bulk", bulkAdUpload.array("images", 50), async (req: Request, res: Response) => {
   try {
     const files = req.files as Express.Multer.File[] | undefined;
     if (!files || files.length === 0) {
       return res.status(400).json({ message: "Nessuna immagine ricevuta" });
     }
-    const { baseName, targetUserType, displayDuration } = req.body;
-    if (!baseName || !baseName.trim()) {
+    const { baseName, targetUserType, displayDuration } = req.body as {
+      baseName?: string;
+      targetUserType?: string;
+      displayDuration?: string;
+    };
+    if (!baseName?.trim()) {
       return res.status(400).json({ message: "Nome base campagna obbligatorio" });
     }
-    const duration = parseInt(displayDuration) || 10;
-    const created: any[] = [];
+    const duration = parseInt(displayDuration ?? "10") || 10;
+    const created: BulkCampaignResult[] = [];
     let failed = 0;
     const failedFiles: string[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      if (file.size > BULK_AD_MAX_FILE_SIZE) {
+        console.warn(`[bulk ad] Skipping "${file.originalname}": size ${file.size} > ${BULK_AD_MAX_FILE_SIZE}`);
+        failed++;
+        failedFiles.push(`${file.originalname} (troppo grande, max 5MB)`);
+        continue;
+      }
       const campaignName =
         files.length === 1
           ? baseName.trim()
@@ -1493,9 +1525,15 @@ router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Re
           targetId: campaign.id,
           details: `Bulk upload: ${campaign.name} (${targetUserType || "biker"})`,
         });
-        created.push(campaign);
+        created.push({
+          id: campaign.id,
+          name: campaign.name,
+          imageUrl: campaign.imageUrl,
+          targetUserType: campaign.targetUserType,
+          isActive: campaign.isActive,
+        });
       } catch (err) {
-        console.error(`[bulk ad] Failed for file ${file.originalname}:`, err);
+        console.error(`[bulk ad] Failed for "${file.originalname}":`, err);
         failed++;
         failedFiles.push(file.originalname);
       }

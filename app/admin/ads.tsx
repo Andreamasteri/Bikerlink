@@ -46,6 +46,15 @@ interface ImageHealthData {
   isRunning: boolean;
 }
 
+type RNFilePayload = { uri: string; name: string; type: string };
+
+interface BulkUploadResponse {
+  created: number;
+  failed: number;
+  campaigns: { id: string; name: string; imageUrl: string | null; isActive: boolean }[];
+  failedFiles: string[];
+}
+
 type TabKey = "biker" | "zavorrina" | "coppia" | "tutti";
 
 const TABS: { key: TabKey; label: string; icon: string; iconSet: "material" | "community" | "ionicons"; color: string }[] = [
@@ -156,7 +165,6 @@ export default function AdminAds() {
   const [bulkDuration, setBulkDuration] = useState("10");
   const [bulkImages, setBulkImages] = useState<BulkImageAsset[]>([]);
   const [bulkUploading, setBulkUploading] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
 
   const [settingsDuration, setSettingsDuration] = useState("10");
   const [settingsMode, setSettingsMode] = useState<"sequential" | "random">("sequential");
@@ -311,66 +319,52 @@ export default function AdminAds() {
   async function handleBulkCreate() {
     if (!bulkBaseName.trim() || bulkImages.length === 0 || bulkUploading) return;
     setBulkUploading(true);
-    setBulkProgress({ current: 0, total: bulkImages.length });
 
-    let created = 0;
-    let failed = 0;
-    const failedNames: string[] = [];
-    const baseUrl = getApiUrl();
-    const bulkUrl = new URL("/api/admin/advertisements/bulk", baseUrl).toString();
-    const duration = parseInt(bulkDuration) || 10;
+    try {
+      const formData = new FormData();
+      formData.append("baseName", bulkBaseName.trim());
+      formData.append("targetUserType", bulkTarget);
+      formData.append("displayDuration", String(parseInt(bulkDuration) || 10));
 
-    for (let i = 0; i < bulkImages.length; i++) {
-      const img = bulkImages[i];
-      const campaignName =
-        bulkImages.length === 1
-          ? bulkBaseName.trim()
-          : `${bulkBaseName.trim()} #${i + 1}`;
-      try {
-        const formData = new FormData();
-        formData.append("baseName", campaignName);
-        formData.append("targetUserType", bulkTarget);
-        formData.append("displayDuration", String(duration));
+      for (const img of bulkImages) {
         const rawFilename = img.uri.split("/").pop() || "image.jpg";
         const match = /\.(\w+)$/.exec(rawFilename);
         const mimeType = match ? `image/${match[1].toLowerCase()}` : "image/jpeg";
-        formData.append("images", { uri: img.uri, name: rawFilename, type: mimeType } as any);
-        const res = await globalThis.fetch(bulkUrl, {
-          method: "POST",
-          body: formData,
-          credentials: "include",
-        });
-        if (res.ok) {
-          const data = await res.json();
-          created += data.created ?? 1;
-          failed += data.failed ?? 0;
-          if (data.failedFiles?.length) failedNames.push(...data.failedFiles);
-        } else {
-          failed++;
-          failedNames.push(campaignName);
-        }
-      } catch {
-        failed++;
-        failedNames.push(campaignName);
+        const payload: RNFilePayload = { uri: img.uri, name: rawFilename, type: mimeType };
+        formData.append("images", payload as unknown as Blob);
       }
-      setBulkProgress({ current: i + 1, total: bulkImages.length });
+
+      const bulkUrl = new URL("/api/admin/advertisements/bulk", getApiUrl()).toString();
+      const res = await globalThis.fetch(bulkUrl, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+
+      const data: BulkUploadResponse = await res.json();
+      const created = data.created ?? 0;
+      const failed = data.failed ?? 0;
+
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/my-ads"] });
+
+      setShowBulkModal(false);
+      setBulkBaseName("");
+      setBulkImages([]);
+      setBulkTarget("tutti");
+      setBulkDuration("10");
+
+      const summary =
+        `${created} campagn${created === 1 ? "a" : "e"} creat${created === 1 ? "a" : "e"}` +
+        (failed > 0 ? `, ${failed} ignorat${failed === 1 ? "a" : "e"}.` : ".");
+      Alert.alert("Upload completato", summary);
+    } catch (err) {
+      Alert.alert("Errore", "Upload non riuscito. Riprova.");
+      console.error("[bulk upload]", err);
+    } finally {
+      setBulkUploading(false);
     }
-
-    queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/ads/my-ads"] });
-    setBulkUploading(false);
-    setBulkProgress(null);
-    setShowBulkModal(false);
-    setBulkBaseName("");
-    setBulkImages([]);
-    setBulkTarget("tutti");
-    setBulkDuration("10");
-
-    const summary =
-      `${created} campagn${created === 1 ? "a" : "e"} creat${created === 1 ? "a" : "e"}` +
-      (failed > 0 ? `, ${failed} fallite.` : ".");
-    Alert.alert("Upload completato", summary);
   }
 
   function handleCreate() {
@@ -687,22 +681,6 @@ export default function AdminAds() {
                     </View>
                   </View>
                 ))}
-              </View>
-            )}
-
-            {bulkProgress && (
-              <View style={styles.progressContainer}>
-                <View style={styles.progressBar}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      { width: `${Math.round((bulkProgress.current / bulkProgress.total) * 100)}%` as any },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.progressText}>
-                  {bulkProgress.current}/{bulkProgress.total} campagne create…
-                </Text>
               </View>
             )}
 
@@ -1170,26 +1148,5 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 10,
     color: "#fff",
-  },
-  progressContainer: {
-    marginBottom: 16,
-    gap: 8,
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: Colors.border,
-    borderRadius: 3,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: Colors.accent,
-    borderRadius: 3,
-  },
-  progressText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    textAlign: "center",
   },
 });
