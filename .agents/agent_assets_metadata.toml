@@ -6,6 +6,84 @@ uri = "file://attached_assets/generated_images/generated_image.png"
 type = "image"
 title = "generated_image"
 
+[[generated]]
+id = "hpwtl_XU1y7v_Bi2Hwja6"
+uri = "file://attached_assets/guide/01-fake-position.png"
+type = "image"
+title = "fake position guide card"
+
+[[generated]]
+id = "KPqPnz6u3Xp3PTbBt1Jod"
+uri = "file://attached_assets/guide/02-garage-moto.png"
+type = "image"
+title = "garage moto guide card fixed"
+
+[[generated]]
+id = "ZnoORvc_Ui4eAQj472uRw"
+uri = "file://attached_assets/guide/03-lastfm.png"
+type = "image"
+title = "lastfm guide card"
+
+[[generated]]
+id = "YqB1w2jnOGscaArvoJ3S8"
+uri = "file://attached_assets/guide/04-profilo.png"
+type = "image"
+title = "profile guide card"
+
+[[generated]]
+id = "UuITkRWa43mExpNCx5dJl"
+uri = "file://attached_assets/guide/05-mappa.png"
+type = "image"
+title = "map guide card"
+
+[[generated]]
+id = "y2AnUMVPirWsGwSzDfyQz"
+uri = "file://attached_assets/guide/06-match.png"
+type = "image"
+title = "match guide card"
+
+[[generated]]
+id = "5AJKjyuthl0ivxOdD3oT5"
+uri = "file://attached_assets/guide/07-ride.png"
+type = "image"
+title = "ride availability guide card"
+
+[[generated]]
+id = "x2gNabonZZvYtlHfSb7LF"
+uri = "file://attached_assets/guide/08-chat.png"
+type = "image"
+title = "chat guide card"
+
+[[generated]]
+id = "_okL3wrKhjAjPyQvX1d3d"
+uri = "file://attached_assets/guide/09-motoclub.png"
+type = "image"
+title = "motoclub guide card"
+
+[[generated]]
+id = "mjO85w3GgVuDgvBWsdeY2"
+uri = "file://attached_assets/guide/10-tracking.png"
+type = "image"
+title = "tracking guide card"
+
+[[generated]]
+id = "A1fTOkTHw5llYxEwgZkO3"
+uri = "file://attached_assets/guide/11-trip.png"
+type = "image"
+title = "trip proposals guide card"
+
+[[generated]]
+id = "fER5eMV7zgxyg5QCwoIP6"
+uri = "file://attached_assets/guide/12-eventi.png"
+type = "image"
+title = "events guide card"
+
+[[generated]]
+id = "qVnYb28_2s257S0wb505k"
+uri = "file://attached_assets/guide/13-music.png"
+type = "image"
+title = "music guide card"
+
 [[outputs]]
 id = "4Y78ngKHwO0VLy8lAIKVp"
 uri = "file://manuale-utente-bikerlink.docx"
@@ -35,3 +113,87 @@ id = "IcquHso74nCLt8hcoNy4r"
 uri = "file://docs/app-store-connect-checklist.md"
 type = "text"
 title = "Checklist App Store Connect — BikerLink"
+
+[[outputs]]
+id = "gjLc7QbnNQkT0dYHmaEAs"
+uri = "file://attached_assets/guide-bikerlink-immagini.tar.gz"
+type = "unspecified"
+title = "Guide BikerLink — 13 card JPG (tar.gz)"
+
+[[outputs]]
+id = "E7MXzQcdUjz4Yc_LHBDw4"
+uri = "file://attached_assets/guide/01-fake-position.jpg"
+type = "image"
+title = "01 — Posizione Personalizzata"
+
+[[outputs]]
+id = "pGP4T0JKirypuKtpNLo0Y"
+uri = "file://attached_assets/guide/02-garage-moto.jpg"
+type = "image"
+title = "02 — Aggiungi la tua Moto"
+
+[[outputs]]
+id = "qA0sN7a76VQjdJc4H8dSD"
+uri = "file://attached_assets/guide/03-lastfm.jpg"
+type = "image"
+title = "03 — Collega Last.FM"
+
+[[outputs]]
+id = "jVeIqpS6tHLXMmi-xkBaw"
+uri = "file://attached_assets/guide/04-profilo.jpg"
+type = "image"
+title = "04 — Profilo"
+
+[[outputs]]
+id = "umYxZEW5N9kbG00xP2knf"
+uri = "file://attached_assets/guide/05-mappa.jpg"
+type = "image"
+title = "05 — Mappa Interattiva"
+
+[[outputs]]
+id = "0gx_bTIPKqv7zfjyK5IlF"
+uri = "file://attached_assets/guide/06-match.jpg"
+type = "image"
+title = "06 — Sistema Match"
+
+[[outputs]]
+id = "lvxjNGCO8u3uWNhv2FoV7"
+uri = "file://attached_assets/guide/07-ride.jpg"
+type = "image"
+title = "07 — Ride! Disponibilità"
+
+[[outputs]]
+id = "_8inH-nlLII_EZVAo3ncz"
+uri = "file://attached_assets/guide/08-chat.jpg"
+type = "image"
+title = "08 — Chat e Messaggi"
+
+[[outputs]]
+id = "B6L3ZicssJWeHH3jytqAG"
+uri = "file://attached_assets/guide/09-motoclub.jpg"
+type = "image"
+title = "09 — Motoclub"
+
+[[outputs]]
+id = "m8dLzAwVHHLoQEzOpn1mL"
+uri = "file://attached_assets/guide/10-tracking.jpg"
+type = "image"
+title = "10 — Performance Counter"
+
+[[outputs]]
+id = "gTbALyCypxrgTZD9Ar8mn"
+uri = "file://attached_assets/guide/11-trip.jpg"
+type = "image"
+title = "11 — Trip / Proposte Gita"
+
+[[outputs]]
+id = "qZrUEH7fabrpvSD2Zz1cq"
+uri = "file://attached_assets/guide/12-eventi.jpg"
+type = "image"
+title = "12 — Raduni ed Eventi"
+
+[[outputs]]
+id = "XQDCwB4SCXrS8GIvWpgUJ"
+uri = "file://attached_assets/guide/13-music.jpg"
+type = "image"
+title = "13 — Music / Radio Biker"
