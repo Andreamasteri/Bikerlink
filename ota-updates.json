@@ -4443,6 +4443,28 @@
     "apkBuildId": null,
     "apkVersionCode": 35,
     "apkUrl": null,
-    "status": "published"
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 142,
+    "version": "1.142.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-142 rv7.0.0: Fix campagne (pulsante, immagini nere, health check immagini rotte)",
+    "note": "Task #881: Fix pulsante Crea Campagna, fallback immagini nere admin/moderator/home. Task #883: Health check backend immagini rotte (ogni 15min), warning UI admin con badge e banner, endpoint /api/admin/advertisements/image-health. CURRENT_OTA_NUMBER=142.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "43dc261db1c838374275b3c52eb2570868731ac0",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 35,
+    "apkUrl": null,
+    "status": "pending"
   }
 ]
