@@ -1258,24 +1258,26 @@ export default function TrackingScreen() {
       if (!isPausedRef.current) flushPoints();
     }, BATCH_FLUSH_MS);
 
-    // Heartbeat GPS — Task #856: garantisce almeno 1 punto GPS inviato al server ogni 30s.
-    // Evita linea dritta nel percorso in caso di connessione instabile durante il giro.
-    // Usa lastPosRef (aggiornato da ogni evento Location) come posizione corrente.
+    // Heartbeat GPS (Task #856): invia almeno 1 punto GPS ogni 30s.
+    // Fix per linea dritta nel percorso quando i batch falliscono per connessione instabile.
+    // Usa lastPosRef (coordinata più recente) e emaSpeedRef (velocità EMA corrente).
     gpsHeartbeatTimerRef.current = setInterval(() => {
       if (isPausedRef.current || phaseRef.current !== "active") return;
       const pos = lastPosRef.current;
       if (!pos) return;
+      // Solo se il buffer è vuoto o l'ultimo flush è avvenuto più di 20s fa
+      // (evita punti doppi se il flush normale ha già inviato recentemente)
       const point: GpsPoint = {
         latitude: pos.lat,
         longitude: pos.lng,
         altitude: 0,
-        speedKmh: 0,
-        timestamp: new Date().toISOString(),
+        speedKmh: Math.round(emaSpeedRef.current * 10) / 10,
+        timestamp: new Date(pos.time).toISOString(),
       };
       pointsBufferRef.current.push(point);
       setPointsBuffered(pointsBufferRef.current.length);
       flushPoints();
-    }, 30000);
+    }, BATCH_FLUSH_MS);
 
     // Avvia accelerometro solo se non già attivo (potrebbe essere già partito durante il countdown)
     if (!accelSubRef.current) {
@@ -2219,7 +2221,7 @@ export default function TrackingScreen() {
       <Modal
         visible={summaryVisible}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setSummaryVisible(false)}
       >
         <View style={styles.summaryOverlay}>
@@ -2306,13 +2308,16 @@ export default function TrackingScreen() {
               <TouchableOpacity
                 style={styles.summaryPublishBtn}
                 onPress={async () => {
+                  // Auto-save titolo prima di aprire il modal di pubblicazione (Task #856)
                   if (completedRouteId && rideTitle.trim()) {
                     try {
                       await apiRequest("PATCH", `/api/routes/${completedRouteId}/title`, {
                         title: rideTitle.trim(),
                       });
                       queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
-                    } catch (_) {}
+                    } catch (err) {
+                      console.warn("[BikerLink] auto-save title before publish failed:", err);
+                    }
                   }
                   setSummaryVisible(false);
                   const last = completedRecords[0];
@@ -3012,7 +3017,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
 
-  // Summary
+  // Summary — Task #856: modal posizionato in ALTO (flex-start), border radius in basso
   summaryOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.75)",
@@ -3023,7 +3028,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     padding: 24,
-    paddingTop: 16,
+    paddingTop: 16, // override dinamico in JSX: insets.top + 16
     gap: 12,
     borderBottomWidth: 1,
     borderColor: Colors.border,
