@@ -58,6 +58,7 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
 export async function registerRoutes(app: Express): Promise<Server> {
   app.set("trust proxy", 1);
   const PgStore = connectPgSimple(session);
+  const SESSION_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000; // 1 anno
 
   app.use(
     session({
@@ -65,12 +66,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pool,
         tableName: "session",
         createTableIfMissing: true,
+        ttl: 365 * 24 * 60 * 60, // 1 anno in secondi — allineato a maxAge
       }),
       secret: process.env.SESSION_SECRET!,
       resave: false,
       saveUninitialized: false,
+      rolling: true, // rinnova la scadenza ad ogni richiesta HTTP → sessione mai scaduta se app è usata
       cookie: {
-        maxAge: 30 * 24 * 60 * 60 * 1000,
+        maxAge: SESSION_MAX_AGE_MS,
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         // Dev: no SameSite attribute (false) → compatible with HTTP localhost, curl, and React Native native client
