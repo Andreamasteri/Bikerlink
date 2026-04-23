@@ -33,6 +33,24 @@ export async function pickMultipleImages(
   return { assets: [], skipped: 0 };
 }
 
+/**
+ * Appends a React Native image file to a FormData instance.
+ * RN FormData accepts {uri, name, type} objects for file uploads on device;
+ * this utility encapsulates that platform-specific detail in one place.
+ */
+export function appendRNImageToFormData(
+  formData: FormData,
+  key: string,
+  uri: string,
+  filename?: string,
+): void {
+  const name = filename || uri.split("/").pop() || "image.jpg";
+  const match = /\.(\w+)$/.exec(name);
+  const type = match ? `image/${match[1].toLowerCase()}` : "image/jpeg";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (formData as any).append(key, { uri, name, type });
+}
+
 let cameraPermissionAsked = false;
 
 async function ensureCameraPermission(): Promise<boolean> {

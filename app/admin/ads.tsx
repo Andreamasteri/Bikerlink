@@ -18,7 +18,7 @@ import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollV
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialIcons, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { showImagePickerMenu, pickMultipleImages, BulkImageAsset } from "@/lib/image-picker-utils";
+import { showImagePickerMenu, pickMultipleImages, appendRNImageToFormData, BulkImageAsset } from "@/lib/image-picker-utils";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 
@@ -336,10 +336,7 @@ export default function AdminAds() {
         formData.append("baseName", campaignName);
         formData.append("targetUserType", bulkTarget);
         formData.append("displayDuration", duration);
-        const filename = img.uri.split("/").pop() || "image.jpg";
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1].toLowerCase()}` : "image/jpeg";
-        formData.append("images", { uri: img.uri, name: filename, type } as any);
+        appendRNImageToFormData(formData, "images", img.uri, img.fileName);
 
         const res = await globalThis.fetch(bulkUrl, {
           method: "POST",
