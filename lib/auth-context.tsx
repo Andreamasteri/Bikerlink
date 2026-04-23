@@ -186,6 +186,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     retryDelay: (attempt) => RETRY_DELAYS[attempt] ?? 10000,
   });
 
+  // Clear sessionExpired whenever the user becomes authenticated
+  // (covers login via setQueryData, not just queryFn success).
+  useEffect(() => {
+    if (userQuery.data) {
+      setSessionExpired(false);
+    }
+  }, [userQuery.data]);
+
   // isReconnecting is true only during the INITIAL auth check when the user had a previous session.
   // Background refetches (triggered by scheduleAuthRecheck) don't set this flag.
   useEffect(() => {
