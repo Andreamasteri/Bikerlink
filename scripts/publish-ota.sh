@@ -205,6 +205,7 @@ EAS_STATUS="skipped"
 EAS_COMPLETED=0
 EAS_LOG=""
 EAS_STAGED_DIR=""
+PUBLISH_START_TS=$(date +%s)
 
 if [ -z "${EXPO_TOKEN:-}" ]; then
   echo "   ⚠️  EXPO_TOKEN non impostato — passo EAS saltato."
@@ -300,6 +301,161 @@ else
   fi
   # In caso di background in corso (EAS_COMPLETED=0), NON eliminare EAS_LOG né EAS_STAGED_DIR
   # — sono necessari per il processo setsid ancora in esecuzione
+
+  # ── Auto-recupero IDs EAS dopo timeout ──────────────────────────────────────
+  # Se EAS è andato in timeout, aspetta 60s e prova a recuperare gli ID
+  # interrogando prima il log (se il processo ha finito) poi l'API Expo GraphQL.
+  # Se gli ID vengono trovati, aggiorna automaticamente ota-updates.json.
+  if [ "$EAS_COMPLETED" -eq 0 ]; then
+    echo ""
+    echo "   ⏳ Auto-recupero EAS — attendo 60s e riprovo a leggere gli ID..."
+    sleep 60
+
+    # 1) Controlla se il processo ha terminato durante l'attesa
+    if [ -f "$EAS_EXIT_FILE" ]; then
+      EAS_EXIT_RECOVERED=$(cat "$EAS_EXIT_FILE")
+      echo "   Processo EAS terminato (exit $EAS_EXIT_RECOVERED) — leggo il log..."
+      if [ "$EAS_EXIT_RECOVERED" -eq 0 ]; then
+        set +e
+        EAS_UPDATE_GROUP_ID=$(grep -o 'Update group ID[[:space:]]*[a-f0-9-]*' "$EAS_LOG" 2>/dev/null | awk '{print $NF}' | head -1 || true)
+        EAS_ANDROID_UPDATE_ID=$(grep -o 'Android update ID[[:space:]]*[a-f0-9-]*' "$EAS_LOG" 2>/dev/null | awk '{print $NF}' | head -1 || true)
+        EAS_DASHBOARD_URL=$(grep -o 'https://expo\.dev/accounts/[^ ]*' "$EAS_LOG" 2>/dev/null | head -1 || true)
+        set -e
+        rm -f "$EAS_LOG" "$EAS_EXIT_FILE"
+        rm -rf "$EAS_STAGED_DIR"
+      else
+        echo "   ⚠️  Processo EAS terminato con errore (exit $EAS_EXIT_RECOVERED)."
+        rm -f "$EAS_LOG" "$EAS_EXIT_FILE"
+        rm -rf "$EAS_STAGED_DIR"
+      fi
+    fi
+
+    # 2) Se IDs non trovati nel log, interroga l'API Expo GraphQL
+    if [ -z "${EAS_UPDATE_GROUP_ID:-}" ] || [ "${EAS_UPDATE_GROUP_ID:-}" = "N/A" ]; then
+      echo "   Interrogo API Expo GraphQL per recuperare gli ID..."
+      GQL_QUERY='{"query":"{ app { byFullName(fullName: \"@andreamasteri/bikerlink\") { updateBranchByName(name: \"preview\") { updates(limit: 10) { id group message createdAt } } } } }"}'
+      set +e
+      GQL_RESPONSE=$(curl -s --max-time 30 -X POST https://api.expo.dev/graphql \
+        -H "Authorization: Bearer $EXPO_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "$GQL_QUERY" 2>/dev/null || true)
+      set -e
+
+      if echo "${GQL_RESPONSE:-}" | grep -q '"updates"'; then
+        # Filtra per messaggio == RELEASE_NOTES E createdAt >= PUBLISH_START_TS - 600s
+        # per evitare di associare IDs di OTA diverse pubblicate sullo stesso branch.
+        _GQL_NOTES="$RELEASE_NOTES"
+        _GQL_START="$PUBLISH_START_TS"
+        EAS_UPDATE_GROUP_ID=$(echo "$GQL_RESPONSE" | \
+          EAS_NOTES="$_GQL_NOTES" EAS_START="$_GQL_START" node -e "
+process.stdin.resume();
+const chunks=[];
+process.stdin.on('data',c=>chunks.push(c));
+process.stdin.on('end',()=>{
+  try{
+    const d=JSON.parse(chunks.join(''));
+    const all=(d&&d.data&&d.data.app&&d.data.app.byFullName&&d.data.app.byFullName.updateBranchByName&&d.data.app.byFullName.updateBranchByName.updates)||[];
+    const notes=process.env.EAS_NOTES;
+    const startTs=parseInt(process.env.EAS_START||'0',10);
+    const match=all.find(u=>u.message===notes && (new Date(u.createdAt).getTime()/1000)>=(startTs-600));
+    process.stdout.write((match&&match.group)||'');
+  }catch(e){process.stdout.write('');}
+});
+" 2>/dev/null || true)
+        EAS_ANDROID_UPDATE_ID=$(echo "$GQL_RESPONSE" | \
+          EAS_NOTES="$_GQL_NOTES" EAS_START="$_GQL_START" node -e "
+process.stdin.resume();
+const chunks=[];
+process.stdin.on('data',c=>chunks.push(c));
+process.stdin.on('end',()=>{
+  try{
+    const d=JSON.parse(chunks.join(''));
+    const all=(d&&d.data&&d.data.app&&d.data.app.byFullName&&d.data.app.byFullName.updateBranchByName&&d.data.app.byFullName.updateBranchByName.updates)||[];
+    const notes=process.env.EAS_NOTES;
+    const startTs=parseInt(process.env.EAS_START||'0',10);
+    const match=all.find(u=>u.message===notes && (new Date(u.createdAt).getTime()/1000)>=(startTs-600));
+    process.stdout.write((match&&match.id)||'');
+  }catch(e){process.stdout.write('');}
+});
+" 2>/dev/null || true)
+        if [ -z "${EAS_UPDATE_GROUP_ID:-}" ]; then
+          echo "   ⚠️  Nessun update trovato su GraphQL con messaggio corrispondente e timestamp >= avvio EAS."
+        fi
+      else
+        echo "   ⚠️  Risposta GraphQL non valida o IDs non ancora disponibili."
+      fi
+    fi
+
+    # 3) Se IDs trovati, costruisci dashboard URL e aggiorna ota-updates.json
+    if [ -n "${EAS_UPDATE_GROUP_ID:-}" ] && [ "${EAS_UPDATE_GROUP_ID:-}" != "N/A" ]; then
+      [ -z "${EAS_DASHBOARD_URL:-}" ] && EAS_DASHBOARD_URL="https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/$EAS_UPDATE_GROUP_ID"
+      EAS_STATUS="pubblicato (IDs recuperati automaticamente dopo timeout)"
+      EAS_COMPLETED=1
+      echo "   ✅ IDs EAS recuperati — group: $EAS_UPDATE_GROUP_ID"
+
+      # Aggiorna ota-updates.json: trova entry con commitBase == GIT_COMMIT_HASH
+      # e updateGroupId mancante/null, e imposta gli ID recuperati.
+      OTA_JSON_FILE="$(cd "$(dirname "$0")/.." && pwd)/ota-updates.json"
+      if [ -f "$OTA_JSON_FILE" ]; then
+        set +e
+        _UPD_RESULT=$(EAS_GRP="$EAS_UPDATE_GROUP_ID" \
+          EAS_AID="$EAS_ANDROID_UPDATE_ID" \
+          EAS_DASH="$EAS_DASHBOARD_URL" \
+          OTA_COMMIT="$GIT_COMMIT_HASH" \
+          OTA_FILE="$OTA_JSON_FILE" \
+          node -e "
+const fs=require('fs');
+const file=process.env.OTA_FILE;
+const grp=process.env.EAS_GRP;
+const aid=process.env.EAS_AID;
+const dash=process.env.EAS_DASH;
+const commit=process.env.OTA_COMMIT;
+try{
+  const data=JSON.parse(fs.readFileSync(file,'utf8'));
+  let updated=false;
+  for(const e of data){
+    if(e.commitBase===commit && (!e.updateGroupId||e.updateGroupId===null)){
+      e.updateGroupId=grp;
+      if(aid)e.androidUpdateId=aid;
+      if(dash)e.easDashboard=dash;
+      updated=true;
+      break;
+    }
+  }
+  if(updated){
+    fs.writeFileSync(file,JSON.stringify(data,null,2)+'\n');
+    process.stdout.write('OK');
+  }else{
+    process.stdout.write('NO_MATCH');
+  }
+}catch(err){
+  process.stderr.write(err.message);
+  process.stdout.write('ERR');
+}
+" 2>/tmp/ota-json-update-err-$$.txt)
+        _UPD_EXIT=$?
+        set -e
+        if [ "$_UPD_RESULT" = "OK" ] && [ $_UPD_EXIT -eq 0 ]; then
+          echo "   ✅ ota-updates.json aggiornato automaticamente con gli ID recuperati"
+        elif [ "$_UPD_RESULT" = "NO_MATCH" ]; then
+          echo "   ⚠️  ota-updates.json: nessuna entry con commitBase=$GIT_COMMIT_SHORT e updateGroupId=null"
+          echo "   Aggiorna manualmente: updateGroupId=$EAS_UPDATE_GROUP_ID"
+        else
+          echo "   ⚠️  Errore aggiornamento ota-updates.json: $(cat /tmp/ota-json-update-err-$$.txt 2>/dev/null || true)"
+        fi
+        rm -f "/tmp/ota-json-update-err-$$.txt"
+      else
+        echo "   ⚠️  ota-updates.json non trovato — aggiorna manualmente:"
+        echo "   updateGroupId=$EAS_UPDATE_GROUP_ID"
+        [ -n "${EAS_ANDROID_UPDATE_ID:-}" ] && echo "   androidUpdateId=$EAS_ANDROID_UPDATE_ID"
+      fi
+    else
+      echo "   ⚠️  IDs EAS non disponibili dopo 60s di attesa."
+      echo "   Dashboard: https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates"
+      echo "   Quando la pubblicazione EAS sarà completata, aggiorna manualmente ota-updates.json."
+    fi
+  fi
+  # ── Fine auto-recupero ───────────────────────────────────────────────────────
 fi
 
 echo ""
