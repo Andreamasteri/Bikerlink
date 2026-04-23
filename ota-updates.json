@@ -4421,6 +4421,28 @@
     "apkBuildId": null,
     "apkVersionCode": 35,
     "apkUrl": null,
-    "status": "published"
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 141,
+    "version": "1.141.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-141 rv7.0.0: Pagina web eliminazione account (/delete-account) — requisito Play Store",
+    "note": "Task #880: Aggiunta pagina pubblica /delete-account con istruzioni in-app e link mailto privacy@bikerlink.app. Requisito obbligatorio per submission Google Play Store. Task #872 (fix moderatori) già in produzione via rideploy. CURRENT_OTA_NUMBER=141.",
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "18e3df507f1427094d1081e518f3cec9eac994d2",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 35,
+    "apkUrl": null,
+    "status": "pending"
   }
 ]
