@@ -804,12 +804,32 @@ function setupErrorHandler(app: express.Application) {
         }
 
         try {
+          // Prima: rileva e risolvi eventuali nickname duplicati case-insensitive già presenti
+          const dupes = await db.execute(sql`
+            SELECT LOWER(nickname) AS lower_nick, array_agg(id ORDER BY created_at DESC) AS ids
+            FROM users
+            GROUP BY LOWER(nickname)
+            HAVING COUNT(*) > 1
+          `);
+          if (dupes.rows.length > 0) {
+            console.warn(`[MIGRATION] Trovati ${dupes.rows.length} gruppi di nickname duplicati (case-insensitive) — rinomino i duplicati non-primari`);
+            for (const row of dupes.rows) {
+              const ids = row.ids as string[];
+              // Il primo (più recente per created_at) è il "vincitore" — gli altri vengono rinominati
+              for (let i = 1; i < ids.length; i++) {
+                const newNickname = `${row.lower_nick}_dup${i}`;
+                await db.execute(sql`UPDATE users SET nickname = ${newNickname} WHERE id = ${ids[i]}`);
+                console.warn(`[MIGRATION] Nickname duplicato rinominato: id=${ids[i]} → ${newNickname}`);
+              }
+            }
+          }
+          // Poi: crea l'indice UNIQUE case-insensitive (ora sicuro, nessun duplicato)
           await db.execute(sql`
             CREATE UNIQUE INDEX IF NOT EXISTS users_nickname_lower_unique_idx ON users (LOWER(nickname))
           `);
           console.log("[MIGRATION] Indice UNIQUE case-insensitive su users.nickname creato/già esistente");
         } catch (e) {
-          console.warn("[MIGRATION] users nickname lower unique index:", e);
+          console.error("[MIGRATION] ERRORE CRITICO users nickname lower unique index:", e);
         }
 
         // Autovacuum aggressivo sulle tabelle soggette a bloat da DELETE massivi
