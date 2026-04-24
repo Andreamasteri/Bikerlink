@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Platform,
   BackHandler,
+  Switch,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
@@ -199,6 +200,7 @@ export default function AdminAds() {
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [editGroupName, setEditGroupName] = useState("");
   const [editGroupLinkUrl, setEditGroupLinkUrl] = useState("");
+  const [editGroupIsActive, setEditGroupIsActive] = useState(true);
 
   const [settingsDuration, setSettingsDuration] = useState("10");
   const [settingsMode, setSettingsMode] = useState<"sequential" | "random">("sequential");
@@ -311,10 +313,11 @@ export default function AdminAds() {
   });
 
   const groupEditMutation = useMutation({
-    mutationFn: async ({ groupId, name, linkUrl }: { groupId: string; name: string; linkUrl: string }) => {
+    mutationFn: async ({ groupId, name, linkUrl, isActive }: { groupId: string; name: string; linkUrl: string; isActive: boolean }) => {
       const res = await apiRequest("PUT", `/api/admin/advertisements/group/${groupId}`, {
         name: name.trim(),
         linkUrl: linkUrl.trim() || null,
+        isActive,
       });
       return res.json();
     },
@@ -497,8 +500,10 @@ export default function AdminAds() {
     if (groupCampaigns.length === 0) return;
     const firstName = groupCampaigns[0].name.replace(/\s*#\d+$/, "");
     const firstLink = groupCampaigns[0].linkUrl ?? "";
+    const allActive = groupCampaigns.every((c) => c.isActive);
     setEditGroupName(firstName);
     setEditGroupLinkUrl(firstLink);
+    setEditGroupIsActive(allActive);
     setEditingGroupId(groupId);
   }
 
@@ -1028,7 +1033,7 @@ export default function AdminAds() {
               />
               <Text style={styles.settingsLabel}>Link URL (opzionale)</Text>
               <TextInput
-                style={[styles.input, { marginBottom: 20 }]}
+                style={[styles.input, { marginBottom: 16 }]}
                 placeholder="https://..."
                 placeholderTextColor={Colors.textSecondary}
                 value={editGroupLinkUrl}
@@ -1037,9 +1042,18 @@ export default function AdminAds() {
                 autoCapitalize="none"
                 autoCorrect={false}
               />
+              <View style={styles.toggleRow}>
+                <Text style={styles.settingsLabel}>Campagne attive</Text>
+                <Switch
+                  value={editGroupIsActive}
+                  onValueChange={setEditGroupIsActive}
+                  trackColor={{ false: Colors.surface, true: Colors.accent }}
+                  thumbColor="#fff"
+                />
+              </View>
               <TouchableOpacity
-                style={[styles.submitBtn, { opacity: (!editGroupName.trim() || groupEditMutation.isPending) ? 0.4 : 1 }]}
-                onPress={() => { if (editingGroupId && editGroupName.trim()) groupEditMutation.mutate({ groupId: editingGroupId, name: editGroupName, linkUrl: editGroupLinkUrl }); }}
+                style={[styles.submitBtn, { opacity: (!editGroupName.trim() || groupEditMutation.isPending) ? 0.4 : 1, marginTop: 20 }]}
+                onPress={() => { if (editingGroupId && editGroupName.trim()) groupEditMutation.mutate({ groupId: editingGroupId, name: editGroupName, linkUrl: editGroupLinkUrl, isActive: editGroupIsActive }); }}
                 disabled={!editGroupName.trim() || groupEditMutation.isPending}
               >
                 {groupEditMutation.isPending ? (
@@ -1369,6 +1383,12 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 11,
     color: Colors.accent,
+  },
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 4,
   },
   overlayBg: {
     flex: 1,

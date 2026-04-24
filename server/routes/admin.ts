@@ -1650,7 +1650,7 @@ router.delete("/advertisements/bulk-delete", async (req: Request, res: Response)
 router.put("/advertisements/group/:groupId", async (req: Request, res: Response) => {
   try {
     const { groupId } = req.params;
-    const { name, linkUrl } = req.body as { name?: string; linkUrl?: string };
+    const { name, linkUrl, isActive } = req.body as { name?: string; linkUrl?: string; isActive?: boolean };
     if (!name?.trim()) {
       return res.status(400).json({ message: "Nome base obbligatorio" });
     }
@@ -1667,18 +1667,21 @@ router.put("/advertisements/group/:groupId", async (req: Request, res: Response)
     const updated = [];
     for (let i = 0; i < sorted.length; i++) {
       const newName = sorted.length === 1 ? name.trim() : `${name.trim()} #${i + 1}`;
+      const updatePayload: Record<string, unknown> = { name: newName, linkUrl: linkUrl?.trim() || null };
+      if (typeof isActive === "boolean") updatePayload.isActive = isActive;
       const [upd] = await db.update(adCampaignsTable)
-        .set({ name: newName, linkUrl: linkUrl?.trim() || null })
+        .set(updatePayload)
         .where(eq(adCampaignsTable.id, sorted[i].id))
         .returning();
       updated.push(upd);
     }
+    const activeLabel = typeof isActive === "boolean" ? `, isActive=${isActive}` : "";
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
       action: "update_advertisement_group",
       targetType: "campaign",
       targetId: groupId,
-      details: `Gruppo aggiornato: ${name.trim()} (${updated.length} campagne)`,
+      details: `Gruppo aggiornato: ${name.trim()} (${updated.length} campagne${activeLabel})`,
     });
     return res.json(updated);
   } catch (error) {
