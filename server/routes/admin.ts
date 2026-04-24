@@ -1478,8 +1478,21 @@ router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Re
     const { randomUUID } = await import("crypto");
     const batchGroupId = files.length > 1 ? randomUUID() : null;
 
-    const results = await Promise.allSettled(
-      files.map(async (file, i) => {
+    const BULK_CONCURRENCY = 10;
+    async function allSettledLimited<T>(
+      fns: (() => Promise<T>)[],
+      limit: number
+    ): Promise<PromiseSettledResult<T>[]> {
+      const results: PromiseSettledResult<T>[] = [];
+      for (let i = 0; i < fns.length; i += limit) {
+        const batch = fns.slice(i, i + limit).map(fn => fn());
+        results.push(...await Promise.allSettled(batch));
+      }
+      return results;
+    }
+
+    const results = await allSettledLimited<BulkCampaignResult>(
+      files.map((file, i) => async () => {
         if (file.size > BULK_AD_MAX_FILE_SIZE) {
           throw new Error(`${file.originalname} (troppo grande, max 5MB)`);
         }
@@ -1519,7 +1532,8 @@ router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Re
           targetUserType: campaign.targetUserType,
           isActive: campaign.isActive,
         } as BulkCampaignResult;
-      })
+      }),
+      BULK_CONCURRENCY
     );
 
     const created: BulkCampaignResult[] = [];
