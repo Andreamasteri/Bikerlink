@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -85,6 +85,10 @@ function CampaignCard({
         return `${base}${base.includes("?") ? "&" : "?"}v=${v}`;
       })()
     : null;
+
+  useEffect(() => {
+    setImageError(false);
+  }, [imageUri]);
 
   return (
     <View style={[styles.card, isBroken && styles.cardBroken]}>

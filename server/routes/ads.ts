@@ -17,6 +17,13 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
   }
   try {
     const imageBuffer = await downloadBuffer(`public/ads/${filename}`);
+    try {
+      const localDir = path.resolve(process.cwd(), "uploads", "ads");
+      fs.mkdirSync(localDir, { recursive: true });
+      fs.writeFileSync(localPath, imageBuffer);
+    } catch (writeErr) {
+      console.warn("Ad image disk cache write failed (non-fatal):", writeErr);
+    }
     const ext = path.extname(filename).toLowerCase();
     const mimeMap: Record<string, string> = {
       ".jpg": "image/jpeg",
