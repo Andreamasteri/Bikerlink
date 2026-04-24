@@ -270,6 +270,78 @@ uri = "file://exports/feature-images/30-bikerlink-benvenuto.png"
 type = "image"
 title = "generated_image"
 
+[[generated]]
+id = "s1lDZJsWGqTyZCsyBOB0u"
+uri = "file://assets/screenshots/phone/ScreenPhone-01.png"
+type = "image"
+title = "bikerlink map screen phone"
+
+[[generated]]
+id = "Cas6avVYOCMd0mSN_Mw1i"
+uri = "file://assets/screenshots/phone/ScreenPhone-02.png"
+type = "image"
+title = "bikerlink match screen phone"
+
+[[generated]]
+id = "KcWloSLuGvEysGsGugt8y"
+uri = "file://assets/screenshots/phone/ScreenPhone-03.png"
+type = "image"
+title = "bikerlink motoclub screen phone"
+
+[[generated]]
+id = "6riQLOIyiIV4uqva4ytcH"
+uri = "file://assets/screenshots/phone/ScreenPhone-04.png"
+type = "image"
+title = "bikerlink chat screen phone"
+
+[[generated]]
+id = "87yTEX1O3D32cQmeRtb7h"
+uri = "file://assets/screenshots/phone/ScreenPhone-05.png"
+type = "image"
+title = "bikerlink tracking screen phone"
+
+[[generated]]
+id = "5_ZuCR8CD28in4auHiPkk"
+uri = "file://assets/screenshots/phone/ScreenPhone-06.png"
+type = "image"
+title = "bikerlink garage screen phone"
+
+[[generated]]
+id = "oaWUuhp4L2MeMI8kP_ib6"
+uri = "file://assets/screenshots/phone/ScreenPhone-07.png"
+type = "image"
+title = "bikerlink proposals screen phone"
+
+[[generated]]
+id = "bUDs1NNRaFsUFpaWFYIIB"
+uri = "file://assets/screenshots/phone/ScreenPhone-08.png"
+type = "image"
+title = "bikerlink profile screen phone"
+
+[[generated]]
+id = "H3JzLl7mVNUmVmKhH9tmI"
+uri = "file://assets/screenshots/chromebook/ScreenChromebook-01.png"
+type = "image"
+title = "bikerlink map chromebook landscape"
+
+[[generated]]
+id = "4-Z71v4i4Li2rmPxfXDWE"
+uri = "file://assets/screenshots/chromebook/ScreenChromebook-02.png"
+type = "image"
+title = "bikerlink match chromebook landscape"
+
+[[generated]]
+id = "MqHTS2IkMZ_njC-xgBBNt"
+uri = "file://assets/screenshots/chromebook/ScreenChromebook-03.png"
+type = "image"
+title = "bikerlink events chromebook landscape"
+
+[[generated]]
+id = "xAMCJ5wxZ-bodNG9ZlpkY"
+uri = "file://assets/screenshots/chromebook/ScreenChromebook-04.png"
+type = "image"
+title = "bikerlink motoclub chromebook landscape"
+
 [[outputs]]
 id = "4Y78ngKHwO0VLy8lAIKVp"
 uri = "file://manuale-utente-bikerlink.docx"
