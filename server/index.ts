@@ -580,6 +580,12 @@ function setupErrorHandler(app: express.Application) {
         }
 
         try {
+          await db.execute(sql`ALTER TABLE ad_campaigns ADD COLUMN IF NOT EXISTS group_id TEXT`);
+        } catch (e) {
+          console.warn("[MIGRATION] ad_campaigns.group_id:", e);
+        }
+
+        try {
           await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ghost_mode BOOLEAN NOT NULL DEFAULT false`);
         } catch (e) {
           console.warn("[MIGRATION] users.ghost_mode:", e);

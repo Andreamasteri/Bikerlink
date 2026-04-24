@@ -537,6 +537,7 @@ export const adCampaigns = pgTable("ad_campaigns", {
   sortOrder: integer("sort_order").notNull().default(0),
   placement: varchar("placement", { length: 30 }).notNull().default("all"),
   imageVersion: integer("image_version").notNull().default(0),
+  groupId: text("group_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

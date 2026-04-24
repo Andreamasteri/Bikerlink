@@ -4532,5 +4532,29 @@
     "apkVersionCode": 35,
     "apkUrl": null,
     "status": "published"
+  },
+  {
+    "updateNumber": 146,
+    "version": "1.146.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-146: Gestione campagne pubblicitarie — groupId bulk upload, linkUrl bulk, pulsante modifica singola (nome+link), modifica gruppo, Elimina tutte, BackHandler Android",
+    "publishedAt": "2026-04-24",
+    "runtimeVersion": "7.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #911 — 6 feature admin/ads.tsx: (1) bulk upload assegna groupId condiviso, (2) campo linkUrl nel bulk modal, (3) pulsante modifica campagna singola (nome+linkUrl), (4) modal modifica gruppo per campagne raggruppate, (5) pulsante Elimina tutte con conferma, (6) BackHandler Android in admin/ads.tsx e moderator/campaigns.tsx. CURRENT_OTA_NUMBER=146.",
+    "releaseId": "dff157f8-f2cc-49ff-9fb3-7c50b3f3e4fe",
+    "bundleUrl": "private/ota/ota-1.146.0-1777031874702.js",
+    "updateGroupId": "7856c434-6c42-48e7-bc38-4222b0c15b45",
+    "androidUpdateId": "019dbf5b-a4c1-7e60-a172-97a68a772812",
+    "iosUpdateId": null,
+    "commitBase": "d37b01ff33844143bc70651a9d45aec8568515e1",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/7856c434-6c42-48e7-bc38-4222b0c15b45",
+    "apkBuildId": null,
+    "apkVersionCode": 35,
+    "apkUrl": null,
+    "status": "published"
   }
 ]

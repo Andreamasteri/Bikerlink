@@ -1464,10 +1464,11 @@ router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Re
     if (!files || files.length === 0) {
       return res.status(400).json({ message: "Nessuna immagine ricevuta" });
     }
-    const { baseName, targetUserType, displayDuration } = req.body as {
+    const { baseName, targetUserType, displayDuration, linkUrl } = req.body as {
       baseName?: string;
       targetUserType?: string;
       displayDuration?: string;
+      linkUrl?: string;
     };
     if (!baseName?.trim()) {
       return res.status(400).json({ message: "Nome base campagna obbligatorio" });
@@ -1476,6 +1477,8 @@ router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Re
     const created: BulkCampaignResult[] = [];
     let failed = 0;
     const failedFiles: string[] = [];
+    const { randomUUID } = await import("crypto");
+    const batchGroupId = files.length > 1 ? randomUUID() : null;
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -1495,7 +1498,7 @@ router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Re
           name: campaignName,
           sponsor: "Syneco Lubrificanti",
           imageUrl,
-          linkUrl: null,
+          linkUrl: linkUrl?.trim() || null,
           displayMode: "banner",
           description: null,
           targetUserType: targetUserType || "biker",
@@ -1505,13 +1508,14 @@ router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Re
           startDate: null,
           endDate: null,
           placement: "home",
+          groupId: batchGroupId,
         });
         await storage.createModeratorLog({
           moderatorId: req.session.userId!,
           action: "create_advertisement",
           targetType: "campaign",
           targetId: campaign.id,
-          details: `Bulk upload: ${campaign.name} (${targetUserType || "biker"})`,
+          details: `Bulk upload: ${campaign.name} (${targetUserType || "biker"})${batchGroupId ? ` gruppo=${batchGroupId}` : ""}`,
         });
         created.push({
           id: campaign.id,
@@ -1527,7 +1531,7 @@ router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Re
       }
     }
 
-    return res.status(201).json({ created: created.length, failed, campaigns: created, failedFiles });
+    return res.status(201).json({ created: created.length, failed, campaigns: created, failedFiles, groupId: batchGroupId });
   } catch (error) {
     console.error("Admin bulk advertisement error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -1611,6 +1615,68 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
     return res.json(campaign);
   } catch (error) {
     console.error("Admin update advertisement error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/advertisements/bulk-delete", async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body as { ids?: string[] };
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "Array di ID campagne obbligatorio" });
+    }
+    const { adCampaigns: adCampaignsTable } = await import("@shared/schema");
+    await db.delete(adCampaignsTable).where(inArray(adCampaignsTable.id, ids));
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "bulk_delete_advertisements",
+      targetType: "campaign",
+      targetId: ids.join(",").substring(0, 200),
+      details: `Eliminate ${ids.length} campagne in blocco`,
+    });
+    return res.json({ deleted: ids.length });
+  } catch (error) {
+    console.error("Admin bulk delete advertisements error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.put("/advertisements/group/:groupId", async (req: Request, res: Response) => {
+  try {
+    const { groupId } = req.params;
+    const { name, linkUrl } = req.body as { name?: string; linkUrl?: string };
+    if (!name?.trim()) {
+      return res.status(400).json({ message: "Nome base obbligatorio" });
+    }
+    const { adCampaigns: adCampaignsTable } = await import("@shared/schema");
+    const existing = await db.select().from(adCampaignsTable).where(eq(adCampaignsTable.groupId, groupId));
+    if (existing.length === 0) {
+      return res.status(404).json({ message: "Gruppo non trovato" });
+    }
+    const sorted = [...existing].sort((a, b) => {
+      const numA = parseInt(a.name.match(/#(\d+)$/)?.[1] ?? "0");
+      const numB = parseInt(b.name.match(/#(\d+)$/)?.[1] ?? "0");
+      return numA - numB;
+    });
+    const updated = [];
+    for (let i = 0; i < sorted.length; i++) {
+      const newName = sorted.length === 1 ? name.trim() : `${name.trim()} #${i + 1}`;
+      const [upd] = await db.update(adCampaignsTable)
+        .set({ name: newName, linkUrl: linkUrl?.trim() || null })
+        .where(eq(adCampaignsTable.id, sorted[i].id))
+        .returning();
+      updated.push(upd);
+    }
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_advertisement_group",
+      targetType: "campaign",
+      targetId: groupId,
+      details: `Gruppo aggiornato: ${name.trim()} (${updated.length} campagne)`,
+    });
+    return res.json(updated);
+  } catch (error) {
+    console.error("Admin update advertisement group error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

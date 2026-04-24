@@ -12,6 +12,7 @@ import {
   Image,
   ActivityIndicator,
   Platform,
+  BackHandler,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
@@ -38,6 +39,7 @@ interface Campaign {
   sortOrder: number;
   placement: string;
   imageVersion: number;
+  groupId: string | null;
 }
 
 interface ImageHealthData {
@@ -67,11 +69,17 @@ function CampaignCard({
   item,
   onToggle,
   onDelete,
+  onEdit,
+  onEditGroup,
+  groupCount,
   isBroken,
 }: {
   item: Campaign;
   onToggle: (id: string, isActive: boolean) => void;
   onDelete: (item: Campaign) => void;
+  onEdit: (item: Campaign) => void;
+  onEditGroup?: () => void;
+  groupCount?: number;
   isBroken?: boolean;
 }) {
   const [imageError, setImageError] = useState(false);
@@ -126,8 +134,19 @@ function CampaignCard({
                 <Text style={[styles.badgeText, { color: Colors.error }]}>Immagine rotta</Text>
               </View>
             )}
+            {groupCount && groupCount > 1 ? (
+              <View style={[styles.badge, { backgroundColor: Colors.accent + "22" }]}>
+                <Text style={[styles.badgeText, { color: Colors.accent }]}>Gruppo ({groupCount})</Text>
+              </View>
+            ) : null}
             <Text style={styles.cardImpressions}>{item.impressions} impressioni</Text>
           </View>
+          {groupCount && groupCount > 1 && onEditGroup ? (
+            <TouchableOpacity onPress={onEditGroup} style={styles.groupEditBtn}>
+              <MaterialIcons name="folder-special" size={13} color={Colors.accent} />
+              <Text style={styles.groupEditBtnText}>Modifica gruppo</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
         <View style={styles.cardActions}>
           {item.isActive ? (
@@ -139,6 +158,9 @@ function CampaignCard({
               <MaterialIcons name="play-circle-filled" size={28} color={Colors.success} />
             </TouchableOpacity>
           )}
+          <TouchableOpacity onPress={() => onEdit(item)} style={styles.actionBtn}>
+            <MaterialIcons name="edit" size={22} color={Colors.accent} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => onDelete(item)} style={styles.actionBtn}>
             <MaterialIcons name="delete-outline" size={26} color={Colors.error} />
           </TouchableOpacity>
@@ -165,9 +187,18 @@ export default function AdminAds() {
   const [bulkBaseName, setBulkBaseName] = useState("");
   const [bulkTarget, setBulkTarget] = useState<TabKey>("tutti");
   const [bulkDuration, setBulkDuration] = useState("10");
+  const [bulkLinkUrl, setBulkLinkUrl] = useState("");
   const [bulkImages, setBulkImages] = useState<BulkImageAsset[]>([]);
   const [bulkUploading, setBulkUploading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
+
+  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editLinkUrl, setEditLinkUrl] = useState("");
+
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editGroupName, setEditGroupName] = useState("");
+  const [editGroupLinkUrl, setEditGroupLinkUrl] = useState("");
 
   const [settingsDuration, setSettingsDuration] = useState("10");
   const [settingsMode, setSettingsMode] = useState<"sequential" | "random">("sequential");
@@ -263,6 +294,65 @@ export default function AdminAds() {
     },
   });
 
+  const singleEditMutation = useMutation({
+    mutationFn: async ({ id, name, linkUrl }: { id: string; name: string; linkUrl: string }) => {
+      const res = await apiRequest("PUT", `/api/admin/advertisements/${id}`, {
+        name: name.trim(),
+        linkUrl: linkUrl.trim() || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
+      setEditingCampaign(null);
+    },
+    onError: (err: Error) => Alert.alert("Errore", err.message),
+  });
+
+  const groupEditMutation = useMutation({
+    mutationFn: async ({ groupId, name, linkUrl }: { groupId: string; name: string; linkUrl: string }) => {
+      const res = await apiRequest("PUT", `/api/admin/advertisements/group/${groupId}`, {
+        name: name.trim(),
+        linkUrl: linkUrl.trim() || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
+      setEditingGroupId(null);
+    },
+    onError: (err: Error) => Alert.alert("Errore", err.message),
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await apiRequest("DELETE", "/api/admin/advertisements/bulk-delete", { ids });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/my-ads"] });
+    },
+    onError: (err: Error) => Alert.alert("Errore", err.message),
+  });
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const onBack = () => {
+      if (editingCampaign) { setEditingCampaign(null); return true; }
+      if (editingGroupId) { setEditingGroupId(null); return true; }
+      if (showCreateModal) { setShowCreateModal(false); resetForm(); return true; }
+      if (showBulkModal) { if (!bulkUploading) { setShowBulkModal(false); setBulkBaseName(""); setBulkImages([]); setBulkTarget("tutti"); setBulkLinkUrl(""); } return true; }
+      if (showSettingsModal) { setShowSettingsModal(false); return true; }
+      return false;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBack);
+    return () => sub.remove();
+  }, [editingCampaign, editingGroupId, showCreateModal, showBulkModal, showSettingsModal, bulkUploading]);
+
   async function handleRestartAll() {
     const activeCampaigns = campaigns.filter((c) => c.isActive);
     if (activeCampaigns.length === 0) return;
@@ -328,41 +418,39 @@ export default function AdminAds() {
     const failedNames: string[] = [];
     const bulkUrl = new URL("/api/admin/advertisements/bulk", getApiUrl()).toString();
     const duration = String(parseInt(bulkDuration) || 10);
+    const formData = new FormData();
+    formData.append("baseName", bulkBaseName.trim());
+    formData.append("targetUserType", bulkTarget);
+    formData.append("displayDuration", duration);
+    if (bulkLinkUrl.trim()) formData.append("linkUrl", bulkLinkUrl.trim());
     for (let i = 0; i < bulkImages.length; i++) {
       const img = bulkImages[i];
-      const campaignName =
-        bulkImages.length === 1 ? bulkBaseName.trim() : `${bulkBaseName.trim()} #${i + 1}`;
-      try {
-        const formData = new FormData();
-        formData.append("baseName", campaignName);
-        formData.append("targetUserType", bulkTarget);
-        formData.append("displayDuration", duration);
-        const filename = img.fileName || img.uri.split("/").pop() || "image.jpg";
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1].toLowerCase()}` : "image/jpeg";
-        formData.append("images", { uri: img.uri, name: filename, type } as any);
-        const res = await globalThis.fetch(bulkUrl, {
-          method: "POST",
-          body: formData,
-          credentials: "include",
-        });
-        if (!res.ok) {
-          console.warn(`[bulk] #${i + 1} http ${res.status}`);
-          failed++;
-          failedNames.push(campaignName);
-        } else {
-          const data: BulkUploadResponse = await res.json();
-          created += data.created ?? 1;
-          failed += data.failed ?? 0;
-          if (data.failedFiles?.length) failedNames.push(...data.failedFiles);
-        }
-      } catch (err) {
-        console.error(`[bulk] #${i + 1}`, err);
-        failed++;
-        failedNames.push(campaignName);
-      }
-      setBulkProgress({ current: i + 1, total: bulkImages.length });
+      const filename = img.fileName || img.uri.split("/").pop() || "image.jpg";
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1].toLowerCase()}` : "image/jpeg";
+      formData.append("images", { uri: img.uri, name: filename, type } as any);
     }
+    try {
+      const res = await globalThis.fetch(bulkUrl, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        failed = bulkImages.length;
+        console.warn(`[bulk] http ${res.status}: ${text}`);
+      } else {
+        const data: BulkUploadResponse = await res.json();
+        created = data.created ?? 0;
+        failed = data.failed ?? 0;
+        if (data.failedFiles?.length) failedNames.push(...data.failedFiles);
+      }
+    } catch (err) {
+      console.error("[bulk] fetch error:", err);
+      failed = bulkImages.length;
+    }
+    setBulkProgress({ current: bulkImages.length, total: bulkImages.length });
     queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
     queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
     queryClient.invalidateQueries({ queryKey: ["/api/ads/my-ads"] });
@@ -373,12 +461,45 @@ export default function AdminAds() {
     setBulkImages([]);
     setBulkTarget("tutti");
     setBulkDuration("10");
+    setBulkLinkUrl("");
     const summaryMsg =
       `${created} campagn${created === 1 ? "a" : "e"} creat${created === 1 ? "a" : "e"}` +
       (failed > 0
         ? `, ${failed} fallite${failedNames.length ? `: ${failedNames.slice(0, 3).join(", ")}${failedNames.length > 3 ? `… (+${failedNames.length - 3})` : ""}` : ""}.`
         : ".");
     Alert.alert("Upload completato", summaryMsg);
+  }
+
+  function handleDeleteAll() {
+    if (campaigns.length === 0) return;
+    Alert.alert(
+      "Elimina tutte le campagne",
+      `Eliminare tutte le ${campaigns.length} campagne visibili nel tab "${TABS.find(t => t.key === activeTab)?.label}"? L'operazione è irreversibile.`,
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: `Elimina ${campaigns.length}`,
+          style: "destructive",
+          onPress: () => bulkDeleteMutation.mutate(campaigns.map((c) => c.id)),
+        },
+      ]
+    );
+  }
+
+  function openSingleEdit(campaign: Campaign) {
+    setEditName(campaign.name);
+    setEditLinkUrl(campaign.linkUrl ?? "");
+    setEditingCampaign(campaign);
+  }
+
+  function openGroupEdit(groupId: string) {
+    const groupCampaigns = campaigns.filter((c) => c.groupId === groupId);
+    if (groupCampaigns.length === 0) return;
+    const firstName = groupCampaigns[0].name.replace(/\s*#\d+$/, "");
+    const firstLink = groupCampaigns[0].linkUrl ?? "";
+    setEditGroupName(firstName);
+    setEditGroupLinkUrl(firstLink);
+    setEditingGroupId(groupId);
   }
 
   function handleCreate() {
@@ -507,6 +628,17 @@ export default function AdminAds() {
           >
             <MaterialIcons name="refresh" size={20} color={Colors.textSecondary} />
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleDeleteAll}
+            disabled={bulkDeleteMutation.isPending || campaigns.length === 0}
+            style={styles.toolbarBtn}
+          >
+            {bulkDeleteMutation.isPending ? (
+              <ActivityIndicator size="small" color={Colors.error} />
+            ) : (
+              <MaterialIcons name="delete-sweep" size={22} color={campaigns.length > 0 ? Colors.error : Colors.textSecondary} />
+            )}
+          </TouchableOpacity>
           <TouchableOpacity onPress={openRotationSettings} style={styles.toolbarBtn}>
             <MaterialIcons name="settings" size={20} color={Colors.textSecondary} />
           </TouchableOpacity>
@@ -522,14 +654,22 @@ export default function AdminAds() {
           ref={flatListRef}
           data={campaigns}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <CampaignCard
-              item={item}
-              onToggle={(id, isActive) => toggleMutation.mutate({ id, isActive })}
-              onDelete={handleDelete}
-              isBroken={brokenIdSet.has(item.id)}
-            />
-          )}
+          renderItem={({ item }) => {
+            const gc = item.groupId
+              ? campaigns.filter((c) => c.groupId === item.groupId).length
+              : undefined;
+            return (
+              <CampaignCard
+                item={item}
+                onToggle={(id, isActive) => toggleMutation.mutate({ id, isActive })}
+                onDelete={handleDelete}
+                onEdit={openSingleEdit}
+                onEditGroup={item.groupId ? () => openGroupEdit(item.groupId!) : undefined}
+                groupCount={gc}
+                isBroken={brokenIdSet.has(item.id)}
+              />
+            );
+          }}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 80 }}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
@@ -555,7 +695,7 @@ export default function AdminAds() {
         <MaterialIcons name="add" size={28} color={Colors.background} />
       </TouchableOpacity>
 
-      <Modal visible={showCreateModal} animationType="slide">
+      <Modal visible={showCreateModal} animationType="slide" onRequestClose={() => { setShowCreateModal(false); resetForm(); }}>
         <View style={[styles.createModalContainer, { paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Nuova Campagna — {currentTab.label}</Text>
@@ -616,7 +756,7 @@ export default function AdminAds() {
         </View>
       </Modal>
 
-      <Modal visible={showBulkModal} animationType="slide">
+      <Modal visible={showBulkModal} animationType="slide" onRequestClose={() => { if (!bulkUploading) { setShowBulkModal(false); setBulkBaseName(""); setBulkImages([]); setBulkTarget("tutti"); setBulkLinkUrl(""); } }}>
         <View style={[styles.createModalContainer, { paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Carica cartella</Text>
@@ -654,6 +794,19 @@ export default function AdminAds() {
                 </TouchableOpacity>
               ))}
             </View>
+
+            <Text style={styles.settingsLabel}>Link URL (opzionale)</Text>
+            <TextInput
+              style={[styles.input, { marginBottom: 12 }]}
+              placeholder="https://..."
+              placeholderTextColor={Colors.textSecondary}
+              value={bulkLinkUrl}
+              onChangeText={setBulkLinkUrl}
+              keyboardType="url"
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!bulkUploading}
+            />
 
             <Text style={styles.settingsLabel}>Durata rotazione (secondi)</Text>
             <TextInput
@@ -790,6 +943,111 @@ export default function AdminAds() {
                 <Text style={styles.submitBtnText}>Salva Impostazioni</Text>
               )}
             </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal
+        visible={!!editingCampaign}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setEditingCampaign(null)}
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+          <View style={styles.overlayBg}>
+            <View style={styles.overlayCard}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Modifica Campagna</Text>
+                <TouchableOpacity onPress={() => setEditingCampaign(null)}>
+                  <MaterialIcons name="close" size={22} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.settingsLabel}>Nome</Text>
+              <TextInput
+                style={[styles.input, { marginBottom: 12 }]}
+                placeholder="Nome campagna"
+                placeholderTextColor={Colors.textSecondary}
+                value={editName}
+                onChangeText={setEditName}
+                autoFocus
+              />
+              <Text style={styles.settingsLabel}>Link URL (opzionale)</Text>
+              <TextInput
+                style={[styles.input, { marginBottom: 20 }]}
+                placeholder="https://..."
+                placeholderTextColor={Colors.textSecondary}
+                value={editLinkUrl}
+                onChangeText={setEditLinkUrl}
+                keyboardType="url"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                style={[styles.submitBtn, { opacity: (!editName.trim() || singleEditMutation.isPending) ? 0.4 : 1 }]}
+                onPress={() => { if (editingCampaign && editName.trim()) singleEditMutation.mutate({ id: editingCampaign.id, name: editName, linkUrl: editLinkUrl }); }}
+                disabled={!editName.trim() || singleEditMutation.isPending}
+              >
+                {singleEditMutation.isPending ? (
+                  <ActivityIndicator color={Colors.background} />
+                ) : (
+                  <Text style={styles.submitBtnText}>Salva</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal
+        visible={!!editingGroupId}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setEditingGroupId(null)}
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+          <View style={styles.overlayBg}>
+            <View style={styles.overlayCard}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Modifica Gruppo</Text>
+                <TouchableOpacity onPress={() => setEditingGroupId(null)}>
+                  <MaterialIcons name="close" size={22} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <Text style={[styles.cardDesc, { marginBottom: 12 }]}>
+                Rinomina e aggiorna il link di tutte le campagne del gruppo. I numeri (#1, #2...) vengono aggiunti automaticamente.
+              </Text>
+              <Text style={styles.settingsLabel}>Nome base gruppo</Text>
+              <TextInput
+                style={[styles.input, { marginBottom: 12 }]}
+                placeholder="Nome base (es. Estate 2026)"
+                placeholderTextColor={Colors.textSecondary}
+                value={editGroupName}
+                onChangeText={setEditGroupName}
+                autoFocus
+              />
+              <Text style={styles.settingsLabel}>Link URL (opzionale)</Text>
+              <TextInput
+                style={[styles.input, { marginBottom: 20 }]}
+                placeholder="https://..."
+                placeholderTextColor={Colors.textSecondary}
+                value={editGroupLinkUrl}
+                onChangeText={setEditGroupLinkUrl}
+                keyboardType="url"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                style={[styles.submitBtn, { opacity: (!editGroupName.trim() || groupEditMutation.isPending) ? 0.4 : 1 }]}
+                onPress={() => { if (editingGroupId && editGroupName.trim()) groupEditMutation.mutate({ groupId: editingGroupId, name: editGroupName, linkUrl: editGroupLinkUrl }); }}
+                disabled={!editGroupName.trim() || groupEditMutation.isPending}
+              >
+                {groupEditMutation.isPending ? (
+                  <ActivityIndicator color={Colors.background} />
+                ) : (
+                  <Text style={styles.submitBtnText}>Salva Gruppo</Text>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -1095,6 +1353,36 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  fabDeleteAll: {
+    right: 152,
+    backgroundColor: Colors.error,
+  },
+  groupEditBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+    alignSelf: "flex-start",
+  },
+  groupEditBtnText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: Colors.accent,
+  },
+  overlayBg: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  overlayCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    width: "100%",
+    maxWidth: 400,
   },
   targetRow: {
     flexDirection: "row",

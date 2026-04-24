@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Platform,
   ScrollView,
+  BackHandler,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native";
 import { useRouter } from "expo-router";
@@ -276,6 +277,21 @@ export default function ModeratorCampaigns() {
   const isEditing = !!editingCampaign;
   const showModal = showCreateModal || isEditing;
   const isPending = createMutation.isPending || updateMutation.isPending;
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const onBack = () => {
+      if (showModal) {
+        setShowCreateModal(false);
+        setEditingCampaign(null);
+        resetForm();
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBack);
+    return () => sub.remove();
+  }, [showModal]);
 
   return (
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
