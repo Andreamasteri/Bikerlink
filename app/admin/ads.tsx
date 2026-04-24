@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -171,6 +171,47 @@ function CampaignCard({
   );
 }
 
+type ListItem =
+  | { type: "campaign"; data: Campaign }
+  | { type: "groupHeader"; groupId: string; baseName: string; count: number; allActive: boolean; someActive: boolean };
+
+function GroupHeader({
+  baseName,
+  count,
+  allActive,
+  someActive,
+  isCollapsed,
+  onToggleCollapse,
+  onEdit,
+}: {
+  baseName: string;
+  count: number;
+  allActive: boolean;
+  someActive: boolean;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+  onEdit: () => void;
+}) {
+  const dotColor = allActive ? Colors.success : someActive ? Colors.warning : Colors.error;
+  return (
+    <View style={styles.groupSectionHeader}>
+      <TouchableOpacity style={styles.groupSectionLeft} onPress={onToggleCollapse} activeOpacity={0.7}>
+        <MaterialIcons
+          name={isCollapsed ? "chevron-right" : "expand-more"}
+          size={20}
+          color={Colors.textSecondary}
+        />
+        <View style={[styles.groupSectionDot, { backgroundColor: dotColor }]} />
+        <Text style={styles.groupSectionName} numberOfLines={1}>{baseName}</Text>
+        <Text style={styles.groupSectionCount}> · {count} immagini</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.groupSectionEdit} onPress={onEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <MaterialIcons name="folder-special" size={18} color={Colors.accent} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function AdminAds() {
   const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);
@@ -231,6 +272,40 @@ export default function AdminAds() {
 
   const brokenIdSet = new Set<string>(imageHealth?.brokenIds ?? []);
   const brokenInView = campaigns.filter((c) => brokenIdSet.has(c.id));
+
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  const listItems = useMemo<ListItem[]>(() => {
+    const items: ListItem[] = [];
+    const seenGroupIds = new Set<string>();
+    for (const campaign of campaigns) {
+      if (campaign.groupId) {
+        if (!seenGroupIds.has(campaign.groupId)) {
+          seenGroupIds.add(campaign.groupId);
+          const groupCampaigns = campaigns.filter((c) => c.groupId === campaign.groupId);
+          const baseName = campaign.name.replace(/\s*#\d+$/, "");
+          const allActive = groupCampaigns.every((c) => c.isActive);
+          const someActive = groupCampaigns.some((c) => c.isActive);
+          items.push({ type: "groupHeader", groupId: campaign.groupId, baseName, count: groupCampaigns.length, allActive, someActive });
+        }
+        if (!collapsedGroups.has(campaign.groupId)) {
+          items.push({ type: "campaign", data: campaign });
+        }
+      } else {
+        items.push({ type: "campaign", data: campaign });
+      }
+    }
+    return items;
+  }, [campaigns, collapsedGroups]);
+
+  function toggleGroupCollapse(groupId: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }
 
   const createMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -657,21 +732,32 @@ export default function AdminAds() {
       ) : (
         <FlatList
           ref={flatListRef}
-          data={campaigns}
-          keyExtractor={(item) => item.id}
+          data={listItems}
+          keyExtractor={(item) => item.type === "groupHeader" ? `group-header-${item.groupId}` : item.data.id}
           renderItem={({ item }) => {
-            const gc = item.groupId
-              ? campaigns.filter((c) => c.groupId === item.groupId).length
-              : undefined;
+            if (item.type === "groupHeader") {
+              return (
+                <GroupHeader
+                  baseName={item.baseName}
+                  count={item.count}
+                  allActive={item.allActive}
+                  someActive={item.someActive}
+                  isCollapsed={collapsedGroups.has(item.groupId)}
+                  onToggleCollapse={() => toggleGroupCollapse(item.groupId)}
+                  onEdit={() => openGroupEdit(item.groupId)}
+                />
+              );
+            }
+            const campaign = item.data;
             return (
               <CampaignCard
-                item={item}
+                item={campaign}
                 onToggle={(id, isActive) => toggleMutation.mutate({ id, isActive })}
                 onDelete={handleDelete}
                 onEdit={openSingleEdit}
-                onEditGroup={item.groupId ? () => openGroupEdit(item.groupId!) : undefined}
-                groupCount={gc}
-                isBroken={brokenIdSet.has(item.id)}
+                onEditGroup={campaign.groupId ? () => openGroupEdit(campaign.groupId!) : undefined}
+                groupCount={campaign.groupId ? campaigns.filter((c) => c.groupId === campaign.groupId).length : undefined}
+                isBroken={brokenIdSet.has(campaign.id)}
               />
             );
           }}
@@ -1383,6 +1469,41 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 11,
     color: Colors.accent,
+  },
+  groupSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingTop: 20,
+    paddingBottom: 6,
+    paddingHorizontal: 2,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.surface,
+    marginBottom: 4,
+  },
+  groupSectionLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: 6,
+  },
+  groupSectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  groupSectionName: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.text,
+    flex: 1,
+  },
+  groupSectionCount: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  groupSectionEdit: {
+    padding: 4,
   },
   toggleRow: {
     flexDirection: "row",
