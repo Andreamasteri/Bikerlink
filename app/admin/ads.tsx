@@ -1020,7 +1020,7 @@ export default function AdminAds() {
                 </TouchableOpacity>
               </View>
               <Text style={[styles.cardDesc, { marginBottom: 12 }]}>
-                Rinomina e aggiorna il link di tutte le campagne del gruppo. I numeri (#1, #2...) vengono aggiunti automaticamente.
+                Rinomina, aggiorna il link e attiva/disattiva tutte le campagne del gruppo in una volta. I numeri (#1, #2...) vengono aggiunti automaticamente.
               </Text>
               <Text style={styles.settingsLabel}>Nome base gruppo</Text>
               <TextInput
@@ -1043,7 +1043,7 @@ export default function AdminAds() {
                 autoCorrect={false}
               />
               <View style={styles.toggleRow}>
-                <Text style={styles.settingsLabel}>Campagne attive</Text>
+                <Text style={styles.settingsLabel}>Attiva tutte le campagne del gruppo</Text>
                 <Switch
                   value={editGroupIsActive}
                   onValueChange={(v) => { setEditGroupIsActive(v); setEditGroupIsActiveDirty(true); }}
