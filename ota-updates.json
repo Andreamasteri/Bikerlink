@@ -4555,6 +4555,30 @@
     "apkBuildId": null,
     "apkVersionCode": 35,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 147,
+    "version": "1.147.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-147 rv7.0.0: Admin UI campagne — group toggle attiva/disattiva + section headers con collapse",
+    "publishedAt": "2026-04-24",
+    "runtimeVersion": "7.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #912: Switch 'Attiva tutte / Disattiva tutte' nel modal di modifica gruppo campagne (dirty-flag pattern, isActive opzionale nel PUT /advertisements/group/:groupId). Task #913: GroupHeader component nella FlatList admin campagne — status dot colorato, chevron collapse/expand, shortcut modifica gruppo. collapsedGroups Set<string> + groupMeta O(n) precomputed. CURRENT_OTA_NUMBER=147.",
+    "releaseId": "d1095a0a-11e8-4769-b78d-4651298e1ce4",
+    "bundleUrl": "private/ota/ota-1.147.0-1777040130365.js",
+    "updateGroupId": "0ab5d11b-bb38-4440-9776-177e47364ed3",
+    "androidUpdateId": "019dbfd9-a923-7fc0-a356-40b08cdc7926",
+    "iosUpdateId": null,
+    "commitBase": "8caeb058fc1c1b9c19223c89fc23c289235c6a77",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/0ab5d11b-bb38-4440-9776-177e47364ed3",
+    "apkBuildId": null,
+    "apkVersionCode": 35,
+    "apkUrl": null,
     "status": "published"
   }
 ]
