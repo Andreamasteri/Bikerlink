@@ -479,6 +479,25 @@ function setupErrorHandler(app: express.Application) {
 
   const port = parseInt(process.env.PORT || "5000", 10);
 
+  // Best-effort pre-listen cache warm-up: downloads any active campaign image
+  // not already on disk before server.listen() is called, so no request can
+  // arrive before the cache is populated. A 30s timeout prevents deadlock if
+  // object storage is slow or unreachable; errors only log — startup always
+  // proceeds regardless of warm-up outcome.
+  try {
+    const { warmupAdImageCache } = await import("./routes/ads");
+    const WARMUP_TIMEOUT_MS = 30_000;
+    await Promise.race([
+      warmupAdImageCache(),
+      new Promise<void>((resolve) => setTimeout(() => {
+        console.warn("[INIT] Ad image warmup timed out after 30s — continuing startup");
+        resolve();
+      }, WARMUP_TIMEOUT_MS)),
+    ]);
+  } catch (e) {
+    console.warn("[INIT] Ad image warmup failed (non-fatal):", e);
+  }
+
   // Track active connections so we can destroy them on shutdown
   const activeConnections = new Set<import("net").Socket>();
 

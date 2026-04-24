@@ -6,6 +6,49 @@ import fs from "fs";
 
 const router = Router();
 
+/**
+ * Pre-warm the local disk cache for ad images at server startup.
+ * Downloads any active campaign image not already present in uploads/ads/.
+ * Runs fully in the background — errors are logged but never thrown.
+ */
+export async function warmupAdImageCache(): Promise<void> {
+  try {
+    const campaigns = await storage.getActiveCampaigns();
+    const localDir = path.resolve(process.cwd(), "uploads", "ads");
+    fs.mkdirSync(localDir, { recursive: true });
+
+    let downloaded = 0;
+    let skipped = 0;
+
+    for (const campaign of campaigns) {
+      if (!campaign.imageUrl) continue;
+      const match = campaign.imageUrl.match(/\/api\/ads\/images\/([^?#]+)/);
+      if (!match) continue;
+      const filename = match[1];
+      if (!filename || filename.includes("..") || filename.includes("/")) continue;
+
+      const localPath = path.join(localDir, filename);
+      if (fs.existsSync(localPath)) {
+        skipped++;
+        continue;
+      }
+
+      try {
+        const buffer = await downloadBuffer(`public/ads/${filename}`);
+        fs.writeFileSync(localPath, buffer);
+        downloaded++;
+        console.log(`[ADS WARMUP] Cached: ${filename}`);
+      } catch (err) {
+        console.warn(`[ADS WARMUP] Failed to cache ${filename}:`, err);
+      }
+    }
+
+    console.log(`[ADS WARMUP] Done — downloaded: ${downloaded}, already cached: ${skipped}`);
+  } catch (err) {
+    console.warn("[ADS WARMUP] Warmup failed (non-fatal):", err);
+  }
+}
+
 router.get("/images/:filename", async (req: Request, res: Response) => {
   const filename = req.params.filename;
   if (!filename || filename.includes("..") || filename.includes("/")) {
