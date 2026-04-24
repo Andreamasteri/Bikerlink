@@ -201,6 +201,7 @@ export default function AdminAds() {
   const [editGroupName, setEditGroupName] = useState("");
   const [editGroupLinkUrl, setEditGroupLinkUrl] = useState("");
   const [editGroupIsActive, setEditGroupIsActive] = useState(true);
+  const [editGroupIsActiveDirty, setEditGroupIsActiveDirty] = useState(false);
 
   const [settingsDuration, setSettingsDuration] = useState("10");
   const [settingsMode, setSettingsMode] = useState<"sequential" | "random">("sequential");
@@ -313,12 +314,10 @@ export default function AdminAds() {
   });
 
   const groupEditMutation = useMutation({
-    mutationFn: async ({ groupId, name, linkUrl, isActive }: { groupId: string; name: string; linkUrl: string; isActive: boolean }) => {
-      const res = await apiRequest("PUT", `/api/admin/advertisements/group/${groupId}`, {
-        name: name.trim(),
-        linkUrl: linkUrl.trim() || null,
-        isActive,
-      });
+    mutationFn: async ({ groupId, name, linkUrl, isActive }: { groupId: string; name: string; linkUrl: string; isActive?: boolean }) => {
+      const payload: Record<string, unknown> = { name: name.trim(), linkUrl: linkUrl.trim() || null };
+      if (typeof isActive === "boolean") payload.isActive = isActive;
+      const res = await apiRequest("PUT", `/api/admin/advertisements/group/${groupId}`, payload);
       return res.json();
     },
     onSuccess: () => {
@@ -504,6 +503,7 @@ export default function AdminAds() {
     setEditGroupName(firstName);
     setEditGroupLinkUrl(firstLink);
     setEditGroupIsActive(allActive);
+    setEditGroupIsActiveDirty(false);
     setEditingGroupId(groupId);
   }
 
@@ -1046,14 +1046,14 @@ export default function AdminAds() {
                 <Text style={styles.settingsLabel}>Campagne attive</Text>
                 <Switch
                   value={editGroupIsActive}
-                  onValueChange={setEditGroupIsActive}
+                  onValueChange={(v) => { setEditGroupIsActive(v); setEditGroupIsActiveDirty(true); }}
                   trackColor={{ false: Colors.surface, true: Colors.accent }}
                   thumbColor="#fff"
                 />
               </View>
               <TouchableOpacity
                 style={[styles.submitBtn, { opacity: (!editGroupName.trim() || groupEditMutation.isPending) ? 0.4 : 1, marginTop: 20 }]}
-                onPress={() => { if (editingGroupId && editGroupName.trim()) groupEditMutation.mutate({ groupId: editingGroupId, name: editGroupName, linkUrl: editGroupLinkUrl, isActive: editGroupIsActive }); }}
+                onPress={() => { if (editingGroupId && editGroupName.trim()) groupEditMutation.mutate({ groupId: editingGroupId, name: editGroupName, linkUrl: editGroupLinkUrl, isActive: editGroupIsActiveDirty ? editGroupIsActive : undefined }); }}
                 disabled={!editGroupName.trim() || groupEditMutation.isPending}
               >
                 {groupEditMutation.isPending ? (
