@@ -49,6 +49,32 @@ export async function warmupAdImageCache(): Promise<void> {
   }
 }
 
+/**
+ * Download and cache a single ad image to uploads/ads/ in the background.
+ * Safe to call fire-and-forget — errors are logged but never thrown.
+ */
+export async function cacheAdImage(imageUrl: string | null | undefined): Promise<void> {
+  if (!imageUrl) return;
+  try {
+    const match = imageUrl.match(/\/api\/ads\/images\/([^?#]+)/);
+    if (!match) return;
+    const filename = match[1];
+    if (!filename || filename.includes("..") || filename.includes("/")) return;
+
+    const localDir = path.resolve(process.cwd(), "uploads", "ads");
+    fs.mkdirSync(localDir, { recursive: true });
+    const localPath = path.join(localDir, filename);
+
+    if (fs.existsSync(localPath)) return;
+
+    const buffer = await downloadBuffer(`public/ads/${filename}`);
+    fs.writeFileSync(localPath, buffer);
+    console.log(`[ADS CACHE] Cached on publish: ${filename}`);
+  } catch (err) {
+    console.warn("[ADS CACHE] Failed to cache image on publish (non-fatal):", err);
+  }
+}
+
 router.get("/images/:filename", async (req: Request, res: Response) => {
   const filename = req.params.filename;
   if (!filename || filename.includes("..") || filename.includes("/")) {

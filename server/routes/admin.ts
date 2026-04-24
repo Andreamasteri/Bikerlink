@@ -16,6 +16,7 @@ import { isProtectedUser } from "../constants";
 import { SERVER_START_TIME, uptimeState } from "../uptime";
 import { getDriveClient } from "../lib/drive-client";
 import { DRIVE_FOLDER_TRADUZIONI_ID } from "../backup-service";
+import { cacheAdImage } from "./ads";
 
 const router = Router();
 
@@ -1524,6 +1525,7 @@ router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Re
           targetUserType: campaign.targetUserType,
           isActive: campaign.isActive,
         });
+        cacheAdImage(campaign.imageUrl).catch(() => {});
       } catch (err) {
         console.error(`[bulk ad] Failed for "${file.originalname}":`, err);
         failed++;
@@ -1567,6 +1569,7 @@ router.post("/advertisements", adUpload.single("image"), async (req: Request, re
       targetId: campaign.id,
       details: `Pubblicità creata: ${campaign.name} (${targetUserType || "biker"})`,
     });
+    cacheAdImage(campaign.imageUrl).catch(() => {});
     return res.status(201).json(campaign);
   } catch (error) {
     console.error("Admin create advertisement error:", error);
@@ -1612,6 +1615,9 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
       targetId: id,
       details: `Pubblicità aggiornata: ${campaign.name}`,
     });
+    if (req.file || req.body.imageUrl !== undefined) {
+      cacheAdImage(campaign.imageUrl).catch(() => {});
+    }
     return res.json(campaign);
   } catch (error) {
     console.error("Admin update advertisement error:", error);

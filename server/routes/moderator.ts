@@ -3,6 +3,7 @@ import multer from "multer";
 import path from "path";
 import { storage } from "../storage";
 import { uploadBuffer } from "../objectStorage";
+import { cacheAdImage } from "./ads";
 
 const router = Router();
 
@@ -212,6 +213,7 @@ router.post("/advertisements", adUpload.single("image"), async (req: Request, re
       targetId: campaign.id,
       details: `Campagna creata dal moderatore: ${campaign.name} (${targetUserType || "biker"})`,
     });
+    cacheAdImage(campaign.imageUrl).catch(() => {});
     return res.status(201).json(campaign);
   } catch (error) {
     console.error("Moderator create campaign error:", error);
@@ -262,6 +264,9 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
       targetId: id,
       details: `Campagna aggiornata dal moderatore: ${campaign.name}`,
     });
+    if (req.file || req.body.imageUrl !== undefined) {
+      cacheAdImage(campaign.imageUrl).catch(() => {});
+    }
     return res.json(campaign);
   } catch (error) {
     console.error("Moderator update campaign error:", error);
