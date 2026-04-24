@@ -1475,25 +1475,18 @@ router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Re
       return res.status(400).json({ message: "Nome base campagna obbligatorio" });
     }
     const duration = parseInt(displayDuration ?? "10") || 10;
-    const created: BulkCampaignResult[] = [];
-    let failed = 0;
-    const failedFiles: string[] = [];
     const { randomUUID } = await import("crypto");
     const batchGroupId = files.length > 1 ? randomUUID() : null;
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      if (file.size > BULK_AD_MAX_FILE_SIZE) {
-        console.warn(`[bulk ad] Skipping "${file.originalname}": size ${file.size} > ${BULK_AD_MAX_FILE_SIZE}`);
-        failed++;
-        failedFiles.push(`${file.originalname} (troppo grande, max 5MB)`);
-        continue;
-      }
-      const campaignName =
-        files.length === 1
-          ? baseName.trim()
-          : `${baseName.trim()} #${i + 1}`;
-      try {
+    const results = await Promise.allSettled(
+      files.map(async (file, i) => {
+        if (file.size > BULK_AD_MAX_FILE_SIZE) {
+          throw new Error(`${file.originalname} (troppo grande, max 5MB)`);
+        }
+        const campaignName =
+          files.length === 1
+            ? baseName.trim()
+            : `${baseName.trim()} #${i + 1}`;
         const imageUrl = await uploadAdImageToObjectStorage(file.buffer, file.originalname, file.mimetype);
         const campaign = await storage.createAdCampaign({
           name: campaignName,
@@ -1518,18 +1511,30 @@ router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Re
           targetId: campaign.id,
           details: `Bulk upload: ${campaign.name} (${targetUserType || "biker"})${batchGroupId ? ` gruppo=${batchGroupId}` : ""}`,
         });
-        created.push({
+        cacheAdImage(campaign.imageUrl).catch(() => {});
+        return {
           id: campaign.id,
           name: campaign.name,
           imageUrl: campaign.imageUrl,
           targetUserType: campaign.targetUserType,
           isActive: campaign.isActive,
-        });
-        cacheAdImage(campaign.imageUrl).catch(() => {});
-      } catch (err) {
-        console.error(`[bulk ad] Failed for "${file.originalname}":`, err);
+        } as BulkCampaignResult;
+      })
+    );
+
+    const created: BulkCampaignResult[] = [];
+    const failedFiles: string[] = [];
+    let failed = 0;
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        created.push(result.value);
+      } else {
         failed++;
-        failedFiles.push(file.originalname);
+        const msg = result.reason instanceof Error
+          ? result.reason.message
+          : String(result.reason);
+        console.error(`[bulk ad] Failed:`, result.reason);
+        failedFiles.push(msg);
       }
     }
 
