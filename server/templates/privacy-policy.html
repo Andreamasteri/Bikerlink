@@ -176,7 +176,8 @@
         <li>Foto delle moto nel garage</li>
         <li>Foto partecipanti ai contest fotografici settimanali</li>
         <li>Foto associate a eventi motociclistici</li>
-        <li>Foto scattate direttamente tramite la fotocamera del dispositivo (permesso <code>CAMERA</code>), esclusivamente su azione esplicita dell'utente</li>
+        <li>Foto scattate direttamente tramite la fotocamera del dispositivo (permesso <code>android.permission.CAMERA</code>), esclusivamente su azione esplicita dell'utente</li>
+        <li>Foto selezionate dalla galleria del dispositivo tramite il selettore immagini di sistema (permesso <code>android.permission.READ_MEDIA_IMAGES</code>), esclusivamente su azione esplicita dell'utente</li>
       </ul>
 
       <h3>2.5 Chat e Messaggi</h3>
@@ -353,9 +354,12 @@
       </p>
 
       <!-- ─── 7. POSIZIONE IN BACKGROUND ─── -->
-      <h2>7. Posizione GPS in Background</h2>
-      <p>BikerLink richiede l'accesso alla posizione anche quando l'app è in background nelle seguenti situazioni:</p>
+      <h2>7. Posizione GPS (<code>android.permission.ACCESS_FINE_LOCATION</code> / <code>ACCESS_BACKGROUND_LOCATION</code>)</h2>
+      <p>BikerLink richiede i permessi <code>ACCESS_COARSE_LOCATION</code>, <code>ACCESS_FINE_LOCATION</code> e <code>ACCESS_BACKGROUND_LOCATION</code> per le seguenti funzionalità:</p>
       <ul>
+        <li>
+          <strong>Mappa biker in tempo reale:</strong> mostra la posizione dell'utente e quella dei motociclisti vicini sulla mappa.
+        </li>
         <li>
           <strong>Tracking percorsi:</strong> quando l'utente avvia manualmente la registrazione di un giro in moto, la posizione viene acquisita continuamente per tracciare il percorso. Il tracking si interrompe allo stop manuale o al termine del giro.
         </li>
@@ -364,7 +368,7 @@
         </li>
       </ul>
       <div class="callout">
-        <p>L'acquisizione in background è attiva <strong>solo</strong> quando l'utente attiva esplicitamente queste funzioni. Non avviene in modo automatico, permanente o senza interazione dell'utente.</p>
+        <p>L'acquisizione in background (<code>ACCESS_BACKGROUND_LOCATION</code>) è attiva <strong>solo</strong> quando l'utente attiva esplicitamente il tracking o la funzione SOS. Non avviene in modo automatico, permanente o senza interazione dell'utente.</p>
       </div>
 
       <!-- ─── 8. FOTOCAMERA ─── -->
