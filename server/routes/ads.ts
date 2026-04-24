@@ -1,6 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { downloadBuffer } from "../objectStorage";
+import { db } from "../db";
+import { adCampaigns } from "@shared/schema";
 import path from "path";
 import fs from "fs";
 
@@ -72,6 +74,52 @@ export async function cacheAdImage(imageUrl: string | null | undefined): Promise
     console.log(`[ADS CACHE] Cached on publish: ${filename}`);
   } catch (err) {
     console.warn("[ADS CACHE] Failed to cache image on publish (non-fatal):", err);
+  }
+}
+
+/**
+ * Delete files in uploads/ads/ that are not referenced by any campaign in the DB.
+ * Runs on a daily schedule — errors are logged but never thrown.
+ */
+export async function cleanupOrphanedAdImages(): Promise<void> {
+  try {
+    const localDir = path.resolve(process.cwd(), "uploads", "ads");
+    if (!fs.existsSync(localDir)) return;
+
+    // Query ALL campaigns (active + inactive) so we never delete images
+    // belonging to temporarily paused campaigns.
+    const allCampaigns = await db.select({ imageUrl: adCampaigns.imageUrl }).from(adCampaigns);
+
+    const referencedFilenames = new Set<string>();
+    for (const { imageUrl } of allCampaigns) {
+      if (!imageUrl) continue;
+      const match = imageUrl.match(/\/api\/ads\/images\/([^?#]+)/);
+      if (!match) continue;
+      const filename = match[1];
+      if (filename && !filename.includes("..") && !filename.includes("/")) {
+        referencedFilenames.add(filename);
+      }
+    }
+
+    const files = fs.readdirSync(localDir);
+    let removed = 0;
+
+    for (const file of files) {
+      if (referencedFilenames.has(file)) continue;
+      try {
+        fs.unlinkSync(path.join(localDir, file));
+        removed++;
+        console.log(`[ADS CLEANUP] Removed orphaned image: ${file}`);
+      } catch (unlinkErr) {
+        console.warn(`[ADS CLEANUP] Failed to remove ${file} (non-fatal):`, unlinkErr);
+      }
+    }
+
+    console.log(
+      `[ADS CLEANUP] Done — removed: ${removed}, kept: ${referencedFilenames.size} referenced`,
+    );
+  } catch (err) {
+    console.warn("[ADS CLEANUP] Cleanup failed (non-fatal):", err);
   }
 }
 

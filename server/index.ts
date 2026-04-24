@@ -1103,6 +1103,17 @@ function setupErrorHandler(app: express.Application) {
         await runPlaylistSnapshot();
         setInterval(runPlaylistSnapshot, SIX_HOURS_MS);
         console.log("[INIT] Phase 7 playlist snapshot job started (every 6h)");
+
+        // Phase 8 — daily cleanup of orphaned ad images in uploads/ads/
+        const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+        const { cleanupOrphanedAdImages } = await import("./routes/ads");
+        // Run once 5 minutes after startup so warm-up and first traffic settle,
+        // then repeat every 24 hours.
+        setTimeout(async () => {
+          await cleanupOrphanedAdImages();
+          setInterval(cleanupOrphanedAdImages, ONE_DAY_MS);
+        }, 5 * 60 * 1000);
+        console.log("[INIT] Phase 8 ad image cleanup job scheduled (5min delay, then every 24h)");
       })().catch((err) => {
         console.error("[INIT] Startup phase chain error:", err);
         initState.initializing = false;
