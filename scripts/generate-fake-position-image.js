@@ -18,19 +18,6 @@ const svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
     <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
       <feGaussianBlur stdDeviation="90" result="blur"/>
     </filter>
-    <filter id="softglow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="18" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <clipPath id="col1clip">
-      <rect x="0" y="0" width="532" height="${H}"/>
-    </clipPath>
-    <clipPath id="col2clip">
-      <rect x="534" y="0" width="532" height="${H}"/>
-    </clipPath>
-    <clipPath id="col3clip">
-      <rect x="1068" y="0" width="532" height="${H}"/>
-    </clipPath>
   </defs>
 
   <!-- ── BACKGROUND ── -->
