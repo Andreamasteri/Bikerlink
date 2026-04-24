@@ -275,6 +275,28 @@ export default function AdminAds() {
 
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
+  // O(n) precomputed group metadata — avoids repeated filter calls in renderItem.
+  const groupMeta = useMemo(() => {
+    const meta = new Map<string, { baseName: string; count: number; allActive: boolean; someActive: boolean }>();
+    for (const campaign of campaigns) {
+      if (!campaign.groupId) continue;
+      const existing = meta.get(campaign.groupId);
+      if (existing) {
+        existing.count++;
+        if (!campaign.isActive) existing.allActive = false;
+        if (campaign.isActive) existing.someActive = true;
+      } else {
+        meta.set(campaign.groupId, {
+          baseName: campaign.name.replace(/\s*#\d+$/, ""),
+          count: 1,
+          allActive: campaign.isActive,
+          someActive: campaign.isActive,
+        });
+      }
+    }
+    return meta;
+  }, [campaigns]);
+
   const listItems = useMemo<ListItem[]>(() => {
     const items: ListItem[] = [];
     const seenGroupIds = new Set<string>();
@@ -282,11 +304,8 @@ export default function AdminAds() {
       if (campaign.groupId) {
         if (!seenGroupIds.has(campaign.groupId)) {
           seenGroupIds.add(campaign.groupId);
-          const groupCampaigns = campaigns.filter((c) => c.groupId === campaign.groupId);
-          const baseName = campaign.name.replace(/\s*#\d+$/, "");
-          const allActive = groupCampaigns.every((c) => c.isActive);
-          const someActive = groupCampaigns.some((c) => c.isActive);
-          items.push({ type: "groupHeader", groupId: campaign.groupId, baseName, count: groupCampaigns.length, allActive, someActive });
+          const meta = groupMeta.get(campaign.groupId)!;
+          items.push({ type: "groupHeader", groupId: campaign.groupId, ...meta });
         }
         if (!collapsedGroups.has(campaign.groupId)) {
           items.push({ type: "campaign", data: campaign });
@@ -296,7 +315,7 @@ export default function AdminAds() {
       }
     }
     return items;
-  }, [campaigns, collapsedGroups]);
+  }, [campaigns, collapsedGroups, groupMeta]);
 
   function toggleGroupCollapse(groupId: string) {
     setCollapsedGroups((prev) => {
@@ -756,7 +775,7 @@ export default function AdminAds() {
                 onDelete={handleDelete}
                 onEdit={openSingleEdit}
                 onEditGroup={campaign.groupId ? () => openGroupEdit(campaign.groupId!) : undefined}
-                groupCount={campaign.groupId ? campaigns.filter((c) => c.groupId === campaign.groupId).length : undefined}
+                groupCount={campaign.groupId ? groupMeta.get(campaign.groupId)?.count : undefined}
                 isBroken={brokenIdSet.has(campaign.id)}
               />
             );
