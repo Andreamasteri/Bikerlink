@@ -275,6 +275,25 @@ function configureExpoAndLanding(app: express.Application) {
     next();
   });
 
+  // ── Pagine HTML statiche (privacy, termini, cancella account) ──────────────
+  // DEVONO essere prima di qualsiasi express.static — in produzione
+  // static-build/index.html esiste e la SPA catch-all intercetterebbe queste
+  // route se registrate dopo i middleware di file statici.
+  const htmlPages: Record<string, string> = {
+    "/privacy":        "privacy-policy.html",
+    "/privacy-policy": "privacy-policy.html",
+    "/terms":          "terms.html",
+    "/delete-account": "delete-account.html",
+  };
+  for (const [route, file] of Object.entries(htmlPages)) {
+    const filePath = path.resolve(process.cwd(), "server", "templates", file);
+    app.get(route, (_req: Request, res: Response) => {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "no-store");
+      res.sendFile(filePath);
+    });
+  }
+
   app.use("/assets", express.static(path.resolve(process.cwd(), "assets")));
   app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
   app.use(express.static(path.resolve(process.cwd(), "static-build")));
@@ -300,23 +319,6 @@ function configureExpoAndLanding(app: express.Application) {
       res.status(404).send("Web build not available");
     }
   });
-
-  // ── Pagine HTML statiche (privacy, termini, cancella account) ──────────────
-  // Devono stare prima della SPA fallback, altrimenti vengono intercettate.
-  const htmlPages: Record<string, string> = {
-    "/privacy":        "privacy-policy.html",
-    "/privacy-policy": "privacy-policy.html",
-    "/terms":          "terms.html",
-    "/delete-account": "delete-account.html",
-  };
-  for (const [route, file] of Object.entries(htmlPages)) {
-    const filePath = path.resolve(process.cwd(), "server", "templates", file);
-    app.get(route, (_req: Request, res: Response) => {
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "no-store");
-      res.sendFile(filePath);
-    });
-  }
 
   // SPA fallback: serve index.html per rotte sconosciute quando static-build esiste.
   // In dev (no static-build): proxy a Metro :8081 tramite createProxyMiddleware —
