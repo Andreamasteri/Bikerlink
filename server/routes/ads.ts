@@ -88,6 +88,11 @@ export async function cleanupOrphanedAdImages(): Promise<void> {
     // campaigns should be reclaimed as they are no longer served to users.
     const activeCampaigns = await storage.getActiveCampaigns();
 
+    // Contract: campaign imageUrls for locally-cached images must match
+    // /api/ads/images/<filename> — the same format used by warmupAdImageCache
+    // and cacheAdImage. URLs in any other format are not deleted (they are not
+    // in uploads/ads/) but are also not treated as references, so a change in
+    // URL format here would require updating all three functions together.
     const referencedFilenames = new Set<string>();
     for (const { imageUrl } of activeCampaigns) {
       if (!imageUrl) continue;
