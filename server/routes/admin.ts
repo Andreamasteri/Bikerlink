@@ -1525,16 +1525,15 @@ router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Re
     const created: BulkCampaignResult[] = [];
     const failedFiles: string[] = [];
     let failed = 0;
-    for (const result of results) {
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
       if (result.status === "fulfilled") {
         created.push(result.value);
       } else {
         failed++;
-        const msg = result.reason instanceof Error
-          ? result.reason.message
-          : String(result.reason);
-        console.error(`[bulk ad] Failed:`, result.reason);
-        failedFiles.push(msg);
+        const filename = files[i].originalname;
+        console.error(`[bulk ad] Failed for "${filename}":`, result.reason);
+        failedFiles.push(filename);
       }
     }
 
