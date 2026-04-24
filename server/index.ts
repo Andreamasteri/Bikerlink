@@ -301,6 +301,23 @@ function configureExpoAndLanding(app: express.Application) {
     }
   });
 
+  // ── Pagine HTML statiche (privacy, termini, cancella account) ──────────────
+  // Devono stare prima della SPA fallback, altrimenti vengono intercettate.
+  const htmlPages: Record<string, string> = {
+    "/privacy":        "privacy-policy.html",
+    "/privacy-policy": "privacy-policy.html",
+    "/terms":          "terms.html",
+    "/delete-account": "delete-account.html",
+  };
+  for (const [route, file] of Object.entries(htmlPages)) {
+    const filePath = path.resolve(process.cwd(), "server", "templates", file);
+    app.get(route, (_req: Request, res: Response) => {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "no-store");
+      res.sendFile(filePath);
+    });
+  }
+
   // SPA fallback: serve index.html per rotte sconosciute quando static-build esiste.
   // In dev (no static-build): proxy a Metro :8081 tramite createProxyMiddleware —
   // permette al canvas Replit di raggiungere le rotte Expo Router (/welcome, ecc.).

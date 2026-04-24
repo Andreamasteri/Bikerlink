@@ -170,12 +170,13 @@
         <p><strong>Controlli privacy disponibili:</strong> Ghost Mode (invisibile sulla mappa), Nascondi dalla mappa, Position Fuzzing (rumore ±500 m sulle coordinate), Fake Home (sostituisce coordinate reali con posizione fittizia nei pressi di casa).</p>
       </div>
 
-      <h3>2.4 Foto</h3>
+      <h3>2.4 Foto e Fotocamera</h3>
       <ul>
         <li>Foto profilo (multiple, soggette ad approvazione del team)</li>
         <li>Foto delle moto nel garage</li>
         <li>Foto partecipanti ai contest fotografici settimanali</li>
         <li>Foto associate a eventi motociclistici</li>
+        <li>Foto scattate direttamente tramite la fotocamera del dispositivo (permesso <code>CAMERA</code>), esclusivamente su azione esplicita dell'utente</li>
       </ul>
 
       <h3>2.5 Chat e Messaggi</h3>
@@ -366,8 +367,20 @@
         <p>L'acquisizione in background è attiva <strong>solo</strong> quando l'utente attiva esplicitamente queste funzioni. Non avviene in modo automatico, permanente o senza interazione dell'utente.</p>
       </div>
 
-      <!-- ─── 8. SICUREZZA ─── -->
-      <h2>8. Sicurezza dei Dati</h2>
+      <!-- ─── 8. FOTOCAMERA ─── -->
+      <h2>8. Accesso alla Fotocamera (<code>android.permission.CAMERA</code>)</h2>
+      <p>BikerLink richiede il permesso di accesso alla fotocamera del dispositivo per le seguenti funzionalità:</p>
+      <ul>
+        <li><strong>Foto profilo:</strong> l'utente può scattare una foto direttamente dalla fotocamera per impostarla come immagine del proprio profilo.</li>
+        <li><strong>Foto moto (Garage):</strong> l'utente può fotografare la propria moto per aggiungerla al garage digitale.</li>
+        <li><strong>Contest fotografici:</strong> l'utente può scattare e caricare una foto per partecipare ai contest settimanali.</li>
+      </ul>
+      <div class="callout">
+        <p>La fotocamera viene attivata <strong>solo</strong> quando l'utente tocca esplicitamente il pulsante "Scatta foto". BikerLink non accede alla fotocamera in background, non registra video e non trasmette immagini senza il consenso esplicito dell'utente. Le foto caricate vengono archiviate in modo sicuro sui server BikerLink.</p>
+      </div>
+
+      <!-- ─── 9. SICUREZZA ─── -->
+      <h2>9. Sicurezza dei Dati</h2>
       <p>BikerLink adotta le seguenti misure tecniche e organizzative:</p>
       <ul>
         <li>Trasmissione dati cifrata via HTTPS/TLS</li>
@@ -378,20 +391,20 @@
       </ul>
       <p>Nessun sistema è infallibile. In caso di violazione che possa comportare rischi per i tuoi diritti, verrai notificato nei modi previsti dal GDPR.</p>
 
-      <!-- ─── 9. MINORI ─── -->
-      <h2>9. Minori</h2>
+      <!-- ─── 10. MINORI ─── -->
+      <h2>10. Minori</h2>
       <p>BikerLink è destinato esclusivamente a utenti maggiorenni (18 anni o più). Non raccogliamo consapevolmente dati di minori. Se ritieni che un minore abbia creato un account, contattaci a <a href="mailto:bikerlinkapp@gmail.com">bikerlinkapp@gmail.com</a> e provvederemo alla cancellazione immediata.</p>
 
-      <!-- ─── 10. COOKIE ─── -->
-      <h2>10. Cookie e Tecnologie Simili</h2>
+      <!-- ─── 11. COOKIE ─── -->
+      <h2>11. Cookie e Tecnologie Simili</h2>
       <p>BikerLink è un'app mobile. Non utilizziamo cookie tradizionali. Le WebView integrate per la visualizzazione delle mappe (Leaflet/OpenStreetMap) possono utilizzare <em>localStorage</em> del browser per memorizzare preferenze tecniche di visualizzazione. Questi dati non vengono trasmessi ai nostri server.</p>
 
-      <!-- ─── 11. AGGIORNAMENTI ─── -->
-      <h2>11. Aggiornamenti a questa Informativa</h2>
+      <!-- ─── 12. AGGIORNAMENTI ─── -->
+      <h2>12. Aggiornamenti a questa Informativa</h2>
       <p>Ci riserviamo il diritto di modificare questa informativa in qualsiasi momento. Le modifiche sostanziali verranno comunicate tramite notifica in-app o via email. La data dell'ultima modifica è indicata in cima al documento. L'uso continuato dell'app dopo la comunicazione delle modifiche implica l'accettazione della nuova versione.</p>
 
-      <!-- ─── 12. CONTATTI ─── -->
-      <h2>12. Contatti</h2>
+      <!-- ─── 13. CONTATTI ─── -->
+      <h2>13. Contatti</h2>
       <p>
         <strong>BikerLink</strong><br>
         Email: <a href="mailto:bikerlinkapp@gmail.com">bikerlinkapp@gmail.com</a>
