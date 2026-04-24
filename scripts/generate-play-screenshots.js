@@ -1,630 +1,655 @@
 #!/usr/bin/env node
+// BikerLink Play Store Screenshots - SVG+sharp, no emoji, DejaVu Sans font
 const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 
 const C = {
-  bg: '#0D0D0D', surface: '#1E1E1E', surfaceL: '#2A2A2A',
-  accent: '#FF6600', accentD: '#CC5200',
-  text: '#FFFFFF', textSec: '#9A9A9A', textMut: '#666666',
-  blue: '#4A90D9', pink: '#E91E8C', green: '#4CAF50',
-  red: '#E63946', border: '#2A2A2A', warning: '#FF8C00',
+  bg: '#0D0D0D', surface: '#1E1E1E', surfaceL: '#2A2A2A', surfaceXL: '#363636',
+  accent: '#FF6600', accentD: '#CC5200', accentFaded: '#FF660020',
+  text: '#FFFFFF', textSec: '#9A9A9A', textMut: '#555555',
+  blue: '#4A90D9', blueFaded: '#4A90D920',
+  pink: '#E91E8C', pinkFaded: '#E91E8C20',
+  green: '#4CAF50', red: '#E63946', redFaded: '#E6394620',
+  border: '#2D2D2D', warning: '#FF8C00',
 };
+const FONT = 'DejaVu Sans';
 
-function statusBar(w) {
-  return `
-    <rect x="0" y="0" width="${w}" height="44" fill="${C.surface}"/>
-    <text x="28" y="28" font-family="system-ui,sans-serif" font-size="16" font-weight="600" fill="${C.text}">9:41</text>
-    <text x="${w-28}" y="28" font-family="system-ui,sans-serif" font-size="12" fill="${C.text}" text-anchor="end">●●● WiFi 🔋</text>
-  `;
+function rect(x, y, w, h, fill, rx=0, opacity=1) {
+  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="${fill}" opacity="${opacity}"/>`;
+}
+function circle(cx, cy, r, fill, opacity=1) {
+  return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" opacity="${opacity}"/>`;
+}
+function line(x1, y1, x2, y2, stroke, sw=1, opacity=1) {
+  return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${sw}" opacity="${opacity}"/>`;
+}
+function text(x, y, content, size, fill, anchor='start', weight='400', opacity=1) {
+  return `<text x="${x}" y="${y}" font-family="${FONT}" font-size="${size}" font-weight="${weight}" fill="${fill}" text-anchor="${anchor}" opacity="${opacity}">${content}</text>`;
+}
+function textBox(x, y, w, h, label, labelColor, bgColor, rx=12) {
+  return `${rect(x, y, w, h, bgColor, rx)}${text(x+w/2, y+h/2+5, label, 12, labelColor, 'middle', '600')}`;
 }
 
+// Icon shapes (pure SVG paths)
+function iconMotorcycle(cx, cy, size, color) {
+  // Simplified moto: two circles (wheels) + body shape
+  const s = size/24;
+  const r = 8*s;
+  const lx = cx-14*s, rx2 = cx+14*s, wh = cy+6*s;
+  return `
+    ${circle(lx, wh, r, 'none')}
+    <circle cx="${lx}" cy="${wh}" r="${r}" fill="none" stroke="${color}" stroke-width="${2*s}"/>
+    <circle cx="${rx2}" cy="${wh}" r="${r}" fill="none" stroke="${color}" stroke-width="${2*s}"/>
+    <path d="M${lx+r} ${wh} L${cx-4*s} ${cy-4*s} L${cx+8*s} ${cy-4*s} L${rx2-r} ${wh}" fill="none" stroke="${color}" stroke-width="${2*s}" stroke-linecap="round"/>
+    <circle cx="${cx+2*s}" cy="${cy-4*s}" r="${4*s}" fill="${color}" opacity="0.8"/>
+  `;
+}
+function iconPerson(cx, cy, size, color) {
+  const s = size/24;
+  return `
+    ${circle(cx, cy-6*s, 6*s, color, 0.9)}
+    <path d="M${cx-9*s} ${cy+12*s} Q${cx-9*s} ${cy+2*s} ${cx} ${cy+2*s} Q${cx+9*s} ${cy+2*s} ${cx+9*s} ${cy+12*s}" fill="${color}" opacity="0.8"/>
+  `;
+}
+function iconShield(cx, cy, size, color) {
+  const s = size/24;
+  return `<path d="M${cx} ${cy-11*s} L${cx+9*s} ${cy-7*s} L${cx+9*s} ${cy+1*s} Q${cx+9*s} ${cy+7*s} ${cx} ${cy+11*s} Q${cx-9*s} ${cy+7*s} ${cx-9*s} ${cy+1*s} L${cx-9*s} ${cy-7*s} Z" fill="${color}" opacity="0.85"/>
+    ${text(cx, cy+5, 'B', size*0.4, '#fff', 'middle', '700')}`;
+}
+function iconPin(cx, cy, size, color) {
+  const s = size/24;
+  return `<path d="M${cx} ${cy+10*s} Q${cx-8*s} ${cy+2*s} ${cx-8*s} ${cy-3*s} A${8*s} ${8*s} 0 1 1 ${cx+8*s} ${cy-3*s} Q${cx+8*s} ${cy+2*s} ${cx} ${cy+10*s} Z" fill="${color}"/>
+    ${circle(cx, cy-3*s, 4*s, '#fff', 0.6)}`;
+}
+function iconChat(cx, cy, size, color) {
+  const s = size/24;
+  return `<rect x="${cx-9*s}" y="${cy-8*s}" width="${18*s}" height="${13*s}" rx="${4*s}" fill="${color}" opacity="0.85"/>
+    <path d="M${cx-4*s} ${cy+5*s} L${cx-7*s} ${cy+9*s} L${cx+2*s} ${cy+5*s} Z" fill="${color}" opacity="0.85"/>`;
+}
+function iconStar(cx, cy, size, color) {
+  const s = size/24;
+  return `<polygon points="${cx},${cy-9*s} ${cx+2.5*s},${cy-3*s} ${cx+9*s},${cy-3*s} ${cx+4*s},${cy+1*s} ${cx+6*s},${cy+8*s} ${cx},${cy+4*s} ${cx-6*s},${cy+8*s} ${cx-4*s},${cy+1*s} ${cx-9*s},${cy-3*s} ${cx-2.5*s},${cy-3*s}" fill="${color}"/>`;
+}
+function iconMegaphone(cx, cy, size, color) {
+  const s = size/24;
+  return `<path d="M${cx-9*s} ${cy-3*s} L${cx+4*s} ${cy-8*s} L${cx+4*s} ${cy+8*s} L${cx-9*s} ${cy+3*s} Z" fill="${color}" opacity="0.85"/>
+    <rect x="${cx-9*s}" y="${cy-3*s}" width="${8*s}" height="${6*s}" rx="2" fill="${color}" opacity="0.6"/>`;
+}
+function iconMap(cx, cy, size, color) {
+  const s = size/24;
+  return `<path d="M${cx-9*s} ${cy-8*s} L${cx-3*s} ${cy-5*s} L${cx+3*s} ${cy-8*s} L${cx+9*s} ${cy-5*s} L${cx+9*s} ${cy+8*s} L${cx+3*s} ${cy+5*s} L${cx-3*s} ${cy+8*s} L${cx-9*s} ${cy+5*s} Z" fill="${color}" opacity="0.85"/>`;
+}
+function iconGear(cx, cy, size, color) {
+  const s = size/24;
+  return `${circle(cx, cy, 8*s, color, 0.85)}${circle(cx, cy, 4*s, C.bg)}`;
+}
+
+// Status bar
+function statusBar(w) {
+  return `${rect(0, 0, w, 44, C.surface)}
+    ${text(24, 29, '9:41', 15, C.text, 'start', '600')}
+    ${line(0, 44, w, 44, C.border)}
+    ${text(w-16, 29, '100%', 13, C.textSec, 'end')}
+    ${rect(w-72, 14, 54, 16, C.textSec, 4, 0.6)}
+    ${rect(w-72, 14, 52, 16, C.green, 4, 0.7)}
+    ${text(w-76, 27, 'WiFi', 11, C.textSec, 'end')}`;
+}
+
+// Bottom tab bar
 function tabBar(w, h, active) {
   const tabs = [
-    { icon: '🗺', label: 'Mappa' },
-    { icon: '⚡', label: 'Match' },
-    { icon: '📢', label: 'Proposte' },
-    { icon: '💬', label: 'Chat' },
-    { icon: '👤', label: 'Profilo' },
+    { label: 'Mappa', iconFn: (cx,cy)=>iconMap(cx,cy,22,active===0?C.accent:C.textMut) },
+    { label: 'Match', iconFn: (cx,cy)=>`${iconPerson(cx-7,cy,18,C.blue)}${iconPerson(cx+7,cy,18,C.pink)}` },
+    { label: 'Proposte', iconFn: (cx,cy)=>iconMegaphone(cx,cy,22,active===2?C.accent:C.textMut) },
+    { label: 'Chat', iconFn: (cx,cy)=>iconChat(cx,cy,22,active===3?C.accent:C.textMut) },
+    { label: 'Profilo', iconFn: (cx,cy)=>iconPerson(cx,cy,22,active===4?C.accent:C.textMut) },
   ];
   const tw = w / tabs.length;
   const by = h - 80;
-  let out = `<rect x="0" y="${by}" width="${w}" height="80" fill="${C.surface}"/>
-    <line x1="0" y1="${by}" x2="${w}" y2="${by}" stroke="${C.border}" stroke-width="1"/>`;
+  let out = `${rect(0, by, w, 80, C.surface)}${line(0, by, w, by, C.border)}`;
   tabs.forEach((t, i) => {
     const cx = tw * i + tw / 2;
     const color = i === active ? C.accent : C.textMut;
-    out += `
-      <text x="${cx}" y="${by + 28}" font-family="system-ui,sans-serif" font-size="22" text-anchor="middle">${t.icon}</text>
-      <text x="${cx}" y="${by + 52}" font-family="system-ui,sans-serif" font-size="14" fill="${color}" text-anchor="middle" font-weight="${i===active?'700':'400'}">${t.label}</text>
-    `;
+    const fw = i === active ? '700' : '400';
+    out += t.iconFn(cx, by+24);
+    out += text(cx, by+54, t.label, 12, color, 'middle', fw);
+    if (i === active) out += `${circle(cx, by+64, 3, C.accent)}`;
   });
   return out;
 }
 
-function header(w, title, subtitle) {
-  return `
-    <rect x="0" y="44" width="${w}" height="64" fill="${C.surface}"/>
-    <line x1="0" y1="108" x2="${w}" y2="108" stroke="${C.border}" stroke-width="1"/>
-    <text x="20" y="84" font-family="system-ui,sans-serif" font-size="22" font-weight="700" fill="${C.text}">${title}</text>
-    ${subtitle ? `<text x="20" y="103" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}">${subtitle}</text>` : ''}
-  `;
+// Header bar
+function header(w, title, subtitle, y=44) {
+  const hh = subtitle ? 70 : 58;
+  return `${rect(0, y, w, hh, C.surface)}
+    ${line(0, y+hh, w, y+hh, C.border)}
+    ${text(24, y+(subtitle?36:38), title, subtitle?21:22, C.text, 'start', '700')}
+    ${subtitle ? text(24, y+56, subtitle, 13, C.textSec) : ''}`;
 }
 
-function card(x, y, w, h, rx=14) {
-  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="${C.surface}" stroke="${C.border}" stroke-width="1"/>`;
+// Card container
+function card(x, y, w, h, rx=12) {
+  return `${rect(x, y, w, h, C.surface, rx)}${rect(x, y, w, h, C.border, rx, 0)}
+    <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="none" stroke="${C.border}" stroke-width="1"/>`;
 }
 
-function badge(x, y, text, color, bgOpacity=0.15) {
-  const pad = 10;
-  const bw = text.length * 8 + pad*2;
-  return `
-    <rect x="${x}" y="${y}" width="${bw}" height="26" rx="13" fill="${color}" opacity="${bgOpacity}"/>
-    <text x="${x+bw/2}" y="${y+17}" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="${color}" text-anchor="middle">${text}</text>
-  `;
+// Avatar circle with initials
+function avatar(cx, cy, r, color, initials) {
+  return `${circle(cx, cy, r, color, 0.9)}${text(cx, cy+6, initials, r*0.7, '#fff', 'middle', '700')}`;
 }
 
-function avatar(cx, cy, r, color, icon='●') {
-  return `
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" opacity="0.9"/>
-    <text x="${cx}" y="${cy+r*0.4}" font-family="system-ui,sans-serif" font-size="${r*1.0}" text-anchor="middle" fill="#fff">${icon}</text>
-  `;
+// Pill badge
+function pill(x, y, w, h, label, color, rx=10) {
+  return `${rect(x, y, w, h, color, rx, 0.15)}${text(x+w/2, y+h*0.67, label, Math.min(h*0.55,13), color, 'middle', '600')}`;
 }
 
+// Simple map background
 function mapBg(x, y, w, h) {
-  const streets = [];
-  for(let i=0; i<8; i++) {
-    const x1 = x + Math.floor(Math.random()*100+50)*3;
-    const y1 = y + 20;
-    streets.push(`<line x1="${x1}" y1="${y}" x2="${x1+Math.floor((Math.random()-0.5)*200)}" y2="${y+h}" stroke="#1A2A1A" stroke-width="8" opacity="0.8"/>`);
-  }
-  for(let i=0; i<6; i++) {
-    const y1 = y + Math.floor(Math.random()*100+50)*2;
-    streets.push(`<line x1="${x}" y1="${y1}" x2="${x+w}" y2="${y1+Math.floor((Math.random()-0.5)*100)}" stroke="#1A2A1A" stroke-width="8" opacity="0.8"/>`);
-  }
-  return `
-    <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#0F1A0F"/>
-    ${streets.join('')}
-    <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${C.border}" stroke-width="1"/>
-  `;
+  let out = `${rect(x, y, w, h, '#0A120A')}`;
+  // Horizontal roads
+  const hroads = [0.2,0.4,0.6,0.75,0.9];
+  hroads.forEach(p => {
+    out += `${rect(x, y+h*p-4, w, 8, '#183018', 0)}`;
+    out += `${rect(x, y+h*p-1, w, 2, '#245224', 0, 0.5)}`;
+  });
+  // Vertical roads
+  const vroads = [0.15,0.3,0.5,0.65,0.82];
+  vroads.forEach(p => {
+    out += `${rect(x+w*p-4, y, 8, h, '#183018', 0)}`;
+    out += `${rect(x+w*p-1, y, 2, h, '#245224', 0, 0.5)}`;
+  });
+  // City blocks
+  const blocks = [{x:0.17,y:0.22,w:0.11,h:0.16},{x:0.32,y:0.22,w:0.16,h:0.16},{x:0.52,y:0.22,w:0.11,h:0.16},
+    {x:0.17,y:0.42,w:0.11,h:0.30},{x:0.32,y:0.42,w:0.16,h:0.30},{x:0.67,y:0.42,w:0.13,h:0.30}];
+  blocks.forEach(b => out += `${rect(x+w*b.x, y+h*b.y, w*b.w, h*b.h, '#152015', 0, 0.8)}`);
+  return out;
 }
 
-function bikerPin(cx, cy, label) {
-  return `
-    <circle cx="${cx}" cy="${cy}" r="22" fill="${C.accent}" opacity="0.15"/>
-    <circle cx="${cx}" cy="${cy}" r="14" fill="${C.accent}"/>
-    <text x="${cx}" y="${cy+5}" font-family="system-ui,sans-serif" font-size="13" text-anchor="middle" fill="#fff">🏍</text>
-    ${label ? `<rect x="${cx-20}" y="${cy-36}" width="40" height="18" rx="9" fill="${C.surface}"/>
-    <text x="${cx}" y="${cy-24}" font-family="system-ui,sans-serif" font-size="10" fill="${C.text}" text-anchor="middle">${label}</text>` : ''}
-  `;
+// Biker pin on map
+function bikerPin(cx, cy, label, color) {
+  return `${circle(cx, cy, 22, color, 0.12)}
+    ${circle(cx, cy, 14, color, 0.9)}
+    ${iconMotorcycle(cx, cy, 16, '#fff')}
+    ${label ? `${rect(cx-20, cy-38, 40, 18, C.surface, 9)}${text(cx, cy-26, label, 10, C.text, 'middle','600')}` : ''}`;
 }
 
-// ======= SCREEN 1: MAPPA =======
+// Route polyline (simplified)
+function routePath(pts, color, sw=4) {
+  const d = pts.map((p,i)=>(i===0?'M':'L')+p[0]+' '+p[1]).join(' ');
+  return `<path d="${d}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+
+// ===== SCREEN GENERATORS =====
+
 function screenMappa(w, h) {
-  const mapY = 108, mapH = h - 108 - 80;
-  const pins = [
-    {cx: w*0.25, cy: mapY+mapH*0.25, label:'MotoRider42'},
-    {cx: w*0.55, cy: mapY+mapH*0.4, label:'DucatiGuy'},
-    {cx: w*0.7, cy: mapY+mapH*0.6, label:'VespaRoma'},
-    {cx: w*0.3, cy: mapY+mapH*0.65, label:'BitoBiker'},
-    {cx: w*0.8, cy: mapY+mapH*0.3, label:'AlpiRider'},
-    {cx: w*0.45, cy: mapY+mapH*0.75, label:null},
+  const mapY=114, mapH=h-114-80;
+  const pins=[
+    {cx:w*0.22,cy:mapY+mapH*0.22,label:'MotoRider42',color:C.blue},
+    {cx:w*0.55,cy:mapY+mapH*0.38,label:'DucatiGuy',color:C.blue},
+    {cx:w*0.72,cy:mapY+mapH*0.58,label:'SofiaR.',color:C.pink},
+    {cx:w*0.32,cy:mapY+mapH*0.62,label:'AlpiRider',color:C.blue},
+    {cx:w*0.80,cy:mapY+mapH*0.28,label:'VespaRm.',color:C.accent},
+    {cx:w*0.48,cy:mapY+mapH*0.78,label:null,color:C.blue},
   ];
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-    <rect width="${w}" height="${h}" fill="${C.bg}"/>
-    ${statusBar(w)}
-    ${header(w, 'BikerLink', '🏍 Mappa Biker vicini a te')}
+  const cx=w/2, cy=mapY+mapH*0.48;
+  return svg(w, h, `
     ${mapBg(0, mapY, w, mapH)}
-    ${pins.map(p => bikerPin(p.cx, p.cy, p.label)).join('')}
-    <circle cx="${w/2}" cy="${mapY+mapH/2}" r="60" fill="none" stroke="${C.accent}" stroke-width="1.5" opacity="0.3" stroke-dasharray="8 4"/>
-    <circle cx="${w/2}" cy="${mapY+mapH/2}" r="120" fill="none" stroke="${C.accent}" stroke-width="1" opacity="0.15" stroke-dasharray="8 4"/>
-    <circle cx="${w/2}" cy="${mapY+mapH/2}" r="8" fill="${C.blue}"/>
-    <circle cx="${w/2}" cy="${mapY+mapH/2}" r="20" fill="${C.blue}" opacity="0.2"/>
-    ${card(12, h-168, w-24, 72, 14)}
-    <text x="28" y="${h-140}" font-family="system-ui,sans-serif" font-size="15" font-weight="600" fill="${C.text}">6 biker trovati nelle vicinanze</text>
-    <text x="28" y="${h-120}" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}">Raggio attivo: 50 km · Aggiornato ora</text>
-    ${tabBar(w, h, 0)}
-  </svg>`;
-}
-
-// ======= SCREEN 2: MATCH =======
-function screenMatch(w, h) {
-  const cw = (w-40)/2;
-  const cardY = 128;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-    <rect width="${w}" height="${h}" fill="${C.bg}"/>
+    ${pins.map(p=>bikerPin(p.cx, p.cy, p.label, p.color)).join('')}
+    ${circle(cx, cy, 80, C.accent, 0.06)}
+    <circle cx="${cx}" cy="${cy}" r="80" fill="none" stroke="${C.accent}" stroke-width="1.5" stroke-dasharray="8 5" opacity="0.4"/>
+    ${circle(cx, cy, 8, C.blue, 0.95)}
+    ${circle(cx, cy, 18, C.blue, 0.2)}
+    ${card(12, h-168, w-24, 78, 14)}
+    ${text(28, h-138, '6 biker nelle vicinanze', 16, C.text, 'start', '700')}
+    ${text(28, h-116, 'Raggio: 50 km  |  Aggiornato adesso', 13, C.textSec)}
+    ${pill(28, h-102, 110, 24, 'Espandi raggio', C.accent, 12)}
     ${statusBar(w)}
-    ${header(w, 'Match ⚡', 'Trova il tuo compagno di viaggio')}
-    ${card(12, cardY, cw, 300)}
-    ${avatar(12+cw/2, cardY+64, 44, C.blue, '🏍')}
-    <text x="${12+cw/2}" y="${cardY+130}" font-family="system-ui,sans-serif" font-size="17" font-weight="700" fill="${C.text}" text-anchor="middle">MotoRider42</text>
-    <text x="${12+cw/2}" y="${cardY+152}" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="middle">Biker · Roma</text>
-    ${badge(12+cw/2-30, cardY+170, 'Naked', C.blue)}
-    ${badge(12+cw/2-35, cardY+202, 'Mozzafiato', C.accent)}
-    <text x="${12+cw/2}" y="${cardY+252}" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="middle">Ducati Monster 821</text>
-    <text x="${12+cw/2}" y="${cardY+274}" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="middle">📍 12 km da te</text>
-    ${card(28+cw, cardY, cw, 300)}
-    ${avatar(28+cw+cw/2, cardY+64, 44, C.pink, '👤')}
-    <text x="${28+cw+cw/2}" y="${cardY+130}" font-family="system-ui,sans-serif" font-size="17" font-weight="700" fill="${C.text}" text-anchor="middle">SofiaRider</text>
-    <text x="${28+cw+cw/2}" y="${cardY+152}" font-family="system-ui,sans-serif" font-size="13" fill="${C.pink}" text-anchor="middle">Zavorrina · Milano</text>
-    ${badge(28+cw+cw/2-30, cardY+170, 'Touring', C.pink)}
-    ${badge(28+cw+cw/2-30, cardY+202, 'Allegra', C.warning)}
-    <text x="${28+cw+cw/2}" y="${cardY+252}" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="middle">Honda CB500F</text>
-    <text x="${28+cw+cw/2}" y="${cardY+274}" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="middle">📍 8 km da te</text>
-    <text x="${w/2}" y="${cardY+360}" font-family="system-ui,sans-serif" font-size="15" fill="${C.textSec}" text-anchor="middle">Compatibilità</text>
-    <rect x="${w*0.1}" y="${cardY+374}" width="${w*0.8}" height="6" rx="3" fill="${C.surfaceL}"/>
-    <rect x="${w*0.1}" y="${cardY+374}" width="${w*0.8*0.87}" height="6" rx="3" fill="${C.accent}"/>
-    <text x="${w/2}" y="${cardY+400}" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="${C.accent}" text-anchor="middle">87% compatibili</text>
-    <rect x="20" y="${cardY+430}" width="${w-40}" height="54" rx="27" fill="${C.accent}"/>
-    <text x="${w/2}" y="${cardY+465}" font-family="system-ui,sans-serif" font-size="18" font-weight="700" fill="#fff" text-anchor="middle">⚡ Invia Match</text>
-    ${tabBar(w, h, 1)}
-  </svg>`;
+    ${header(w, 'BikerLink', 'Mappa biker vicini')}
+    ${tabBar(w, h, 0)}
+  `);
 }
 
-// ======= SCREEN 3: MOTOCLUB =======
+function screenMatch(w, h) {
+  const cw=(w-40)/2, cardY=128, ch=290;
+  return svg(w, h, `
+    ${card(12, cardY, cw, ch)}
+    ${avatar(12+cw/2, cardY+60, 40, C.blue, 'M')}
+    ${text(12+cw/2, cardY+118, 'MotoRider42', 16, C.text, 'middle', '700')}
+    ${text(12+cw/2, cardY+140, 'Biker - Roma', 13, C.textSec, 'middle')}
+    ${pill(12+cw/2-40, cardY+156, 80, 24, 'Naked', C.blue)}
+    ${pill(12+cw/2-45, cardY+188, 90, 24, 'Mozzafiato', C.accent)}
+    ${text(12+cw/2, cardY+232, 'Ducati 821', 13, C.textSec, 'middle')}
+    ${text(12+cw/2, cardY+254, '12 km da te', 13, C.accent, 'middle', '600')}
+    ${card(28+cw, cardY, cw, ch)}
+    ${avatar(28+cw+cw/2, cardY+60, 40, C.pink, 'S')}
+    ${text(28+cw+cw/2, cardY+118, 'SofiaRider', 16, C.text, 'middle', '700')}
+    ${text(28+cw+cw/2, cardY+140, 'Zavorrina - MI', 13, C.pink, 'middle')}
+    ${pill(28+cw+cw/2-38, cardY+156, 76, 24, 'Touring', C.pink)}
+    ${pill(28+cw+cw/2-35, cardY+188, 70, 24, 'Allegra', C.warning)}
+    ${text(28+cw+cw/2, cardY+232, 'Honda CB500F', 13, C.textSec, 'middle')}
+    ${text(28+cw+cw/2, cardY+254, '8 km da te', 13, C.accent, 'middle', '600')}
+    ${text(w/2, cardY+310, 'Compatibilita\'', 14, C.textSec, 'middle')}
+    ${rect(w*0.1, cardY+322, w*0.8, 6, C.surfaceL, 3)}
+    ${rect(w*0.1, cardY+322, w*0.8*0.87, 6, C.accent, 3)}
+    ${text(w/2, cardY+358, '87% compatibili', 22, C.accent, 'middle', '800')}
+    ${rect(20, cardY+378, w-40, 54, C.accent, 27)}
+    ${text(w/2, cardY+412, 'Invia Match', 18, '#fff', 'middle', '700')}
+    ${rect(20, cardY+444, w-40, 44, C.surfaceL, 22)}
+    ${text(w/2, cardY+472, 'Salta', 15, C.textSec, 'middle')}
+    ${statusBar(w)}
+    ${header(w, 'Match', 'Trova il tuo compagno di viaggio')}
+    ${tabBar(w, h, 1)}
+  `);
+}
+
 function screenMotoclub(w, h) {
   const clubs = [
-    {name:'Ducati Club Roma', members:'142', events:'3', color: C.red},
-    {name:'Vespa Riders Milano', members:'89', events:'7', color: C.accent},
-    {name:'BMW Motorrad Nord', members:'213', events:'2', color: C.blue},
-    {name:'Honda Club Italia', members:'67', events:'1', color: C.green},
-    {name:'KTM Adventure Crew', members:'55', events:'4', color: C.warning},
+    {name:'Ducati Club Roma', members:'142', events:'3', color:C.red},
+    {name:'Vespa Riders Milano', members:'89', events:'7', color:C.accent},
+    {name:'BMW Motorrad Nord', members:'213', events:'2', color:C.blue},
+    {name:'Honda Club Italia', members:'67', events:'1', color:C.green},
+    {name:'KTM Adventure Crew', members:'55', events:'4', color:C.warning},
   ];
-  let clubCards = '';
+  let content = `${rect(12, 118, w-24, 36, C.surfaceL, 10)}${text(36, 141, 'Cerca un club...', 14, C.textMut)}`;
   clubs.forEach((cl, i) => {
-    const cy = 128 + i*108;
-    clubCards += `
-      ${card(12, cy, w-24, 96)}
-      <circle cx="60" cy="${cy+48}" r="30" fill="${cl.color}" opacity="0.15"/>
-      <text x="60" y="${cy+56}" font-family="system-ui,sans-serif" font-size="24" text-anchor="middle">🛡</text>
-      <text x="104" y="${cy+30}" font-family="system-ui,sans-serif" font-size="16" font-weight="700" fill="${C.text}">${cl.name}</text>
-      <text x="104" y="${cy+52}" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}">👥 ${cl.members} membri</text>
-      <text x="104" y="${cy+72}" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}">📅 ${cl.events} eventi in programma</text>
-      <rect x="${w-80}" y="${cy+30}" width="60" height="28" rx="14" fill="${cl.color}" opacity="0.15"/>
-      <text x="${w-50}" y="${cy+49}" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="${cl.color}" text-anchor="middle">Unisciti</text>
-    `;
+    const cy = 168 + i*106;
+    content += `${card(12, cy, w-24, 94)}
+      ${circle(52, cy+47, 26, cl.color, 0.15)}
+      ${iconShield(52, cy+47, 28, cl.color)}
+      ${text(90, cy+32, cl.name, 16, C.text, 'start', '700')}
+      ${text(90, cy+54, members(cl.members)+' membri', 13, C.textSec)}
+      ${text(90, cy+72, cl.events+' eventi in programma', 13, C.textSec)}
+      ${rect(w-90, cy+30, 70, 28, cl.color, 14, 0.12)}
+      ${text(w-55, cy+49, 'Unisciti', 12, cl.color, 'middle', '600')}`;
   });
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-    <rect width="${w}" height="${h}" fill="${C.bg}"/>
+  function members(n){ return n; }
+  return svg(w, h, `${content}
     ${statusBar(w)}
-    ${header(w, 'Motoclub 🛡', 'Directory club motociclistici')}
-    <rect x="12" y="112" width="${w-24}" height="40" rx="10" fill="${C.surfaceL}"/>
-    <text x="36" y="137" font-family="system-ui,sans-serif" font-size="14" fill="${C.textMut}">🔍 Cerca un club...</text>
-    ${clubCards}
+    ${header(w, 'Motoclub', 'Directory club motociclistici')}
     ${tabBar(w, h, 2)}
-  </svg>`;
+  `);
 }
 
-// ======= SCREEN 4: CHAT =======
 function screenChat(w, h) {
   const convs = [
-    {name:'Ducati Club Roma 🛡', last:'Chi partecipa sabato al giro?', time:'10:42', unread:5, color:C.accent, icon:'🛡'},
-    {name:'MotoRider42', last:'Sei disponibile domenica?', time:'09:15', unread:2, color:C.blue, icon:'🏍'},
-    {name:'SofiaRider', last:'Ho trovato un percorso fantastico!', time:'Ieri', unread:0, color:C.pink, icon:'👤'},
-    {name:'BMW Club Nord', last:'Foto del giro di ieri', time:'Ieri', unread:1, color:C.blue, icon:'🛡'},
-    {name:'DucatiGuy', last:'Grazie per il consiglio!', time:'Lun', unread:0, color:C.blue, icon:'🏍'},
-    {name:'Vespa Riders', last:'Nuovo raduno a Firenze', time:'Dom', unread:3, color:C.warning, icon:'🛡'},
+    {name:'Ducati Club Roma', last:'Chi viene sabato al giro?', time:'10:42', unread:5, color:C.accent, icon:'C'},
+    {name:'MotoRider42', last:'Sei disponibile domenica?', time:'09:15', unread:2, color:C.blue, icon:'M'},
+    {name:'SofiaRider', last:'Ho trovato un percorso top!', time:'Ieri', unread:0, color:C.pink, icon:'S'},
+    {name:'BMW Club Nord', last:'Foto del giro di ieri', time:'Ieri', unread:1, color:C.blue, icon:'B'},
+    {name:'DucatiGuy', last:'Grazie del consiglio!', time:'Lun', unread:0, color:C.blue, icon:'D'},
+    {name:'Vespa Riders', last:'Nuovo raduno a Firenze', time:'Dom', unread:3, color:C.warning, icon:'V'},
   ];
-  let rows = '';
+  let rows = `${rect(0, 114, w, 44, C.surface)}
+    ${text(20, 142, 'Amici (3)', 13, C.textSec, 'start', '600')}
+    ${rect(w-120, 118, 108, 32, C.accent, 16)}
+    ${text(w-66, 139, '+ Nuova Chat', 12, '#fff', 'middle', '600')}`;
+  // Friend bubbles
+  ['M','S','D'].forEach((l,i)=>{
+    const fcx = 24 + i*58;
+    rows += `${circle(fcx, 188, 22, i===1?C.pink:C.blue, 0.9)}${text(fcx, 194, l, 16, '#fff', 'middle', '700')}`;
+  });
+  let startY = 224;
   convs.forEach((c, i) => {
-    const cy = 128 + i*86;
-    rows += `
-      <rect x="0" y="${cy}" width="${w}" height="86" fill="${i%2===0?C.bg:C.bg}"/>
-      <line x1="60" y1="${cy+85}" x2="${w-12}" y2="${cy+85}" stroke="${C.border}" stroke-width="0.5"/>
-      <circle cx="36" cy="${cy+43}" r="22" fill="${c.color}" opacity="0.8"/>
-      <text x="36" y="${cy+50}" font-family="system-ui,sans-serif" font-size="16" text-anchor="middle">${c.icon}</text>
-      <text x="68" y="${cy+30}" font-family="system-ui,sans-serif" font-size="15" font-weight="${c.unread>0?'700':'500'}" fill="${C.text}">${c.name}</text>
-      <text x="68" y="${cy+52}" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" textLength="${w-120}" lengthAdjust="spacingAndGlyphs">${c.last.substring(0,35)}${c.last.length>35?'…':''}</text>
-      <text x="${w-12}" y="${cy+30}" font-family="system-ui,sans-serif" font-size="12" fill="${C.textMut}" text-anchor="end">${c.time}</text>
-      ${c.unread>0?`<circle cx="${w-20}" cy="${cy+56}" r="11" fill="${C.accent}"/>
-      <text x="${w-20}" y="${cy+61}" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">${c.unread}</text>`:''}
-    `;
+    const cy = startY + i*84;
+    rows += `${line(60, cy+83, w-12, cy+83, C.border, 0.5)}
+      ${avatar(36, cy+42, 20, c.color, c.icon)}
+      ${text(66, cy+28, c.name, 15, C.text, 'start', c.unread>0?'700':'500')}
+      ${text(66, cy+50, c.last.substring(0,36)+(c.last.length>36?'...':''), 13, C.textSec)}
+      ${text(w-14, cy+28, c.time, 12, C.textMut, 'end')}`;
+    if(c.unread>0) rows += `${circle(w-22, cy+52, 12, C.accent, 0.9)}${text(w-22, cy+57, String(c.unread), 11, '#fff', 'middle', '700')}`;
   });
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-    <rect width="${w}" height="${h}" fill="${C.bg}"/>
+  return svg(w, h, `${rows}
     ${statusBar(w)}
-    <rect x="0" y="44" width="${w}" height="84" fill="${C.surface}"/>
-    <line x1="0" y1="128" x2="${w}" y2="128" stroke="${C.border}" stroke-width="1"/>
-    <text x="20" y="76" font-family="system-ui,sans-serif" font-size="22" font-weight="700" fill="${C.text}">Chat 💬</text>
-    <rect x="${w-136}" y="52" width="124" height="36" rx="18" fill="${C.accent}"/>
-    <text x="${w-74}" y="75" font-family="system-ui,sans-serif" font-size="13" font-weight="700" fill="#fff" text-anchor="middle">+ Nuova Chat</text>
-    ${rows}
+    ${header(w, 'Chat', '')}
     ${tabBar(w, h, 3)}
-  </svg>`;
+  `);
 }
 
-// ======= SCREEN 5: TRACKING =======
 function screenTracking(w, h) {
-  const mapY = 108, mapH = h*0.45;
-  const statsY = mapY + mapH + 10;
-  const routePoints = [];
-  for(let i=0; i<=20; i++) {
-    const px = w*0.1 + (w*0.8)*(i/20) + Math.sin(i*0.7)*20;
-    const py = mapY+mapH*0.2 + (mapH*0.6)*(i/20) + Math.cos(i*0.5)*15;
-    routePoints.push(`${px},${py}`);
+  const mapY=114, mapH=h*0.44;
+  const pts=[];
+  for(let i=0;i<=20;i++){
+    pts.push([w*0.1+(w*0.8)*(i/20)+Math.sin(i*0.7)*18, mapY+mapH*0.18+(mapH*0.64)*(i/20)+Math.cos(i*0.5)*14]);
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-    <rect width="${w}" height="${h}" fill="${C.bg}"/>
-    ${statusBar(w)}
-    ${header(w, 'Tracking GPS 📍', 'Giro in corso · Live')}
+  const sx=pts[pts.length-1][0], sy=pts[pts.length-1][1];
+  const statsY=mapY+mapH+16;
+  const statsH=h-mapY-mapH-80-20;
+  return svg(w, h, `
     ${mapBg(0, mapY, w, mapH)}
-    <polyline points="${routePoints.join(' ')}" fill="none" stroke="${C.accent}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
-    <circle cx="${routePoints[0].split(',')[0]}" cy="${routePoints[0].split(',')[1]}" r="8" fill="${C.green}"/>
-    <circle cx="${routePoints[routePoints.length-1].split(',')[0]}" cy="${routePoints[routePoints.length-1].split(',')[1]}" r="10" fill="${C.blue}"/>
-    <circle cx="${routePoints[routePoints.length-1].split(',')[0]}" cy="${routePoints[routePoints.length-1].split(',')[1]}" r="20" fill="${C.blue}" opacity="0.2"/>
-    ${card(12, statsY, w-24, 190)}
-    <text x="${w/2}" y="${statsY+60}" font-family="system-ui,sans-serif" font-size="52" font-weight="800" fill="${C.accent}" text-anchor="middle">87</text>
-    <text x="${w/2}" y="${statsY+88}" font-family="system-ui,sans-serif" font-size="16" fill="${C.textSec}" text-anchor="middle">km/h</text>
-    <line x1="${w/3}" y1="${statsY+106}" x2="${w/3}" y2="${statsY+170}" stroke="${C.border}" stroke-width="1"/>
-    <line x1="${w*2/3}" y1="${statsY+106}" x2="${w*2/3}" y2="${statsY+170}" stroke="${C.border}" stroke-width="1"/>
-    <text x="${w/6}" y="${statsY+132}" font-family="system-ui,sans-serif" font-size="22" font-weight="700" fill="${C.text}" text-anchor="middle">67.4</text>
-    <text x="${w/6}" y="${statsY+154}" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="middle">km percorsi</text>
-    <text x="${w/2}" y="${statsY+132}" font-family="system-ui,sans-serif" font-size="22" font-weight="700" fill="${C.text}" text-anchor="middle">1:23</text>
-    <text x="${w/2}" y="${statsY+154}" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="middle">durata</text>
-    <text x="${w*5/6}" y="${statsY+132}" font-family="system-ui,sans-serif" font-size="22" font-weight="700" fill="${C.text}" text-anchor="middle">+450m</text>
-    <text x="${w*5/6}" y="${statsY+154}" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="middle">dislivello</text>
-    <rect x="20" y="${statsY+215}" width="${w-40}" height="52" rx="26" fill="${C.red}" opacity="0.9"/>
-    <text x="${w/2}" y="${statsY+248}" font-family="system-ui,sans-serif" font-size="17" font-weight="700" fill="#fff" text-anchor="middle">■ Termina Giro</text>
+    ${routePath(pts, C.accent, 4)}
+    ${circle(pts[0][0], pts[0][1], 8, C.green, 0.95)}
+    ${circle(sx, sy, 10, C.blue, 0.95)}
+    ${circle(sx, sy, 22, C.blue, 0.2)}
+    ${card(12, statsY, w-24, Math.min(statsH, 420))}
+    ${text(w/2, statsY+58, '87', 54, C.accent, 'middle', '800')}
+    ${text(w/2, statsY+84, 'km/h velocita\'', 15, C.textSec, 'middle')}
+    ${line(12, statsY+100, w-12, statsY+100, C.border)}
+    ${line(w/3, statsY+110, w/3, statsY+182, C.border)}
+    ${line(w*2/3, statsY+110, w*2/3, statsY+182, C.border)}
+    ${text(w/6, statsY+138, '67.4 km', 20, C.text, 'middle', '700')}
+    ${text(w/6, statsY+162, 'percorsi', 13, C.textSec, 'middle')}
+    ${text(w/2, statsY+138, '1h 23m', 20, C.text, 'middle', '700')}
+    ${text(w/2, statsY+162, 'durata', 13, C.textSec, 'middle')}
+    ${text(w*5/6, statsY+138, '+450 m', 20, C.text, 'middle', '700')}
+    ${text(w*5/6, statsY+162, 'dislivello', 13, C.textSec, 'middle')}
+    ${line(12, statsY+188, w-12, statsY+188, C.border)}
+    ${text(24, statsY+218, 'Velocita\' massima', 14, C.textSec)}
+    ${text(w-24, statsY+218, '118 km/h', 16, C.accent, 'end', '700')}
+    ${text(24, statsY+252, 'Moto: Ducati Monster 821', 14, C.textSec)}
+    ${text(w-24, statsY+252, 'Naked', 13, C.blue, 'end', '600')}
+    ${text(24, statsY+286, 'Partenza: Piazza Venezia, Roma', 14, C.textSec)}
+    ${rect(20, statsY+310, w-40, 52, C.red, 26, 0.9)}
+    ${text(w/2, statsY+343, 'Termina Giro', 17, '#fff', 'middle', '700')}
+    ${statusBar(w)}
+    ${header(w, 'Tracking GPS', 'Giro in corso - Live')}
     ${tabBar(w, h, 0)}
-  </svg>`;
+  `);
 }
 
-// ======= SCREEN 6: GARAGE =======
 function screenGarage(w, h) {
-  const motos = [
-    {brand:'Ducati', model:'Monster 821', cc:'821cc', type:'Naked', style:'Mozzafiato', default:true},
-    {brand:'Honda', model:'CB500F', cc:'500cc', type:'Naked', style:'Allegra', default:false},
+  const motos=[
+    {brand:'Ducati', model:'Monster 821', cc:'821cc', type:'Naked', style:'Mozzafiato', def:true},
+    {brand:'Honda', model:'CB500F', cc:'500cc', type:'Naked', style:'Allegra', def:false},
   ];
-  let motoCards = '';
+  let content = `${rect(12, 118, w-24, 36, C.surfaceL, 10)}${text(36, 141, 'Cerca moto...', 14, C.textMut)}
+    ${rect(w-76, 52, 64, 34, C.accent, 17)}
+    ${text(w-44, 74, '+ Aggiungi', 11, '#fff', 'middle', '700')}`;
   motos.forEach((m, i) => {
-    const cy = 160 + i*200;
-    motoCards += `
-      ${card(12, cy, w-24, 184)}
-      ${m.default ? `<rect x="20" y="${cy+8}" width="90" height="24" rx="12" fill="${C.accent}" opacity="0.15"/>
-      <text x="65" y="${cy+24}" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="${C.accent}" text-anchor="middle">⭐ Principale</text>` : ''}
-      <text x="26" y="${cy+64}" font-family="system-ui,sans-serif" font-size="42" text-anchor="start">🏍</text>
-      <text x="100" y="${cy+52}" font-family="system-ui,sans-serif" font-size="19" font-weight="700" fill="${C.text}">${m.brand} ${m.model}</text>
-      <text x="100" y="${cy+76}" font-family="system-ui,sans-serif" font-size="14" fill="${C.textSec}">${m.cc} · ${m.type}</text>
-      <rect x="100" y="${cy+88}" width="${m.type.length*8+16}" height="24" rx="12" fill="${C.accent}" opacity="0.12"/>
-      <text x="${100+m.type.length*4+8}" y="${cy+104}" font-family="system-ui,sans-serif" font-size="12" fill="${C.accent}" text-anchor="middle">${m.type}</text>
-      <rect x="${100+m.type.length*8+24}" y="${cy+88}" width="${m.style.length*8+16}" height="24" rx="12" fill="${C.blue}" opacity="0.12"/>
-      <text x="${100+m.type.length*8+24+m.style.length*4+8}" y="${cy+104}" font-family="system-ui,sans-serif" font-size="12" fill="${C.blue}" text-anchor="middle">${m.style}</text>
-      <line x1="12" y1="${cy+130}" x2="${w-12}" y2="${cy+130}" stroke="${C.border}" stroke-width="0.8"/>
-      <rect x="20" y="${cy+142}" width="${(w-50)/2}" height="34" rx="10" fill="${C.surfaceL}"/>
-      <text x="${20+(w-50)/4}" y="${cy+164}" font-family="system-ui,sans-serif" font-size="13" fill="${C.text}" text-anchor="middle">✏️ Modifica</text>
-      <rect x="${24+(w-50)/2}" y="${cy+142}" width="${(w-50)/2}" height="34" rx="10" fill="${C.red}" opacity="0.1"/>
-      <text x="${24+(w-50)/2+(w-50)/4}" y="${cy+164}" font-family="system-ui,sans-serif" font-size="13" fill="${C.red}" text-anchor="middle">🗑 Elimina</text>
-    `;
+    const cy = 168 + i*200;
+    content += `${card(12, cy, w-24, 184)}`;
+    if(m.def) content += `${pill(22, cy+10, 100, 24, '  Principale', C.accent, 12)}${iconStar(82, cy+22, 16, C.accent)}`;
+    content += `
+      ${iconMotorcycle(66, cy+72, 44, C.accent)}
+      ${text(110, cy+52, m.brand+' '+m.model, 19, C.text, 'start', '700')}
+      ${text(110, cy+76, m.cc+' - '+m.type, 14, C.textSec)}
+      ${pill(110, cy+88, 70, 24, m.type, C.accent)}
+      ${pill(188, cy+88, 80, 24, m.style, C.blue)}
+      ${line(12, cy+128, w-12, cy+128, C.border)}
+      ${rect(20, cy+142, (w-52)/2, 34, C.surfaceL, 10)}
+      ${text(20+(w-52)/4, cy+164, 'Modifica', 13, C.text, 'middle')}
+      ${rect(28+(w-52)/2, cy+142, (w-52)/2, 34, C.red, 10, 0.1)}
+      ${text(28+(w-52)/2+(w-52)/4, cy+164, 'Elimina', 13, C.red, 'middle')}`;
   });
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-    <rect width="${w}" height="${h}" fill="${C.bg}"/>
+  return svg(w, h, `${content}
+    ${text(w/2, h-100, 'Aggiungi fino a 5 moto al tuo garage', 13, C.textSec, 'middle')}
     ${statusBar(w)}
-    ${header(w, 'Il mio Garage 🏍', 'Le tue moto')}
-    <rect x="${w-76}" y="52" width="64" height="36" rx="18" fill="${C.accent}"/>
-    <text x="${w-44}" y="75" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="#fff" text-anchor="middle">+</text>
-    <rect x="12" y="112" width="${w-24}" height="36" rx="10" fill="${C.surfaceL}"/>
-    <text x="30" y="135" font-family="system-ui,sans-serif" font-size="14" fill="${C.textMut}">🔍 Cerca moto...</text>
-    ${motoCards}
-    <text x="${w/2}" y="${160+motos.length*200+24}" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="middle">Aggiungi fino a 5 moto al tuo garage</text>
+    ${header(w, 'Il mio Garage', 'Le tue moto')}
     ${tabBar(w, h, 0)}
-  </svg>`;
+  `);
 }
 
-// ======= SCREEN 7: PROPOSTE =======
 function screenProposte(w, h) {
-  const proposals = [
-    {type:'Giro', icon:'🏍', color:C.blue, title:'Giro sulle Dolomiti', creator:'MotoRider42', location:'Bolzano', date:'Dom 28 Apr', km:'120km', members:'5/8'},
-    {type:'Con Zavorrina', icon:'👫', color:C.pink, title:'Weekend a Firenze', creator:'AlpiRider', location:'Firenze', date:'Sab 4 Mag', km:'80km', members:'2/4'},
-    {type:'Passaggio', icon:'🚗', color:C.green, title:'Passaggio verso Roma', creator:'SofiaRider', location:'Roma', date:'Ven 26 Apr', km:'45km', members:'1/2'},
-    {type:'Giro', icon:'🏍', color:C.blue, title:'Costa Amalfitana Tour', creator:'DucatiGuy', location:'Salerno', date:'Sab 11 Mag', km:'200km', members:'7/10'},
+  const proposals=[
+    {type:'Giro', icon:'GIRO', color:C.blue, title:'Giro sulle Dolomiti', creator:'MotoRider42', loc:'Bolzano', date:'Dom 28 Apr', km:'120 km', count:'5/8'},
+    {type:'Con Zavorrina', icon:'Z+B', color:C.pink, title:'Weekend a Firenze', creator:'AlpiRider', loc:'Firenze', date:'Sab 4 Mag', km:'80 km', count:'2/4'},
+    {type:'Passaggio', icon:'PASS', color:C.green, title:'Passaggio verso Roma', creator:'SofiaRider', loc:'Roma', date:'Ven 26 Apr', km:'45 km', count:'1/2'},
+    {type:'Giro', icon:'GIRO', color:C.blue, title:'Costa Amalfitana Tour', creator:'DucatiGuy', loc:'Salerno', date:'Sab 11 Mag', km:'200 km', count:'7/10'},
   ];
-  const filterKeys = ['Tutti','Giro','Con Zavorrina','Passaggio','Richieste'];
-  let filters = '';
-  filterKeys.forEach((f, i) => {
-    const fw = f.length*8+20;
-    const fx = 12 + filterKeys.slice(0,i).reduce((s,k)=>s+k.length*8+28,0);
-    filters += `
-      <rect x="${fx}" y="112" width="${fw}" height="30" rx="15" fill="${i===0?C.accent:C.surfaceL}" opacity="${i===0?'0.15':'1'}"/>
-      <text x="${fx+fw/2}" y="${112+20}" font-family="system-ui,sans-serif" font-size="12" font-weight="${i===0?'700':'400'}" fill="${i===0?C.accent:C.textSec}" text-anchor="middle">${f}</text>
-    `;
+  const filterKeys=['Tutti','Giro','Con Zav.','Passaggio','Richieste'];
+  let content = '';
+  let fx = 12;
+  filterKeys.forEach((f,i)=>{
+    const fw=f.length*8+18;
+    content += `${rect(fx, 116, fw, 28, i===0?C.accent:C.surfaceL, 14, i===0?0.15:1)}${text(fx+fw/2, 134, f, 12, i===0?C.accent:C.textSec, 'middle', i===0?'700':'400')}`;
+    fx += fw + 8;
   });
-  let propCards = '';
   proposals.forEach((p, i) => {
-    const cy = 156 + i*128;
-    propCards += `
-      ${card(12, cy, w-24, 116)}
-      <text x="26" y="${cy+24}" font-family="system-ui,sans-serif" font-size="18">${p.icon}</text>
-      <text x="50" y="${cy+24}" font-family="system-ui,sans-serif" font-size="15" font-weight="700" fill="${C.text}">${p.creator}</text>
-      <rect x="${w-100}" y="${cy+8}" width="${p.type.length*7+16}" height="22" rx="11" fill="${p.color}" opacity="0.15"/>
-      <text x="${w-100+(p.type.length*7+16)/2}" y="${cy+23}" font-family="system-ui,sans-serif" font-size="11" fill="${p.color}" text-anchor="middle">${p.type}</text>
-      <text x="26" y="${cy+48}" font-family="system-ui,sans-serif" font-size="16" font-weight="600" fill="${C.text}">${p.title}</text>
-      <text x="26" y="${cy+70}" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}">📍 ${p.location} · 🗓 ${p.date}</text>
-      <text x="26" y="${cy+90}" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}">🛣 ${p.km} · 👥 ${p.members} partecipanti</text>
-    `;
+    const cy = 158 + i*126;
+    content += `${card(12, cy, w-24, 114)}
+      ${pill(20, cy+10, p.icon.length*9+16, 24, p.icon, p.color)}
+      ${text(20+p.icon.length*9+24, cy+26, p.creator, 14, C.text, 'start', '700')}
+      ${text(w-20, cy+26, p.type, 12, p.color, 'end', '600')}
+      ${text(20, cy+50, p.title, 16, C.text, 'start', '600')}
+      ${iconPin(18+8, cy+74, 14, C.textSec)}${text(34, cy+78, p.loc, 13, C.textSec)}
+      ${text(20, cy+78, '', 13, C.textSec)}
+      ${text(w/2, cy+78, p.date, 13, C.textSec, 'middle')}
+      ${text(w-20, cy+78, p.km+' - '+p.count+' part.', 12, C.accent, 'end', '600')}`;
   });
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-    <rect width="${w}" height="${h}" fill="${C.bg}"/>
+  return svg(w, h, `${content}
+    ${circle(w-36, h-108, 28, C.accent, 0.95)}
+    ${text(w-36, h-100, '+', 32, '#fff', 'middle', '300')}
     ${statusBar(w)}
-    ${header(w, 'Proposte 📢', 'Giri ed eventi vicini a te')}
-    ${filters}
-    ${propCards}
-    <circle cx="${w-36}" cy="${h-116}" r="28" fill="${C.accent}"/>
-    <text x="${w-36}" y="${h-108}" font-family="system-ui,sans-serif" font-size="28" font-weight="300" fill="#fff" text-anchor="middle">+</text>
+    ${header(w, 'Proposte', 'Giri ed eventi vicini')}
     ${tabBar(w, h, 2)}
-  </svg>`;
+  `);
 }
 
-// ======= SCREEN 8: PROFILO =======
 function screenProfilo(w, h) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-    <rect width="${w}" height="${h}" fill="${C.bg}"/>
+  return svg(w, h, `
+    ${rect(0, 114, w, 170, C.surface)}
+    ${line(0, 284, w, 284, C.border)}
+    ${circle(w/2, 196, 52, C.blue, 0.15)}
+    ${circle(w/2, 196, 44, C.blue, 0.9)}
+    ${iconPerson(w/2, 198, 40, '#fff')}
+    ${text(w/2, 278, 'MotoRider42', 20, C.text, 'middle', '700')}
+    ${text(w/2, 300, 'Biker - Roma, Italia', 14, C.textSec, 'middle')}
+    ${card(12, 318, (w-36)/3, 78)}
+    ${text(12+(w-36)/6, 354, '12.4k', 20, C.accent, 'middle', '700')}
+    ${text(12+(w-36)/6, 376, 'km totali', 12, C.textSec, 'middle')}
+    ${card(24+(w-36)/3, 318, (w-36)/3, 78)}
+    ${text(24+(w-36)/3+(w-36)/6, 354, '89', 20, C.accent, 'middle', '700')}
+    ${text(24+(w-36)/3+(w-36)/6, 376, 'giri fatti', 12, C.textSec, 'middle')}
+    ${card(36+(w-36)*2/3, 318, (w-36)/3, 78)}
+    ${text(36+(w-36)*2/3+(w-36)/6, 354, '7', 20, C.accent, 'middle', '700')}
+    ${text(36+(w-36)*2/3+(w-36)/6, 376, 'trofei', 12, C.textSec, 'middle')}
+    ${[
+      {label:'Ducati Monster 821', sub:'Naked - Mozzafiato', icon:'moto'},
+      {label:'Privacy e Posizione', sub:'Nascondi dalla mappa', icon:'lock'},
+      {label:'Tema: Asfalto', sub:'Personalizza i colori', icon:'color'},
+      {label:'Lingua e Unita\'', sub:'Italiano - km/h', icon:'globe'},
+      {label:'Documenti', sub:'Manuale - EULA - Privacy', icon:'doc'},
+    ].map((row,i)=>{
+      const ry=410+i*66;
+      return `${card(12, ry, w-24, 54)}
+        ${circle(42, ry+27, 16, C.accent, 0.1)}
+        ${text(42, ry+32, row.icon==='moto'?'M':row.icon==='lock'?'L':row.icon==='color'?'C':row.icon==='globe'?'G':'D', 13, C.accent, 'middle', '700')}
+        ${text(68, ry+22, row.label, 15, C.text, 'start', '600')}
+        ${text(68, ry+40, row.sub, 12, C.textSec)}
+        ${text(w-20, ry+30, '>', 18, C.textSec, 'end')}`;
+    }).join('')}
+    ${rect(20, h-154, w-40, 50, C.red, 25, 0.1)}
+    ${text(w/2, h-122, 'Esci dall\'account', 16, C.red, 'middle', '600')}
     ${statusBar(w)}
-    ${header(w, 'Profilo 👤', '')}
-    <rect x="0" y="108" width="${w}" height="160" fill="${C.surface}"/>
-    <circle cx="${w/2}" cy="190" r="52" fill="${C.accent}" opacity="0.15"/>
-    <circle cx="${w/2}" cy="190" r="44" fill="${C.blue}"/>
-    <text x="${w/2}" y="206" font-family="system-ui,sans-serif" font-size="36" text-anchor="middle">🏍</text>
-    <text x="${w/2}" y="274" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="${C.text}" text-anchor="middle">MotoRider42</text>
-    <text x="${w/2}" y="298" font-family="system-ui,sans-serif" font-size="14" fill="${C.textSec}" text-anchor="middle">Biker · Roma, Italia</text>
-    ${card(12, 322, (w-36)/3, 80)}
-    <text x="${12+(w-36)/6}" y="358" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="${C.accent}" text-anchor="middle">12.4k</text>
-    <text x="${12+(w-36)/6}" y="380" font-family="system-ui,sans-serif" font-size="12" fill="${C.textSec}" text-anchor="middle">km totali</text>
-    ${card(24+(w-36)/3, 322, (w-36)/3, 80)}
-    <text x="${24+(w-36)/3+(w-36)/6}" y="358" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="${C.accent}" text-anchor="middle">89</text>
-    <text x="${24+(w-36)/3+(w-36)/6}" y="380" font-family="system-ui,sans-serif" font-size="12" fill="${C.textSec}" text-anchor="middle">giri fatti</text>
-    ${card(36+(w-36)*2/3, 322, (w-36)/3, 80)}
-    <text x="${36+(w-36)*2/3+(w-36)/6}" y="358" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="${C.accent}" text-anchor="middle">7</text>
-    <text x="${36+(w-36)*2/3+(w-36)/6}" y="380" font-family="system-ui,sans-serif" font-size="12" fill="${C.textSec}" text-anchor="middle">trofei</text>
-    ${card(12, 418, w-24, 56)} 
-    <text x="26" y="452" font-family="system-ui,sans-serif" font-size="15" font-weight="600" fill="${C.text}">🏍 Ducati Monster 821</text>
-    <text x="${w-20}" y="452" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="end">Naked · Mozzafiato ›</text>
-    ${card(12, 486, w-24, 56)}
-    <text x="26" y="520" font-family="system-ui,sans-serif" font-size="15" font-weight="600" fill="${C.text}">🔒 Privacy &amp; Posizione</text>
-    <text x="${w-20}" y="520" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="end">›</text>
-    ${card(12, 554, w-24, 56)}
-    <text x="26" y="588" font-family="system-ui,sans-serif" font-size="15" font-weight="600" fill="${C.text}">🎨 Tema Asfalto</text>
-    <text x="${w-20}" y="588" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="end">›</text>
-    ${card(12, 622, w-24, 56)}
-    <text x="26" y="656" font-family="system-ui,sans-serif" font-size="15" font-weight="600" fill="${C.text}">🌍 Lingua &amp; Unità</text>
-    <text x="${w-20}" y="656" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="end">Italiano ›</text>
-    ${card(12, 690, w-24, 56)}
-    <text x="26" y="724" font-family="system-ui,sans-serif" font-size="15" font-weight="600" fill="${C.text}">📖 Manuale &amp; EULA</text>
-    <text x="${w-20}" y="724" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="end">›</text>
-    <rect x="20" y="762" width="${w-40}" height="52" rx="26" fill="${C.red}" opacity="0.1"/>
-    <text x="${w/2}" y="794" font-family="system-ui,sans-serif" font-size="16" font-weight="600" fill="${C.red}" text-anchor="middle">Esci dall'account</text>
+    ${header(w, 'Profilo', 'Il tuo account BikerLink')}
     ${tabBar(w, h, 4)}
-  </svg>`;
+  `);
 }
 
-// ======= CHROMEBOOK LANDSCAPE VERSIONS =======
+// ===== CHROMEBOOK LANDSCAPE =====
+
+function cbStatusBar(w) {
+  return `${rect(0, 0, w, 36, C.surface)}
+    ${line(0, 36, w, 36, C.border)}
+    ${text(16, 24, 'BikerLink', 14, C.accent, 'start', '700')}
+    ${text(w/2, 24, 'Mappa  |  Motoclub  |  Proposte  |  Chat  |  Profilo', 13, C.textMut, 'middle')}
+    ${text(w-16, 24, '9:41  100%', 13, C.textSec, 'end')}`;
+}
+
 function chromebookMappa(w, h) {
-  const mapW = Math.floor(w*0.65);
-  const panelX = mapW;
-  const bikers = [
-    {name:'MotoRider42', dist:'2 km', type:'Naked', color:C.blue},
-    {name:'DucatiGuy', dist:'5 km', type:'Touring', color:C.blue},
-    {name:'SofiaRider', dist:'8 km', type:'Enduro', color:C.pink},
-    {name:'AlpiRider', dist:'12 km', type:'Naked', color:C.blue},
-    {name:'VespaRoma', dist:'15 km', type:'Custom', color:C.accent},
+  const mapW=Math.floor(w*0.62), panelX=mapW;
+  const bikers=[
+    {name:'MotoRider42',dist:'2 km',type:'Naked',init:'M',color:C.blue},
+    {name:'DucatiGuy',dist:'5 km',type:'Touring',init:'D',color:C.blue},
+    {name:'SofiaRider',dist:'8 km',type:'Enduro',init:'S',color:C.pink},
+    {name:'AlpiRider',dist:'12 km',type:'Naked',init:'A',color:C.blue},
+    {name:'VespaRoma',dist:'15 km',type:'Custom',init:'V',color:C.accent},
   ];
-  const pins = [
-    {cx:mapW*0.2,cy:h*0.3},{cx:mapW*0.45,cy:h*0.45},{cx:mapW*0.6,cy:h*0.25},
-    {cx:mapW*0.3,cy:h*0.65},{cx:mapW*0.7,cy:h*0.7},{cx:mapW*0.5,cy:h*0.75},
-  ];
-  const sbar = `<rect x="0" y="0" width="${w}" height="36" fill="${C.surface}"/>
-    <text x="16" y="24" font-family="system-ui,sans-serif" font-size="14" font-weight="700" fill="${C.accent}">BikerLink</text>
-    <text x="${w/2}" y="24" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="middle">🗺 Mappa · 🛡 Motoclub · 📢 Proposte · 💬 Chat · 👤 Profilo</text>
-    <text x="${w-16}" y="24" font-family="system-ui,sans-serif" font-size="13" fill="${C.text}" text-anchor="end">9:41</text>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-    <rect width="${w}" height="${h}" fill="${C.bg}"/>
-    ${sbar}
+  const pins=[{cx:mapW*0.2,cy:h*0.35},{cx:mapW*0.42,cy:h*0.48},{cx:mapW*0.6,cy:h*0.28},
+    {cx:mapW*0.28,cy:h*0.68},{cx:mapW*0.72,cy:h*0.72},{cx:mapW*0.52,cy:h*0.78}];
+  return svg(w, h, `
     ${mapBg(0, 36, mapW, h-36)}
-    ${pins.map(p => bikerPin(p.cx, p.cy+36, null)).join('')}
-    <circle cx="${mapW*0.5}" cy="${h*0.5}" r="8" fill="${C.blue}"/>
-    <circle cx="${mapW*0.5}" cy="${h*0.5}" r="24" fill="${C.blue}" opacity="0.2"/>
-    <rect x="${mapW}" y="36" width="${w-mapW}" height="${h-36}" fill="${C.surface}"/>
-    <line x1="${mapW}" y1="36" x2="${mapW}" y2="${h}" stroke="${C.border}" stroke-width="1"/>
-    <text x="${panelX+20}" y="70" font-family="system-ui,sans-serif" font-size="16" font-weight="700" fill="${C.text}">Biker vicini</text>
-    <text x="${panelX+20}" y="90" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}">6 motociclisti nel raggio</text>
+    ${pins.map(p=>bikerPin(p.cx, p.cy, null, C.blue)).join('')}
+    ${circle(mapW*0.5, h*0.52, 8, C.blue, 0.95)}
+    ${circle(mapW*0.5, h*0.52, 22, C.blue, 0.2)}
+    ${rect(panelX, 36, w-panelX, h-36, C.surface)}
+    ${line(panelX, 36, panelX, h, C.border)}
+    ${text(panelX+20, 72, 'Biker vicini (6)', 16, C.text, 'start', '700')}
+    ${text(panelX+20, 92, 'Nel raggio di 50 km', 13, C.textSec)}
     ${bikers.map((b,i)=>{
-      const by = 108 + i*90;
-      return `${card(panelX+10, by, w-mapW-20, 78, 10)}
-        <circle cx="${panelX+42}" cy="${by+39}" r="18" fill="${b.color}" opacity="0.8"/>
-        <text x="${panelX+42}" y="${by+45}" font-family="system-ui,sans-serif" font-size="14" text-anchor="middle">🏍</text>
-        <text x="${panelX+70}" y="${by+28}" font-family="system-ui,sans-serif" font-size="14" font-weight="600" fill="${C.text}">${b.name}</text>
-        <text x="${panelX+70}" y="${by+48}" font-family="system-ui,sans-serif" font-size="12" fill="${C.textSec}">📍 ${b.dist} · ${b.type}</text>
-        <rect x="${w-80}" y="${by+24}" width="64" height="28" rx="14" fill="${C.accent}" opacity="0.12"/>
-        <text x="${w-48}" y="${by+43}" font-family="system-ui,sans-serif" font-size="11" fill="${C.accent}" text-anchor="middle">Contatta</text>`;
+      const by=108+i*88;
+      return `${card(panelX+10,by,w-panelX-20,76,10)}
+        ${avatar(panelX+38, by+38, 18, b.color, b.init)}
+        ${text(panelX+66, by+28, b.name, 14, C.text,'start','600')}
+        ${text(panelX+66, by+48, b.dist+' - '+b.type, 12, C.textSec)}
+        ${rect(w-88, by+24, 70, 28, C.accent, 14, 0.12)}
+        ${text(w-53, by+43, 'Contatta', 11, C.accent, 'middle', '600')}`;
     }).join('')}
-  </svg>`;
+    ${cbStatusBar(w)}
+  `);
 }
 
 function chromebookMotoclub(w, h) {
-  const lw = Math.floor(w*0.35);
-  const rw = w - lw;
-  const clubs = [
-    {name:'Ducati Club Roma',members:'142',color:C.red},
-    {name:'Vespa Riders Milano',members:'89',color:C.accent},
-    {name:'BMW Motorrad Nord',members:'213',color:C.blue},
-    {name:'Honda Club Italia',members:'67',color:C.green},
+  const lw=Math.floor(w*0.33), rw=w-lw;
+  const clubs=[
+    {name:'Ducati Club Roma',members:'142',color:C.red,init:'D'},
+    {name:'Vespa Riders Milano',members:'89',color:C.accent,init:'V'},
+    {name:'BMW Motorrad Nord',members:'213',color:C.blue,init:'B'},
+    {name:'Honda Club Italia',members:'67',color:C.green,init:'H'},
+    {name:'KTM Adventure Crew',members:'55',color:C.warning,init:'K'},
   ];
-  const sbar = `<rect x="0" y="0" width="${w}" height="36" fill="${C.surface}"/>
-    <text x="16" y="24" font-family="system-ui,sans-serif" font-size="14" font-weight="700" fill="${C.accent}">BikerLink</text>
-    <text x="${w/2}" y="24" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="middle">🗺 Mappa · 🛡 Motoclub · 📢 Proposte · 💬 Chat · 👤 Profilo</text>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-    <rect width="${w}" height="${h}" fill="${C.bg}"/>
-    ${sbar}
-    <rect x="0" y="36" width="${lw}" height="${h-36}" fill="${C.surface}"/>
-    <line x1="${lw}" y1="36" x2="${lw}" y2="${h}" stroke="${C.border}" stroke-width="1"/>
-    <text x="16" y="70" font-family="system-ui,sans-serif" font-size="16" font-weight="700" fill="${C.text}">Motoclub 🛡</text>
-    <rect x="10" y="80" width="${lw-20}" height="32" rx="10" fill="${C.surfaceL}"/>
-    <text x="22" y="101" font-family="system-ui,sans-serif" font-size="13" fill="${C.textMut}">🔍 Cerca...</text>
+  return svg(w, h, `
+    ${rect(0, 36, lw, h-36, C.surface)}
+    ${line(lw, 36, lw, h, C.border)}
+    ${text(16, 70, 'Motoclub', 16, C.text, 'start', '700')}
+    ${rect(10, 78, lw-20, 32, C.surfaceL, 10)}
+    ${text(28, 99, 'Cerca un club...', 13, C.textMut)}
     ${clubs.map((c,i)=>{
-      const cy = 126+i*90;
-      const isActive = i===0;
-      return `<rect x="0" y="${cy}" width="${lw}" height="82" fill="${isActive?C.accent+'18':C.bg}"/>
-        <line x1="0" y1="${cy+81}" x2="${lw}" y2="${cy+81}" stroke="${C.border}" stroke-width="0.5"/>
-        <circle cx="32" cy="${cy+41}" r="18" fill="${c.color}" opacity="0.8"/>
-        <text x="32" y="${cy+47}" font-family="system-ui,sans-serif" font-size="14" text-anchor="middle">🛡</text>
-        <text x="58" y="${cy+30}" font-family="system-ui,sans-serif" font-size="13" font-weight="600" fill="${C.text}">${c.name}</text>
-        <text x="58" y="${cy+50}" font-family="system-ui,sans-serif" font-size="12" fill="${C.textSec}">👥 ${c.members} membri</text>`;
+      const cy=120+i*88, active=i===0;
+      return `${rect(0, cy, lw, 80, active?C.accent+'18':C.bg)}
+        ${line(0, cy+79, lw, cy+79, C.border, 0.5)}
+        ${avatar(32, cy+40, 18, c.color, c.init)}
+        ${text(58, cy+28, c.name, 13, C.text, 'start', active?'700':'500')}
+        ${text(58, cy+48, c.members+' membri', 12, C.textSec)}`;
     }).join('')}
-    <rect x="${lw}" y="36" width="${rw}" height="${h-36}" fill="${C.bg}"/>
-    <text x="${lw+24}" y="75" font-family="system-ui,sans-serif" font-size="18" font-weight="700" fill="${C.text}">Ducati Club Roma 🛡</text>
-    <text x="${lw+24}" y="98" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}">142 membri · Fondato nel 2008 · Roma, Lazio</text>
-    <rect x="${lw+24}" y="110" width="110" height="30" rx="15" fill="${C.accent}"/>
-    <text x="${lw+79}" y="130" font-family="system-ui,sans-serif" font-size="13" font-weight="700" fill="#fff" text-anchor="middle">+ Unisciti</text>
-    <rect x="${lw+144}" y="110" width="110" height="30" rx="15" fill="${C.surfaceL}"/>
-    <text x="${lw+199}" y="130" font-family="system-ui,sans-serif" font-size="13" fill="${C.text}" text-anchor="middle">💬 Chat Club</text>
-    <text x="${lw+24}" y="162" font-family="system-ui,sans-serif" font-size="14" font-weight="600" fill="${C.text}">Prossimi eventi</text>
-    ${[{t:'Giro sul Tuscolo',d:'Dom 28 Apr, 09:00'},{t:'Raduno Natale',d:'Sab 4 Mag, 10:00'},{t:'Giro Colli Albani',d:'Dom 11 Mag, 08:30'}].map((e,i)=>{
-      const ey = 174+i*72;
-      return `${card(lw+24, ey, rw-48, 60, 10)}
-        <text x="${lw+44}" y="${ey+24}" font-family="system-ui,sans-serif" font-size="14" font-weight="600" fill="${C.text}">${e.t}</text>
-        <text x="${lw+44}" y="${ey+44}" font-family="system-ui,sans-serif" font-size="12" fill="${C.textSec}">📅 ${e.d}</text>`;
+    ${rect(lw, 36, rw, h-36, C.bg)}
+    ${text(lw+24, 74, 'Ducati Club Roma', 18, C.text, 'start', '700')}
+    ${text(lw+24, 96, '142 membri - Fondato 2008 - Roma, Lazio', 13, C.textSec)}
+    ${rect(lw+24, 108, 108, 30, C.accent, 15)}
+    ${text(lw+78, 128, '+ Unisciti', 13, '#fff', 'middle', '700')}
+    ${rect(lw+140, 108, 110, 30, C.surfaceL, 15)}
+    ${text(lw+195, 128, 'Chat Club', 13, C.text, 'middle')}
+    ${text(lw+24, 162, 'Prossimi eventi', 14, C.text, 'start', '600')}
+    ${[{t:'Giro sul Tuscolo',d:'Dom 28 Apr, 09:00'},{t:'Raduno Primavera',d:'Sab 4 Mag, 10:00'},{t:'Giro Colli Albani',d:'Dom 11 Mag, 08:30'}].map((e,i)=>{
+      const ey=178+i*68;
+      return `${card(lw+24, ey, rw-48, 58, 10)}
+        ${text(lw+44, ey+24, e.t, 14, C.text, 'start', '600')}
+        ${text(lw+44, ey+44, e.d, 12, C.textSec)}`;
     }).join('')}
-    <text x="${lw+24}" y="400" font-family="system-ui,sans-serif" font-size="14" font-weight="600" fill="${C.text}">Membri recenti</text>
-    ${[C.blue,C.blue,C.pink,C.blue,C.accent,C.pink,C.blue].map((c,i)=>`
-      <circle cx="${lw+48+i*56}" cy="440" r="22" fill="${c}" opacity="0.8"/>
-      <text x="${lw+48+i*56}" y="447" font-family="system-ui,sans-serif" font-size="16" text-anchor="middle">🏍</text>
-    `).join('')}
-  </svg>`;
+    ${text(lw+24, 396, 'Membri recenti', 14, C.text, 'start', '600')}
+    ${[C.blue,C.blue,C.pink,C.blue,C.accent,C.pink,C.blue].map((c,i)=>
+      `${avatar(lw+48+i*56, 434, 20, c, ['M','D','S','A','V','L','G'][i])}`
+    ).join('')}
+    ${cbStatusBar(w)}
+  `);
 }
 
 function chromebookGarage(w, h) {
-  const lw = Math.floor(w*0.38);
-  const sbar = `<rect x="0" y="0" width="${w}" height="36" fill="${C.surface}"/>
-    <text x="16" y="24" font-family="system-ui,sans-serif" font-size="14" font-weight="700" fill="${C.accent}">BikerLink</text>
-    <text x="${w/2}" y="24" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="middle">🗺 Mappa · 🛡 Motoclub · 📢 Proposte · 💬 Chat · 👤 Profilo</text>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-    <rect width="${w}" height="${h}" fill="${C.bg}"/>
-    ${sbar}
-    <rect x="0" y="36" width="${lw}" height="${h-36}" fill="${C.surface}"/>
-    <line x1="${lw}" y1="36" x2="${lw}" y2="${h}" stroke="${C.border}" stroke-width="1"/>
-    <text x="16" y="70" font-family="system-ui,sans-serif" font-size="16" font-weight="700" fill="${C.text}">Garage 🏍</text>
-    <text x="16" y="88" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}">Le tue moto (2/5)</text>
-    ${[{b:'Ducati',m:'Monster 821',active:true},{b:'Honda',m:'CB500F',active:false}].map((mo,i)=>{
-      const cy = 102+i*100;
-      return `<rect x="0" y="${cy}" width="${lw}" height="92" fill="${mo.active?C.accent+'15':C.bg}"/>
-        <line x1="0" y1="${cy+91}" x2="${lw}" y2="${cy+91}" stroke="${C.border}" stroke-width="0.5"/>
-        <text x="28" y="${cy+44}" font-family="system-ui,sans-serif" font-size="32">🏍</text>
-        <text x="68" y="${cy+30}" font-family="system-ui,sans-serif" font-size="14" font-weight="600" fill="${C.text}">${mo.b} ${mo.m}</text>
-        ${mo.active?`<rect x="68" y="${cy+36}" width="68" height="20" rx="10" fill="${C.accent}" opacity="0.15"/>
-        <text x="102" y="${cy+50}" font-family="system-ui,sans-serif" font-size="11" fill="${C.accent}" text-anchor="middle">⭐ Principale</text>`:''}
-        <text x="68" y="${cy+64}" font-family="system-ui,sans-serif" font-size="12" fill="${C.textSec}">${mo.b==='Ducati'?'821cc · Naked':'500cc · Naked'}</text>`;
+  const lw=Math.floor(w*0.36), rw=w-lw;
+  const motos=[{b:'Ducati',m:'Monster 821',def:true,cc:'821cc',type:'Naked',style:'Mozzafiato'},
+               {b:'Honda',m:'CB500F',def:false,cc:'500cc',type:'Naked',style:'Allegra'}];
+  return svg(w, h, `
+    ${rect(0, 36, lw, h-36, C.surface)}
+    ${line(lw, 36, lw, h, C.border)}
+    ${text(16, 70, 'Garage', 16, C.text, 'start', '700')}
+    ${text(16, 90, 'Le tue moto (2/5)', 13, C.textSec)}
+    ${motos.map((m,i)=>{
+      const cy=104+i*96, active=m.def;
+      return `${rect(0, cy, lw, 88, active?C.accent+'12':C.bg)}
+        ${line(0, cy+87, lw, cy+87, C.border, 0.5)}
+        ${iconMotorcycle(36, cy+44, 34, active?C.accent:C.textSec)}
+        ${text(72, cy+30, m.b+' '+m.m, 14, C.text, 'start', active?'700':'500')}
+        ${active?pill(72, cy+38, 80, 22, 'Principale', C.accent, 11):''}
+        ${text(72, cy+68, m.cc+' - '+m.type, 12, C.textSec)}`;
     }).join('')}
-    <rect x="${lw}" y="36" width="${w-lw}" height="${h-36}" fill="${C.bg}"/>
-    <text x="${lw+24}" y="72" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="${C.text}">Ducati Monster 821</text>
-    <text x="${lw+24}" y="96" font-family="system-ui,sans-serif" font-size="14" fill="${C.textSec}">821cc · Naked · Stile: Mozzafiato · ⭐ Moto principale</text>
-    <text x="${lw+24}" y="126" font-family="system-ui,sans-serif" font-size="68">🏍</text>
-    ${[
-      {label:'Cilindrata', val:'821 cc'},
-      {label:'Tipo', val:'Naked'},
-      {label:'Stile di guida', val:'Mozzafiato'},
-      {label:'Anno', val:'2019'},
-      {label:'In vendita', val:'No'},
-    ].map((item,i)=>{
-      const row = `<rect x="${lw+24}" y="${140+i*50}" width="${w-lw-48}" height="40" rx="8" fill="${C.surface}"/>
-        <text x="${lw+44}" y="${140+i*50+26}" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}">${item.label}</text>
-        <text x="${w-36}" y="${140+i*50+26}" font-family="system-ui,sans-serif" font-size="13" font-weight="600" fill="${C.text}" text-anchor="end">${item.val}</text>`;
-      return row;
+    ${rect(lw, 36, rw, h-36, C.bg)}
+    ${text(lw+24, 74, 'Ducati Monster 821', 20, C.text, 'start', '700')}
+    ${text(lw+24, 96, '821cc - Naked - Stile: Mozzafiato - Moto principale', 13, C.textSec)}
+    ${iconMotorcycle(lw+rw/4, 180, 80, C.accent)}
+    ${[{l:'Cilindrata',v:'821 cc'},{l:'Tipo',v:'Naked'},{l:'Stile guida',v:'Mozzafiato'},{l:'Anno',v:'2019'},{l:'In vendita',v:'No'}].map((row,i)=>{
+      const ry=240+i*50;
+      return `${card(lw+24, ry, rw-48, 40, 8)}
+        ${text(lw+44, ry+26, row.l, 13, C.textSec)}
+        ${text(lw+rw-36, ry+26, row.v, 13, C.text, 'end', '600')}`;
     }).join('')}
-    <rect x="${lw+24}" y="${h-76}" width="${(w-lw-60)/2}" height="44" rx="22" fill="${C.surfaceL}"/>
-    <text x="${lw+24+(w-lw-60)/4}" y="${h-47}" font-family="system-ui,sans-serif" font-size="14" fill="${C.text}" text-anchor="middle">✏️ Modifica</text>
-    <rect x="${lw+36+(w-lw-60)/2}" y="${h-76}" width="${(w-lw-60)/2}" height="44" rx="22" fill="${C.red}" opacity="0.12"/>
-    <text x="${lw+36+(w-lw-60)/2+(w-lw-60)/4}" y="${h-47}" font-family="system-ui,sans-serif" font-size="14" fill="${C.red}" text-anchor="middle">🗑 Elimina</text>
-  </svg>`;
+    ${rect(lw+24, h-68, (rw-52)/2, 42, C.surfaceL, 21)}
+    ${text(lw+24+(rw-52)/4, h-40, 'Modifica', 13, C.text, 'middle')}
+    ${rect(lw+32+(rw-52)/2, h-68, (rw-52)/2, 42, C.red, 21, 0.1)}
+    ${text(lw+32+(rw-52)/2+(rw-52)/4, h-40, 'Elimina', 13, C.red, 'middle')}
+    ${cbStatusBar(w)}
+  `);
 }
 
 function chromebookTracking(w, h) {
-  const mapW = Math.floor(w*0.6);
-  const panelW = w - mapW;
-  const sbar = `<rect x="0" y="0" width="${w}" height="36" fill="${C.surface}"/>
-    <text x="16" y="24" font-family="system-ui,sans-serif" font-size="14" font-weight="700" fill="${C.accent}">BikerLink</text>
-    <text x="${w/2}" y="24" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="middle">🗺 Mappa · 🛡 Motoclub · 📢 Proposte · 💬 Chat · 👤 Profilo</text>`;
-  const routePoints2 = [];
-  for(let i=0; i<=20; i++) {
-    const px = mapW*0.08 + (mapW*0.84)*(i/20) + Math.sin(i*0.8)*18;
-    const py = h*0.15 + (h*0.65)*(i/20) + Math.cos(i*0.6)*14;
-    routePoints2.push(`${px},${py+36}`);
-  }
+  const mapW=Math.floor(w*0.58), panelW=w-mapW;
+  const pts2=[];
+  for(let i=0;i<=20;i++) pts2.push([mapW*0.08+(mapW*0.84)*(i/20)+Math.sin(i*0.8)*16, 36+(h-36)*0.14+((h-36)*0.7)*(i/20)+Math.cos(i*0.6)*13]);
+  const ep=pts2[pts2.length-1];
+  return svg(w, h, `
+    ${mapBg(0, 36, mapW, h-36)}
+    ${routePath(pts2, C.accent, 4)}
+    ${circle(pts2[0][0], pts2[0][1], 8, C.green, 0.95)}
+    ${circle(ep[0], ep[1], 10, C.blue, 0.95)}
+    ${circle(ep[0], ep[1], 22, C.blue, 0.2)}
+    ${rect(mapW, 36, panelW, h-36, C.surface)}
+    ${line(mapW, 36, mapW, h, C.border)}
+    ${text(mapW+20, 72, 'Tracking Live', 16, C.text, 'start', '700')}
+    ${rect(mapW+20, 80, panelW-40, 20, C.green, 10, 0.15)}
+    ${text(mapW+panelW/2, 95, 'Giro in corso', 12, C.green, 'middle', '600')}
+    ${text(mapW+panelW/2, 148, '87', 50, C.accent, 'middle', '800')}
+    ${text(mapW+panelW/2, 172, 'km/h', 14, C.textSec, 'middle')}
+    ${line(mapW+20, 188, w-20, 188, C.border)}
+    ${[{v:'67.4 km',l:'percorsi'},{v:'1h 23m',l:'durata'},{v:'+450 m',l:'dislivello'},{v:'118 km/h',l:'velocita\' max'}].map((s,i)=>{
+      const sy=206+i*72;
+      return `${text(mapW+panelW/2, sy, s.v, 22, C.text, 'middle', '700')}
+        ${text(mapW+panelW/2, sy+20, s.l, 13, C.textSec, 'middle')}
+        ${line(mapW+20, sy+34, w-20, sy+34, C.border, 0.5)}`;
+    }).join('')}
+    ${rect(mapW+20, h-66, panelW-40, 44, C.red, 22, 0.9)}
+    ${text(mapW+panelW/2, h-37, 'Termina Giro', 15, '#fff', 'middle', '700')}
+    ${cbStatusBar(w)}
+  `);
+}
+
+function svg(w, h, content) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
     <rect width="${w}" height="${h}" fill="${C.bg}"/>
-    ${sbar}
-    ${mapBg(0, 36, mapW, h-36)}
-    <polyline points="${routePoints2.join(' ')}" fill="none" stroke="${C.accent}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="${routePoints2[0].split(',')[0]}" cy="${routePoints2[0].split(',')[1]}" r="8" fill="${C.green}"/>
-    <circle cx="${routePoints2[routePoints2.length-1].split(',')[0]}" cy="${routePoints2[routePoints2.length-1].split(',')[1]}" r="10" fill="${C.blue}"/>
-    <circle cx="${routePoints2[routePoints2.length-1].split(',')[0]}" cy="${routePoints2[routePoints2.length-1].split(',')[1]}" r="24" fill="${C.blue}" opacity="0.2"/>
-    <rect x="${mapW}" y="36" width="${panelW}" height="${h-36}" fill="${C.surface}"/>
-    <line x1="${mapW}" y1="36" x2="${mapW}" y2="${h}" stroke="${C.border}" stroke-width="1"/>
-    <text x="${mapW+20}" y="80" font-family="system-ui,sans-serif" font-size="16" font-weight="700" fill="${C.text}">Tracking Live 📍</text>
-    <rect x="${mapW+20}" y="88" width="${panelW-40}" height="20" rx="10" fill="${C.green}" opacity="0.15"/>
-    <text x="${mapW+panelW/2}" y="103" font-family="system-ui,sans-serif" font-size="12" fill="${C.green}" text-anchor="middle">● Giro in corso</text>
-    <text x="${mapW+panelW/2}" y="152" font-family="system-ui,sans-serif" font-size="48" font-weight="800" fill="${C.accent}" text-anchor="middle">87</text>
-    <text x="${mapW+panelW/2}" y="178" font-family="system-ui,sans-serif" font-size="15" fill="${C.textSec}" text-anchor="middle">km/h</text>
-    <line x1="${mapW+20}" y1="196" x2="${w-20}" y2="196" stroke="${C.border}" stroke-width="1"/>
-    ${[{v:'67.4 km',l:'percorsi'},{v:'1h 23m',l:'durata'},{v:'+450m',l:'dislivello'},{v:'118',l:'km/h max'}].map((s,i)=>{
-      const sy = 212 + i*72;
-      return `<text x="${mapW+panelW/2}" y="${sy}" font-family="system-ui,sans-serif" font-size="22" font-weight="700" fill="${C.text}" text-anchor="middle">${s.v}</text>
-        <text x="${mapW+panelW/2}" y="${sy+22}" font-family="system-ui,sans-serif" font-size="13" fill="${C.textSec}" text-anchor="middle">${s.l}</text>
-        <line x1="${mapW+20}" y1="${sy+36}" x2="${w-20}" y2="${sy+36}" stroke="${C.border}" stroke-width="0.5"/>`;
-    }).join('')}
-    <rect x="${mapW+20}" y="${h-70}" width="${panelW-40}" height="46" rx="23" fill="${C.red}" opacity="0.9"/>
-    <text x="${mapW+panelW/2}" y="${h-40}" font-family="system-ui,sans-serif" font-size="15" font-weight="700" fill="#fff" text-anchor="middle">■ Termina Giro</text>
+    ${content}
   </svg>`;
 }
 
-async function saveSvg(svgStr, outPath, width, height) {
+async function save(svgStr, outPath, w, h) {
   const dir = path.dirname(outPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  const buf = Buffer.from(svgStr, 'utf8');
-  await sharp(buf, { density: 192 })
-    .resize(width, height, { fit: 'fill' })
-    .png({ compressionLevel: 6 })
+  if(!fs.existsSync(dir)) fs.mkdirSync(dir, {recursive:true});
+  await sharp(Buffer.from(svgStr,'utf8'), {density:192})
+    .resize(w, h, {fit:'fill'})
+    .png({compressionLevel:6})
     .toFile(outPath);
-  console.log(`  ✓ ${outPath} (${width}x${height})`);
+  console.log(`  ok ${outPath} (${w}x${h})`);
 }
 
 async function main() {
-  const PW = 1080, PH = 1920;
-  const T7W = 1200, T7H = 1920;
-  const T10W = 1600, T10H = 2560;
-  const CW = 1280, CH = 800;
-
-  const screens = [
-    { fn: screenMappa,    name: '01' },
-    { fn: screenMatch,    name: '02' },
-    { fn: screenMotoclub, name: '03' },
-    { fn: screenChat,     name: '04' },
-    { fn: screenTracking, name: '05' },
-    { fn: screenGarage,   name: '06' },
-    { fn: screenProposte, name: '07' },
-    { fn: screenProfilo,  name: '08' },
+  const screens=[
+    {fn:screenMappa,    n:'01'},
+    {fn:screenMatch,    n:'02'},
+    {fn:screenMotoclub, n:'03'},
+    {fn:screenChat,     n:'04'},
+    {fn:screenTracking, n:'05'},
+    {fn:screenGarage,   n:'06'},
+    {fn:screenProposte, n:'07'},
+    {fn:screenProfilo,  n:'08'},
   ];
-
-  console.log('\n=== Generating Phone 1080x1920 ===');
-  for (const s of screens) {
-    await saveSvg(s.fn(PW, PH), `assets/screenshots/phone/ScreenPhone-${s.name}.png`, PW, PH);
-  }
-
-  console.log('\n=== Generating Tablet 7" 1200x1920 ===');
-  for (const s of screens) {
-    await saveSvg(s.fn(T7W, T7H), `assets/screenshots/tablet7/ScreenTablet7-${s.name}.png`, T7W, T7H);
-  }
-
-  console.log('\n=== Generating Tablet 10" 1600x2560 ===');
-  for (const s of screens) {
-    await saveSvg(s.fn(T10W, T10H), `assets/screenshots/tablet10/ScreenTablet10-${s.name}.png`, T10W, T10H);
-  }
-
-  console.log('\n=== Generating Chromebook 1280x800 ===');
-  await saveSvg(chromebookMappa(CW, CH),     'assets/screenshots/chromebook/ScreenChromebook-01.png', CW, CH);
-  await saveSvg(chromebookMotoclub(CW, CH),  'assets/screenshots/chromebook/ScreenChromebook-02.png', CW, CH);
-  await saveSvg(chromebookGarage(CW, CH),    'assets/screenshots/chromebook/ScreenChromebook-03.png', CW, CH);
-  await saveSvg(chromebookTracking(CW, CH),  'assets/screenshots/chromebook/ScreenChromebook-04.png', CW, CH);
-
-  console.log('\n=== DONE ===');
+  console.log('=== Phone 1080x1920 ===');
+  for(const s of screens) await save(s.fn(1080,1920), `assets/screenshots/phone/ScreenPhone-${s.n}.png`, 1080, 1920);
+  console.log('=== Tablet 7" 1200x1920 ===');
+  for(const s of screens) await save(s.fn(1200,1920), `assets/screenshots/tablet7/ScreenTablet7-${s.n}.png`, 1200, 1920);
+  console.log('=== Tablet 10" 1600x2560 ===');
+  for(const s of screens) await save(s.fn(1600,2560), `assets/screenshots/tablet10/ScreenTablet10-${s.n}.png`, 1600, 2560);
+  console.log('=== Chromebook 1280x800 ===');
+  await save(chromebookMappa(1280,800),    'assets/screenshots/chromebook/ScreenChromebook-01.png', 1280, 800);
+  await save(chromebookMotoclub(1280,800), 'assets/screenshots/chromebook/ScreenChromebook-02.png', 1280, 800);
+  await save(chromebookGarage(1280,800),   'assets/screenshots/chromebook/ScreenChromebook-03.png', 1280, 800);
+  await save(chromebookTracking(1280,800), 'assets/screenshots/chromebook/ScreenChromebook-04.png', 1280, 800);
+  console.log('=== DONE ===');
 }
-
 main().catch(console.error);
