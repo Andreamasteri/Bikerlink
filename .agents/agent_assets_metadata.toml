@@ -467,3 +467,45 @@ id = "Dmc9RLNr0pKZ-zLG9rkwY"
 uri = "file://exports/bikerlink-onboarding-images.zip"
 type = "unspecified"
 title = "BikerLink Onboarding — 30 immagini 1600×1100 px"
+
+[[outputs]]
+id = "cuExXSZpI31SsnZ43Il9T"
+uri = "file://attached_assets/generated_videos/bikerlink_promo_final.mp4"
+type = "video"
+title = "BikerLink — Video Promo Finale (106 MB)"
+
+[[outputs]]
+id = "2n6T3gNTg8wi2nV0_hIXg"
+uri = "file://attached_assets/generated_videos/bikerlink_intro_rider.mp4"
+type = "video"
+title = "Clip: Intro Rider"
+
+[[outputs]]
+id = "Ryf1XGXqVqIngBFnJIgWE"
+uri = "file://attached_assets/generated_videos/bikerlink_gps_route.mp4"
+type = "video"
+title = "Clip: GPS Route"
+
+[[outputs]]
+id = "6kekekBIakMz9VRP4ws7t"
+uri = "file://attached_assets/generated_videos/bikerlink_map_tracking.mp4"
+type = "video"
+title = "Clip: Map Tracking"
+
+[[outputs]]
+id = "Daw5rLTDVjArzRLI7_q_Q"
+uri = "file://attached_assets/generated_videos/bikerlink_motoclub.mp4"
+type = "video"
+title = "Clip: MotoClub"
+
+[[outputs]]
+id = "WMJL1Ff-61cZwesR6CIOt"
+uri = "file://attached_assets/generated_videos/bikerlink_sos_alert.mp4"
+type = "video"
+title = "Clip: SOS Alert"
+
+[[outputs]]
+id = "LhjM0TvC72pkcAYHxiBpV"
+uri = "file://attached_assets/generated_videos/bikerlink_outro_together.mp4"
+type = "video"
+title = "Clip: Outro Together"
