@@ -1,8 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { downloadBuffer } from "../objectStorage";
-import { db } from "../db";
-import { adCampaigns } from "@shared/schema";
 import path from "path";
 import fs from "fs";
 
@@ -86,12 +84,12 @@ export async function cleanupOrphanedAdImages(): Promise<void> {
     const localDir = path.resolve(process.cwd(), "uploads", "ads");
     if (!fs.existsSync(localDir)) return;
 
-    // Query ALL campaigns (active + inactive) so we never delete images
-    // belonging to temporarily paused campaigns.
-    const allCampaigns = await db.select({ imageUrl: adCampaigns.imageUrl }).from(adCampaigns);
+    // Only active campaigns are protected — images from deleted or deactivated
+    // campaigns should be reclaimed as they are no longer served to users.
+    const activeCampaigns = await storage.getActiveCampaigns();
 
     const referencedFilenames = new Set<string>();
-    for (const { imageUrl } of allCampaigns) {
+    for (const { imageUrl } of activeCampaigns) {
       if (!imageUrl) continue;
       const match = imageUrl.match(/\/api\/ads\/images\/([^?#]+)/);
       if (!match) continue;
