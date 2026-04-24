@@ -4579,6 +4579,32 @@
     "apkBuildId": null,
     "apkVersionCode": 35,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 148,
+    "version": "1.148.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-148 rv7.0.0: Fix bulk upload campagne — MIME type normalizzato (image/jpg → image/jpeg)",
+    "publishedAt": "2026-04-24",
+    "runtimeVersion": "7.0.0",
+    "platforms": [
+      "android"
+    ],
+    "jsEngine": "hermes",
+    "note": "Task #919: fix caricamento massivo campagne (0/29 fallite). Root cause: frontend inviava image/jpg (estensione .jpg) invece di image/jpeg; multer fileFilter rifiutava tutta la richiesta multipart restituendo 500. Fix: (1) BulkImageAsset.mimeType mappato da expo-image-picker asset; (2) tipo MIME normalizzato in ads.tsx (image/jpg→image/jpeg); (3) image/jpg aggiunto alla whitelist multer come safety net per APK precedenti. Redeploy produzione incluso. CURRENT_OTA_NUMBER=148.",
+    "releaseId": "1b8b33a7-17db-4470-9224-31c4d96f88fb",
+    "bundleUrl": "private/ota/ota-1.148.0-1777042263757.js",
+    "updateGroupId": "f70c0da4-0178-4814-9e5e-f499120fdde3",
+    "androidUpdateId": "019dbff9-cd30-7ef3-9d34-b5d4ecb518af",
+    "iosUpdateId": null,
+    "commitBase": "c91346000b60acade5bac8fd212e36c736590e56",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/f70c0da4-0178-4814-9e5e-f499120fdde3",
+    "apkBuildId": null,
+    "apkVersionCode": 35,
+    "apkUrl": null,
     "status": "published"
   }
 ]

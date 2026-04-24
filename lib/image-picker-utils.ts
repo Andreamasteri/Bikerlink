@@ -4,6 +4,7 @@ import { Alert, Platform, ActionSheetIOS } from "react-native";
 export interface BulkImageAsset {
   uri: string;
   fileName: string;
+  mimeType?: string;
   fileSize?: number;
 }
 
@@ -24,6 +25,7 @@ export async function pickMultipleImages(
     const all = result.assets.map((a, i) => ({
       uri: a.uri,
       fileName: a.fileName || `image_${i + 1}.jpg`,
+      mimeType: a.mimeType,
       fileSize: a.fileSize,
     }));
     const valid = all.filter((a) => !a.fileSize || a.fileSize <= MAX_BULK_FILE_SIZE);

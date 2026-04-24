@@ -522,9 +522,14 @@ export default function AdminAds() {
     for (let i = 0; i < bulkImages.length; i++) {
       const img = bulkImages[i];
       const filename = img.fileName || img.uri.split("/").pop() || "image.jpg";
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1].toLowerCase()}` : "image/jpeg";
-      formData.append("images", { uri: img.uri, name: filename, type } as any);
+      const rawMime = img.mimeType || (() => {
+        const m = /\.(\w+)$/.exec(filename);
+        return m ? `image/${m[1].toLowerCase()}` : "image/jpeg";
+      })();
+      const normalised = ["image/jpg", "image/jpe", "image/jfif"].includes(rawMime)
+        ? "image/jpeg"
+        : rawMime;
+      formData.append("images", { uri: img.uri, name: filename, type: normalised } as any);
     }
     try {
       const res = await globalThis.fetch(bulkUrl, {
