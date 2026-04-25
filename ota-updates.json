@@ -4629,6 +4629,30 @@
     "apkBuildId": null,
     "apkVersionCode": 36,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 150,
+    "version": "1.150.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-150 rv7.0.0: Semaphore concorrenza match, 503 busy, metriche server",
+    "publishedAt": "2026-04-25",
+    "runtimeVersion": "7.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Supercede OTA-149 (EAS mancante). Include: Task #928 semaphore globale 5 concorrenti su /garage-matches e /biker-matches; Task #932 risposta 503 JSON quando coda piena (SemaphoreQueueFullError); Task #933 endpoint GET /api/metrics + log periodico ogni 60s activeCount/pendingCount. Frontend invariato rispetto a OTA-149 (NativeUpdateChecker + admin versioni native). CURRENT_OTA_NUMBER=150.",
+    "releaseId": "509aafbe-f083-4105-a774-e719b1f007a8",
+    "bundleUrl": "private/ota/ota-1.150.0-1777110468281.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "4ba28c2cdb30b32414f358855a9a878ebe9cfec6",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 36,
+    "apkUrl": null,
     "status": "published"
   }
 ]
