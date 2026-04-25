@@ -4620,7 +4620,7 @@ router.put("/settings/native-version", async (req: Request, res: Response) => {
       targetType: "app_setting",
       targetId: "native_version_config",
       details: `Android ${android.latestVersion}/${android.minVersion}, iOS ${ios.latestVersion}/${ios.minVersion}`,
-    } as any);
+    });
     return res.json({ success: true });
   } catch (error) {
     console.error("Admin native-version update error:", error);
