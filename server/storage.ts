@@ -137,6 +137,7 @@ import {
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
+  getUsersByIds(ids: string[]): Promise<User[]>;
   getUserByNickname(nickname: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
@@ -154,6 +155,7 @@ export interface IStorage {
 
   searchUsers(query: string): Promise<{ user: User; profile: UserProfile | null }[]>;
   getUserProfile(userId: string): Promise<UserProfile | undefined>;
+  getUserProfilesByIds(ids: string[]): Promise<UserProfile[]>;
   createUserProfile(profile: InsertUserProfile): Promise<UserProfile>;
   updateUserProfile(userId: string, data: Partial<InsertUserProfile>): Promise<UserProfile | undefined>;
   upsertUserProfile(userId: string, data: Partial<InsertUserProfile>): Promise<UserProfile>;
@@ -399,6 +401,11 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUsersByIds(ids: string[]): Promise<User[]> {
+    if (ids.length === 0) return [];
+    return db.select().from(users).where(inArray(users.id, ids));
+  }
+
   async getUserByNickname(nickname: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(sql`LOWER(${users.nickname}) = LOWER(${nickname})`).limit(1);
     return user;
@@ -474,6 +481,11 @@ export class DatabaseStorage implements IStorage {
   async getUserProfile(userId: string): Promise<UserProfile | undefined> {
     const [profile] = await db.select().from(userProfiles).where(eq(userProfiles.userId, userId)).limit(1);
     return profile;
+  }
+
+  async getUserProfilesByIds(ids: string[]): Promise<UserProfile[]> {
+    if (ids.length === 0) return [];
+    return db.select().from(userProfiles).where(inArray(userProfiles.userId, ids));
   }
 
   async createUserProfile(data: InsertUserProfile): Promise<UserProfile> {

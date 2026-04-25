@@ -155,10 +155,21 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
       return !blockedIds.has(otherId);
     });
 
+    const allUserIds = [...new Set(filteredMatches.flatMap(m => [m.bikerId, m.zavarrinaId]))];
+    const otherUserIds = [...new Set(filteredMatches.map(m => m.bikerId === userId ? m.zavarrinaId : m.bikerId))];
+
+    const [bulkUsers, bulkProfiles] = await Promise.all([
+      storage.getUsersByIds(allUserIds),
+      storage.getUserProfilesByIds(otherUserIds),
+    ]);
+
+    const userMap = new Map(bulkUsers.map(u => [u.id, u]));
+    const profileMap = new Map(bulkProfiles.map(p => [p.userId, p]));
+
     const results = await allLimited(
       filteredMatches.map((match) => async () => {
-        const biker = await storage.getUser(match.bikerId);
-        const zavorrina = await storage.getUser(match.zavarrinaId);
+        const biker = userMap.get(match.bikerId);
+        const zavorrina = userMap.get(match.zavarrinaId);
         const bikerMoto = await storage.getUserMotorcycle(match.bikerMotorcycleId);
         const wishlistMoto = await storage.getWishlistMoto(match.wishlistMotoId);
 
@@ -169,15 +180,11 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
           return null;
         }
 
-        let otherLat: number | null = null;
-        let otherLng: number | null = null;
-        let otherCoordUpdatedAt: Date | null = null;
-        if (otherUser?.id) {
-          const profile = await storage.getUserProfile(otherUser.id);
-          otherLat = profile?.latitude ?? null;
-          otherLng = profile?.longitude ?? null;
-          otherCoordUpdatedAt = profile?.coordinatesUpdatedAt ?? null;
-        }
+        const otherProfile = otherUser?.id ? profileMap.get(otherUser.id) : undefined;
+        const otherLat: number | null = otherProfile?.latitude ?? null;
+        const otherLng: number | null = otherProfile?.longitude ?? null;
+        const otherCoordUpdatedAt: Date | null = otherProfile?.coordinatesUpdatedAt ?? null;
+
         let distanceKm: number | null = null;
         let distanceFlag: "ok" | "old_psn" | "no_psn" = "no_psn";
         if (myLat != null && myLng != null && otherLat != null && otherLng != null) {
@@ -406,10 +413,21 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
       return !blockedIds.has(otherId);
     });
 
+    const allBikerIds = [...new Set(filteredMatches.flatMap(m => [m.biker1Id, m.biker2Id]))];
+    const otherBikerIds = [...new Set(filteredMatches.map(m => m.biker1Id === userId ? m.biker2Id : m.biker1Id))];
+
+    const [bulkBikers, bulkBikerProfiles] = await Promise.all([
+      storage.getUsersByIds(allBikerIds),
+      storage.getUserProfilesByIds(otherBikerIds),
+    ]);
+
+    const bikerMap = new Map(bulkBikers.map(u => [u.id, u]));
+    const bikerProfileMap = new Map(bulkBikerProfiles.map(p => [p.userId, p]));
+
     const results = await allLimited(
       filteredMatches.map((match) => async () => {
-        const biker1 = await storage.getUser(match.biker1Id);
-        const biker2 = await storage.getUser(match.biker2Id);
+        const biker1 = bikerMap.get(match.biker1Id);
+        const biker2 = bikerMap.get(match.biker2Id);
 
         const isBiker1 = match.biker1Id === userId;
         const otherBiker = isBiker1 ? biker2 : biker1;
@@ -418,15 +436,11 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
           return null;
         }
 
-        let otherLat: number | null = null;
-        let otherLng: number | null = null;
-        let otherCoordUpdatedAt: Date | null = null;
-        if (otherBiker?.id) {
-          const profile = await storage.getUserProfile(otherBiker.id);
-          otherLat = profile?.latitude ?? null;
-          otherLng = profile?.longitude ?? null;
-          otherCoordUpdatedAt = profile?.coordinatesUpdatedAt ?? null;
-        }
+        const otherProfile = otherBiker?.id ? bikerProfileMap.get(otherBiker.id) : undefined;
+        const otherLat: number | null = otherProfile?.latitude ?? null;
+        const otherLng: number | null = otherProfile?.longitude ?? null;
+        const otherCoordUpdatedAt: Date | null = otherProfile?.coordinatesUpdatedAt ?? null;
+
         let distanceKm: number | null = null;
         let distanceFlag: "ok" | "old_psn" | "no_psn" = "no_psn";
         if (myLat != null && myLng != null && otherLat != null && otherLng != null) {
