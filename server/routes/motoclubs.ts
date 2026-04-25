@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
+import { allLimited } from "../lib/concurrency";
 import { getRegionCenter } from "../../constants/regionCenters";
 import {
   motoClubs,
@@ -458,8 +459,8 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     if (country || region || language) {
       const memberCountsByClub: Record<string, number> = {};
 
-      const filteredClubIds = await Promise.all(
-        result.map(async (club) => {
+      const filteredClubIds = await allLimited(
+        result.map((club) => async () => {
           const memberQuery = db.select({ u: users })
             .from(motoClubMembers)
             .innerJoin(users, eq(users.id, motoClubMembers.userId))
@@ -696,7 +697,7 @@ router.get("/map/pending-locations", requireAuth, async (req: Request, res: Resp
       ))
       .orderBy(desc(motoClubs.updatedAt));
 
-    const enriched = await Promise.all(clubs.map(async (c) => {
+    const enriched = await allLimited(clubs.map((c) => async () => {
       let proposerNickname: string | null = null;
       if (c.proposedBy) {
         const proposer = await storage.getUser(c.proposedBy);

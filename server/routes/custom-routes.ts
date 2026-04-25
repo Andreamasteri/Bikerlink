@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { storage } from "../storage";
+import { allLimited } from "../lib/concurrency";
 
 const router = Router();
 
@@ -42,7 +43,7 @@ router.get("/api/custom-routes", async (req, res) => {
       };
     };
 
-    const myRoutes = await Promise.all(myRoutesRaw.map(enrichRoute));
+    const myRoutes = await allLimited(myRoutesRaw.map((r) => () => enrichRoute(r)));
 
     const friendsVisible: typeof publicRoutesRaw = [];
     for (const route of friendsRoutesRaw) {
@@ -55,7 +56,7 @@ router.get("/api/custom-routes", async (req, res) => {
       (r) => r.userId !== userId
     );
 
-    const publicRoutes = await Promise.all(publicAndFriends.map(enrichRoute));
+    const publicRoutes = await allLimited(publicAndFriends.map((r) => () => enrichRoute(r)));
 
     res.json({ disabled: false, myRoutes, publicRoutes });
   } catch (error: any) {
@@ -290,8 +291,8 @@ router.get("/api/users/:userId/custom-routes", async (req, res) => {
       return false;
     });
 
-    const enriched = await Promise.all(
-      visibleRoutes.map(async (route) => {
+    const enriched = await allLimited(
+      visibleRoutes.map((route) => async () => {
         const waypoints = await storage.getCustomRouteWaypoints(route.id);
         return { ...route, waypointCount: waypoints.length };
       })

@@ -17,6 +17,7 @@ import { SERVER_START_TIME, uptimeState } from "../uptime";
 import { getDriveClient } from "../lib/drive-client";
 import { DRIVE_FOLDER_TRADUZIONI_ID } from "../backup-service";
 import { cacheAdImage } from "./ads";
+import { allSettledLimited } from "../lib/concurrency";
 
 const router = Router();
 
@@ -1479,18 +1480,6 @@ router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Re
     const batchGroupId = files.length > 1 ? randomUUID() : null;
 
     const BULK_CONCURRENCY = 10;
-    async function allSettledLimited<T>(
-      fns: (() => Promise<T>)[],
-      limit: number
-    ): Promise<PromiseSettledResult<T>[]> {
-      const results: PromiseSettledResult<T>[] = [];
-      for (let i = 0; i < fns.length; i += limit) {
-        const batch = fns.slice(i, i + limit).map(fn => fn());
-        results.push(...await Promise.allSettled(batch));
-      }
-      return results;
-    }
-
     const results = await allSettledLimited<BulkCampaignResult>(
       files.map((file, i) => async () => {
         if (file.size > BULK_AD_MAX_FILE_SIZE) {

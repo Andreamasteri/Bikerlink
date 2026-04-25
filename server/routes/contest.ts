@@ -3,6 +3,7 @@ import path from "path";
 import multer from "multer";
 import { storage } from "../storage";
 import { uploadBuffer, downloadBuffer } from "../objectStorage";
+import { allLimited } from "../lib/concurrency";
 
 const router = Router();
 
@@ -96,8 +97,8 @@ router.get("/entries", async (req: Request, res: Response) => {
     const dailyCount = await storage.getDailyVoteCount(userId, today);
     const votesUsed = dailyCount?.count ?? 0;
 
-    const entriesWithVoteInfo = await Promise.all(
-      entries.map(async (entry) => {
+    const entriesWithVoteInfo = await allLimited(
+      entries.map((entry) => async () => {
         const existingVote = await storage.getPhotoVote(entry.id, userId);
         return {
           ...entry,

@@ -4,6 +4,7 @@ import { db } from "../db";
 import { motoClubMembers } from "@shared/schema";
 import { and, eq } from "drizzle-orm";
 import { runMatchingForUser, runProposalMatchingForUser } from "../matching-engine";
+import { allLimited } from "../lib/concurrency";
 
 const router = Router();
 
@@ -72,8 +73,8 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
       }
     }
 
-    const results = await Promise.all(
-      allProposals.map(async (proposal) => {
+    const results = await allLimited(
+      allProposals.map((proposal) => async () => {
         const participants = await storage.getProposalParticipants(proposal.id);
         const creator = await storage.getUser(proposal.userId);
         const creatorName = creator?.nickname ?? "Sconosciuto";
@@ -107,8 +108,8 @@ router.get("/matches", requireAuth, async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const matches = await storage.getProposalMatches(userId);
 
-    const results = await Promise.all(
-      matches.map(async (match) => {
+    const results = await allLimited(
+      matches.map((match) => async () => {
         const proposal1 = await storage.getProposal(match.proposalId1);
         const proposal2 = await storage.getProposal(match.proposalId2);
         const user1 = await storage.getUser(match.userId1);
@@ -154,8 +155,8 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
       return !blockedIds.has(otherId);
     });
 
-    const results = await Promise.all(
-      filteredMatches.map(async (match) => {
+    const results = await allLimited(
+      filteredMatches.map((match) => async () => {
         const biker = await storage.getUser(match.bikerId);
         const zavorrina = await storage.getUser(match.zavarrinaId);
         const bikerMoto = await storage.getUserMotorcycle(match.bikerMotorcycleId);
@@ -405,8 +406,8 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
       return !blockedIds.has(otherId);
     });
 
-    const results = await Promise.all(
-      filteredMatches.map(async (match) => {
+    const results = await allLimited(
+      filteredMatches.map((match) => async () => {
         const biker1 = await storage.getUser(match.biker1Id);
         const biker2 = await storage.getUser(match.biker2Id);
 
@@ -580,8 +581,8 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
     const participants = await storage.getProposalParticipants(proposal.id);
     const creator = await storage.getUser(proposal.userId);
 
-    const participantDetails = await Promise.all(
-      participants.map(async (p) => {
+    const participantDetails = await allLimited(
+      participants.map((p) => async () => {
         const user = await storage.getUser(p.userId);
         return {
           ...p,

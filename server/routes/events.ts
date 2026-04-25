@@ -26,6 +26,7 @@ import {
   lte,
 } from "drizzle-orm";
 import { uploadBuffer, deleteObject } from "../objectStorage";
+import { allLimited } from "../lib/concurrency";
 
 const router = Router();
 
@@ -219,7 +220,7 @@ router.get("/admin/pending", async (req: Request, res: Response) => {
       .where(eq(events.status, "pending"))
       .orderBy(asc(events.createdAt));
 
-    const enriched = await Promise.all(rows.map(r => enrichEvent(r, userId)));
+    const enriched = await allLimited(rows.map((r) => () => enrichEvent(r, userId)));
     return res.json(enriched);
   } catch (err) {
     console.error("[events] GET /admin/pending error:", err);
@@ -308,7 +309,7 @@ router.get("/my", async (req: Request, res: Response) => {
       .where(eq(events.creatorId, userId))
       .orderBy(desc(events.createdAt));
 
-    const enriched = await Promise.all(rows.map(r => enrichEvent(r, userId)));
+    const enriched = await allLimited(rows.map((r) => () => enrichEvent(r, userId)));
     return res.json(enriched);
   } catch (err) {
     console.error("[events] GET /my error:", err);
@@ -903,7 +904,7 @@ async function sendClubInvites(evt: Event, approvedEventId: string): Promise<voi
           .from(motoClubMembers)
           .where(eq(motoClubMembers.clubId, club.id));
 
-        await Promise.all(members.map(async (member) => {
+        await allLimited(members.map((member) => async () => {
           if (member.userId === evt.creatorId) return;
           try {
             await storage.createNotification({

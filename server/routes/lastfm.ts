@@ -12,6 +12,7 @@ import {
   conversationParticipants,
 } from "@shared/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
+import { allLimited } from "../lib/concurrency";
 
 const router = Router();
 
@@ -577,8 +578,8 @@ router.get("/shared-playlists", requireAuth, async (req: Request, res: Response)
 
     const fromUserMap = new Map(fromUsersData.map((u) => [u.id, u]));
 
-    const result = await Promise.all(
-      playlists.map(async (playlist) => {
+    const result = await allLimited(
+      playlists.map((playlist) => async () => {
         const fromUser = fromUserMap.get(playlist.fromUserId);
         const photos = fromUser ? await storage.getUserPhotos(fromUser.id) : [];
         return {

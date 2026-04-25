@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
+import { allLimited } from "../lib/concurrency";
 
 const router = Router();
 
@@ -69,8 +70,8 @@ router.get("/active", async (req: Request, res: Response) => {
     }
 
     const requests = await storage.getActiveSosRequests();
-    const enriched = await Promise.all(
-      requests.map(async (r) => {
+    const enriched = await allLimited(
+      requests.map((r) => async () => {
         const requester = await storage.getUser(r.requesterId);
         return {
           ...r,
