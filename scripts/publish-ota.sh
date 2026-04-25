@@ -232,7 +232,7 @@ else
     _EAS_EXIT_FILE="$EAS_EXIT_FILE" \
   setsid bash -c '
     CI=1 EXPO_PUBLIC_DOMAIN=biker-link.replit.app \
-    npx eas-cli@16 update \
+    npx eas-cli@18 update \
       --skip-bundler \
       --input-dir "$_EAS_INPUT_DIR" \
       --channel preview \
