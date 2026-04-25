@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 
 const SEEN_KEY = "bikerlink:seenMatchIds";
+const INIT_KEY_PREFIX = "bikerlink:matchAlertInit:v1:";
 
 function namespacedId(source: string, id: string | number): string {
   return `${source}:${id}`;
@@ -12,27 +13,62 @@ function namespacedId(source: string, id: string | number): string {
 
 export function useNewMatchAlert() {
   const { user } = useAuth();
+  const userId = user?.id ?? null;
+
   const [visible, setVisible] = useState(false);
   const [seenLoaded, setSeenLoaded] = useState(false);
   const seenRef = useRef<Set<string>>(new Set());
   const initializedSources = useRef<Set<string>>(new Set());
+  const prevUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    AsyncStorage.getItem(SEEN_KEY)
-      .then((raw) => {
-        if (raw) {
+    if (prevUserIdRef.current === userId) return;
+
+    seenRef.current = new Set();
+    initializedSources.current = new Set();
+    setVisible(false);
+    setSeenLoaded(false);
+    prevUserIdRef.current = userId;
+
+    if (!userId) return;
+
+    const seenKey = SEEN_KEY;
+    const initKey = `${INIT_KEY_PREFIX}${userId}`;
+
+    Promise.all([
+      AsyncStorage.getItem(seenKey),
+      AsyncStorage.getItem(initKey),
+    ])
+      .then(([rawSeen, rawInit]) => {
+        if (rawSeen) {
           try {
-            seenRef.current = new Set(JSON.parse(raw));
+            seenRef.current = new Set(JSON.parse(rawSeen));
+          } catch {}
+        }
+        if (rawInit) {
+          try {
+            const sources: string[] = JSON.parse(rawInit);
+            sources.forEach((s) => initializedSources.current.add(s));
           } catch {}
         }
         setSeenLoaded(true);
       })
       .catch(() => setSeenLoaded(true));
-  }, []);
+  }, [userId]);
 
   const addSeen = (ids: string[]) => {
     ids.forEach((id) => seenRef.current.add(id));
     AsyncStorage.setItem(SEEN_KEY, JSON.stringify([...seenRef.current])).catch(() => {});
+  };
+
+  const markSourceInitialized = (sourceKey: string) => {
+    initializedSources.current.add(sourceKey);
+    if (userId) {
+      AsyncStorage.setItem(
+        `${INIT_KEY_PREFIX}${userId}`,
+        JSON.stringify([...initializedSources.current])
+      ).catch(() => {});
+    }
   };
 
   const processSource = (sourceKey: string, items: Array<{ id: string | number }> | undefined) => {
@@ -40,7 +76,7 @@ export function useNewMatchAlert() {
     const ids = items.map((m) => namespacedId(sourceKey, m.id));
     if (!initializedSources.current.has(sourceKey)) {
       addSeen(ids);
-      initializedSources.current.add(sourceKey);
+      markSourceInitialized(sourceKey);
       return;
     }
     const newIds = ids.filter((id) => !seenRef.current.has(id));
@@ -50,7 +86,7 @@ export function useNewMatchAlert() {
     }
   };
 
-  const enabled = !!user && Platform.OS !== "web";
+  const enabled = !!userId && Platform.OS !== "web" && seenLoaded;
 
   const { data: garageData } = useQuery<Array<{ id: string | number }>>({
     queryKey: ["/api/proposals/garage-matches"],
