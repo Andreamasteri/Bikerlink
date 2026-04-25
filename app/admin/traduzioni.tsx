@@ -601,9 +601,14 @@ export default function TraduzioniScreen() {
 
   async function loadOAuthStatus() {
     setDriveStatusLoading(true);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
     try {
       const url = new URL("/api/admin/drive/oauth-status", getApiUrl());
-      const resp = await fetch(url.toString(), { credentials: "include" });
+      const resp = await fetch(url.toString(), {
+        credentials: "include",
+        signal: controller.signal,
+      });
       if (resp.ok) {
         const data = await resp.json();
         setDriveConnected(data.connected === true);
@@ -619,6 +624,7 @@ export default function TraduzioniScreen() {
       setDriveEmail(null);
       setDriveTokenExpired(false);
     } finally {
+      clearTimeout(timer);
       setDriveStatusLoading(false);
     }
   }

@@ -156,6 +156,8 @@ export async function handleDriveOAuthCallback(
   return { email };
 }
 
+const DRIVE_STATUS_TIMEOUT_MS = 6000;
+
 export async function getDriveOAuthStatus(): Promise<{
   connected: boolean;
   email: string | null;
@@ -164,15 +166,26 @@ export async function getDriveOAuthStatus(): Promise<{
 }> {
   const refreshToken = await getStoredRefreshToken();
   if (!refreshToken) return { connected: false, email: null, hint: "" };
+
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("DRIVE_STATUS_TIMEOUT")), DRIVE_STATUS_TIMEOUT_MS)
+  );
+
   try {
     const oauth2 = buildOAuth2Client();
     oauth2.setCredentials({ refresh_token: refreshToken });
     const drv = google.drive({ version: "v3", auth: oauth2 });
-    const about = await drv.about.get({ fields: "user" });
+    const about = await Promise.race([
+      drv.about.get({ fields: "user" }),
+      timeout,
+    ]);
     const email = about.data.user?.emailAddress ?? null;
     const hint = email ? `Connesso come ${email}` : "Connesso";
     return { connected: true, email, hint };
   } catch (err: any) {
+    if (err?.message === "DRIVE_STATUS_TIMEOUT") {
+      return { connected: false, email: null, hint: "" };
+    }
     const isExpired =
       err?.response?.data?.error === "invalid_grant" ||
       (typeof err?.message === "string" && err.message.includes("invalid_grant")) ||
