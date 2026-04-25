@@ -3812,6 +3812,11 @@ router.post("/translations/export", async (req: Request, res: Response) => {
           message: "Google Drive non è connesso. Vai in Admin → Traduzioni e premi 'Connetti Google Drive'.",
         });
       }
+      if (connErr?.message === "GOOGLE_DRIVE_TOKEN_EXPIRED") {
+        return res.status(401).json({
+          message: "GOOGLE_DRIVE_TOKEN_EXPIRED",
+        });
+      }
       throw connErr;
     }
 
@@ -4627,6 +4632,9 @@ router.delete("/drive/cleanup-exports", async (_req: Request, res: Response) => 
     } catch (connErr: any) {
       if (connErr?.message === "GOOGLE_DRIVE_NOT_CONNECTED") {
         return res.status(401).json({ message: "Google Drive non è connesso. Connetti prima l'account." });
+      }
+      if (connErr?.message === "GOOGLE_DRIVE_TOKEN_EXPIRED") {
+        return res.status(401).json({ message: "GOOGLE_DRIVE_TOKEN_EXPIRED" });
       }
       throw connErr;
     }

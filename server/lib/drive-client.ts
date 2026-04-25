@@ -77,11 +77,41 @@ async function getStoredRefreshToken(): Promise<string | null> {
 export async function getDriveUserClient(): Promise<drive_v3.Drive> {
   const refreshToken = await getStoredRefreshToken();
   if (!refreshToken) {
-    const err = new Error("GOOGLE_DRIVE_NOT_CONNECTED");
-    throw err;
+    throw new Error("GOOGLE_DRIVE_NOT_CONNECTED");
   }
   const oauth2 = buildOAuth2Client();
   oauth2.setCredentials({ refresh_token: refreshToken });
+
+  oauth2.on("tokens", (tokens) => {
+    if (tokens.refresh_token) {
+      db.insert(appSettings)
+        .values({
+          key: "google_drive_refresh_token",
+          value: tokens.refresh_token,
+          description: "OAuth2 refresh token Google Drive (auto-rotated)",
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: [appSettings.key],
+          set: { value: tokens.refresh_token, updatedAt: new Date() },
+        })
+        .catch((e) => console.warn("[drive-client] token rotation persist failed:", e?.message));
+    }
+  });
+
+  try {
+    await oauth2.getAccessToken();
+  } catch (err: any) {
+    const isExpired =
+      err?.response?.data?.error === "invalid_grant" ||
+      (typeof err?.message === "string" && err.message.includes("invalid_grant")) ||
+      err?.code === "invalid_grant";
+    if (isExpired) {
+      throw new Error("GOOGLE_DRIVE_TOKEN_EXPIRED");
+    }
+    throw err;
+  }
+
   return google.drive({ version: "v3", auth: oauth2 });
 }
 
@@ -130,6 +160,7 @@ export async function getDriveOAuthStatus(): Promise<{
   connected: boolean;
   email: string | null;
   hint: string;
+  tokenExpired?: boolean;
 }> {
   const refreshToken = await getStoredRefreshToken();
   if (!refreshToken) return { connected: false, email: null, hint: "" };
@@ -141,8 +172,12 @@ export async function getDriveOAuthStatus(): Promise<{
     const email = about.data.user?.emailAddress ?? null;
     const hint = email ? `Connesso come ${email}` : "Connesso";
     return { connected: true, email, hint };
-  } catch {
-    return { connected: false, email: null, hint: "" };
+  } catch (err: any) {
+    const isExpired =
+      err?.response?.data?.error === "invalid_grant" ||
+      (typeof err?.message === "string" && err.message.includes("invalid_grant")) ||
+      err?.code === "invalid_grant";
+    return { connected: false, email: null, hint: "", tokenExpired: isExpired };
   }
 }
 

@@ -582,6 +582,7 @@ export default function TraduzioniScreen() {
 
   const [driveConnected, setDriveConnected] = useState<boolean | null>(null);
   const [driveEmail, setDriveEmail] = useState<string | null>(null);
+  const [driveTokenExpired, setDriveTokenExpired] = useState(false);
   const [driveStatusLoading, setDriveStatusLoading] = useState(false);
   const [connectingDrive, setConnectingDrive] = useState(false);
   const [disconnectingDrive, setDisconnectingDrive] = useState(false);
@@ -606,12 +607,17 @@ export default function TraduzioniScreen() {
       if (resp.ok) {
         const data = await resp.json();
         setDriveConnected(data.connected === true);
-        setDriveEmail(data.email ?? null);
+        setDriveEmail(data.connected === true ? (data.email ?? null) : null);
+        setDriveTokenExpired(data.tokenExpired === true);
       } else {
         setDriveConnected(false);
+        setDriveEmail(null);
+        setDriveTokenExpired(false);
       }
     } catch {
       setDriveConnected(false);
+      setDriveEmail(null);
+      setDriveTokenExpired(false);
     } finally {
       setDriveStatusLoading(false);
     }
@@ -804,8 +810,15 @@ export default function TraduzioniScreen() {
       setExportedFileUrl(data.fileUrl || null);
       await loadImportInfo();
     } catch (e: any) {
-      setExportStatus("error");
-      setExportResult(e?.message || "Errore durante l'esportazione");
+      if (e?.message === "GOOGLE_DRIVE_TOKEN_EXPIRED") {
+        setDriveConnected(false);
+        setDriveTokenExpired(true);
+        setExportStatus("error");
+        setExportResult("Token Drive scaduto — riconnetti Google Drive dal banner qui sopra");
+      } else {
+        setExportStatus("error");
+        setExportResult(e?.message || "Errore durante l'esportazione");
+      }
     }
   }
 
@@ -1060,9 +1073,15 @@ export default function TraduzioniScreen() {
           </View>
         ) : (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, flexWrap: "wrap" }}>
-            <MaterialCommunityIcons name="alert-circle-outline" size={18} color="#FF6600" />
+            <MaterialCommunityIcons
+              name={driveTokenExpired ? "clock-alert-outline" : "alert-circle-outline"}
+              size={18}
+              color="#FF6600"
+            />
             <Text style={[styles.oauthBannerText, { color: "#FF6600", flex: 1 }]}>
-              Drive non connesso — l'export richiede autenticazione
+              {driveTokenExpired
+                ? "Token scaduto — riconnetti Google Drive"
+                : "Drive non connesso — l'export richiede autenticazione"}
             </Text>
             <TouchableOpacity
               onPress={handleConnectDrive}
@@ -1072,7 +1091,9 @@ export default function TraduzioniScreen() {
             >
               {connectingDrive
                 ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={styles.oauthConnectText}>Connetti Google Drive</Text>
+                : <Text style={styles.oauthConnectText}>
+                    {driveTokenExpired ? "Riconnetti" : "Connetti Google Drive"}
+                  </Text>
               }
             </TouchableOpacity>
           </View>
