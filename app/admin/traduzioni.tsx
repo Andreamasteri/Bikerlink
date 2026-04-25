@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
+import { useFocusEffect } from "expo-router";
 
 const STORAGE_KEY_SHEET = "@admin_last_import_sheet";
 
@@ -590,6 +591,12 @@ export default function TraduzioniScreen() {
     loadPrefs();
     loadOAuthStatus();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadOAuthStatus();
+    }, [])
+  );
 
   async function loadOAuthStatus() {
     setDriveStatusLoading(true);

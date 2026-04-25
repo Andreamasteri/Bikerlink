@@ -21,6 +21,8 @@ import {
   handleDriveOAuthCallback,
   getDriveOAuthStatus,
   disconnectDriveOAuth,
+  generateOAuthState,
+  validateAndConsumeOAuthState,
 } from "../lib/drive-client";
 import { DRIVE_FOLDER_TRADUZIONI_ID } from "../backup-service";
 import { cacheAdImage } from "./ads";
@@ -230,8 +232,14 @@ router.post("/startup-beacon", (req: Request, res: Response) => {
 
 router.get("/drive/oauth-callback", async (req: Request, res: Response) => {
   const code = req.query.code as string | undefined;
+  const state = req.query.state as string | undefined;
   if (!code) {
     return res.status(400).send(oauthHtmlPage("Errore", "Parametro 'code' mancante. Riprova.", false));
+  }
+  if (!validateAndConsumeOAuthState(state)) {
+    return res.status(400).send(
+      oauthHtmlPage("Errore", "Richiesta OAuth non valida o scaduta. Riprova dalla app BikerLink.", false)
+    );
   }
   try {
     const { email } = await handleDriveOAuthCallback(code);
@@ -4671,7 +4679,8 @@ router.get("/drive/oauth-status", async (_req: Request, res: Response) => {
 
 router.get("/drive/oauth-start", async (_req: Request, res: Response) => {
   try {
-    const authUrl = getDriveOAuthUrl();
+    const state = generateOAuthState();
+    const authUrl = getDriveOAuthUrl(state);
     return res.json({ authUrl });
   } catch (err: any) {
     console.error("[drive/oauth-start] errore:", err?.message);

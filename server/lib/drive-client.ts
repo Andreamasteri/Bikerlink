@@ -2,9 +2,32 @@ import { google, drive_v3 } from "googleapis";
 import { db } from "../db";
 import { appSettings } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import crypto from "crypto";
 
 export const DRIVE_OAUTH_REDIRECT_URI =
   "https://biker-link.replit.app/api/admin/drive/oauth-callback";
+
+const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
+const oauthStateStore = new Map<string, number>();
+
+export function generateOAuthState(): string {
+  const state = crypto.randomBytes(32).toString("hex");
+  oauthStateStore.set(state, Date.now());
+  setTimeout(() => oauthStateStore.delete(state), OAUTH_STATE_TTL_MS);
+  return state;
+}
+
+export function validateAndConsumeOAuthState(state: string | undefined): boolean {
+  if (!state) return false;
+  const ts = oauthStateStore.get(state);
+  if (!ts) return false;
+  if (Date.now() - ts > OAUTH_STATE_TTL_MS) {
+    oauthStateStore.delete(state);
+    return false;
+  }
+  oauthStateStore.delete(state);
+  return true;
+}
 
 let _drive: drive_v3.Drive | null = null;
 
@@ -62,12 +85,13 @@ export async function getDriveUserClient(): Promise<drive_v3.Drive> {
   return google.drive({ version: "v3", auth: oauth2 });
 }
 
-export function getDriveOAuthUrl(): string {
+export function getDriveOAuthUrl(state: string): string {
   const oauth2 = buildOAuth2Client();
   return oauth2.generateAuthUrl({
     access_type: "offline",
     scope: ["https://www.googleapis.com/auth/drive.file"],
     prompt: "consent",
+    state,
   });
 }
 
@@ -105,18 +129,20 @@ export async function handleDriveOAuthCallback(
 export async function getDriveOAuthStatus(): Promise<{
   connected: boolean;
   email: string | null;
+  hint: string | null;
 }> {
   const refreshToken = await getStoredRefreshToken();
-  if (!refreshToken) return { connected: false, email: null };
+  if (!refreshToken) return { connected: false, email: null, hint: null };
   try {
     const oauth2 = buildOAuth2Client();
     oauth2.setCredentials({ refresh_token: refreshToken });
     const drv = google.drive({ version: "v3", auth: oauth2 });
     const about = await drv.about.get({ fields: "user" });
     const email = about.data.user?.emailAddress ?? null;
-    return { connected: true, email };
+    const hint = email ? `Connesso come ${email}` : "Connesso";
+    return { connected: true, email, hint };
   } catch {
-    return { connected: false, email: null };
+    return { connected: false, email: null, hint: null };
   }
 }
 
