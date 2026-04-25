@@ -2,6 +2,8 @@ import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
+import * as XLSX from "xlsx";
+import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, ShadingType, AlignmentType, TextRun, HeightRule } from "docx";
 import bcrypt from "bcryptjs";
 import { uploadBuffer, objectExists } from "../objectStorage";
 import { storage } from "../storage";
@@ -3935,6 +3937,157 @@ router.get("/translations/download-csv", async (req: Request, res: Response) => 
   } catch (error) {
     console.error("[translations/download-csv] error:", error);
     return res.status(500).json({ message: "Errore durante il download CSV" });
+  }
+});
+
+router.get("/translations/download-xlsx", async (req: Request, res: Response) => {
+  try {
+    const langsParam = ((req.query.langs as string) || "").trim();
+    const langs = langsParam
+      ? langsParam.split(",").filter((l) => ALLOWED_LANGS.has(l.trim())).map((l) => l.trim())
+      : Array.from(ALLOWED_LANGS);
+
+    const { keyMap } = TRANSLATIONS_STAGING;
+    if (Object.keys(keyMap).length === 0) {
+      return res.status(400).json({ message: "Esegui prima 'Prepara generazione'" });
+    }
+
+    const headers = ["Chiave", "Posizione nell'app", "IT (fonte)", ...langs.map((l) => l.toUpperCase())];
+    const rows = Object.entries(keyMap).map(([key, val]) => {
+      const row: string[] = [key, val.position, val.it];
+      for (const _l of langs) row.push("");
+      return row;
+    });
+
+    const wsData = [headers, ...rows];
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    const colWidths = [
+      { wch: 40 },
+      { wch: 30 },
+      { wch: 50 },
+      ...langs.map(() => ({ wch: 50 })),
+    ];
+    ws["!cols"] = colWidths;
+
+    const accentFill = { patternType: "solid" as const, fgColor: { rgb: "FF6600" } };
+    const accentFont = { bold: true, color: { rgb: "FFFFFF" }, sz: 11 };
+    for (let c = 0; c < headers.length; c++) {
+      const cellRef = XLSX.utils.encode_cell({ r: 0, c });
+      if (!ws[cellRef]) ws[cellRef] = { v: headers[c], t: "s" };
+      ws[cellRef].s = { fill: accentFill, font: accentFont, alignment: { wrapText: true, vertical: "center" } };
+    }
+
+    XLSX.utils.book_append_sheet(wb, ws, "Traduzioni");
+    const xlsxBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+    const filename = `BikerLink_Traduzioni_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.send(xlsxBuffer);
+  } catch (error) {
+    console.error("[translations/download-xlsx] error:", error);
+    return res.status(500).json({ message: "Errore durante il download XLSX" });
+  }
+});
+
+router.get("/translations/download-docx", async (req: Request, res: Response) => {
+  try {
+    const langsParam = ((req.query.langs as string) || "").trim();
+    const langs = langsParam
+      ? langsParam.split(",").filter((l) => ALLOWED_LANGS.has(l.trim())).map((l) => l.trim())
+      : Array.from(ALLOWED_LANGS);
+
+    const { keyMap } = TRANSLATIONS_STAGING;
+    if (Object.keys(keyMap).length === 0) {
+      return res.status(400).json({ message: "Esegui prima 'Prepara generazione'" });
+    }
+
+    const ACCENT = "FF6600";
+    const WHITE = "FFFFFF";
+    const DARK = "1E1E1E";
+
+    function makeHeaderCell(text: string): TableCell {
+      return new TableCell({
+        shading: { type: ShadingType.SOLID, color: ACCENT, fill: ACCENT },
+        width: { size: 2000, type: WidthType.DXA },
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text, bold: true, color: WHITE, size: 18 })],
+          }),
+        ],
+      });
+    }
+
+    function makeCell(text: string): TableCell {
+      return new TableCell({
+        width: { size: 2000, type: WidthType.DXA },
+        children: [
+          new Paragraph({
+            children: [new TextRun({ text, size: 16, color: DARK })],
+          }),
+        ],
+      });
+    }
+
+    const headerRow = new TableRow({
+      tableHeader: true,
+      height: { value: 400, rule: HeightRule.ATLEAST },
+      children: [
+        makeHeaderCell("Chiave"),
+        makeHeaderCell("Posizione"),
+        makeHeaderCell("IT"),
+        ...langs.map((l) => makeHeaderCell(l.toUpperCase())),
+      ],
+    });
+
+    const dataRows = Object.entries(keyMap).map(([key, val]) =>
+      new TableRow({
+        children: [
+          makeCell(key),
+          makeCell(val.position),
+          makeCell(val.it),
+          ...langs.map(() => makeCell("")),
+        ],
+      })
+    );
+
+    const table = new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [headerRow, ...dataRows],
+    });
+
+    const doc = new Document({
+      sections: [
+        {
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `BikerLink Traduzioni — ${new Date().toISOString().slice(0, 10)}`,
+                  bold: true,
+                  size: 28,
+                  color: ACCENT,
+                }),
+              ],
+            }),
+            new Paragraph({ children: [new TextRun({ text: "" })] }),
+            table,
+          ],
+        },
+      ],
+    });
+
+    const docxBuffer = await Packer.toBuffer(doc);
+    const filename = `BikerLink_Traduzioni_${new Date().toISOString().slice(0, 10)}.docx`;
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.send(docxBuffer);
+  } catch (error) {
+    console.error("[translations/download-docx] error:", error);
+    return res.status(500).json({ message: "Errore durante il download DOCX" });
   }
 });
 

@@ -16,7 +16,7 @@ description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink
 - **Canale EAS**: `preview`
 - **Runtime Version**: `7.0.0` (ciclo corrente, APK v37)
 - **APK corrente**: versionCode **37**, versionName **2.3.0** (build EAS: non catturato — inviato con --no-wait, apkUrl: n/d. Consultare https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds per recuperare il build ID reale)
-- **OTA corrente**: OTA-152 (ultima stabile, pubblicata 2026-04-25)
+- **OTA corrente**: OTA-153 (ultima stabile, pubblicata 2026-04-25)
 - **Utenti**: su Android fisico via APK — NON usano il dev server
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
@@ -136,8 +136,9 @@ Questo previene lacune documentali come quella di APK v37 (build ID mai registra
 |-----|---------------|
 | 150 | 1.150.0       | ← superseded
 | 151 | 1.151.0       | ← superseded
-| 152 | 1.152.0       | ← pubblicata (corrente)
-| 153 | 1.153.0       |
+| 152 | 1.152.0       | ← superseded
+| 153 | 1.153.0       | ← pubblicata (corrente)
+| 154 | 1.154.0       |
 
 ## Cicli precedenti (storico)
 - Ciclo 2.x: OTA 1–21, 23 (APK versionCode 4–6, rv 2.0.0)

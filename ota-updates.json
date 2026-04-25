@@ -4713,6 +4713,32 @@
     "apkBuildId": null,
     "apkVersionCode": 37,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 153,
+    "version": "1.153.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-153 rv7.0.0: Download Excel e Word traduzioni admin (rimozione Drive OAuth)",
+    "publishedAt": "2026-04-25",
+    "runtimeVersion": "7.0.0",
+    "platforms": [
+      "android"
+    ],
+    "jsEngine": "hermes",
+    "note": "Task #953: Rimosso banner OAuth Google Drive e pulsante export Drive da admin/traduzioni. Aggiunti endpoint backend GET /api/admin/translations/download-xlsx e /download-docx (SheetJS + docx). Frontend: due nuovi pulsanti 'Scarica Excel (.xlsx)' e 'Scarica Tabella Word (.docx)' che scaricano direttamente sul dispositivo tramite expo-file-system + expo-sharing. Nessuna dipendenza Google Drive richiesta. CURRENT_OTA_NUMBER=153. EAS timeout: git index.lock — bundle custom attivo.",
+    "releaseId": "b954ce37-c5fa-4246-bf70-40168c9259e3",
+    "bundleUrl": "private/ota/ota-1.153.0-1777143705548.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "e48a02be27bd52a9e3b81fc1c96a919947855ac8",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 37,
+    "apkUrl": null,
     "status": "published"
   }
 ]

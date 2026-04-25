@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -7,19 +7,17 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
-  Linking,
   TextInput,
   Modal,
   FlatList,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
-import { useFocusEffect } from "expo-router";
 
 const STORAGE_KEY_SHEET = "@admin_last_import_sheet";
 
@@ -550,9 +548,6 @@ export default function TraduzioniScreen() {
   const [prepareResult, setPrepareResult] = useState("");
 
   const [exportLangs, setExportLangs] = useState<string[]>(["en", "de", "es", "fr", "tr"]);
-  const [exportStatus, setExportStatus] = useState<StepStatus>("idle");
-  const [exportResult, setExportResult] = useState("");
-  const [exportedFileUrl, setExportedFileUrl] = useState<string | null>(null);
 
   const sheetFetchSeq = useRef(0);
 
@@ -574,92 +569,16 @@ export default function TraduzioniScreen() {
   const [restartStatus, setRestartStatus] = useState<StepStatus>("idle");
   const [restartResult, setRestartResult] = useState("");
 
-  const [downloadLoading, setDownloadLoading] = useState(false);
-  const [downloadResult, setDownloadResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [xlsxLoading, setXlsxLoading] = useState(false);
+  const [xlsxResult, setXlsxResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
-  const [cleanupLoading2, setCleanupLoading2] = useState(false);
-  const [cleanupResult2, setCleanupResult2] = useState<string | null>(null);
-
-  const [driveConnected, setDriveConnected] = useState<boolean | null>(null);
-  const [driveEmail, setDriveEmail] = useState<string | null>(null);
-  const [driveTokenExpired, setDriveTokenExpired] = useState(false);
-  const [driveStatusLoading, setDriveStatusLoading] = useState(false);
-  const [connectingDrive, setConnectingDrive] = useState(false);
-  const [disconnectingDrive, setDisconnectingDrive] = useState(false);
+  const [docxLoading, setDocxLoading] = useState(false);
+  const [docxResult, setDocxResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   useEffect(() => {
     loadImportInfo();
     loadPrefs();
-    loadOAuthStatus();
   }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadOAuthStatus();
-    }, [])
-  );
-
-  async function loadOAuthStatus() {
-    setDriveStatusLoading(true);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
-    try {
-      const url = new URL("/api/admin/drive/oauth-status", getApiUrl());
-      const resp = await fetch(url.toString(), {
-        credentials: "include",
-        signal: controller.signal,
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        setDriveConnected(data.connected === true);
-        setDriveEmail(data.connected === true ? (data.email ?? null) : null);
-        setDriveTokenExpired(data.tokenExpired === true);
-      } else {
-        setDriveConnected(false);
-        setDriveEmail(null);
-        setDriveTokenExpired(false);
-      }
-    } catch {
-      setDriveConnected(false);
-      setDriveEmail(null);
-      setDriveTokenExpired(false);
-    } finally {
-      clearTimeout(timer);
-      setDriveStatusLoading(false);
-    }
-  }
-
-  async function handleConnectDrive() {
-    setConnectingDrive(true);
-    try {
-      const url = new URL("/api/admin/drive/oauth-start", getApiUrl());
-      const resp = await fetch(url.toString(), { credentials: "include" });
-      if (!resp.ok) throw new Error("Errore generazione URL");
-      const data = await resp.json();
-      if (data.authUrl) {
-        await Linking.openURL(data.authUrl);
-        setTimeout(() => {
-          loadOAuthStatus();
-          setConnectingDrive(false);
-        }, 4000);
-      } else {
-        setConnectingDrive(false);
-      }
-    } catch (e: any) {
-      setConnectingDrive(false);
-    }
-  }
-
-  async function handleDisconnectDrive() {
-    setDisconnectingDrive(true);
-    try {
-      const url = new URL("/api/admin/drive/oauth-disconnect", getApiUrl());
-      await fetch(url.toString(), { method: "DELETE", credentials: "include" });
-      setDriveConnected(false);
-      setDriveEmail(null);
-    } catch {}
-    setDisconnectingDrive(false);
-  }
 
   async function loadPrefs() {
     type PrefsResponse = {
@@ -797,101 +716,105 @@ export default function TraduzioniScreen() {
     }
   }
 
-  async function handleExport() {
-    if (exportLangs.length === 0) {
-      setExportStatus("error");
-      setExportResult("Seleziona almeno una lingua");
-      return;
-    }
-    setExportStatus("loading");
-    setExportResult("");
-    setExportedFileUrl(null);
-    setDownloadResult(null);
-    setCleanupResult2(null);
-    try {
-      const resp = await apiRequest("POST", "/api/admin/translations/export", { langs: exportLangs });
-      const data = await resp.json();
-      setExportStatus("success");
-      setExportResult(data.message || "Sheet creato con successo");
-      setExportedFileUrl(data.fileUrl || null);
-      await loadImportInfo();
-    } catch (e: any) {
-      if (e?.message === "GOOGLE_DRIVE_TOKEN_EXPIRED") {
-        setDriveConnected(false);
-        setDriveTokenExpired(true);
-        setExportStatus("error");
-        setExportResult("Token Drive scaduto — riconnetti Google Drive dal banner qui sopra");
-      } else {
-        setExportStatus("error");
-        setExportResult(e?.message || "Errore durante l'esportazione");
-      }
-    }
-  }
-
-  async function handleDownloadCsv() {
-    setDownloadLoading(true);
-    setDownloadResult(null);
+  async function handleDownloadXlsx() {
+    setXlsxLoading(true);
+    setXlsxResult(null);
     try {
       const langs = exportLangs.length > 0 ? exportLangs : ["en", "de", "es", "fr", "tr"];
       const url = new URL(
-        `/api/admin/translations/download-csv?langs=${langs.join(",")}`,
+        `/api/admin/translations/download-xlsx?langs=${langs.join(",")}`,
         getApiUrl()
       );
-
       if (Platform.OS === "web") {
         const resp = await fetch(url.toString(), { credentials: "include" });
-        if (!resp.ok) throw new Error("Errore download");
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error((err as any).message || "Errore download");
+        }
         const blob = await resp.blob();
         const blobUrl = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = blobUrl;
-        a.download = `BikerLink_Traduzioni_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.download = `BikerLink_Traduzioni_${new Date().toISOString().slice(0, 10)}.xlsx`;
         a.click();
         URL.revokeObjectURL(blobUrl);
-        setDownloadResult({ ok: true, msg: "Download avviato" });
+        setXlsxResult({ ok: true, msg: "Download Excel avviato" });
       } else {
         const resp = await fetch(url.toString(), { credentials: "include" });
-        if (!resp.ok) throw new Error("Errore download");
-        const csvText = await resp.text();
-        const filePath = `${FileSystem.cacheDirectory}BikerLink_Traduzioni.csv`;
-        await FileSystem.writeAsStringAsync(filePath, csvText, {
-          encoding: 'utf8',
-        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error((err as any).message || "Errore download");
+        }
+        const arrayBuf = await resp.arrayBuffer();
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
+        const filePath = `${FileSystem.cacheDirectory}BikerLink_Traduzioni.xlsx`;
+        await FileSystem.writeAsStringAsync(filePath, base64, { encoding: FileSystem.EncodingType.Base64 });
         const canShare = await Sharing.isAvailableAsync();
         if (canShare) {
           await Sharing.shareAsync(filePath, {
-            mimeType: "text/csv",
-            dialogTitle: "Salva CSV Traduzioni",
+            mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            dialogTitle: "Salva Excel Traduzioni",
           });
-          setDownloadResult({ ok: true, msg: "File CSV pronto da condividere" });
+          setXlsxResult({ ok: true, msg: "File Excel pronto da condividere" });
         } else {
-          setDownloadResult({ ok: false, msg: "Condivisione non disponibile su questo dispositivo" });
+          setXlsxResult({ ok: false, msg: "Condivisione non disponibile su questo dispositivo" });
         }
       }
     } catch (e: any) {
-      setDownloadResult({ ok: false, msg: e?.message || "Errore download" });
+      setXlsxResult({ ok: false, msg: e?.message || "Errore download" });
     } finally {
-      setDownloadLoading(false);
+      setXlsxLoading(false);
     }
   }
 
-  async function handleCleanupInline() {
-    setCleanupLoading2(true);
-    setCleanupResult2(null);
+  async function handleDownloadDocx() {
+    setDocxLoading(true);
+    setDocxResult(null);
     try {
-      const url = new URL("/api/admin/drive/cleanup-exports", getApiUrl());
-      const resp = await fetch(url.toString(), { method: "DELETE", credentials: "include" });
-      const data = await resp.json();
-      if (!resp.ok) {
-        setCleanupResult2(`Errore: ${data.message ?? "sconosciuto"}`);
+      const langs = exportLangs.length > 0 ? exportLangs : ["en", "de", "es", "fr", "tr"];
+      const url = new URL(
+        `/api/admin/translations/download-docx?langs=${langs.join(",")}`,
+        getApiUrl()
+      );
+      if (Platform.OS === "web") {
+        const resp = await fetch(url.toString(), { credentials: "include" });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error((err as any).message || "Errore download");
+        }
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = `BikerLink_Traduzioni_${new Date().toISOString().slice(0, 10)}.docx`;
+        a.click();
+        URL.revokeObjectURL(blobUrl);
+        setDocxResult({ ok: true, msg: "Download Word avviato" });
       } else {
-        const mb = data.freed > 0 ? ` (${(data.freed / 1024 / 1024).toFixed(1)} MB liberati)` : "";
-        setCleanupResult2(`OK: eliminati ${data.deleted} file${mb}. Riprova l'esportazione.`);
+        const resp = await fetch(url.toString(), { credentials: "include" });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error((err as any).message || "Errore download");
+        }
+        const arrayBuf = await resp.arrayBuffer();
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
+        const filePath = `${FileSystem.cacheDirectory}BikerLink_Traduzioni.docx`;
+        await FileSystem.writeAsStringAsync(filePath, base64, { encoding: FileSystem.EncodingType.Base64 });
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(filePath, {
+            mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            dialogTitle: "Salva Word Traduzioni",
+          });
+          setDocxResult({ ok: true, msg: "File Word pronto da condividere" });
+        } else {
+          setDocxResult({ ok: false, msg: "Condivisione non disponibile su questo dispositivo" });
+        }
       }
-    } catch {
-      setCleanupResult2("Errore di rete");
+    } catch (e: any) {
+      setDocxResult({ ok: false, msg: e?.message || "Errore download" });
     } finally {
-      setCleanupLoading2(false);
+      setDocxLoading(false);
     }
   }
 
@@ -1044,104 +967,19 @@ export default function TraduzioniScreen() {
         resultText={prepareResult}
       />
 
-      <View style={styles.oauthBanner}>
-        {driveStatusLoading || driveConnected === null ? (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <ActivityIndicator size="small" color={Colors.accent} />
-            <Text style={styles.oauthBannerText}>Verifica connessione Drive...</Text>
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={[styles.stepBadge]}>
+            <Text style={styles.stepBadgeText}>2</Text>
           </View>
-        ) : driveConnected ? (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, flexWrap: "wrap" }}>
-            <MaterialCommunityIcons name="check-circle" size={18} color="#4CAF50" />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.oauthBannerText, { color: "#4CAF50" }]}>Drive connesso</Text>
-              {driveEmail ? (
-                <Text style={[styles.oauthBannerSub, { color: "#4CAF50" }]}>{driveEmail}</Text>
-              ) : null}
-            </View>
-            <TouchableOpacity
-              onPress={handleDisconnectDrive}
-              disabled={disconnectingDrive}
-              style={styles.oauthDisconnectBtn}
-              activeOpacity={0.7}
-            >
-              {disconnectingDrive
-                ? <ActivityIndicator size="small" color="#888" />
-                : <Text style={styles.oauthDisconnectText}>Disconnetti</Text>
-              }
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={loadOAuthStatus}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <MaterialCommunityIcons name="refresh" size={16} color="#4CAF50" />
-            </TouchableOpacity>
+          <View style={styles.cardHeaderText}>
+            <Text style={styles.cardTitle}>Scarica tabella traduzioni</Text>
+            <Text style={styles.cardDesc}>Genera ed esporta in Excel o Word per la traduzione esterna. IT è sempre inclusa.</Text>
           </View>
-        ) : (
-          <View style={{ gap: 10, flex: 1 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <MaterialCommunityIcons
-                name={driveTokenExpired ? "clock-alert-outline" : "alert-circle-outline"}
-                size={18}
-                color="#FF6600"
-              />
-              <Text style={[styles.oauthBannerText, { color: "#FF6600", flex: 1 }]}>
-                {driveTokenExpired
-                  ? "Token scaduto — riconnetti Google Drive"
-                  : "Drive non connesso — l'export richiede autenticazione"}
-              </Text>
-              <TouchableOpacity
-                onPress={handleConnectDrive}
-                disabled={connectingDrive}
-                style={styles.oauthConnectBtn}
-                activeOpacity={0.7}
-              >
-                {connectingDrive
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={styles.oauthConnectText}>
-                      {driveTokenExpired ? "Riconnetti" : "Connetti Google Drive"}
-                    </Text>
-                }
-              </TouchableOpacity>
-            </View>
-            {driveTokenExpired && (
-              <View style={{ backgroundColor: "#1a1200", borderRadius: 8, padding: 10, gap: 6 }}>
-                <Text style={{ fontSize: 12, color: "#FFC107", fontFamily: "Inter_600SemiBold" }}>
-                  Soluzione permanente — app in modalità "Testing"
-                </Text>
-                <Text style={{ fontSize: 11, color: "#c8a84b", fontFamily: "Inter_400Regular", lineHeight: 17 }}>
-                  I token Google scadono ogni 7 giorni in modalità Testing. Per eliminarla definitivamente:
-                </Text>
-                <Text style={{ fontSize: 11, color: "#c8a84b", fontFamily: "Inter_400Regular", lineHeight: 17 }}>
-                  {"1. Vai su Google Cloud Console → APIs & Services → OAuth consent screen\n2. Clicca \"Pubblica app\" (Testing → Produzione)\n3. Premi Riconnetti qui sopra per ottenere un token permanente"}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => Linking.openURL("https://console.cloud.google.com/apis/credentials/consent")}
-                  style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}
-                  activeOpacity={0.7}
-                >
-                  <MaterialCommunityIcons name="open-in-new" size={13} color="#FFC107" />
-                  <Text style={{ fontSize: 11, color: "#FFC107", fontFamily: "Inter_500Medium", textDecorationLine: "underline" }}>
-                    Apri Google Cloud Console
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        )}
-      </View>
+        </View>
 
-      <StepCard
-        stepNumber={2}
-        title="Genera ed esporta su Drive"
-        description="Crea un Google Sheet con le colonne selezionate. IT è sempre inclusa."
-        status={exportStatus}
-        buttonLabel="Genera ed esporta"
-        onPress={handleExport}
-        resultText={exportResult}
-      >
         <View style={styles.langPicker}>
-          <Text style={styles.langPickerLabel}>Lingue da includere nel foglio:</Text>
+          <Text style={styles.langPickerLabel}>Lingue da includere:</Text>
           {LANGS.map((l) => (
             <LangCheckbox
               key={l.code}
@@ -1154,88 +992,67 @@ export default function TraduzioniScreen() {
         </View>
 
         <View style={styles.sectionDivider} />
-        <View style={styles.pickerButton}>
-          <MaterialCommunityIcons name="folder-outline" size={18} color={Colors.accent} />
-          <Text style={styles.pickerButtonText} numberOfLines={1}>Cartella: Traduzioni BikerLink</Text>
-        </View>
-
-        {exportedFileUrl ? (
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => Linking.openURL(exportedFileUrl!)}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons name="open-in-new" size={16} color={Colors.accent} />
-            <Text style={styles.linkButtonText}>Apri Google Sheet</Text>
-          </TouchableOpacity>
-        ) : null}
-
-        <View style={styles.sectionDivider} />
 
         <TouchableOpacity
-          style={[styles.secondaryButton, downloadLoading && styles.buttonDisabled]}
-          onPress={handleDownloadCsv}
-          disabled={downloadLoading}
+          style={[styles.button, xlsxLoading && styles.buttonDisabled]}
+          onPress={handleDownloadXlsx}
+          disabled={xlsxLoading}
           activeOpacity={0.7}
         >
-          {downloadLoading ? (
-            <ActivityIndicator color={Colors.accent} size="small" />
+          {xlsxLoading ? (
+            <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <MaterialCommunityIcons name="download" size={16} color={Colors.accent} />
+            <>
+              <MaterialCommunityIcons name="microsoft-excel" size={18} color="#fff" />
+              <Text style={styles.buttonText}>Scarica Excel (.xlsx)</Text>
+            </>
           )}
-          <Text style={styles.secondaryButtonText}>
-            {downloadLoading ? "Generazione..." : "Scarica CSV direttamente"}
-          </Text>
         </TouchableOpacity>
 
-        {downloadResult ? (
-          <View style={[styles.inlineHint, downloadResult.ok ? styles.inlineHintOk : styles.inlineHintErr]}>
+        {xlsxResult ? (
+          <View style={[styles.inlineHint, xlsxResult.ok ? styles.inlineHintOk : styles.inlineHintErr]}>
             <MaterialCommunityIcons
-              name={downloadResult.ok ? "check-circle-outline" : "alert-circle-outline"}
+              name={xlsxResult.ok ? "check-circle-outline" : "alert-circle-outline"}
               size={14}
-              color={downloadResult.ok ? "#4CAF50" : "#eb5757"}
+              color={xlsxResult.ok ? "#4CAF50" : "#eb5757"}
             />
-            <Text style={[styles.inlineHintText, { color: downloadResult.ok ? "#4CAF50" : "#eb5757" }]}>
-              {downloadResult.msg}
+            <Text style={[styles.inlineHintText, { color: xlsxResult.ok ? "#4CAF50" : "#eb5757" }]}>
+              {xlsxResult.msg}
             </Text>
           </View>
         ) : null}
 
-        {exportStatus === "error" && exportResult.toLowerCase().includes("permessi") ? (
-          <View style={styles.permissionBox}>
-            <MaterialCommunityIcons name="shield-alert-outline" size={16} color="#eb5757" />
-            <Text style={styles.permissionText}>
-              {exportResult}
+        <View style={{ height: 10 }} />
+
+        <TouchableOpacity
+          style={[styles.secondaryButton, docxLoading && styles.buttonDisabled]}
+          onPress={handleDownloadDocx}
+          disabled={docxLoading}
+          activeOpacity={0.7}
+        >
+          {docxLoading ? (
+            <ActivityIndicator color={Colors.accent} size="small" />
+          ) : (
+            <>
+              <MaterialCommunityIcons name="microsoft-word" size={18} color={Colors.accent} />
+              <Text style={styles.secondaryButtonText}>Scarica Tabella Word (.docx)</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        {docxResult ? (
+          <View style={[styles.inlineHint, docxResult.ok ? styles.inlineHintOk : styles.inlineHintErr]}>
+            <MaterialCommunityIcons
+              name={docxResult.ok ? "check-circle-outline" : "alert-circle-outline"}
+              size={14}
+              color={docxResult.ok ? "#4CAF50" : "#eb5757"}
+            />
+            <Text style={[styles.inlineHintText, { color: docxResult.ok ? "#4CAF50" : "#eb5757" }]}>
+              {docxResult.msg}
             </Text>
           </View>
         ) : null}
-        {exportStatus === "error" && exportResult.toLowerCase().includes("quota") ? (
-          <View style={styles.quotaBox}>
-            <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#FFC107" />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.quotaText}>
-                Drive pieno. Premi per liberare spazio eliminando i vecchi export, poi riprova:
-              </Text>
-              <TouchableOpacity
-                style={[styles.cleanupButton, cleanupLoading2 && styles.buttonDisabled]}
-                onPress={handleCleanupInline}
-                disabled={cleanupLoading2}
-                activeOpacity={0.7}
-              >
-                {cleanupLoading2 ? (
-                  <ActivityIndicator color="#eb5757" size="small" />
-                ) : (
-                  <MaterialCommunityIcons name="trash-can-outline" size={14} color="#eb5757" />
-                )}
-                <Text style={styles.cleanupButtonText}>Libera spazio Drive</Text>
-              </TouchableOpacity>
-              {cleanupResult2 ? (
-                <Text style={styles.cleanupResultText}>{cleanupResult2}</Text>
-              ) : null}
-            </View>
-          </View>
-        ) : null}
-      </StepCard>
+      </View>
 
       <StepCard
         stepNumber={3}
