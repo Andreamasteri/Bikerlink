@@ -237,8 +237,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/expo-updates", async (req: Request, res: Response) => {
     try {
       const runtimeVersion = req.headers["expo-runtime-version"] as string | undefined;
+      const platform = req.headers["expo-platform"] as string | undefined;
       const currentUpdateId = req.headers["expo-current-update-id"] as string | undefined;
       const ifNoneMatch = req.headers["if-none-match"] as string | undefined;
+
+      // Only serve Android OTA bundles — iOS publishing is handled separately
+      if (platform && platform !== "android") {
+        return res.status(204).end();
+      }
 
       if (runtimeVersion && runtimeVersion !== "7.0.0") {
         return res.status(204).end();
@@ -282,6 +288,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: release.id,
         createdAt,
         runtimeVersion: "7.0.0",
+        // assets: [] is intentional — OTA bundles are single-file JS (no separate
+        // image/font assets extracted). The bundle itself is in launchAsset only.
         assets: [] as unknown[],
         launchAsset: {
           hash: sha256Hash,
