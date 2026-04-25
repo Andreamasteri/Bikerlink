@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "node:http";
 import path from "node:path";
 import fs from "node:fs";
+import crypto from "node:crypto";
 import { initState } from "./init-state";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
@@ -228,6 +229,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({ hasUpdate: false, version: null, releaseNotes: null, bundlePath: null, publishedAt: null });
     }
   });
+
+  // ─── Expo Updates Protocol v1 ───────────────────────────────────────────────
+  // In-memory SHA-256 cache: releaseId → base64url hash
+  const _expoUpdateHashCache = new Map<string, string>();
+
+  app.get("/api/expo-updates", async (req: Request, res: Response) => {
+    try {
+      const runtimeVersion = req.headers["expo-runtime-version"] as string | undefined;
+      const currentUpdateId = req.headers["expo-current-update-id"] as string | undefined;
+      const ifNoneMatch = req.headers["if-none-match"] as string | undefined;
+
+      if (runtimeVersion && runtimeVersion !== "7.0.0") {
+        return res.status(204).end();
+      }
+
+      const result = await pool.query(
+        "SELECT * FROM ota_releases WHERE status = 'active' ORDER BY published_at DESC LIMIT 1"
+      );
+
+      if (!result.rows.length) {
+        return res.status(204).end();
+      }
+
+      const release = result.rows[0];
+
+      if (currentUpdateId && currentUpdateId === release.id) {
+        return res.status(204).end();
+      }
+
+      if (ifNoneMatch && ifNoneMatch === `"${release.id}"`) {
+        return res.status(304).end();
+      }
+
+      let sha256Hash = _expoUpdateHashCache.get(release.id);
+      if (!sha256Hash) {
+        const { downloadBuffer } = await import("./objectStorage");
+        const bundleBuffer = await downloadBuffer(release.bundle_path as string);
+        sha256Hash = crypto.createHash("sha256").update(bundleBuffer).digest("base64url");
+        _expoUpdateHashCache.set(release.id as string, sha256Hash);
+        console.log(`[expo-updates] Computed SHA-256 for release ${release.id}: ${sha256Hash.substring(0, 12)}...`);
+      }
+
+      const BASE_URL = "https://biker-link.replit.app";
+      const bundleUrl = `${BASE_URL}/api/expo-updates/assets/${encodeURIComponent(release.id as string)}`;
+
+      const createdAt: string = release.published_at
+        ? new Date(release.published_at as string | Date).toISOString()
+        : new Date().toISOString();
+
+      const manifest = {
+        id: release.id,
+        createdAt,
+        runtimeVersion: "7.0.0",
+        assets: [] as unknown[],
+        launchAsset: {
+          hash: sha256Hash,
+          key: "bundle",
+          contentType: "application/javascript",
+          url: bundleUrl,
+        },
+        metadata: {},
+        extra: {
+          expoClient: {
+            name: "BikerLink",
+            version: "2.4.0",
+          },
+        },
+      };
+
+      res.setHeader("expo-protocol-version", "1");
+      res.setHeader("expo-sfv-version", "0");
+      res.setHeader("cache-control", "private, max-age=0");
+      res.setHeader("etag", `"${release.id}"`);
+      return res.json(manifest);
+    } catch (error) {
+      console.error("[expo-updates] Error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/expo-updates/assets/:releaseId", async (req: Request, res: Response) => {
+    try {
+      const { releaseId } = req.params;
+      const result = await pool.query(
+        "SELECT bundle_path FROM ota_releases WHERE id = $1",
+        [releaseId]
+      );
+      if (!result.rows.length || !result.rows[0].bundle_path) {
+        return res.status(404).end();
+      }
+      const { downloadBuffer } = await import("./objectStorage");
+      const bundleBuffer = await downloadBuffer(result.rows[0].bundle_path as string);
+      res.setHeader("content-type", "application/javascript");
+      res.setHeader("cache-control", "public, max-age=31536000, immutable");
+      return res.end(bundleBuffer);
+    } catch (error) {
+      console.error("[expo-updates/assets] Error:", error);
+      return res.status(500).end();
+    }
+  });
+  // ────────────────────────────────────────────────────────────────────────────
 
   app.get(["/privacy-policy", "/privacy"], (_req, res) => {
     const templatePath = path.resolve(

@@ -2,7 +2,7 @@
   "expo": {
     "name": "BikerLink",
     "slug": "bikerlink",
-    "version": "2.3.0",
+    "version": "2.4.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "bikerlink",
@@ -29,7 +29,7 @@
     },
     "android": {
       "package": "com.bikerlink.app",
-      "versionCode": 37,
+      "versionCode": 38,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -102,7 +102,7 @@
       "typedRoutes": true
     },
     "updates": {
-      "url": "https://u.expo.dev/a25192d7-72e5-46af-97d0-2d38ed9b78e3",
+      "url": "https://biker-link.replit.app/api/expo-updates",
       "enabled": true,
       "fallbackToCacheTimeout": 0,
       "checkAutomatically": "ON_ERROR_RECOVERY"

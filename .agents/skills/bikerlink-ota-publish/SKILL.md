@@ -14,9 +14,10 @@ description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
 - **Canale EAS**: `preview`
-- **Runtime Version**: `7.0.0` (ciclo corrente, APK v37)
-- **APK corrente**: versionCode **37**, versionName **2.3.0** (build EAS: non catturato — inviato con --no-wait, apkUrl: n/d. Consultare https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds per recuperare il build ID reale)
+- **Runtime Version**: `7.0.0` (ciclo corrente, APK v38)
+- **APK corrente**: versionCode **38**, versionName **2.4.0** (Task #958 — configurato, build EAS da lanciare con `bash scripts/build-apk.sh`)
 - **OTA corrente**: OTA-154 (bundle custom attivo, EAS non aggiornato — vedere nota sotto)
+- **Updates URL**: `https://biker-link.replit.app/api/expo-updates` (Expo Updates Protocol v1)
 - **Utenti**: su Android fisico via APK — NON usano il dev server
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
@@ -129,17 +130,18 @@ Tutti i check devono essere ✔. Il warning sui cicli multipli (2.0.0, 3.0.0, 4.
 - I dispositivi che già usano `expo-updates` (EAS) per controllare aggiornamenti **NON vedranno le nuove OTA** perché EAS è fermo all'ultima versione pubblicata con successo (OTA-152).
 - I dispositivi su OTA-152 sono bloccati finché non viene installato un nuovo APK.
 
-### Fix strutturale (APK v38)
-Il fix definitivo richiede:
-1. Implementare il **Expo Updates Protocol v1** sul nostro backend custom (endpoint dedicato)
-2. Cambiare `updates.url` in `app.json` da `https://u.expo.dev/...` a `https://biker-link.replit.app/api/expo-updates`
-3. Costruire e distribuire **APK v38** con questa configurazione
-4. Dopo APK v38: gli aggiornamenti OTA sono completamente indipendenti da EAS
+### Fix strutturale (APK v38) — IMPLEMENTATO (Task #958)
+✅ **Implementato**: Backend serve `GET /api/expo-updates` (Expo Updates Protocol v1) e `GET /api/expo-updates/assets/:releaseId`.
+✅ **app.json**: `updates.url` → `https://biker-link.replit.app/api/expo-updates`
+✅ **versionCode**: 38, versionName 2.4.0 (build.gradle + app.json aggiornati)
+⏳ **Pendente**: build APK v38 via `bash scripts/build-apk.sh` (richiede autorizzazione utente)
+
+Dopo APK v38 installato sui dispositivi: gli aggiornamenti OTA sono completamente indipendenti da EAS.
 
 ### Nel frattempo
 - Pubblicare comunque con `publish-ota.sh` — il bundle custom si aggiorna
-- I nuovi installati (APK v38+) riceveranno tutti gli aggiornamenti
-- I dispositivi su OTA-152 necessitano di reinstallare l'APK manualmente
+- I nuovi installati con APK v38 riceveranno tutti gli aggiornamenti via backend custom
+- I dispositivi su OTA-152 (APK v37) necessitano di reinstallare APK v38 manualmente
 
 ## ⚠️ Nota: APK build ID e URL dopo --no-wait
 `scripts/build-apk.sh` invia la build con `--no-wait` e **non cattura** il build ID restituito da EAS. Dopo ogni nuova build APK, recuperare manualmente il build ID e l'URL del file `.apk` da https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds e aggiornarli in `ota-updates.json` nella entry più recente del ciclo corrente:
