@@ -4739,6 +4739,32 @@
     "apkBuildId": null,
     "apkVersionCode": 37,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 154,
+    "version": "1.154.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-154 rv7.0.0: fix distribuzione EAS (OTA-153 non pervenuta via expo-updates)",
+    "publishedAt": "2026-04-25",
+    "runtimeVersion": "7.0.0",
+    "platforms": [
+      "android"
+    ],
+    "jsEngine": "hermes",
+    "note": "OTA-154: git index.lock blocca eas update sia in main agent che in build mode — pubblicazione EAS impossibile dall'ambiente Replit. Bundle custom attivo sul backend (release 275c292c). Dispositivi su OTA-152 (che usano expo-updates/EAS) NON ricevono questo aggiornamento automaticamente. Fix strutturale richiede APK v38 con updates.url puntato al backend custom (Expo Updates Protocol). CURRENT_OTA_NUMBER=154.",
+    "releaseId": "275c292c-67e2-4c86-a73f-c821e944db37",
+    "bundleUrl": "private/ota/ota-1.154.0-1777148705051.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "4698e1b15f6dc191b61620cbd5e04b0272418733",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 37,
+    "apkUrl": null,
     "status": "published"
   }
 ]
