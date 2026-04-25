@@ -1460,7 +1460,7 @@ interface BulkCampaignResult {
   isActive: boolean;
 }
 
-router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Request, res: Response) => {
+router.post("/advertisements/bulk", adUpload.array("images", 10), async (req: Request, res: Response) => {
   try {
     const files = req.files as Express.Multer.File[] | undefined;
     if (!files || files.length === 0) {

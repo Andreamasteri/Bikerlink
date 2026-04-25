@@ -515,7 +515,10 @@ export default function AdminAds() {
     const failedNames: string[] = [];
     const bulkUrl = new URL("/api/admin/advertisements/bulk", getApiUrl()).toString();
     const duration = String(parseInt(bulkDuration) || 10);
-    const batchGroupId = Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+    const batchGroupId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
     const CHUNK_SIZE = 10;
 
     for (let chunkStart = 0; chunkStart < totalImages; chunkStart += CHUNK_SIZE) {
