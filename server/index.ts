@@ -12,6 +12,7 @@ import { seedMotoclubs } from "./routes/motoclubs";
 import * as fs from "fs";
 import * as path from "path";
 import { initUptimeTracking, startMetroMonitor, stopMetroMonitor } from "./uptime";
+import { matchEnrichmentSemaphore, MATCH_ENRICHMENT_GLOBAL_LIMIT } from "./lib/concurrency";
 
 const app = express();
 const log = console.log;
@@ -450,6 +451,16 @@ function setupErrorHandler(app: express.Application) {
 
   app.get("/healthz", (_req: Request, res: Response) => {
     res.status(200).send("ok");
+  });
+
+  app.get("/api/metrics", (_req: Request, res: Response) => {
+    res.json({
+      matchEnrichmentSemaphore: {
+        activeCount: matchEnrichmentSemaphore.activeCount,
+        pendingCount: matchEnrichmentSemaphore.pendingCount,
+        limit: MATCH_ENRICHMENT_GLOBAL_LIMIT,
+      },
+    });
   });
 
   setupCors(app);
@@ -1114,6 +1125,20 @@ function setupErrorHandler(app: express.Application) {
           setInterval(cleanupOrphanedAdImages, ONE_DAY_MS);
         }, 5 * 60 * 1000);
         console.log("[INIT] Phase 8 ad image cleanup job scheduled (5min delay, then every 24h)");
+
+        // Phase 9 — periodic semaphore queue-depth metrics (every 60s)
+        const METRICS_INTERVAL_MS = 60_000;
+        const logSemaphoreMetrics = () => {
+          const active = matchEnrichmentSemaphore.activeCount;
+          const pending = matchEnrichmentSemaphore.pendingCount;
+          const limit = MATCH_ENRICHMENT_GLOBAL_LIMIT;
+          const pressure = pending > 0 ? " ⚠ PRESSURE" : "";
+          console.log(
+            `[METRICS] matchEnrichmentSemaphore — active=${active}/${limit} pending=${pending}${pressure}`
+          );
+        };
+        setInterval(logSemaphoreMetrics, METRICS_INTERVAL_MS);
+        console.log("[INIT] Phase 9 semaphore metrics logger started (every 60s)");
       })().catch((err) => {
         console.error("[INIT] Startup phase chain error:", err);
         initState.initializing = false;
