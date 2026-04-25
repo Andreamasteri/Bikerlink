@@ -52,6 +52,7 @@ export default function NativeUpdateChecker() {
           Platform.OS === "android" ? config.android : config.ios;
         const installed = Constants.expoConfig?.version ?? "0.0.0";
         const { latestVersion, minVersion, storeUrl: sUrl } = platform;
+        if (!sUrl || !sUrl.startsWith("https://")) return;
         if (compareSemver(installed, minVersion) < 0) {
           setStoreUrl(sUrl);
           setIsForced(true);

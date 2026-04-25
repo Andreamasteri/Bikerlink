@@ -4606,6 +4606,19 @@ router.put("/settings/native-version", async (req: Request, res: Response) => {
     if (!android || !ios) {
       return res.status(400).json({ message: "Payload non valido: android e ios richiesti" });
     }
+    const semverRe = /^\d+\.\d+\.\d+$/;
+    const urlRe = /^https:\/\/.+/;
+    const validate = (p: typeof android, name: string) => {
+      if (!semverRe.test(p.latestVersion)) throw new Error(`${name}.latestVersion non valido (formato X.Y.Z richiesto)`);
+      if (!semverRe.test(p.minVersion)) throw new Error(`${name}.minVersion non valido (formato X.Y.Z richiesto)`);
+      if (!urlRe.test(p.storeUrl)) throw new Error(`${name}.storeUrl non valido (URL https:// richiesto)`);
+    };
+    try {
+      validate(android, "android");
+      validate(ios, "ios");
+    } catch (e: unknown) {
+      return res.status(400).json({ message: e instanceof Error ? e.message : "Payload non valido" });
+    }
     await Promise.all([
       storage.upsertAppSetting("native_android_latest", android.latestVersion),
       storage.upsertAppSetting("native_android_min", android.minVersion),
