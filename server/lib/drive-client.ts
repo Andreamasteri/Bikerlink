@@ -129,10 +129,10 @@ export async function handleDriveOAuthCallback(
 export async function getDriveOAuthStatus(): Promise<{
   connected: boolean;
   email: string | null;
-  hint: string | null;
+  hint: string;
 }> {
   const refreshToken = await getStoredRefreshToken();
-  if (!refreshToken) return { connected: false, email: null, hint: null };
+  if (!refreshToken) return { connected: false, email: null, hint: "" };
   try {
     const oauth2 = buildOAuth2Client();
     oauth2.setCredentials({ refresh_token: refreshToken });
@@ -142,7 +142,7 @@ export async function getDriveOAuthStatus(): Promise<{
     const hint = email ? `Connesso come ${email}` : "Connesso";
     return { connected: true, email, hint };
   } catch {
-    return { connected: false, email: null, hint: null };
+    return { connected: false, email: null, hint: "" };
   }
 }
 

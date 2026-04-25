@@ -630,6 +630,8 @@ export default function TraduzioniScreen() {
           loadOAuthStatus();
           setConnectingDrive(false);
         }, 4000);
+      } else {
+        setConnectingDrive(false);
       }
     } catch (e: any) {
       setConnectingDrive(false);
