@@ -107,6 +107,10 @@ export async function getDriveUserClient(): Promise<drive_v3.Drive> {
       (typeof err?.message === "string" && err.message.includes("invalid_grant")) ||
       err?.code === "invalid_grant";
     if (isExpired) {
+      console.warn(
+        "[drive-client] invalid_grant: il refresh token è scaduto (probabile app in modalità Testing — 7 giorni). " +
+        "Soluzione permanente: Google Cloud Console → APIs & Services → OAuth consent screen → Pubblica app (Testing → Produzione), poi riconnetti Drive."
+      );
       throw new Error("GOOGLE_DRIVE_TOKEN_EXPIRED");
     }
     throw err;
@@ -190,6 +194,12 @@ export async function getDriveOAuthStatus(): Promise<{
       err?.response?.data?.error === "invalid_grant" ||
       (typeof err?.message === "string" && err.message.includes("invalid_grant")) ||
       err?.code === "invalid_grant";
+    if (isExpired) {
+      console.warn(
+        "[drive-client] OAuth status: invalid_grant rilevato. Probabile app in modalità Testing (scadenza 7 giorni). " +
+        "Soluzione: Google Cloud Console → OAuth consent screen → Pubblica app, poi riconnetti Drive."
+      );
+    }
     return { connected: false, email: null, hint: "", tokenExpired: isExpired };
   }
 }

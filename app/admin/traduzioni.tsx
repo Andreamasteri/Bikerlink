@@ -1078,30 +1078,55 @@ export default function TraduzioniScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, flexWrap: "wrap" }}>
-            <MaterialCommunityIcons
-              name={driveTokenExpired ? "clock-alert-outline" : "alert-circle-outline"}
-              size={18}
-              color="#FF6600"
-            />
-            <Text style={[styles.oauthBannerText, { color: "#FF6600", flex: 1 }]}>
-              {driveTokenExpired
-                ? "Token scaduto — riconnetti Google Drive"
-                : "Drive non connesso — l'export richiede autenticazione"}
-            </Text>
-            <TouchableOpacity
-              onPress={handleConnectDrive}
-              disabled={connectingDrive}
-              style={styles.oauthConnectBtn}
-              activeOpacity={0.7}
-            >
-              {connectingDrive
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={styles.oauthConnectText}>
-                    {driveTokenExpired ? "Riconnetti" : "Connetti Google Drive"}
+          <View style={{ gap: 10, flex: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <MaterialCommunityIcons
+                name={driveTokenExpired ? "clock-alert-outline" : "alert-circle-outline"}
+                size={18}
+                color="#FF6600"
+              />
+              <Text style={[styles.oauthBannerText, { color: "#FF6600", flex: 1 }]}>
+                {driveTokenExpired
+                  ? "Token scaduto — riconnetti Google Drive"
+                  : "Drive non connesso — l'export richiede autenticazione"}
+              </Text>
+              <TouchableOpacity
+                onPress={handleConnectDrive}
+                disabled={connectingDrive}
+                style={styles.oauthConnectBtn}
+                activeOpacity={0.7}
+              >
+                {connectingDrive
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={styles.oauthConnectText}>
+                      {driveTokenExpired ? "Riconnetti" : "Connetti Google Drive"}
+                    </Text>
+                }
+              </TouchableOpacity>
+            </View>
+            {driveTokenExpired && (
+              <View style={{ backgroundColor: "#1a1200", borderRadius: 8, padding: 10, gap: 6 }}>
+                <Text style={{ fontSize: 12, color: "#FFC107", fontFamily: "Inter_600SemiBold" }}>
+                  Soluzione permanente — app in modalità "Testing"
+                </Text>
+                <Text style={{ fontSize: 11, color: "#c8a84b", fontFamily: "Inter_400Regular", lineHeight: 17 }}>
+                  I token Google scadono ogni 7 giorni in modalità Testing. Per eliminarla definitivamente:
+                </Text>
+                <Text style={{ fontSize: 11, color: "#c8a84b", fontFamily: "Inter_400Regular", lineHeight: 17 }}>
+                  {"1. Vai su Google Cloud Console → APIs & Services → OAuth consent screen\n2. Clicca \"Pubblica app\" (Testing → Produzione)\n3. Premi Riconnetti qui sopra per ottenere un token permanente"}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => Linking.openURL("https://console.cloud.google.com/apis/credentials/consent")}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}
+                  activeOpacity={0.7}
+                >
+                  <MaterialCommunityIcons name="open-in-new" size={13} color="#FFC107" />
+                  <Text style={{ fontSize: 11, color: "#FFC107", fontFamily: "Inter_500Medium", textDecorationLine: "underline" }}>
+                    Apri Google Cloud Console
                   </Text>
-              }
-            </TouchableOpacity>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         )}
       </View>
