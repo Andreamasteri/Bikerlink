@@ -12,6 +12,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { getApiUrl } from "@/lib/query-client";
 import { Platform, AppState, ActivityIndicator, View, Text, StyleSheet } from "react-native";
 import NativeUpdateChecker from "@/components/NativeUpdateChecker";
+import MatchPopupAlert from "@/components/MatchPopupAlert";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import * as Updates from "expo-updates";
@@ -621,6 +622,7 @@ export default function RootLayout() {
                     <AdminUptimeOverlay />
                     <BackgroundNotificationHandler />
                     <LanguageKeyedRoot />
+                    <MatchPopupAlert />
                   </MapReadyGate>
                 </StartupGate>
                 </GestureHandlerRootView>
