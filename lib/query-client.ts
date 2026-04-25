@@ -12,6 +12,15 @@ export function getApiUrl(): string {
   return url.href.replace(/\/$/, "");
 }
 
+export class ServerBusyError extends Error {
+  retryAfter: number;
+  constructor(retryAfter: number) {
+    super("Server occupato, riprova più tardi");
+    this.name = "ServerBusyError";
+    this.retryAfter = retryAfter;
+  }
+}
+
 // When any non-auth endpoint receives a 401, silently re-check /api/auth/me.
 // React Query deduplicates concurrent refetches — only one HTTP request is made.
 // If the session is truly gone, auth-context will set sessionExpired and redirect.
@@ -27,6 +36,11 @@ function scheduleAuthRecheck() {
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    if (res.status === 503) {
+      const retryAfterHeader = res.headers.get("Retry-After");
+      const retryAfter = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 3;
+      throw new ServerBusyError(isNaN(retryAfter) ? 3 : retryAfter);
+    }
     const contentType = res.headers.get("content-type") || "";
     if (contentType.includes("text/html")) {
       throw new Error("Server non disponibile. Riprova tra un momento.");
@@ -102,7 +116,18 @@ export const queryClient = new QueryClient({
       refetchInterval: false,
       refetchOnWindowFocus: false,
       staleTime: Infinity,
-      retry: false,
+      retry: (failureCount, error) => {
+        if (error instanceof ServerBusyError) {
+          return failureCount < 3;
+        }
+        return false;
+      },
+      retryDelay: (_, error) => {
+        if (error instanceof ServerBusyError) {
+          return error.retryAfter * 1000;
+        }
+        return 1000;
+      },
     },
     mutations: {
       retry: false,

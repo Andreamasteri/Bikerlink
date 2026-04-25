@@ -21,7 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { useColors } from "@/hooks/useColors";
-import { queryClient, getApiUrl, apiRequest } from "@/lib/query-client";
+import { queryClient, getApiUrl, apiRequest, ServerBusyError } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import { useT, useLocale } from "@/lib/language-context";
 
@@ -538,14 +538,14 @@ export default function MatchScreen() {
     refetchOnMount: true,
   });
 
-  const { data: garageMatches, isLoading: garageLoading, refetch: garageRefetch, isRefetching: garageRefetching } = useQuery<any[]>({
+  const { data: garageMatches, isLoading: garageLoading, refetch: garageRefetch, isRefetching: garageRefetching, error: garageError, failureReason: garageFailureReason, isFetching: garageIsFetching } = useQuery<any[]>({
     queryKey: ["/api/proposals/garage-matches"],
     enabled: !!user,
     refetchInterval: 30000,
     refetchOnMount: true,
   });
 
-  const { data: bikerMatches, isLoading: bikerLoading, refetch: bikerRefetch, isRefetching: bikerRefetching } = useQuery<any[]>({
+  const { data: bikerMatches, isLoading: bikerLoading, refetch: bikerRefetch, isRefetching: bikerRefetching, error: bikerError, failureReason: bikerFailureReason, isFetching: bikerIsFetching } = useQuery<any[]>({
     queryKey: ["/api/proposals/biker-matches"],
     enabled: !!user,
     refetchInterval: 30000,
@@ -682,6 +682,12 @@ export default function MatchScreen() {
     activeTab === "music" ? musicLoading :
     activeTab === "accepted" ? (garageLoading || bikerLoading || proposalLoading) :
     blockedLoading;
+
+  const isServerBusy =
+    ((activeTab === "zavorrine" || activeTab === "accepted") &&
+      ((garageFailureReason instanceof ServerBusyError && garageIsFetching) || garageError instanceof ServerBusyError)) ||
+    ((activeTab === "biker" || activeTab === "accepted") &&
+      ((bikerFailureReason instanceof ServerBusyError && bikerIsFetching) || bikerError instanceof ServerBusyError));
   const isRefetching =
     activeTab === "zavorrine" ? garageRefetching :
     activeTab === "biker" ? bikerRefetching :
@@ -1356,6 +1362,11 @@ export default function MatchScreen() {
           <Text style={styles.emptyTitle}>{t("match.emptyMusicTitle")}</Text>
           <Text style={styles.emptyDesc}>{t("match.emptyMusicDesc")}</Text>
         </View>
+      ) : isServerBusy ? (
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={Colors.accent} />
+          <Text style={styles.serverBusyText}>Per favore attendere…</Text>
+        </View>
       ) : isLoading ? (
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={Colors.accent} />
@@ -1581,6 +1592,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center" as const,
     alignItems: "center" as const,
+  },
+  serverBusyText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: Colors.textSecondary,
   },
   list: {
     padding: 10,

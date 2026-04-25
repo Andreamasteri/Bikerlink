@@ -250,6 +250,7 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
   }); // matchEnrichmentSemaphore.run
   } catch (err) {
     if (err instanceof SemaphoreQueueFullError) {
+      res.setHeader("Retry-After", "3");
       return res.status(503).json({ message: "Server occupato, riprova più tardi" });
     }
     console.error("Get garage matches outer error:", err);
@@ -512,6 +513,7 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
   }); // matchEnrichmentSemaphore.run
   } catch (err) {
     if (err instanceof SemaphoreQueueFullError) {
+      res.setHeader("Retry-After", "3");
       return res.status(503).json({ message: "Server occupato, riprova più tardi" });
     }
     console.error("Get biker-biker matches outer error:", err);
