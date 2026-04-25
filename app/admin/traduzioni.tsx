@@ -183,8 +183,6 @@ function DriveFileBrowser({
   const [breadcrumb, setBreadcrumb] = useState<BreadcrumbItem[]>([{ id: null, name: "Drive" }]);
   const [browseData, setBrowseData] = useState<BrowseResult>({ folderName: "Drive", folders: [], sheets: [] });
   const [searchText, setSearchText] = useState("");
-  const [cleanupLoading, setCleanupLoading] = useState(false);
-  const [cleanupResult, setCleanupResult] = useState<string | null>(null);
   const [refreshingCache, setRefreshingCache] = useState(false);
   const [cacheMsg, setCacheMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const cacheMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -216,32 +214,11 @@ function DriveFileBrowser({
     }
   }
 
-  async function handleCleanupExports() {
-    setCleanupLoading(true);
-    setCleanupResult(null);
-    try {
-      const url = new URL("/api/admin/drive/cleanup-exports", getApiUrl());
-      const resp = await fetch(url.toString(), { method: "DELETE", credentials: "include" });
-      const data = await resp.json();
-      if (!resp.ok) {
-        setCleanupResult(`Errore: ${data.message ?? "sconosciuto"}`);
-      } else {
-        const mb = data.freed > 0 ? ` (${(data.freed / 1024 / 1024).toFixed(1)} MB)` : "";
-        setCleanupResult(`Eliminati ${data.deleted} file${mb}`);
-      }
-    } catch {
-      setCleanupResult("Errore di rete");
-    } finally {
-      setCleanupLoading(false);
-    }
-  }
-
   useEffect(() => {
     if (visible) {
       setCurrentFolderId(null);
       setBreadcrumb([{ id: null, name: "Drive" }]);
       setSearchText("");
-      setCleanupResult(null);
       loadFolder(null);
     }
     return () => {
@@ -354,28 +331,6 @@ function DriveFileBrowser({
               <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary }}>
                 Google Drive → tasto destro sulla cartella → Condividi
               </Text>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 }}>
-                <TouchableOpacity
-                  onPress={handleCleanupExports}
-                  disabled={cleanupLoading}
-                  style={{
-                    flexDirection: "row", alignItems: "center", gap: 4,
-                    backgroundColor: "#4a1a1a", borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5,
-                  }}
-                  activeOpacity={0.7}
-                >
-                  {cleanupLoading
-                    ? <ActivityIndicator size="small" color="#eb5757" />
-                    : <MaterialCommunityIcons name="trash-can-outline" size={14} color="#eb5757" />
-                  }
-                  <Text style={{ fontSize: 12, color: "#eb5757", fontFamily: "Inter_500Medium" }}>Pulisci export vecchi</Text>
-                </TouchableOpacity>
-                {cleanupResult && (
-                  <Text style={{ fontSize: 11, color: Colors.textSecondary, fontFamily: "Inter_400Regular", flex: 1 }}>
-                    {cleanupResult}
-                  </Text>
-                )}
-              </View>
             </View>
           )}
 
@@ -1641,110 +1596,5 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     flex: 1,
-  },
-  permissionBox: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    backgroundColor: "rgba(235,87,87,0.08)",
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "rgba(235,87,87,0.3)",
-    marginBottom: 8,
-  },
-  permissionText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: "#eb5757",
-    lineHeight: 17,
-    flex: 1,
-  },
-  quotaBox: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    backgroundColor: "rgba(255,193,7,0.08)",
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,193,7,0.3)",
-  },
-  quotaText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: "#FFC107",
-    lineHeight: 17,
-    marginBottom: 8,
-  },
-  cleanupButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "rgba(235,87,87,0.12)",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    alignSelf: "flex-start",
-  },
-  cleanupButtonText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    color: "#eb5757",
-  },
-  cleanupResultText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: Colors.textSecondary,
-    marginTop: 6,
-  },
-  oauthBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#1a1a1a",
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 8,
-  },
-  oauthBannerText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: Colors.text,
-  },
-  oauthBannerSub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    marginTop: 2,
-  },
-  oauthConnectBtn: {
-    backgroundColor: "#FF6600",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    minWidth: 48,
-    alignItems: "center",
-  },
-  oauthConnectText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    color: "#fff",
-  },
-  oauthDisconnectBtn: {
-    backgroundColor: "#2a2a2a",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    minWidth: 48,
-    alignItems: "center",
-  },
-  oauthDisconnectText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    color: Colors.textSecondary,
   },
 });
