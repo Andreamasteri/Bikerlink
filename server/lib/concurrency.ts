@@ -47,23 +47,51 @@ export async function allLimited<T>(
 }
 
 /**
+ * Thrown by Semaphore.acquire() when the waiting queue has reached its
+ * configured maximum depth (maxQueue).  Callers should translate this into an
+ * HTTP 503 response so clients can back off and retry.
+ */
+export class SemaphoreQueueFullError extends Error {
+  constructor(max: number) {
+    super(`Semaphore queue full (maxQueue=${max})`);
+    this.name = "SemaphoreQueueFullError";
+  }
+}
+
+/**
  * A lightweight semaphore that bounds the number of concurrently running async
  * operations server-wide.  Excess callers are queued (FIFO) and resume as slots
  * become available.
+ *
+ * @param max      - Maximum number of concurrent executions.
+ * @param maxQueue - Optional maximum number of requests allowed to wait in the
+ *                   queue.  When the queue is full, acquire() rejects with a
+ *                   SemaphoreQueueFullError instead of adding to the queue.
+ *                   Defaults to Infinity (unlimited queueing — original behaviour).
  */
 export class Semaphore {
   private running = 0;
   private readonly queue: (() => void)[] = [];
+  private readonly maxQueue: number;
 
-  constructor(private readonly max: number) {
+  constructor(private readonly max: number, options: { maxQueue?: number } = {}) {
     if (max < 1) throw new RangeError(`Semaphore: max must be >= 1, got ${max}`);
+    const mq = options.maxQueue ?? Infinity;
+    if (typeof mq !== "number" || (isFinite(mq) && (mq < 0 || !Number.isInteger(mq)))) {
+      throw new RangeError(`Semaphore: maxQueue must be a non-negative integer or Infinity, got ${mq}`);
+    }
+    this.maxQueue = mq;
   }
 
-  /** Acquire a slot.  Resolves immediately if capacity is available, otherwise waits. */
+  /** Acquire a slot.  Resolves immediately if capacity is available, otherwise waits.
+   *  Throws SemaphoreQueueFullError if the wait queue has reached maxQueue. */
   acquire(): Promise<void> {
     if (this.running < this.max) {
       this.running++;
       return Promise.resolve();
+    }
+    if (this.queue.length >= this.maxQueue) {
+      return Promise.reject(new SemaphoreQueueFullError(this.maxQueue));
     }
     return new Promise<void>((resolve) => {
       this.queue.push(resolve);
@@ -114,8 +142,26 @@ export const MATCH_ENRICHMENT_GLOBAL_LIMIT = (() => {
 })();
 
 /**
+ * Maximum number of requests allowed to wait in the match-enrichment queue.
+ * When the backlog exceeds this value, new requests are immediately rejected
+ * so the route can return HTTP 503.
+ *
+ * Override with the MATCH_ENRICHMENT_MAX_QUEUE environment variable.
+ * Default: Infinity (unlimited queueing — preserves original behaviour).
+ */
+export const MATCH_ENRICHMENT_MAX_QUEUE = (() => {
+  const val = parseInt(process.env.MATCH_ENRICHMENT_MAX_QUEUE ?? "", 10);
+  return isNaN(val) || val < 0 ? Infinity : val;
+})();
+
+/**
  * Shared semaphore instance used by /garage-matches and /biker-matches routes.
  * At most MATCH_ENRICHMENT_GLOBAL_LIMIT of those handlers will execute their
  * enrichment work concurrently across all connected users.
+ * When the queue depth reaches MATCH_ENRICHMENT_MAX_QUEUE, acquire() rejects
+ * with SemaphoreQueueFullError so the route can return HTTP 503.
  */
-export const matchEnrichmentSemaphore = new Semaphore(MATCH_ENRICHMENT_GLOBAL_LIMIT);
+export const matchEnrichmentSemaphore = new Semaphore(
+  MATCH_ENRICHMENT_GLOBAL_LIMIT,
+  { maxQueue: MATCH_ENRICHMENT_MAX_QUEUE }
+);

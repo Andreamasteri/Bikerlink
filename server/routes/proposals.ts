@@ -4,7 +4,7 @@ import { db } from "../db";
 import { motoClubMembers } from "@shared/schema";
 import { and, eq } from "drizzle-orm";
 import { runMatchingForUser, runProposalMatchingForUser } from "../matching-engine";
-import { allLimited, matchEnrichmentSemaphore } from "../lib/concurrency";
+import { allLimited, matchEnrichmentSemaphore, SemaphoreQueueFullError } from "../lib/concurrency";
 
 const router = Router();
 
@@ -135,6 +135,7 @@ router.get("/matches", requireAuth, async (req: Request, res: Response) => {
 });
 
 router.get("/garage-matches", requireAuth, async (req: Request, res: Response) => {
+  try {
   await matchEnrichmentSemaphore.run(async () => {
   try {
     const userId = req.session.userId!;
@@ -247,6 +248,13 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
     return res.status(500).json({ message: "Errore interno del server" });
   }
   }); // matchEnrichmentSemaphore.run
+  } catch (err) {
+    if (err instanceof SemaphoreQueueFullError) {
+      return res.status(503).json({ message: "Server occupato, riprova più tardi" });
+    }
+    console.error("Get garage matches outer error:", err);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
 });
 
 router.post("/garage-matches/:id/accept", requireAuth, async (req: Request, res: Response) => {
@@ -395,6 +403,7 @@ router.post("/matches/:id/reject", requireAuth, async (req: Request, res: Respon
 });
 
 router.get("/biker-matches", requireAuth, async (req: Request, res: Response) => {
+  try {
   await matchEnrichmentSemaphore.run(async () => {
   try {
     const userId = req.session.userId!;
@@ -501,6 +510,13 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
     return res.status(500).json({ message: "Errore interno del server" });
   }
   }); // matchEnrichmentSemaphore.run
+  } catch (err) {
+    if (err instanceof SemaphoreQueueFullError) {
+      return res.status(503).json({ message: "Server occupato, riprova più tardi" });
+    }
+    console.error("Get biker-biker matches outer error:", err);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
 });
 
 router.post("/biker-matches/:id/accept", requireAuth, async (req: Request, res: Response) => {
