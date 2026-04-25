@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, ShadingType, AlignmentType, TextRun, HeightRule } from "docx";
 import bcrypt from "bcryptjs";
 import { uploadBuffer, objectExists } from "../objectStorage";
@@ -3953,35 +3953,38 @@ router.get("/translations/download-xlsx", async (req: Request, res: Response) =>
     }
 
     const headers = ["Chiave", "Posizione nell'app", "IT (fonte)", ...langs.map((l) => l.toUpperCase())];
-    const rows = Object.entries(keyMap).map(([key, val]) => {
-      const row: string[] = [key, val.position, val.it];
-      for (const _l of langs) row.push("");
-      return row;
-    });
 
-    const wsData = [headers, ...rows];
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Traduzioni");
 
-    const colWidths = [
-      { wch: 40 },
-      { wch: 30 },
-      { wch: 50 },
-      ...langs.map(() => ({ wch: 50 })),
+    ws.columns = [
+      { key: "col0", width: 40 },
+      { key: "col1", width: 30 },
+      { key: "col2", width: 50 },
+      ...langs.map((_l, i) => ({ key: `col${i + 3}`, width: 50 })),
     ];
-    ws["!cols"] = colWidths;
 
-    const accentFill = { patternType: "solid" as const, fgColor: { rgb: "FF6600" } };
-    const accentFont = { bold: true, color: { rgb: "FFFFFF" }, sz: 11 };
-    for (let c = 0; c < headers.length; c++) {
-      const cellRef = XLSX.utils.encode_cell({ r: 0, c });
-      if (!ws[cellRef]) ws[cellRef] = { v: headers[c], t: "s" };
-      ws[cellRef].s = { fill: accentFill, font: accentFont, alignment: { wrapText: true, vertical: "center" } };
+    const headerRow = ws.addRow(headers);
+    headerRow.eachCell((cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFF6600" } };
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+      cell.alignment = { wrapText: true, vertical: "middle", horizontal: "center" };
+      cell.border = {
+        top: { style: "thin", color: { argb: "FFCC5200" } },
+        bottom: { style: "thin", color: { argb: "FFCC5200" } },
+      };
+    });
+    headerRow.height = 22;
+
+    for (const [key, val] of Object.entries(keyMap)) {
+      const row = [key, val.position, val.it, ...langs.map(() => "")];
+      const dataRow = ws.addRow(row);
+      dataRow.eachCell((cell) => {
+        cell.alignment = { wrapText: true, vertical: "top" };
+      });
     }
 
-    XLSX.utils.book_append_sheet(wb, ws, "Traduzioni");
-    const xlsxBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-
+    const xlsxBuffer = await wb.xlsx.writeBuffer();
     const filename = `BikerLink_Traduzioni_${new Date().toISOString().slice(0, 10)}.xlsx`;
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);

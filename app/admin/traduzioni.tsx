@@ -716,6 +716,31 @@ export default function TraduzioniScreen() {
     }
   }
 
+  function extractErrorMessage(e: unknown, fallback: string): string {
+    if (e instanceof Error) return e.message || fallback;
+    return fallback;
+  }
+
+  async function arrayBufferToBase64(buf: ArrayBuffer): Promise<string> {
+    const bytes = new Uint8Array(buf);
+    const CHUNK = 8192;
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      binary += String.fromCharCode(...Array.from(bytes.subarray(i, i + CHUNK)));
+    }
+    return btoa(binary);
+  }
+
+  async function parseBinaryErrorMessage(resp: Response): Promise<string> {
+    try {
+      const data: unknown = await resp.json();
+      if (data && typeof data === "object" && "message" in data && typeof (data as { message: unknown }).message === "string") {
+        return (data as { message: string }).message;
+      }
+    } catch {}
+    return "Errore download";
+  }
+
   async function handleDownloadXlsx() {
     setXlsxLoading(true);
     setXlsxResult(null);
@@ -727,10 +752,7 @@ export default function TraduzioniScreen() {
       );
       if (Platform.OS === "web") {
         const resp = await fetch(url.toString(), { credentials: "include" });
-        if (!resp.ok) {
-          const err = await resp.json().catch(() => ({}));
-          throw new Error((err as any).message || "Errore download");
-        }
+        if (!resp.ok) throw new Error(await parseBinaryErrorMessage(resp));
         const blob = await resp.blob();
         const blobUrl = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -741,12 +763,9 @@ export default function TraduzioniScreen() {
         setXlsxResult({ ok: true, msg: "Download Excel avviato" });
       } else {
         const resp = await fetch(url.toString(), { credentials: "include" });
-        if (!resp.ok) {
-          const err = await resp.json().catch(() => ({}));
-          throw new Error((err as any).message || "Errore download");
-        }
+        if (!resp.ok) throw new Error(await parseBinaryErrorMessage(resp));
         const arrayBuf = await resp.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
+        const base64 = await arrayBufferToBase64(arrayBuf);
         const filePath = `${FileSystem.cacheDirectory}BikerLink_Traduzioni.xlsx`;
         await FileSystem.writeAsStringAsync(filePath, base64, { encoding: FileSystem.EncodingType.Base64 });
         const canShare = await Sharing.isAvailableAsync();
@@ -760,8 +779,8 @@ export default function TraduzioniScreen() {
           setXlsxResult({ ok: false, msg: "Condivisione non disponibile su questo dispositivo" });
         }
       }
-    } catch (e: any) {
-      setXlsxResult({ ok: false, msg: e?.message || "Errore download" });
+    } catch (e: unknown) {
+      setXlsxResult({ ok: false, msg: extractErrorMessage(e, "Errore download Excel") });
     } finally {
       setXlsxLoading(false);
     }
@@ -778,10 +797,7 @@ export default function TraduzioniScreen() {
       );
       if (Platform.OS === "web") {
         const resp = await fetch(url.toString(), { credentials: "include" });
-        if (!resp.ok) {
-          const err = await resp.json().catch(() => ({}));
-          throw new Error((err as any).message || "Errore download");
-        }
+        if (!resp.ok) throw new Error(await parseBinaryErrorMessage(resp));
         const blob = await resp.blob();
         const blobUrl = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -792,12 +808,9 @@ export default function TraduzioniScreen() {
         setDocxResult({ ok: true, msg: "Download Word avviato" });
       } else {
         const resp = await fetch(url.toString(), { credentials: "include" });
-        if (!resp.ok) {
-          const err = await resp.json().catch(() => ({}));
-          throw new Error((err as any).message || "Errore download");
-        }
+        if (!resp.ok) throw new Error(await parseBinaryErrorMessage(resp));
         const arrayBuf = await resp.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
+        const base64 = await arrayBufferToBase64(arrayBuf);
         const filePath = `${FileSystem.cacheDirectory}BikerLink_Traduzioni.docx`;
         await FileSystem.writeAsStringAsync(filePath, base64, { encoding: FileSystem.EncodingType.Base64 });
         const canShare = await Sharing.isAvailableAsync();
@@ -811,8 +824,8 @@ export default function TraduzioniScreen() {
           setDocxResult({ ok: false, msg: "Condivisione non disponibile su questo dispositivo" });
         }
       }
-    } catch (e: any) {
-      setDocxResult({ ok: false, msg: e?.message || "Errore download" });
+    } catch (e: unknown) {
+      setDocxResult({ ok: false, msg: extractErrorMessage(e, "Errore download Word") });
     } finally {
       setDocxLoading(false);
     }
