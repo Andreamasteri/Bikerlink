@@ -1466,18 +1466,23 @@ router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Re
     if (!files || files.length === 0) {
       return res.status(400).json({ message: "Nessuna immagine ricevuta" });
     }
-    const { baseName, targetUserType, displayDuration, linkUrl } = req.body as {
+    const { baseName, targetUserType, displayDuration, linkUrl, groupId: externalGroupId, startIndex: startIndexStr, totalImages: totalImagesStr } = req.body as {
       baseName?: string;
       targetUserType?: string;
       displayDuration?: string;
       linkUrl?: string;
+      groupId?: string;
+      startIndex?: string;
+      totalImages?: string;
     };
     if (!baseName?.trim()) {
       return res.status(400).json({ message: "Nome base campagna obbligatorio" });
     }
     const duration = parseInt(displayDuration ?? "10") || 10;
     const { randomUUID } = await import("crypto");
-    const batchGroupId = files.length > 1 ? randomUUID() : null;
+    const startIndex = parseInt(startIndexStr ?? "0") || 0;
+    const totalImages = parseInt(totalImagesStr ?? "0") || files.length;
+    const batchGroupId = externalGroupId?.trim() || (files.length > 1 ? randomUUID() : null);
 
     const BULK_CONCURRENCY = 10;
     const results = await allSettledLimited<BulkCampaignResult>(
@@ -1485,10 +1490,11 @@ router.post("/advertisements/bulk", adUpload.array("images", 50), async (req: Re
         if (file.size > BULK_AD_MAX_FILE_SIZE) {
           throw new Error(`${file.originalname} (troppo grande, max 5MB)`);
         }
+        const globalIndex = startIndex + i;
         const campaignName =
-          files.length === 1
+          totalImages === 1
             ? baseName.trim()
-            : `${baseName.trim()} #${i + 1}`;
+            : `${baseName.trim()} #${globalIndex + 1}`;
         const imageUrl = await uploadAdImageToObjectStorage(file.buffer, file.originalname, file.mimetype);
         const campaign = await storage.createAdCampaign({
           name: campaignName,

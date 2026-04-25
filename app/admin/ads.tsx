@@ -508,50 +508,61 @@ export default function AdminAds() {
   async function handleBulkCreate() {
     if (!bulkBaseName.trim() || bulkImages.length === 0 || bulkUploading) return;
     setBulkUploading(true);
-    setBulkProgress({ current: 0, total: bulkImages.length });
+    const totalImages = bulkImages.length;
+    setBulkProgress({ current: 0, total: totalImages });
     let created = 0;
     let failed = 0;
     const failedNames: string[] = [];
     const bulkUrl = new URL("/api/admin/advertisements/bulk", getApiUrl()).toString();
     const duration = String(parseInt(bulkDuration) || 10);
-    const formData = new FormData();
-    formData.append("baseName", bulkBaseName.trim());
-    formData.append("targetUserType", bulkTarget);
-    formData.append("displayDuration", duration);
-    if (bulkLinkUrl.trim()) formData.append("linkUrl", bulkLinkUrl.trim());
-    for (let i = 0; i < bulkImages.length; i++) {
-      const img = bulkImages[i];
-      const filename = img.fileName || img.uri.split("/").pop() || "image.jpg";
-      const rawMime = img.mimeType || (() => {
-        const m = /\.(\w+)$/.exec(filename);
-        return m ? `image/${m[1].toLowerCase()}` : "image/jpeg";
-      })();
-      const normalised = ["image/jpg", "image/jpe", "image/jfif"].includes(rawMime)
-        ? "image/jpeg"
-        : rawMime;
-      formData.append("images", { uri: img.uri, name: filename, type: normalised } as any);
-    }
-    try {
-      const res = await globalThis.fetch(bulkUrl, {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        failed = bulkImages.length;
-        console.warn(`[bulk] http ${res.status}: ${text}`);
-      } else {
-        const data: BulkUploadResponse = await res.json();
-        created = data.created ?? 0;
-        failed = data.failed ?? 0;
-        if (data.failedFiles?.length) failedNames.push(...data.failedFiles);
+    const batchGroupId = Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+    const CHUNK_SIZE = 10;
+
+    for (let chunkStart = 0; chunkStart < totalImages; chunkStart += CHUNK_SIZE) {
+      const chunk = bulkImages.slice(chunkStart, chunkStart + CHUNK_SIZE);
+      const formData = new FormData();
+      formData.append("baseName", bulkBaseName.trim());
+      formData.append("targetUserType", bulkTarget);
+      formData.append("displayDuration", duration);
+      formData.append("groupId", batchGroupId);
+      formData.append("startIndex", String(chunkStart));
+      formData.append("totalImages", String(totalImages));
+      if (bulkLinkUrl.trim()) formData.append("linkUrl", bulkLinkUrl.trim());
+      for (let i = 0; i < chunk.length; i++) {
+        const img = chunk[i];
+        const filename = img.fileName || img.uri.split("/").pop() || "image.jpg";
+        const rawMime = img.mimeType || (() => {
+          const m = /\.(\w+)$/.exec(filename);
+          return m ? `image/${m[1].toLowerCase()}` : "image/jpeg";
+        })();
+        const normalised = ["image/jpg", "image/jpe", "image/jfif"].includes(rawMime)
+          ? "image/jpeg"
+          : rawMime;
+        formData.append("images", { uri: img.uri, name: filename, type: normalised } as any);
       }
-    } catch (err) {
-      console.error("[bulk] fetch error:", err);
-      failed = bulkImages.length;
+      try {
+        const res = await globalThis.fetch(bulkUrl, {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          failed += chunk.length;
+          console.warn(`[bulk] http ${res.status}: ${text}`);
+        } else {
+          const data: BulkUploadResponse = await res.json();
+          created += data.created ?? 0;
+          failed += data.failed ?? 0;
+          if (data.failedFiles?.length) failedNames.push(...data.failedFiles);
+        }
+      } catch (err) {
+        console.error("[bulk] fetch error:", err);
+        failed += chunk.length;
+      }
+      setBulkProgress({ current: Math.min(chunkStart + CHUNK_SIZE, totalImages), total: totalImages });
     }
-    setBulkProgress({ current: bulkImages.length, total: bulkImages.length });
+    setBulkProgress({ current: totalImages, total: totalImages });
     queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
     queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
     queryClient.invalidateQueries({ queryKey: ["/api/ads/my-ads"] });
