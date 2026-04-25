@@ -14,8 +14,9 @@ description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
 - **Canale EAS**: `preview`
-- **Runtime Version**: `7.0.0` (ciclo corrente, APK v29)
-- **APK corrente**: versionCode **29** (expo-notifications nativo, build EAS: 2680c671-a1d5-494b-943b-7d0bccc96725)
+- **Runtime Version**: `7.0.0` (ciclo corrente, APK v37)
+- **APK corrente**: versionCode **37**, versionName **2.3.0** (build EAS: non catturato — inviato con --no-wait, apkUrl: n/d. Consultare https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds per recuperare il build ID reale)
+- **OTA corrente**: OTA-152 (ultima stabile, pubblicata 2026-04-25)
 - **Utenti**: su Android fisico via APK — NON usano il dev server
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
@@ -52,7 +53,7 @@ export const CURRENT_OTA_NUMBER = <VECCHIO>;  // → <NUOVO>
 Il commento sopra va tenuto generico:
 ```typescript
 // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-// Ciclo 7.0.0 — APK v29 — aggiornare ad ogni nuova OTA pubblicata
+// Ciclo 7.0.0 — APK v37 — aggiornare ad ogni nuova OTA pubblicata
 export const CURRENT_OTA_NUMBER = 56;
 ```
 
@@ -76,7 +77,7 @@ Marcare la entry precedente come `"status": "superseded"`, poi aggiungere in fon
   "commitBase": "<hash git completo da passo 2>",
   "easDashboard": null,
   "apkBuildId": null,
-  "apkVersionCode": 28,
+  "apkVersionCode": 37,
   "apkUrl": null,
   "status": "pending"
 }
@@ -122,13 +123,21 @@ Tutti i check devono essere ✔. Il warning sui cicli multipli (2.0.0, 3.0.0, 4.
 ## Cosa fare se EAS va in timeout
 Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare una nuova OTA con numero N+1 alla prossima occasione — **non** eseguire `eas-cli` manualmente.
 
+## ⚠️ Nota: APK build ID e URL dopo --no-wait
+`scripts/build-apk.sh` invia la build con `--no-wait` e **non cattura** il build ID restituito da EAS. Dopo ogni nuova build APK, recuperare manualmente il build ID e l'URL del file `.apk` da https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds e aggiornarli in `ota-updates.json` nella entry più recente del ciclo corrente:
+```json
+"apkBuildId": "<UUID-da-EAS-dashboard>",
+"apkUrl": "https://expo.dev/artifacts/eas/<hash>.apk"
+```
+Questo previene lacune documentali come quella di APK v37 (build ID mai registrato).
+
 ## Numerazione versioni
 | OTA | Script version |
 |-----|---------------|
-| 108 | 1.108.0       | ← superseded
-| 109 | 1.109.0       | ← superseded
-| 110 | 1.110.0       | ← pubblicata (corrente)
-| 111 | 1.111.0       |
+| 150 | 1.150.0       | ← superseded
+| 151 | 1.151.0       | ← superseded
+| 152 | 1.152.0       | ← pubblicata (corrente)
+| 153 | 1.153.0       |
 
 ## Cicli precedenti (storico)
 - Ciclo 2.x: OTA 1–21, 23 (APK versionCode 4–6, rv 2.0.0)
@@ -136,7 +145,7 @@ Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare 
 - Ciclo 4.x: OTA 37–40 (APK versionCode 10, rv 4.0.0)
 - Ciclo 5.x: OTA 41 (APK versionCode 11, rv 5.0.0) — DEPRECATO (crash expo-location plugin)
 - Ciclo 6.x: OTA 42–43 (APK versionCode 12, rv 6.0.0) — OBSOLETO (utenti devono aggiornare APK)
-- Ciclo 7.x: OTA 44–67+ (APK versionCode 13→29, rv 7.0.0) ← CORRENTE
+- Ciclo 7.x: OTA 44–152+ (APK versionCode 13→37, rv 7.0.0) ← CORRENTE
   - APK v13: FAILED (react-native-maps 1.27.2 — causa esatta sconosciuta, diagnosi errata al momento)
   - APK v14: FAILED (newArchEnabled=true + react-native-maps 1.18.0 → incompatibili, fix in app.json ignorato)
   - APK v15: FAILED (fix newArchEnabled=false in app.json → ignorato, bare workflow usa gradle.properties)
@@ -148,7 +157,9 @@ Lo script lo segnala ma non blocca. Il bundle custom è già attivo. Pubblicare 
   - APK v20: FAILED — fix strings.xml runtimeVersion 7.0.0 + rimozione ACCESS_BACKGROUND_LOCATION + rollback completo Task #564
   - APK v21–v27: build successive fino alla versione stabile
   - APK v28: STABILE — background location tracking (Task #607) + OTA 53–62
-  - APK v29: STABILE — expo-notifications nativo + versionCode 29 + versionName 1.9.4 (EAS: 2680c671, APK: https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk) + OTA 63–64–65–66–67
+  - APK v29: STABILE — expo-notifications nativo + versionCode 29 + versionName 1.9.4 (EAS: 2680c671, APK: https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk) + OTA 63–67
+  - APK v30–v36: build intermedie successive (vedi ota-updates.json per dettagli per ciclo)
+  - APK v37: STABILE — versionName 2.3.0, build inviata con --no-wait (build ID non catturato in log; recuperare da https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds) + OTA 151–152 ← APK CORRENTE
 
 ## ⚠️ ANALISI ARCHITETTURA (DEFINITIVA)
 React Native 0.82+ ha rimosso il supporto Old Architecture. Il flag newArchEnabled=false
