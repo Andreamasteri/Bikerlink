@@ -4542,7 +4542,9 @@
     "message": "OTA-146: Gestione campagne pubblicitarie — groupId bulk upload, linkUrl bulk, pulsante modifica singola (nome+link), modifica gruppo, Elimina tutte, BackHandler Android",
     "publishedAt": "2026-04-24",
     "runtimeVersion": "7.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "note": "Task #911 — 6 feature admin/ads.tsx: (1) bulk upload assegna groupId condiviso, (2) campo linkUrl nel bulk modal, (3) pulsante modifica campagna singola (nome+linkUrl), (4) modal modifica gruppo per campagne raggruppate, (5) pulsante Elimina tutte con conferma, (6) BackHandler Android in admin/ads.tsx e moderator/campaigns.tsx. CURRENT_OTA_NUMBER=146.",
     "releaseId": "dff157f8-f2cc-49ff-9fb3-7c50b3f3e4fe",
@@ -4566,7 +4568,9 @@
     "message": "OTA-147 rv7.0.0: Admin UI campagne — group toggle attiva/disattiva + section headers con collapse",
     "publishedAt": "2026-04-24",
     "runtimeVersion": "7.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "note": "Task #912: Switch 'Attiva tutte / Disattiva tutte' nel modal di modifica gruppo campagne (dirty-flag pattern, isActive opzionale nel PUT /advertisements/group/:groupId). Task #913: GroupHeader component nella FlatList admin campagne — status dot colorato, chevron collapse/expand, shortcut modifica gruppo. collapsedGroups Set<string> + groupMeta O(n) precomputed. CURRENT_OTA_NUMBER=147.",
     "releaseId": "d1095a0a-11e8-4769-b78d-4651298e1ce4",
@@ -4616,7 +4620,9 @@
     "message": "OTA-149 rv7.0.0: Pop-up aggiornamento app — controllo versione nativa Play Store e App Store",
     "publishedAt": "2026-04-25",
     "runtimeVersion": "7.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "note": "Task #930: NativeUpdateChecker component — controlla all'avvio la versione installata contro il backend admin (GET /api/settings/native-version). Mostra modale soft-update (chiudibile) o force-update (non chiudibile) basandosi su latestVersion/minVersion configurabili dall'admin. Pannello admin in system.tsx con TextInput per Android/iOS versione corrente, minima, URL store. Backend: PUT /api/admin/settings/native-version salva in appSettings. Nessuna libreria esterna. CURRENT_OTA_NUMBER=149.",
     "releaseId": "1e8a9371-708b-4929-8659-00fdad1d3694",
@@ -4640,7 +4646,9 @@
     "message": "OTA-150 rv7.0.0: Semaphore concorrenza match, 503 busy, metriche server",
     "publishedAt": "2026-04-25",
     "runtimeVersion": "7.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "note": "Supercede OTA-149 (EAS mancante). Include: Task #928 semaphore globale 5 concorrenti su /garage-matches e /biker-matches; Task #932 risposta 503 JSON quando coda piena (SemaphoreQueueFullError); Task #933 endpoint GET /api/metrics + log periodico ogni 60s activeCount/pendingCount. Frontend invariato rispetto a OTA-149 (NativeUpdateChecker + admin versioni native). CURRENT_OTA_NUMBER=150.",
     "releaseId": "509aafbe-f083-4105-a774-e719b1f007a8",
@@ -4652,6 +4660,32 @@
     "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/98f92892-16ae-4ab3-b0ff-e3a1984aebe9",
     "apkBuildId": null,
     "apkVersionCode": 36,
+    "apkUrl": null,
+    "status": "published"
+  },
+  {
+    "updateNumber": 151,
+    "version": "1.151.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-151 rv7.0.0: Fix bulk upload campagne — batch da 10",
+    "publishedAt": "2026-04-25",
+    "runtimeVersion": "7.0.0",
+    "platforms": [
+      "android"
+    ],
+    "jsEngine": "hermes",
+    "note": "Fix bulk upload admin campagne (Task #942): il frontend suddivide le immagini in batch da 10 per richiesta HTTP, evitando timeout su upload massivi >23 file. Backend: limite multer ridotto a 10 file/request, groupId accettato da client. CURRENT_OTA_NUMBER=151.",
+    "releaseId": "c899669f-cded-43f6-9718-e27fe907c7c6",
+    "bundleUrl": "private/ota/ota-1.151.0-1777122142441.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "4f70e013deaf230f1221112c14f684d3b096815e",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 37,
     "apkUrl": null,
     "status": "published"
   }
