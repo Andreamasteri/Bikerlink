@@ -4605,6 +4605,30 @@
     "apkBuildId": null,
     "apkVersionCode": 35,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 149,
+    "version": "1.149.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-149 rv7.0.0: Pop-up aggiornamento app — controllo versione nativa Play Store e App Store",
+    "publishedAt": "2026-04-25",
+    "runtimeVersion": "7.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Task #930: NativeUpdateChecker component — controlla all'avvio la versione installata contro il backend admin (GET /api/settings/native-version). Mostra modale soft-update (chiudibile) o force-update (non chiudibile) basandosi su latestVersion/minVersion configurabili dall'admin. Pannello admin in system.tsx con TextInput per Android/iOS versione corrente, minima, URL store. Backend: PUT /api/admin/settings/native-version salva in appSettings. Nessuna libreria esterna. CURRENT_OTA_NUMBER=149.",
+    "releaseId": "1e8a9371-708b-4929-8659-00fdad1d3694",
+    "bundleUrl": "private/ota/ota-1.149.0-1777105355265.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "ac458457561fa6bbda6deae1093e2b4a84aa97ac",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 36,
+    "apkUrl": null,
     "status": "published"
   }
 ]

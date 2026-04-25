@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Platform,
   ActivityIndicator,
+  TextInput,
+  Alert,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useNavigation } from "expo-router";
 import otaUpdatesRaw from "@/ota-updates.json";
+import { getApiUrl } from "@/lib/query-client";
 
 interface OtaUpdateEntry {
   updateNumber: number;
@@ -116,10 +119,61 @@ function eventLabel(type: string): string {
   }
 }
 
+interface NativeVersionConfig {
+  android: { latestVersion: string; minVersion: string; storeUrl: string };
+  ios: { latestVersion: string; minVersion: string; storeUrl: string };
+}
+
 export default function SystemScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const [backendUptimeSec, setBackendUptimeSec] = useState<number>(0);
+
+  const [nativeAndroidLatest, setNativeAndroidLatest] = useState("");
+  const [nativeAndroidMin, setNativeAndroidMin] = useState("");
+  const [nativeAndroidUrl, setNativeAndroidUrl] = useState("");
+  const [nativeIosLatest, setNativeIosLatest] = useState("");
+  const [nativeIosMin, setNativeIosMin] = useState("");
+  const [nativeIosUrl, setNativeIosUrl] = useState("");
+  const [savingNative, setSavingNative] = useState(false);
+
+  const { data: nativeVerData } = useQuery<NativeVersionConfig>({
+    queryKey: ["/api/settings/native-version"],
+  });
+
+  useEffect(() => {
+    if (!nativeVerData) return;
+    setNativeAndroidLatest(nativeVerData.android.latestVersion);
+    setNativeAndroidMin(nativeVerData.android.minVersion);
+    setNativeAndroidUrl(nativeVerData.android.storeUrl);
+    setNativeIosLatest(nativeVerData.ios.latestVersion);
+    setNativeIosMin(nativeVerData.ios.minVersion);
+    setNativeIosUrl(nativeVerData.ios.storeUrl);
+  }, [nativeVerData]);
+
+  const saveNativeVersion = useCallback(async () => {
+    setSavingNative(true);
+    try {
+      const res = await fetch(
+        new URL("/api/admin/settings/native-version", getApiUrl()).toString(),
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            android: { latestVersion: nativeAndroidLatest, minVersion: nativeAndroidMin, storeUrl: nativeAndroidUrl },
+            ios: { latestVersion: nativeIosLatest, minVersion: nativeIosMin, storeUrl: nativeIosUrl },
+          }),
+        }
+      );
+      if (!res.ok) throw new Error("Errore server");
+      Alert.alert("Salvato", "Configurazione versioni native aggiornata.");
+    } catch {
+      Alert.alert("Errore", "Impossibile salvare la configurazione.");
+    } finally {
+      setSavingNative(false);
+    }
+  }, [nativeAndroidLatest, nativeAndroidMin, nativeAndroidUrl, nativeIosLatest, nativeIosMin, nativeIosUrl]);
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery<SystemHealth>({
     queryKey: ["/api/admin/system-health"],
@@ -297,6 +351,96 @@ export default function SystemScreen() {
                 </Text>
               </View>
             ))}
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="phone-portrait-outline" size={18} color={Colors.accent} />
+              <Text style={styles.cardTitle}>Versioni Native</Text>
+            </View>
+            <Text style={styles.nativeLabel}>Android</Text>
+            <View style={styles.nativeRow}>
+              <View style={styles.nativeField}>
+                <Text style={styles.nativeFieldLabel}>Ultima</Text>
+                <TextInput
+                  style={styles.nativeInput}
+                  value={nativeAndroidLatest}
+                  onChangeText={setNativeAndroidLatest}
+                  placeholder="2.2.0"
+                  placeholderTextColor={Colors.textMuted ?? "#666"}
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                />
+              </View>
+              <View style={styles.nativeField}>
+                <Text style={styles.nativeFieldLabel}>Minima</Text>
+                <TextInput
+                  style={styles.nativeInput}
+                  value={nativeAndroidMin}
+                  onChangeText={setNativeAndroidMin}
+                  placeholder="1.0.0"
+                  placeholderTextColor={Colors.textMuted ?? "#666"}
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+            <TextInput
+              style={[styles.nativeInput, { marginBottom: 12 }]}
+              value={nativeAndroidUrl}
+              onChangeText={setNativeAndroidUrl}
+              placeholder="URL Play Store"
+              placeholderTextColor={Colors.textMuted ?? "#666"}
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            <Text style={styles.nativeLabel}>iOS</Text>
+            <View style={styles.nativeRow}>
+              <View style={styles.nativeField}>
+                <Text style={styles.nativeFieldLabel}>Ultima</Text>
+                <TextInput
+                  style={styles.nativeInput}
+                  value={nativeIosLatest}
+                  onChangeText={setNativeIosLatest}
+                  placeholder="2.2.0"
+                  placeholderTextColor={Colors.textMuted ?? "#666"}
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                />
+              </View>
+              <View style={styles.nativeField}>
+                <Text style={styles.nativeFieldLabel}>Minima</Text>
+                <TextInput
+                  style={styles.nativeInput}
+                  value={nativeIosMin}
+                  onChangeText={setNativeIosMin}
+                  placeholder="1.0.0"
+                  placeholderTextColor={Colors.textMuted ?? "#666"}
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+            <TextInput
+              style={[styles.nativeInput, { marginBottom: 16 }]}
+              value={nativeIosUrl}
+              onChangeText={setNativeIosUrl}
+              placeholder="URL App Store"
+              placeholderTextColor={Colors.textMuted ?? "#666"}
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              style={[styles.nativeSaveBtn, savingNative && { opacity: 0.6 }]}
+              onPress={saveNativeVersion}
+              disabled={savingNative}
+            >
+              {savingNative ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.nativeSaveBtnText}>Salva configurazione</Text>
+              )}
+            </TouchableOpacity>
           </View>
 
           <Text style={styles.sectionTitle}>Ultimi eventi ({mergedEvents.length})</Text>
@@ -480,5 +624,50 @@ const styles = StyleSheet.create({
     color: Colors.textMuted ?? "#888",
     fontFamily: "Inter_400Regular",
     fontSize: 11,
+  },
+  nativeLabel: {
+    color: Colors.accent,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  nativeRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 8,
+  },
+  nativeField: {
+    flex: 1,
+  },
+  nativeFieldLabel: {
+    color: Colors.textMuted ?? "#888",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    marginBottom: 4,
+  },
+  nativeInput: {
+    backgroundColor: Colors.background,
+    color: Colors.text,
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: Colors.border ?? "#333",
+  },
+  nativeSaveBtn: {
+    backgroundColor: Colors.accent,
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: "center",
+  },
+  nativeSaveBtnText: {
+    color: "#fff",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
   },
 });

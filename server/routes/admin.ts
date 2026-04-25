@@ -4597,6 +4597,37 @@ router.delete("/drive/cleanup-exports", async (_req: Request, res: Response) => 
   }
 });
 
+router.put("/settings/native-version", async (req: Request, res: Response) => {
+  try {
+    const { android, ios } = req.body as {
+      android: { latestVersion: string; minVersion: string; storeUrl: string };
+      ios: { latestVersion: string; minVersion: string; storeUrl: string };
+    };
+    if (!android || !ios) {
+      return res.status(400).json({ message: "Payload non valido: android e ios richiesti" });
+    }
+    await Promise.all([
+      storage.upsertAppSetting("native_android_latest", android.latestVersion),
+      storage.upsertAppSetting("native_android_min", android.minVersion),
+      storage.upsertAppSetting("native_android_store_url", android.storeUrl),
+      storage.upsertAppSetting("native_ios_latest", ios.latestVersion),
+      storage.upsertAppSetting("native_ios_min", ios.minVersion),
+      storage.upsertAppSetting("native_ios_store_url", ios.storeUrl),
+    ]);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_setting",
+      targetType: "app_setting",
+      targetId: "native_version_config",
+      details: `Android ${android.latestVersion}/${android.minVersion}, iOS ${ios.latestVersion}/${ios.minVersion}`,
+    } as any);
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("Admin native-version update error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 // Protected by router.use(requireAdmin) above — only admins can access
 router.get("/gps-errors", async (req: Request, res: Response) => {
   try {

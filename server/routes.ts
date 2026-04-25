@@ -629,6 +629,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/native-version", async (_req, res) => {
+    try {
+      const [androidLatest, androidMin, androidUrl, iosLatest, iosMin, iosUrl] = await Promise.all([
+        storage.getAppSetting("native_android_latest"),
+        storage.getAppSetting("native_android_min"),
+        storage.getAppSetting("native_android_store_url"),
+        storage.getAppSetting("native_ios_latest"),
+        storage.getAppSetting("native_ios_min"),
+        storage.getAppSetting("native_ios_store_url"),
+      ]);
+      return res.json({
+        android: {
+          latestVersion: androidLatest?.value || "1.0.0",
+          minVersion: androidMin?.value || "1.0.0",
+          storeUrl: androidUrl?.value || "https://play.google.com/store/apps/details?id=com.bikerlink.app",
+        },
+        ios: {
+          latestVersion: iosLatest?.value || "1.0.0",
+          minVersion: iosMin?.value || "1.0.0",
+          storeUrl: iosUrl?.value || "https://apps.apple.com/app/bikerlink",
+        },
+      });
+    } catch {
+      return res.json({
+        android: { latestVersion: "1.0.0", minVersion: "1.0.0", storeUrl: "https://play.google.com/store/apps/details?id=com.bikerlink.app" },
+        ios: { latestVersion: "1.0.0", minVersion: "1.0.0", storeUrl: "https://apps.apple.com/app/bikerlink" },
+      });
+    }
+  });
+
   app.get("/api/settings/splash", async (_req, res) => {
     try {
       const [modeSetting, messageSetting, listSetting] = await Promise.all([
