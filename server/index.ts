@@ -1127,18 +1127,58 @@ function setupErrorHandler(app: express.Application) {
         console.log("[INIT] Phase 8 ad image cleanup job scheduled (5min delay, then every 24h)");
 
         // Phase 9 — periodic semaphore queue-depth metrics (every 60s)
+        //
+        // PRESSURE_ALERT_THRESHOLD (env: PRESSURE_ALERT_THRESHOLD, default 3):
+        //   Number of consecutive 60-second intervals where pendingCount > 0
+        //   before a WARNING-level alert is emitted.  Set to 1 to alert on the
+        //   very first queued interval; set higher to tolerate brief spikes.
         const METRICS_INTERVAL_MS = 60_000;
+        const PRESSURE_ALERT_THRESHOLD = (() => {
+          const val = parseInt(process.env.PRESSURE_ALERT_THRESHOLD ?? "", 10);
+          return isNaN(val) || val < 1 ? 3 : val;
+        })();
+        let consecutivePressureCount = 0;
+        // alertFiredThisEpisode prevents repeat [ALERT] logs during sustained pressure.
+        // The alert fires exactly once when the threshold is first crossed; it resets
+        // only when pressure clears so a second episode triggers a fresh alert.
+        let alertFiredThisEpisode = false;
         const logSemaphoreMetrics = () => {
           const active = matchEnrichmentSemaphore.activeCount;
           const pending = matchEnrichmentSemaphore.pendingCount;
           const limit = MATCH_ENRICHMENT_GLOBAL_LIMIT;
-          const pressure = pending > 0 ? " ⚠ PRESSURE" : "";
-          console.log(
-            `[METRICS] matchEnrichmentSemaphore — active=${active}/${limit} pending=${pending}${pressure}`
-          );
+
+          if (pending > 0) {
+            consecutivePressureCount++;
+            const pressure = ` ⚠ PRESSURE (consecutive=${consecutivePressureCount}/${PRESSURE_ALERT_THRESHOLD})`;
+            console.log(
+              `[METRICS] matchEnrichmentSemaphore — active=${active}/${limit} pending=${pending}${pressure}`
+            );
+            if (consecutivePressureCount >= PRESSURE_ALERT_THRESHOLD && !alertFiredThisEpisode) {
+              alertFiredThisEpisode = true;
+              console.warn(
+                `[ALERT] matchEnrichmentSemaphore has been under pressure for ${consecutivePressureCount} consecutive interval(s) ` +
+                `(pending=${pending}, limit=${limit}). ` +
+                `Consider raising MATCH_ENRICHMENT_CONCURRENCY or scaling the server.`
+              );
+            }
+          } else {
+            if (consecutivePressureCount > 0) {
+              console.log(
+                `[METRICS] matchEnrichmentSemaphore — pressure cleared after ${consecutivePressureCount} consecutive interval(s)`
+              );
+            } else {
+              console.log(
+                `[METRICS] matchEnrichmentSemaphore — active=${active}/${limit} pending=${pending}`
+              );
+            }
+            consecutivePressureCount = 0;
+            alertFiredThisEpisode = false;
+          }
         };
         setInterval(logSemaphoreMetrics, METRICS_INTERVAL_MS);
-        console.log("[INIT] Phase 9 semaphore metrics logger started (every 60s)");
+        console.log(
+          `[INIT] Phase 9 semaphore metrics logger started (every 60s, alert after ${PRESSURE_ALERT_THRESHOLD} consecutive pressure intervals — override with PRESSURE_ALERT_THRESHOLD env var)`
+        );
       })().catch((err) => {
         console.error("[INIT] Startup phase chain error:", err);
         initState.initializing = false;
