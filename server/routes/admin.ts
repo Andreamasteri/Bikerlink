@@ -1644,7 +1644,7 @@ router.delete("/advertisements/bulk-delete", async (req: Request, res: Response)
       moderatorId: req.session.userId!,
       action: "bulk_delete_advertisements",
       targetType: "campaign",
-      targetId: ids.join(",").substring(0, 200),
+      targetId: ids[0] ?? "bulk",
       details: `Eliminate ${ids.length} campagne in blocco`,
     });
     return res.json({ deleted: ids.length });
