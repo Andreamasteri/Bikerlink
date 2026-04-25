@@ -3768,6 +3768,7 @@ router.post("/translations/export", async (req: Request, res: Response) => {
     let createResp: Awaited<ReturnType<typeof drive.files.create>>;
     try {
       createResp = await drive.files.create({
+        supportsAllDrives: true,
         requestBody: {
           name: spreadsheetTitle,
           mimeType: "application/vnd.google-apps.spreadsheet",
@@ -3780,10 +3781,8 @@ router.post("/translations/export", async (req: Request, res: Response) => {
         fields: "id,name",
       });
     } catch (createErr: any) {
-      console.error("[translations/export] Drive create error — code:", createErr?.code, "errors:", JSON.stringify(createErr?.errors ?? []));
-      const isQuota =
-        createErr?.errors?.some((e: any) => e.reason === "storageQuotaExceeded") ||
-        createErr?.message?.toLowerCase().includes("quota");
+      console.error("[translations/export] Drive create error — code:", createErr?.code, "errors:", JSON.stringify(createErr?.errors ?? []), "message:", createErr?.message);
+      const isQuota = createErr?.errors?.some((e: any) => e.reason === "storageQuotaExceeded");
       if (isQuota) {
         return res.status(507).json({
           message: "Quota Drive esaurita. Vai in Admin → Traduzioni → 'Pulisci file Drive' per liberare spazio.",
@@ -3791,7 +3790,7 @@ router.post("/translations/export", async (req: Request, res: Response) => {
       }
       const isPermission =
         createErr?.errors?.some((e: any) =>
-          ["forbidden", "insufficientPermissions", "notFound"].includes(e.reason)
+          ["forbidden", "insufficientPermissions", "notFound", "teamDriveFileLimitExceeded"].includes(e.reason)
         ) ||
         createErr?.code === 403;
       if (isPermission) {
