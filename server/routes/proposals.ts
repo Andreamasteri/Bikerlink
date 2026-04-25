@@ -4,7 +4,7 @@ import { db } from "../db";
 import { motoClubMembers } from "@shared/schema";
 import { and, eq } from "drizzle-orm";
 import { runMatchingForUser, runProposalMatchingForUser } from "../matching-engine";
-import { allLimited } from "../lib/concurrency";
+import { allLimited, matchEnrichmentSemaphore } from "../lib/concurrency";
 
 const router = Router();
 
@@ -135,6 +135,7 @@ router.get("/matches", requireAuth, async (req: Request, res: Response) => {
 });
 
 router.get("/garage-matches", requireAuth, async (req: Request, res: Response) => {
+  await matchEnrichmentSemaphore.run(async () => {
   try {
     const userId = req.session.userId!;
     const blockedIds = new Set(await storage.getBlockedUserIds(userId));
@@ -245,6 +246,7 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
     console.error("Get garage matches error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
+  }); // matchEnrichmentSemaphore.run
 });
 
 router.post("/garage-matches/:id/accept", requireAuth, async (req: Request, res: Response) => {
@@ -393,6 +395,7 @@ router.post("/matches/:id/reject", requireAuth, async (req: Request, res: Respon
 });
 
 router.get("/biker-matches", requireAuth, async (req: Request, res: Response) => {
+  await matchEnrichmentSemaphore.run(async () => {
   try {
     const userId = req.session.userId!;
     const blockedIds = new Set(await storage.getBlockedUserIds(userId));
@@ -497,6 +500,7 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
     console.error("Get biker-biker matches error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
+  }); // matchEnrichmentSemaphore.run
 });
 
 router.post("/biker-matches/:id/accept", requireAuth, async (req: Request, res: Response) => {

@@ -45,3 +45,77 @@ export async function allLimited<T>(
   }
   return results;
 }
+
+/**
+ * A lightweight semaphore that bounds the number of concurrently running async
+ * operations server-wide.  Excess callers are queued (FIFO) and resume as slots
+ * become available.
+ */
+export class Semaphore {
+  private running = 0;
+  private readonly queue: (() => void)[] = [];
+
+  constructor(private readonly max: number) {
+    if (max < 1) throw new RangeError(`Semaphore: max must be >= 1, got ${max}`);
+  }
+
+  /** Acquire a slot.  Resolves immediately if capacity is available, otherwise waits. */
+  acquire(): Promise<void> {
+    if (this.running < this.max) {
+      this.running++;
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      this.queue.push(resolve);
+    });
+  }
+
+  /** Release the slot back to the pool, unblocking the next queued waiter if any. */
+  release(): void {
+    const next = this.queue.shift();
+    if (next) {
+      next();
+    } else {
+      this.running--;
+    }
+  }
+
+  /** Convenience wrapper: acquire → run fn → release (even on error). */
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    await this.acquire();
+    try {
+      return await fn();
+    } finally {
+      this.release();
+    }
+  }
+
+  /** Number of requests currently holding a slot. */
+  get activeCount(): number {
+    return this.running;
+  }
+
+  /** Number of requests waiting for a slot. */
+  get pendingCount(): number {
+    return this.queue.length;
+  }
+}
+
+/**
+ * Global concurrency limit for the heavy match-enrichment routes
+ * (/garage-matches, /biker-matches).
+ *
+ * Override with the MATCH_ENRICHMENT_CONCURRENCY environment variable.
+ * Default: 5 simultaneous requests server-wide.
+ */
+export const MATCH_ENRICHMENT_GLOBAL_LIMIT = (() => {
+  const val = parseInt(process.env.MATCH_ENRICHMENT_CONCURRENCY ?? "", 10);
+  return isNaN(val) || val < 1 ? 5 : val;
+})();
+
+/**
+ * Shared semaphore instance used by /garage-matches and /biker-matches routes.
+ * At most MATCH_ENRICHMENT_GLOBAL_LIMIT of those handlers will execute their
+ * enrichment work concurrently across all connected users.
+ */
+export const matchEnrichmentSemaphore = new Semaphore(MATCH_ENRICHMENT_GLOBAL_LIMIT);
