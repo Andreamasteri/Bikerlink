@@ -6,6 +6,10 @@ import { useAuth } from "@/lib/auth-context";
 
 const SEEN_KEY = "bikerlink:seenMatchIds";
 
+function namespacedId(source: string, id: string | number): string {
+  return `${source}:${id}`;
+}
+
 export function useNewMatchAlert() {
   const { user } = useAuth();
   const [visible, setVisible] = useState(false);
@@ -33,7 +37,7 @@ export function useNewMatchAlert() {
 
   const processSource = (sourceKey: string, items: Array<{ id: string | number }> | undefined) => {
     if (!seenLoaded || !items) return;
-    const ids = items.map((m) => String(m.id));
+    const ids = items.map((m) => namespacedId(sourceKey, m.id));
     if (!initializedSources.current.has(sourceKey)) {
       addSeen(ids);
       initializedSources.current.add(sourceKey);
