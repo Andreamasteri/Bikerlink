@@ -579,10 +579,66 @@ export default function TraduzioniScreen() {
   const [cleanupLoading2, setCleanupLoading2] = useState(false);
   const [cleanupResult2, setCleanupResult2] = useState<string | null>(null);
 
+  const [driveConnected, setDriveConnected] = useState<boolean | null>(null);
+  const [driveEmail, setDriveEmail] = useState<string | null>(null);
+  const [driveStatusLoading, setDriveStatusLoading] = useState(false);
+  const [connectingDrive, setConnectingDrive] = useState(false);
+  const [disconnectingDrive, setDisconnectingDrive] = useState(false);
+
   useEffect(() => {
     loadImportInfo();
     loadPrefs();
+    loadOAuthStatus();
   }, []);
+
+  async function loadOAuthStatus() {
+    setDriveStatusLoading(true);
+    try {
+      const url = new URL("/api/admin/drive/oauth-status", getApiUrl());
+      const resp = await fetch(url.toString(), { credentials: "include" });
+      if (resp.ok) {
+        const data = await resp.json();
+        setDriveConnected(data.connected === true);
+        setDriveEmail(data.email ?? null);
+      } else {
+        setDriveConnected(false);
+      }
+    } catch {
+      setDriveConnected(false);
+    } finally {
+      setDriveStatusLoading(false);
+    }
+  }
+
+  async function handleConnectDrive() {
+    setConnectingDrive(true);
+    try {
+      const url = new URL("/api/admin/drive/oauth-start", getApiUrl());
+      const resp = await fetch(url.toString(), { credentials: "include" });
+      if (!resp.ok) throw new Error("Errore generazione URL");
+      const data = await resp.json();
+      if (data.authUrl) {
+        await Linking.openURL(data.authUrl);
+        setTimeout(() => {
+          loadOAuthStatus();
+          setConnectingDrive(false);
+        }, 4000);
+      }
+    } catch (e: any) {
+      setConnectingDrive(false);
+    }
+  }
+
+  async function handleDisconnectDrive() {
+    setDisconnectingDrive(true);
+    try {
+      const url = new URL("/api/admin/drive/oauth-disconnect", getApiUrl());
+      await fetch(url.toString(), { method: "DELETE", credentials: "include" });
+      setDriveConnected(false);
+      setDriveEmail(null);
+    } catch {}
+    setDisconnectingDrive(false);
+  }
 
   async function loadPrefs() {
     type PrefsResponse = {
@@ -959,6 +1015,60 @@ export default function TraduzioniScreen() {
         onPress={handlePrepare}
         resultText={prepareResult}
       />
+
+      <View style={styles.oauthBanner}>
+        {driveStatusLoading || driveConnected === null ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <ActivityIndicator size="small" color={Colors.accent} />
+            <Text style={styles.oauthBannerText}>Verifica connessione Drive...</Text>
+          </View>
+        ) : driveConnected ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, flexWrap: "wrap" }}>
+            <MaterialCommunityIcons name="check-circle" size={18} color="#4CAF50" />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.oauthBannerText, { color: "#4CAF50" }]}>Drive connesso</Text>
+              {driveEmail ? (
+                <Text style={[styles.oauthBannerSub, { color: "#4CAF50" }]}>{driveEmail}</Text>
+              ) : null}
+            </View>
+            <TouchableOpacity
+              onPress={handleDisconnectDrive}
+              disabled={disconnectingDrive}
+              style={styles.oauthDisconnectBtn}
+              activeOpacity={0.7}
+            >
+              {disconnectingDrive
+                ? <ActivityIndicator size="small" color="#888" />
+                : <Text style={styles.oauthDisconnectText}>Disconnetti</Text>
+              }
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={loadOAuthStatus}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialCommunityIcons name="refresh" size={16} color="#4CAF50" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, flexWrap: "wrap" }}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={18} color="#FF6600" />
+            <Text style={[styles.oauthBannerText, { color: "#FF6600", flex: 1 }]}>
+              Drive non connesso — l'export richiede autenticazione
+            </Text>
+            <TouchableOpacity
+              onPress={handleConnectDrive}
+              disabled={connectingDrive}
+              style={styles.oauthConnectBtn}
+              activeOpacity={0.7}
+            >
+              {connectingDrive
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={styles.oauthConnectText}>Connetti Google Drive</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
 
       <StepCard
         stepNumber={2}
@@ -1696,5 +1806,54 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textSecondary,
     marginTop: 6,
+  },
+  oauthBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1a1a1a",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 8,
+  },
+  oauthBannerText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.text,
+  },
+  oauthBannerSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    marginTop: 2,
+  },
+  oauthConnectBtn: {
+    backgroundColor: "#FF6600",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    minWidth: 48,
+    alignItems: "center",
+  },
+  oauthConnectText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: "#fff",
+  },
+  oauthDisconnectBtn: {
+    backgroundColor: "#2a2a2a",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    minWidth: 48,
+    alignItems: "center",
+  },
+  oauthDisconnectText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.textSecondary,
   },
 });

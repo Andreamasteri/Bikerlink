@@ -14,7 +14,14 @@ import { MOTORCYCLES, pickRandomN, getMotoYear } from "../mass-seed-data";
 import { getLastMatchingCycleMeta, runBikerBikerMatching, runWishlistMatching, runMatchingForUser } from "../matching-engine";
 import { isProtectedUser } from "../constants";
 import { SERVER_START_TIME, uptimeState } from "../uptime";
-import { getDriveClient } from "../lib/drive-client";
+import {
+  getDriveClient,
+  getDriveUserClient,
+  getDriveOAuthUrl,
+  handleDriveOAuthCallback,
+  getDriveOAuthStatus,
+  disconnectDriveOAuth,
+} from "../lib/drive-client";
 import { DRIVE_FOLDER_TRADUZIONI_ID } from "../backup-service";
 import { cacheAdImage } from "./ads";
 import { allSettledLimited } from "../lib/concurrency";
@@ -220,6 +227,41 @@ router.post("/startup-beacon", (req: Request, res: Response) => {
     return res.status(500).json({ message: "Errore interno" });
   }
 });
+
+router.get("/drive/oauth-callback", async (req: Request, res: Response) => {
+  const code = req.query.code as string | undefined;
+  if (!code) {
+    return res.status(400).send(oauthHtmlPage("Errore", "Parametro 'code' mancante. Riprova.", false));
+  }
+  try {
+    const { email } = await handleDriveOAuthCallback(code);
+    const emailMsg = email ? ` come <strong>${email}</strong>` : "";
+    return res.send(
+      oauthHtmlPage(
+        "Connessione riuscita!",
+        `Google Drive collegato${emailMsg}.<br>Puoi chiudere questa scheda e tornare all'app BikerLink.`,
+        true
+      )
+    );
+  } catch (err: any) {
+    console.error("[drive/oauth-callback] errore:", err?.message);
+    return res.status(500).send(
+      oauthHtmlPage("Errore", err?.message ?? "Errore interno. Riprova.", false)
+    );
+  }
+});
+
+function oauthHtmlPage(title: string, body: string, success: boolean): string {
+  const color = success ? "#4CAF50" : "#F44336";
+  const icon = success ? "✅" : "❌";
+  return `<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BikerLink — Google Drive</title>
+<style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0d0d0d;font-family:sans-serif;color:#fff}
+.card{background:#1e1e1e;border-radius:16px;padding:40px 32px;max-width:400px;text-align:center;border:2px solid ${color}}
+.icon{font-size:48px;margin-bottom:16px} h1{font-size:22px;margin:0 0 16px;color:${color}}
+p{font-size:15px;color:#ccc;line-height:1.6;margin:0}</style></head>
+<body><div class="card"><div class="icon">${icon}</div><h1>${title}</h1><p>${body}</p></div></body></html>`;
+}
 
 router.use(requireAdmin);
 
@@ -3753,11 +3795,21 @@ router.post("/translations/export", async (req: Request, res: Response) => {
       .map((row) => row.map(csvEscape).join(","))
       .join("\r\n");
 
-    const drive = getDriveClient();
+    let drive;
+    try {
+      drive = await getDriveUserClient();
+    } catch (connErr: any) {
+      if (connErr?.message === "GOOGLE_DRIVE_NOT_CONNECTED") {
+        return res.status(401).json({
+          message: "Google Drive non è connesso. Vai in Admin → Traduzioni e premi 'Connetti Google Drive'.",
+        });
+      }
+      throw connErr;
+    }
 
     if (TRANSLATIONS_STAGING.exportedFileId) {
       try {
-        await drive.files.delete({ fileId: TRANSLATIONS_STAGING.exportedFileId, supportsAllDrives: true });
+        await drive.files.delete({ fileId: TRANSLATIONS_STAGING.exportedFileId });
         console.log(`[translations/export] Vecchio file Drive eliminato: ${TRANSLATIONS_STAGING.exportedFileId}`);
       } catch (delErr: any) {
         console.warn(`[translations/export] Impossibile eliminare vecchio file ${TRANSLATIONS_STAGING.exportedFileId}:`, delErr?.message);
@@ -3768,7 +3820,6 @@ router.post("/translations/export", async (req: Request, res: Response) => {
     let createResp: Awaited<ReturnType<typeof drive.files.create>>;
     try {
       createResp = await drive.files.create({
-        supportsAllDrives: true,
         requestBody: {
           name: spreadsheetTitle,
           mimeType: "application/vnd.google-apps.spreadsheet",
@@ -3795,7 +3846,7 @@ router.post("/translations/export", async (req: Request, res: Response) => {
         createErr?.code === 403;
       if (isPermission) {
         return res.status(403).json({
-          message: "Il Service Account non ha permessi di scrittura sulla cartella Drive. Condividi la cartella con l'email del SA come Editor.",
+          message: "Permessi insufficienti su Google Drive. Riconnetti l'account tramite il pulsante 'Connetti Google Drive'.",
         });
       }
       throw createErr;
@@ -4562,21 +4613,27 @@ router.get("/drive/storage-info", async (_req: Request, res: Response) => {
 
 router.delete("/drive/cleanup-exports", async (_req: Request, res: Response) => {
   try {
-    const drive = getDriveClient();
+    let drive;
+    try {
+      drive = await getDriveUserClient();
+    } catch (connErr: any) {
+      if (connErr?.message === "GOOGLE_DRIVE_NOT_CONNECTED") {
+        return res.status(401).json({ message: "Google Drive non è connesso. Connetti prima l'account." });
+      }
+      throw connErr;
+    }
     const q = `(name contains 'BikerLink' OR name contains 'Traduzioni' OR name contains 'bikerlink') and trashed=false`;
     const listResp = await drive.files.list({
       q,
       fields: "files(id,name,size)",
       pageSize: 100,
-      supportsAllDrives: true,
-      includeItemsFromAllDrives: true,
     });
     const files = listResp.data.files || [];
     let deleted = 0;
     let freed = 0;
     for (const f of files) {
       try {
-        await drive.files.delete({ fileId: f.id!, supportsAllDrives: true });
+        await drive.files.delete({ fileId: f.id! });
         deleted++;
         freed += f.size ? parseInt(f.size as unknown as string) : 0;
         console.log(`[cleanup-exports] Eliminato: ${f.name} (${f.id})`);
@@ -4596,9 +4653,39 @@ router.delete("/drive/cleanup-exports", async (_req: Request, res: Response) => 
         ["forbidden", "insufficientPermissions", "notFound"].includes(e.reason)
       );
     if (isPermission) {
-      return res.status(403).json({ message: "Il Service Account non ha permessi sulla cartella Drive." });
+      return res.status(403).json({ message: "Permessi insufficienti su Drive. Riconnetti l'account OAuth." });
     }
     return res.status(500).json({ message: "Errore durante la pulizia Drive" });
+  }
+});
+
+router.get("/drive/oauth-status", async (_req: Request, res: Response) => {
+  try {
+    const status = await getDriveOAuthStatus();
+    return res.json(status);
+  } catch (err: any) {
+    console.error("[drive/oauth-status] errore:", err?.message);
+    return res.status(500).json({ message: "Errore verifica stato Drive" });
+  }
+});
+
+router.get("/drive/oauth-start", async (_req: Request, res: Response) => {
+  try {
+    const authUrl = getDriveOAuthUrl();
+    return res.json({ authUrl });
+  } catch (err: any) {
+    console.error("[drive/oauth-start] errore:", err?.message);
+    return res.status(500).json({ message: err?.message ?? "Errore generazione URL OAuth" });
+  }
+});
+
+router.delete("/drive/oauth-disconnect", async (_req: Request, res: Response) => {
+  try {
+    await disconnectDriveOAuth();
+    return res.json({ ok: true });
+  } catch (err: any) {
+    console.error("[drive/oauth-disconnect] errore:", err?.message);
+    return res.status(500).json({ message: "Errore disconnessione Drive" });
   }
 });
 

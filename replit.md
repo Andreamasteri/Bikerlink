@@ -54,7 +54,7 @@ BikerLink utilizes a modern full-stack architecture.
 - **Photo Contest**: Weekly contest with voting.
 - **Syneco Integration**: Workshop locator and advertising.
 - **Collectible Easter Eggs**: Geolocation-based hidden items.
-- **Admin & Moderation Panels**: Comprehensive tools for platform management.
+- **Admin & Moderation Panels**: Comprehensive tools for platform management. Translations export uses **OAuth2 Google Drive** (account bikerlinkapp@gmail.com) — token stored in `app_settings.google_drive_refresh_token`. OAuth client: `GOOGLE_DRIVE_CLIENT_ID` / `GOOGLE_DRIVE_CLIENT_SECRET` (project `project-0a755da1-5c43-4c1b-897`). Callback: `https://biker-link.replit.app/api/admin/drive/oauth-callback`. Admin must connect via "Connetti Google Drive" button in Traduzioni panel before exporting. Service Account (`GOOGLE_SERVICE_ACCOUNT_JSON`) still used for browsing/reading Drive.
 - **Automatic Matching**: Connects users based on profiles and preferences.
 - **User Favorites**: Users can mark other users as favorites via a star icon next to nicknames. Favorites are persisted in `user_favorites` table. FavoriteStar component (`components/FavoriteStar.tsx`) shown in all user lists. Primal star is red (#FF3B30), favorite star is yellow (#FFD700) when active, white outline when inactive.
 - **Custom Routes**: Allows users to create and share personalized routes.
