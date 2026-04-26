@@ -9,11 +9,14 @@
 #    2. Creare il file di autorizzazione monouso:
 #         touch .local/apk-build-authorized
 #    3. Eseguire questo script:
-#         bash scripts/build-apk.sh [preview|production]
+#         bash scripts/build-apk.sh                # default = release-apk (APK arm64 dimagrita ~50MB)
+#         bash scripts/build-apk.sh release-apk    # equivalente esplicito
+#         bash scripts/build-apk.sh production     # AAB Play Store (NON APK)
 #
 #  Il file .local/apk-build-authorized viene eliminato automaticamente dopo
 #  l'uso — ogni build richiede una nuova autorizzazione esplicita.
 #
+#  ⚠️  Profilo "preview" RIMOSSO (Task #1017) — produceva APK universali ~135MB.
 #  ⚠️  NON usare `npx eas-cli build` direttamente — usa SEMPRE questo script.
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -42,7 +45,7 @@ if [ ! -f "$AUTH_FILE" ]; then
   echo "    1. Ottenere approvazione esplicita dall'utente"
   echo "    2. Creare il file di autorizzazione:"
   echo "         touch .local/apk-build-authorized"
-  echo "    3. Rieseguire: bash scripts/build-apk.sh [$PROFILE]"
+  echo "    3. Rieseguire: bash scripts/build-apk.sh [release-apk|production]"
   echo ""
   echo "  Questo blocco esiste per prevenire build non autorizzate."
   echo ""
