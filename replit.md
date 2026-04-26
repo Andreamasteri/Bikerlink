@@ -54,6 +54,7 @@ BikerLink utilizes a modern full-stack architecture.
 - Fake user generation is implemented for testing and initial user base simulation, with admin controls for management.
 - Email services are handled via Nodemailer with Gmail SMTP.
 - **OnlineTracker** (`server/online-tracker.ts`): In-memory singleton that tracks active sessions in real-time. Counter endpoints (`online-count`, `biker-available-count`, `zavorrine-available-count`) read directly from this tracker (zero DB queries). Updated on login, logout, availability toggle, ghost-mode toggle, heartbeat, and every authenticated API request (middleware in `server/routes.ts`). Stale sessions auto-expire after 15 minutes via a cleanup interval. On server restart, sessions are re-registered transparently from the first API call.
+- **Backend startup phases** (server/index.ts): Phase 1–3 migrations/seed → Phase 4 motoclub → Phase 5 fake users → Phase 6 club conversations → Phase 7 playlist snapshot (6h) → Phase 8 ad cleanup (24h) → Phase 9 semaphore metrics (60s) → Phase 10 VACUUM FULL alle 03:00 Europe/Rome → **Phase 11 workspace cache cleanup (5min delay poi ogni 24h via child_process.exec su scripts/cleanup-cache.sh)**. La Phase 11 usa Opzione B (cron interno Express) invece di Replit Scheduled Deployment — coerente con Phase 7–10, nessuna infrastruttura extra. Prima pulizia manuale eseguita al merge (Task #994): liberati 919MB (.cache/ 719M + .metro-cache/ 200M).
 
 **Core Features:**
 - **Interactive Maps**: Display users, workshops, and easter eggs.

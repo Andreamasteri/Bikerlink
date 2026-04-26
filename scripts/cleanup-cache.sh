@@ -74,10 +74,25 @@ AFTER_METRO=$(size_of "$PROJECT_ROOT/.metro-cache")
 AFTER_NM=$(size_of "$PROJECT_ROOT/node_modules/.cache")
 AFTER_TMP=$(size_of "/tmp/logs")
 
+# ── Calcola MB liberati totali ───────────────────────────────────────────────
+# Converte "719M"→719, "200M"→200, "192K"→0.1, "0"→0 in MB (interi)
+to_mb() {
+  local v="$1"
+  case "$v" in
+    *G) echo "${v%G}" | awk '{printf "%d", $1 * 1024}' ;;
+    *M) echo "${v%M}" | awk '{printf "%d", $1}' ;;
+    *K) echo "0" ;;
+    *) echo "0" ;;
+  esac
+}
+MB_BEFORE=$(( $(to_mb "$BEFORE_CACHE") + $(to_mb "$BEFORE_METRO") + $(to_mb "$BEFORE_NM") + $(to_mb "$BEFORE_TMP") ))
+MB_AFTER=$(( $(to_mb "$AFTER_CACHE") + $(to_mb "$AFTER_METRO") + $(to_mb "$AFTER_NM") + $(to_mb "$AFTER_TMP") ))
+MB_FREED=$(( MB_BEFORE - MB_AFTER ))
+
 # ── Scrivi record nel log ─────────────────────────────────────────────────────
 {
   echo "$SEPARATOR"
-  echo "[$TIMESTAMP] Pulizia cache completata"
+  echo "[$TIMESTAMP] Pulizia cache completata — liberati circa ${MB_FREED}MB"
   echo "  .cache/             $BEFORE_CACHE → $AFTER_CACHE  ($STATUS_CACHE)"
   echo "  .metro-cache/       $BEFORE_METRO → $AFTER_METRO  ($STATUS_METRO)"
   echo "  node_modules/.cache $BEFORE_NM → $AFTER_NM  ($STATUS_NM)"
@@ -98,4 +113,4 @@ if [ -f "$LOG_FILE" ]; then
 fi
 
 # ── Output sommario su stdout ─────────────────────────────────────────────────
-echo "[CLEANUP] Fatto: .cache $BEFORE_CACHE→$AFTER_CACHE | .metro-cache $BEFORE_METRO→$AFTER_METRO | node_modules/.cache $BEFORE_NM→$AFTER_NM | /tmp/logs $BEFORE_TMP→$AFTER_TMP"
+echo "[CLEANUP] Liberati ~${MB_FREED}MB: .cache $BEFORE_CACHE→$AFTER_CACHE | .metro-cache $BEFORE_METRO→$AFTER_METRO | node_modules/.cache $BEFORE_NM→$AFTER_NM | /tmp/logs $BEFORE_TMP→$AFTER_TMP"
