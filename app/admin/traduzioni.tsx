@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
+import * as DocumentPicker from "expo-document-picker";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 
@@ -127,6 +128,11 @@ export default function TraduzioniScreen() {
 
   const [docxLoading, setDocxLoading] = useState(false);
   const [docxResult, setDocxResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const [importStatus, setImportStatus] = useState<StepStatus>("idle");
+  const [importResult, setImportResult] = useState("");
+  const [importFileName, setImportFileName] = useState<string>("");
+  const webImportInputRef = React.useRef<HTMLInputElement | null>(null);
 
   async function handlePrepare() {
     setPrepareStatus("loading");
@@ -250,6 +256,97 @@ export default function TraduzioniScreen() {
     );
   }
 
+  async function uploadDocxFile(formData: FormData): Promise<void> {
+    const url = new URL("/api/admin/translations/import-docx", getApiUrl());
+    const resp = await fetch(url.toString(), {
+      method: "POST",
+      credentials: "include",
+      body: formData as any,
+    });
+    let payload: any = null;
+    try {
+      payload = await resp.json();
+    } catch {}
+    if (!resp.ok || !payload?.ok) {
+      const errMsg =
+        (payload && typeof payload.message === "string" && payload.message) ||
+        `Errore HTTP ${resp.status}`;
+      throw new Error(errMsg);
+    }
+    const summary = payload.langCounts
+      ? Object.entries(payload.langCounts as Record<string, number>)
+          .map(([l, n]) => `${l.toUpperCase()}: ${n}`)
+          .join(", ")
+      : "";
+    setImportStatus("success");
+    setImportResult(summary ? `Stringhe aggiornate → ${summary}` : payload.message || "Import completato");
+  }
+
+  async function handleWebFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportFileName(file.name);
+    setImportStatus("loading");
+    setImportResult("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file, file.name);
+      await uploadDocxFile(fd);
+    } catch (err: unknown) {
+      setImportStatus("error");
+      setImportResult(extractErrorMessage(err, "Errore durante l'import"));
+    } finally {
+      if (webImportInputRef.current) webImportInputRef.current.value = "";
+    }
+  }
+
+  async function handlePickAndImportNative() {
+    setImportStatus("loading");
+    setImportResult("");
+    try {
+      const picked = await DocumentPicker.getDocumentAsync({
+        type: [
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/octet-stream",
+          "*/*",
+        ],
+        multiple: false,
+        copyToCacheDirectory: true,
+      });
+      if (picked.canceled || !picked.assets || picked.assets.length === 0) {
+        setImportStatus("idle");
+        return;
+      }
+      const asset = picked.assets[0];
+      if (!/\.docx$/i.test(asset.name || "")) {
+        throw new Error("Seleziona un file con estensione .docx");
+      }
+      setImportFileName(asset.name || "documento.docx");
+
+      const fd = new FormData();
+      fd.append("file", {
+        uri: asset.uri,
+        name: asset.name || "translations.docx",
+        type:
+          asset.mimeType ||
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      } as any);
+      await uploadDocxFile(fd);
+    } catch (err: unknown) {
+      setImportStatus("error");
+      setImportResult(extractErrorMessage(err, "Errore durante l'import"));
+    }
+  }
+
+  function handleImportPress() {
+    if (importStatus === "loading") return;
+    if (Platform.OS === "web") {
+      webImportInputRef.current?.click();
+    } else {
+      handlePickAndImportNative();
+    }
+  }
+
   return (
     <ScrollView
       style={styles.container}
@@ -328,10 +425,91 @@ export default function TraduzioniScreen() {
         ) : null}
       </View>
 
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View
+            style={[
+              styles.stepBadge,
+              importStatus === "success" && styles.stepBadgeSuccess,
+              importStatus === "error" && styles.stepBadgeError,
+            ]}
+          >
+            <Text style={styles.stepBadgeText}>3</Text>
+          </View>
+          <View style={styles.cardHeaderText}>
+            <Text style={styles.cardTitle}>Importa DOCX tradotto</Text>
+            <Text style={styles.cardDesc}>
+              Carica il file Word tradotto: le celle non vuote sovrascrivono i valori esistenti in
+              lib/i18n/. Le celle vuote vengono ignorate.
+            </Text>
+          </View>
+        </View>
+
+        {Platform.OS === "web" ? (
+          <input
+            ref={(el) => {
+              webImportInputRef.current = el;
+            }}
+            type="file"
+            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            style={{ display: "none" }}
+            onChange={handleWebFileSelected}
+          />
+        ) : null}
+
+        <TouchableOpacity
+          style={[styles.button, importStatus === "loading" && styles.buttonDisabled]}
+          onPress={handleImportPress}
+          disabled={importStatus === "loading"}
+          activeOpacity={0.7}
+        >
+          {importStatus === "loading" ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <>
+              <MaterialCommunityIcons name="file-upload-outline" size={18} color="#fff" />
+              <Text style={styles.buttonText}>Seleziona file .docx</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        {importFileName ? (
+          <Text style={styles.importFileName} numberOfLines={1}>
+            File: {importFileName}
+          </Text>
+        ) : null}
+
+        {importResult ? (
+          <View
+            style={[
+              styles.resultBox,
+              importStatus === "success" && styles.resultBoxSuccess,
+              importStatus === "error" && styles.resultBoxError,
+            ]}
+          >
+            <MaterialCommunityIcons
+              name={
+                importStatus === "success" ? "check-circle-outline" : "alert-circle-outline"
+              }
+              size={16}
+              color={importStatus === "success" ? "#4CAF50" : "#F44336"}
+            />
+            <Text
+              style={[
+                styles.resultText,
+                importStatus === "success" ? styles.resultTextSuccess : styles.resultTextError,
+              ]}
+            >
+              {importResult}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
       <StepCard
-        stepNumber={3}
+        stepNumber={4}
         title="Riavvia Backend"
-        description="Riavvia il server dopo aver sostituito manualmente i file in lib/i18n/."
+        description="Riavvia il server per caricare le nuove traduzioni in lib/i18n/."
         status={restartStatus}
         buttonLabel="Riavvia Backend"
         onPress={handleRestart}
@@ -438,6 +616,12 @@ const styles = StyleSheet.create({
   inlineHintOk: { backgroundColor: "#4CAF5015" },
   inlineHintErr: { backgroundColor: "#eb575715" },
   inlineHintText: { fontSize: 12, fontFamily: "Inter_400Regular", flex: 1 },
+  importFileName: {
+    marginTop: 8,
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontFamily: "Inter_500Medium",
+  },
   infoBanner: {
     flexDirection: "row", gap: 12,
     backgroundColor: Colors.accent + "15",

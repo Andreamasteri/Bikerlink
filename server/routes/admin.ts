@@ -3958,6 +3958,183 @@ router.post("/translations/restart", async (_req: Request, res: Response) => {
   }
 });
 
+const docxImportUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const okMime =
+      file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      file.mimetype === "application/octet-stream" ||
+      file.mimetype === "application/zip";
+    const okExt = /\.docx$/i.test(file.originalname || "");
+    if (okMime || okExt) cb(null, true);
+    else cb(new Error("Formato file non valido: serve .docx"));
+  },
+});
+
+function escapeI18nValue(raw: string): string {
+  return raw
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\n/g, "\\n");
+}
+
+function applyTranslationsToFile(filePath: string, updates: Record<string, string>): number {
+  if (!fs.existsSync(filePath)) return 0;
+  const original = fs.readFileSync(filePath, "utf-8");
+  const lines = original.split("\n");
+  let changed = 0;
+  const lineRegex = /^(\s*")([^"]+)("\s*:\s*")((?:[^"\\]|\\.)*)("\s*,?\s*)$/;
+
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(lineRegex);
+    if (!m) continue;
+    const key = m[2];
+    if (!Object.prototype.hasOwnProperty.call(updates, key)) continue;
+    const newValRaw = updates[key];
+    if (typeof newValRaw !== "string" || newValRaw.length === 0) continue;
+    const newValEsc = escapeI18nValue(newValRaw);
+    if (newValEsc === m[4]) continue;
+    lines[i] = `${m[1]}${m[2]}${m[3]}${newValEsc}${m[5]}`;
+    changed++;
+  }
+
+  if (changed > 0) {
+    fs.writeFileSync(filePath, lines.join("\n"), "utf-8");
+  }
+  return changed;
+}
+
+type ParsedDocxRow = string[];
+
+async function parseDocxTable(buffer: Buffer): Promise<ParsedDocxRow[]> {
+  const JSZip = (await import("jszip")).default;
+  const { XMLParser } = await import("fast-xml-parser");
+
+  const zip = await JSZip.loadAsync(buffer);
+  const docFile = zip.file("word/document.xml");
+  if (!docFile) throw new Error("DOCX non valido: word/document.xml mancante");
+  const xml = await docFile.async("string");
+
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    preserveOrder: false,
+    parseTagValue: false,
+    trimValues: false,
+    isArray: (name) => ["w:tbl", "w:tr", "w:tc", "w:p", "w:r", "w:t"].includes(name),
+  });
+  const parsed = parser.parse(xml);
+
+  const body = parsed?.["w:document"]?.["w:body"];
+  if (!body) throw new Error("DOCX non valido: body mancante");
+  const tables = body["w:tbl"];
+  if (!Array.isArray(tables) || tables.length === 0) {
+    throw new Error("Nessuna tabella trovata nel DOCX");
+  }
+
+  const tbl = tables[0];
+  const rows = tbl["w:tr"] || [];
+  const out: ParsedDocxRow[] = [];
+
+  function extractCellText(cell: any): string {
+    const paragraphs = cell["w:p"] || [];
+    const paraTexts: string[] = [];
+    for (const p of paragraphs) {
+      const runs = p["w:r"] || [];
+      let runText = "";
+      for (const r of runs) {
+        const ts = r["w:t"] || [];
+        for (const t of ts) {
+          if (typeof t === "string") runText += t;
+          else if (t && typeof t === "object" && "#text" in t) runText += String(t["#text"] ?? "");
+        }
+      }
+      paraTexts.push(runText);
+    }
+    return paraTexts.join("\n");
+  }
+
+  for (const row of rows) {
+    const cells = row["w:tc"] || [];
+    out.push(cells.map(extractCellText));
+  }
+  return out;
+}
+
+router.post(
+  "/translations/import-docx",
+  docxImportUpload.single("file"),
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "File DOCX mancante" });
+
+      let rows: ParsedDocxRow[];
+      try {
+        rows = await parseDocxTable(req.file.buffer);
+      } catch (e: any) {
+        return res.status(400).json({ message: e?.message || "Impossibile leggere il file DOCX" });
+      }
+
+      if (rows.length < 2) {
+        return res.status(400).json({ message: "Tabella vuota o priva di righe dati" });
+      }
+
+      const header = rows[0].map((h) => (h || "").trim());
+      const langColumns: { lang: string; col: number }[] = [];
+      for (let i = 0; i < header.length; i++) {
+        const code = header[i].toLowerCase().slice(0, 2);
+        if (ALLOWED_LANGS.has(code)) {
+          langColumns.push({ lang: code, col: i });
+        }
+      }
+      if (langColumns.length === 0) {
+        return res.status(400).json({
+          message: "Header tabella non riconosciuto: nessuna colonna lingua valida (EN, DE, ES, FR, TR)",
+        });
+      }
+
+      const keyCol = 0;
+      const updatesByLang: Record<string, Record<string, string>> = {};
+      for (const { lang } of langColumns) updatesByLang[lang] = {};
+
+      for (let r = 1; r < rows.length; r++) {
+        const row = rows[r];
+        const key = (row[keyCol] || "").trim();
+        if (!key) continue;
+        for (const { lang, col } of langColumns) {
+          const cell = row[col];
+          if (typeof cell !== "string") continue;
+          const val = cell.replace(/\r\n/g, "\n").trim();
+          if (!val) continue;
+          updatesByLang[lang][key] = val;
+        }
+      }
+
+      const langCounts: Record<string, number> = {};
+      for (const { lang } of langColumns) {
+        const filePath = LANG_FILE_MAP[lang];
+        const count = applyTranslationsToFile(filePath, updatesByLang[lang]);
+        langCounts[lang] = count;
+      }
+
+      const summary = Object.entries(langCounts)
+        .map(([l, n]) => `${l.toUpperCase()}: ${n}`)
+        .join(", ");
+
+      return res.json({
+        ok: true,
+        langCounts,
+        message: `Stringhe aggiornate → ${summary}`,
+      });
+    } catch (error: any) {
+      console.error("[translations/import-docx] error:", error);
+      return res.status(500).json({ message: error?.message || "Errore durante l'import DOCX" });
+    }
+  }
+);
+
 router.get("/settings/bg-location", async (_req: Request, res: Response) => {
   try {
     const [enabled, trigger, interval, notificationText, ghostModeContinue] = await Promise.all([
