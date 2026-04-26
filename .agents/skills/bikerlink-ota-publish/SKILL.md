@@ -16,7 +16,7 @@ description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink
 - **Canale EAS**: `preview`
 - **Runtime Version**: `7.0.0` (ciclo corrente, APK v38)
 - **APK corrente**: versionCode **38**, versionName **2.4.0** (Task #958 — configurato, build EAS da lanciare con `bash scripts/build-apk.sh`)
-- **OTA corrente**: OTA-154 (bundle custom attivo, EAS non aggiornato — vedere nota sotto)
+- **OTA corrente**: OTA-155 (bundle custom attivo, EAS non aggiornato — vedere nota sotto)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates` (Expo Updates Protocol v1)
 - **Utenti**: su Android fisico via APK — NON usano il dev server
 - **Admin email**: `admin@bikerlink.it`
@@ -132,8 +132,9 @@ Tutti i check devono essere ✔. Il warning sui cicli multipli (2.0.0, 3.0.0, 4.
 
 ### Fix strutturale (APK v38) — IMPLEMENTATO (Task #958)
 ✅ **Implementato**: Backend serve `GET /api/expo-updates` (Expo Updates Protocol v1) e `GET /api/expo-updates/assets/:releaseId`.
-✅ **app.json**: `updates.url` → `https://biker-link.replit.app/api/expo-updates`
+✅ **app.json**: `updates.url` → `https://biker-link.replit.app/api/expo-updates`; 1 solo intentFilter (`bikerlink://lastfm-callback`)
 ✅ **versionCode**: 38, versionName 2.4.0 (build.gradle + app.json aggiornati)
+✅ **AndroidManifest.xml**: `EXPO_UPDATE_URL` aggiornato al backend custom; intent filter `data-generated` corretto da `spotify-callback` → `lastfm-callback`
 ⏳ **Pendente**: build APK v38 via `bash scripts/build-apk.sh` (richiede autorizzazione utente)
 
 Dopo APK v38 installato sui dispositivi: gli aggiornamenti OTA sono completamente indipendenti da EAS.

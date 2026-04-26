@@ -31,7 +31,7 @@
     <meta-data android:name="expo.modules.updates.EXPO_RUNTIME_VERSION" android:value="@string/expo_runtime_version"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" android:value="ERROR_RECOVERY_ONLY"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0"/>
-    <meta-data android:name="expo.modules.updates.EXPO_UPDATE_URL" android:value="https://u.expo.dev/a25192d7-72e5-46af-97d0-2d38ed9b78e3"/>
+    <meta-data android:name="expo.modules.updates.EXPO_UPDATE_URL" android:value="https://biker-link.replit.app/api/expo-updates"/>
     <service
         android:name=".OverlayService"
         android:foregroundServiceType="specialUse"
@@ -49,7 +49,7 @@
       </intent-filter>
       <intent-filter data-generated="true">
         <action android:name="android.intent.action.VIEW"/>
-        <data android:scheme="bikerlink" android:host="spotify-callback"/>
+        <data android:scheme="bikerlink" android:host="lastfm-callback"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <category android:name="android.intent.category.DEFAULT"/>
       </intent-filter>
