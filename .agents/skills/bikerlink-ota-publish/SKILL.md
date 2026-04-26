@@ -15,7 +15,7 @@ description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink
 - **Piattaforma**: Android only (iOS non supportato per OTA)
 - **Canale EAS**: `preview`
 - **Runtime Version**: `7.0.0` (ciclo corrente, APK v38)
-- **APK corrente**: versionCode **38**, versionName **2.4.0** (Task #958 — configurato, build EAS da lanciare con `bash scripts/build-apk.sh`)
+- **APK corrente**: versionCode **38**, versionName **2.4.0** (Task #961 — build EAS inviata 2026-04-26 commit bf49d39, --no-wait; build ID e APK URL da recuperare da https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds e aggiornare in ota-updates.json → OTA-155)
 - **OTA corrente**: OTA-155 (bundle custom attivo, EAS non aggiornato — vedere nota sotto)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates` (Expo Updates Protocol v1)
 - **Utenti**: su Android fisico via APK — NON usano il dev server
@@ -135,7 +135,7 @@ Tutti i check devono essere ✔. Il warning sui cicli multipli (2.0.0, 3.0.0, 4.
 ✅ **app.json**: `updates.url` → `https://biker-link.replit.app/api/expo-updates`; 1 solo intentFilter (`bikerlink://lastfm-callback`)
 ✅ **versionCode**: 38, versionName 2.4.0 (build.gradle + app.json aggiornati)
 ✅ **AndroidManifest.xml**: `EXPO_UPDATE_URL` aggiornato al backend custom; intent filter `data-generated` corretto da `spotify-callback` → `lastfm-callback`
-⏳ **Pendente**: build APK v38 via `bash scripts/build-apk.sh` (richiede autorizzazione utente)
+✅ **Build APK v38 inviata**: 2026-04-26 commit bf49d39 — recuperare build ID e APK URL da https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds e aggiornare ota-updates.json → OTA-155 (apkBuildId, apkUrl)
 
 Dopo APK v38 installato sui dispositivi: gli aggiornamenti OTA sono completamente indipendenti da EAS.
 
@@ -182,7 +182,8 @@ Questo previene lacune documentali come quella di APK v37 (build ID mai registra
   - APK v28: STABILE — background location tracking (Task #607) + OTA 53–62
   - APK v29: STABILE — expo-notifications nativo + versionCode 29 + versionName 1.9.4 (EAS: 2680c671, APK: https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk) + OTA 63–67
   - APK v30–v36: build intermedie successive (vedi ota-updates.json per dettagli per ciclo)
-  - APK v37: STABILE — versionName 2.3.0, build inviata con --no-wait (build ID non catturato in log; recuperare da https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds) + OTA 151–152 ← APK CORRENTE
+  - APK v37: STABILE — versionName 2.3.0, build inviata con --no-wait (build ID non catturato in log; recuperare da https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds) + OTA 151–154
+  - APK v38: IN BUILD — versionName 2.4.0, build inviata 2026-04-26 commit bf49d39 con --no-wait, updates.url→backend custom (Expo Updates Protocol v1) ← APK CORRENTE (build ID da recuperare su expo.dev)
 
 ## ⚠️ ANALISI ARCHITETTURA (DEFINITIVA)
 React Native 0.82+ ha rimosso il supporto Old Architecture. Il flag newArchEnabled=false
