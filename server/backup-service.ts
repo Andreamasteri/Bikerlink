@@ -5,8 +5,7 @@ import archiver from "archiver";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { Readable } from "stream";
-import { getDriveClient } from "./lib/drive-client";
+import { uploadBuffer } from "./objectStorage";
 import { db } from "./db";
 import { appSettings } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -16,9 +15,7 @@ const execAsync = promisify(exec);
 const DEFAULT_DB_HOURS = 24;
 const DEFAULT_MEDIA_HOURS = 168;
 
-export const DRIVE_FOLDER_TRADUZIONI_ID = "1Jp5v-Ds5EZmMeBwQMenUO_0wFEDRF-Cs";
-export const DRIVE_FOLDER_DB_ID = "1tPAYmQSRqLQOxeu4yqPhi6XxaTj-UPnl";
-export const DRIVE_FOLDER_MEDIA_ID = "1qI_KDsqipaN7FRGmHeD0HF-m1Crk21Iy";
+export const BACKUP_OBJECT_PREFIX = ".private/backups";
 
 let dbSchedulerTimer: NodeJS.Timeout | null = null;
 let mediaSchedulerTimer: NodeJS.Timeout | null = null;
@@ -101,18 +98,23 @@ export async function setBackupFrequency(freq: Partial<BackupFrequency>): Promis
   return next;
 }
 
-interface LastBackupMeta {
+export interface LastBackupMeta {
   timestamp: string;
   size: number;
-  fileId?: string;
+  objectPath?: string;
+  fileName?: string;
 }
 
 async function saveLastBackup(type: "db" | "media", meta: LastBackupMeta) {
   await upsertJsonSetting(
     type === "db" ? "backup.last_db" : "backup.last_media",
     meta,
-    type === "db" ? "Ultimo backup DB su Drive" : "Ultimo backup media su Drive"
+    type === "db" ? "Ultimo backup DB su Object Storage" : "Ultimo backup media su Object Storage"
   );
+}
+
+export async function getLastBackupMeta(type: "db" | "media"): Promise<LastBackupMeta | null> {
+  return readJsonSetting<LastBackupMeta>(type === "db" ? "backup.last_db" : "backup.last_media");
 }
 
 export async function getBackupStatus() {
@@ -130,7 +132,7 @@ export async function getBackupStatus() {
     isBackingUp,
     nextScheduled: dbNextAt?.toISOString() ?? null,
     nextMediaScheduled: mediaNextAt?.toISOString() ?? null,
-    driveFolder: { folderId: DRIVE_FOLDER_DB_ID, folderName: "Backup DB" },
+    storage: { type: "object_storage" as const, prefix: BACKUP_OBJECT_PREFIX },
     dbHours: freq.dbHours,
     mediaHours: freq.mediaHours,
     configured: true,
@@ -146,29 +148,12 @@ async function isAutoBackupEnabled(): Promise<boolean> {
 }
 
 export async function setAutoBackupEnabled(enabled: boolean) {
-  await upsertSetting("backup_auto_enabled", enabled ? "true" : "false", "Backup automatico (Google Drive)");
+  await upsertSetting("backup_auto_enabled", enabled ? "true" : "false", "Backup automatico (Object Storage)");
   if (enabled) {
     await startScheduler();
   } else {
     stopScheduler();
   }
-}
-
-async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string, folderId: string): Promise<string> {
-  const drive = getDriveClient();
-  const readable = new Readable();
-  readable.push(buffer);
-  readable.push(null);
-  const resp = await drive.files.create({
-    requestBody: {
-      name: fileName,
-      parents: [folderId],
-    },
-    media: { mimeType, body: readable },
-    fields: "id",
-  });
-  if (!resp.data.id) throw new Error("Upload su Drive completato ma senza fileId nella risposta");
-  return resp.data.id;
 }
 
 export async function backupDatabase(): Promise<{ path: string; name: string; size: number }> {
@@ -195,13 +180,14 @@ export async function backupDatabase(): Promise<{ path: string; name: string; si
 
     const buf = fs.readFileSync(tmpGz);
     const fileName = `bikerlink_db_${ts}.sql.gz`;
+    const objectPath = `${BACKUP_OBJECT_PREFIX}/db/${fileName}`;
 
-    const fileId = await uploadToDrive(buf, fileName, "application/gzip", DRIVE_FOLDER_DB_ID);
-    const meta: LastBackupMeta = { timestamp: new Date().toISOString(), size: buf.length, fileId };
+    await uploadBuffer(objectPath, buf, "application/gzip");
+    const meta: LastBackupMeta = { timestamp: new Date().toISOString(), size: buf.length, objectPath, fileName };
     await saveLastBackup("db", meta);
 
-    console.log(`[backup-service] DB backup su Drive: ${fileName} (${buf.length} bytes) → ${fileId}`);
-    return { path: fileId, name: fileName, size: buf.length };
+    console.log(`[backup-service] DB backup su Object Storage: ${objectPath} (${buf.length} bytes)`);
+    return { path: objectPath, name: fileName, size: buf.length };
   } finally {
     isBackingUp = false;
     try { fs.unlinkSync(tmpSql); } catch {}
@@ -236,13 +222,14 @@ export async function backupMedia(): Promise<{ path: string; name: string; size:
     });
 
     const fileName = `bikerlink_media_${ts}.zip`;
+    const objectPath = `${BACKUP_OBJECT_PREFIX}/media/${fileName}`;
 
-    const fileId = await uploadToDrive(zipBuffer, fileName, "application/zip", DRIVE_FOLDER_MEDIA_ID);
-    const meta: LastBackupMeta = { timestamp: new Date().toISOString(), size: zipBuffer.length, fileId };
+    await uploadBuffer(objectPath, zipBuffer, "application/zip");
+    const meta: LastBackupMeta = { timestamp: new Date().toISOString(), size: zipBuffer.length, objectPath, fileName };
     await saveLastBackup("media", meta);
 
-    console.log(`[backup-service] Media backup su Drive: ${fileName} (${zipBuffer.length} bytes) → ${fileId}`);
-    return { path: fileId, name: fileName, size: zipBuffer.length };
+    console.log(`[backup-service] Media backup su Object Storage: ${objectPath} (${zipBuffer.length} bytes)`);
+    return { path: objectPath, name: fileName, size: zipBuffer.length };
   } finally {
     isBackingUp = false;
     try { fs.unlinkSync(tmpZip); } catch {}

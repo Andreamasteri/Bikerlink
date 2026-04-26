@@ -16,7 +16,7 @@ import { MOTORCYCLES, pickRandomN, getMotoYear } from "../mass-seed-data";
 import { getLastMatchingCycleMeta, runBikerBikerMatching, runWishlistMatching, runMatchingForUser } from "../matching-engine";
 import { isProtectedUser } from "../constants";
 import { SERVER_START_TIME, uptimeState } from "../uptime";
-import { getDriveClient } from "../lib/drive-client";
+import { downloadBuffer } from "../objectStorage";
 import { cacheAdImage } from "./ads";
 import { allSettledLimited } from "../lib/concurrency";
 
@@ -43,59 +43,6 @@ interface StartupBeaconEntry {
 }
 const startupBeacons: StartupBeaconEntry[] = [];
 const BEACONS_MAX = 50;
-
-const DRIVE_FOLDER_CACHE_TTL_MS = 10 * 60 * 1000;
-const DRIVE_FOLDER_CACHE_MAX = 500;
-
-interface DriveFolderCacheEntry {
-  name: string;
-  parents: string[] | undefined;
-  expiresAt: number;
-}
-
-const driveFolderNameCache = new Map<string, DriveFolderCacheEntry>();
-
-function evictExpiredDriveFolderCache(): void {
-  const now = Date.now();
-  for (const [key, entry] of driveFolderNameCache) {
-    if (entry.expiresAt <= now) {
-      driveFolderNameCache.delete(key);
-    }
-  }
-  while (driveFolderNameCache.size > DRIVE_FOLDER_CACHE_MAX) {
-    const firstKey = driveFolderNameCache.keys().next().value;
-    if (firstKey !== undefined) driveFolderNameCache.delete(firstKey as string);
-  }
-}
-
-async function getDriveFolderMeta(
-  folderId: string
-): Promise<{ name: string; parents: string[] | undefined } | null> {
-  const now = Date.now();
-  const cached = driveFolderNameCache.get(folderId);
-  if (cached && cached.expiresAt > now) {
-    return { name: cached.name, parents: cached.parents };
-  }
-  try {
-    const drive = getDriveClient();
-    const resp = await drive.files.get({
-      fileId: folderId,
-      fields: "name,parents",
-    });
-    const data = resp.data;
-    if (!data.name) return null;
-    const parents = (data.parents as string[] | undefined) ?? undefined;
-    evictExpiredDriveFolderCache();
-    driveFolderNameCache.set(folderId, {
-      name: data.name,
-      parents,
-      expiresAt: now + DRIVE_FOLDER_CACHE_TTL_MS,
-    });
-    return { name: data.name, parents };
-  } catch {
-    return null;
-  }
-}
 
 interface ClubAssignStats {
   assigned: number;
@@ -3222,7 +3169,7 @@ router.post("/backup/db", async (_req: Request, res: Response) => {
       action: "backup_db",
       targetType: "system",
       targetId: result.name.slice(0, 36),
-      details: `Backup DB su Drive: ${result.name} (${result.size} bytes)`,
+      details: `Backup DB su Object Storage: ${result.name} (${result.size} bytes)`,
     });
     return res.json({ ok: true, ...result });
   } catch (error: any) {
@@ -3240,7 +3187,7 @@ router.post("/backup/media", async (_req: Request, res: Response) => {
       action: "backup_media",
       targetType: "system",
       targetId: result.name.slice(0, 36),
-      details: `Backup media su Drive: ${result.name} (${result.size} bytes)`,
+      details: `Backup media su Object Storage: ${result.name} (${result.size} bytes)`,
     });
     return res.json({ ok: true, ...result });
   } catch (error: any) {
@@ -3264,12 +3211,30 @@ router.put("/backup/schedule", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/backup/drive-folder", (_req: Request, res: Response) => {
-  return res.json({ folder: null });
-});
-
-router.post("/backup/drive-folder", (_req: Request, res: Response) => {
-  return res.json({ ok: true });
+router.get("/backup/download/:type", async (req: Request, res: Response) => {
+  try {
+    const type = req.params.type;
+    if (type !== "db" && type !== "media") {
+      return res.status(400).json({ message: "type deve essere 'db' o 'media'" });
+    }
+    const { getLastBackupMeta } = await import("../backup-service");
+    const meta = await getLastBackupMeta(type);
+    if (!meta || !meta.objectPath) {
+      return res.status(404).json({ message: "Nessun backup disponibile" });
+    }
+    const buf = await downloadBuffer(meta.objectPath);
+    const fileName = meta.fileName
+      || meta.objectPath.split("/").pop()
+      || (type === "db" ? "bikerlink_db.sql.gz" : "bikerlink_media.zip");
+    const contentType = type === "db" ? "application/gzip" : "application/zip";
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Length", String(buf.length));
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    return res.end(buf);
+  } catch (error: any) {
+    console.error("Admin backup download error:", error);
+    return res.status(500).json({ message: error.message || "Errore durante il download del backup" });
+  }
 });
 
 router.get("/backup/frequency", async (_req: Request, res: Response) => {
@@ -3953,476 +3918,6 @@ router.get("/translations/download-docx", async (req: Request, res: Response) =>
   }
 });
 
-function getImportInfo() {
-  return {
-    exportedFileId: TRANSLATIONS_STAGING.exportedFileId,
-    exportedLangs: TRANSLATIONS_STAGING.exportedLangs,
-  };
-}
-
-router.get("/translations/import-info", (_req: Request, res: Response) => {
-  return res.json(getImportInfo());
-});
-
-router.get("/translations/import", (_req: Request, res: Response) => {
-  return res.json(getImportInfo());
-});
-
-router.get("/translations/browse", async (req: Request, res: Response) => {
-  try {
-    const folderId = (req.query.folderId as string | undefined)?.trim();
-    const searchQuery = (req.query.q as string | undefined)?.trim();
-    const drive = getDriveClient();
-
-    if (searchQuery) {
-      const escapedQ = searchQuery.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-      const driveQ = `name contains '${escapedQ}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
-      let sheetsData: { id?: string | null; name?: string | null; modifiedTime?: string | null; parents?: string[] | null }[] = [];
-      try {
-        const sheetsResp = await drive.files.list({
-          q: driveQ,
-          fields: "files(id,name,modifiedTime,parents)",
-          orderBy: "modifiedTime desc",
-          pageSize: 50,
-        });
-        sheetsData = sheetsResp.data.files || [];
-      } catch (driveErr) {
-        console.error("[translations/browse] Search Drive error:", driveErr);
-        return res.status(502).json({ message: "Errore nella ricerca Drive" });
-      }
-
-      async function resolveFolderPath(parentId: string | undefined): Promise<string> {
-        if (!parentId) return "";
-        const parts: string[] = [];
-        let currentId: string | undefined = parentId;
-        const MAX_DEPTH = 6;
-        for (let i = 0; i < MAX_DEPTH && currentId; i++) {
-          const meta = await getDriveFolderMeta(currentId);
-          if (!meta) break;
-          parts.unshift(meta.name);
-          currentId = meta.parents?.[0];
-        }
-        return parts.join(" / ");
-      }
-
-      const sheetsWithPaths = await Promise.all(
-        sheetsData.map(async (f) => ({
-          id: f.id ?? "",
-          name: f.name ?? "",
-          modifiedTime: f.modifiedTime ?? undefined,
-          folderPath: await resolveFolderPath(f.parents?.[0] ?? undefined).catch(() => ""),
-        }))
-      );
-
-      return res.json({
-        folderName: "Risultati ricerca",
-        folders: [],
-        sheets: sheetsWithPaths,
-        isSearch: true,
-      });
-    }
-
-    const driveListOpts = { supportsAllDrives: true, includeItemsFromAllDrives: true };
-
-    let foldersFiles: { id?: string | null; name?: string | null }[] = [];
-    let sheetsFiles: { id?: string | null; name?: string | null; modifiedTime?: string | null }[] = [];
-
-    if (folderId) {
-      const parentClause = `'${folderId}' in parents`;
-      const qFolders = `${parentClause} and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-      const qSheets = `${parentClause} and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
-      try {
-        const [foldersResp, sheetsResp] = await Promise.all([
-          drive.files.list({ q: qFolders, fields: "files(id,name)", orderBy: "name", pageSize: 100, ...driveListOpts }),
-          drive.files.list({ q: qSheets, fields: "files(id,name,modifiedTime)", orderBy: "modifiedTime desc", pageSize: 100, ...driveListOpts }),
-        ]);
-        foldersFiles = foldersResp.data.files || [];
-        sheetsFiles = sheetsResp.data.files || [];
-      } catch (driveErr) {
-        console.error("[translations/browse] Drive error:", driveErr);
-        return res.status(502).json({ message: "Errore nel recupero del contenuto Drive" });
-      }
-    } else {
-      const qRootFolders = `'root' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-      const qRootSheets = `'root' in parents and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
-      const qSharedFolders = `sharedWithMe=true and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-      const qSharedSheets = `sharedWithMe=true and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
-      try {
-        const [rF, rS, sF, sS] = await Promise.all([
-          drive.files.list({ q: qRootFolders, fields: "files(id,name)", orderBy: "name", pageSize: 100, ...driveListOpts }),
-          drive.files.list({ q: qRootSheets, fields: "files(id,name,modifiedTime)", orderBy: "modifiedTime desc", pageSize: 100, ...driveListOpts }),
-          drive.files.list({ q: qSharedFolders, fields: "files(id,name)", orderBy: "name", pageSize: 100, ...driveListOpts }),
-          drive.files.list({ q: qSharedSheets, fields: "files(id,name,modifiedTime)", orderBy: "modifiedTime desc", pageSize: 100, ...driveListOpts }),
-        ]);
-        const seenF = new Set<string>();
-        for (const f of [...(rF.data.files || []), ...(sF.data.files || [])]) {
-          if (f.id && !seenF.has(f.id)) { seenF.add(f.id); foldersFiles.push(f); }
-        }
-        const seenS = new Set<string>();
-        for (const f of [...(rS.data.files || []), ...(sS.data.files || [])]) {
-          if (f.id && !seenS.has(f.id)) { seenS.add(f.id); sheetsFiles.push(f); }
-        }
-        foldersFiles.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
-      } catch (driveErr) {
-        console.error("[translations/browse] Drive error:", driveErr);
-        return res.status(502).json({ message: "Errore nel recupero del contenuto Drive" });
-      }
-    }
-
-    let folderName = "Drive";
-    let saEmail: string | undefined;
-    if (folderId) {
-      const meta = await getDriveFolderMeta(folderId);
-      if (meta) folderName = meta.name;
-    } else {
-      try {
-        const saJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-        if (saJson) saEmail = (JSON.parse(saJson) as { client_email?: string }).client_email;
-      } catch { /* ignore */ }
-    }
-
-    return res.json({
-      folderName,
-      folders: foldersFiles.map((f) => ({ id: f.id ?? "", name: f.name ?? "" })),
-      sheets: sheetsFiles.map((f) => ({ id: f.id ?? "", name: f.name ?? "", modifiedTime: f.modifiedTime ?? undefined })),
-      ...(saEmail ? { saEmail } : {}),
-    });
-  } catch (error) {
-    console.error("[translations/browse] error:", error);
-    return res.status(500).json({ message: "Errore durante la navigazione Drive" });
-  }
-});
-
-router.get("/translations/file-path", async (req: Request, res: Response) => {
-  try {
-    const fileId = (req.query.fileId as string | undefined)?.trim();
-    if (!fileId) {
-      return res.status(400).json({ message: "fileId richiesto" });
-    }
-    const fileMeta = await getDriveFolderMeta(fileId);
-    if (!fileMeta) {
-      return res.status(502).json({ message: "Impossibile recuperare il percorso del file" });
-    }
-    const parentId = fileMeta.parents?.[0];
-    if (!parentId) {
-      return res.json({ folderPath: "Drive" });
-    }
-
-    const parent = await getDriveFolderMeta(parentId);
-    if (!parent) {
-      return res.json({ folderPath: "Drive" });
-    }
-    const parentName = parent.name;
-    const grandParentId = parent.parents?.[0];
-
-    if (!grandParentId) {
-      return res.json({ folderPath: parentName });
-    }
-
-    const grandParent = await getDriveFolderMeta(grandParentId);
-    if (!grandParent) {
-      return res.json({ folderPath: parentName });
-    }
-
-    return res.json({ folderPath: `${grandParent.name} / ${parentName}` });
-  } catch (error) {
-    console.error("[translations/file-path] error:", error);
-    return res.status(500).json({ message: "Errore durante il recupero del percorso" });
-  }
-});
-
-router.delete("/translations/folder-cache", (_req: Request, res: Response) => {
-  const clearedCount = driveFolderNameCache.size;
-  driveFolderNameCache.clear();
-  console.log(`[translations/folder-cache] Cache svuotata: ${clearedCount} voci rimosse`);
-  return res.json({ cleared: clearedCount });
-});
-
-const TRANSLATIONS_PREFS_KEY = "translations.prefs";
-
-router.get("/translations/prefs", async (_req: Request, res: Response) => {
-  try {
-    const rows = await db.select().from(appSettings).where(eq(appSettings.key, TRANSLATIONS_PREFS_KEY));
-    if (rows.length === 0 || !rows[0].valueJson) return res.json({ hasRecord: false });
-    const stored = rows[0].valueJson as { sheet?: { id: string; name: string; folderPath?: string } | null };
-    return res.json({
-      hasRecord: true,
-      sheet: stored.sheet ?? null,
-    });
-  } catch (error) {
-    console.error("[translations/prefs GET] error:", error);
-    return res.status(500).json({ message: "Errore nel recupero delle preferenze" });
-  }
-});
-
-router.post("/translations/prefs", async (req: Request, res: Response) => {
-  try {
-    const { sheet } = req.body as {
-      sheet?: { id: string; name: string; folderPath?: string } | null;
-    };
-    if (sheet === undefined) return res.json({ ok: true });
-    const existing = await db.select().from(appSettings).where(eq(appSettings.key, TRANSLATIONS_PREFS_KEY));
-    const current = (existing.length > 0 && existing[0].valueJson ? existing[0].valueJson : {}) as Record<string, unknown>;
-    const updated = { ...current, sheet };
-    await db.insert(appSettings)
-      .values({ key: TRANSLATIONS_PREFS_KEY, valueJson: updated, description: "Preferenze admin traduzioni (foglio import)" })
-      .onConflictDoUpdate({ target: appSettings.key, set: { valueJson: updated, updatedAt: new Date() } });
-    return res.json({ ok: true });
-  } catch (error) {
-    console.error("[translations/prefs POST] error:", error);
-    return res.status(500).json({ message: "Errore nel salvataggio delle preferenze" });
-  }
-});
-
-router.get("/translations/preview-sheet", async (req: Request, res: Response) => {
-  try {
-    const fileId = (req.query.fileId as string | undefined)?.trim();
-    if (!fileId) {
-      return res.status(400).json({ message: "fileId richiesto" });
-    }
-
-    const drive = getDriveClient();
-    let csvText: string;
-    try {
-      const exportResp = await drive.files.export(
-        { fileId, mimeType: "text/csv" },
-        { responseType: "text" }
-      );
-      csvText = exportResp.data as string;
-    } catch (driveErr) {
-      console.error("[translations/preview-sheet] Drive error:", driveErr);
-      return res.status(500).json({ message: "Errore nella lettura del Google Sheet" });
-    }
-    const firstLine = csvText.split(/\r?\n/)[0] ?? "";
-
-    // Simple split for header — headers don't contain commas/quotes in our format
-    const columns = firstLine.split(",").map((c) => c.trim().replace(/^"|"$/g, "").toUpperCase());
-    const langColumns = columns.filter((c) => ALLOWED_LANGS.has(c.toLowerCase()));
-
-    return res.json({ columns, langColumns });
-  } catch (error) {
-    console.error("[translations/preview-sheet] error:", error);
-    return res.status(500).json({ message: "Errore durante la preview del foglio" });
-  }
-});
-
-router.post("/translations/import", async (req: Request, res: Response) => {
-  try {
-    const { langs, fileId: customFileId } = req.body as { langs: string[]; fileId?: string };
-    if (!langs || !Array.isArray(langs) || langs.length === 0) {
-      return res.status(400).json({ message: "Seleziona almeno una lingua da importare" });
-    }
-
-    const { exportedFileId, exportedLangs, keyMap } = TRANSLATIONS_STAGING;
-    const resolvedFileId = (customFileId && customFileId.trim()) ? customFileId.trim() : exportedFileId;
-
-    if (!resolvedFileId) {
-      return res.status(400).json({ message: "Nessun file selezionato. Esegui prima 'Genera ed esporta' o specifica un file manualmente" });
-    }
-
-    const invalidLangsImport = langs.filter((l) => !ALLOWED_LANGS.has(l));
-    if (invalidLangsImport.length > 0) {
-      return res.status(400).json({ message: `Lingue non valide: ${invalidLangsImport.join(", ")}` });
-    }
-
-    const usingSessionFile = resolvedFileId === exportedFileId && !customFileId?.trim();
-    if (usingSessionFile && exportedLangs.length > 0) {
-      const invalidLangs = langs.filter((l) => !exportedLangs.includes(l));
-      if (invalidLangs.length > 0) {
-        return res.status(400).json({ message: `Lingue non presenti nell'esportazione: ${invalidLangs.join(", ")}` });
-      }
-    }
-
-    const drive = getDriveClient();
-    let csvText: string;
-    try {
-      const exportResp = await drive.files.export(
-        { fileId: resolvedFileId, mimeType: "text/csv" },
-        { responseType: "text" }
-      );
-      csvText = exportResp.data as string;
-    } catch (driveErr) {
-      console.error("[translations/import] read error:", driveErr);
-      return res.status(500).json({ message: "Errore nella lettura del Google Sheet" });
-    }
-
-    function parseCsv(text: string): string[][] {
-      const rows: string[][] = [];
-      let row: string[] = [];
-      let field = "";
-      let inQuotes = false;
-      let i = 0;
-      while (i < text.length) {
-        const ch = text[i];
-        if (inQuotes) {
-          if (ch === '"') {
-            if (text[i + 1] === '"') {
-              field += '"';
-              i += 2;
-            } else {
-              inQuotes = false;
-              i++;
-            }
-          } else {
-            field += ch;
-            i++;
-          }
-        } else {
-          if (ch === '"') {
-            inQuotes = true;
-            i++;
-          } else if (ch === ',') {
-            row.push(field);
-            field = "";
-            i++;
-          } else if (ch === '\r' && text[i + 1] === '\n') {
-            row.push(field);
-            field = "";
-            if (row.some((f) => f !== "")) rows.push(row);
-            row = [];
-            i += 2;
-          } else if (ch === '\n') {
-            row.push(field);
-            field = "";
-            if (row.some((f) => f !== "")) rows.push(row);
-            row = [];
-            i++;
-          } else {
-            field += ch;
-            i++;
-          }
-        }
-      }
-      if (field !== "" || row.length > 0) {
-        row.push(field);
-        if (row.some((f) => f !== "")) rows.push(row);
-      }
-      return rows;
-    }
-
-    const allRows = parseCsv(csvText);
-
-    if (allRows.length < 2) {
-      return res.status(400).json({ message: "Il foglio è vuoto o mancano le righe" });
-    }
-
-    const headerRow = allRows[0];
-    const langColumnIndexes: Record<string, number> = {};
-    for (const lang of langs) {
-      const colHeader = lang.toUpperCase();
-      const idx = headerRow.indexOf(colHeader);
-      if (idx !== -1) {
-        langColumnIndexes[lang] = idx;
-      }
-    }
-
-    const importedData: Record<string, Record<string, string>> = {};
-    for (const lang of langs) {
-      importedData[lang] = {};
-    }
-
-    for (let i = 1; i < allRows.length; i++) {
-      const row = allRows[i];
-      const key = row[0];
-      if (!key || !keyMap[key]) continue;
-      for (const lang of langs) {
-        const colIdx = langColumnIndexes[lang];
-        if (colIdx !== undefined) {
-          const val = row[colIdx] || "";
-          if (val.trim()) {
-            importedData[lang][key] = val;
-          }
-        }
-      }
-    }
-
-    TRANSLATIONS_STAGING.importedData = importedData;
-
-    const summary = langs.map((l) => `${l.toUpperCase()}: ${Object.keys(importedData[l] || {}).length} stringhe`).join(", ");
-    return res.json({
-      langs,
-      summary,
-      message: `Dati importati: ${summary}`,
-    });
-  } catch (error) {
-    console.error("[translations/import] error:", error);
-    return res.status(500).json({ message: "Errore durante l'importazione" });
-  }
-});
-
-router.post("/translations/apply", async (_req: Request, res: Response) => {
-  try {
-    const { importedData, keyMap } = TRANSLATIONS_STAGING;
-
-    if (Object.keys(importedData).length === 0) {
-      return res.status(400).json({ message: "Nessun dato importato. Esegui prima 'Importa da Drive'" });
-    }
-
-    const allKeys = Object.keys(keyMap);
-    const summaryByLang: Record<string, { updated: number; skipped: number }> = {};
-
-    for (const [lang, translations] of Object.entries(importedData)) {
-      if (!ALLOWED_LANGS.has(lang)) {
-        console.warn(`[translations/apply] skipping unknown lang: ${lang}`);
-        continue;
-      }
-      const filePath = LANG_FILE_MAP[lang];
-
-      const existingValues: Record<string, string> = {};
-      try {
-        const existing = fs.readFileSync(filePath, "utf-8");
-        const kvRegex = /^\s*"([^"]+)"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,?\s*$/gm;
-        let m: RegExpExecArray | null;
-        while ((m = kvRegex.exec(existing)) !== null) {
-          const k = m[1].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
-          const v = m[2].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
-          existingValues[k] = v;
-        }
-      } catch {
-      }
-
-      const varName = lang;
-      const lines: string[] = [`const ${varName}: Record<string, string> = {`];
-
-      let updated = 0;
-      let skipped = 0;
-
-      for (const key of allKeys) {
-        const imported = translations[key];
-        if (imported && imported.trim()) {
-          const escaped = imported.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
-          lines.push(`  "${key}": "${escaped}",`);
-          updated++;
-        } else {
-          const preserved = existingValues[key] ?? "";
-          const escaped = preserved.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
-          lines.push(`  "${key}": "${escaped}",`);
-          skipped++;
-        }
-      }
-
-      lines.push(`};`);
-      lines.push(``);
-      lines.push(`export default ${varName};`);
-      lines.push(``);
-
-      fs.writeFileSync(filePath, lines.join("\n"), "utf-8");
-      summaryByLang[lang] = { updated, skipped };
-    }
-
-    const summaryStr = Object.entries(summaryByLang)
-      .map(([l, s]) => `${l.toUpperCase()}: ${s.updated} aggiornate, ${s.skipped} preservate`)
-      .join(" | ");
-
-    return res.json({
-      summary: summaryByLang,
-      message: `Traduzioni applicate: ${summaryStr}`,
-    });
-  } catch (error) {
-    console.error("[translations/apply] error:", error);
-    return res.status(500).json({ message: "Errore durante l'applicazione delle traduzioni" });
-  }
-});
 
 router.get("/coordinate-history/stats", async (_req: Request, res: Response) => {
   try {
@@ -4615,29 +4110,6 @@ router.patch("/settings/floating-widget", async (req: Request, res: Response) =>
   }
 });
 
-router.get("/drive/storage-info", async (_req: Request, res: Response) => {
-  try {
-    const drive = getDriveClient();
-    const about = await drive.about.get({ fields: "storageQuota" });
-    const quota = about.data?.storageQuota ?? {};
-    return res.json({
-      limit: quota.limit ? parseInt(quota.limit) : null,
-      usage: quota.usage ? parseInt(quota.usage) : null,
-      usageInDrive: quota.usageInDrive ? parseInt(quota.usageInDrive) : null,
-    });
-  } catch (error: any) {
-    console.error("Drive storage-info error — code:", error?.code, "errors:", JSON.stringify(error?.errors ?? []), error);
-    const isPermission =
-      error?.code === 403 ||
-      error?.errors?.some((e: any) =>
-        ["forbidden", "insufficientPermissions", "notFound"].includes(e.reason)
-      );
-    if (isPermission) {
-      return res.status(403).json({ message: "Il Service Account non ha permessi di lettura su Drive." });
-    }
-    return res.status(500).json({ message: "Errore nel recupero quota Drive" });
-  }
-});
 
 router.put("/settings/native-version", async (req: Request, res: Response) => {
   try {

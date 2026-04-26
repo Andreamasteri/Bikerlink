@@ -1,23 +1,25 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, TextInput, Platform, Switch,
+  ActivityIndicator, TextInput, Platform, Switch, Alert,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import Colors from "@/constants/colors";
-import { getApiUrl, queryClient, apiRequest } from "@/lib/query-client";
+import { getApiUrl, queryClient, apiRequest, authFetchHeaders } from "@/lib/query-client";
 
 interface BackupStatus {
   scheduled: boolean;
   autoEnabled: boolean;
-  lastDbBackup: { timestamp: string; size: number } | null;
-  lastMediaBackup: { timestamp: string; size: number } | null;
+  lastDbBackup: { timestamp: string; size: number; objectPath?: string; fileName?: string } | null;
+  lastMediaBackup: { timestamp: string; size: number; objectPath?: string; fileName?: string } | null;
   isBackingUp: boolean;
   nextScheduled: string | null;
   nextMediaScheduled: string | null;
-  driveFolder: { folderId: string; folderName: string } | null;
+  storage: { type: "object_storage"; prefix: string };
   dbHours: number;
   mediaHours: number;
   configured: boolean;
@@ -47,6 +49,7 @@ export default function BackupScreen() {
   const [dbHoursInput, setDbHoursInput] = useState("");
   const [mediaHoursInput, setMediaHoursInput] = useState("");
   const [freqEditing, setFreqEditing] = useState(false);
+  const [downloadingType, setDownloadingType] = useState<null | "db" | "media">(null);
 
   const freqInitialized = useRef(false);
   const { data: status, refetch: refetchStatus } = useQuery<BackupStatus>({
@@ -125,6 +128,55 @@ export default function BackupScreen() {
     freqMutation.mutate({ dbHours: dbH, mediaHours: mediaH });
   }
 
+  async function handleDownload(type: "db" | "media") {
+    const meta = type === "db" ? status?.lastDbBackup : status?.lastMediaBackup;
+    if (!meta) {
+      Alert.alert("Nessun backup", "Esegui prima un backup manuale o automatico.");
+      return;
+    }
+    setDownloadingType(type);
+    try {
+      const url = new URL(`/api/admin/backup/download/${type}`, getApiUrl()).toString();
+      const fileName = meta.fileName
+        || (type === "db" ? "bikerlink_db.sql.gz" : "bikerlink_media.zip");
+
+      if (Platform.OS === "web") {
+        const res = await fetch(url, {
+          credentials: "include",
+          headers: authFetchHeaders(),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+      } else {
+        const filePath = `${FileSystem.cacheDirectory}${fileName}`;
+        const dl = await FileSystem.downloadAsync(url, filePath, {
+          headers: authFetchHeaders(),
+        });
+        if (dl.status !== 200) throw new Error(`HTTP ${dl.status}`);
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(dl.uri, {
+            dialogTitle: `Salva ${fileName}`,
+            mimeType: type === "db" ? "application/gzip" : "application/zip",
+          });
+        } else {
+          Alert.alert("Scaricato", `Salvato in: ${dl.uri}`);
+        }
+      }
+    } catch (err: any) {
+      Alert.alert("Errore download", err?.message || "Impossibile scaricare");
+    } finally {
+      setDownloadingType(null);
+    }
+  }
+
   const isBackingUp = backupDbMutation.isPending || backupMediaMutation.isPending || status?.isBackingUp;
 
   return (
@@ -137,17 +189,15 @@ export default function BackupScreen() {
     >
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
-          <MaterialCommunityIcons name="google-drive" size={22} color={Colors.accent} />
-          <Text style={styles.cardTitle}>Cartelle Drive</Text>
+          <MaterialCommunityIcons name="cloud-lock" size={22} color={Colors.accent} />
+          <Text style={styles.cardTitle}>Object Storage</Text>
         </View>
-        <View style={styles.folderRow}>
-          <MaterialCommunityIcons name="folder" size={18} color={Colors.accent} />
-          <Text style={styles.folderName} numberOfLines={1}>DB → Backup DB BikerLink</Text>
-        </View>
-        <View style={styles.folderRow}>
-          <MaterialCommunityIcons name="folder" size={18} color={Colors.accent} />
-          <Text style={styles.folderName} numberOfLines={1}>Media → Backup Media BikerLink</Text>
-        </View>
+        <Text style={styles.storageInfo}>
+          I backup vengono salvati automaticamente sull'Object Storage privato di Replit.
+        </Text>
+        <Text style={styles.storagePath}>
+          {status?.storage?.prefix || ".private/backups"}/
+        </Text>
       </View>
 
       <View style={styles.card}>
@@ -173,12 +223,32 @@ export default function BackupScreen() {
             <Text style={styles.lastLabel}>Ultimo DB</Text>
             <Text style={styles.lastValue}>{status?.lastDbBackup ? formatDate(status.lastDbBackup.timestamp) : "—"}</Text>
             {status?.lastDbBackup && <Text style={styles.lastSize}>{formatBytes(status.lastDbBackup.size)}</Text>}
+            <TouchableOpacity
+              style={[styles.downloadBtn, (!status?.lastDbBackup || downloadingType === "db") && styles.btnDisabled]}
+              onPress={() => handleDownload("db")}
+              disabled={!status?.lastDbBackup || downloadingType === "db"}
+            >
+              {downloadingType === "db"
+                ? <ActivityIndicator size="small" color={Colors.accent} />
+                : <MaterialCommunityIcons name="download" size={16} color={Colors.accent} />}
+              <Text style={styles.downloadBtnText}>Scarica</Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.divider} />
           <View style={styles.lastItem}>
             <Text style={styles.lastLabel}>Ultimo Media</Text>
             <Text style={styles.lastValue}>{status?.lastMediaBackup ? formatDate(status.lastMediaBackup.timestamp) : "—"}</Text>
             {status?.lastMediaBackup && <Text style={styles.lastSize}>{formatBytes(status.lastMediaBackup.size)}</Text>}
+            <TouchableOpacity
+              style={[styles.downloadBtn, (!status?.lastMediaBackup || downloadingType === "media") && styles.btnDisabled]}
+              onPress={() => handleDownload("media")}
+              disabled={!status?.lastMediaBackup || downloadingType === "media"}
+            >
+              {downloadingType === "media"
+                ? <ActivityIndicator size="small" color={Colors.accent} />
+                : <MaterialCommunityIcons name="download" size={16} color={Colors.accent} />}
+              <Text style={styles.downloadBtnText}>Scarica</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -229,9 +299,9 @@ export default function BackupScreen() {
 
       <View style={styles.actionsRow}>
         <TouchableOpacity
-          style={[styles.actionBtn, styles.actionBtnGreen, (!!isBackingUp || !status?.driveFolder) && styles.btnDisabled]}
+          style={[styles.actionBtn, styles.actionBtnGreen, !!isBackingUp && styles.btnDisabled]}
           onPress={() => backupDbMutation.mutate()}
-          disabled={!!isBackingUp || !status?.driveFolder}
+          disabled={!!isBackingUp}
           activeOpacity={0.8}
         >
           {backupDbMutation.isPending
@@ -242,9 +312,9 @@ export default function BackupScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.actionBtn, styles.actionBtnBlue, (!!isBackingUp || !status?.driveFolder) && styles.btnDisabled]}
+          style={[styles.actionBtn, styles.actionBtnBlue, !!isBackingUp && styles.btnDisabled]}
           onPress={() => backupMediaMutation.mutate()}
-          disabled={!!isBackingUp || !status?.driveFolder}
+          disabled={!!isBackingUp}
           activeOpacity={0.8}
         >
           {backupMediaMutation.isPending
@@ -279,14 +349,20 @@ const styles = StyleSheet.create({
   },
   cardHeaderRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
   cardTitle: { flex: 1, fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.text },
-  folderRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  folderName: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.text },
+  storageInfo: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, marginBottom: 8 },
+  storagePath: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.accent },
   statusSub: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, marginBottom: 4, marginLeft: 32 },
   lastRow: { flexDirection: "row", borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 12, marginTop: 4 },
   lastItem: { flex: 1, alignItems: "center" },
   lastLabel: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginBottom: 2 },
   lastValue: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.text, textAlign: "center" },
   lastSize: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
+  downloadBtn: {
+    marginTop: 8, flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
+    borderWidth: 1, borderColor: Colors.accent + "40",
+  },
+  downloadBtnText: { color: Colors.accent, fontSize: 12, fontFamily: "Inter_600SemiBold" },
   divider: { width: 1, backgroundColor: Colors.border, marginHorizontal: 8 },
   freqRow: { flexDirection: "row", alignItems: "flex-end", gap: 10 },
   freqItem: { flex: 1 },

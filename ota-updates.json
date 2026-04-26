@@ -4804,7 +4804,9 @@
     "message": "OTA-156 rv7.0.0: fix FileSystem.EncodingType.Base64 undefined in traduzioni download",
     "publishedAt": "2026-04-26",
     "runtimeVersion": "7.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "note": "Fix: FileSystem.EncodingType.Base64 era undefined in expo-file-system v55 — sostituito con stringa letterale 'base64' in handleDownloadXlsx e handleDownloadDocx (app/admin/traduzioni.tsx righe 728 e 773). CURRENT_OTA_NUMBER=156.",
     "releaseId": "517a5e01-3670-4f18-9c81-04556447205c",
@@ -4828,7 +4830,9 @@
     "message": "OTA-157 rv7.0.0: fix sessione persistente APK Android (auth dual cookie+Bearer token)",
     "publishedAt": "2026-04-26",
     "runtimeVersion": "7.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "note": "Fix strutturale logout involontari su APK Android: il cookie jar di React Native perdeva connect.sid (process killed dall'OS, OTA reload). Aggiunto sistema dual-auth: il backend ritorna sessionToken (formato s:<sid>.<sig>) nei response di login/register/reset/verify; il client lo salva in AsyncStorage (@bikerlink/session_token) e lo invia come header Authorization: Bearer in tutte le richieste; un middleware lato server prima di express-session lo ri-inietta come cookie connect.sid sintetico se assente. Cookie restano attivi (retrocompatibile). File: server/routes.ts (bridge middleware), server/routes/auth.ts (buildSessionToken+sessionToken nei 4 response), lib/query-client.ts (helpers initSessionToken/setSessionToken/clearSessionToken/authFetchHeaders+Authorization su apiRequest+getQueryFn), lib/auth-context.tsx (save/clear token su login/register/logout, init al boot, Bearer su /me e /users/nearby). CURRENT_OTA_NUMBER=157.",
     "releaseId": "38289f3e-f0e8-4538-a10d-7a9f76489026",
@@ -4852,7 +4856,9 @@
     "message": "OTA-158 rv7.0.0: completa dual-auth — sessionToken salvato anche dopo reset password e verifica email",
     "publishedAt": "2026-04-26",
     "runtimeVersion": "7.0.0",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "jsEngine": "hermes",
     "note": "Completa il fix dual-auth di OTA-157: aggiunto setSessionToken anche in app/(auth)/forgot-password.tsx (handleReset) e app/(auth)/verify-email.tsx (handleVerify) — prima il backend ritornava sessionToken in tutti e 4 i response auth ma il frontend lo salvava solo dopo login/register. Ora la sessione persiste anche dopo reset password e verifica email su APK Android. Inoltre: server/index.ts redazione del campo sessionToken nei log delle response per evitare leak in console (sostituito con [REDACTED]). CURRENT_OTA_NUMBER=158.",
     "releaseId": "eca8d5ae-459f-4f3d-807b-5d3fd807ee83",
@@ -4861,6 +4867,58 @@
     "androidUpdateId": null,
     "iosUpdateId": null,
     "commitBase": "7c2e84fd6ef8ebdd7d090f04ede6c336e5fb45c5",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 38,
+    "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 159,
+    "version": "1.159.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-159 rv7.0.0: rimosso googleapis (~122MB), backup migrato da Drive a Object Storage Replit",
+    "publishedAt": "2026-04-26",
+    "runtimeVersion": "7.0.0",
+    "platforms": [
+      "android"
+    ],
+    "jsEngine": "hermes",
+    "note": "Cleanup tecnico Task #967: (1) eliminato server/lib/drive-client.ts e rimosso pacchetto googleapis dalle dipendenze (~122MB risparmiati); (2) server/backup-service.ts riscritto per usare Replit Object Storage (.private/backups/db/ + .private/backups/media/) invece di Google Drive — schedule giornaliero/settimanale invariato; (3) admin.ts: rimossi tutti gli endpoint Drive (/translations/browse, file-path, folder-cache, prefs, preview-sheet, import, apply, /backup/drive-folder, /drive/storage-info), aggiunto GET /api/admin/backup/download/:type per scaricare backup direttamente da Object Storage; (4) UI app/admin/backup.tsx: rimossa card Cartelle Drive, sostituita con card Object Storage + bottoni Scarica per DB/Media; (5) UI app/admin/traduzioni.tsx: semplificato in 3 step (Prepara → Scarica xlsx/docx → Riavvia Backend), rimosso DriveFileBrowser (~340 righe) e Step Importa/Applica da Drive; (6) metro.config.js: rimosso googleapis da SERVER_ONLY_PACKAGES. CURRENT_OTA_NUMBER=159.",
+    "releaseId": "ad5381f6-2fa5-40f4-b655-b004b9253c22",
+    "bundleUrl": "private/ota/ota-1.159.0-1777197920991.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "58d6eba90e7f3128f9dc46f514e347cb99444067",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 38,
+    "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 160,
+    "version": "1.160.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-160 rv7.0.0: fix download backup admin (Authorization Bearer header)",
+    "publishedAt": "2026-04-26",
+    "runtimeVersion": "7.0.0",
+    "platforms": [
+      "android"
+    ],
+    "jsEngine": "hermes",
+    "note": "Hotfix Task #967: app/admin/backup.tsx — handleDownload() ora invia Authorization: Bearer <token> via authFetchHeaders() sia sul percorso web (fetch+blob) che nativo (FileSystem.downloadAsync con options.headers). Senza questo header, gli endpoint admin protetti da requireAdmin restituivano 401 e i download del backup DB/media fallivano. CURRENT_OTA_NUMBER=160.",
+    "releaseId": "df812d5f-af21-45ac-b494-44edbeb3f4d4",
+    "bundleUrl": "private/ota/ota-1.160.0-1777198274220.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "58d6eba90e7f3128f9dc46f514e347cb99444067",
     "easDashboard": null,
     "apkBuildId": null,
     "apkVersionCode": 38,

@@ -56,7 +56,6 @@ config.resolver.blockList = [
 config.resolver.platforms = ["ios", "android", "web"];
 
 const SERVER_ONLY_PACKAGES = [
-  "googleapis",
   "pdfkit",
   "sharp",
   "docx",
