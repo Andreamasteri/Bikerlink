@@ -5026,7 +5026,7 @@
     "apkCompletedAt": "2026-04-26T12:35:18.932Z",
     "deviceTestStatus": "pending",
     "deviceTestNote": "Task #996: APK v39 (versionCode 39, versionName 3.0.0, rv 8.0.0) da verificare su Android — no crash al boot, login funzionante, mappe visibili. URL: https://expo.dev/artifacts/eas/nUADFAf6ddBUzcbZMjKBxR.apk",
-    "status": "published"
+    "status": "superseded"
   },
   {
     "updateNumber": null,
@@ -5056,5 +5056,31 @@
     "deviceTestStatus": "pending",
     "deviceTestNote": "APK v40 in build su EAS — da verificare su Android dopo completamento (no crash al boot, login funzionante, mappe visibili).",
     "status": "building"
+  },
+  {
+    "updateNumber": 2,
+    "version": "1.2.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-2 rv8.0.0: spiderfy biker sovrapposti su mappa",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "note": "Task #1016: integrato OverlappingMarkerSpiderfier-Leaflet (CDN unpkg 0.2.7) in lib/leaflet-map-html.ts. I marker biker/zavorrina/coppia con coordinate vicine (entro 22px) si aprono ora a ventaglio al tap, con linee arancio (#FF6600). Nessun cambio per workshops/events/clubs/eggs/SOS/realMe/fakeMe. CURRENT_OTA_NUMBER=2.",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "3a1fd7cb-3ee2-4fb9-9ee7-15345ecb9041",
+    "bundleUrl": "private/ota/ota-1.2.0-1777237353606.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "d768a0c5c05717ac20d55b66262e84c71c14bbc4",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 39,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-26T21:02:36.323Z"
   }
 ]

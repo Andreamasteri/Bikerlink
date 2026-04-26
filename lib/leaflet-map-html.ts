@@ -102,12 +102,24 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     return SVG.motorbike;
   }
 
-  function addMarker(lat, lng, html, size, anchor, onClick) {
+  function addMarker(lat, lng, html, size, anchor, onClick, omsData) {
     var m = L.marker([lat, lng], {
       icon: L.divIcon({ html: html, className: "", iconSize: size, iconAnchor: anchor })
     }).addTo(markersLayer);
-    if (onClick) m.on("click", onClick);
+    if (omsData && oms) {
+      m.bikerlinkData = omsData;
+      try { oms.addMarker(m); } catch(e) {}
+    } else if (onClick) {
+      m.on("click", onClick);
+    }
     return m;
+  }
+
+  function clearAllMarkers() {
+    if (oms) {
+      try { oms.clearMarkers(); } catch(e) {}
+    }
+    markersLayer.clearLayers();
   }
 
   /* ── Bridge ───────────────────────────────────────────────────────── */
@@ -126,7 +138,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
         }).addTo(map);
       }
 
-      markersLayer.clearLayers();
+      clearAllMarkers();
       circlesLayer.clearLayers();
 
       /* GPS blue dot */
@@ -166,10 +178,11 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
         addMarker(sos.lat, sos.lng, sosHtml, [80, 24], [40, 24], null);
       });
 
-      /* Users */
+      /* Users — registrati con OMS per spiderfy su sovrapposizione */
       (m.users || []).forEach(function(u) {
         var color = getUserColor(u.userType, u.sex);
         var svg = getUserSvg(u.userType, u.sex);
+        var omsData = { type: "user", id: u.id };
         var html;
         if (u.isCurrentUser) {
           html = "<div style=\\"display:flex;flex-direction:column;align-items:center;\\">" +
@@ -177,13 +190,9 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
             "font-size:10px;font-weight:700;color:#fff;margin-bottom:2px;" +
             "box-shadow:0 1px 4px rgba(0,0,0,0.4);border:1.5px solid rgba(255,255,255,0.8)\\">Tu</div>" +
             iconBadge(color, svg, 36) + "</div>";
-          addMarker(u.lat, u.lng, html, [52, 60], [26, 60], function() {
-            postMsg({ type: "markerPress", markerType: "user", id: u.id });
-          });
+          addMarker(u.lat, u.lng, html, [52, 60], [26, 60], null, omsData);
         } else {
-          addMarker(u.lat, u.lng, iconBadge(color, svg, 30), [30, 30], [15, 15], function() {
-            postMsg({ type: "markerPress", markerType: "user", id: u.id });
-          });
+          addMarker(u.lat, u.lng, iconBadge(color, svg, 30), [30, 30], [15, 15], null, omsData);
         }
       });
 
