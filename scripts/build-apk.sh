@@ -131,7 +131,7 @@ if [[ "$GP_LINE" != "reactNativeArchitectures=arm64-v8a" ]]; then
   echo "     Task #1017 richiede arm64-v8a SOLO (default permanente)."
   exit 1
 fi
-BG_LINE=$(grep -oE 'abiFilters[[:space:]]+"[^"]*"(,[[:space:]]*"[^"]*")*' android/app/build.gradle | head -1)
+BG_LINE=$(grep -oE 'abiFilters[[:space:]]+"[^"]*"(,[[:space:]]*"[^"]*")*' android/app/build.gradle 2>/dev/null | head -1 || true)
 if [[ "$BG_LINE" != 'abiFilters "arm64-v8a"' ]]; then
   echo "  ✖  REGRESSIONE ABI rilevata in android/app/build.gradle"
   echo '     Atteso: abiFilters "arm64-v8a"'
