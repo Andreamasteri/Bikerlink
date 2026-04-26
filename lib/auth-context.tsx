@@ -42,7 +42,7 @@ function useLoginMutation() {
       if (response?.sessionToken) {
         await setSessionToken(response.sessionToken);
       }
-      const { sessionToken: _t, ...user } = response as any;
+      const { sessionToken: _t, ...user } = response;
       queryClient.setQueryData(["/api/auth/me"], user);
       AsyncStorage.setItem(HAD_SESSION_KEY, "true").catch(() => {});
       queryClient.invalidateQueries({
