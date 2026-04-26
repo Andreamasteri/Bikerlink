@@ -23,6 +23,7 @@ const LANGS = [
   { code: "de", label: "DE — Tedesco" },
   { code: "es", label: "ES — Spagnolo" },
   { code: "fr", label: "FR — Francese" },
+  { code: "el", label: "EL — Greco" },
   { code: "tr", label: "TR — Turco" },
 ];
 
@@ -121,7 +122,7 @@ export default function TraduzioniScreen() {
   const [prepareStatus, setPrepareStatus] = useState<StepStatus>("idle");
   const [prepareResult, setPrepareResult] = useState("");
 
-  const [exportLangs, setExportLangs] = useState<string[]>(["en", "de", "es", "fr", "tr"]);
+  const [exportLangs, setExportLangs] = useState<string[]>(["en", "de", "es", "fr", "el", "tr"]);
 
   const [restartStatus, setRestartStatus] = useState<StepStatus>("idle");
   const [restartResult, setRestartResult] = useState("");
@@ -184,7 +185,7 @@ export default function TraduzioniScreen() {
     setDocxLoading(true);
     setDocxResult(null);
     try {
-      const langs = exportLangs.length > 0 ? exportLangs : ["en", "de", "es", "fr", "tr"];
+      const langs = exportLangs.length > 0 ? exportLangs : ["en", "de", "es", "fr", "el", "tr"];
       const url = new URL(
         `/api/admin/translations/download-docx?langs=${langs.join(",")}`,
         getApiUrl()

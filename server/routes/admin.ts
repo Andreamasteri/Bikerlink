@@ -3602,13 +3602,14 @@ const TRANSLATIONS_STAGING: {
   exportedLangs: [],
 };
 
-const ALLOWED_LANGS = new Set(["en", "de", "es", "fr", "tr"]);
+const ALLOWED_LANGS = new Set(["en", "de", "es", "fr", "el", "tr"]);
 
 const LANG_FILE_MAP: Record<string, string> = {
   en: path.resolve(process.cwd(), "lib/i18n/en.ts"),
   de: path.resolve(process.cwd(), "lib/i18n/de.ts"),
   es: path.resolve(process.cwd(), "lib/i18n/es.ts"),
   fr: path.resolve(process.cwd(), "lib/i18n/fr.ts"),
+  el: path.resolve(process.cwd(), "lib/i18n/el.ts"),
   tr: path.resolve(process.cwd(), "lib/i18n/tr.ts"),
 };
 
@@ -3617,6 +3618,7 @@ const LANG_LABELS: Record<string, string> = {
   de: "Tedesco (DE)",
   es: "Spagnolo (ES)",
   fr: "Francese (FR)",
+  el: "Greco (EL)",
   tr: "Turco (TR)",
 };
 
@@ -4102,7 +4104,7 @@ router.post(
       }
       if (langColumns.length === 0) {
         return res.status(400).json({
-          message: "Header tabella non riconosciuto: nessuna colonna lingua valida (EN, DE, ES, FR, TR)",
+          message: "Header tabella non riconosciuto: nessuna colonna lingua valida (EN, DE, ES, FR, EL, TR)",
         });
       }
 

@@ -814,6 +814,7 @@ export default function EditProfileScreen() {
                   { code: "de" as AppLanguage, flag: "🇩🇪", label: "Deutsch" },
                   { code: "es" as AppLanguage, flag: "🇪🇸", label: "Español" },
                   { code: "fr" as AppLanguage, flag: "🇫🇷", label: "Français" },
+                  { code: "el" as AppLanguage, flag: "🇬🇷", label: "Ελληνικά" },
                   { code: "tr" as AppLanguage, flag: "🇹🇷", label: "Türkçe" },
                 ]).map((lang) => {
                   const isActive = language === lang.code;
