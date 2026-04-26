@@ -230,7 +230,8 @@ router.post("/:id/photos", requireAuth, async (req: Request, res: Response) => {
     const rawBuffer = Buffer.from(base64Data, "base64");
     const { compressToWebP } = await import("../utils/image-processing");
     const compressed = await compressToWebP(rawBuffer, detectedMime);
-    const uniqueName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.webp`;
+    const ext = compressed.mimeType === "image/gif" ? ".gif" : ".webp";
+    const uniqueName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}${ext}`;
     const filePath = path.join(uploadsDir, uniqueName);
     fs.writeFileSync(filePath, compressed.buffer);
 

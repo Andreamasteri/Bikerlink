@@ -48,7 +48,8 @@ router.post("/entries", upload.single("photo"), async (req: Request, res: Respon
     if (req.file) {
       const { compressToWebP } = await import("../utils/image-processing");
       const compressed = await compressToWebP(req.file.buffer, req.file.mimetype);
-      const filename = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.webp`;
+      const ext = compressed.mimeType === "image/gif" ? ".gif" : ".webp";
+      const filename = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}${ext}`;
       const objectPath = `public/contest/${filename}`;
 
       await uploadBuffer(objectPath, compressed.buffer, compressed.mimeType);
