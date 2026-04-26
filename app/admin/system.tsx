@@ -15,8 +15,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useNavigation } from "expo-router";
+import Constants from "expo-constants";
 import otaUpdatesRaw from "@/ota-updates.json";
 import { getApiUrl } from "@/lib/query-client";
+import { evaluateUpdateOutcome, type UpdateOutcome } from "@/lib/semver";
+import {
+  triggerSoftPreview,
+  triggerForcedPreview,
+  forceRecheck,
+} from "@/components/NativeUpdateChecker";
 
 interface OtaUpdateEntry {
   updateNumber: number;
@@ -124,6 +131,38 @@ interface NativeVersionConfig {
   ios: { latestVersion: string; minVersion: string; storeUrl: string };
 }
 
+interface VersionDistributionRow {
+  platform: string;
+  version: string;
+  count: number;
+}
+
+interface VersionDistribution {
+  totalTracked: number;
+  underMin: number;
+  underLatest: number;
+  config: {
+    android: { latestVersion: string; minVersion: string };
+    ios: { latestVersion: string; minVersion: string };
+  };
+  byPlatformVersion: VersionDistributionRow[];
+  windowDays: number;
+  generatedAt: string;
+}
+
+function platformLabel(p: string): string {
+  if (p === "android") return "Android";
+  if (p === "ios") return "iOS";
+  if (p === "web") return "Web";
+  return p;
+}
+
+function outcomeMeta(o: UpdateOutcome): { label: string; color: string; icon: keyof typeof Ionicons.glyphMap } {
+  if (o === "force") return { label: "Force update richiesto", color: "#FF4444", icon: "alert-circle" };
+  if (o === "soft") return { label: "Soft update disponibile", color: "#FFAA00", icon: "arrow-up-circle" };
+  return { label: "Nessun aggiornamento", color: "#44AA44", icon: "checkmark-circle" };
+}
+
 export default function SystemScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -137,9 +176,38 @@ export default function SystemScreen() {
   const [nativeIosUrl, setNativeIosUrl] = useState("");
   const [savingNative, setSavingNative] = useState(false);
 
-  const { data: nativeVerData } = useQuery<NativeVersionConfig>({
+  const { data: nativeVerData, refetch: refetchNativeVer, isFetching: isFetchingNativeVer } = useQuery<NativeVersionConfig>({
     queryKey: ["/api/settings/native-version"],
   });
+
+  const {
+    data: versionDist,
+    isLoading: isLoadingDist,
+    isFetching: isFetchingDist,
+    refetch: refetchDist,
+  } = useQuery<VersionDistribution>({
+    queryKey: ["/api/admin/settings/version-distribution"],
+    refetchInterval: 60000,
+  });
+
+  const installedVersion = Constants.expoConfig?.version ?? "0.0.0";
+  const installedPlatform: "android" | "ios" | "web" = Platform.OS === "ios" ? "ios" : Platform.OS === "android" ? "android" : "web";
+
+  const checkOutcome: UpdateOutcome | null = useMemo(() => {
+    if (!nativeVerData || installedPlatform === "web") return null;
+    const cfg = installedPlatform === "android" ? nativeVerData.android : nativeVerData.ios;
+    return evaluateUpdateOutcome(installedVersion, cfg.minVersion, cfg.latestVersion);
+  }, [nativeVerData, installedPlatform, installedVersion]);
+
+  const [isRechecking, setIsRechecking] = useState(false);
+  const handleForceRecheck = useCallback(async () => {
+    setIsRechecking(true);
+    try {
+      await Promise.all([refetchNativeVer(), forceRecheck()]);
+    } finally {
+      setIsRechecking(false);
+    }
+  }, [refetchNativeVer]);
 
   useEffect(() => {
     if (!nativeVerData) return;
@@ -443,6 +511,187 @@ export default function SystemScreen() {
             </TouchableOpacity>
           </View>
 
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={Colors.accent} />
+              <Text style={styles.cardTitle}>Verifica aggiornamenti versione</Text>
+              <TouchableOpacity onPress={handleForceRecheck} disabled={isRechecking || isFetchingNativeVer}>
+                {(isRechecking || isFetchingNativeVer) ? (
+                  <ActivityIndicator size="small" color={Colors.accent} />
+                ) : (
+                  <Ionicons name="refresh" size={18} color={Colors.accent} />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.kvRow}>
+              <Text style={styles.kvLabel}>Versione installata</Text>
+              <Text style={styles.kvValue}>{installedVersion} · {platformLabel(installedPlatform)}</Text>
+            </View>
+
+            {nativeVerData && (
+              <>
+                <View style={styles.kvRow}>
+                  <Text style={styles.kvLabel}>Backend Android</Text>
+                  <Text style={styles.kvValue}>
+                    latest {nativeVerData.android.latestVersion} · min {nativeVerData.android.minVersion}
+                  </Text>
+                </View>
+                <View style={styles.kvRow}>
+                  <Text style={styles.kvLabel}>Backend iOS</Text>
+                  <Text style={styles.kvValue}>
+                    latest {nativeVerData.ios.latestVersion} · min {nativeVerData.ios.minVersion}
+                  </Text>
+                </View>
+              </>
+            )}
+
+            {installedPlatform === "web" ? (
+              <View style={[styles.outcomeRow, { backgroundColor: "rgba(136,136,136,0.15)" }]}>
+                <Ionicons name="information-circle" size={18} color={Colors.textMuted ?? "#888"} />
+                <Text style={[styles.outcomeText, { color: Colors.textMuted ?? "#888" }]}>
+                  Il check di versione gira solo su Android/iOS.
+                </Text>
+              </View>
+            ) : checkOutcome ? (
+              (() => {
+                const meta = outcomeMeta(checkOutcome);
+                return (
+                  <View style={[styles.outcomeRow, { backgroundColor: `${meta.color}22` }]}>
+                    <Ionicons name={meta.icon} size={18} color={meta.color} />
+                    <Text style={[styles.outcomeText, { color: meta.color }]}>{meta.label}</Text>
+                  </View>
+                );
+              })()
+            ) : (
+              <View style={[styles.outcomeRow, { backgroundColor: "rgba(136,136,136,0.15)" }]}>
+                <ActivityIndicator size="small" color={Colors.textMuted ?? "#888"} />
+                <Text style={[styles.outcomeText, { color: Colors.textMuted ?? "#888" }]}>
+                  Caricamento configurazione…
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={[styles.actionBtn, installedPlatform === "web" && styles.actionBtnDisabled]}
+                onPress={() => triggerSoftPreview()}
+                disabled={installedPlatform === "web"}
+              >
+                <Ionicons name="arrow-up-circle-outline" size={16} color="#fff" />
+                <Text style={styles.actionBtnText}>Simula popup soft</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: "#FF4444" }, installedPlatform === "web" && styles.actionBtnDisabled]}
+                onPress={() => triggerForcedPreview()}
+                disabled={installedPlatform === "web"}
+              >
+                <Ionicons name="alert-circle-outline" size={16} color="#fff" />
+                <Text style={styles.actionBtnText}>Simula popup forzato</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={[styles.actionBtnWide, isRechecking && { opacity: 0.6 }]}
+              onPress={handleForceRecheck}
+              disabled={isRechecking}
+            >
+              {isRechecking ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="refresh-circle-outline" size={16} color="#fff" />
+                  <Text style={styles.actionBtnText}>Forza re-check ora</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            {installedPlatform === "web" && (
+              <Text style={styles.hintText}>
+                I pulsanti di simulazione sono disabilitati su web (il modale di update gira solo su mobile).
+              </Text>
+            )}
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="people-outline" size={18} color={Colors.accent} />
+              <Text style={styles.cardTitle}>Distribuzione versioni utenti</Text>
+              <TouchableOpacity onPress={() => refetchDist()} disabled={isFetchingDist}>
+                {isFetchingDist ? (
+                  <ActivityIndicator size="small" color={Colors.accent} />
+                ) : (
+                  <Ionicons name="refresh" size={18} color={Colors.accent} />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {isLoadingDist ? (
+              <View style={{ alignItems: "center", paddingVertical: 16 }}>
+                <ActivityIndicator size="small" color={Colors.accent} />
+              </View>
+            ) : !versionDist ? (
+              <Text style={styles.hintText}>Dati non disponibili.</Text>
+            ) : (
+              <>
+                <View style={styles.statsRow}>
+                  <View style={styles.statBox}>
+                    <Text style={styles.statValue}>{versionDist.totalTracked}</Text>
+                    <Text style={styles.statLabel}>Tracciati ({versionDist.windowDays}gg)</Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text style={[styles.statValue, { color: "#FF4444" }]}>{versionDist.underMin}</Text>
+                    <Text style={styles.statLabel}>{"< minVersion"}</Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text style={[styles.statValue, { color: "#FFAA00" }]}>{versionDist.underLatest}</Text>
+                    <Text style={styles.statLabel}>{"< latestVersion"}</Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text style={[styles.statValue, { color: "#44AA44" }]}>
+                      {versionDist.totalTracked > 0
+                        ? Math.round(((versionDist.totalTracked - versionDist.underMin - versionDist.underLatest) / versionDist.totalTracked) * 100)
+                        : 0}%
+                    </Text>
+                    <Text style={styles.statLabel}>Aggiornati</Text>
+                  </View>
+                </View>
+
+                {versionDist.byPlatformVersion.length === 0 ? (
+                  <Text style={styles.hintText}>Nessun heartbeat con versione negli ultimi {versionDist.windowDays} giorni.</Text>
+                ) : (
+                  ["android", "ios", "web"].map((plat) => {
+                    const rows = versionDist.byPlatformVersion.filter((r) => r.platform === plat);
+                    if (rows.length === 0) return null;
+                    const cfg = plat === "android" ? versionDist.config.android : plat === "ios" ? versionDist.config.ios : null;
+                    return (
+                      <View key={plat} style={{ marginTop: 10 }}>
+                        <Text style={styles.nativeLabel}>{platformLabel(plat)}</Text>
+                        {rows.map((row) => {
+                          let badge: { color: string; text: string } | null = null;
+                          if (cfg) {
+                            const o = evaluateUpdateOutcome(row.version, cfg.minVersion, cfg.latestVersion);
+                            if (o === "force") badge = { color: "#FF4444", text: "< min" };
+                            else if (o === "soft") badge = { color: "#FFAA00", text: "< latest" };
+                          }
+                          return (
+                            <View key={`${plat}-${row.version}`} style={styles.distRow}>
+                              <Text style={styles.distVersion}>{row.version}</Text>
+                              {badge && (
+                                <View style={[styles.distBadge, { backgroundColor: badge.color }]}>
+                                  <Text style={styles.distBadgeText}>{badge.text}</Text>
+                                </View>
+                              )}
+                              <Text style={styles.distCount}>{row.count} utenti</Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    );
+                  })
+                )}
+              </>
+            )}
+          </View>
+
           <Text style={styles.sectionTitle}>Ultimi eventi ({mergedEvents.length})</Text>
         </>
       }
@@ -669,5 +918,140 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
+  },
+  kvRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 6,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border ?? "#333",
+  },
+  kvLabel: {
+    color: Colors.textMuted ?? "#888",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+  },
+  kvValue: {
+    color: Colors.text,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    flexShrink: 1,
+    textAlign: "right",
+    marginLeft: 8,
+  },
+  outcomeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 10,
+    marginBottom: 12,
+  },
+  outcomeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    flex: 1,
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: Colors.accent,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  actionBtnWide: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#444",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  actionBtnDisabled: {
+    opacity: 0.4,
+  },
+  actionBtnText: {
+    color: "#fff",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
+  hintText: {
+    color: Colors.textMuted ?? "#888",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    fontStyle: "italic",
+    marginTop: 8,
+    textAlign: "center",
+  },
+  statsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 4,
+  },
+  statBox: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.border ?? "#333",
+  },
+  statValue: {
+    color: Colors.text,
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+  },
+  statLabel: {
+    color: Colors.textMuted ?? "#888",
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    textAlign: "center",
+    marginTop: 2,
+  },
+  distRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 6,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border ?? "#333",
+  },
+  distVersion: {
+    color: Colors.text,
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    flex: 1,
+  },
+  distBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  distBadgeText: {
+    color: "#fff",
+    fontFamily: "Inter_700Bold",
+    fontSize: 9,
+    letterSpacing: 0.4,
+  },
+  distCount: {
+    color: Colors.textMuted ?? "#888",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
   },
 });

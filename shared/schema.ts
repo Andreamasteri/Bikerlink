@@ -49,6 +49,8 @@ export const users = pgTable("users", {
   lastLoginAt: timestamp("last_login_at"),
   lastLogoutAt: timestamp("last_logout_at"),
   lastAppCloseAt: timestamp("last_app_close_at"),
+  lastAppVersion: varchar("last_app_version", { length: 32 }),
+  lastPlatform: varchar("last_platform", { length: 16 }),
   firstLoginAt: timestamp("first_login_at"),
   firstLoginLat: doublePrecision("first_login_lat"),
   firstLoginLng: doublePrecision("first_login_lng"),

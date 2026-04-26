@@ -11,6 +11,7 @@ import {
 import Constants from "expo-constants";
 import { getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
+import { compareSemver } from "@/lib/semver";
 
 interface PlatformVersionConfig {
   latestVersion: string;
@@ -23,13 +24,43 @@ interface NativeVersionConfig {
   ios: PlatformVersionConfig;
 }
 
-function compareSemver(a: string, b: string): number {
-  const parse = (v: string) => v.split(".").map((n) => parseInt(n, 10) || 0);
-  const [aMaj, aMin, aPatch] = parse(a);
-  const [bMaj, bMin, bPatch] = parse(b);
-  if (aMaj !== bMaj) return aMaj - bMaj;
-  if (aMin !== bMin) return aMin - bMin;
-  return aPatch - bPatch;
+type Listener = (state: { visible: boolean; isForced: boolean; storeUrl: string }) => void;
+
+let listener: Listener | null = null;
+let recheckRunner: (() => Promise<void>) | null = null;
+let lastConfig: NativeVersionConfig | null = null;
+
+function emit(state: { visible: boolean; isForced: boolean; storeUrl: string }) {
+  if (listener) listener(state);
+}
+
+function pickPlatform(config: NativeVersionConfig): PlatformVersionConfig | null {
+  if (Platform.OS === "android") return config.android;
+  if (Platform.OS === "ios") return config.ios;
+  return null;
+}
+
+function fallbackStoreUrl(): string {
+  if (Platform.OS === "ios") return "https://apps.apple.com/app/bikerlink";
+  return "https://play.google.com/store/apps/details?id=com.bikerlink.app";
+}
+
+export function triggerSoftPreview() {
+  const url = lastConfig
+    ? pickPlatform(lastConfig)?.storeUrl || fallbackStoreUrl()
+    : fallbackStoreUrl();
+  emit({ visible: true, isForced: false, storeUrl: url });
+}
+
+export function triggerForcedPreview() {
+  const url = lastConfig
+    ? pickPlatform(lastConfig)?.storeUrl || fallbackStoreUrl()
+    : fallbackStoreUrl();
+  emit({ visible: true, isForced: true, storeUrl: url });
+}
+
+export async function forceRecheck(): Promise<void> {
+  if (recheckRunner) await recheckRunner();
 }
 
 export default function NativeUpdateChecker() {
@@ -39,33 +70,56 @@ export default function NativeUpdateChecker() {
   const checkedRef = useRef(false);
 
   useEffect(() => {
-    if (Platform.OS === "web") return;
-    const timer = setTimeout(async () => {
-      if (checkedRef.current) return;
-      checkedRef.current = true;
+    listener = (state) => {
+      setVisible(state.visible);
+      setIsForced(state.isForced);
+      setStoreUrl(state.storeUrl);
+    };
+    return () => {
+      listener = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const runCheck = async () => {
+      if (Platform.OS === "web") return;
       try {
         const url = new URL("/api/settings/native-version", getApiUrl()).toString();
         const res = await fetch(url);
         if (!res.ok) return;
         const config: NativeVersionConfig = await res.json();
-        const platform: PlatformVersionConfig =
-          Platform.OS === "android" ? config.android : config.ios;
+        lastConfig = config;
+        const platform = pickPlatform(config);
+        if (!platform) return;
         const installed = Constants.expoConfig?.version ?? "0.0.0";
         const { latestVersion, minVersion, storeUrl: sUrl } = platform;
         if (!sUrl || !sUrl.startsWith("https://")) return;
         if (compareSemver(installed, minVersion) < 0) {
-          setStoreUrl(sUrl);
-          setIsForced(true);
-          setVisible(true);
+          emit({ visible: true, isForced: true, storeUrl: sUrl });
         } else if (compareSemver(installed, latestVersion) < 0) {
-          setStoreUrl(sUrl);
-          setIsForced(false);
-          setVisible(true);
+          emit({ visible: true, isForced: false, storeUrl: sUrl });
+        } else {
+          emit({ visible: false, isForced: false, storeUrl: sUrl });
         }
       } catch {
       }
+    };
+
+    recheckRunner = async () => {
+      checkedRef.current = false;
+      await runCheck();
+    };
+
+    if (Platform.OS === "web") return;
+    const timer = setTimeout(async () => {
+      if (checkedRef.current) return;
+      checkedRef.current = true;
+      await runCheck();
     }, 2000);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      recheckRunner = null;
+    };
   }, []);
 
   if (!visible) return null;

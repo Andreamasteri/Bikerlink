@@ -4100,6 +4100,91 @@ router.put("/settings/native-version", async (req: Request, res: Response) => {
 });
 
 // Protected by router.use(requireAdmin) above — only admins can access
+router.get("/settings/version-distribution", async (_req: Request, res: Response) => {
+  try {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const [androidLatest, androidMin, iosLatest, iosMin] = await Promise.all([
+      storage.getAppSetting("native_android_latest"),
+      storage.getAppSetting("native_android_min"),
+      storage.getAppSetting("native_ios_latest"),
+      storage.getAppSetting("native_ios_min"),
+    ]);
+    const config = {
+      android: {
+        latestVersion: androidLatest?.value || "1.0.0",
+        minVersion: androidMin?.value || "1.0.0",
+      },
+      ios: {
+        latestVersion: iosLatest?.value || "1.0.0",
+        minVersion: iosMin?.value || "1.0.0",
+      },
+    };
+
+    const rows = await db
+      .select({
+        platform: users.lastPlatform,
+        version: users.lastAppVersion,
+        count: sql<number>`COUNT(*)::int`,
+      })
+      .from(users)
+      .where(
+        and(
+          sql`${users.lastLoginAt} IS NOT NULL`,
+          sql`${users.lastLoginAt} >= ${sevenDaysAgo}`,
+          sql`${users.lastAppVersion} IS NOT NULL`,
+          sql`${users.lastPlatform} IS NOT NULL`,
+        ),
+      )
+      .groupBy(users.lastPlatform, users.lastAppVersion);
+
+    const compareSemver = (a: string, b: string): number => {
+      const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
+      const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
+      const [aMaj = 0, aMin = 0, aPatch = 0] = pa;
+      const [bMaj = 0, bMin = 0, bPatch = 0] = pb;
+      if (aMaj !== bMaj) return aMaj - bMaj;
+      if (aMin !== bMin) return aMin - bMin;
+      return aPatch - bPatch;
+    };
+    const semverRe = /^\d+\.\d+\.\d+$/;
+
+    let totalTracked = 0;
+    let underMin = 0;
+    let underLatest = 0;
+    const byPlatformVersion = rows
+      .filter((r) => r.platform && r.version)
+      .map((r) => {
+        const platform = String(r.platform);
+        const version = String(r.version);
+        const count = Number(r.count) || 0;
+        totalTracked += count;
+        if (semverRe.test(version) && (platform === "android" || platform === "ios")) {
+          const cfg = platform === "android" ? config.android : config.ios;
+          if (compareSemver(version, cfg.minVersion) < 0) underMin += count;
+          else if (compareSemver(version, cfg.latestVersion) < 0) underLatest += count;
+        }
+        return { platform, version, count };
+      })
+      .sort((a, b) => {
+        if (a.platform !== b.platform) return a.platform.localeCompare(b.platform);
+        return compareSemver(b.version, a.version);
+      });
+
+    return res.json({
+      totalTracked,
+      underMin,
+      underLatest,
+      config,
+      byPlatformVersion,
+      windowDays: 7,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("version-distribution error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.get("/gps-errors", async (req: Request, res: Response) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 100, 500);

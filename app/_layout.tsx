@@ -16,6 +16,7 @@ import MatchPopupAlert from "@/components/MatchPopupAlert";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import * as Updates from "expo-updates";
+import Constants from "expo-constants";
 
 let Notifications: typeof import("expo-notifications") | null = null;
 try {
@@ -74,7 +75,9 @@ SplashScreen.preventAutoHideAsync();
 const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000;
 async function sendHeartbeat() {
   try {
-    await apiRequest("POST", "/api/auth/heartbeat");
+    const appVersion = Constants.expoConfig?.version ?? "0.0.0";
+    const platform = Platform.OS;
+    await apiRequest("POST", "/api/auth/heartbeat", { appVersion, platform });
   } catch {}
 }
 

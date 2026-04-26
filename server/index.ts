@@ -619,6 +619,13 @@ function setupErrorHandler(app: express.Application) {
         }
 
         try {
+          await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_app_version VARCHAR(32)`);
+          await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_platform VARCHAR(16)`);
+        } catch (e) {
+          console.warn("[MIGRATION] users.last_app_version/last_platform:", e);
+        }
+
+        try {
           await db.execute(sql`ALTER TABLE moto_clubs ADD COLUMN IF NOT EXISTS region VARCHAR(100)`);
           await db.execute(sql`ALTER TABLE moto_clubs ADD COLUMN IF NOT EXISTS country VARCHAR(2)`);
           await db.execute(sql`ALTER TABLE moto_clubs ADD COLUMN IF NOT EXISTS is_featured BOOLEAN NOT NULL DEFAULT false`);

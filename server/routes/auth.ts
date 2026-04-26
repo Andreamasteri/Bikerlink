@@ -574,7 +574,17 @@ router.post("/heartbeat", async (req: Request, res: Response) => {
   try {
     const userId = req.session?.userId;
     if (!userId) return res.status(401).json({ ok: false });
-    await storage.updateUser(userId, { lastLoginAt: new Date() } as any);
+    const body = (req.body ?? {}) as { appVersion?: unknown; platform?: unknown };
+    const semverRe = /^\d+\.\d+\.\d+$/;
+    const platformAllowed = new Set(["android", "ios", "web"]);
+    const update: Record<string, unknown> = { lastLoginAt: new Date() };
+    if (typeof body.appVersion === "string" && semverRe.test(body.appVersion)) {
+      update.lastAppVersion = body.appVersion;
+    }
+    if (typeof body.platform === "string" && platformAllowed.has(body.platform)) {
+      update.lastPlatform = body.platform;
+    }
+    await storage.updateUser(userId, update as any);
     onlineTracker.touch(userId);
     return res.json({ ok: true });
   } catch {
