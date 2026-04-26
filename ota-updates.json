@@ -4790,8 +4790,9 @@
     "easDashboard": null,
     "apkBuildId": "7ecd4368-9640-4200-88e5-c33b902a7edc",
     "apkVersionCode": 38,
-    "apkUrl": null,
+    "apkUrl": "https://expo.dev/artifacts/eas/gEaBaW4hnhupnDP5CpYW1m.apk",
     "status": "published",
-    "apkVersionName": "2.4.0"
+    "apkVersionName": "2.4.0",
+    "apkCompletedAt": "2026-04-26T01:27:31.449Z"
   }
 ]

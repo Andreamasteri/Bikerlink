@@ -15,7 +15,7 @@ description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink
 - **Piattaforma**: Android only (iOS non supportato per OTA)
 - **Canale EAS**: `preview`
 - **Runtime Version**: `7.0.0` (ciclo corrente, APK v38)
-- **APK corrente**: versionCode **38**, versionName **2.4.0** (Task #961 — build EAS inviata 2026-04-26 commit bf49d39, --no-wait; build ID e APK URL da recuperare da https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds e aggiornare in ota-updates.json → OTA-155)
+- **APK corrente**: versionCode **38**, versionName **2.4.0** (completata 2026-04-26T01:27Z — buildId: `7ecd4368-9640-4200-88e5-c33b902a7edc`, APK: https://expo.dev/artifacts/eas/gEaBaW4hnhupnDP5CpYW1m.apk)
 - **OTA corrente**: OTA-155 (bundle custom attivo, EAS non aggiornato — vedere nota sotto)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates` (Expo Updates Protocol v1)
 - **Utenti**: su Android fisico via APK — NON usano il dev server
