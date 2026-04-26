@@ -4949,6 +4949,32 @@
     "apkBuildId": null,
     "apkVersionCode": 38,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 162,
+    "version": "1.162.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-162 rv7.0.0: pulizia pipeline EAS + dedup app.json",
+    "publishedAt": "2026-04-26",
+    "runtimeVersion": "7.0.0",
+    "platforms": [
+      "android"
+    ],
+    "jsEngine": "hermes",
+    "note": "Task #973: rimosso step EAS [7/7] da scripts/publish-ota.sh (incluso ramo auto-recupero IDs via GraphQL); ridotti i passi a 6 (guard, login, export, find, upload, create+publish, check). Dedup app.json: ios.UIBackgroundModes 4→2 ([location, audio]), android.permissions 28→14, android.intentFilters 2→1 (lastfm-callback). OTA di verifica della pipeline semplificata. CURRENT_OTA_NUMBER=162.",
+    "releaseId": "e03bfd85-7858-4290-b26e-3426510baa46",
+    "bundleUrl": "private/ota/ota-1.162.0-1777200739075.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "caa9f80011044dec99d8dc0447c8f0290122453c",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 38,
+    "apkUrl": null,
     "status": "published"
   }
 ]
