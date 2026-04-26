@@ -4065,7 +4065,15 @@ async function parseDocxTable(buffer: Buffer): Promise<ParsedDocxRow[]> {
 
 router.post(
   "/translations/import-docx",
-  docxImportUpload.single("file"),
+  (req: Request, res: Response, next) => {
+    docxImportUpload.single("file")(req, res, (err: unknown) => {
+      if (err) {
+        const msg = err instanceof Error ? err.message : "File non valido";
+        return res.status(400).json({ message: msg });
+      }
+      next();
+    });
+  },
   async (req: Request, res: Response) => {
     try {
       if (!req.file) return res.status(400).json({ message: "File DOCX mancante" });
