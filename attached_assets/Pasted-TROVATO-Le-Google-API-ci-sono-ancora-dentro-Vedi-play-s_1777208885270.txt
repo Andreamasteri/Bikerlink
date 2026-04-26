@@ -1,0 +1,58 @@
+TROVATO! Le Google API ci sono ancora dentro! Vedi: play-services-location, play-services-mlkit-barcode-scanning, play-services-code-scanner, firebase-iid-interop, firebase-measurement-connector, vision-common, barcode-scanning. Non sono state rimosse davvero.
+
+Analizziamo nel dettaglio le 3 zone più pesanti.
+
+
+4 actions
+Aspetta, RISULTATI IMPRESSIONANTI. Fammi finire l'analisi senza il timeout.
+
+
+3 actions
+Ho fatto l'analisi completa dei 129MB dell'APK. Ecco la verità:
+
+Cosa c'è REALMENTE dentro
+Sezione	Peso	Dettaglio
+lib/ (native)	94MB	librerie native compilate
+classes.dex*	40MB	5 file DEX = bytecode Java/Kotlin
+res/	24MB	1.325 file, quasi tutti font TTF
+assets/	5.5MB	bundle JS + modelli ML Kit
+Le bombe trovate
+1. Le Google API NON sono state rimosse — sono ancora tutte dentro!
+Trovati nel APK:
+
+play-services-mlkit-barcode-scanning
+play-services-code-scanner, play-services-location, play-services-cloud-messaging
+play-services-base, play-services-basement, play-services-stats, play-services-tasks
+firebase-encoders (3 varianti), firebase-iid-interop, firebase-measurement-connector
+vision-common, vision-interfaces, barcode-scanning
+2. ML Kit Barcode Scanner = 20MB sprecati
+La libreria libbarhopper_v3.so (lo scanner barcode di Google) pesa 19.3MB totali sulle 4 architetture + altri 868KB di modelli TensorFlow nei file mlkit_barcode_models/*.tflite. Tu non usi codici a barre. Viene tirata dentro automaticamente da expo-camera.
+
+3. APK include x86 e x86_64 = 54MB sprecati
+
+x86_64:      27MB  ← solo per emulatori
+x86:         27MB  ← solo per emulatori  
+arm64-v8a:   25MB  ← telefoni moderni (necessaria)
+armeabi-v7a: 17MB  ← telefoni vecchi (necessaria)
+
+Nessun telefono Android reale usa x86. È codice morto. Filtrandolo via si risparmiano 54MB di colpo.
+
+4. Font TTF = 24MB
+1.325 file in res/, quasi tutti font del pacchetto @expo/vector-icons. Probabilmente carichi tutti i set (FontAwesome, MaterialIcons, Ionicons, AntDesign, Feather, ecc.) anche se ne usi 3-4.
+
+5. Supporto AVIF = 7MB
+libavif_android.so (1.9MB × 4 archi) di expo-image per il formato AVIF. Se usi solo PNG/JPEG, è inutile.
+
+Risparmio realistico stimato
+Intervento	Risparmio
+Rimuovere x86/x86_64 (ABI filter)	−54MB
+Rimuovere ML Kit Barcode da expo-camera	−20MB
+Spostare immagini onboarding (task #991)	−35MB
+Trimming font vector-icons	−10/15MB
+ProGuard/R8 (task #991)	−5/10MB
+Rimuovere AVIF	−7MB
+APK target realistico: 30-45MB invece di 129MB.
+
+Sui backup/log/cache che chiedevi: nell'APK NON ci sono. I tuoi backup, log e cache stanno sul server o sul telefono dopo l'installazione, non finiscono nel pacchetto. Anche i file PDF, DOCX, Excel server-side sono già stati esclusi correttamente dal metro.config.js (li vedo nella lista SERVER_ONLY_PACKAGES).
+
+Aggiorno il task #991 trasformandolo in un piano completo di ottimizzazione APK con tutti questi interventi?

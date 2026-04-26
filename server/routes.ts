@@ -206,6 +206,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/media/harley-promo", async (_req: Request, res: Response) => {
+    try {
+      const { downloadBuffer } = await import("./objectStorage");
+      const buffer = await downloadBuffer("public/playstore/bikerlink_harley_30s.mp4");
+      res.setHeader("Content-Type", "video/mp4");
+      res.setHeader("Content-Length", buffer.length);
+      res.setHeader("Content-Disposition", "inline; filename=\"bikerlink_harley_30s.mp4\"");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      return res.send(buffer);
+    } catch (error) {
+      console.error("Harley promo video serve error:", error);
+      return res.status(404).json({ message: "Video non trovato" });
+    }
+  });
+
   app.get("/api/favorites", async (req: Request, res: Response) => {
     if (!req.session.userId) return res.status(401).json({ message: "Non autenticato" });
     try {
