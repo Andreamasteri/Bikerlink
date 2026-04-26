@@ -4923,6 +4923,32 @@
     "apkBuildId": null,
     "apkVersionCode": 38,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 161,
+    "version": "1.161.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-161 rv7.0.0: rimosso export Excel + fix API deprecata Word (legacy)",
+    "publishedAt": "2026-04-26",
+    "runtimeVersion": "7.0.0",
+    "platforms": [
+      "android"
+    ],
+    "jsEngine": "hermes",
+    "note": "Task #966: rimosso completamente export Excel da admin/traduzioni (UI, stato, funzione, endpoint /api/admin/translations/download-xlsx, import ExcelJS). Disinstallati pacchetti exceljs (~23MB) e xlsx (~7.2MB). Fix warning writeAsStringAsync deprecated su expo-file-system v55: import switchato a expo-file-system/legacy in app/admin/traduzioni.tsx. Il download Word continua a funzionare. CURRENT_OTA_NUMBER=161.",
+    "releaseId": "42b751e0-60d0-4508-ac8e-6d30fbbf2e9c",
+    "bundleUrl": "private/ota/ota-1.161.0-1777200084440.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "d3af69b32032d91cd0ce37bf7621b289ca9daf9c",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 38,
+    "apkUrl": null,
     "status": "published"
   }
 ]

@@ -2,7 +2,6 @@ import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
-import ExcelJS from "exceljs";
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, ShadingType, AlignmentType, TextRun, HeightRule } from "docx";
 import bcrypt from "bcryptjs";
 import { uploadBuffer, objectExists } from "../objectStorage";
@@ -3761,61 +3760,6 @@ router.get("/translations/download-csv", async (req: Request, res: Response) => 
   } catch (error) {
     console.error("[translations/download-csv] error:", error);
     return res.status(500).json({ message: "Errore durante il download CSV" });
-  }
-});
-
-router.get("/translations/download-xlsx", async (req: Request, res: Response) => {
-  try {
-    const langsParam = ((req.query.langs as string) || "").trim();
-    const langs = langsParam
-      ? langsParam.split(",").filter((l) => ALLOWED_LANGS.has(l.trim())).map((l) => l.trim())
-      : Array.from(ALLOWED_LANGS);
-
-    const { keyMap } = TRANSLATIONS_STAGING;
-    if (Object.keys(keyMap).length === 0) {
-      return res.status(400).json({ message: "Esegui prima 'Prepara generazione'" });
-    }
-
-    const headers = ["Chiave", "Posizione nell'app", "IT (fonte)", ...langs.map((l) => l.toUpperCase())];
-
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet("Traduzioni");
-
-    ws.columns = [
-      { key: "col0", width: 40 },
-      { key: "col1", width: 30 },
-      { key: "col2", width: 50 },
-      ...langs.map((_l, i) => ({ key: `col${i + 3}`, width: 50 })),
-    ];
-
-    const headerRow = ws.addRow(headers);
-    headerRow.eachCell((cell) => {
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFF6600" } };
-      cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
-      cell.alignment = { wrapText: true, vertical: "middle", horizontal: "center" };
-      cell.border = {
-        top: { style: "thin", color: { argb: "FFCC5200" } },
-        bottom: { style: "thin", color: { argb: "FFCC5200" } },
-      };
-    });
-    headerRow.height = 22;
-
-    for (const [key, val] of Object.entries(keyMap)) {
-      const row = [key, val.position, val.it, ...langs.map(() => "")];
-      const dataRow = ws.addRow(row);
-      dataRow.eachCell((cell) => {
-        cell.alignment = { wrapText: true, vertical: "top" };
-      });
-    }
-
-    const xlsxBuffer = await wb.xlsx.writeBuffer();
-    const filename = `BikerLink_Traduzioni_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    return res.send(xlsxBuffer);
-  } catch (error) {
-    console.error("[translations/download-xlsx] error:", error);
-    return res.status(500).json({ message: "Errore durante il download XLSX" });
   }
 });
 

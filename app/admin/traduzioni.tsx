@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
@@ -125,9 +125,6 @@ export default function TraduzioniScreen() {
   const [restartStatus, setRestartStatus] = useState<StepStatus>("idle");
   const [restartResult, setRestartResult] = useState("");
 
-  const [xlsxLoading, setXlsxLoading] = useState(false);
-  const [xlsxResult, setXlsxResult] = useState<{ ok: boolean; msg: string } | null>(null);
-
   const [docxLoading, setDocxLoading] = useState(false);
   const [docxResult, setDocxResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
@@ -175,51 +172,6 @@ export default function TraduzioniScreen() {
       }
     } catch {}
     return "Errore download";
-  }
-
-  async function handleDownloadXlsx() {
-    setXlsxLoading(true);
-    setXlsxResult(null);
-    try {
-      const langs = exportLangs.length > 0 ? exportLangs : ["en", "de", "es", "fr", "tr"];
-      const url = new URL(
-        `/api/admin/translations/download-xlsx?langs=${langs.join(",")}`,
-        getApiUrl()
-      );
-      if (Platform.OS === "web") {
-        const resp = await fetch(url.toString(), { credentials: "include" });
-        if (!resp.ok) throw new Error(await parseBinaryErrorMessage(resp));
-        const blob = await resp.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = blobUrl;
-        a.download = `BikerLink_Traduzioni_${new Date().toISOString().slice(0, 10)}.xlsx`;
-        a.click();
-        URL.revokeObjectURL(blobUrl);
-        setXlsxResult({ ok: true, msg: "Download Excel avviato" });
-      } else {
-        const resp = await fetch(url.toString(), { credentials: "include" });
-        if (!resp.ok) throw new Error(await parseBinaryErrorMessage(resp));
-        const arrayBuf = await resp.arrayBuffer();
-        const base64 = await arrayBufferToBase64(arrayBuf);
-        const filePath = `${FileSystem.cacheDirectory}BikerLink_Traduzioni.xlsx`;
-        await FileSystem.writeAsStringAsync(filePath, base64, { encoding: "base64" });
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(filePath, {
-            mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            dialogTitle: "Salva Excel Traduzioni",
-          });
-          setXlsxResult({ ok: true, msg: "File Excel pronto da condividere" });
-        } else {
-          setXlsxResult({ ok: false, msg: "Condivisione non disponibile su questo dispositivo" });
-        }
-      }
-    } catch (e: unknown) {
-      setXlsxResult({ ok: false, msg: extractErrorMessage(e, "Errore download Excel") });
-    } finally {
-      setXlsxLoading(false);
-    }
   }
 
   async function handleDownloadDocx() {
@@ -307,7 +259,7 @@ export default function TraduzioniScreen() {
       ]}
     >
       <Text style={styles.pageDesc}>
-        Esporta tutte le stringhe dell'app in Excel o Word, falle tradurre esternamente, poi sostituisci i file
+        Esporta tutte le stringhe dell'app in Word, falle tradurre esternamente, poi sostituisci i file
         in lib/i18n/ e riavvia il backend.
       </Text>
 
@@ -328,7 +280,7 @@ export default function TraduzioniScreen() {
           </View>
           <View style={styles.cardHeaderText}>
             <Text style={styles.cardTitle}>Scarica tabella traduzioni</Text>
-            <Text style={styles.cardDesc}>Genera ed esporta in Excel o Word per la traduzione esterna. IT è sempre inclusa.</Text>
+            <Text style={styles.cardDesc}>Genera ed esporta in Word per la traduzione esterna. IT è sempre inclusa.</Text>
           </View>
         </View>
 
@@ -347,48 +299,17 @@ export default function TraduzioniScreen() {
         <View style={styles.sectionDivider} />
 
         <TouchableOpacity
-          style={[styles.button, xlsxLoading && styles.buttonDisabled]}
-          onPress={handleDownloadXlsx}
-          disabled={xlsxLoading}
-          activeOpacity={0.7}
-        >
-          {xlsxLoading ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <>
-              <MaterialCommunityIcons name="microsoft-excel" size={18} color="#fff" />
-              <Text style={styles.buttonText}>Scarica Excel (.xlsx)</Text>
-            </>
-          )}
-        </TouchableOpacity>
-
-        {xlsxResult ? (
-          <View style={[styles.inlineHint, xlsxResult.ok ? styles.inlineHintOk : styles.inlineHintErr]}>
-            <MaterialCommunityIcons
-              name={xlsxResult.ok ? "check-circle-outline" : "alert-circle-outline"}
-              size={14}
-              color={xlsxResult.ok ? "#4CAF50" : "#eb5757"}
-            />
-            <Text style={[styles.inlineHintText, { color: xlsxResult.ok ? "#4CAF50" : "#eb5757" }]}>
-              {xlsxResult.msg}
-            </Text>
-          </View>
-        ) : null}
-
-        <View style={{ height: 10 }} />
-
-        <TouchableOpacity
-          style={[styles.secondaryButton, docxLoading && styles.buttonDisabled]}
+          style={[styles.button, docxLoading && styles.buttonDisabled]}
           onPress={handleDownloadDocx}
           disabled={docxLoading}
           activeOpacity={0.7}
         >
           {docxLoading ? (
-            <ActivityIndicator color={Colors.accent} size="small" />
+            <ActivityIndicator color="#fff" size="small" />
           ) : (
             <>
-              <MaterialCommunityIcons name="microsoft-word" size={18} color={Colors.accent} />
-              <Text style={styles.secondaryButtonText}>Scarica Tabella Word (.docx)</Text>
+              <MaterialCommunityIcons name="microsoft-word" size={18} color="#fff" />
+              <Text style={styles.buttonText}>Scarica Tabella Word (.docx)</Text>
             </>
           )}
         </TouchableOpacity>

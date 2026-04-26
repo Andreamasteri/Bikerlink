@@ -38,7 +38,6 @@
     "connect-pg-simple": "^10.0.0",
     "docx": "^9.6.1",
     "drizzle-orm": "^0.45.2",
-    "exceljs": "^4.4.0",
     "expo": "~55.0.17",
     "expo-application": "^55.0.14",
     "expo-auth-session": "~55.0.15",
@@ -95,7 +94,6 @@
     "sharp": "^0.34.5",
     "tsx": "^4.20.6",
     "undici": "^6.24.1",
-    "xlsx": "^0.18.5",
     "zod": "^3.24.2"
   },
   "devDependencies": {
