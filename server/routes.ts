@@ -134,6 +134,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   });
 
+  app.get("/api/assets/onboarding/:filename", async (req: Request, res: Response) => {
+    const { filename } = req.params;
+    if (!/^\d{2}-[a-z0-9-]+\.png$/.test(filename)) {
+      return res.status(400).send("Invalid filename");
+    }
+    try {
+      const { downloadBuffer } = await import("./objectStorage");
+      const buffer = await downloadBuffer(`public/onboarding/${filename}`);
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      return res.send(buffer);
+    } catch {
+      return res.status(404).send("Not found");
+    }
+  });
+
   app.use("/api/auth", authRoutes);
   app.use("/api/users", userRoutes);
   app.use("/api/motorcycles", motorcycleRoutes);

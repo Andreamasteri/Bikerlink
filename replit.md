@@ -1,5 +1,13 @@
 # BikerLink
 
+## Anti-pattern dell'agente — leggere prima di lavorare
+
+1. **Gerarchia delle fonti di verità per le dipendenze native**: per dichiarare che una libreria nativa Android non è nell'APK, NON basta verificare `package.json` o gli `import` nel codice JS. Le dipendenze transitive di Expo (es. `expo-camera` tira ML Kit Barcode, `expo-notifications` tira Firebase Cloud Messaging) finiscono nell'APK senza apparire in `package.json`. La sola fonte di verità è il `.apk` compilato (o il gradle dependency tree).
+
+2. **Verifica con metodo diverso dall'esecuzione**: se ho fatto un cambiamento guardando il file X, NON devo verificarlo riguardando il file X. Il bias di conferma fa rileggere la stessa fonte e confermare l'errore originale. Verifica = altro metodo (binario, dependency tree, comando di build, log reali).
+
+3. **"Fatto" ≠ "credo di aver fatto"**: per task di rimozione/pulizia, "fatto" significa che esiste una prova oggettiva nell'output finale (binario, log, response API). Se la prova non c'è, dichiarare esplicitamente "applicato ma non verificato sul binario" — non "fatto".
+
 ## Overview
 BikerLink is a React Native (Expo SDK 55) mobile application designed to connect motorcyclists ("biker") and passengers ("zavorrine") across Italy, with a vision to expand Pan-European. The application aims to foster a community for motorcycle enthusiasts, enabling them to find riding partners, organize group rides, and share experiences. The tagline, "U'll never ride alone," encapsulates its core mission. Sponsored by Syneco Lubrificanti, BikerLink also integrates advertising and services relevant to its user base, such as Syneco workshops. The project seeks to create a dynamic platform for the motorcycle community, offering interactive maps, social features, and essential tools for riders.
 
@@ -24,6 +32,7 @@ BikerLink utilizes a modern full-stack architecture.
 - Interactive maps are implemented esclusivamente con Leaflet in WebView (componenti `Leaflet*Map.tsx`), con varianti web-specifiche (`.web.tsx`) dove necessario.
 - **Legacy app_settings keys**: la chiave `maps_engine` (Task #720) è stata rimossa completamente: il toggle Google Maps vs Leaflet non esiste più, l'endpoint `PUT /api/admin/settings/maps_engine` è stato eliminato e la risposta di `GET /api/settings/maps` non include più il campo `engine`.
 - Features include user profiles (Biker, Zavorrina/Zavorrino, Coppia), interactive maps displaying users, Syneco workshops, and collectible easter eggs.
+- **Onboarding images** (Task #991): le 30 PNG dell'onboarding sono archiviate in Object Storage (`public/onboarding/*.png`) e servite via `GET /api/assets/onboarding/:filename` (Cache-Control immutable 1 anno). `components/OnboardingCarousel.tsx` usa `{ uri: getApiUrl() + "/api/assets/onboarding/..." }`. La cartella `assets/images/onboarding/` è stata rimossa dal repository.
 - Users can create and respond to ride proposals, engage in private and group chats, and track GPS routes with performance statistics.
 - A photo contest system allows users to upload and vote on photos.
 - User-specific features include a "Garage" for bikers to list motorcycles and a "Wishlist" for passengers to specify desired rides.

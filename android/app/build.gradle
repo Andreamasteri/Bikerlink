@@ -96,6 +96,10 @@ android {
         versionName "3.0.0"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
+
+        ndk {
+            abiFilters "arm64-v8a", "armeabi-v7a"
+        }
     }
     signingConfigs {
         debug {
@@ -167,6 +171,12 @@ android {
             android.packagingOptions[prop] += it
         }
     }
+}
+
+configurations.all {
+    exclude group: "com.google.mlkit", module: "barcode-scanning"
+    exclude group: "com.google.android.gms", module: "play-services-mlkit-barcode-scanning"
+    exclude group: "androidx.camera", module: "camera-mlkit-vision"
 }
 
 dependencies {
