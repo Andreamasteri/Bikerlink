@@ -108,7 +108,19 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     }).addTo(markersLayer);
     if (omsData && oms) {
       m.bikerlinkData = omsData;
-      try { oms.addMarker(m); } catch(e) {}
+      try {
+        oms.addMarker(m);
+      } catch(e) {
+        /* OMS fail → fallback al click classico per non perdere il tap */
+        m.on("click", function() {
+          postMsg({ type: "markerPress", markerType: omsData.type, id: omsData.id });
+        });
+      }
+    } else if (omsData && !oms) {
+      /* CDN OMS non caricata → fallback click classico */
+      m.on("click", function() {
+        postMsg({ type: "markerPress", markerType: omsData.type, id: omsData.id });
+      });
     } else if (onClick) {
       m.on("click", onClick);
     }
