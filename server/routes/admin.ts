@@ -4389,6 +4389,33 @@ router.get("/gps-errors", async (req: Request, res: Response) => {
   }
 });
 
+let cacheCleanupRunning = false;
+
+router.post("/cache/cleanup", async (_req: Request, res: Response) => {
+  try {
+    if (cacheCleanupRunning) {
+      return res.status(409).json({ error: "cleanup_already_running" });
+    }
+    cacheCleanupRunning = true;
+    const { spawn } = await import("child_process");
+    const scriptPath = path.join(process.cwd(), "scripts", "cleanup-cache.sh");
+    const child = spawn("bash", [scriptPath], { detached: true, stdio: "ignore" });
+    child.on("close", () => {
+      cacheCleanupRunning = false;
+    });
+    child.on("error", (err) => {
+      console.error("[CACHE-CLEANUP] Errore avvio script:", err);
+      cacheCleanupRunning = false;
+    });
+    child.unref();
+    return res.json({ started: true });
+  } catch (error) {
+    cacheCleanupRunning = false;
+    console.error("Admin cache cleanup error:", error);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 router.post("/db/vacuum-full", async (_req: Request, res: Response) => {
   try {
     const { isVacuumRunning, runVacuumFullAll } = await import("../vacuum-service");
