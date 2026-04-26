@@ -98,7 +98,8 @@ android {
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
 
         ndk {
-            abiFilters "arm64-v8a", "armeabi-v7a"
+            // Task #1017: solo arm64-v8a (default permanente — APK dimagrita ~50MB invece di 135MB)
+            abiFilters "arm64-v8a"
         }
     }
     signingConfigs {

@@ -21,7 +21,9 @@ set -euo pipefail
 
 AUTH_FILE=".local/apk-build-authorized"
 LOG_FILE="logs/apk-build-history.log"
-PROFILE="${1:-preview}"
+# Task #1017: default permanente = release-apk (arm64-v8a only + NewArch + ProGuard/R8)
+# APK dimagrita (~50MB invece di 135MB). Per AAB Play Store usa esplicitamente "production".
+PROFILE="${1:-release-apk}"
 
 # ── Banner ──────────────────────────────────────────────────────────────────
 echo ""
@@ -92,9 +94,23 @@ fi
 echo "  ✔  versionCode sincronizzato e verificato: $VERSION_CODE (app.json → build.gradle)"
 
 # ── 3. Validazione profilo ──────────────────────────────────────────────────
-if [[ "$PROFILE" != "preview" && "$PROFILE" != "production" && "$PROFILE" != "release-apk" ]]; then
+# Task #1017: profili ammessi sono solo "release-apk" (default APK dimagrita) e
+# "production" (AAB Play Store). Il vecchio "preview" è stato rimosso per evitare
+# regressioni accidentali a APK universali (4 ABI = ~135MB invece di ~50MB).
+if [[ "$PROFILE" == "preview" ]]; then
+  echo "  ✖  Profilo 'preview' RIMOSSO (Task #1017)"
+  echo ""
+  echo "  Il profilo 'preview' produceva APK universali (4 ABI, ~135MB)."
+  echo "  Da ora il default è 'release-apk' (arm64-v8a only + NewArch, ~50MB)."
+  echo ""
+  echo "  Usa: bash scripts/build-apk.sh             # default = release-apk (APK dimagrita)"
+  echo "  Usa: bash scripts/build-apk.sh release-apk # esplicito"
+  echo "  Usa: bash scripts/build-apk.sh production  # AAB Play Store"
+  exit 1
+fi
+if [[ "$PROFILE" != "production" && "$PROFILE" != "release-apk" ]]; then
   echo "  ✖  Profilo non valido: '$PROFILE'"
-  echo "  Usa: bash scripts/build-apk.sh [preview|production|release-apk]"
+  echo "  Usa: bash scripts/build-apk.sh [release-apk|production]"
   exit 1
 fi
 

@@ -166,6 +166,36 @@ Dopo APK v38 installato sui dispositivi: gli aggiornamenti OTA sono completament
 - I nuovi installati con APK v38 riceveranno tutti gli aggiornamenti via backend custom
 - I dispositivi su OTA-152 (APK v37) necessitano di reinstallare APK v38 manualmente
 
+## 🏗️ Build APK — default dimagrito (Task #1017)
+
+Da Task #1017 in poi, **ogni build APK BikerLink usa il profilo dimagrito di default**:
+
+- ABI: **solo `arm64-v8a`** (telefoni Android moderni dal 2017 in poi)
+- New Architecture: **abilitata** (`newArchEnabled=true`)
+- ProGuard/R8: **abilitato** (`enableMinifyInReleaseBuilds=true`)
+- Shrink Resources: **abilitato** (`enableShrinkResourcesInReleaseBuilds=true`)
+- Hermes: **abilitato**
+- **Dimensione attesa**: ~45-55 MB (vs 135 MB delle vecchie APK universali a 4 ABI)
+
+### Comando standard (default = dimagrito)
+```bash
+touch .local/apk-build-authorized
+bash scripts/build-apk.sh             # → profilo release-apk (APK arm64 dimagrita)
+bash scripts/build-apk.sh release-apk # equivalente esplicito
+bash scripts/build-apk.sh production  # SOLO per AAB Play Store (non APK)
+```
+
+### Profili EAS
+- ✅ **`release-apk`** — APK arm64-v8a + NewArch + ProGuard/R8 (default per "builda APK")
+- ✅ **`production`** — AAB per Play Store (invariato, distribuzione store)
+- ❌ **`preview`** — RIMOSSO da `eas.json` (Task #1017). Lo script blocca con messaggio chiaro qualsiasi tentativo di lanciare `bash scripts/build-apk.sh preview`.
+
+### Configurazione persistente (bare workflow)
+Dato che `android/` è committato nel repo, il restringimento ABI è applicato in:
+- `android/gradle.properties` → `reactNativeArchitectures=arm64-v8a`
+- `android/app/build.gradle` → `ndk { abiFilters "arm64-v8a" }`
+- `app.json` plugins → `expo-build-properties` con `android.newArchEnabled=true` + ProGuard/Shrink (per coerenza con eventuale futuro prebuild)
+
 ## ⚠️ Nota: APK build ID e URL dopo --no-wait
 `scripts/build-apk.sh` invia la build con `--no-wait` e **non cattura** il build ID restituito da EAS. Dopo ogni nuova build APK, recuperare manualmente il build ID e l'URL del file `.apk` da https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds e aggiornarli in `ota-updates.json` nella entry più recente del ciclo corrente:
 ```json

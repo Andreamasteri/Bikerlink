@@ -119,9 +119,29 @@ Usare SEMPRE `scripts/build-apk.sh` — mai `npx eas-cli build` direttamente.
 Procedura:
 1. Ottenere approvazione esplicita dall'utente ("sì, avvia la build APK")
 2. `touch .local/apk-build-authorized`  ← token monouso, viene eliminato dopo l'uso
-3. `bash scripts/build-apk.sh [preview|production]`
+3. `bash scripts/build-apk.sh` → default `release-apk` (APK arm64 dimagrita ~50MB)
+   - oppure `bash scripts/build-apk.sh production` per AAB Play Store
 
 Lo script blocca l'esecuzione se `.local/apk-build-authorized` non esiste, logga ogni build in `logs/apk-build-history.log`, e richiede un nuovo token per ogni build successiva.
+
+### Profilo APK standard — `release-apk` (Task #1017)
+
+Da Task #1017 in poi il default permanente è il profilo **dimagrito**:
+
+| Caratteristica | Valore |
+|---|---|
+| ABI | **solo `arm64-v8a`** (telefoni Android dal 2017 in poi) |
+| New Architecture | **abilitata** (`newArchEnabled=true`) |
+| ProGuard / R8 | **abilitato** |
+| Shrink Resources | **abilitato** |
+| Hermes | **abilitato** |
+| Dimensione attesa | **~45-55 MB** (vs 135 MB delle APK universali pre-#1017) |
+
+Configurazione applicata in:
+- `android/gradle.properties` → `reactNativeArchitectures=arm64-v8a`
+- `android/app/build.gradle` → `ndk { abiFilters "arm64-v8a" }`
+- `app.json` plugins → `expo-build-properties` (newArchEnabled + ProGuard + ShrinkResources)
+- `eas.json` → solo profili `release-apk` e `production`. Il vecchio `preview` (APK universali 4 ABI ~135MB) è stato **rimosso**: `bash scripts/build-apk.sh preview` viene bloccato con messaggio esplicito.
 
 ## Legacy app_settings keys (non più utilizzate)
 - **`maps_engine`** (Task #649 → dismessa Task #718/#719): toggle motore mappa Google Maps vs Leaflet. Le mappe sono ora esclusivamente Leaflet (vedi sezione Frontend). La riga in `app_settings` con key='maps_engine' è stata rimossa dal DB di produzione (verificato: assente sia in dev che prod). L'endpoint `GET /api/settings/maps` continua a rispondere correttamente: in mancanza della riga il campo `engine` viene restituito col fallback `"leaflet"` (compatibilità retro). Il PUT admin `/api/admin/settings/maps_engine` resta presente come stub legacy e potrà essere rimosso del tutto in un task successivo.
