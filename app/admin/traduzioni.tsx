@@ -260,12 +260,24 @@ export default function TraduzioniScreen() {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
   function base64ToArrayBuffer(base64: string): ArrayBuffer {
-    const binary = atob(base64);
-    const len = binary.length;
-    const buffer = new ArrayBuffer(len);
-    const view = new Uint8Array(buffer);
-    for (let i = 0; i < len; i++) view[i] = binary.charCodeAt(i);
-    return buffer;
+    const cleaned = base64.replace(/[^A-Za-z0-9+/=]/g, "");
+    if (typeof globalThis.atob === "function") {
+      const binary = globalThis.atob(cleaned);
+      const len = binary.length;
+      const buffer = new ArrayBuffer(len);
+      const view = new Uint8Array(buffer);
+      for (let i = 0; i < len; i++) view[i] = binary.charCodeAt(i);
+      return buffer;
+    }
+    const BufferImpl = (globalThis as { Buffer?: { from: (s: string, e: string) => Uint8Array } })
+      .Buffer;
+    if (BufferImpl) {
+      const buf = BufferImpl.from(cleaned, "base64");
+      const out = new ArrayBuffer(buf.byteLength);
+      new Uint8Array(out).set(buf);
+      return out;
+    }
+    throw new Error("Decodifica base64 non disponibile in questo runtime");
   }
 
   async function uploadDocxFile(formData: FormData): Promise<void> {
@@ -375,8 +387,8 @@ export default function TraduzioniScreen() {
       ]}
     >
       <Text style={styles.pageDesc}>
-        Esporta tutte le stringhe dell'app in Word, falle tradurre esternamente, poi sostituisci i file
-        in lib/i18n/ e riavvia il backend.
+        Esporta tutte le stringhe dell'app in Word, falle tradurre esternamente, poi importa il file
+        tradotto direttamente da qui e riavvia il backend.
       </Text>
 
       <StepCard
