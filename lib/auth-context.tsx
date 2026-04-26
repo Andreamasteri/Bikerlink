@@ -1,7 +1,16 @@
 import React, { createContext, useContext, useMemo, useState, useEffect, useRef, ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { queryClient, apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
+import {
+  queryClient,
+  apiRequest,
+  getQueryFn,
+  getApiUrl,
+  setSessionToken,
+  clearSessionToken,
+  initSessionToken,
+  authFetchHeaders,
+} from "@/lib/query-client";
 import type { User } from "@shared/schema";
 
 type SafeUser = Omit<User, "password">;
@@ -28,7 +37,12 @@ function useLoginMutation() {
       const res = await apiRequest("POST", "/api/auth/login", data);
       return await res.json();
     },
-    onSuccess: (user: SafeUser) => {
+    onSuccess: async (response: SafeUser & { sessionToken?: string }) => {
+      // Persist Bearer token (mobile cookie-jar bypass) BEFORE any subsequent fetch
+      if (response?.sessionToken) {
+        await setSessionToken(response.sessionToken);
+      }
+      const { sessionToken: _t, ...user } = response as any;
       queryClient.setQueryData(["/api/auth/me"], user);
       AsyncStorage.setItem(HAD_SESSION_KEY, "true").catch(() => {});
       queryClient.invalidateQueries({
@@ -62,7 +76,10 @@ function useLoginMutation() {
               const url = new URL("/api/users/nearby", baseUrl);
               url.searchParams.set("lat", nearbyLat.toString());
               url.searchParams.set("lng", nearbyLng.toString());
-              const res = await fetch(url.toString(), { credentials: "include" });
+              const res = await fetch(url.toString(), {
+                headers: authFetchHeaders(),
+                credentials: "include",
+              });
               if (!res.ok) return [];
               return res.json();
             },
@@ -92,9 +109,14 @@ function useRegisterMutation() {
       const res = await apiRequest("POST", "/api/auth/register", data);
       return await res.json();
     },
-    onSuccess: (response: any) => {
+    onSuccess: async (response: any) => {
       if (!response?.requiresEmailVerification) {
-        queryClient.setQueryData(["/api/auth/me"], response);
+        // Persist Bearer token (mobile cookie-jar bypass) BEFORE any subsequent fetch
+        if (response?.sessionToken) {
+          await setSessionToken(response.sessionToken);
+        }
+        const { sessionToken: _t, ...user } = response;
+        queryClient.setQueryData(["/api/auth/me"], user);
         AsyncStorage.setItem(HAD_SESSION_KEY, "true").catch(() => {});
       }
     },
@@ -109,8 +131,12 @@ function useLogoutMutation() {
     onSuccess: () => {
       queryClient.setQueryData(["/api/auth/me"], null);
       AsyncStorage.removeItem(HAD_SESSION_KEY).catch(() => {});
+      clearSessionToken().catch(() => {});
     },
-    onError: () => {},
+    onError: () => {
+      // Even on error, clear local token so the app stops sending stale Bearer
+      clearSessionToken().catch(() => {});
+    },
   });
 }
 
@@ -122,12 +148,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isReconnecting, setIsReconnecting] = useState(false);
   const hadSessionRef = useRef<boolean>(false);
 
-  // Prefetch the AsyncStorage "had session" marker before enabling the query
+  // Prefetch AsyncStorage state before enabling the query:
+  //  1) the "had session" marker (controls retry/redirect UX)
+  //  2) the Bearer session token (must be in cache before the first fetch fires)
   const [storageChecked, setStorageChecked] = useState(false);
   useEffect(() => {
-    AsyncStorage.getItem(HAD_SESSION_KEY)
-      .then((val) => {
-        hadSessionRef.current = val === "true";
+    Promise.all([
+      AsyncStorage.getItem(HAD_SESSION_KEY).catch(() => null),
+      initSessionToken().catch(() => null),
+    ])
+      .then(([hadSession]) => {
+        hadSessionRef.current = hadSession === "true";
         setStorageChecked(true);
       })
       .catch(() => {
@@ -143,7 +174,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let res: Response;
     try {
-      res = await fetch(url.toString(), { credentials: "include", signal });
+      res = await fetch(url.toString(), {
+        headers: authFetchHeaders(),
+        credentials: "include",
+        signal,
+      });
     } catch (err: unknown) {
       // AbortError = query was cancelled, re-throw as-is
       if (err instanceof Error && err.name === "AbortError") throw err;

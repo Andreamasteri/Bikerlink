@@ -61,6 +61,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const PgStore = connectPgSimple(session);
   const SESSION_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000; // 1 anno
 
+  // Bridge Bearer token → cookie connect.sid (per client mobile React Native).
+  // Il cookie jar nativo Android/iOS può perdere connect.sid (process killed dall'OS,
+  // OTA reload del network stack, ecc). Il client mobile salva il token Bearer in
+  // AsyncStorage e lo invia come header Authorization. Qui lo ri-inietto come
+  // cookie sintetico così express-session lo legge con la sua logica standard.
+  // Il valore Bearer è il valore raw firmato del cookie (formato `s:<sid>.<sig>`).
+  app.use((req, _res, next) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.substring(7).trim();
+      if (token && (!req.headers.cookie || !req.headers.cookie.includes("connect.sid="))) {
+        const cookieValue = `connect.sid=${encodeURIComponent(token)}`;
+        req.headers.cookie = req.headers.cookie
+          ? `${req.headers.cookie}; ${cookieValue}`
+          : cookieValue;
+      }
+    }
+    next();
+  });
+
   app.use(
     session({
       store: new PgStore({

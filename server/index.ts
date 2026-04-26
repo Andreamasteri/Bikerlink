@@ -96,7 +96,9 @@ function setupRequestLogging(app: express.Application) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
 
       if (capturedJsonResponse && res.statusCode !== 304) {
-        const jsonStr = JSON.stringify(capturedJsonResponse);
+        const sanitized: Record<string, unknown> = { ...capturedJsonResponse };
+        if ("sessionToken" in sanitized) sanitized.sessionToken = "[REDACTED]";
+        const jsonStr = JSON.stringify(sanitized);
         logLine += ` :: ${jsonStr.length > 200 ? jsonStr.slice(0, 197) + "..." : jsonStr}`;
       }
 

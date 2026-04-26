@@ -2,11 +2,25 @@ import { Router, type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import rateLimit from "express-rate-limit";
+import signature from "cookie-signature";
 import { registerSchema, loginSchema } from "@shared/schema";
 import { storage } from "../storage";
 import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetConfirmationEmail, sendInvitationGiftEmail, sendNewUserNotificationEmail } from "../email";
 import { createClubInvitesForMoto, createRegionalClubInvite } from "./motoclubs";
 import { onlineTracker } from "../online-tracker";
+
+/**
+ * Calcola il token Bearer da restituire al client mobile.
+ * È il valore raw firmato che express-session mette nel cookie connect.sid
+ * (formato `s:<sid>.<sig>`). Il client lo salva in AsyncStorage e lo invia
+ * come header Authorization, dove un middleware lato server lo ri-inietta
+ * come cookie sintetico per express-session.
+ */
+function buildSessionToken(sessionID: string): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) return "";
+  return "s:" + signature.sign(sessionID, secret);
+}
 
 declare module "express-session" {
   interface SessionData {
@@ -218,7 +232,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     });
 
     const { password: _, ...safeUser } = user;
-    return res.status(201).json({ ...safeUser, giftMessage: invitationGiftMessage });
+    return res.status(201).json({ ...safeUser, giftMessage: invitationGiftMessage, sessionToken: buildSessionToken(req.sessionID) });
   } catch (error) {
     console.error("Register error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -296,7 +310,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     });
 
     const { password: _, ...safeUser } = userRecord ?? user;
-    return res.json(safeUser);
+    return res.json({ ...safeUser, sessionToken: buildSessionToken(req.sessionID) });
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -429,7 +443,7 @@ router.post("/reset-password", resetPasswordLimiter, async (req: Request, res: R
     );
 
     const { password: _, ...safeUser } = user;
-    return res.json({ ...safeUser, passwordReset: true });
+    return res.json({ ...safeUser, passwordReset: true, sessionToken: buildSessionToken(req.sessionID) });
   } catch (error) {
     console.error("Reset password error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -503,7 +517,7 @@ router.post("/verify-email", async (req: Request, res: Response) => {
       req.session.save((err) => { if (err) reject(err); else resolve(); });
     });
     const { password: _, ...safeUser } = user;
-    return res.json({ ...safeUser, emailVerified: true });
+    return res.json({ ...safeUser, emailVerified: true, sessionToken: buildSessionToken(req.sessionID) });
   } catch (error) {
     console.error("Verify email error:", error);
     return res.status(500).json({ message: "Errore interno del server" });

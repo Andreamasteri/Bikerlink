@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export function getApiUrl(): string {
   let host = process.env.EXPO_PUBLIC_DOMAIN;
@@ -10,6 +11,71 @@ export function getApiUrl(): string {
   let url = new URL(`https://${host}`);
 
   return url.href.replace(/\/$/, "");
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// SESSION TOKEN (Bearer) — fix sessione persistente per APK Android.
+// Il cookie jar nativo di React Native può perdere connect.sid (process killed
+// dall'OS, OTA reload del network stack, ecc), causando logout involontari.
+// Il backend (login/register/etc) restituisce `sessionToken` nel body della
+// risposta; lo salviamo qui in AsyncStorage + cache in memoria per inviarlo
+// come Authorization: Bearer <token> su tutte le richieste successive.
+// Resta retrocompatibile: il cookie viene comunque inviato (credentials: include).
+// ──────────────────────────────────────────────────────────────────────
+
+export const SESSION_TOKEN_KEY = "@bikerlink/session_token";
+let _sessionTokenCache: string | null = null;
+let _tokenInitialized = false;
+
+/** Ritorna il token in cache (senza I/O). Chiamare initSessionToken() al boot. */
+export function getSessionToken(): string | null {
+  return _sessionTokenCache;
+}
+
+/** Carica il token da AsyncStorage in cache. Idempotente. */
+export async function initSessionToken(): Promise<string | null> {
+  if (_tokenInitialized) return _sessionTokenCache;
+  try {
+    const stored = await AsyncStorage.getItem(SESSION_TOKEN_KEY);
+    _sessionTokenCache = stored ?? null;
+  } catch {
+    _sessionTokenCache = null;
+  }
+  _tokenInitialized = true;
+  return _sessionTokenCache;
+}
+
+/** Salva il token (login/register/reset-password). */
+export async function setSessionToken(token: string | null | undefined): Promise<void> {
+  if (typeof token !== "string" || token.length === 0) return;
+  _sessionTokenCache = token;
+  _tokenInitialized = true;
+  try {
+    await AsyncStorage.setItem(SESSION_TOKEN_KEY, token);
+  } catch {}
+}
+
+/** Rimuove il token (logout). */
+export async function clearSessionToken(): Promise<void> {
+  _sessionTokenCache = null;
+  _tokenInitialized = true;
+  try {
+    await AsyncStorage.removeItem(SESSION_TOKEN_KEY);
+  } catch {}
+}
+
+function buildAuthHeaders(extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { ...(extra ?? {}) };
+  const token = _sessionTokenCache;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+/** Esposto per i pochi fetch fuori da apiRequest/getQueryFn (auth-context). */
+export function authFetchHeaders(extra?: Record<string, string>): Record<string, string> {
+  return buildAuthHeaders(extra);
 }
 
 export class ServerBusyError extends Error {
@@ -66,9 +132,12 @@ export async function apiRequest(
   const baseUrl = getApiUrl();
   const url = new URL(route, baseUrl);
 
+  const baseHeaders: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
+  const headers = buildAuthHeaders(baseHeaders);
+
   const res = await fetch(url.toString(), {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -91,6 +160,7 @@ export const getQueryFn: <T>(options: {
     const url = new URL(queryKey.join("/") as string, baseUrl);
 
     const res = await fetch(url.toString(), {
+      headers: buildAuthHeaders(),
       credentials: "include",
       signal,
     });

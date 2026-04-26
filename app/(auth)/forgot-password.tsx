@@ -14,7 +14,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, setSessionToken } from "@/lib/query-client";
 import { queryClient } from "@/lib/query-client";
 
 const RESEND_COOLDOWN = 60;
@@ -115,6 +115,9 @@ export default function ForgotPasswordScreen() {
         password: newPassword,
       });
       const userData = await res.json();
+      if (userData?.sessionToken) {
+        await setSessionToken(userData.sessionToken);
+      }
       queryClient.setQueryData(["/api/auth/me"], userData);
       router.replace("/(tabs)");
     } catch (err: any) {

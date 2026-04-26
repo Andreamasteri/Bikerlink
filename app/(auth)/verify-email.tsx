@@ -15,7 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQueryClient } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { apiRequest, getApiUrl, setSessionToken } from "@/lib/query-client";
 
 const RESEND_COOLDOWN = 60;
 
@@ -65,6 +65,9 @@ export default function VerifyEmailScreen() {
     try {
       const res = await apiRequest("POST", "/api/auth/verify-email", { email, token: token.trim() });
       const userData = await res.json();
+      if (userData?.sessionToken) {
+        await setSessionToken(userData.sessionToken);
+      }
       queryClient.setQueryData(["/api/auth/me"], userData);
       router.replace("/(tabs)");
     } catch (err: any) {
