@@ -538,10 +538,18 @@ export default function SystemScreen() {
                   </Text>
                 </View>
                 <View style={styles.kvRow}>
+                  <Text style={styles.kvLabel}>Store URL Android</Text>
+                  <Text style={styles.kvValue} numberOfLines={1}>{nativeVerData.android.storeUrl}</Text>
+                </View>
+                <View style={styles.kvRow}>
                   <Text style={styles.kvLabel}>Backend iOS</Text>
                   <Text style={styles.kvValue}>
                     latest {nativeVerData.ios.latestVersion} · min {nativeVerData.ios.minVersion}
                   </Text>
+                </View>
+                <View style={styles.kvRow}>
+                  <Text style={styles.kvLabel}>Store URL iOS</Text>
+                  <Text style={styles.kvValue} numberOfLines={1}>{nativeVerData.ios.storeUrl}</Text>
                 </View>
               </>
             )}
