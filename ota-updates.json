@@ -5025,7 +5025,7 @@
     "apkUrl": "https://expo.dev/artifacts/eas/nUADFAf6ddBUzcbZMjKBxR.apk",
     "apkCompletedAt": "2026-04-26T12:35:18.932Z",
     "deviceTestStatus": "pending",
-    "deviceTestNote": "Task #989: APK v39 (versionCode 39, versionName 3.0.0, rv 8.0.0) da verificare su Android — no crash al boot, login funzionante, mappe visibili.",
+    "deviceTestNote": "Task #996: APK v39 (versionCode 39, versionName 3.0.0, rv 8.0.0) da verificare su Android — no crash al boot, login funzionante, mappe visibili. URL: https://expo.dev/artifacts/eas/nUADFAf6ddBUzcbZMjKBxR.apk",
     "status": "published"
   }
 ]
