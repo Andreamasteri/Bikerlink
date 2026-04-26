@@ -5008,7 +5008,7 @@
     "message": "OTA-1 rv8.0.0: prima OTA del ciclo V3",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
-    "note": "Task #974: apertura ciclo V3 — versionName 3.0.0, versionCode 39, runtimeVersion 8.0.0, New Architecture abilitata (newArchEnabled=true). Prima OTA del ciclo 8.x. CURRENT_OTA_NUMBER=1.",
+    "note": "Task #974: apertura ciclo V3 — versionName 3.0.0, versionCode 39, runtimeVersion 8.0.0, New Architecture abilitata (newArchEnabled=true). Prima OTA del ciclo 8.x. CURRENT_OTA_NUMBER=1. APK build inviata Task #982 (2026-04-26T12:17:55Z, commit 5da5977).",
     "platforms": [
       "android"
     ],
@@ -5018,12 +5018,12 @@
     "androidUpdateId": null,
     "iosUpdateId": null,
     "commitBase": "25734af25bb4d44f97ac1e27423c8aab46d1ecb7",
-    "easDashboard": null,
-    "apkBuildId": null,
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/b167f108-813d-4981-893a-2896c0268a5b",
+    "apkBuildId": "b167f108-813d-4981-893a-2896c0268a5b",
     "apkVersionCode": 39,
     "apkVersionName": "3.0.0",
     "apkUrl": null,
     "apkCompletedAt": null,
-    "status": "pending"
+    "status": "building"
   }
 ]
