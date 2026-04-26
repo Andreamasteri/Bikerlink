@@ -15,6 +15,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 <body>
 <div id="map"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/overlapping-marker-spiderfier-leaflet@0.2.7/dist/oms.min.js"></script>
 <script>
 (function() {
   function postMsg(data) {
@@ -37,6 +38,25 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
   var markersLayer = L.layerGroup().addTo(map);
   var circlesLayer = L.layerGroup().addTo(map);
   var userDotMarker = null;
+
+  /* Spiderfier: apre a ventaglio i marker biker sovrapposti */
+  var oms = null;
+  if (typeof OverlappingMarkerSpiderfier === "function") {
+    oms = new OverlappingMarkerSpiderfier(map, {
+      keepSpiderfied: true,
+      nearbyDistance: 22,
+      circleSpiralSwitchover: 9,
+      legWeight: 1.5
+    });
+    if (oms.legColors) {
+      oms.legColors.usual = "#FF6600";
+      oms.legColors.highlighted = "#FF8800";
+    }
+    oms.addListener("click", function(marker) {
+      var d = marker.bikerlinkData;
+      if (d) postMsg({ type: "markerPress", markerType: d.type, id: d.id });
+    });
+  }
 
   map.on("moveend", function() {
     var c = map.getCenter();
