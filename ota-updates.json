@@ -5012,8 +5012,8 @@
     "platforms": [
       "android"
     ],
-    "releaseId": null,
-    "bundleUrl": null,
+    "releaseId": "6ea819be-facf-4099-8bd7-e4637800c5d9",
+    "bundleUrl": "private/ota/ota-1.1.0-1777207579625.js",
     "updateGroupId": null,
     "androidUpdateId": null,
     "iosUpdateId": null,
@@ -5024,6 +5024,6 @@
     "apkVersionName": "3.0.0",
     "apkUrl": null,
     "apkCompletedAt": null,
-    "status": "building"
+    "status": "published"
   }
 ]
