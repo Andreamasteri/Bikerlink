@@ -11,6 +11,8 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
+    // Accetta tutti i formati immagine (JPEG, PNG, WebP, HEIC/HEIF, AVIF, ecc.)
+    // L'output viene comunque convertito in WebP da compressToWebP()
     if (file.mimetype.startsWith("image/")) {
       cb(null, true);
     } else {

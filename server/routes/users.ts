@@ -40,11 +40,18 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/heic",
+      "image/heif",
+      "image/avif",
+    ];
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Tipo di file non supportato. Usa JPEG, PNG o WebP."));
+      cb(new Error("Tipo di file non supportato. Usa JPEG, PNG, WebP, HEIC/HEIF o AVIF."));
     }
   },
 });
