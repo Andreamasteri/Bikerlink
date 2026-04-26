@@ -28,9 +28,10 @@ backend custom `https://biker-link.replit.app/api/expo-updates` (Expo Updates Pr
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
 - **Canale EAS**: `preview`
-- **Runtime Version**: `7.0.0` (ciclo corrente, APK v38)
-- **APK corrente**: versionCode **38**, versionName **2.4.0** (completata 2026-04-26T01:27Z — buildId: `7ecd4368-9640-4200-88e5-c33b902a7edc`, APK: https://expo.dev/artifacts/eas/gEaBaW4hnhupnDP5CpYW1m.apk)
-- **OTA corrente**: OTA-156 (bundle custom attivo — EAS Updates dismesso, Task #980)
+- **Runtime Version**: `8.0.0` (ciclo corrente, APK v39) ← CICLO V3
+- **APK corrente**: versionCode **39**, versionName **3.0.0** (build inviata 2026-04-26T12:17Z — buildId: `b167f108-813d-4981-893a-2896c0268a5b`, APK URL da recuperare su expo.dev — verifica dispositivo in corso)
+- **APK precedente (ciclo 7.x)**: versionCode **38**, versionName **2.4.0** (buildId: `7ecd4368-9640-4200-88e5-c33b902a7edc`, APK: https://expo.dev/artifacts/eas/gEaBaW4hnhupnDP5CpYW1m.apk)
+- **OTA corrente**: OTA-1 rv8.0.0 (bundle custom attivo — EAS Updates dismesso, Task #980)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates` (Expo Updates Protocol v1)
 - **Utenti**: su Android fisico via APK — NON usano il dev server
 - **Admin email**: `admin@bikerlink.it`
@@ -190,22 +191,11 @@ Questo previene lacune documentali come quella di APK v37 (build ID mai registra
 - Ciclo 4.x: OTA 37–40 (APK versionCode 10, rv 4.0.0)
 - Ciclo 5.x: OTA 41 (APK versionCode 11, rv 5.0.0) — DEPRECATO (crash expo-location plugin)
 - Ciclo 6.x: OTA 42–43 (APK versionCode 12, rv 6.0.0) — OBSOLETO (utenti devono aggiornare APK)
-- Ciclo 7.x: OTA 44–152+ (APK versionCode 13→37, rv 7.0.0) ← CORRENTE
-  - APK v13: FAILED (react-native-maps 1.27.2 — causa esatta sconosciuta, diagnosi errata al momento)
-  - APK v14: FAILED (newArchEnabled=true + react-native-maps 1.18.0 → incompatibili, fix in app.json ignorato)
-  - APK v15: FAILED (fix newArchEnabled=false in app.json → ignorato, bare workflow usa gradle.properties)
-  - APK v16: FAILED (newArchEnabled=false + react-native-reanimated 4.2.3 → crash, Reanimated v4 richiede New Arch)
-  - APK v17: FAILED (status: failed — causa esatta sconosciuta, ma expo-location plugin presente)
-  - APK v18: FAILED (build ID: c4ff4d58) — react-native-reanimated 3.19.5 non compila con RN 0.83.4:
-    hermes-engine::libhermes non trovato in CMake (struttura Hermes cambiata in RN 0.76+, Reanimated 3.x non aggiornato)
-  - APK v19: FAILED — CRASH avvio: strings.xml expo_runtime_version=4.0.0 (doveva essere 7.0.0) + ACCESS_BACKGROUND_LOCATION in manifest
-  - APK v20: FAILED — fix strings.xml runtimeVersion 7.0.0 + rimozione ACCESS_BACKGROUND_LOCATION + rollback completo Task #564
-  - APK v21–v27: build successive fino alla versione stabile
-  - APK v28: STABILE — background location tracking (Task #607) + OTA 53–62
-  - APK v29: STABILE — expo-notifications nativo + versionCode 29 + versionName 1.9.4 (EAS: 2680c671, APK: https://expo.dev/artifacts/eas/5KLcwsgh9jtqLLdNrbxNxg.apk) + OTA 63–67
-  - APK v30–v36: build intermedie successive (vedi ota-updates.json per dettagli per ciclo)
-  - APK v37: STABILE — versionName 2.3.0, build inviata con --no-wait (build ID non catturato in log; recuperare da https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds) + OTA 151–154
-  - APK v38: IN BUILD — versionName 2.4.0, build inviata 2026-04-26 commit bf49d39 con --no-wait, updates.url→backend custom (Expo Updates Protocol v1) ← APK CORRENTE (build ID da recuperare su expo.dev)
+- Ciclo 7.x: OTA 44–156 (APK versionCode 13→38, rv 7.0.0) — CHIUSO
+  - APK v37: STABILE — versionName 2.3.0 + OTA 151–154
+  - APK v38: STABILE — versionName 2.4.0, buildId: 7ecd4368-9640-4200-88e5-c33b902a7edc, APK: https://expo.dev/artifacts/eas/gEaBaW4hnhupnDP5CpYW1m.apk, updates.url→backend custom + OTA 155–156
+- Ciclo 8.x: OTA 1+ (APK versionCode 39, rv 8.0.0) ← CORRENTE (V3)
+  - APK v39: IN VERIFICA — versionName 3.0.0, buildId: b167f108-813d-4981-893a-2896c0268a5b (build inviata 2026-04-26T12:17Z), APK URL da recuperare su expo.dev, New Arch abilitata (newArchEnabled=true)
 
 ## ⚠️ ANALISI ARCHITETTURA (DEFINITIVA)
 React Native 0.82+ ha rimosso il supporto Old Architecture. Il flag newArchEnabled=false
@@ -220,7 +210,7 @@ I crash erano causati da librerie incompatibili, NON dalla New Architecture stes
 Il progetto ha `android/` committato → bare workflow. Modificare SEMPRE i file Android direttamente:
 - **Architecture**: `android/gradle.properties` → `newArchEnabled=true` (default EAS, come v10)
 - **versionCode**: `android/app/build.gradle` → `versionCode` (E anche app.json per consistenza)
-- **⚠️ CRITICO — runtimeVersion**: `android/app/src/main/res/values/strings.xml` → `expo_runtime_version` DEVE essere uguale a `runtimeVersion` in app.json (attuale: "7.0.0"). EAS NON aggiorna questo file automaticamente in bare workflow. Se non corrisponde → CRASH all'avvio garantito.
+- **⚠️ CRITICO — runtimeVersion**: `android/app/src/main/res/values/strings.xml` → `expo_runtime_version` DEVE essere uguale a `runtimeVersion` in app.json (attuale: "8.0.0" ciclo V3). EAS NON aggiorna questo file automaticamente in bare workflow. Se non corrisponde → CRASH all'avvio garantito.
 - **⚠️ CRITICO — AndroidManifest**: NON includere `ACCESS_BACKGROUND_LOCATION` in `android/app/src/main/AndroidManifest.xml` a meno che il background location sia implementato completamente e correttamente. Causa crash su Android 12+.
 
 ## VERSIONI LIBRERIE CERTIFICATE (v19, identico a v10)
