@@ -199,6 +199,28 @@ export default function SystemScreen() {
     return evaluateUpdateOutcome(installedVersion, cfg.minVersion, cfg.latestVersion);
   }, [nativeVerData, installedPlatform, installedVersion]);
 
+  const [isCleanupRunning, setIsCleanupRunning] = useState(false);
+
+  const handleCacheCleanup = useCallback(async () => {
+    setIsCleanupRunning(true);
+    try {
+      const res = await fetch(
+        new URL("/api/admin/cache/cleanup", getApiUrl()).toString(),
+        { method: "POST", credentials: "include" }
+      );
+      if (res.status === 409) {
+        Alert.alert("In corso", "Pulizia cache già in esecuzione, attendi.");
+        return;
+      }
+      if (!res.ok) throw new Error("Errore server");
+      Alert.alert("Avviata", "Pulizia cache workspace avviata in background.");
+    } catch {
+      Alert.alert("Errore", "Impossibile avviare la pulizia della cache.");
+    } finally {
+      setIsCleanupRunning(false);
+    }
+  }, []);
+
   const [isRechecking, setIsRechecking] = useState(false);
   const handleForceRecheck = useCallback(async () => {
     setIsRechecking(true);
@@ -698,6 +720,30 @@ export default function SystemScreen() {
                 )}
               </>
             )}
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="trash-outline" size={18} color="#FF8C00" />
+              <Text style={styles.cardTitle}>Cache workspace</Text>
+            </View>
+            <Text style={styles.hintText}>
+              Libera spazio eliminando la cache di build (.cache/, node_modules/.cache). L&apos;operazione gira in background e non interrompe il server.
+            </Text>
+            <TouchableOpacity
+              style={[styles.actionBtnWide, { marginTop: 12, backgroundColor: "#FF8C00" }, isCleanupRunning && { opacity: 0.6 }]}
+              onPress={handleCacheCleanup}
+              disabled={isCleanupRunning}
+            >
+              {isCleanupRunning ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="trash-outline" size={16} color="#fff" />
+                  <Text style={styles.actionBtnText}>Svuota cache workspace</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
 
           <Text style={styles.sectionTitle}>Ultimi eventi ({mergedEvents.length})</Text>

@@ -4405,5 +4405,31 @@ router.post("/db/vacuum-full", async (_req: Request, res: Response) => {
   }
 });
 
+let cacheCleanupRunning = false;
+
+router.post("/cache/cleanup", async (_req: Request, res: Response) => {
+  try {
+    if (cacheCleanupRunning) {
+      return res.status(409).json({ error: "cleanup_already_running" });
+    }
+    cacheCleanupRunning = true;
+    const { exec } = await import("child_process");
+    exec("bash scripts/cleanup-cache.sh", (err, stdout, stderr) => {
+      cacheCleanupRunning = false;
+      if (err) {
+        console.error("[CACHE CLEANUP] Errore:", err.message);
+        console.error("[CACHE CLEANUP] stderr:", stderr);
+      } else {
+        console.log("[CACHE CLEANUP] Completato:", stdout.trim());
+      }
+    });
+    return res.json({ started: true });
+  } catch (error) {
+    cacheCleanupRunning = false;
+    console.error("Admin cache-cleanup error:", error);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 export default router;
 
