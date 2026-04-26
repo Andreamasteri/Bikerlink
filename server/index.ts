@@ -1205,6 +1205,33 @@ function setupErrorHandler(app: express.Application) {
           }, 5 * 60 * 1000);
           console.log("[INIT] Phase 11 workspace cache cleanup scheduled (5min delay, then every 24h)");
         }
+
+        // Phase 11.5 — log rotation every 24h
+        // Runs scripts/rotate-logs.sh via child_process.exec.
+        // First run is delayed 10 min after boot (staggers with Phase 11 cache cleanup).
+        // Truncates any .log in logs/ that exceeds 1 MB, keeping the last 200 KB.
+        {
+          const { exec: execRotate } = await import("child_process");
+          const pathMod = await import("path");
+          const rotateScriptPath = pathMod.resolve(process.cwd(), "scripts/rotate-logs.sh");
+          const runRotate = () => {
+            execRotate(`bash "${rotateScriptPath}"`, { timeout: 60_000 }, (err, stdout, stderr) => {
+              if (err) {
+                console.warn("[LOG-ROTATE] Error:", err.message);
+                if (stderr) console.warn("[LOG-ROTATE] stderr:", stderr.slice(0, 400));
+              } else {
+                const summary = stdout.trim().split("\n").pop() ?? "";
+                console.log("[LOG-ROTATE]", summary || "Log rotation completata");
+              }
+            });
+          };
+          // First run after 10 minutes, then every 24 hours
+          setTimeout(() => {
+            runRotate();
+            setInterval(runRotate, 24 * 60 * 60 * 1000);
+          }, 10 * 60 * 1000);
+          console.log("[INIT] Phase 11.5 log rotation scheduled (10min delay, then every 24h)");
+        }
       })().catch((err) => {
         console.error("[INIT] Startup phase chain error:", err);
         initState.initializing = false;
