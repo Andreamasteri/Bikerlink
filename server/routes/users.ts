@@ -977,11 +977,12 @@ router.post("/me/photos", requireAuth, upload.single("photo"), async (req: Reque
       return res.status(400).json({ message: "Nessuna foto caricata" });
     }
 
-    const ext = path.extname(req.file.originalname).toLowerCase() || ".jpg";
-    const filename = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9) + ext;
+    const { compressToWebP } = await import("../utils/image-processing");
+    const compressed = await compressToWebP(req.file.buffer, req.file.mimetype);
+    const filename = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9) + ".webp";
     const objectPath = `public/photos/${filename}`;
 
-    await uploadBuffer(objectPath, req.file.buffer, req.file.mimetype);
+    await uploadBuffer(objectPath, compressed.buffer, compressed.mimeType);
 
     const photoUrl = `/api/users/photos/${filename}`;
     const sortOrder = await storage.getUserPhotoCount(userId);

@@ -225,10 +225,14 @@ router.post("/:id/photos", requireAuth, async (req: Request, res: Response) => {
     }
 
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-    const ext = (filename || "photo.jpg").split(".").pop() || "jpg";
-    const uniqueName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${ext}`;
+    const mimeMatch = imageBase64.match(/^data:(image\/\w+);base64,/);
+    const detectedMime = mimeMatch ? mimeMatch[1] : "image/jpeg";
+    const rawBuffer = Buffer.from(base64Data, "base64");
+    const { compressToWebP } = await import("../utils/image-processing");
+    const compressed = await compressToWebP(rawBuffer, detectedMime);
+    const uniqueName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.webp`;
     const filePath = path.join(uploadsDir, uniqueName);
-    fs.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
+    fs.writeFileSync(filePath, compressed.buffer);
 
     const photoUrl = `/uploads/motorcycles/${uniqueName}`;
     const photo = await storage.addMotorcyclePhoto({

@@ -1365,11 +1365,14 @@ const inviteCodeUpload = multer({
 });
 
 async function uploadAdImageToObjectStorage(buffer: Buffer, originalname: string, mimetype: string): Promise<string> {
+  const { compressToWebP } = await import("../utils/image-processing");
+  const compressed = await compressToWebP(buffer, mimetype);
   const uniqueSuffix = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
-  const filename = uniqueSuffix + path.extname(originalname);
+  const ext = compressed.mimeType === "image/gif" ? path.extname(originalname) : ".webp";
+  const filename = uniqueSuffix + ext;
   const objectPath = `public/ads/${filename}`;
-  console.log(`[uploadAdImageToObjectStorage] Uploading "${originalname}" → ${objectPath} (${buffer.length} bytes, ${mimetype})`);
-  await uploadBuffer(objectPath, buffer, mimetype);
+  console.log(`[uploadAdImageToObjectStorage] Uploading "${originalname}" → ${objectPath} (${compressed.buffer.length} bytes, ${compressed.mimeType})`);
+  await uploadBuffer(objectPath, compressed.buffer, compressed.mimeType);
   console.log(`[uploadAdImageToObjectStorage] Upload OK → /api/ads/images/${filename}`);
   return `/api/ads/images/${filename}`;
 }
@@ -4428,32 +4431,6 @@ router.post("/db/vacuum-full", async (_req: Request, res: Response) => {
     return res.json({ started: true });
   } catch (error) {
     console.error("Admin vacuum-full error:", error);
-    return res.status(500).json({ message: "Errore interno" });
-  }
-});
-
-let cacheCleanupRunning = false;
-
-router.post("/cache/cleanup", async (_req: Request, res: Response) => {
-  try {
-    if (cacheCleanupRunning) {
-      return res.status(409).json({ error: "cleanup_already_running" });
-    }
-    cacheCleanupRunning = true;
-    const { exec } = await import("child_process");
-    exec("bash scripts/cleanup-cache.sh", (err, stdout, stderr) => {
-      cacheCleanupRunning = false;
-      if (err) {
-        console.error("[CACHE CLEANUP] Errore:", err.message);
-        console.error("[CACHE CLEANUP] stderr:", stderr);
-      } else {
-        console.log("[CACHE CLEANUP] Completato:", stdout.trim());
-      }
-    });
-    return res.json({ started: true });
-  } catch (error) {
-    cacheCleanupRunning = false;
-    console.error("Admin cache-cleanup error:", error);
     return res.status(500).json({ message: "Errore interno" });
   }
 });

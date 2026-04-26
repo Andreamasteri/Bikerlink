@@ -46,11 +46,12 @@ router.post("/entries", upload.single("photo"), async (req: Request, res: Respon
     let photoUrl: string | null = null;
 
     if (req.file) {
-      const ext = path.extname(req.file.originalname).toLowerCase() || ".jpg";
-      const filename = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}${ext}`;
+      const { compressToWebP } = await import("../utils/image-processing");
+      const compressed = await compressToWebP(req.file.buffer, req.file.mimetype);
+      const filename = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.webp`;
       const objectPath = `public/contest/${filename}`;
 
-      await uploadBuffer(objectPath, req.file.buffer, req.file.mimetype);
+      await uploadBuffer(objectPath, compressed.buffer, compressed.mimeType);
 
       photoUrl = `/api/contest/photos/${filename}`;
     } else if (req.body.photoUrl) {
