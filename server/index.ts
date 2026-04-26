@@ -937,36 +937,20 @@ function setupErrorHandler(app: express.Application) {
 
         // Phase 2.5: VACUUM FULL deferred (60s dopo avvio)
         // Recupera lo spazio fisico lasciato dai DELETE massivi degli utenti fittizi.
-        // Usa raw pool client — VACUUM FULL non può girare dentro una transazione.
-        // Si esegue UNA SOLA VOLTA (flag db_vacuum_full_v2 in app_settings).
+        // Si esegue UNA SOLA VOLTA (flag db_vacuum_full_v3 in app_settings).
         setTimeout(async () => {
-          let client: import("pg").PoolClient | null = null;
           try {
             const { storage: stVac } = await import("./storage");
-            const done = await stVac.getAppSetting("db_vacuum_full_v2");
+            const done = await stVac.getAppSetting("db_vacuum_full_v3");
             if (done?.value === "done") {
-              console.log("[VACUUM] Già eseguito in precedenza — skip.");
+              console.log("[VACUUM] One-shot già eseguito in precedenza — skip.");
               return;
             }
-            client = await pool.connect();
-            const vacTables = [
-              "biker_biker_matches",
-              "biker_zavorrina_matches",
-              "user_profiles",
-              "user_playlist_snapshots",
-              "conversations",
-            ];
-            for (const t of vacTables) {
-              const t0 = Date.now();
-              await client.query(`VACUUM FULL ANALYZE ${t}`);
-              console.log(`[VACUUM] VACUUM FULL ${t} completato in ${Date.now() - t0}ms`);
-            }
-            await stVac.upsertAppSetting("db_vacuum_full_v2", "done");
-            console.log("[VACUUM] Tutti i VACUUM FULL completati — spazio recuperato.");
+            const { runVacuumFullAll } = await import("./vacuum-service");
+            await runVacuumFullAll();
+            await stVac.upsertAppSetting("db_vacuum_full_v3", "done");
           } catch (e) {
-            console.warn("[VACUUM] Errore durante VACUUM FULL:", e);
-          } finally {
-            if (client) client.release();
+            console.warn("[VACUUM] Errore durante VACUUM FULL one-shot:", e);
           }
         }, 60_000);
 
@@ -1188,6 +1172,11 @@ function setupErrorHandler(app: express.Application) {
         console.log(
           `[INIT] Phase 9 semaphore metrics logger started (every 60s, alert after ${PRESSURE_ALERT_THRESHOLD} consecutive pressure intervals — override with PRESSURE_ALERT_THRESHOLD env var)`
         );
+
+        // Phase 10 — nightly VACUUM FULL ANALYZE at 03:00 Europe/Rome
+        const { scheduleNightlyVacuum } = await import("./vacuum-service");
+        scheduleNightlyVacuum();
+        console.log("[INIT] Phase 10 nightly VACUUM scheduler registered (03:00 Europe/Rome)");
       })().catch((err) => {
         console.error("[INIT] Startup phase chain error:", err);
         initState.initializing = false;

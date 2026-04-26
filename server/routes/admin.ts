@@ -4389,5 +4389,21 @@ router.get("/gps-errors", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/db/vacuum-full", async (_req: Request, res: Response) => {
+  try {
+    const { isVacuumRunning, runVacuumFullAll } = await import("../vacuum-service");
+    if (isVacuumRunning()) {
+      return res.status(409).json({ error: "vacuum_already_running" });
+    }
+    runVacuumFullAll().catch((err) => {
+      console.error("[VACUUM] Errore nel giro manuale da endpoint admin:", err);
+    });
+    return res.json({ started: true });
+  } catch (error) {
+    console.error("Admin vacuum-full error:", error);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 export default router;
 
