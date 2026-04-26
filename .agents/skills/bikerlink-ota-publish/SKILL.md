@@ -195,7 +195,7 @@ Questo previene lacune documentali come quella di APK v37 (build ID mai registra
   - APK v37: STABILE — versionName 2.3.0 + OTA 151–154
   - APK v38: STABILE — versionName 2.4.0, buildId: 7ecd4368-9640-4200-88e5-c33b902a7edc, APK: https://expo.dev/artifacts/eas/gEaBaW4hnhupnDP5CpYW1m.apk, updates.url→backend custom + OTA 155–156
 - Ciclo 8.x: OTA 1+ (APK versionCode 39, rv 8.0.0) ← CORRENTE (V3)
-  - APK v39: IN VERIFICA — versionName 3.0.0, buildId: b167f108-813d-4981-893a-2896c0268a5b (build inviata 2026-04-26T12:17Z), APK URL da recuperare su expo.dev, New Arch abilitata (newArchEnabled=true)
+  - APK v39: IN VERIFICA — versionName 3.0.0, buildId: b167f108-813d-4981-893a-2896c0268a5b (completata 2026-04-26T12:35Z), APK: https://expo.dev/artifacts/eas/nUADFAf6ddBUzcbZMjKBxR.apk, New Arch abilitata (newArchEnabled=true)
 
 ## ⚠️ ANALISI ARCHITETTURA (DEFINITIVA)
 React Native 0.82+ ha rimosso il supporto Old Architecture. Il flag newArchEnabled=false

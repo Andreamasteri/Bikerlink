@@ -5022,8 +5022,10 @@
     "apkBuildId": "b167f108-813d-4981-893a-2896c0268a5b",
     "apkVersionCode": 39,
     "apkVersionName": "3.0.0",
-    "apkUrl": null,
-    "apkCompletedAt": null,
+    "apkUrl": "https://expo.dev/artifacts/eas/nUADFAf6ddBUzcbZMjKBxR.apk",
+    "apkCompletedAt": "2026-04-26T12:35:18.932Z",
+    "deviceTestStatus": "pending",
+    "deviceTestNote": "Task #989: APK v39 (versionCode 39, versionName 3.0.0, rv 8.0.0) da verificare su Android — no crash al boot, login funzionante, mappe visibili.",
     "status": "published"
   }
 ]
