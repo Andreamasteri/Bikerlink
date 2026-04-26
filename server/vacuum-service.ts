@@ -106,20 +106,21 @@ export function scheduleNightlyVacuum(): void {
     return;
   }
 
-  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
-  const fireAndReschedule = () => {
+  const fireAndReschedule = async () => {
     if (isRunning) {
       console.warn("[VACUUM] Esecuzione notturna saltata: giro precedente ancora in corso.");
     } else {
-      runVacuumFullAll().catch((err) => {
+      try {
+        await runVacuumFullAll();
+      } catch (err) {
         console.error("[VACUUM] Errore nel giro notturno:", err);
-      });
+      }
     }
-    // Schedule next occurrence in exactly 24h regardless of run outcome or duration
-    const nextAt = new Date(Date.now() + ONE_DAY_MS).toISOString();
-    console.log(`[VACUUM] Prossima esecuzione programmata: ${nextAt} (tra 1440 minuti)`);
-    setTimeout(fireAndReschedule, ONE_DAY_MS);
+    // Recalculate next 03:00 Europe/Rome from now (handles DST transitions correctly)
+    const delayMs = msUntilNextRomeThreeAM();
+    const nextAt = new Date(Date.now() + delayMs).toISOString();
+    console.log(`[VACUUM] Prossima esecuzione programmata: ${nextAt} (tra ${Math.round(delayMs / 60_000)} minuti)`);
+    setTimeout(fireAndReschedule, delayMs);
   };
 
   const initialDelayMs = msUntilNextRomeThreeAM();
