@@ -4394,6 +4394,7 @@ router.get("/gps-errors", async (req: Request, res: Response) => {
 
 let cacheCleanupRunning = false;
 
+// POST /admin/cache/cleanup — avvia scripts/cleanup-cache.sh in background
 router.post("/cache/cleanup", async (_req: Request, res: Response) => {
   try {
     if (cacheCleanupRunning) {
