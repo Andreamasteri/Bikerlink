@@ -222,7 +222,12 @@ export default function EditProfileScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
     },
     onError: (error: Error) => {
-      Alert.alert(t("common.error"), error.message);
+      let msg = error.message;
+      try {
+        const parsed = JSON.parse(msg);
+        if (parsed?.message) msg = parsed.message;
+      } catch {}
+      Alert.alert(t("common.error"), msg);
     },
   });
 

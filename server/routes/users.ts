@@ -1,5 +1,5 @@
-import { Router, type Request, type Response } from "express";
-import multer from "multer";
+import { Router, type Request, type Response, type NextFunction } from "express";
+import multer, { MulterError } from "multer";
 import path from "path";
 import fs from "fs";
 import { storage } from "../storage";
@@ -966,7 +966,21 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
 // Foto utente — memorizzate su Replit Object Storage (cloud), path: public/photos/<filename>
 // Persistono tra APK update, OTA update e cache del dispositivo.
 // Vengono eliminate solo con deleteObject() oppure se l'account viene cancellato (cascade).
-router.post("/me/photos", requireAuth, upload.single("photo"), async (req: Request, res: Response) => {
+router.post("/me/photos", requireAuth, async (req: Request, res: Response) => {
+  const multerError = await new Promise<MulterError | Error | null>((resolve) => {
+    upload.single("photo")(req, res, ((err?: unknown) => {
+      if (err instanceof MulterError || err instanceof Error) resolve(err);
+      else resolve(null);
+    }) as NextFunction);
+  });
+
+  if (multerError) {
+    if (multerError instanceof MulterError && multerError.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ message: "Foto troppo grande. Dimensione massima consentita: 5 MB." });
+    }
+    return res.status(400).json({ message: multerError.message || "Formato file non supportato." });
+  }
+
   try {
     const userId = req.session.userId!;
 

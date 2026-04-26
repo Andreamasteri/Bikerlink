@@ -183,6 +183,14 @@ export default function ProfileScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
     },
+    onError: (error: Error) => {
+      let msg = error.message;
+      try {
+        const parsed = JSON.parse(msg);
+        if (parsed?.message) msg = parsed.message;
+      } catch {}
+      Alert.alert("Errore caricamento foto", msg);
+    },
   });
 
   const deletePhotoMutation = useMutation({
