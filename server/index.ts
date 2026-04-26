@@ -1179,6 +1179,32 @@ function setupErrorHandler(app: express.Application) {
         const { scheduleNightlyVacuum } = await import("./vacuum-service");
         scheduleNightlyVacuum();
         console.log("[INIT] Phase 10 nightly VACUUM scheduler registered (03:00 Europe/Rome)");
+
+        // Phase 11 — workspace cache cleanup every 24h
+        // Runs scripts/cleanup-cache.sh via child_process.exec.
+        // First run is delayed 5 min after boot (avoids interfering with startup).
+        {
+          const { exec } = await import("child_process");
+          const path = await import("path");
+          const scriptPath = path.resolve(process.cwd(), "scripts/cleanup-cache.sh");
+          const runCleanup = () => {
+            exec(`bash "${scriptPath}"`, { timeout: 120_000 }, (err, stdout, stderr) => {
+              if (err) {
+                console.warn("[CLEANUP] Cache cleanup error:", err.message);
+                if (stderr) console.warn("[CLEANUP] stderr:", stderr.slice(0, 400));
+              } else {
+                const summary = stdout.trim().split("\n").pop() ?? "";
+                console.log("[CLEANUP]", summary || "Cache cleanup completata");
+              }
+            });
+          };
+          // First run after 5 minutes, then every 24 hours
+          setTimeout(() => {
+            runCleanup();
+            setInterval(runCleanup, 24 * 60 * 60 * 1000);
+          }, 5 * 60 * 1000);
+          console.log("[INIT] Phase 11 workspace cache cleanup scheduled (5min delay, then every 24h)");
+        }
       })().catch((err) => {
         console.error("[INIT] Startup phase chain error:", err);
         initState.initializing = false;
