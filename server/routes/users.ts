@@ -978,11 +978,11 @@ router.post("/me/photos", requireAuth, upload.single("photo"), async (req: Reque
     }
 
     const { compressToWebP } = await import("../utils/image-processing");
-    const compressed = await compressToWebP(req.file.buffer, req.file.mimetype);
+    const webpBuffer = await compressToWebP(req.file.buffer);
     const filename = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9) + ".webp";
     const objectPath = `public/photos/${filename}`;
 
-    await uploadBuffer(objectPath, compressed.buffer, compressed.mimeType);
+    await uploadBuffer(objectPath, webpBuffer, "image/webp");
 
     const photoUrl = `/api/users/photos/${filename}`;
     const sortOrder = await storage.getUserPhotoCount(userId);

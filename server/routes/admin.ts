@@ -1365,8 +1365,8 @@ const inviteCodeUpload = multer({
 });
 
 async function uploadAdImageToObjectStorage(buffer: Buffer, originalname: string, mimetype: string): Promise<string> {
-  const { compressToWebP } = await import("../utils/image-processing");
-  const compressed = await compressToWebP(buffer, mimetype);
+  const { compressToWebPOrPassGif } = await import("../utils/image-processing");
+  const compressed = await compressToWebPOrPassGif(buffer, mimetype);
   const uniqueSuffix = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
   const ext = compressed.mimeType === "image/gif" ? path.extname(originalname) : ".webp";
   const filename = uniqueSuffix + ext;
