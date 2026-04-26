@@ -4791,8 +4791,32 @@
     "apkBuildId": "7ecd4368-9640-4200-88e5-c33b902a7edc",
     "apkVersionCode": 38,
     "apkUrl": "https://expo.dev/artifacts/eas/gEaBaW4hnhupnDP5CpYW1m.apk",
-    "status": "published",
+    "status": "superseded",
     "apkVersionName": "2.4.0",
     "apkCompletedAt": "2026-04-26T01:27:31.449Z"
+  },
+  {
+    "updateNumber": 156,
+    "version": "1.156.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-156 rv7.0.0: fix FileSystem.EncodingType.Base64 undefined in traduzioni download",
+    "publishedAt": "2026-04-26",
+    "runtimeVersion": "7.0.0",
+    "platforms": ["android"],
+    "jsEngine": "hermes",
+    "note": "Fix: FileSystem.EncodingType.Base64 era undefined in expo-file-system v55 — sostituito con stringa letterale 'base64' in handleDownloadXlsx e handleDownloadDocx (app/admin/traduzioni.tsx righe 728 e 773). CURRENT_OTA_NUMBER=156.",
+    "releaseId": "517a5e01-3670-4f18-9c81-04556447205c",
+    "bundleUrl": "private/ota/ota-1.156.0-1777168292952.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "4592a8a341ee7a7013f718d07875f791efe80cf9",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 38,
+    "apkUrl": null,
+    "status": "published"
   }
 ]

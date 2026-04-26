@@ -722,7 +722,7 @@ export default function TraduzioniScreen() {
         const arrayBuf = await resp.arrayBuffer();
         const base64 = await arrayBufferToBase64(arrayBuf);
         const filePath = `${FileSystem.cacheDirectory}BikerLink_Traduzioni.xlsx`;
-        await FileSystem.writeAsStringAsync(filePath, base64, { encoding: FileSystem.EncodingType.Base64 });
+        await FileSystem.writeAsStringAsync(filePath, base64, { encoding: "base64" });
         const canShare = await Sharing.isAvailableAsync();
         if (canShare) {
           await Sharing.shareAsync(filePath, {
@@ -767,7 +767,7 @@ export default function TraduzioniScreen() {
         const arrayBuf = await resp.arrayBuffer();
         const base64 = await arrayBufferToBase64(arrayBuf);
         const filePath = `${FileSystem.cacheDirectory}BikerLink_Traduzioni.docx`;
-        await FileSystem.writeAsStringAsync(filePath, base64, { encoding: FileSystem.EncodingType.Base64 });
+        await FileSystem.writeAsStringAsync(filePath, base64, { encoding: "base64" });
         const canShare = await Sharing.isAvailableAsync();
         if (canShare) {
           await Sharing.shareAsync(filePath, {
