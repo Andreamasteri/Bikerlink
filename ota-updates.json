@@ -4780,7 +4780,7 @@
       "android"
     ],
     "jsEngine": "hermes",
-    "note": "Task #962: Prima OTA pubblicata dopo APK v38 con updates.url puntato a https://biker-link.replit.app/api/expo-updates (Expo Updates Protocol v1). Verifica end-to-end: backend custom → dispositivo riceve aggiornamento. EAS fallito (Manifest Validation Error: intentFilters duplicati in app.json al momento della pubblicazione — poi corretti nello stesso task). Backend custom attivo. CURRENT_OTA_NUMBER=155. — Task #961: build APK v38 (versionCode 38, versionName 2.4.0) inviata a EAS 2026-04-26 commit bf49d39 con --no-wait. Build ID e APK URL da recuperare da https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds e aggiornare in questo record (apkBuildId, apkUrl).",
+    "note": "Task #962: Prima OTA pubblicata dopo APK v38 con updates.url puntato a https://biker-link.replit.app/api/expo-updates (Expo Updates Protocol v1). Verifica end-to-end: backend custom → dispositivo riceve aggiornamento. EAS fallito (Manifest Validation Error: intentFilters duplicati in app.json al momento della pubblicazione — poi corretti nello stesso task). Backend custom attivo. CURRENT_OTA_NUMBER=155. — Task #961: build APK v38 (versionCode 38, versionName 2.4.0) inviata a EAS 2026-04-26 commit bf49d39 con --no-wait. Build ID e APK URL da recuperare da https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds e aggiornare in questo record (apkBuildId, apkUrl). | APK v38 build EAS: 7ecd4368-9640-4200-88e5-c33b902a7edc (inviata 2026-04-26, --no-wait)",
     "releaseId": "f72a3e15-9b2d-4047-9127-02864de1b426",
     "bundleUrl": "private/ota/ota-1.155.0-1777163514867.js",
     "updateGroupId": null,
@@ -4788,9 +4788,10 @@
     "iosUpdateId": null,
     "commitBase": "8cee6c2f4d327bfe16fd4cb1730d72596de5cad4",
     "easDashboard": null,
-    "apkBuildId": null,
+    "apkBuildId": "7ecd4368-9640-4200-88e5-c33b902a7edc",
     "apkVersionCode": 38,
     "apkUrl": null,
-    "status": "published"
+    "status": "published",
+    "apkVersionName": "2.4.0"
   }
 ]
