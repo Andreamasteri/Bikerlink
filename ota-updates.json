@@ -4975,6 +4975,28 @@
     "apkBuildId": null,
     "apkVersionCode": 38,
     "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 163,
+    "version": "1.163.0",
+    "cycle": "7.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-163 rv7.0.0: pannello admin verifica aggiornamenti versione",
+    "runtimeVersion": "7.0.0",
+    "jsEngine": "hermes",
+    "note": "Task #977: pannello admin 'Verifica aggiornamenti versione' (commits 0583b74 e 66e02d6, pubblicati con [skip ota]). CURRENT_OTA_NUMBER=163.",
+    "releaseId": "6bf89961-5f98-49fd-9125-78ceaa9591c4",
+    "bundleUrl": "private/ota/ota-1.163.0-1777203261158.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "a0eb5f14269e544545d62b18bb6192e5602cb4c3",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 38,
+    "apkUrl": null,
     "status": "published"
   }
 ]
