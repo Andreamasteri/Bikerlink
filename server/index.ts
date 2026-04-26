@@ -947,8 +947,10 @@ function setupErrorHandler(app: express.Application) {
               return;
             }
             const { runVacuumFullAll } = await import("./vacuum-service");
-            await runVacuumFullAll();
-            await stVac.upsertAppSetting("db_vacuum_full_v3", "done");
+            const outcome = await runVacuumFullAll();
+            if (outcome === "executed") {
+              await stVac.upsertAppSetting("db_vacuum_full_v3", "done");
+            }
           } catch (e) {
             console.warn("[VACUUM] Errore durante VACUUM FULL one-shot:", e);
           }

@@ -22,10 +22,11 @@ export function isVacuumRunning(): boolean {
   return isRunning;
 }
 
-export async function runVacuumFullAll(): Promise<void> {
+/** Returns "executed" if the run completed, "skipped" if another run was already active. */
+export async function runVacuumFullAll(): Promise<"executed" | "skipped"> {
   if (isRunning) {
     console.warn("[VACUUM] Giro già in corso — skip.");
-    return;
+    return "skipped";
   }
   isRunning = true;
   const startTotal = Date.now();
@@ -66,6 +67,7 @@ export async function runVacuumFullAll(): Promise<void> {
     }
     const totalElapsed = Date.now() - startTotal;
     console.log(`[VACUUM] Completato in ${totalElapsed}ms — spazio recuperato.`);
+    return "executed";
   } catch (err) {
     console.error("[VACUUM] Errore durante VACUUM FULL:", err);
     throw err;
@@ -78,7 +80,7 @@ export async function runVacuumFullAll(): Promise<void> {
 /**
  * Returns milliseconds until the next 03:00:00 in Europe/Rome timezone.
  * Uses Intl.DateTimeFormat to read the current Rome-local time components,
- * then computes the delta in seconds.
+ * then computes the delta in seconds. Handles DST transitions correctly.
  */
 function msUntilNextRomeThreeAM(): number {
   const now = new Date();
@@ -100,6 +102,18 @@ function msUntilNextRomeThreeAM(): number {
   return delta * 1000;
 }
 
+/** Format a future UTC Date as "YYYY-MM-DD HH:MM Europe/Rome" for readable log output. */
+function formatRomeTime(date: Date): string {
+  return date.toLocaleString("it-IT", {
+    timeZone: "Europe/Rome",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function scheduleNightlyVacuum(): void {
   if (process.env.DISABLE_NIGHTLY_VACUUM === "1") {
     console.log("[VACUUM] Scheduler notturno disabilitato (DISABLE_NIGHTLY_VACUUM=1).");
@@ -118,15 +132,17 @@ export function scheduleNightlyVacuum(): void {
     }
     // Recalculate next 03:00 Europe/Rome from now (handles DST transitions correctly)
     const delayMs = msUntilNextRomeThreeAM();
-    const nextAt = new Date(Date.now() + delayMs).toISOString();
-    console.log(`[VACUUM] Prossima esecuzione programmata: ${nextAt} (tra ${Math.round(delayMs / 60_000)} minuti)`);
+    const nextAt = new Date(Date.now() + delayMs);
+    console.log(
+      `[VACUUM] Prossima esecuzione programmata: ${formatRomeTime(nextAt)} (Europe/Rome) — tra ${Math.round(delayMs / 60_000)} minuti`,
+    );
     setTimeout(fireAndReschedule, delayMs);
   };
 
   const initialDelayMs = msUntilNextRomeThreeAM();
-  const firstAt = new Date(Date.now() + initialDelayMs).toISOString();
+  const firstAt = new Date(Date.now() + initialDelayMs);
   console.log(
-    `[VACUUM] Prossima esecuzione programmata: ${firstAt} (tra ${Math.round(initialDelayMs / 60_000)} minuti)`,
+    `[VACUUM] Prossima esecuzione programmata: ${formatRomeTime(firstAt)} (Europe/Rome) — tra ${Math.round(initialDelayMs / 60_000)} minuti`,
   );
   setTimeout(fireAndReschedule, initialDelayMs);
 }
