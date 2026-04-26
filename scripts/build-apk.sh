@@ -120,6 +120,7 @@ sleep 5
 # ── 6. Build EAS (set -e disabilitato attorno al comando per catturare exit code) ─
 set +e
 CI=1 \
+EAS_NO_VCS=1 \
 EAS_SKIP_AUTO_FINGERPRINT=1 \
 EXPO_PUBLIC_DOMAIN=biker-link.replit.app \
 npx eas-cli@18 build \

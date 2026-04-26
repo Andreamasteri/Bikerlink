@@ -5027,5 +5027,34 @@
     "deviceTestStatus": "pending",
     "deviceTestNote": "Task #996: APK v39 (versionCode 39, versionName 3.0.0, rv 8.0.0) da verificare su Android — no crash al boot, login funzionante, mappe visibili. URL: https://expo.dev/artifacts/eas/nUADFAf6ddBUzcbZMjKBxR.apk",
     "status": "published"
+  },
+  {
+    "updateNumber": 1,
+    "version": "1.1.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "APK v40: build nativa ottimizzata (expo-battery rimosso, WebP compression, icon compressa)",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "note": "Task #1012: APK v40 (versionCode 40, versionName 3.0.0, rv 8.0.0, New Architecture). Ottimizzazioni: expo-battery rimosso (Task #1010), WebP compression (Tasks #1005/#1007/#1008), android-icon-background.png compressa (1.2MB→359KB), EAS_NO_VCS=1 aggiunto a build-apk.sh.",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "695a5d0d26e4671da4c29f601502e8e8deda0b55",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/ba5205c6-0cc8-41ce-ba8c-8e68a117dabf",
+    "apkBuildId": "ba5205c6-0cc8-41ce-ba8c-8e68a117dabf",
+    "apkVersionCode": 40,
+    "apkVersionName": "3.0.0",
+    "apkUrl": null,
+    "apkCompletedAt": null,
+    "deviceTestStatus": "pending",
+    "deviceTestNote": "APK v40 in build su EAS — da verificare su Android dopo completamento (no crash al boot, login funzionante, mappe visibili).",
+    "status": "building"
   }
 ]
