@@ -1897,7 +1897,19 @@ router.get("/moderator-logs", async (req: Request, res: Response) => {
 
     const rawLogs = await storage.getModeratorLogs();
 
-    let filtered = rawLogs;
+    const distinctAuthorIds = [...new Set(rawLogs.map((l) => l.moderatorId))];
+    const authorsResolved = await Promise.all(distinctAuthorIds.map((id) => storage.getUser(id)));
+    const userMap = new Map<string, { id: string; nickname: string }>();
+    const moderatorRoleIds = new Set<string>();
+    for (const u of authorsResolved) {
+      if (!u) continue;
+      userMap.set(u.id, { id: u.id, nickname: u.nickname });
+      if (u.role === "moderator") moderatorRoleIds.add(u.id);
+    }
+
+    const moderatorOnlyLogs = rawLogs.filter((l) => moderatorRoleIds.has(l.moderatorId));
+
+    let filtered = moderatorOnlyLogs;
     if (filterModeratorId) filtered = filtered.filter((l) => l.moderatorId === filterModeratorId);
     if (filterAction) filtered = filtered.filter((l) => l.action === filterAction);
 
@@ -1905,19 +1917,20 @@ router.get("/moderator-logs", async (req: Request, res: Response) => {
     const offset = (page - 1) * limit;
     const paginated = filtered.slice(offset, offset + limit);
 
-    const allUserIds = new Set<string>();
+    const targetUserIdsToResolve = new Set<string>();
     for (const log of paginated) {
-      allUserIds.add(log.moderatorId);
-      if (log.targetType === "user" && log.targetId) allUserIds.add(log.targetId);
+      if (log.targetType === "user" && log.targetId && !userMap.has(log.targetId)) {
+        targetUserIdsToResolve.add(log.targetId);
+      }
     }
-    const allModeratorsInFull = [...new Set(rawLogs.map((l) => l.moderatorId))];
-    for (const id of allModeratorsInFull) allUserIds.add(id);
+    if (targetUserIdsToResolve.size > 0) {
+      const targetUsers = await Promise.all([...targetUserIdsToResolve].map((id) => storage.getUser(id)));
+      for (const u of targetUsers) {
+        if (u) userMap.set(u.id, { id: u.id, nickname: u.nickname });
+      }
+    }
 
-    const resolvedUsers = await Promise.all([...allUserIds].map((id) => storage.getUser(id)));
-    const userMap = new Map<string, { id: string; nickname: string }>();
-    for (const u of resolvedUsers) {
-      if (u) userMap.set(u.id, { id: u.id, nickname: u.nickname });
-    }
+    const allModeratorsInFull = [...new Set(moderatorOnlyLogs.map((l) => l.moderatorId))];
 
     const enriched = paginated.map((log) => ({
       ...log,
@@ -1927,7 +1940,7 @@ router.get("/moderator-logs", async (req: Request, res: Response) => {
 
     const moderatorProfiles = allModeratorsInFull
       .map((id) => userMap.get(id) ?? { id, nickname: id });
-    const allActions = [...new Set(rawLogs.map((l) => l.action))];
+    const allActions = [...new Set(moderatorOnlyLogs.map((l) => l.action))];
 
     return res.json({
       logs: enriched,
@@ -1940,6 +1953,24 @@ router.get("/moderator-logs", async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Admin moderator-logs error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/moderator-logs", async (req: Request, res: Response) => {
+  try {
+    const adminId = req.session.userId!;
+    const deletedCount = await storage.clearModeratorLogs();
+    await db.insert(moderatorLogs).values({
+      moderatorId: adminId,
+      action: "clear_moderator_logs",
+      targetType: "system",
+      targetId: null,
+      details: `Log moderatori svuotati (${deletedCount} righe)`,
+    });
+    return res.json({ message: "Log moderatori svuotati", deletedCount });
+  } catch (error) {
+    console.error("Admin delete moderator-logs error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

@@ -274,6 +274,7 @@ export interface IStorage {
 
   getAllUsers(): Promise<User[]>;
   getModeratorLogs(): Promise<ModeratorLog[]>;
+  clearModeratorLogs(): Promise<number>;
   getAllCampaigns(): Promise<AdCampaign[]>;
   deleteEasterEgg(id: string): Promise<void>;
   deleteWorkshop(id: string): Promise<void>;
@@ -1090,6 +1091,11 @@ export class DatabaseStorage implements IStorage {
 
   async getModeratorLogs(): Promise<ModeratorLog[]> {
     return db.select().from(moderatorLogs).orderBy(desc(moderatorLogs.createdAt));
+  }
+
+  async clearModeratorLogs(): Promise<number> {
+    const result = await db.delete(moderatorLogs).returning({ id: moderatorLogs.id });
+    return result.length;
   }
 
   async getAllCampaigns(): Promise<AdCampaign[]> {

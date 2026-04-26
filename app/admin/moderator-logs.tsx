@@ -9,8 +9,9 @@ import {
   Platform,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from "react-native";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { apiRequest } from "@/lib/query-client";
@@ -88,6 +89,7 @@ function LogRow({ log }: { log: ModeratorLog }) {
 
 export default function AdminModeratorLogs() {
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [moderatorId, setModeratorId] = useState<string>("");
   const [action, setAction] = useState<string>("");
@@ -106,6 +108,37 @@ export default function AdminModeratorLogs() {
       return res.json();
     },
   });
+
+  const clearMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/admin/moderator-logs");
+      return res.json() as Promise<{ message: string; deletedCount: number }>;
+    },
+    onSuccess: (result) => {
+      setPage(1);
+      setModeratorId("");
+      setAction("");
+      setSearch("");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/moderator-logs"] });
+      Alert.alert("Log svuotati", `${result.deletedCount} righe eliminate.`);
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Errore sconosciuto";
+      Alert.alert("Errore", `Impossibile svuotare i log: ${msg}`);
+    },
+  });
+
+  function handleClearLogs() {
+    if (clearMutation.isPending) return;
+    Alert.alert(
+      "Svuota log moderatori",
+      "Cancellare tutti i log moderatori? L'operazione non è reversibile.",
+      [
+        { text: "Annulla", style: "cancel" },
+        { text: "Svuota", style: "destructive", onPress: () => clearMutation.mutate() },
+      ]
+    );
+  }
 
   const logs = data?.logs ?? [];
   const totalPages = data?.totalPages ?? 1;
@@ -132,20 +165,35 @@ export default function AdminModeratorLogs() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: webBottomInset }]}>
-      <View style={styles.searchBar}>
-        <Ionicons name="search-outline" size={18} color={Colors.textSecondary} />
-        <TextInput
-          style={styles.searchInput}
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Cerca in questa pagina…"
-          placeholderTextColor={Colors.textSecondary}
-        />
-        {hasFilters && (
-          <TouchableOpacity onPress={handleResetFilters}>
-            <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
-          </TouchableOpacity>
-        )}
+      <View style={styles.headerRow}>
+        <View style={styles.searchBar}>
+          <Ionicons name="search-outline" size={18} color={Colors.textSecondary} />
+          <TextInput
+            style={styles.searchInput}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Cerca in questa pagina…"
+            placeholderTextColor={Colors.textSecondary}
+          />
+          {hasFilters && (
+            <TouchableOpacity onPress={handleResetFilters}>
+              <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        <TouchableOpacity
+          style={[styles.clearBtn, clearMutation.isPending && styles.clearBtnDisabled]}
+          onPress={handleClearLogs}
+          disabled={clearMutation.isPending}
+          testID="clear-moderator-logs-btn"
+          accessibilityLabel="Svuota log moderatori"
+        >
+          {clearMutation.isPending ? (
+            <ActivityIndicator size="small" color={Colors.error} />
+          ) : (
+            <Ionicons name="trash-outline" size={20} color={Colors.error} />
+          )}
+        </TouchableOpacity>
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersRow}>
@@ -232,12 +280,19 @@ export default function AdminModeratorLogs() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+  },
   searchBar: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.surface,
-    margin: 16,
-    marginBottom: 8,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -246,6 +301,17 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   searchInput: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.text },
+  clearBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.error + "55",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  clearBtnDisabled: { opacity: 0.5 },
   filtersRow: {
     paddingHorizontal: 16,
     paddingVertical: 6,
@@ -253,18 +319,18 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: "center",
   },
-  filterLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary },
+  filterLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: Colors.text },
   filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   filterChipActive: { backgroundColor: Colors.accent + "22", borderColor: Colors.accent },
-  filterChipText: { fontSize: 12, fontFamily: "Inter_500Medium", color: Colors.textSecondary },
-  filterChipTextActive: { color: Colors.accent },
+  filterChipText: { fontSize: 13, fontFamily: "Inter_500Medium", color: Colors.text },
+  filterChipTextActive: { color: Colors.accent, fontFamily: "Inter_600SemiBold" },
   center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
   emptyText: { fontSize: 15, color: Colors.textSecondary, fontFamily: "Inter_500Medium" },
   list: { paddingHorizontal: 16, paddingBottom: 24 },
