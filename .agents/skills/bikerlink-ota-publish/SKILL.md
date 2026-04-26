@@ -194,7 +194,13 @@ bash scripts/build-apk.sh production  # SOLO per AAB Play Store (non APK)
 Dato che `android/` è committato nel repo, il restringimento ABI è applicato in:
 - `android/gradle.properties` → `reactNativeArchitectures=arm64-v8a`
 - `android/app/build.gradle` → `ndk { abiFilters "arm64-v8a" }`
-- `app.json` plugins → `expo-build-properties` con `android.newArchEnabled=true` + ProGuard/Shrink (per coerenza con eventuale futuro prebuild)
+- `app.json` plugins → `expo-build-properties` con `android.newArchEnabled=true` + ProGuard/Shrink + `buildArchs: ["arm64-v8a"]` (per coerenza con eventuale futuro prebuild)
+
+### Conseguenza sul profilo `production` (AAB Play Store)
+Poiché il restringimento ABI vive nei file Android committati, **anche l'AAB del profilo `production` sarà arm64-only**. È intenzionale e accettabile: Google Play Store richiede 64-bit dal 2019, Android 14 (ottobre 2023) deprecate il supporto 32-bit, e l'AAB di Play Store gestisce comunque lo splitting automatico per ABI. Per riabilitare armeabi-v7a sull'AAB in futuro occorre parametrizzare `abiFilters` via gradle property (es. `-PandroidAbiFilters=...`) nel `gradleCommand` del profilo production di `eas.json`.
+
+### Guardia config-based (anti-regressione)
+`scripts/build-apk.sh` esegue prima di ogni build EAS un'assertion che verifica i tre punti di configurazione (`gradle.properties`, `build.gradle`, plugin `expo-build-properties` in `app.json`). Se qualcuno regredisce uno qualsiasi di questi file a multi-ABI, la build viene bloccata con messaggio chiaro — la guardia è indipendente dal nome del profilo, quindi protegge anche da modifiche accidentali a `release-apk` in `eas.json`.
 
 ## ⚠️ Nota: APK build ID e URL dopo --no-wait
 `scripts/build-apk.sh` invia la build con `--no-wait` e **non cattura** il build ID restituito da EAS. Dopo ogni nuova build APK, recuperare manualmente il build ID e l'URL del file `.apk` da https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds e aggiornarli in `ota-updates.json` nella entry più recente del ciclo corrente:

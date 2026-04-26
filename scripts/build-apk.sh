@@ -117,6 +117,38 @@ if [[ "$PROFILE" != "production" && "$PROFILE" != "release-apk" ]]; then
   exit 1
 fi
 
+# ── 3a. Assertion config-based — Task #1017 ─────────────────────────────────
+# Verifica che la config Android non sia stata accidentalmente regredita a
+# multi-ABI (4 ABI universale = APK ~135MB invece di ~50MB).
+# Questo controllo è indipendente dal nome del profilo: se qualcuno modifica
+# release-apk in eas.json o riattiva multi-ABI in gradle.properties / build.gradle,
+# la build viene bloccata con messaggio chiaro.
+GP_LINE=$(grep -E "^reactNativeArchitectures=" android/gradle.properties || echo "")
+if [[ "$GP_LINE" != "reactNativeArchitectures=arm64-v8a" ]]; then
+  echo "  ✖  REGRESSIONE ABI rilevata in android/gradle.properties"
+  echo "     Atteso: reactNativeArchitectures=arm64-v8a"
+  echo "     Trovato: $GP_LINE"
+  echo "     Task #1017 richiede arm64-v8a SOLO (default permanente)."
+  exit 1
+fi
+BG_LINE=$(grep -oE 'abiFilters[[:space:]]+"[^"]*"(,[[:space:]]*"[^"]*")*' android/app/build.gradle | head -1)
+if [[ "$BG_LINE" != 'abiFilters "arm64-v8a"' ]]; then
+  echo "  ✖  REGRESSIONE ABI rilevata in android/app/build.gradle"
+  echo '     Atteso: abiFilters "arm64-v8a"'
+  echo "     Trovato: $BG_LINE"
+  echo "     Task #1017 richiede arm64-v8a SOLO (default permanente)."
+  exit 1
+fi
+EBP=$(node -e "const c=require('./app.json'); const p=(c.expo.plugins||[]).find(x=>Array.isArray(x)&&x[0]==='expo-build-properties'); process.stdout.write(p?JSON.stringify(p[1]?.android?.buildArchs||[]):'MISSING')")
+if [[ "$EBP" != '["arm64-v8a"]' ]]; then
+  echo "  ✖  REGRESSIONE plugin expo-build-properties in app.json"
+  echo '     Atteso: android.buildArchs = ["arm64-v8a"]'
+  echo "     Trovato: $EBP"
+  echo "     Task #1017 richiede arm64-v8a SOLO nel plugin (default permanente)."
+  exit 1
+fi
+echo "  ✔  Config Android verificata: arm64-v8a only (gradle.properties + build.gradle + app.json)"
+
 # ── 4. Log dell'evento ───────────────────────────────────────────────────────
 mkdir -p logs
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")

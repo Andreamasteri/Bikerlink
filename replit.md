@@ -143,6 +143,10 @@ Configurazione applicata in:
 - `app.json` plugins → `expo-build-properties` (newArchEnabled + ProGuard + ShrinkResources)
 - `eas.json` → solo profili `release-apk` e `production`. Il vecchio `preview` (APK universali 4 ABI ~135MB) è stato **rimosso**: `bash scripts/build-apk.sh preview` viene bloccato con messaggio esplicito.
 
+**Nota sul profilo `production` (AAB Play Store):** poiché il restringimento ABI è applicato nei file Android committati (`android/gradle.properties` + `android/app/build.gradle`), anche l'AAB generato dal profilo `production` sarà arm64-only. Questa è una conseguenza intenzionale e accettabile: Google Play Store richiede 64-bit dal 2019 e Android 14 (ottobre 2023) deprecate il supporto 32-bit. Inoltre il formato AAB di Play Store gestisce automaticamente la consegna per ABI. Se in futuro servisse riabilitare armeabi-v7a SOLO per l'AAB Play Store, occorrerà rendere `abiFilters` parametrizzabile via gradle property (es. `-PandroidAbiFilters=...`) e impostarlo nel `gradleCommand` del profilo production in `eas.json`.
+
+**Guardia config-based in `scripts/build-apk.sh`:** prima di ogni build EAS lo script verifica che `gradle.properties`, `build.gradle` e il plugin `expo-build-properties` in `app.json` siano tutti coerenti con arm64-only. Se qualcuno regredisce uno qualsiasi di questi tre file la build viene bloccata con messaggio chiaro — la guardia non dipende dal nome del profilo.
+
 ## Legacy app_settings keys (non più utilizzate)
 - **`maps_engine`** (Task #649 → dismessa Task #718/#719): toggle motore mappa Google Maps vs Leaflet. Le mappe sono ora esclusivamente Leaflet (vedi sezione Frontend). La riga in `app_settings` con key='maps_engine' è stata rimossa dal DB di produzione (verificato: assente sia in dev che prod). L'endpoint `GET /api/settings/maps` continua a rispondere correttamente: in mancanza della riga il campo `engine` viene restituito col fallback `"leaflet"` (compatibilità retro). Il PUT admin `/api/admin/settings/maps_engine` resta presente come stub legacy e potrà essere rimosso del tutto in un task successivo.
 
