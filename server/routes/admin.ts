@@ -4121,6 +4121,9 @@ router.post(
       }
 
       const langCounts: Record<string, number> = {};
+      for (const lang of Array.from(ALLOWED_LANGS)) {
+        langCounts[lang] = 0;
+      }
       for (const { lang } of langColumns) {
         const filePath = LANG_FILE_MAP[lang];
         const count = applyTranslationsToFile(filePath, updatesByLang[lang]);
