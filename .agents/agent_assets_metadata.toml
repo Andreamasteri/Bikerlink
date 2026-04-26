@@ -509,3 +509,9 @@ id = "LhjM0TvC72pkcAYHxiBpV"
 uri = "file://attached_assets/generated_videos/bikerlink_outro_together.mp4"
 type = "video"
 title = "Clip: Outro Together"
+
+[[outputs]]
+id = "MKEdfzBMo2hxt8PxPkwbM"
+uri = "file://attached_assets/generated_videos/biker_adrenalina_17s.mp4"
+type = "video"
+title = "Biker Adrenalina — 18s (impennata, curve, salto crepaccio)"
