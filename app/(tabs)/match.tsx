@@ -297,7 +297,7 @@ function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, onBlock
               disabled={isPending}
             >
               <Ionicons name="ban" size={16} color={Colors.accentRed} />
-              <Text style={[styles.actionBtnText, { color: Colors.accentRed, fontSize: 13 }]}>{t("match.blockUser")}</Text>
+              <Text style={[styles.actionBtnText, { color: Colors.accentRed, fontSize: 16 }]}>{t("match.blockUser")}</Text>
             </TouchableOpacity>
           </View>
           <TouchableOpacity
@@ -987,17 +987,17 @@ export default function MatchScreen() {
           <View style={{ flexDirection: "row" as const, flexWrap: "wrap" as const, gap: 6, marginTop: 8 }}>
             {item.songsInCommon > 0 && (
               <View style={[styles.countBadge, { backgroundColor: Colors.accent + "20", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }]}>
-                <Text style={{ fontSize: 12, color: Colors.accent, fontFamily: "Inter_500Medium" }}>{item.songsInCommon} brani in comune</Text>
+                <Text style={{ fontSize: 15, color: Colors.accent, fontFamily: "Inter_500Medium" }}>{item.songsInCommon} brani in comune</Text>
               </View>
             )}
             {item.sharedArtist && (
               <View style={[styles.countBadge, { backgroundColor: Colors.surface, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }]}>
-                <Text style={{ fontSize: 12, color: Colors.textSecondary, fontFamily: "Inter_500Medium" }}>{item.sharedArtist}</Text>
+                <Text style={{ fontSize: 15, color: Colors.textSecondary, fontFamily: "Inter_500Medium" }}>{item.sharedArtist}</Text>
               </View>
             )}
             {item.sharedGenre && (
               <View style={[styles.countBadge, { backgroundColor: Colors.surface, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }]}>
-                <Text style={{ fontSize: 12, color: Colors.textSecondary, fontFamily: "Inter_500Medium" }}>{item.sharedGenre}</Text>
+                <Text style={{ fontSize: 15, color: Colors.textSecondary, fontFamily: "Inter_500Medium" }}>{item.sharedGenre}</Text>
               </View>
             )}
           </View>
@@ -1409,7 +1409,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   inlineTitle: {
-    fontSize: 20,
+    fontSize: 26,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
   },
@@ -1448,7 +1448,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent + "40",
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
   },
@@ -1465,7 +1465,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   countBadgeText: {
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: "700" as const,
   },
   systemDescBanner: {
@@ -1483,10 +1483,10 @@ const styles = StyleSheet.create({
   },
   systemDescText: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 15,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
-    lineHeight: 16,
+    lineHeight: 21,
   },
   distanceFilterRow: {
     flexDirection: "row" as const,
@@ -1507,7 +1507,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent + "40",
   },
   distanceModeBtnText: {
-    fontSize: 12,
+    fontSize: 15,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
   },
@@ -1517,14 +1517,14 @@ const styles = StyleSheet.create({
   },
   distanceKmInput: {
     flex: 1,
-    minWidth: 48,
-    maxWidth: 80,
-    height: 34,
+    minWidth: 52,
+    maxWidth: 88,
+    height: 38,
     backgroundColor: Colors.surface,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 0,
-    fontSize: 13,
+    fontSize: 16,
     fontFamily: "Inter_500Medium",
     color: Colors.text,
     textAlign: "center" as const,
@@ -1539,7 +1539,7 @@ const styles = StyleSheet.create({
     alignItems: "center" as const,
   },
   distanceKmApplyText: {
-    fontSize: 12,
+    fontSize: 15,
     fontFamily: "Inter_700Bold",
     color: "#fff",
   },
@@ -1548,7 +1548,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   distanceWarning: {
-    fontSize: 11,
+    fontSize: 14,
     fontFamily: "Inter_400Regular",
     fontStyle: "italic" as const,
     color: Colors.textSecondary,
@@ -1566,10 +1566,10 @@ const styles = StyleSheet.create({
   },
   bikerInfoText: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 14,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
-    lineHeight: 16,
+    lineHeight: 20,
   },
   removeBtn: {
     marginLeft: 4,
@@ -1595,7 +1595,7 @@ const styles = StyleSheet.create({
   },
   serverBusyText: {
     marginTop: 12,
-    fontSize: 14,
+    fontSize: 17,
     color: Colors.textSecondary,
   },
   list: {
@@ -1630,17 +1630,17 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   statusLabel: {
-    fontSize: 14,
+    fontSize: 17,
     fontFamily: "Inter_600SemiBold",
     flex: 1,
   },
   matchStatusText: {
-    fontSize: 14,
+    fontSize: 17,
     fontFamily: "Inter_600SemiBold",
     flex: 1,
   },
   matchDate: {
-    fontSize: 12,
+    fontSize: 15,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
   },
@@ -1653,11 +1653,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   matchNickname: {
-    fontSize: 16,
+    fontSize: 20,
     fontFamily: "Inter_700Bold",
   },
   matchUserType: {
-    fontSize: 12,
+    fontSize: 15,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
   },
@@ -1673,7 +1673,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   proposalMiniLabel: {
-    fontSize: 11,
+    fontSize: 14,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
     marginBottom: 4,
@@ -1685,12 +1685,12 @@ const styles = StyleSheet.create({
   },
   proposalMiniTitle: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 16,
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
   },
   proposalMiniSub: {
-    fontSize: 11,
+    fontSize: 14,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     marginTop: 3,
@@ -1703,7 +1703,7 @@ const styles = StyleSheet.create({
   },
   infoText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 16,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
   },
@@ -1740,7 +1740,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.accentRed + "30",
   },
   actionBtnText: {
-    fontSize: 14,
+    fontSize: 17,
     fontFamily: "Inter_600SemiBold",
   },
   chatBtn: {
@@ -1754,7 +1754,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   chatBtnText: {
-    fontSize: 14,
+    fontSize: 17,
     fontFamily: "Inter_600SemiBold",
     color: Colors.background,
   },
@@ -1765,17 +1765,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   emptyTitle: {
-    fontSize: 17,
+    fontSize: 22,
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
     textAlign: "center" as const,
   },
   emptyDesc: {
-    fontSize: 14,
+    fontSize: 17,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     textAlign: "center" as const,
-    lineHeight: 20,
+    lineHeight: 24,
   },
   musicCriteriaChip: {
     flexDirection: "row" as const,
@@ -1789,12 +1789,12 @@ const styles = StyleSheet.create({
   },
   musicCriteriaText: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 14,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
   },
   musicCriteriaChange: {
-    fontSize: 11,
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
     color: Colors.accent,
   },
@@ -1809,7 +1809,7 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   distanceBadgeText: {
-    fontSize: 11,
+    fontSize: 14,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
   },
