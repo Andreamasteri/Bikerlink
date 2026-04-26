@@ -68,7 +68,8 @@ export default function VerifyEmailScreen() {
       if (userData?.sessionToken) {
         await setSessionToken(userData.sessionToken);
       }
-      queryClient.setQueryData(["/api/auth/me"], userData);
+      const { sessionToken: _t, ...user } = userData ?? {};
+      queryClient.setQueryData(["/api/auth/me"], user);
       router.replace("/(tabs)");
     } catch (err: any) {
       const msg = err?.message || "Errore durante la verifica";
