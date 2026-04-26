@@ -215,6 +215,50 @@ else
   fail "Impossibile verificare i duplicati updateNumber in ota-updates.json."
 fi
 
+# ── 6b. NIENTE EAS UPDATES — solo backend custom ─────────────
+# Verifica che l'endpoint OTA sia il backend custom su sia app.json sia
+# AndroidManifest.xml. EAS Updates è dismesso (solo `eas build` per le APK):
+# se app.json punta ancora a u.expo.dev, ogni nuova APK ricostruita
+# nasce con il manifest sbagliato e ignora le OTA pubblicate sul backend custom.
+EXPECTED_OTA_URL="https://biker-link.replit.app/api/expo-updates"
+
+APP_JSON_URL=$(node -e "
+  try {
+    const j = JSON.parse(require('fs').readFileSync('app.json','utf8'));
+    process.stdout.write(j?.expo?.updates?.url ?? '');
+  } catch { process.stdout.write('READ_ERROR'); }
+" 2>/dev/null || echo "READ_ERROR")
+
+if [ "$APP_JSON_URL" = "READ_ERROR" ] || [ -z "$APP_JSON_URL" ]; then
+  fail "Impossibile leggere expo.updates.url da app.json"
+elif [ "$APP_JSON_URL" = "$EXPECTED_OTA_URL" ]; then
+  ok "app.json updates.url = backend custom"
+else
+  fail "app.json updates.url='$APP_JSON_URL' — atteso '$EXPECTED_OTA_URL'. EAS Updates è dismesso."
+fi
+
+if grep -q "u.expo.dev" app.json 2>/dev/null; then
+  fail "app.json contiene ancora 'u.expo.dev'. EAS Updates è dismesso: rimuovere ogni riferimento."
+else
+  ok "app.json non contiene riferimenti a u.expo.dev"
+fi
+
+ANDROID_MANIFEST="android/app/src/main/AndroidManifest.xml"
+if [ -f "$ANDROID_MANIFEST" ]; then
+  if grep -q "u.expo.dev" "$ANDROID_MANIFEST" 2>/dev/null; then
+    fail "$ANDROID_MANIFEST contiene 'u.expo.dev'. Aggiornare EXPO_UPDATE_URL al backend custom."
+  else
+    ok "AndroidManifest.xml non contiene riferimenti a u.expo.dev"
+  fi
+  if grep -q "android:name=\"expo.modules.updates.EXPO_UPDATE_URL\".*android:value=\"$EXPECTED_OTA_URL\"" "$ANDROID_MANIFEST"; then
+    ok "AndroidManifest.xml EXPO_UPDATE_URL = backend custom"
+  else
+    fail "AndroidManifest.xml: meta-data EXPO_UPDATE_URL non punta a $EXPECTED_OTA_URL"
+  fi
+else
+  warn "$ANDROID_MANIFEST non trovato — saltato check manifest Android"
+fi
+
 # ── 7. CICLI MULTIPLI — warning se il registro ha più runtimeVersion ──
 MULTI_CYCLE_CHECK=$(node -e "
   const appJson = JSON.parse(require('fs').readFileSync('app.json','utf8'));

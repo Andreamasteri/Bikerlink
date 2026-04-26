@@ -69,6 +69,7 @@ BikerLink utilizes a modern full-stack architecture.
 - EAS Build is used for cloud-based Android APK and AAB generation, supporting `preview` and `production` profiles.
 - **react-native-reanimated@~4.2.1** (versione corretta SDK 55, bundledNativeModules.json) configurato per compatibilità EAS. NOTA: reanimated 3.x causava CMake build failure con NDK r27b (immagine EAS ubuntu-24.04-jdk-17-ndk-r27b-sdk-55). Android/ rimosso da git — EAS usa managed workflow (expo prebuild automatico). `react-native-maps` rimosso (Task #717): tutte le mappe usano Leaflet in WebView.
 - OTA updates are managed via custom scripts for seamless deployment of new features.
+- **OTA delivery — solo backend custom** (Task #980): l'endpoint `expo.updates.url` in `app.json` punta a `https://biker-link.replit.app/api/expo-updates` (Expo Updates Protocol v1, servito da `server/routes/expo-updates.ts`). EAS Updates è dismesso: `eas update` / canali EAS Updates non vengono più usati. `eas build` resta attivo per generare APK/AAB e `extra.eas.projectId` deve restare in app.json (serve a `eas build`). La guard `scripts/validate-ota.sh` blocca la pubblicazione se trova `u.expo.dev` in `app.json` o `android/app/src/main/AndroidManifest.xml`. ⚠️ Le APK installate prima del fix di app.json possono avere ancora l'URL EAS bakato nel manifest nativo: il fix è effettivo solo dalla prossima APK ricostruita.
 
 ## Utenti Seed
 

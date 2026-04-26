@@ -11,6 +11,20 @@ description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink
 - **Non chiedere conferma separata** prima di eseguire lo script di pubblicazione
 - Eseguire l'intera procedura (passi 1–7) in un'unica sessione senza interruzioni
 
+## 🚫 EAS UPDATES — DISMESSO (Task #980)
+**EAS Updates non è più usato per la delivery OTA.** L'unico canale OTA attivo è il
+backend custom `https://biker-link.replit.app/api/expo-updates` (Expo Updates Protocol v1).
+
+- ✅ `eas build` resta attivo per generare APK/AAB (`extra.eas.projectId` in app.json
+  serve a `eas build`, non va rimosso).
+- ❌ `eas update` / `npx eas-cli update` / canale `preview` su EAS Updates: **non usare più.**
+- ❌ `app.json` non deve più puntare a `u.expo.dev`. La guard `validate-ota.sh` blocca
+  la pubblicazione se trova `u.expo.dev` in `app.json` o nel manifest Android.
+- ⚠️ Le APK già installate **prima** del fix di `app.json` possono ancora avere l'URL
+  EAS bakato nel manifest nativo: il fix sarà effettivo solo dalla **prossima APK
+  ricostruita** che leggerà il nuovo `expo.updates.url`. Le APK pubblicate dopo task
+  #958 (v38) usano già il backend custom — vedere AndroidManifest.xml.
+
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
 - **Canale EAS**: `preview`
@@ -100,20 +114,26 @@ Lo script esegue automaticamente:
 4. Creazione release draft sul backend custom
 5. Pubblicazione release (stato → active)
 6. Verifica versione attiva via `/api/updates/check`
-7. Pubblicazione aggiornamento su EAS
+
+**Nota**: lo step storico "pubblicazione su EAS Updates" è stato rimosso (Task #980 —
+EAS Updates dismesso). I dispositivi ricevono le OTA esclusivamente dal backend custom.
 
 ### PASSO 6 — Aggiornare `ota-updates.json` con gli ID reali
-L'output dello script mostra tutti gli ID. Sostituire i `null` con i valori reali:
+L'output dello script mostra gli ID generati dal backend custom. Sostituire i `null`
+con i valori reali:
 ```json
 {
   "releaseId": "<da output: Release ID>",
   "bundleUrl": "<da output: Bundle URL>",
-  "updateGroupId": "<da output: EAS Update Group>",
-  "androidUpdateId": "<da output: EAS Android ID>",
-  "easDashboard": "<da output: EAS Dashboard>",
+  "updateGroupId": null,
+  "androidUpdateId": null,
+  "easDashboard": null,
   "status": "published"
 }
 ```
+I campi `updateGroupId`, `androidUpdateId`, `easDashboard` restano `null` perché
+EAS Updates è dismesso (Task #980): mantenerli nel record solo per compatibilità
+storica del registro.
 
 ### PASSO 7 — Validazione finale
 ```bash
