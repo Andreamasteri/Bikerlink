@@ -133,36 +133,34 @@ else
   fail "Impossibile analizzare ota-updates.json per il controllo PENDING globale."
 fi
 
-# ── 4c. IDS EAS NULL in entry published del ciclo corrente ──
+# ── 4c. IDS EAS NULL in entry published del ciclo corrente (atteso, info-only) ──
+# NOTA: Task #980 ha dismesso EAS Updates. Le entry pubblicate dopo la dismissione
+# hanno volutamente updateGroupId/androidUpdateId = null. Questo blocco resta
+# come info-only per visibilità storica e NON è più un warning bloccante.
 NULL_EAS_IDS=$(node -e "
   const appJson = JSON.parse(require('fs').readFileSync('app.json','utf8'));
   const rv = appJson?.expo?.runtimeVersion ?? null;
   const data = JSON.parse(require('fs').readFileSync('ota-updates.json','utf8'));
   const cycle = data.filter(e => typeof e.updateNumber === 'number' && e.runtimeVersion === rv);
   const published = cycle.filter(e => e.status === 'published');
-  const warnings = [];
+  const noted = [];
   for (const e of published) {
     const missing = [];
     if (e.updateGroupId === null || e.updateGroupId === undefined) missing.push('updateGroupId');
     if (e.androidUpdateId === null || e.androidUpdateId === undefined) missing.push('androidUpdateId');
-    if (missing.length > 0) warnings.push('OTA-' + e.updateNumber + ':' + missing.join('+'));
+    if (missing.length > 0) noted.push('OTA-' + e.updateNumber);
   }
-  if (warnings.length === 0) { console.log('OK'); }
-  else { console.log('NULL_IDS:' + warnings.join(',')); }
+  if (noted.length === 0) { console.log('NONE'); }
+  else { console.log('NULL_IDS:' + noted.join(',')); }
 " 2>/dev/null || echo "ERROR")
 
-if [ "$NULL_EAS_IDS" = "OK" ]; then
-  ok "ota-updates.json: tutti gli IDs EAS presenti nelle entry published del ciclo corrente"
+if [ "$NULL_EAS_IDS" = "NONE" ]; then
+  ok "ota-updates.json: nessun ID EAS legacy mancante (registro storico completo)"
 elif [[ "$NULL_EAS_IDS" == NULL_IDS:* ]]; then
   ENTRIES="${NULL_EAS_IDS#NULL_IDS:}"
-  IFS=',' read -ra ENTRY_LIST <<< "$ENTRIES"
-  for ENTRY in "${ENTRY_LIST[@]}"; do
-    OTA_NUM="${ENTRY%%:*}"
-    FIELDS="${ENTRY#*:}"
-    warn "$OTA_NUM ha IDs EAS null: ${FIELDS/+/, }. La pubblicazione EAS potrebbe non essere stata completata o i metadati non sono stati recuperati."
-  done
+  info "ota-updates.json: $ENTRIES senza IDs EAS — atteso (EAS Updates dismesso, Task #980)"
 elif [ "$NULL_EAS_IDS" = "ERROR" ]; then
-  warn "Impossibile verificare gli IDs EAS nelle entry published di ota-updates.json."
+  warn "Impossibile leggere lo stato degli IDs EAS legacy in ota-updates.json."
 fi
 
 # ── 5. COMMITBASE HASH VALIDO nell'ultima entry del ciclo ────

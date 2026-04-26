@@ -30,7 +30,7 @@ backend custom `https://biker-link.replit.app/api/expo-updates` (Expo Updates Pr
 - **Canale EAS**: `preview`
 - **Runtime Version**: `7.0.0` (ciclo corrente, APK v38)
 - **APK corrente**: versionCode **38**, versionName **2.4.0** (completata 2026-04-26T01:27Z — buildId: `7ecd4368-9640-4200-88e5-c33b902a7edc`, APK: https://expo.dev/artifacts/eas/gEaBaW4hnhupnDP5CpYW1m.apk)
-- **OTA corrente**: OTA-156 (bundle custom attivo, EAS non aggiornato — vedere nota sotto)
+- **OTA corrente**: OTA-156 (bundle custom attivo — EAS Updates dismesso, Task #980)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates` (Expo Updates Protocol v1)
 - **Utenti**: su Android fisico via APK — NON usano il dev server
 - **Admin email**: `admin@bikerlink.it`
@@ -38,8 +38,9 @@ backend custom `https://biker-link.replit.app/api/expo-updates` (Expo Updates Pr
 - **Backend produzione**: `biker-link.replit.app`
 
 ## Regola critica
-⛔ **MAI** eseguire `npx eas-cli` direttamente.  
-✅ Usare **sempre** `bash scripts/publish-ota.sh` — gestisce bundle, upload, backend custom e EAS in sequenza.
+⛔ **MAI** eseguire `npx eas-cli update` direttamente — EAS Updates è dismesso (Task #980).
+✅ Usare **sempre** `bash scripts/publish-ota.sh` — gestisce bundle, upload e pubblicazione
+sul backend custom in sequenza. Lo script non chiama più EAS Updates.
 
 ## File chiave
 - `lib/ota.ts` — contiene `CURRENT_OTA_NUMBER` (unica sorgente di verità)
