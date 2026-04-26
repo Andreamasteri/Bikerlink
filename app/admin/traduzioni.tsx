@@ -256,16 +256,36 @@ export default function TraduzioniScreen() {
     );
   }
 
+  const DOCX_MIME =
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+  function base64ToArrayBuffer(base64: string): ArrayBuffer {
+    const binary = atob(base64);
+    const len = binary.length;
+    const buffer = new ArrayBuffer(len);
+    const view = new Uint8Array(buffer);
+    for (let i = 0; i < len; i++) view[i] = binary.charCodeAt(i);
+    return buffer;
+  }
+
   async function uploadDocxFile(formData: FormData): Promise<void> {
+    type ImportResponse = {
+      ok?: boolean;
+      langCounts?: Record<string, number>;
+      message?: string;
+    };
     const url = new URL("/api/admin/translations/import-docx", getApiUrl());
     const resp = await fetch(url.toString(), {
       method: "POST",
       credentials: "include",
-      body: formData as any,
+      body: formData,
     });
-    let payload: any = null;
+    let payload: ImportResponse | null = null;
     try {
-      payload = await resp.json();
+      const parsed: unknown = await resp.json();
+      if (parsed && typeof parsed === "object") {
+        payload = parsed as ImportResponse;
+      }
     } catch {}
     if (!resp.ok || !payload?.ok) {
       const errMsg =
@@ -274,12 +294,14 @@ export default function TraduzioniScreen() {
       throw new Error(errMsg);
     }
     const summary = payload.langCounts
-      ? Object.entries(payload.langCounts as Record<string, number>)
+      ? Object.entries(payload.langCounts)
           .map(([l, n]) => `${l.toUpperCase()}: ${n}`)
           .join(", ")
       : "";
     setImportStatus("success");
-    setImportResult(summary ? `Stringhe aggiornate → ${summary}` : payload.message || "Import completato");
+    setImportResult(
+      summary ? `Stringhe aggiornate → ${summary}` : payload.message || "Import completato"
+    );
   }
 
   async function handleWebFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
@@ -305,11 +327,7 @@ export default function TraduzioniScreen() {
     setImportResult("");
     try {
       const picked = await DocumentPicker.getDocumentAsync({
-        type: [
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "application/octet-stream",
-          "*/*",
-        ],
+        type: [DOCX_MIME, "application/octet-stream", "*/*"],
         multiple: false,
         copyToCacheDirectory: true,
       });
@@ -318,19 +336,20 @@ export default function TraduzioniScreen() {
         return;
       }
       const asset = picked.assets[0];
-      if (!/\.docx$/i.test(asset.name || "")) {
+      const fileName = asset.name || "translations.docx";
+      if (!/\.docx$/i.test(fileName)) {
         throw new Error("Seleziona un file con estensione .docx");
       }
-      setImportFileName(asset.name || "documento.docx");
+      setImportFileName(fileName);
+
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const arrayBuffer = base64ToArrayBuffer(base64);
+      const blob = new Blob([arrayBuffer], { type: DOCX_MIME });
 
       const fd = new FormData();
-      fd.append("file", {
-        uri: asset.uri,
-        name: asset.name || "translations.docx",
-        type:
-          asset.mimeType ||
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      } as any);
+      fd.append("file", blob, fileName);
       await uploadDocxFile(fd);
     } catch (err: unknown) {
       setImportStatus("error");
