@@ -5314,7 +5314,33 @@
     "apkBuildId": null,
     "apkVersionCode": 40,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-27T12:09:08.333Z"
+  },
+  {
+    "updateNumber": 12,
+    "version": "1.12.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-12 rv8.0.0: fix matching reason 403 (not-admin/not_admin)",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "note": "Task #1051 (rev. code review #4 — APPROVED_WITH_COMMENTS): fix non-blocking comment. app/admin/system.tsx ora accetta sia 'not-admin' (formato server corrente) sia 'not_admin' (legacy) per mostrare il messaggio esplicito 'Il tuo account non ha i permessi di amministratore' nello stato 403. CURRENT_OTA_NUMBER=12.",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "88c56bc7-d172-426d-9d88-807e9e0d32f0",
+    "bundleUrl": "private/ota/ota-1.12.0-1777292050716.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "a5fca97b9cfada106bac36bceefc8a3e089c26b0",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 40,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-27T12:14:14.037Z"
   }
 ]

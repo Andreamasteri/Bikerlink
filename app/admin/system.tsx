@@ -437,7 +437,10 @@ export default function SystemScreen() {
       iconColor = "#FFA500";
     } else if (code === "forbidden") {
       title = "Accesso non autorizzato";
-      hint = reason === "not_admin"
+      // Accetta sia il formato corrente "not-admin" sia il legacy "not_admin"
+      // per garantire la corretta UX se il backend viene rolled-back.
+      const isNotAdmin = reason === "not-admin" || reason === "not_admin";
+      hint = isNotAdmin
         ? "Il tuo account non ha i permessi di amministratore."
         : "Il server ha rifiutato la richiesta (403).";
     } else if (code === "server_error") {
