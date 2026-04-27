@@ -5356,8 +5356,8 @@
     "platforms": [
       "android"
     ],
-    "releaseId": null,
-    "bundleUrl": null,
+    "releaseId": "ba8297a0-c55c-4dac-a722-fd8d04760bf9",
+    "bundleUrl": "private/ota/ota-1.13.0-1777295771189.js",
     "updateGroupId": null,
     "androidUpdateId": null,
     "iosUpdateId": null,
@@ -5366,6 +5366,7 @@
     "apkBuildId": null,
     "apkVersionCode": 40,
     "apkUrl": null,
-    "status": "pending"
+    "status": "published",
+    "publishedAt": "2026-04-27T13:16:36.616Z"
   }
 ]
