@@ -253,6 +253,8 @@ function LiveTableSection({ restartStatus, restartResult, onRestartPress }: {
   const [editingCell, setEditingCell] = useState<{ key: string; lang: string } | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [cellStates, setCellStates] = useState<Record<string, "saving" | "ok" | "error">>({});
+  const [searchText, setSearchText] = useState("");
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   const loadTable = useCallback(async () => {
     setLoadingTable(true);
@@ -322,6 +324,25 @@ function LiveTableSection({ restartStatus, restartResult, onRestartPress }: {
       }, 3000);
     }
   }, []);
+
+  const categories = React.useMemo(() => {
+    const prefixSet = new Set<string>();
+    tableData.forEach((row) => {
+      const prefix = row.key.split(/[._]/)[0];
+      if (prefix) prefixSet.add(prefix);
+    });
+    return Array.from(prefixSet).sort();
+  }, [tableData]);
+
+  const filteredData = React.useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    return tableData.filter((row) => {
+      const matchesCategory = activeCategory ? row.key.startsWith(activeCategory + ".") || row.key.startsWith(activeCategory + "_") || row.key.split(/[._]/)[0] === activeCategory : true;
+      if (!matchesCategory) return false;
+      if (!q) return true;
+      return row.key.toLowerCase().includes(q) || row.it.toLowerCase().includes(q);
+    });
+  }, [tableData, searchText, activeCategory]);
 
   const activeLangList = TABLE_LANGS.filter((l) => activeLangs.has(l.code));
   const totalWidth = COL_POSITION + COL_IT + activeLangList.length * COL_LANG;
@@ -430,21 +451,68 @@ function LiveTableSection({ restartStatus, restartResult, onRestartPress }: {
       ) : null}
 
       {tableData.length > 0 ? (
-        <View style={styles.tableContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator>
-            <View>
-              {renderHeader()}
-              <FlatList
-                data={tableData}
-                renderItem={renderRow}
-                keyExtractor={(item) => item.key}
-                style={{ maxHeight: 520 }}
-                nestedScrollEnabled
-                removeClippedSubviews={false}
-              />
+        <>
+          <View style={styles.searchRow}>
+            <MaterialCommunityIcons name="magnify" size={18} color={Colors.textSecondary} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              value={searchText}
+              onChangeText={setSearchText}
+              placeholder="Cerca per chiave o testo IT..."
+              placeholderTextColor={Colors.textSecondary}
+              clearButtonMode="while-editing"
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            {searchText.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchText("")} activeOpacity={0.7} style={styles.searchClear}>
+                <MaterialCommunityIcons name="close-circle" size={16} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {categories.length > 0 && (
+            <View style={styles.categoryChipsRow}>
+              <TouchableOpacity
+                style={[styles.categoryChip, activeCategory === null && styles.categoryChipActive]}
+                onPress={() => setActiveCategory(null)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.categoryChipText, activeCategory === null && styles.categoryChipTextActive]}>Tutte</Text>
+              </TouchableOpacity>
+              {categories.map((cat) => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[styles.categoryChip, activeCategory === cat && styles.categoryChipActive]}
+                  onPress={() => setActiveCategory(activeCategory === cat ? null : cat)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.categoryChipText, activeCategory === cat && styles.categoryChipTextActive]}>{cat}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
-          </ScrollView>
-        </View>
+          )}
+
+          <Text style={styles.filterCount}>
+            {filteredData.length} / {tableData.length} stringhe
+          </Text>
+
+          <View style={styles.tableContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator>
+              <View>
+                {renderHeader()}
+                <FlatList
+                  data={filteredData}
+                  renderItem={renderRow}
+                  keyExtractor={(item) => item.key}
+                  style={{ maxHeight: 520 }}
+                  nestedScrollEnabled
+                  removeClippedSubviews={false}
+                />
+              </View>
+            </ScrollView>
+          </View>
+        </>
       ) : null}
 
       <View style={styles.sectionDivider} />
@@ -1078,8 +1146,64 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     color: Colors.textSecondary,
   },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 10,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  searchIcon: {
+    marginRight: 6,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.text,
+  },
+  searchClear: {
+    padding: 4,
+  },
+  categoryChipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 8,
+  },
+  categoryChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.background,
+  },
+  categoryChipActive: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent + "15",
+  },
+  categoryChipText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary,
+  },
+  categoryChipTextActive: {
+    color: Colors.accent,
+  },
+  filterCount: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginBottom: 6,
+  },
   tableContainer: {
-    marginTop: 12,
+    marginTop: 4,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: Colors.border,
