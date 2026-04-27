@@ -9,8 +9,7 @@
       "distribution": "internal",
       "credentialsSource": "remote",
       "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease"
+        "buildType": "apk"
       },
       "env": {
         "EXPO_PUBLIC_DOMAIN": "biker-link.replit.app"

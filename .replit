@@ -52,6 +52,10 @@ args = "Error Monitor"
 task = "workflow.run"
 args = "ota-guard"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "APK Build Watch"
+
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -131,6 +135,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "SKIP_LIVE_CHECK=1 bash scripts/validate-ota.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "APK Build Watch"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "CI=1 EAS_NO_VCS=1 EXPO_PUBLIC_DOMAIN=biker-link.replit.app npx eas-cli@18 build --platform android --profile release-apk --non-interactive --wait"
 
 [workflows.workflow.metadata]
 outputType = "console"
