@@ -732,31 +732,39 @@ function setupErrorHandler(app: express.Application) {
                 console.log(`  → ${rv}: ${ids.length} row(s)`);
               }
 
-              // Execute updates per-cycle
+              // Execute batch UPDATE per cycle (one round-trip per runtimeVersion)
               let totalUpdated = 0;
               for (const [rv, ids] of assignMap) {
-                for (const rowId of ids) {
-                  await db.execute(sql`
-                    UPDATE ota_releases SET runtime_version = ${rv}, updated_at = NOW()
-                    WHERE id = ${rowId}
-                  `);
-                  totalUpdated++;
-                }
+                const result = await pool.query(
+                  `UPDATE ota_releases SET runtime_version = $1, updated_at = NOW() WHERE id = ANY($2::text[])`,
+                  [rv, ids]
+                );
+                totalUpdated += (result.rowCount ?? 0);
               }
 
               // Post-backfill verification
-              const nullCheck = await db.execute(sql`
-                SELECT COUNT(*)::int AS remaining FROM ota_releases WHERE runtime_version IS NULL
-              `);
+              const nullCheck = await pool.query(
+                `SELECT COUNT(*)::int AS remaining FROM ota_releases WHERE runtime_version IS NULL`
+              );
               const remaining = (nullCheck.rows[0] as { remaining: number }).remaining ?? 0;
               if (remaining === 0) {
                 console.log(`[MIGRATION] ota_releases: runtime_version backfill complete — ${totalUpdated} row(s) updated, all rows non-NULL`);
               } else {
-                console.warn(`[MIGRATION] ota_releases: ${remaining} row(s) still have NULL runtime_version after backfill`);
+                console.error(`[MIGRATION] ota_releases: ALERT — ${remaining} row(s) still have NULL runtime_version after backfill. OTA serving may be degraded.`);
               }
             }
           } catch (backfillErr) {
             console.warn("[MIGRATION] ota_releases backfill runtime_version:", backfillErr);
+            // Operational alert: check for remaining NULL rows even after failure
+            try {
+              const alertCheck = await pool.query(
+                `SELECT COUNT(*)::int AS remaining FROM ota_releases WHERE runtime_version IS NULL`
+              );
+              const alertRemaining = (alertCheck.rows[0] as { remaining: number }).remaining ?? 0;
+              if (alertRemaining > 0) {
+                console.error(`[MIGRATION] ota_releases: ALERT — ${alertRemaining} row(s) have NULL runtime_version due to backfill error. Strict OTA filtering is active; these rows will not be served.`);
+              }
+            } catch (_) { /* best-effort */ }
           }
         } catch (e) {
           console.warn("[MIGRATION] ota_releases:", e);
