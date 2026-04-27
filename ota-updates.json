@@ -5210,7 +5210,7 @@
     "apkBuildId": null,
     "apkVersionCode": 40,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-27T11:25:18.856Z"
   },
   {
@@ -5236,7 +5236,33 @@
     "apkBuildId": null,
     "apkVersionCode": 40,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-27T11:49:59.840Z"
+  },
+  {
+    "updateNumber": 9,
+    "version": "1.9.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-9 rv8.0.0: Riprova → silent re-auth + 'Vai al login' + tipi puliti",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "note": "Task #1051 (revisione code review): (1) lib/query-client.ts esporta silentAuthRecheck() — one-shot fetch /api/auth/me che il chiamante usa per distinguere 401 transitorio (cookie stale, Bearer ancora valido) da sessione realmente scaduta. (2) app/admin/system.tsx: queryFn invoca silentAuthRecheck e ritenta una sola volta se la sessione è valida. La schermata di errore usa useAuth().sessionExpired e mostra CTA 'Vai al login' (logout + router.replace) quando la sessione è davvero persa. Tipo errore strutturato (class AdminFetchError) — eliminati tutti i cast `any`. (3) server/routes/admin.ts: log [admin-auth] include sessionId troncato (sid=XXXXXXXX…) per diagnostica. CURRENT_OTA_NUMBER=9.",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "868acfb7-daae-4616-aaed-eebc6102cdd0",
+    "bundleUrl": "private/ota/ota-1.9.0-1777291093062.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "a5fca97b9cfada106bac36bceefc8a3e089c26b0",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 40,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-27T11:58:18.349Z"
   }
 ]

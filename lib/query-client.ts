@@ -100,6 +100,29 @@ function scheduleAuthRecheck() {
   }, 300);
 }
 
+/**
+ * One-shot silent re-auth used by admin endpoints (and anyone who needs to
+ * distinguish a real "session expired" from a transient 401). Performs a
+ * single GET /api/auth/me with credentials and returns whether the session is
+ * still valid. Does NOT mutate React Query cache — the caller decides what to
+ * do (retry the original request, mark session expired, etc).
+ */
+export async function silentAuthRecheck(): Promise<boolean> {
+  const baseUrl = getApiUrl();
+  const url = new URL("/api/auth/me", baseUrl);
+  try {
+    const res = await fetch(url.toString(), {
+      headers: buildAuthHeaders(),
+      credentials: "include",
+    });
+    if (res.status === 401) return false;
+    if (!res.ok) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     if (res.status === 503) {

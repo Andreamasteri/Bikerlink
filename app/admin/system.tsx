@@ -14,10 +14,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { useNavigation } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
 import Constants from "expo-constants";
 import otaUpdatesRaw from "@/ota-updates.json";
-import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { getApiUrl, authFetchHeaders, silentAuthRecheck } from "@/lib/query-client";
+import { useAuth } from "@/lib/auth-context";
 import { evaluateUpdateOutcome, type UpdateOutcome } from "@/lib/semver";
 import {
   triggerSoftPreview,
@@ -265,47 +266,83 @@ export default function SystemScreen() {
     }
   }, [nativeAndroidLatest, nativeAndroidMin, nativeAndroidUrl, nativeIosLatest, nativeIosMin, nativeIosUrl]);
 
-  const { data, isLoading, error, refetch, isFetching } = useQuery<SystemHealth, Error & { code?: string; status?: number; reason?: string }>({
-    queryKey: ["/api/admin/system-health"],
-    queryFn: async ({ signal }) => {
-      const url = new URL("/api/admin/system-health", getApiUrl());
-      let res: Response;
-      try {
-        res = await fetch(url.toString(), {
-          headers: authFetchHeaders(),
-          credentials: "include",
-          signal,
-        });
-      } catch (e: any) {
-        if (e?.name === "AbortError") throw e;
-        const err = new Error("network_unavailable") as Error & { code?: string };
-        err.code = "network";
-        throw err;
-      }
-      if (res.status === 401 || res.status === 403) {
-        let reason: string | undefined;
+  type AdminFetchErrorCode = "session_expired" | "forbidden" | "server_error" | "network";
+  class AdminFetchError extends Error {
+    code: AdminFetchErrorCode;
+    status?: number;
+    reason?: string;
+    constructor(code: AdminFetchErrorCode, message: string, status?: number, reason?: string) {
+      super(message);
+      this.name = "AdminFetchError";
+      this.code = code;
+      this.status = status;
+      this.reason = reason;
+    }
+  }
+  const isAdminError = (e: unknown): e is AdminFetchError => e instanceof AdminFetchError;
+
+  const router = useRouter();
+  const { sessionExpired, logoutMutation } = useAuth();
+
+  const fetchSystemHealth = useCallback(async (signal?: AbortSignal): Promise<SystemHealth> => {
+    const url = new URL("/api/admin/system-health", getApiUrl());
+    const doFetch = () =>
+      fetch(url.toString(), {
+        headers: authFetchHeaders(),
+        credentials: "include",
+        signal,
+      });
+
+    let res: Response;
+    try {
+      res = await doFetch();
+    } catch (e: unknown) {
+      if (e instanceof Error && e.name === "AbortError") throw e;
+      throw new AdminFetchError("network", "network_unavailable");
+    }
+
+    // ── 401: silent re-auth one-shot prima di dichiarare la sessione scaduta.
+    // Caso tipico: cookie connect.sid stale dopo cold start, ma il Bearer
+    // token in AsyncStorage è ancora valido. Se /api/auth/me risponde 200,
+    // ritentiamo la fetch silenziosamente; se risponde 401, la sessione è
+    // davvero scaduta e segnaliamo l'errore tipizzato.
+    if (res.status === 401) {
+      const stillValid = await silentAuthRecheck();
+      if (stillValid) {
         try {
-          const body = await res.json();
-          reason = body?.reason;
-        } catch {}
-        const err = new Error(res.status === 401 ? "session_expired" : "forbidden") as Error & { code?: string; status?: number; reason?: string };
-        err.code = res.status === 401 ? "session_expired" : "forbidden";
-        err.status = res.status;
-        err.reason = reason;
-        throw err;
+          res = await doFetch();
+        } catch (e: unknown) {
+          if (e instanceof Error && e.name === "AbortError") throw e;
+          throw new AdminFetchError("network", "network_unavailable");
+        }
       }
-      if (!res.ok) {
-        const err = new Error(`server_${res.status}`) as Error & { code?: string; status?: number };
-        err.code = "server_error";
-        err.status = res.status;
-        throw err;
-      }
-      return (await res.json()) as SystemHealth;
-    },
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      let reason: string | undefined;
+      try {
+        const body = (await res.json()) as { reason?: string };
+        reason = body?.reason;
+      } catch {}
+      throw new AdminFetchError(
+        res.status === 401 ? "session_expired" : "forbidden",
+        res.status === 401 ? "session_expired" : "forbidden",
+        res.status,
+        reason,
+      );
+    }
+    if (!res.ok) {
+      throw new AdminFetchError("server_error", `server_${res.status}`, res.status);
+    }
+    return (await res.json()) as SystemHealth;
+  }, []);
+
+  const { data, isLoading, error, refetch, isFetching } = useQuery<SystemHealth, AdminFetchError>({
+    queryKey: ["/api/admin/system-health"],
+    queryFn: ({ signal }) => fetchSystemHealth(signal),
     refetchInterval: 30000,
-    retry: (count, e: any) => {
-      const code = e?.code;
-      if (code === "session_expired" || code === "forbidden") return false;
+    retry: (count, e) => {
+      if (isAdminError(e) && (e.code === "session_expired" || e.code === "forbidden")) return false;
       return count < 2;
     },
   });
@@ -378,15 +415,19 @@ export default function SystemScreen() {
   }
 
   if (error || !data) {
-    const code = (error as any)?.code as string | undefined;
-    const status = (error as any)?.status as number | undefined;
-    const reason = (error as any)?.reason as string | undefined;
+    const code = isAdminError(error) ? error.code : undefined;
+    const status = isAdminError(error) ? error.status : undefined;
+    const reason = isAdminError(error) ? error.reason : undefined;
+    // sessionExpired da auth-context ha priorità: viene settato dal recheck
+    // /api/auth/me quando la sessione è realmente persa.
+    const isSessionGone = code === "session_expired" || sessionExpired;
+
     let title = "Errore nel caricamento dei dati";
     let hint = "";
     let iconColor = "#FF4444";
-    if (code === "session_expired") {
+    if (isSessionGone) {
       title = "Sessione scaduta";
-      hint = "La tua sessione admin non è più valida. Torna alla home, esci e rientra con le credenziali admin per riaprire il monitor.";
+      hint = "La tua sessione admin non è più valida. Effettua di nuovo l'accesso per riaprire il monitor.";
       iconColor = "#FFA500";
     } else if (code === "forbidden") {
       title = "Accesso non autorizzato";
@@ -404,6 +445,12 @@ export default function SystemScreen() {
     } else {
       hint = "Risposta vuota dal server.";
     }
+
+    const goToLogin = async () => {
+      try { await logoutMutation.mutateAsync(); } catch {}
+      router.replace("/(auth)/login");
+    };
+
     return (
       <View style={[styles.center, { paddingTop: topPadding }]}>
         <Ionicons name="warning-outline" size={40} color={iconColor} />
@@ -413,9 +460,23 @@ export default function SystemScreen() {
             {hint}
           </Text>
         ) : null}
-        <TouchableOpacity style={styles.retryBtn} onPress={handleRefresh}>
-          <Text style={styles.retryBtnText}>Riprova</Text>
-        </TouchableOpacity>
+        {isSessionGone ? (
+          <>
+            <TouchableOpacity style={styles.retryBtn} onPress={goToLogin}>
+              <Text style={styles.retryBtnText}>Vai al login</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.retryBtn, { backgroundColor: "transparent", marginTop: 8 }]}
+              onPress={handleRefresh}
+            >
+              <Text style={[styles.retryBtnText, { color: Colors.accent }]}>Riprova</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <TouchableOpacity style={styles.retryBtn} onPress={handleRefresh}>
+            <Text style={styles.retryBtnText}>Riprova</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
