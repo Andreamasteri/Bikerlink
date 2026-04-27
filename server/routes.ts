@@ -510,7 +510,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       };
 
-      res.setHeader("expo-protocol-version", "1");
+      // expo-protocol-version: 0 — compatibile con risposta JSON semplice (single-manifest).
+      // Protocollo v1 richiederebbe multipart/mixed, che NON serviamo: dichiarare v1
+      // su body JSON causa il rifiuto di reloadAsync() in expo-updates SDK 55.0.21.
+      res.setHeader("expo-protocol-version", "0");
       res.setHeader("expo-sfv-version", "0");
       res.setHeader("cache-control", "private, max-age=0");
       res.setHeader("etag", `"${release.id}"`);
