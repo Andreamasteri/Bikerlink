@@ -388,6 +388,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   })();
 
+  // Read the app version from app.json once at startup — used in OTA manifest
+  // extra.expoClient so the field stays aligned with app.json without manual updates.
+  const _expectedAppVersion: string = (() => {
+    try {
+      const appJson = JSON.parse(fs.readFileSync(path.resolve("app.json"), "utf8"));
+      return appJson?.expo?.version ?? "3.1.0";
+    } catch {
+      return "3.1.0";
+    }
+  })();
+
   app.get("/api/expo-updates", async (req: Request, res: Response) => {
     // ?debug=1 viene accettato SOLO se la sessione è quella di un admin autenticato.
     // Per i client expo-updates normali (anonimi) il flag viene silenziosamente
@@ -505,7 +516,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         extra: {
           expoClient: {
             name: "BikerLink",
-            version: "2.4.0",
+            version: _expectedAppVersion,
           },
         },
       };
