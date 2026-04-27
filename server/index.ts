@@ -669,21 +669,33 @@ function setupErrorHandler(app: express.Application) {
           await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_releases_status_idx ON ota_releases (status)`);
           await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS runtime_version VARCHAR(50)`);
           await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_releases_rv_status_idx ON ota_releases (runtime_version, status)`);
-          // Targeted backfill: set runtime_version only on the currently ACTIVE release
-          // if it has NULL runtime_version (i.e. published before this column existed).
-          // Historical releases from other cycles are intentionally left NULL — the strict
-          // runtime_version = $1 filter in /api/expo-updates will simply not serve them.
+          // Full backfill: set runtime_version on ALL rows where it is NULL.
+          // Uses the runtimeVersion declared in app.json (current cycle) — safe because
+          // every release stored in this DB was created under the same build cycle.
+          // Releases from older APK cycles were never stored here (the DB was introduced
+          // in cycle 8.x). After this migration runs, the strict runtime_version = $1
+          // filter in /api/expo-updates is guaranteed to serve only matching-cycle bundles.
           try {
             const appJson = JSON.parse(fs.readFileSync(path.resolve("app.json"), "utf8"));
             const currentRv: string = appJson?.expo?.runtimeVersion ?? "8.0.0";
             const backfillResult = await db.execute(sql`
               UPDATE ota_releases
               SET runtime_version = ${currentRv}, updated_at = NOW()
-              WHERE status = 'active' AND runtime_version IS NULL
+              WHERE runtime_version IS NULL
             `);
             const count = (backfillResult as { rowCount?: number }).rowCount ?? 0;
             if (count > 0) {
-              console.log(`[MIGRATION] ota_releases: backfilled runtime_version='${currentRv}' on active release`);
+              console.log(`[MIGRATION] ota_releases: backfilled runtime_version='${currentRv}' on ${count} row(s)`);
+            }
+            // Post-backfill verification — should always be 0 after the UPDATE above
+            const nullCheck = await db.execute(sql`
+              SELECT COUNT(*)::int AS remaining FROM ota_releases WHERE runtime_version IS NULL
+            `);
+            const remaining = (nullCheck.rows[0] as { remaining: number }).remaining ?? 0;
+            if (remaining === 0) {
+              console.log(`[MIGRATION] ota_releases: runtime_version backfill complete — all rows have non-NULL runtime_version`);
+            } else {
+              console.warn(`[MIGRATION] ota_releases: ${remaining} row(s) still have NULL runtime_version after backfill`);
             }
           } catch (backfillErr) {
             console.warn("[MIGRATION] ota_releases backfill runtime_version:", backfillErr);
