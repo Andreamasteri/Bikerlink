@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useMemo, useState, useEffect, useRef, ReactNode } from "react";
+import { Platform } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
@@ -151,14 +152,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Prefetch AsyncStorage state before enabling the query:
   //  1) the "had session" marker (controls retry/redirect UX)
   //  2) the Bearer session token (must be in cache before the first fetch fires)
+  // On Android we also fire-and-forget a request to clear the stale connect.sid
+  // cookie from the native cookie jar — the server responds with Max-Age=0 which
+  // causes the OS to evict it. Web is intentionally skipped (cookies work normally).
   const [storageChecked, setStorageChecked] = useState(false);
   useEffect(() => {
     Promise.all([
       AsyncStorage.getItem(HAD_SESSION_KEY).catch(() => null),
       initSessionToken().catch(() => null),
     ])
-      .then(([hadSession]) => {
+      .then(([hadSession, token]) => {
         hadSessionRef.current = hadSession === "true";
+        if (Platform.OS === "android" && token) {
+          const baseUrl = getApiUrl();
+          fetch(new URL("/api/auth/clear-session-cookie", baseUrl).toString(), {
+            method: "POST",
+            credentials: "include",
+          }).catch(() => {});
+        }
         setStorageChecked(true);
       })
       .catch(() => {

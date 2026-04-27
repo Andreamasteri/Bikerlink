@@ -317,6 +317,15 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
   }
 });
 
+// Endpoint chiamato da client Android all'avvio per rimuovere cookie connect.sid stale.
+// Il client mobile usa Bearer token come unica fonte di autenticazione; questo endpoint
+// risponde con Set-Cookie: connect.sid=; Max-Age=0 così il cookie jar nativo lo cancella.
+// Non richiede autenticazione — è un no-op se il cookie non è presente.
+router.post("/clear-session-cookie", (_req: Request, res: Response) => {
+  res.clearCookie("connect.sid", { path: "/" });
+  return res.status(200).json({ ok: true });
+});
+
 router.post("/logout", (req: Request, res: Response) => {
   const userId = req.session?.userId;
   req.session.destroy(async (err) => {
