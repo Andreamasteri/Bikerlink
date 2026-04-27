@@ -682,11 +682,16 @@ function setupErrorHandler(app: express.Application) {
             if (nullCount === 0) {
               console.log("[MIGRATION] ota_releases: runtime_version backfill complete — all rows have non-NULL runtime_version");
             } else {
-              // Build cycle-start map from ota-updates.json
+              // Build cycle-start map from ota-updates.json + ota-updates-archive.json (historic cycles 2.x-7.x)
               type OtaEntry = { runtimeVersion: string; publishedAt?: string };
               const otaUpdatesRaw: OtaEntry[] = JSON.parse(
                 fs.readFileSync(path.resolve("ota-updates.json"), "utf8")
               );
+              const archivePath = path.resolve("ota-updates-archive.json");
+              if (fs.existsSync(archivePath)) {
+                const archiveRaw: OtaEntry[] = JSON.parse(fs.readFileSync(archivePath, "utf8"));
+                otaUpdatesRaw.push(...archiveRaw);
+              }
               const cycleStartMs = new Map<string, number>();
               for (const entry of otaUpdatesRaw) {
                 if (!entry.publishedAt) continue;

@@ -46,16 +46,18 @@ sul backend custom in sequenza. Lo script non chiama più EAS Updates.
 
 ## File chiave
 - `lib/ota.ts` — contiene `CURRENT_OTA_NUMBER` (unica sorgente di verità)
-- `ota-updates.json` — registro storico di tutte le OTA
+- `ota-updates.json` — registro OTA attivo (solo cicli 8.x e successivi)
+- `ota-updates-archive.json` — registro storico cicli 2.x-7.x (solo lettura)
 - `scripts/publish-ota.sh` — script di pubblicazione completo
 - `scripts/validate-ota.sh` — validatore pre/post pubblicazione
 
 ## Procedura completa
 
 ### PASSO 1 — Determinare il numero OTA
-Leggere l'ultima entry del ciclo 7.x in `ota-updates.json` e prendere `updateNumber + 1`.
+Leggere l'ultima entry del ciclo corrente (8.x) in `ota-updates.json` e prendere `updateNumber + 1`.
+I cicli storici 2.x-7.x sono archiviati in `ota-updates-archive.json` (solo lettura).
 ```bash
-# Esempio: se l'ultima è 55, la nuova sarà 56
+# Esempio: se l'ultima è OTA-14, la nuova sarà OTA-15
 ```
 
 ### PASSO 2 — Ottenere l'hash git corrente
@@ -71,22 +73,22 @@ export const CURRENT_OTA_NUMBER = <VECCHIO>;  // → <NUOVO>
 Il commento sopra va tenuto generico:
 ```typescript
 // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-// Ciclo 7.0.0 — APK v37 — aggiornare ad ogni nuova OTA pubblicata
-export const CURRENT_OTA_NUMBER = 56;
+// Ciclo 8.0.0 — APK v41 — aggiornare ad ogni nuova OTA pubblicata
+export const CURRENT_OTA_NUMBER = 15;
 ```
 
 ### PASSO 4 — Aggiungere entry in `ota-updates.json`
 Marcare la entry precedente come `"status": "superseded"`, poi aggiungere in fondo:
 ```json
 {
-  "updateNumber": 56,
-  "cycle": "7.x",
+  "updateNumber": 15,
+  "cycle": "8.x",
   "channel": "preview",
   "platform": "android",
-  "runtimeVersion": "7.0.0",
+  "runtimeVersion": "8.0.0",
   "jsEngine": "hermes",
-  "message": "OTA-56 rv7.0.0: <descrizione breve>",
-  "note": "<note dettagliate sui task inclusi. CURRENT_OTA_NUMBER=56.>",
+  "message": "OTA-15 rv8.0.0: <descrizione breve>",
+  "note": "<note dettagliate sui task inclusi. CURRENT_OTA_NUMBER=15.>",
   "releaseId": null,
   "bundleUrl": null,
   "updateGroupId": null,
@@ -95,7 +97,7 @@ Marcare la entry precedente come `"status": "superseded"`, poi aggiungere in fon
   "commitBase": "<hash git completo da passo 2>",
   "easDashboard": null,
   "apkBuildId": null,
-  "apkVersionCode": 37,
+  "apkVersionCode": 41,
   "apkUrl": null,
   "status": "pending"
 }
@@ -106,7 +108,7 @@ Marcare la entry precedente come `"status": "superseded"`, poi aggiungere in fon
 ```bash
 BIKERLINK_ADMIN_EMAIL="admin@bikerlink.it" \
 BIKERLINK_ADMIN_PASSWORD="$BIKERLINK_ADMIN_PASSWORD" \
-bash scripts/publish-ota.sh "1.56.0" "OTA-56: <messaggio di release>"
+bash scripts/publish-ota.sh "1.15.0" "OTA-15: <messaggio di release>"
 ```
 Il versioning segue `1.<numero OTA>.0`.
 
@@ -142,7 +144,7 @@ storica del registro.
 ```bash
 bash scripts/validate-ota.sh
 ```
-Tutti i check devono essere ✔. Il warning sui cicli multipli (2.0.0, 3.0.0, 4.0.0, 5.0.0, 6.0.0, 7.0.0) è **normale** per il registro storico.
+Tutti i check devono essere ✔. Con la separazione dei cicli storici in `ota-updates-archive.json`, il warning sui cicli multipli non dovrebbe più apparire — `ota-updates.json` contiene solo il ciclo 8.x.
 
 ## ⚠️ PROBLEMA STRUTTURALE EAS — LEGGERE PRIMA DI PUBBLICARE
 
