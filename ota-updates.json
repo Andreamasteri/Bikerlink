@@ -5080,7 +5080,33 @@
     "apkBuildId": null,
     "apkVersionCode": 39,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-26T21:02:36.323Z"
+  },
+  {
+    "updateNumber": 3,
+    "version": "1.3.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-3 rv8.0.0: rifiniture spiderfy + allineamento codice corrente",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "note": "Task #1018: pubblicazione di allineamento. Distribuisce le rifiniture finali del task #1016 (spiderfy markers — commit 5bb18fc, 022cf4d post-OTA-2) e il bundle riflette CURRENT_OTA_NUMBER=3. Nota: la lingua greca del task #1015 era già stata distribuita via OTA-2 (commit d768a0c5 conteneva già lib/i18n/el.ts e relative integrazioni).",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "3885d408-834a-4b34-ad71-dce023a80ff4",
+    "bundleUrl": "private/ota/ota-1.3.0-1777273428491.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "f87c795e1b42992c543c39f8f46bfb603a07e02f",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 39,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-27T07:03:52.180Z"
   }
 ]
