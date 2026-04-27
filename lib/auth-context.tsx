@@ -46,6 +46,13 @@ function useLoginMutation() {
       const { sessionToken: _t, ...user } = response;
       queryClient.setQueryData(["/api/auth/me"], user);
       AsyncStorage.setItem(HAD_SESSION_KEY, "true").catch(() => {});
+      // Clear the freshly-issued connect.sid cookie from the Android native jar
+      if (Platform.OS === "android") {
+        fetch(new URL("/api/auth/clear-session-cookie", getApiUrl()).toString(), {
+          method: "POST",
+          credentials: "include",
+        }).catch(() => {});
+      }
       queryClient.invalidateQueries({
         predicate: (query) => {
           const key = query.queryKey[0] as string;
@@ -119,6 +126,13 @@ function useRegisterMutation() {
         const { sessionToken: _t, ...user } = response;
         queryClient.setQueryData(["/api/auth/me"], user);
         AsyncStorage.setItem(HAD_SESSION_KEY, "true").catch(() => {});
+      }
+      // Clear the freshly-issued connect.sid cookie from the Android native jar
+      if (Platform.OS === "android") {
+        fetch(new URL("/api/auth/clear-session-cookie", getApiUrl()).toString(), {
+          method: "POST",
+          credentials: "include",
+        }).catch(() => {});
       }
     },
   });
