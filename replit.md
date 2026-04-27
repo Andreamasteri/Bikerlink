@@ -71,7 +71,7 @@ BikerLink utilizes a modern full-stack architecture.
 - **Advertisement System**: Targeted ad delivery.
 - **User Types**: Biker, Zavorrina/Zavorrino, Coppia with distinct functionalities.
 - **Multilingual Support**: IT, EN, DE, ES, FR.
-- **Player Musicale in-app** (SDK 55 cycle): `lib/player-context.tsx` (PlayerProvider con **expo-av** Audio.Sound, sleep timer, preferiti AsyncStorage). `components/MiniPlayer.tsx` (barra persistente + modal fullscreen con griglia generi radio). Backend: `server/routes/radio.ts` — `/api/music/genres`, `/stations/:genre` (Radio Browser API), `/preview` + `/preview-playlist` (iTunes Search API), `/suggested-genres`. Pulsante anteprima 30s nelle SharedPlaylistCard in music.tsx. **expo-av@16.0.8** + `expo-media-library`. UIBackgroundModes["audio"] e permessi READ_MEDIA_AUDIO/FOREGROUND_SERVICE in app.json. NOTA: RNTP rimosso (incompatibile New Arch RN 0.83.4).
+- **Player Musicale in-app** (SDK 55 cycle): `lib/player-context.tsx` (PlayerProvider con **expo-audio** createAudioPlayer, sleep timer, preferiti AsyncStorage). `components/MiniPlayer.tsx` (barra persistente + modal fullscreen con griglia generi radio). Backend: `server/routes/radio.ts` — `/api/music/genres`, `/stations/:genre` (Radio Browser API), `/preview` + `/preview-playlist` (iTunes Search API), `/suggested-genres`. Pulsante anteprima 30s nelle SharedPlaylistCard in music.tsx. **expo-audio@55.0.14** + `expo-media-library`. UIBackgroundModes["audio"] e permessi READ_MEDIA_AUDIO/FOREGROUND_SERVICE in app.json. NOTA: expo-av rimosso (Task #1052, R8 KeepAwakeManager error). NOTA: RNTP rimosso (incompatibile New Arch RN 0.83.4).
 - **Music Integration — Last.fm only** (Task #440/#441, cleanup Task #777/#778): Last.fm is the sole music provider. Syncs user's top tracks and recently played songs from Last.fm. Music Match feature finds bikers with common music taste. Playlist sharing via chat messages. Backend: `server/routes/music-match.ts` (handleMusicMatch), `server/routes/auth.ts` (Last.fm connect/disconnect/sync/status/my-tracks/share-playlist/shared-playlists/merge-playlist). DB tables: `user_music_tokens` (renamed from `user_spotify_tokens` via Task #778), `user_music_tracks` with column `lastfm_track_id` (renamed from `spotify_track_id` via Task #778, provider defaults to "lastfm"), `shared_playlists`. messages table has `playlist_id` column. Requires Secrets: `LASTFM_API_KEY`, `LASTFM_SHARED_SECRET`.
 
 **Deployment & Operations:**
@@ -94,7 +94,7 @@ Il seed imposta `emailVerified: true` per tutti gli utenti creati.
 
 ## External Dependencies
 - **Expo SDK 55** (React Native 0.83.4): Core framework for React Native development.
-- **expo-av@16.0.8**: Audio playback (radio streaming, MP3, preview 30s) con background playback. Sostituisce RNTP (incompatibile New Architecture RN 0.83.4).
+- **expo-audio@55.0.14**: Audio playback (radio streaming, MP3, preview 30s) con background playback. Sostituisce expo-av (rimosso in Task #1052: R8 errore KeepAwakeManager in EAS build). Sostituisce RNTP (incompatibile New Architecture RN 0.83.4).
 - **react-native-reanimated@~4.2.1**: Versione corretta per SDK 55 (bundledNativeModules.json). Versioni 3.x causano CMake build failure con NDK r27b su EAS.
 - **expo-media-library**: Accesso alla libreria musicale del dispositivo.
 - **React Native**: Frontend UI framework.

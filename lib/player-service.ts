@@ -1,7 +1,7 @@
 /**
  * BikerLink — Playback Service (stub)
  *
- * Il player musicale usa ora expo-av invece di react-native-track-player.
+ * Il player musicale usa expo-audio invece di react-native-track-player.
  * Questo file è mantenuto per compatibilità ma non ha funzioni attive.
  */
 

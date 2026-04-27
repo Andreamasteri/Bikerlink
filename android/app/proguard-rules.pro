@@ -51,7 +51,3 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.openjsse.**
 
-# ─── expo-av references removed expo-modules-core class (Task #1052 fix) ─────
-# expo.modules.av.video.FullscreenVideoPlayer refs KeepAwakeManager which no
-# longer exists in the current expo-modules-core version → R8 reports MISSING
--dontwarn expo.modules.core.interfaces.services.KeepAwakeManager

@@ -8,7 +8,11 @@ import React, {
 } from "react";
 import { Platform, Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Audio, AVPlaybackStatus } from "expo-av";
+import {
+  createAudioPlayer,
+  setAudioModeAsync,
+} from "expo-audio";
+import type { AudioPlayer as ExpoAudioPlayer, AudioStatus } from "expo-audio";
 import { getApiUrl } from "@/lib/query-client";
 
 export type PlayerSource = "radio" | "library" | "file" | "preview";
@@ -94,7 +98,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [isShuffled, setIsShuffled] = useState(false);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
 
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const playerRef = useRef<ExpoAudioPlayer | null>(null);
+  const listenerRef = useRef<{ remove: () => void } | null>(null);
   const queueRef = useRef<PlayerTrack[]>([]);
   const queueIndexRef = useRef(0);
   const repeatModeRef = useRef<RepeatMode>("off");
@@ -110,12 +115,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     let mounted = true;
     (async () => {
       try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
+        await setAudioModeAsync({
+          allowsRecording: false,
+          playsInSilentMode: true,
           staysActiveInBackground: true,
-          shouldDuckAndroid: true,
-          playThroughEarpieceAndroid: false,
         });
         if (mounted) setIsAvailable(true);
       } catch (err) {
@@ -136,7 +139,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       mounted = false;
-      soundRef.current?.unloadAsync().catch(() => {});
+      listenerRef.current?.remove();
+      listenerRef.current = null;
+      playerRef.current?.remove();
+      playerRef.current = null;
     };
   }, []);
 
@@ -153,22 +159,22 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     return () => { if (sleepTimerRef.current) clearTimeout(sleepTimerRef.current); };
   }, [sleepTimerEnd]);
 
-  const onPlaybackStatus = useCallback((status: AVPlaybackStatus) => {
-    if (!status.isLoaded) {
-      if (status.error) console.warn("[Player] Playback error:", status.error);
-      return;
-    }
-    setIsPlaying(status.isPlaying);
+  const onPlaybackStatus = useCallback((status: AudioStatus) => {
+    if (!status.isLoaded) return;
+    setIsPlaying(status.playing);
     setIsBuffering(status.isBuffering);
-    setPosition(status.positionMillis / 1000);
-    setDuration((status.durationMillis ?? 0) / 1000);
+    setPosition(status.currentTime);
+    setDuration(status.duration ?? 0);
 
-    if (status.didJustFinish && !status.isLooping) {
+    if (status.didJustFinish && !status.loop) {
       const mode = repeatModeRef.current;
       const q = queueRef.current;
       const idx = queueIndexRef.current;
       if (mode === "track") {
-        soundRef.current?.replayAsync().catch((err) => console.warn("[Player] replay error:", err));
+        if (playerRef.current) {
+          playerRef.current.seekTo(0);
+          playerRef.current.play();
+        }
       } else if (mode === "queue" || idx < q.length - 1) {
         const nextIdx = (idx + 1) % q.length;
         loadAndPlay(q[nextIdx], nextIdx);
@@ -178,23 +184,34 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const destroyPlayer = useCallback(() => {
+    if (listenerRef.current) {
+      listenerRef.current.remove();
+      listenerRef.current = null;
+    }
+    if (playerRef.current) {
+      playerRef.current.remove();
+      playerRef.current = null;
+    }
+  }, []);
+
   const loadAndPlay = useCallback(async (track: PlayerTrack, trackIndex: number) => {
     try {
-      if (soundRef.current) {
-        await soundRef.current.unloadAsync().catch(() => {});
-        soundRef.current = null;
-      }
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: track.url },
-        { shouldPlay: true, progressUpdateIntervalMillis: 1000 },
-        onPlaybackStatus
-      );
-      soundRef.current = sound;
+      destroyPlayer();
+
+      const player = createAudioPlayer({ uri: track.url });
+      playerRef.current = player;
+
+      const sub = player.addListener("playbackStatusUpdate", onPlaybackStatus);
+      listenerRef.current = sub;
+
+      player.play();
+
       setCurrentTrack(track);
       setQueueIndex(trackIndex);
       setSource(track.source);
       setIsPlaying(true);
-      setIsBuffering(false);
+      setIsBuffering(true);
       setPosition(0);
     } catch (err) {
       console.warn("[Player] loadAndPlay error:", err);
@@ -203,25 +220,23 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         : "Impossibile riprodurre questo brano.";
       Alert.alert("Riproduzione non riuscita", msg);
     }
-  }, [onPlaybackStatus]);
+  }, [onPlaybackStatus, destroyPlayer]);
 
-  const play = useCallback(async () => {
-    try { await soundRef.current?.playAsync(); } catch (err) { console.warn("[Player] play error:", err); }
+  const play = useCallback(() => {
+    try { playerRef.current?.play(); } catch (err) { console.warn("[Player] play error:", err); }
   }, []);
 
-  const pause = useCallback(async () => {
-    try { await soundRef.current?.pauseAsync(); } catch (err) { console.warn("[Player] pause error:", err); }
+  const pause = useCallback(() => {
+    try { playerRef.current?.pause(); } catch (err) { console.warn("[Player] pause error:", err); }
   }, []);
 
   const togglePlay = useCallback(() => {
     if (isPlayingRef.current) pause(); else play();
   }, [play, pause]);
 
-  const stop = useCallback(async () => {
+  const stop = useCallback(() => {
     try {
-      await soundRef.current?.stopAsync();
-      await soundRef.current?.unloadAsync();
-      soundRef.current = null;
+      destroyPlayer();
     } catch (err) { console.warn("[Player] stop error:", err); }
     setCurrentTrack(null);
     setQueue([]);
@@ -230,7 +245,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     isPlayingRef.current = false;
     setPosition(0);
     setDuration(0);
-  }, []);
+  }, [destroyPlayer]);
 
   const playTrack = useCallback(async (track: PlayerTrack) => {
     setQueue([track]);
@@ -281,7 +296,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const q = queueRef.current;
     const idx = queueIndexRef.current;
     if (position > 3) {
-      try { await soundRef.current?.setPositionAsync(0); } catch (err) { console.warn("[Player] rewind error:", err); }
+      try { await playerRef.current?.seekTo(0); } catch (err) { console.warn("[Player] rewind error:", err); }
       return;
     }
     if (q.length <= 1) return;
@@ -290,7 +305,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [loadAndPlay, position]);
 
   const seekTo = useCallback(async (pos: number) => {
-    try { await soundRef.current?.setPositionAsync(pos * 1000); } catch (err) { console.warn("[Player] seekTo error:", err); }
+    try { await playerRef.current?.seekTo(pos); } catch (err) { console.warn("[Player] seekTo error:", err); }
   }, []);
 
   const setSleepTimer = useCallback((minutes: number | null) => {
@@ -320,10 +335,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const next: RepeatMode =
         prev === "off" ? "track" : prev === "track" ? "queue" : "off";
       repeatModeRef.current = next;
-      if (next === "track" && soundRef.current) {
-        soundRef.current.setIsLoopingAsync(true).catch((err) => console.warn("[Player] setLooping error:", err));
-      } else if (soundRef.current) {
-        soundRef.current.setIsLoopingAsync(false).catch((err) => console.warn("[Player] setLooping error:", err));
+      if (playerRef.current) {
+        playerRef.current.loop = next === "track";
       }
       return next;
     });
