@@ -104,8 +104,10 @@ function scheduleAuthRecheck() {
  * One-shot silent re-auth used by admin endpoints (and anyone who needs to
  * distinguish a real "session expired" from a transient 401). Performs a
  * single GET /api/auth/me with credentials and returns whether the session is
- * still valid. Does NOT mutate React Query cache — the caller decides what to
- * do (retry the original request, mark session expired, etc).
+ * still valid. If the session is gone, also invalidates the cached
+ * /api/auth/me query so auth-context picks up the change and sets
+ * `sessionExpired` globally. The caller decides what to do (retry the
+ * original request, surface a session-expired UI, etc).
  */
 export async function silentAuthRecheck(): Promise<boolean> {
   const baseUrl = getApiUrl();
@@ -115,10 +117,14 @@ export async function silentAuthRecheck(): Promise<boolean> {
       headers: buildAuthHeaders(),
       credentials: "include",
     });
-    if (res.status === 401) return false;
-    if (!res.ok) return false;
-    return true;
+    const ok = res.ok && res.status !== 401;
+    if (!ok) {
+      // Force auth-context to re-evaluate so `sessionExpired` is set globally.
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    }
+    return ok;
   } catch {
+    queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     return false;
   }
 }
@@ -181,16 +187,36 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey, signal }) => {
     const baseUrl = getApiUrl();
     const url = new URL(queryKey.join("/") as string, baseUrl);
+    const path = (queryKey[0] as string) ?? "";
+    const isAuthQuery = path.includes("/api/auth/");
+    const isAdminQuery = path.startsWith("/api/admin");
 
-    const res = await fetch(url.toString(), {
-      headers: buildAuthHeaders(),
-      credentials: "include",
-      signal,
-    });
+    const doFetch = () =>
+      fetch(url.toString(), {
+        headers: buildAuthHeaders(),
+        credentials: "include",
+        signal,
+      });
+
+    let res = await doFetch();
+
+    // Centralized one-shot silent re-auth for admin endpoints.
+    // Cookie connect.sid can go stale on Android after cold start while the
+    // Bearer token in AsyncStorage is still valid. Re-check /api/auth/me once;
+    // if the session is alive, retry the original request silently before
+    // surfacing a 401 to the caller. silentAuthRecheck() invalidates
+    // /api/auth/me when the session is truly gone, so auth-context flips
+    // `sessionExpired` globally for any UI that observes it.
+    if (res.status === 401 && !isAuthQuery && isAdminQuery) {
+      const stillValid = await silentAuthRecheck();
+      if (stillValid) {
+        res = await doFetch();
+      }
+    }
 
     if (res.status === 401) {
-      const isAuthQuery = (queryKey[0] as string)?.includes("/api/auth/");
-      if (!isAuthQuery) {
+      if (!isAuthQuery && !isAdminQuery) {
+        // Non-admin paths keep the legacy debounced recheck.
         scheduleAuthRecheck();
       }
       if (unauthorizedBehavior === "returnNull") {

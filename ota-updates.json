@@ -5262,7 +5262,33 @@
     "apkBuildId": null,
     "apkVersionCode": 40,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-27T11:58:18.349Z"
+  },
+  {
+    "updateNumber": 10,
+    "version": "1.10.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-10 rv8.0.0: silent re-auth admin centralizzato in getQueryFn",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "note": "Task #1051 (revisione code review #2): centralizzata la logica di silent re-auth one-shot per tutte le chiamate /api/admin/* nel default getQueryFn di lib/query-client.ts (non più solo in app/admin/system.tsx). silentAuthRecheck() ora invalida esplicitamente la query /api/auth/me quando la sessione risulta persa, così auth-context setta sessionExpired globalmente per tutte le pagine admin. CURRENT_OTA_NUMBER=10.",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "35867654-f195-4096-895a-c465880901b6",
+    "bundleUrl": "private/ota/ota-1.10.0-1777291352574.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "a5fca97b9cfada106bac36bceefc8a3e089c26b0",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 40,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-27T12:02:59.715Z"
   }
 ]
