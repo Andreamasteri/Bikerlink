@@ -67,15 +67,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AsyncStorage e lo invia come header Authorization. Qui lo ri-inietto come
   // cookie sintetico così express-session lo legge con la sua logica standard.
   // Il valore Bearer è il valore raw firmato del cookie (formato `s:<sid>.<sig>`).
+  //
+  // IMPORTANTE: il Bearer ha sempre la precedenza su qualsiasi connect.sid nativo
+  // già presente nel cookie jar (può essere stale/invalido su Android dopo riavvio
+  // del processo). Il cookie stale viene rimosso e sostituito con il token Bearer.
   app.use((req, _res, next) => {
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith("Bearer ")) {
       const token = authHeader.substring(7).trim();
-      if (token && (!req.headers.cookie || !req.headers.cookie.includes("connect.sid="))) {
+      if (token) {
         const cookieValue = `connect.sid=${encodeURIComponent(token)}`;
-        req.headers.cookie = req.headers.cookie
-          ? `${req.headers.cookie}; ${cookieValue}`
-          : cookieValue;
+        if (req.headers.cookie) {
+          const cleaned = req.headers.cookie
+            .split(";")
+            .map((c) => c.trim())
+            .filter((c) => !c.startsWith("connect.sid="))
+            .join("; ");
+          req.headers.cookie = cleaned ? `${cleaned}; ${cookieValue}` : cookieValue;
+        } else {
+          req.headers.cookie = cookieValue;
+        }
       }
     }
     next();

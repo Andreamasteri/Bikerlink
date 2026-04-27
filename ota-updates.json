@@ -5158,7 +5158,33 @@
     "apkBuildId": null,
     "apkVersionCode": 39,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-27T09:54:15.089Z"
+  },
+  {
+    "updateNumber": 6,
+    "version": "1.6.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-6 rv8.0.0: Fix Bearer Token: priorità su cookie stale — risolto redirect al login da System Monitor",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "note": "Task #1044: fix middleware Bridge Bearer→Cookie in server/routes.ts. Rimossa la guard `!req.headers.cookie.includes('connect.sid=')`: ora quando è presente un header Authorization: Bearer, il cookie connect.sid stale viene sempre rimosso e sostituito con il token Bearer. Risolve il redirect al login su Android quando si clicca 'System Monitor' nel pannello admin (cookie stale ignorato, Bearer token ha sempre la precedenza). CURRENT_OTA_NUMBER=6.",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "106b4714-3777-4ebd-a61a-38509cd0f7c3",
+    "bundleUrl": "private/ota/ota-1.6.0-1777284231475.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "0f549fa0711989de765bee2eb68062ddcaf63b54",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 39,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-27T10:03:54.456Z"
   }
 ]
