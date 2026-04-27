@@ -5106,7 +5106,33 @@
     "apkBuildId": null,
     "apkVersionCode": 39,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-27T07:03:52.180Z"
+  },
+  {
+    "updateNumber": 4,
+    "version": "1.4.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-4 rv8.0.0: tabella traduzioni live + ricerca/filtro + highlight mancanti (admin)",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "note": "Task #1020: tabella traduzioni live nell'admin (editor inline per ogni stringa, GET /api/admin/translations/table, PATCH /api/admin/translations/key). Task #1023: barra di ricerca + filtro per categoria nella tabella (prefisso chiave). Task #1025: evidenziazione righe con traduzioni mancanti (bordo arancione, chip filtro Mancanti). CURRENT_OTA_NUMBER=4.",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "f3fd365a-077e-4db5-a521-0defe5828807",
+    "bundleUrl": "private/ota/ota-1.4.0-1777275673680.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "ad0fb28410eed5b847b1e4a49b354cf6ed93ec76",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 39,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-27T07:41:17.223Z"
   }
 ]
