@@ -472,6 +472,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(users.status, "active"),
+          eq(users.ghostMode, false),
           sql`${users.nickname} ILIKE ${pattern}`
         )
       )

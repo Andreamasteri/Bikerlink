@@ -950,8 +950,8 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
           region: item.user.region,
           country: item.user.country,
           avatarUrl: item.user.avatarUrl,
-          latitude: item.profile?.hideFromMap ? null : (item.profile?.latitude || null),
-          longitude: item.profile?.hideFromMap ? null : (item.profile?.longitude || null),
+          latitude: (item.profile?.hideFromMap || item.user.ghostMode) ? null : (item.profile?.latitude || null),
+          longitude: (item.profile?.hideFromMap || item.user.ghostMode) ? null : (item.profile?.longitude || null),
           isAvailable: (item.profile?.isAvailable || false) && isOnlineSearch,
           bio: item.profile?.bio || null,
         };
