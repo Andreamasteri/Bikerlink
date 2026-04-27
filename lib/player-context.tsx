@@ -85,7 +85,7 @@ const AUDIO_MODE_ACTIVE = {
   allowsRecording: false,
   playsInSilentMode: true,
   shouldPlayInBackground: true,
-  interruptionMode: "duckOthers",
+  interruptionMode: "doNotMix",
 } as const;
 
 const AUDIO_MODE_INACTIVE = {
@@ -202,6 +202,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       listenerRef.current = null;
     }
     if (playerRef.current) {
+      try { playerRef.current.clearLockScreenControls(); } catch (err) { console.debug("[Player] clearLockScreen error:", err); }
       try { playerRef.current.pause(); } catch (err) { console.debug("[Player] destroyPlayer pause error:", err); }
       playerRef.current.loop = false;
       playerRef.current.remove();
@@ -225,6 +226,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       listenerRef.current = sub;
 
       player.play();
+
+      try {
+        player.setActiveForLockScreen(
+          true,
+          {
+            title: track.title,
+            artist: track.artist,
+            albumTitle: track.album,
+            artworkUrl: track.artwork,
+          },
+          { showSeekForward: true, showSeekBackward: true }
+        );
+      } catch (err) {
+        console.debug("[Player] setActiveForLockScreen error:", err);
+      }
 
       setCurrentTrack(track);
       setQueueIndex(trackIndex);

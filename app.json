@@ -94,7 +94,13 @@
         }
       ],
       "expo-web-browser",
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": true,
+          "enableBackgroundRecording": false
+        }
+      ],
       "expo-camera",
       "expo-image",
       "expo-sharing",
