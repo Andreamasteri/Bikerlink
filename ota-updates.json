@@ -5363,8 +5363,8 @@
     "iosUpdateId": null,
     "commitBase": "3e4494e06a5b8f85c2e02bff92384e6348fdb21c",
     "easDashboard": null,
-    "apkBuildId": null,
-    "apkVersionCode": 40,
+    "apkBuildId": "b754683e-75b0-49b5-b246-b534d0a55585",
+    "apkVersionCode": 41,
     "apkUrl": null,
     "status": "published",
     "publishedAt": "2026-04-27T13:16:36.616Z"

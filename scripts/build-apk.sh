@@ -172,12 +172,10 @@ sleep 5
 set +e
 CI=1 \
 EAS_NO_VCS=1 \
-EAS_SKIP_AUTO_FINGERPRINT=1 \
 EXPO_PUBLIC_DOMAIN=biker-link.replit.app \
 npx eas-cli@18 build \
   --platform android \
   --profile "$PROFILE" \
-  --clear-cache \
   --non-interactive \
   --no-wait
 BUILD_EXIT=$?
