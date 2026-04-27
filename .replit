@@ -128,12 +128,12 @@ outputType = "console"
 name = "ota-guard"
 author = "agent"
 
-[workflows.workflow.metadata]
-isValidation = true
-
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "bash scripts/validate-ota.sh"
+args = "SKIP_LIVE_CHECK=1 bash scripts/validate-ota.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"

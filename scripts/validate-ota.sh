@@ -281,6 +281,83 @@ elif [[ "$MULTI_CYCLE_CHECK" == MULTI:* ]]; then
   info "  Questo è normale se il registro è storico — ma verifica che le OTA attive siano solo per $CURRENT_RV_VAL."
 fi
 
+# ── 8. LIVE SERVER GUARD — verifica che la produzione serva l'OTA corrente ──
+echo ""
+echo -e "${BOLD}── Live Server Guard ──────────────────────────────────────${RESET}"
+
+PROD_URL="${BIKERLINK_BACKEND_URL:-https://biker-link.replit.app}"
+LIVE_CHECK_SKIP="${SKIP_LIVE_CHECK:-0}"
+
+LIVE_INFO=$(node -e "
+  const fs = require('fs');
+  try {
+    const rv = JSON.parse(fs.readFileSync('app.json','utf8'))?.expo?.runtimeVersion ?? '8.0.0';
+    const otaSrc = fs.readFileSync('lib/ota.ts','utf8');
+    const m = otaSrc.match(/CURRENT_OTA_NUMBER\s*=\s*(\d+)/);
+    if (!m) { console.log('ERROR:no_ota_number'); process.exit(0); }
+    const otaNum = parseInt(m[1], 10);
+    const data = JSON.parse(fs.readFileSync('ota-updates.json','utf8'));
+    const entry = data.find(e => e.updateNumber === otaNum && e.runtimeVersion === rv);
+    if (!entry) { console.log('ERROR:no_entry:ota=' + otaNum + ':rv=' + rv); process.exit(0); }
+    console.log('OK:rv=' + rv + ':ota=' + otaNum + ':releaseId=' + entry.releaseId);
+  } catch(e) { console.log('ERROR:exception:' + e.message.replace(/\n/g,' ')); }
+" 2>/dev/null || echo "ERROR:node_failed")
+
+if [[ "$LIVE_INFO" == ERROR:* ]]; then
+  warn "Live check saltato — impossibile leggere i dati locali OTA: $LIVE_INFO"
+else
+  EXPECTED_RV=$(echo "$LIVE_INFO" | grep -o 'rv=[^:]*' | head -1 | cut -d= -f2)
+  EXPECTED_OTA=$(echo "$LIVE_INFO" | grep -o 'ota=[^:]*' | head -1 | cut -d= -f2)
+  EXPECTED_RELEASE_ID=$(echo "$LIVE_INFO" | grep -o 'releaseId=.*' | cut -d= -f2)
+
+  info "Controllo produzione: $PROD_URL/api/expo-updates (rv=$EXPECTED_RV, platform=android)"
+
+  HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" \
+    -H "expo-runtime-version: $EXPECTED_RV" \
+    -H "expo-platform: android" \
+    -H "expo-protocol-version: 1" \
+    --max-time 15 \
+    "$PROD_URL/api/expo-updates" 2>/dev/null || echo -e "\nCURL_FAILED")
+
+  HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
+  HTTP_CODE=$(echo "$HTTP_RESPONSE" | tail -1)
+
+  if [ "$HTTP_CODE" = "CURL_FAILED" ] || [ -z "$HTTP_CODE" ]; then
+    warn "Live check non disponibile — impossibile raggiungere $PROD_URL"
+  elif [ "$HTTP_CODE" = "204" ] || [ "$HTTP_CODE" = "304" ]; then
+    if [ "$LIVE_CHECK_SKIP" = "1" ]; then
+      warn "LIVE_CHECK_SKIP=1 OTA_NOT_PUBLISHED: produzione risponde $HTTP_CODE per rv=$EXPECTED_RV (OTA-$EXPECTED_OTA non ancora pubblicata)"
+      info "  Esegui publish-ota.sh poi ri-esegui senza SKIP_LIVE_CHECK=1 per confermare."
+    else
+      fail "LIVE_CHECK_FAIL OTA_NOT_PUBLISHED: produzione risponde HTTP $HTTP_CODE per rv=$EXPECTED_RV — OTA-$EXPECTED_OTA non viene servita!"
+      info "  Esegui publish-ota.sh, poi ri-esegui validate-ota.sh per confermare."
+      info "  Usa SKIP_LIVE_CHECK=1 bash scripts/validate-ota.sh per saltare questo check."
+    fi
+  elif [ "$HTTP_CODE" = "200" ]; then
+    SERVED_RELEASE_ID=$(echo "$HTTP_BODY" | node -e "
+      let d=''; process.stdin.on('data',c=>d+=c).on('end',()=>{
+        try { const j=JSON.parse(d); console.log(j.id ?? ''); } catch{ console.log(''); }
+      });
+    " 2>/dev/null || echo "")
+
+    if [ -z "$SERVED_RELEASE_ID" ]; then
+      fail "LIVE_CHECK_FAIL: produzione risponde 200 ma impossibile estrarre release ID dal manifest (risposta non valida)"
+      info "  Verifica che $PROD_URL/api/expo-updates restituisca un manifest JSON valido con campo 'id'."
+    elif [ "$SERVED_RELEASE_ID" = "$EXPECTED_RELEASE_ID" ]; then
+      ok "LIVE_CHECK_OK: produzione serve OTA-$EXPECTED_OTA (releaseId=$SERVED_RELEASE_ID)"
+    else
+      if [ "$LIVE_CHECK_SKIP" = "1" ]; then
+        warn "LIVE_CHECK_SKIP=1 OTA_NOT_PUBLISHED: produzione serve releaseId=$SERVED_RELEASE_ID, atteso=$EXPECTED_RELEASE_ID (OTA-$EXPECTED_OTA)"
+      else
+        fail "LIVE_CHECK_FAIL OTA_NOT_PUBLISHED: produzione serve releaseId=$SERVED_RELEASE_ID, ma OTA-$EXPECTED_OTA ha releaseId=$EXPECTED_RELEASE_ID"
+        info "  Il server potrebbe servire una OTA diversa da quella attesa. Verifica il DB di produzione."
+      fi
+    fi
+  else
+    warn "Live check: risposta inattesa HTTP $HTTP_CODE da $PROD_URL/api/expo-updates"
+  fi
+fi
+
 # ── RISULTATO FINALE ──────────────────────────────────────────
 echo ""
 echo -e "${BOLD}════════════════════════════════════════${RESET}"

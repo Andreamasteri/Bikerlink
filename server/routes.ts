@@ -345,6 +345,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // In-memory SHA-256 cache: releaseId → base64url hash
   const _expoUpdateHashCache = new Map<string, string>();
 
+  // Read the expected runtimeVersion from app.json once at startup so that
+  // bumping the cycle in app.json automatically updates this endpoint too.
+  const _expectedRuntimeVersion: string = (() => {
+    try {
+      const appJson = JSON.parse(fs.readFileSync(path.resolve("app.json"), "utf8"));
+      return appJson?.expo?.runtimeVersion ?? "8.0.0";
+    } catch {
+      return "8.0.0";
+    }
+  })();
+
   app.get("/api/expo-updates", async (req: Request, res: Response) => {
     try {
       const runtimeVersion = req.headers["expo-runtime-version"] as string | undefined;
@@ -357,7 +368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(204).end();
       }
 
-      if (runtimeVersion && runtimeVersion !== "7.0.0") {
+      if (runtimeVersion && runtimeVersion !== _expectedRuntimeVersion) {
         return res.status(204).end();
       }
 
@@ -398,7 +409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const manifest = {
         id: release.id,
         createdAt,
-        runtimeVersion: "7.0.0",
+        runtimeVersion: runtimeVersion ?? _expectedRuntimeVersion,
         // assets: [] is intentional — OTA bundles are single-file JS (no separate
         // image/font assets extracted). The bundle itself is in launchAsset only.
         assets: [] as unknown[],
