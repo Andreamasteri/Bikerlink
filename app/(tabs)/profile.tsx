@@ -40,6 +40,7 @@ import { useUnits, type TimeFormat, type SpeedUnit, type DistanceUnit } from "@/
 import { convertDistance } from "@/lib/units";
 import * as Updates from "expo-updates";
 import Constants from "expo-constants";
+import * as Application from "expo-application";
 import * as Location from "expo-location";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 import LeafletPickerMap from "@/components/LeafletPickerMap";
@@ -1414,7 +1415,7 @@ export default function ProfileScreen() {
         <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
           <Text style={styles.versionLabel}>Versione app</Text>
           <Text style={styles.versionValue}>
-            {`v${Constants.expoConfig?.android?.versionCode ?? "?"}`}
+            {(`v${Application.nativeBuildVersion ?? "?"}  ${Constants.expoConfig?.version ?? ""}`).trim()}
           </Text>
         </View>
         <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>

@@ -5132,7 +5132,33 @@
     "apkBuildId": null,
     "apkVersionCode": 39,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-27T07:41:17.223Z"
+  },
+  {
+    "updateNumber": 5,
+    "version": "1.5.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-5 rv8.0.0: fix versione app nel profilo (v? → v39 3.0.0)",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "note": "Task #1043: fix visualizzazione versione app nel profilo utente. Sostituito Constants.expoConfig?.android?.versionCode (undefined a runtime) con Application.nativeBuildVersion (expo-application v55.0.14). Mostra ora 'v{versionCode}  {versionName}' es. 'v39  3.0.0'. CURRENT_OTA_NUMBER=5.",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "0d926a7b-56b3-41ad-a067-f7b7312eee00",
+    "bundleUrl": "private/ota/ota-1.5.0-1777283582308.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "37cfa4f7ea8d44a47d6413178801eed898ce5189",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 39,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-27T09:54:15.089Z"
   }
 ]

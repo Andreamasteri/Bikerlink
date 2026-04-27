@@ -31,7 +31,7 @@ backend custom `https://biker-link.replit.app/api/expo-updates` (Expo Updates Pr
 - **Runtime Version**: `8.0.0` (ciclo corrente, APK v40) ← CICLO V3
 - **APK corrente**: versionCode **40**, versionName **3.0.0** (build inviata 2026-04-26T19:52Z — buildId: `ba5205c6-0cc8-41ce-ba8c-8e68a117dabf`, EAS: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/ba5205c6-0cc8-41ce-ba8c-8e68a117dabf — verifica dispositivo in corso)
 - **APK precedente (v39)**: versionCode **39**, versionName **3.0.0** (buildId: `b167f108-813d-4981-893a-2896c0268a5b`, APK: https://expo.dev/artifacts/eas/nUADFAf6ddBUzcbZMjKBxR.apk)
-- **OTA corrente**: OTA-1 rv8.0.0 (bundle custom attivo — EAS Updates dismesso, Task #980)
+- **OTA corrente**: OTA-5 rv8.0.0 (bundle custom attivo — EAS Updates dismesso, Task #980)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates` (Expo Updates Protocol v1)
 - **Utenti**: su Android fisico via APK — NON usano il dev server
 - **Admin email**: `admin@bikerlink.it`
