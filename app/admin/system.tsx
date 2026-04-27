@@ -29,7 +29,7 @@ interface OtaUpdateEntry {
   updateNumber: number;
   channel: string;
   message: string;
-  publishedAt: string;
+  publishedAt?: string;
   runtimeVersion: string;
   platforms: string[];
   jsEngine: string;
@@ -277,14 +277,21 @@ export default function SystemScreen() {
 
   const mergedEvents = useMemo<SystemEvent[]>(() => {
     const backendEvents: SystemEvent[] = data?.events ?? [];
-    const otaEvents: SystemEvent[] = otaUpdates.map((entry) => ({
-      timestamp: new Date(entry.publishedAt).toISOString(),
-      message: `OTA-${entry.updateNumber}: ${entry.message}`,
-      type: "OTA_PUBLISHED",
-    }));
-    return [...backendEvents, ...otaEvents].sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
+    const otaEvents: SystemEvent[] = otaUpdates
+      .filter((entry) => !!entry.publishedAt)
+      .map((entry) => ({
+        timestamp: new Date(entry.publishedAt).toISOString(),
+        message: `OTA-${entry.updateNumber}: ${entry.message}`,
+        type: "OTA_PUBLISHED",
+      }));
+    return [...backendEvents, ...otaEvents].sort((a, b) => {
+      const ta = new Date(a.timestamp).getTime();
+      const tb = new Date(b.timestamp).getTime();
+      if (isNaN(ta) && isNaN(tb)) return 0;
+      if (isNaN(ta)) return 1;
+      if (isNaN(tb)) return -1;
+      return tb - ta;
+    });
   }, [data?.events]);
 
   useEffect(() => {
