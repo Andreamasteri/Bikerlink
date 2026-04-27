@@ -501,18 +501,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       "templates",
       "apple-review.html",
     );
-    const password = process.env.APPLE_REVIEWER_PASSWORD || "AppleReview2026!";
-    try {
-      const html = fs.readFileSync(templatePath, "utf-8").replace(
-        "AppleReview2026!",
-        password,
-      );
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.send(html);
-    } catch {
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.sendFile(templatePath);
-    }
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.sendFile(templatePath);
   });
 
   app.get("/api/settings/privacy-policy", async (_req, res) => {

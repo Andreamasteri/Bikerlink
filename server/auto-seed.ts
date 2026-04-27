@@ -3,11 +3,20 @@ import { db } from "./db";
 import { users, userProfiles, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos, appSettings, invitationCodes } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 
-const essentialUsers = [
+interface EssentialUserDef {
+  nickname: string;
+  email: string;
+  passwordEnvVar: string;
+  role: string;
+  userType: string;
+  sex: string;
+}
+
+const essentialUsers: EssentialUserDef[] = [
   {
     nickname: "admin",
     email: "admin@bikerlink.it",
-    password: "wF5ws73,d;*E",
+    passwordEnvVar: "BIKERLINK_ADMIN_PASSWORD",
     role: "admin",
     userType: "biker",
     sex: "M",
@@ -15,7 +24,7 @@ const essentialUsers = [
   {
     nickname: "moderatore",
     email: "mod@bikerlink.it",
-    password: "mod2025!",
+    passwordEnvVar: "MOD_SEED_PASSWORD",
     role: "moderator",
     userType: "biker",
     sex: "M",
@@ -25,6 +34,12 @@ const essentialUsers = [
 export async function autoSeedEssentialUsers() {
   try {
     for (const userData of essentialUsers) {
+      const seedPassword = process.env[userData.passwordEnvVar];
+      if (!seedPassword) {
+        console.warn(`[auto-seed] Skipping ${userData.role} seed: ${userData.passwordEnvVar} env var not set`);
+        continue;
+      }
+
       const existing = await db
         .select()
         .from(users)
@@ -32,25 +47,11 @@ export async function autoSeedEssentialUsers() {
         .limit(1);
 
       if (existing.length > 0) {
-        // Reconcile admin password on startup to ensure seed credentials stay current.
-        // Limited to role=admin only — other essential users (e.g. moderator) keep
-        // any manually changed password.
-        if (userData.role === "admin") {
-          const existingUser = existing[0];
-          const passwordMatches = await bcrypt.compare(userData.password, existingUser.password);
-          if (!passwordMatches) {
-            const hashedPassword = await bcrypt.hash(userData.password, 12);
-            await db
-              .update(users)
-              .set({ password: hashedPassword })
-              .where(eq(users.email, userData.email));
-            console.log(`[auto-seed] Admin password reconciled to current seed value`);
-          }
-        }
+        // Account already exists — respect any manually changed password, do not reset.
         continue;
       }
 
-      const hashedPassword = await bcrypt.hash(userData.password, 12);
+      const hashedPassword = await bcrypt.hash(seedPassword, 12);
 
       const [user] = await db
         .insert(users)
