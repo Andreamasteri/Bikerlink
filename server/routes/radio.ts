@@ -357,7 +357,26 @@ router.get("/preview-playlist", async (req: Request, res: Response) => {
   return res.json(results);
 });
 
-router.get("/stream", async (req: Request, res: Response) => {
+// SSRF guard: strip IPv6 brackets then check against private/loopback ranges
+function isBlockedHost(parsedUrl: URL): boolean {
+  const hostname = parsedUrl.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  const BLOCKED = /^(localhost|127\.|0\.0\.0\.0|::1$|::ffff:|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|fc00:|fd[0-9a-f]{0,2}:|fe80:)/;
+  return BLOCKED.test(hostname);
+}
+
+function validateStreamUrl(urlStr: string): URL | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(urlStr);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+  if (isBlockedHost(parsed)) return null;
+  return parsed;
+}
+
+router.get("/stream", requireAuth, async (req: Request, res: Response) => {
   const rawUrl = req.query.url;
   const streamUrl = typeof rawUrl === "string" ? rawUrl : Array.isArray(rawUrl) ? rawUrl[0] : undefined;
 
@@ -365,52 +384,83 @@ router.get("/stream", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "url is required" });
   }
 
-  let parsed: URL;
-  try {
-    parsed = new URL(streamUrl);
-  } catch {
-    return res.status(400).json({ error: "url is not valid" });
-  }
-
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    return res.status(400).json({ error: "url must be http or https" });
-  }
-
-  const hostname = parsed.hostname.toLowerCase();
-  const BLOCKED_HOSTS = /^(localhost|127\.|0\.0\.0\.0|::1|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|fc00:|fd|fe80:)/;
-  if (BLOCKED_HOSTS.test(hostname)) {
-    return res.status(400).json({ error: "url host is not allowed" });
+  if (!validateStreamUrl(streamUrl)) {
+    return res.status(400).json({ error: "url is not valid or not allowed" });
   }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
 
   try {
+    // redirect: "manual" prevents auto-following — we re-validate any redirect target
     const upstream = await fetch(streamUrl, {
       headers: {
         "User-Agent": "BikerLink/4.0.0",
         "Icy-MetaData": "1",
       },
       signal: controller.signal,
+      redirect: "manual",
     });
+
+    let finalResponse = upstream;
+
+    if (upstream.status >= 300 && upstream.status < 400) {
+      const location = upstream.headers.get("location");
+      if (!location) {
+        clearTimeout(timer);
+        return res.status(502).json({ error: "Redirect without Location header" });
+      }
+      let redirectTarget: URL;
+      try {
+        redirectTarget = new URL(location, streamUrl);
+      } catch {
+        clearTimeout(timer);
+        return res.status(400).json({ error: "Invalid redirect target" });
+      }
+      if (!validateStreamUrl(redirectTarget.href)) {
+        clearTimeout(timer);
+        return res.status(400).json({ error: "Redirect target is not allowed" });
+      }
+      const controller2 = new AbortController();
+      const timer2 = setTimeout(() => controller2.abort(), 10000);
+      try {
+        finalResponse = await fetch(redirectTarget.href, {
+          headers: {
+            "User-Agent": "BikerLink/4.0.0",
+            "Icy-MetaData": "1",
+          },
+          signal: controller2.signal,
+          redirect: "manual",
+        });
+        clearTimeout(timer2);
+        if (finalResponse.status >= 300 && finalResponse.status < 400) {
+          return res.status(400).json({ error: "Too many redirects" });
+        }
+      } catch (err2) {
+        clearTimeout(timer2);
+        if (!res.headersSent) {
+          return res.status(502).json({ error: "Cannot connect to redirected stream" });
+        }
+        return;
+      }
+    }
 
     clearTimeout(timer);
 
-    if (!upstream.ok) {
-      return res.status(502).json({ error: `Upstream error: ${upstream.status}` });
+    if (!finalResponse.ok) {
+      return res.status(502).json({ error: `Upstream error: ${finalResponse.status}` });
     }
 
-    const contentType = upstream.headers.get("Content-Type") || "audio/mpeg";
-    const transferEncoding = upstream.headers.get("Transfer-Encoding");
+    const contentType = finalResponse.headers.get("Content-Type") || "audio/mpeg";
+    const transferEncoding = finalResponse.headers.get("Transfer-Encoding");
 
     res.setHeader("Content-Type", contentType);
     res.setHeader("Cache-Control", "no-cache, no-store");
-    res.setHeader("Access-Control-Allow-Origin", "*");
     if (transferEncoding) {
       res.setHeader("Transfer-Encoding", transferEncoding);
     }
 
-    if (!upstream.body) {
+    if (!finalResponse.body) {
       return res.status(502).json({ error: "No response body from upstream" });
     }
 
@@ -418,7 +468,7 @@ router.get("/stream", async (req: Request, res: Response) => {
       controller.abort();
     });
 
-    const reader = upstream.body.getReader();
+    const reader = finalResponse.body.getReader();
     const pump = async () => {
       try {
         while (true) {
