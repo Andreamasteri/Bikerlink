@@ -381,7 +381,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   })();
 
   app.get("/api/expo-updates", async (req: Request, res: Response) => {
-    const debug = req.query.debug === "1";
+    // ?debug=1 viene accettato SOLO se la sessione è quella di un admin autenticato.
+    // Per i client expo-updates normali (anonimi) il flag viene silenziosamente
+    // ignorato in modo da non poter inquinare ota_events o causare carico DB.
+    let debug = false;
+    if (req.query.debug === "1") {
+      const sessionAny = (req as any).session;
+      const userId = sessionAny?.userId as string | undefined;
+      if (userId) {
+        try {
+          const { storage } = await import("./storage");
+          const user = await storage.getUser(userId);
+          if (user?.role === "admin") debug = true;
+        } catch {
+          // best-effort: in caso di errore, non abilitare debug
+        }
+      }
+    }
     const logEvent = async (phase: string, releaseId: string | null, errMsg?: string) => {
       if (!debug) return;
       try {

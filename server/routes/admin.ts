@@ -211,25 +211,6 @@ router.post("/ota-error", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/admin/ota-events?limit=100 — Lista eventi OTA persistiti su DB
-// (ordinati dal più recente). Protetto dal middleware admin (registrato a valle).
-router.get("/ota-events", async (req: Request, res: Response) => {
-  try {
-    const limitRaw = parseInt(String(req.query.limit ?? "100"), 10);
-    const limit = Math.min(Math.max(isNaN(limitRaw) ? 100 : limitRaw, 1), 500);
-    const result = await db.execute(sql`
-      SELECT id, created_at, phase, source, platform, runtime_version, current_update_id, release_id, error, fail_count, ip
-      FROM ota_events
-      ORDER BY created_at DESC
-      LIMIT ${limit}
-    `);
-    return res.json({ events: result.rows, limit });
-  } catch (err) {
-    console.error("[OTA-EVENTS] read error:", err);
-    return res.status(500).json({ message: "Errore lettura eventi OTA" });
-  }
-});
-
 router.post("/client-error", (req: Request, res: Response) => {
   try {
     const { message, stack, componentStack, platform, appVersion, isFatal } = req.body || {};
@@ -278,6 +259,25 @@ router.post("/startup-beacon", (req: Request, res: Response) => {
 });
 
 router.use(requireAdmin);
+
+// GET /api/admin/ota-events?limit=100 — Lista eventi OTA persistiti su DB
+// (ordinati dal più recente). Admin-only (montato dopo router.use(requireAdmin)).
+router.get("/ota-events", async (req: Request, res: Response) => {
+  try {
+    const limitRaw = parseInt(String(req.query.limit ?? "100"), 10);
+    const limit = Math.min(Math.max(isNaN(limitRaw) ? 100 : limitRaw, 1), 500);
+    const result = await db.execute(sql`
+      SELECT id, created_at, phase, source, platform, runtime_version, current_update_id, release_id, error, fail_count, ip
+      FROM ota_events
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `);
+    return res.json({ events: result.rows, limit });
+  } catch (err) {
+    console.error("[OTA-EVENTS] read error:", err);
+    return res.status(500).json({ message: "Errore lettura eventi OTA" });
+  }
+});
 
 router.get("/startup-beacon", (_req: Request, res: Response) => {
   return res.json({
