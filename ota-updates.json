@@ -5369,5 +5369,32 @@
     "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
     "status": "published",
     "publishedAt": "2026-04-27T13:16:36.616Z"
+  },
+  {
+    "updateNumber": 14,
+    "version": "1.14.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-14 rv8.0.0: Fix audio expo-audio — shouldPlayInBackground corretto, AudioControlsService aggiunto al manifest",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "note": "Fix bug audio: staysActiveInBackground (non esiste in expo-audio) → shouldPlayInBackground:true + interruptionMode:duckOthers in setAudioModeAsync. Aggiunto expo-audio plugin in app.json. Aggiunto AudioControlsService service declaration in AndroidManifest.xml (necessario per MediaSessionService). Questi fix risolvono nessun suono nell'app. CURRENT_OTA_NUMBER=14.",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "6aecc6ae-0dc3-4842-a566-7b8838deb2ca",
+    "bundleUrl": "private/ota/ota-1.14.0-1777322180337.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "0925490e19065b7c43e662cbf2f781490371e0cc",
+    "easDashboard": null,
+    "apkBuildId": "e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkVersionCode": 41,
+    "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
+    "status": "published",
+    "publishedAt": "2026-04-27T20:36:23.243Z"
   }
 ]

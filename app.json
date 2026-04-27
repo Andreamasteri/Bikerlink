@@ -94,6 +94,7 @@
         }
       ],
       "expo-web-browser",
+      "expo-audio",
       "expo-camera",
       "expo-image",
       "expo-sharing",

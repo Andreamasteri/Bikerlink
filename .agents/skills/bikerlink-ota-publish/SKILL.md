@@ -30,8 +30,9 @@ backend custom `https://biker-link.replit.app/api/expo-updates` (Expo Updates Pr
 - **Canale EAS**: `preview`
 - **Runtime Version**: `8.0.0` (ciclo corrente, APK v41) ← CICLO V3
 - **APK corrente**: versionCode **41**, versionName **3.0.0** (buildId: `e03f51d8-9f2b-496f-bba2-e0fe90b69fb7`, EAS: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7, APK: https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk — completata 2026-04-27, arm64-v8a + NewArch + expo-audio, OTA-13 inclusa)
+- **OTA corrente**: OTA-14 (releaseId: `6aecc6ae-0dc3-4842-a566-7b8838deb2ca`, publicato 2026-04-27 — fix audio expo-audio)
 - **APK precedente (v40)**: versionCode **40**, versionName **3.0.0** (buildId: `ba5205c6-0cc8-41ce-ba8c-8e68a117dabf`, APK: https://expo.dev/artifacts/eas/p1rG9wd7hZg7oPG1WEc4kM.apk)
-- **OTA corrente**: OTA-13 rv8.0.0 (bundle custom attivo — EAS Updates dismesso, Task #980)
+- **OTA base (APK v41)**: OTA-13 rv8.0.0 (bundle custom — EAS Updates dismesso, Task #980)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates` (Expo Updates Protocol v1)
 - **Utenti**: su Android fisico via APK — NON usano il dev server
 - **Admin email**: `admin@bikerlink.it`

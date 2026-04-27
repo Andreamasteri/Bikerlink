@@ -118,7 +118,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         await setAudioModeAsync({
           allowsRecording: false,
           playsInSilentMode: true,
-          staysActiveInBackground: true,
+          shouldPlayInBackground: true,
+          interruptionMode: "duckOthers",
         });
         if (mounted) setIsAvailable(true);
       } catch (err) {
