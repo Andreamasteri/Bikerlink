@@ -1,4 +1,12 @@
 import type { Express, Request, Response, NextFunction } from "express";
+
+declare global {
+  namespace Express {
+    interface Locals {
+      invalidateExpoUpdateHash?: (releaseId?: string) => void;
+    }
+  }
+}
 import { createServer, type Server } from "node:http";
 import path from "node:path";
 import fs from "node:fs";
@@ -358,7 +366,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Esposto al router admin per invalidare la cache dopo publish/rollback.
   // L'admin chiama app.locals.invalidateExpoUpdateHash(id?) — se omesso, svuota tutto.
-  (app as any).locals.invalidateExpoUpdateHash = (releaseId?: string) => {
+  app.locals.invalidateExpoUpdateHash = (releaseId?: string) => {
     if (releaseId) {
       const had = _expoUpdateHashCache.delete(releaseId);
       console.log(`[expo-updates] cache invalidate id=${releaseId} hit=${had}`);
@@ -386,8 +394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // ignorato in modo da non poter inquinare ota_events o causare carico DB.
     let debug = false;
     if (req.query.debug === "1") {
-      const sessionAny = (req as any).session;
-      const userId = sessionAny?.userId as string | undefined;
+      const userId = req.session.userId;
       if (userId) {
         try {
           const { storage } = await import("./storage");
@@ -398,19 +405,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
     }
-    const logEvent = async (phase: string, releaseId: string | null, errMsg?: string) => {
+    // Canonical diagnostic event: phase="server-check", source="server".
+    // Lo `status` (es: "204-not-android", "304-etag-match") va nel campo `error`
+    // come info diagnostica anche quando la richiesta è andata a buon fine.
+    const logEvent = async (status: string, releaseId: string | null, errMsg?: string) => {
       if (!debug) return;
       try {
         const { otaEvents } = await import("@shared/schema");
         const { db } = await import("./db");
+        const detail = errMsg ? `${status} | ${errMsg}` : status;
         await db.insert(otaEvents).values({
-          phase: `server:${phase}`.substring(0, 32),
-          source: "server-debug",
+          phase: "server-check",
+          source: "server",
           platform: ((req.headers["expo-platform"] as string) ?? "?").substring(0, 16),
           runtimeVersion: ((req.headers["expo-runtime-version"] as string) ?? "?").substring(0, 32),
           currentUpdateId: ((req.headers["expo-current-update-id"] as string) ?? "?").substring(0, 64),
           releaseId: releaseId ? releaseId.substring(0, 64) : undefined,
-          error: errMsg ? errMsg.substring(0, 500) : undefined,
+          error: detail.substring(0, 500),
           failCount: 0,
           ip: ((req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
             ?? req.ip

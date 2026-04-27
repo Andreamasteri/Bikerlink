@@ -3688,7 +3688,7 @@ router.post("/ota/:id/publish", async (req: Request, res: Response) => {
     // (impossibile in pratica, UUID), ma soprattutto rimuove vecchie inactive
     // che restavano in cache occupando memoria. Best-effort.
     try {
-      const inv = (req.app as any).locals?.invalidateExpoUpdateHash;
+      const inv = req.app.locals.invalidateExpoUpdateHash;
       if (typeof inv === "function") inv();
     } catch (e) {
       console.error("[OTA] cache invalidate failed:", e);

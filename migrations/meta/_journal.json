@@ -43,6 +43,13 @@
       "when": 1745557200000,
       "tag": "0009_rename_spotify_identifiers",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777670000000,
+      "tag": "0010_ota_events",
+      "breakpoints": true
     }
   ]
 }
