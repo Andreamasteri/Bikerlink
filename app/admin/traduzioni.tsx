@@ -255,6 +255,7 @@ function LiveTableSection({ restartStatus, restartResult, onRestartPress }: {
   const [cellStates, setCellStates] = useState<Record<string, "saving" | "ok" | "error">>({});
   const [searchText, setSearchText] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [showMissingOnly, setShowMissingOnly] = useState(false);
 
   const loadTable = useCallback(async () => {
     setLoadingTable(true);
@@ -334,15 +335,22 @@ function LiveTableSection({ restartStatus, restartResult, onRestartPress }: {
     return Array.from(prefixSet).sort();
   }, [tableData]);
 
+  const rowHasMissing = useCallback((row: TableRow) => {
+    return TABLE_LANGS.some((l) => !((row[l.code as keyof TableRow] as string) ?? "").trim());
+  }, []);
+
+  const missingCount = React.useMemo(() => tableData.filter(rowHasMissing).length, [tableData, rowHasMissing]);
+
   const filteredData = React.useMemo(() => {
     const q = searchText.trim().toLowerCase();
     return tableData.filter((row) => {
       const matchesCategory = activeCategory ? row.key.startsWith(activeCategory + ".") || row.key.startsWith(activeCategory + "_") || row.key.split(/[._]/)[0] === activeCategory : true;
       if (!matchesCategory) return false;
+      if (showMissingOnly && !rowHasMissing(row)) return false;
       if (!q) return true;
       return row.key.toLowerCase().includes(q) || row.it.toLowerCase().includes(q);
     });
-  }, [tableData, searchText, activeCategory]);
+  }, [tableData, searchText, activeCategory, showMissingOnly, rowHasMissing]);
 
   const activeLangList = TABLE_LANGS.filter((l) => activeLangs.has(l.code));
   const totalWidth = COL_POSITION + COL_IT + activeLangList.length * COL_LANG;
@@ -364,11 +372,15 @@ function LiveTableSection({ restartStatus, restartResult, onRestartPress }: {
   );
 
   const renderRow = useCallback(({ item }: { item: TableRow }) => {
+    const missing = rowHasMissing(item);
     return (
-      <View style={[styles.tableRow, { width: totalWidth }]}>
+      <View style={[styles.tableRow, { width: totalWidth }, missing && styles.tableRowMissing]}>
         <View style={[styles.tableCell, { width: COL_POSITION }]}>
-          <Text style={styles.tableCellKey} numberOfLines={2}>{item.position}</Text>
-          <Text style={styles.tableCellSubKey} numberOfLines={1}>{item.key}</Text>
+          <View style={styles.positionCellContent}>
+            <Text style={styles.tableCellKey} numberOfLines={2}>{item.position}</Text>
+            <Text style={styles.tableCellSubKey} numberOfLines={1}>{item.key}</Text>
+          </View>
+          {missing && <View style={styles.missingDot} />}
         </View>
         <TableCell value={item.it} width={COL_IT} editable={false} rowKey={item.key} />
         {activeLangList.map((l) => {
@@ -394,7 +406,7 @@ function LiveTableSection({ restartStatus, restartResult, onRestartPress }: {
         })}
       </View>
     );
-  }, [activeLangList, editingCell, editDraft, cellStates, handleSave, handleStartEdit, totalWidth]);
+  }, [activeLangList, editingCell, editDraft, cellStates, handleSave, handleStartEdit, totalWidth, rowHasMissing]);
 
   return (
     <View style={styles.card}>
@@ -492,6 +504,19 @@ function LiveTableSection({ restartStatus, restartResult, onRestartPress }: {
               ))}
             </View>
           )}
+
+          <View style={styles.missingFilterRow}>
+            <TouchableOpacity
+              style={[styles.missingChip, showMissingOnly && styles.missingChipActive]}
+              onPress={() => setShowMissingOnly((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.missingDotSmall} />
+              <Text style={[styles.missingChipText, showMissingOnly && styles.missingChipTextActive]}>
+                Mancanti{missingCount > 0 ? ` (${missingCount})` : ""}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           <Text style={styles.filterCount}>
             {filteredData.length} / {tableData.length} stringhe
@@ -1287,5 +1312,55 @@ const styles = StyleSheet.create({
   },
   tableCellError: {
     backgroundColor: "#F4433610",
+  },
+  tableRowMissing: {
+    borderLeftWidth: 3,
+    borderLeftColor: "#FF9800",
+    backgroundColor: "#FF980008",
+  },
+  missingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#FF9800",
+    alignSelf: "center",
+    flexShrink: 0,
+    marginLeft: 4,
+  },
+  positionCellContent: {
+    flex: 1,
+    flexDirection: "column",
+  },
+  missingFilterRow: {
+    flexDirection: "row",
+    marginBottom: 6,
+  },
+  missingChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: "#FF9800",
+    backgroundColor: "transparent",
+  },
+  missingChipActive: {
+    backgroundColor: "#FF980020",
+  },
+  missingChipText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: "#FF9800",
+  },
+  missingChipTextActive: {
+    color: "#FF9800",
+  },
+  missingDotSmall: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "#FF9800",
   },
 });
