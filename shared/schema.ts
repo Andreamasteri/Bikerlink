@@ -897,8 +897,10 @@ export const motoClubInvites = pgTable("moto_club_invites", {
   userId: varchar("user_id", { length: 36 })
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
+  invitedBy: varchar("invited_by", { length: 36 }),
   status: varchar("status", { length: 20 }).notNull().default("pending"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("moto_club_invites_unique_idx").on(table.clubId, table.userId),
   index("moto_club_invites_user_idx").on(table.userId),
