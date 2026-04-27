@@ -81,6 +81,20 @@ const PlayerContext = createContext<PlayerContextType | null>(null);
 const FAVORITES_KEY = "player_favorite_stations";
 const SLEEP_KEY = "player_sleep_timer";
 
+const AUDIO_MODE_ACTIVE = {
+  allowsRecording: false,
+  playsInSilentMode: true,
+  shouldPlayInBackground: true,
+  interruptionMode: "duckOthers",
+} as const;
+
+const AUDIO_MODE_INACTIVE = {
+  allowsRecording: false,
+  playsInSilentMode: false,
+  shouldPlayInBackground: false,
+  interruptionMode: "duckOthers",
+} as const;
+
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [isAvailable, setIsAvailable] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -116,12 +130,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     let mounted = true;
     (async () => {
       try {
-        await setAudioModeAsync({
-          allowsRecording: false,
-          playsInSilentMode: true,
-          shouldPlayInBackground: true,
-          interruptionMode: "duckOthers",
-        });
+        await setAudioModeAsync(AUDIO_MODE_ACTIVE);
         if (mounted) setIsAvailable(true);
       } catch (err) {
         console.warn("[Player] Audio mode setup error:", err);
@@ -205,12 +214,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     try {
       destroyPlayer();
 
-      await setAudioModeAsync({
-        allowsRecording: false,
-        playsInSilentMode: true,
-        shouldPlayInBackground: true,
-        interruptionMode: "duckOthers",
-      });
+      await setAudioModeAsync(AUDIO_MODE_ACTIVE);
 
       if (gen !== loadGenRef.current) return;
 
@@ -260,12 +264,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     try {
       destroyPlayer();
     } catch (err) { console.warn("[Player] stop error:", err); }
-    setAudioModeAsync({
-      allowsRecording: false,
-      playsInSilentMode: false,
-      shouldPlayInBackground: false,
-      interruptionMode: "duckOthers",
-    }).catch((err) => console.warn("[Player] audio mode reset error:", err));
+    setAudioModeAsync(AUDIO_MODE_INACTIVE).catch((err) => console.warn("[Player] audio mode reset error:", err));
     setCurrentTrack(null);
     setQueue([]);
     queueRef.current = [];
