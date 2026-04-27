@@ -149,6 +149,24 @@ if [[ "$EBP" != '["arm64-v8a"]' ]]; then
 fi
 echo "  ✔  Config Android verificata: arm64-v8a only (gradle.properties + build.gradle + app.json)"
 
+# New Architecture assertion
+NA_LINE=$(grep -E "^newArchEnabled=" android/gradle.properties || echo "")
+if [[ "$NA_LINE" != "newArchEnabled=true" ]]; then
+  echo "  ✖  REGRESSIONE New Architecture rilevata in android/gradle.properties"
+  echo "     Atteso: newArchEnabled=true"
+  echo "     Trovato: $NA_LINE"
+  echo "     RN 0.82+ richiede New Architecture (hardcoded). Il flag deve essere true."
+  exit 1
+fi
+NA_EBP=$(node -e "const c=require('./app.json'); const p=(c.expo.plugins||[]).find(x=>Array.isArray(x)&&x[0]==='expo-build-properties'); process.stdout.write(p?String(p[1]?.android?.newArchEnabled??'MISSING'):'MISSING')")
+if [[ "$NA_EBP" != "true" ]]; then
+  echo "  ✖  REGRESSIONE New Architecture nel plugin expo-build-properties (app.json)"
+  echo "     Atteso: android.newArchEnabled = true"
+  echo "     Trovato: $NA_EBP"
+  exit 1
+fi
+echo "  ✔  New Architecture verificata: newArchEnabled=true (gradle.properties + app.json)"
+
 # ── 4. Log dell'evento ───────────────────────────────────────────────────────
 mkdir -p logs
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
