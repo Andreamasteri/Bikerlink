@@ -26,10 +26,13 @@ interface OtaErrorEntry {
   failCount: number;
   updateId: string;
   runtimeVersion: string;
+  phase?: string;
+  source?: string;
+  platform?: string;
   timestamp: string;
 }
 const otaErrors: OtaErrorEntry[] = [];
-const OTA_ERRORS_MAX = 50;
+const OTA_ERRORS_MAX = 100;
 
 interface StartupBeaconEntry {
   step: string;
@@ -98,11 +101,14 @@ function requireAdmin(req: Request, res: Response, next: Function) {
 
 router.post("/ota-error", (req: Request, res: Response) => {
   try {
-    const { error, failCount, updateId, runtimeVersion } = req.body as {
+    const { error, failCount, updateId, runtimeVersion, phase, source, platform } = req.body as {
       error?: string;
       failCount?: number;
       updateId?: string;
       runtimeVersion?: string;
+      phase?: string;
+      source?: string;
+      platform?: string;
     };
     if (!error) return res.status(400).json({ message: "error is required" });
     const entry: OtaErrorEntry = {
@@ -110,11 +116,17 @@ router.post("/ota-error", (req: Request, res: Response) => {
       failCount: typeof failCount === "number" ? failCount : 0,
       updateId: String(updateId ?? "unknown").substring(0, 64),
       runtimeVersion: String(runtimeVersion ?? "unknown").substring(0, 16),
+      phase: phase ? String(phase).substring(0, 24) : undefined,
+      source: source ? String(source).substring(0, 24) : undefined,
+      platform: platform ? String(platform).substring(0, 16) : undefined,
       timestamp: new Date().toISOString(),
     };
     otaErrors.push(entry);
     if (otaErrors.length > OTA_ERRORS_MAX) otaErrors.splice(0, otaErrors.length - OTA_ERRORS_MAX);
-    console.warn(`[OTA-ERROR] rv=${entry.runtimeVersion} uid=${entry.updateId} fail#${entry.failCount}: ${entry.error}`);
+    const isOk = entry.error.startsWith("ok:");
+    const tag = isOk ? "OTA-EVENT" : "OTA-ERROR";
+    const fn = isOk ? console.log : console.warn;
+    fn(`[${tag}] rv=${entry.runtimeVersion} uid=${entry.updateId} src=${entry.source ?? "?"} ph=${entry.phase ?? "?"} pf=${entry.platform ?? "?"} fail#${entry.failCount}: ${entry.error}`);
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ message: "Errore interno" });

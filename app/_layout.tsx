@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import * as Updates from "expo-updates";
 import Constants from "expo-constants";
+import { triggerOtaCheck } from "@/lib/ota-check";
 
 let Notifications: typeof import("expo-notifications") | null = null;
 try {
@@ -358,58 +359,18 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
 }
 
 function OtaStartupChecker() {
-  const lastCheckRef = useRef<number>(0);
-  const failCountRef = useRef<number>(0);
-
-  const runCheck = React.useCallback(async () => {
-    if (__DEV__ || Platform.OS === "web") return;
-    const now = Date.now();
-    const cooldown = failCountRef.current >= 3 ? 5 * 60_000 : 60_000;
-    if (now - lastCheckRef.current < cooldown) return;
-    lastCheckRef.current = now;
-    try {
-      if (__DEV__) console.log("[OTA] Checking for update...");
-      const check = await Updates.checkForUpdateAsync();
-      if (__DEV__) console.log("[OTA] isAvailable:", check.isAvailable);
-      if (!check.isAvailable) {
-        failCountRef.current = 0;
-        return;
-      }
-      if (__DEV__) console.log("[OTA] Fetching update...");
-      await Updates.fetchUpdateAsync();
-      if (__DEV__) console.log("[OTA] Reloading...");
-      await Updates.reloadAsync();
-    } catch (err) {
-      failCountRef.current += 1;
-      const errMsg = String(err);
-      if (__DEV__) console.warn(`[OTA] Tentativo ${failCountRef.current} fallito:`, errMsg);
-      try {
-        fetch(new URL("/api/admin/ota-error", getApiUrl()).toString(), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            error: errMsg,
-            failCount: failCountRef.current,
-            updateId: Updates.updateId ?? "embedded",
-            runtimeVersion: Updates.runtimeVersion ?? "unknown",
-          }),
-        }).catch(() => {});
-      } catch {
-        // fire-and-forget: mai bloccare per errori di reporting
-      }
-    }
-  }, []);
-
   useEffect(() => {
-    const timer = setTimeout(runCheck, 3000);
+    const timer = setTimeout(() => {
+      triggerOtaCheck("startup");
+    }, 3000);
     const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active") runCheck();
+      if (state === "active") triggerOtaCheck("appstate");
     });
     return () => {
       clearTimeout(timer);
       sub.remove();
     };
-  }, [runCheck]);
+  }, []);
 
   return null;
 }

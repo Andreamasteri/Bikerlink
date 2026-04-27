@@ -32,22 +32,28 @@ echo ""
 LAYOUT_FILE="app/_layout.tsx"
 PROFILE_FILE="app/(tabs)/profile.tsx"
 OTA_FILE="lib/ota.ts"
+OTA_CHECK_FILE="lib/ota-check.ts"
 
-# ── 1. STATIC IMPORT expo-updates in _layout.tsx ─────────────
-if grep -qE "^import \* as Updates from ['\"]expo-updates['\"]" "$LAYOUT_FILE"; then
+# ── 1. STATIC IMPORT expo-updates ─────────────
+# Le chiamate a Updates.* possono vivere in _layout.tsx (legacy) oppure
+# in lib/ota-check.ts (modulo dedicato dopo il refactor OTA-7).
+if grep -qE "^import \* as Updates from ['\"]expo-updates['\"]" "$LAYOUT_FILE" \
+   || ([ -f "$OTA_CHECK_FILE" ] && grep -qE "^import \* as Updates from ['\"]expo-updates['\"]" "$OTA_CHECK_FILE"); then
   ok "expo-updates: static import OK"
 else
-  fail "expo-updates deve essere importato staticamente in $LAYOUT_FILE"
+  fail "expo-updates deve essere importato staticamente in $LAYOUT_FILE o in $OTA_CHECK_FILE"
   info "  Atteso: import * as Updates from \"expo-updates\""
   info "  Verificare che NON sia un dynamic import (await import(...))"
 fi
 
 # ── 2. OTASTARTUPCHECKER — 3 chiamate obbligatorie ───────────
+# Cerchiamo i metodi sia nel layout che nel modulo dedicato.
 for CALL in "Updates.checkForUpdateAsync" "Updates.fetchUpdateAsync" "Updates.reloadAsync"; do
-  if grep -q "$CALL" "$LAYOUT_FILE"; then
+  if grep -q "$CALL" "$LAYOUT_FILE" \
+     || ([ -f "$OTA_CHECK_FILE" ] && grep -q "$CALL" "$OTA_CHECK_FILE"); then
     ok "OtaStartupChecker: $CALL OK"
   else
-    fail "OtaStartupChecker manca di '$CALL'. Il checker automatico è rotto."
+    fail "OtaStartupChecker manca di '$CALL' (cercato in $LAYOUT_FILE e $OTA_CHECK_FILE). Il checker automatico è rotto."
   fi
 done
 

@@ -5184,7 +5184,33 @@
     "apkBuildId": null,
     "apkVersionCode": 39,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-27T10:03:54.456Z"
+  },
+  {
+    "updateNumber": 7,
+    "version": "1.7.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-7 rv8.0.0: trigger OTA check on login + better error logging (phase/source/platform)",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "note": "Refactor OTA check in lib/ota-check.ts. Aggiunto trigger su login/register success (force, bypass cooldown, delay 1500ms) per evitare il caso 'app aperta da prima della pubblicazione → AppState mai cambiato → check non scatta'. Migliorato logging errori: phase (check/fetch/reload), source (startup/appstate/login/register), platform, currentUpdateId. Eventi 'ok:no-update'/'ok:fetched' segnalati come INFO. CURRENT_OTA_NUMBER=7.",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "f3f97b36-ea00-4e00-bd81-ba7fa6a63dae",
+    "bundleUrl": "private/ota/ota-1.7.0-1777289116068.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "85b736c9e8773da5023e792e0f683729b05c5d0d",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 40,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-27T11:25:18.856Z"
   }
 ]
