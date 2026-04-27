@@ -5288,7 +5288,33 @@
     "apkBuildId": null,
     "apkVersionCode": 40,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-27T12:02:59.715Z"
+  },
+  {
+    "updateNumber": 11,
+    "version": "1.11.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-11 rv8.0.0: AdminFetchError a livello modulo + reason hyphenated",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "note": "Task #1051 (rev. code review #3): (1) AdminFetchError + isAdminError spostati a livello modulo in app/admin/system.tsx — dichiararli dentro il componente faceva fallire instanceof tra render quando React Query restituisce un errore cached. isAdminError ora ha anche un fallback duck-type (e.name === 'AdminFetchError'). (2) server/routes/admin.ts: reason values hyphenated (no-session/user-not-found/not-admin/db-error) e sessionId truncato agli ultimi 6 caratteri (sid=…XXXXXX). CURRENT_OTA_NUMBER=11.",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "0da5b573-4897-486a-baf3-9dee3d157f88",
+    "bundleUrl": "private/ota/ota-1.11.0-1777291745306.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "a5fca97b9cfada106bac36bceefc8a3e089c26b0",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 40,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-27T12:09:08.333Z"
   }
 ]

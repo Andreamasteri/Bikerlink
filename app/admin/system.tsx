@@ -26,6 +26,27 @@ import {
   forceRecheck,
 } from "@/components/NativeUpdateChecker";
 
+// ── Module-scope per garantire identità stabile della classe tra i render.
+// Dichiarare AdminFetchError dentro il componente farebbe sì che `instanceof`
+// fallisca quando React Query restituisce un errore cached creato in un render
+// precedente con una classe ormai diversa.
+type AdminFetchErrorCode = "session_expired" | "forbidden" | "server_error" | "network";
+class AdminFetchError extends Error {
+  code: AdminFetchErrorCode;
+  status?: number;
+  reason?: string;
+  constructor(code: AdminFetchErrorCode, message: string, status?: number, reason?: string) {
+    super(message);
+    this.name = "AdminFetchError";
+    this.code = code;
+    this.status = status;
+    this.reason = reason;
+  }
+}
+const isAdminError = (e: unknown): e is AdminFetchError =>
+  e instanceof AdminFetchError ||
+  (e instanceof Error && e.name === "AdminFetchError" && "code" in e);
+
 interface OtaUpdateEntry {
   updateNumber: number;
   channel: string;
@@ -265,21 +286,6 @@ export default function SystemScreen() {
       setSavingNative(false);
     }
   }, [nativeAndroidLatest, nativeAndroidMin, nativeAndroidUrl, nativeIosLatest, nativeIosMin, nativeIosUrl]);
-
-  type AdminFetchErrorCode = "session_expired" | "forbidden" | "server_error" | "network";
-  class AdminFetchError extends Error {
-    code: AdminFetchErrorCode;
-    status?: number;
-    reason?: string;
-    constructor(code: AdminFetchErrorCode, message: string, status?: number, reason?: string) {
-      super(message);
-      this.name = "AdminFetchError";
-      this.code = code;
-      this.status = status;
-      this.reason = reason;
-    }
-  }
-  const isAdminError = (e: unknown): e is AdminFetchError => e instanceof AdminFetchError;
 
   const router = useRouter();
   const { sessionExpired, logoutMutation } = useAuth();
