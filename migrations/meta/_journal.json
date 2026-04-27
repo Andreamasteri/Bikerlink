@@ -48,7 +48,7 @@
       "idx": 6,
       "version": "7",
       "when": 1777670000000,
-      "tag": "0010_ota_events",
+      "tag": "0012_ota_events",
       "breakpoints": true
     }
   ]
