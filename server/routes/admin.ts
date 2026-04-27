@@ -3868,6 +3868,78 @@ router.get("/translations/download-docx", async (req: Request, res: Response) =>
 });
 
 
+router.get("/translations/table", async (_req: Request, res: Response) => {
+  try {
+    const itPath = path.resolve(process.cwd(), "lib/i18n/it.ts");
+    const raw = fs.readFileSync(itPath, "utf-8");
+
+    const keyMap: Record<string, { position: string; it: string }> = {};
+    const lineRegex = /^\s*"([^"]+)":\s*"((?:[^"\\]|\\.)*)"/;
+    for (const line of raw.split("\n")) {
+      const match = line.match(lineRegex);
+      if (match) {
+        const key = match[1];
+        const itText = match[2].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+        keyMap[key] = { position: buildKeyPositionLabel(key), it: itText };
+      }
+    }
+
+    const langValues: Record<string, Record<string, string>> = {};
+    for (const lang of Array.from(ALLOWED_LANGS)) {
+      langValues[lang] = {};
+      try {
+        const content = fs.readFileSync(LANG_FILE_MAP[lang], "utf-8");
+        const kvRegex = /^\s*"([^"]+)"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,?\s*$/gm;
+        let m: RegExpExecArray | null;
+        while ((m = kvRegex.exec(content)) !== null) {
+          const val = m[2].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+          langValues[lang][m[1]] = val;
+        }
+      } catch {
+        // file missing or unreadable, leave empty
+      }
+    }
+
+    const rows = Object.entries(keyMap).map(([key, val]) => ({
+      key,
+      position: val.position,
+      it: val.it,
+      en: langValues["en"][key] ?? "",
+      de: langValues["de"][key] ?? "",
+      es: langValues["es"][key] ?? "",
+      fr: langValues["fr"][key] ?? "",
+      el: langValues["el"][key] ?? "",
+      tr: langValues["tr"][key] ?? "",
+    }));
+
+    return res.json(rows);
+  } catch (error) {
+    console.error("[translations/table] error:", error);
+    return res.status(500).json({ message: "Errore durante il caricamento della tabella" });
+  }
+});
+
+router.patch("/translations/key", async (req: Request, res: Response) => {
+  try {
+    const { key, lang, value } = req.body as { key?: string; lang?: string; value?: string };
+    if (!key || typeof key !== "string") {
+      return res.status(400).json({ message: "key mancante" });
+    }
+    if (!lang || !ALLOWED_LANGS.has(lang)) {
+      return res.status(400).json({ message: "lang non valido (en, de, es, fr, el, tr)" });
+    }
+    if (typeof value !== "string" || value.trim().length === 0) {
+      return res.status(400).json({ message: "value mancante o vuoto" });
+    }
+    const filePath = LANG_FILE_MAP[lang];
+    const changed = applyTranslationsToFile(filePath, { [key]: value.trim() });
+    return res.json({ ok: true, changed });
+  } catch (error) {
+    console.error("[translations/key] error:", error);
+    return res.status(500).json({ message: "Errore durante il salvataggio" });
+  }
+});
+
 router.get("/coordinate-history/stats", async (_req: Request, res: Response) => {
   try {
     const stats = await storage.getCoordinateHistoryStats();

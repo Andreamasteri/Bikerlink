@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  FlatList,
+  TextInput,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -26,6 +28,27 @@ const LANGS = [
   { code: "el", label: "EL — Greco" },
   { code: "tr", label: "TR — Turco" },
 ];
+
+const TABLE_LANGS = [
+  { code: "en", label: "EN" },
+  { code: "de", label: "DE" },
+  { code: "es", label: "ES" },
+  { code: "fr", label: "FR" },
+  { code: "el", label: "EL" },
+  { code: "tr", label: "TR" },
+];
+
+type TableRow = {
+  key: string;
+  position: string;
+  it: string;
+  en: string;
+  de: string;
+  es: string;
+  fr: string;
+  el: string;
+  tr: string;
+};
 
 function StepCard({
   stepNumber,
@@ -113,6 +136,348 @@ function LangCheckbox({
       />
       <Text style={styles.checkboxLabel}>{label}</Text>
     </TouchableOpacity>
+  );
+}
+
+const COL_POSITION = 220;
+const COL_IT = 180;
+const COL_LANG = 170;
+
+function TableCell({
+  value,
+  width,
+  editable,
+  rowKey,
+  lang,
+  onSave,
+  cellState,
+  isEditing,
+  editDraft,
+  onStartEdit,
+  onDraftChange,
+}: {
+  value: string;
+  width: number;
+  editable: boolean;
+  rowKey: string;
+  lang?: string;
+  onSave?: (key: string, lang: string, value: string) => void;
+  cellState?: "saving" | "ok" | "error" | undefined;
+  isEditing?: boolean;
+  editDraft?: string;
+  onStartEdit?: () => void;
+  onDraftChange?: (v: string) => void;
+}) {
+  if (!editable) {
+    return (
+      <View style={[styles.tableCell, { width }]}>
+        <Text style={styles.tableCellText}>{value}</Text>
+      </View>
+    );
+  }
+
+  if (cellState === "saving") {
+    return (
+      <View style={[styles.tableCell, { width }, styles.tableCellSaving]}>
+        <ActivityIndicator size="small" color={Colors.accent} />
+      </View>
+    );
+  }
+
+  if (cellState === "ok") {
+    return (
+      <View style={[styles.tableCell, { width }, styles.tableCellOk]}>
+        <MaterialCommunityIcons name="check-circle" size={14} color="#4CAF50" />
+        <Text style={[styles.tableCellText, { color: "#4CAF50", flex: 1 }]}>{value}</Text>
+      </View>
+    );
+  }
+
+  if (cellState === "error") {
+    return (
+      <View style={[styles.tableCell, { width }, styles.tableCellError]}>
+        <MaterialCommunityIcons name="alert-circle" size={14} color="#F44336" />
+        <Text style={[styles.tableCellText, { color: "#F44336", flex: 1 }]}>{value}</Text>
+      </View>
+    );
+  }
+
+  if (isEditing) {
+    return (
+      <View style={[styles.tableCell, { width }, styles.tableCellEditing]}>
+        <TextInput
+          style={styles.tableCellInput}
+          value={editDraft}
+          onChangeText={onDraftChange}
+          onBlur={() => {
+            if (onSave && lang && editDraft !== undefined) {
+              onSave(rowKey, lang, editDraft);
+            }
+          }}
+          onSubmitEditing={() => {
+            if (onSave && lang && editDraft !== undefined) {
+              onSave(rowKey, lang, editDraft);
+            }
+          }}
+          multiline
+          autoFocus
+          blurOnSubmit={false}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <TouchableOpacity
+      style={[styles.tableCell, { width }, styles.tableCellTappable]}
+      onPress={onStartEdit}
+      activeOpacity={0.7}
+    >
+      <Text style={[styles.tableCellText, !value && styles.tableCellEmpty]}>
+        {value || "—"}
+      </Text>
+      <MaterialCommunityIcons name="pencil-outline" size={11} color={Colors.textSecondary} style={{ marginLeft: 2 }} />
+    </TouchableOpacity>
+  );
+}
+
+function LiveTableSection({ restartStatus, restartResult, onRestartPress }: {
+  restartStatus: StepStatus;
+  restartResult: string;
+  onRestartPress: () => void;
+}) {
+  const [activeLangs, setActiveLangs] = useState<Set<string>>(new Set(["en", "de", "es", "fr", "el", "tr"]));
+  const [tableData, setTableData] = useState<TableRow[]>([]);
+  const [loadingTable, setLoadingTable] = useState(false);
+  const [tableError, setTableError] = useState("");
+  const [editingCell, setEditingCell] = useState<{ key: string; lang: string } | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [cellStates, setCellStates] = useState<Record<string, "saving" | "ok" | "error">>({});
+
+  const loadTable = useCallback(async () => {
+    setLoadingTable(true);
+    setTableError("");
+    try {
+      const url = new URL("/api/admin/translations/table", getApiUrl());
+      const resp = await fetch(url.toString(), { credentials: "include" });
+      if (!resp.ok) throw new Error(`Errore ${resp.status}`);
+      const data: TableRow[] = await resp.json();
+      setTableData(data);
+    } catch (e: unknown) {
+      setTableError(e instanceof Error ? e.message : "Errore caricamento");
+    } finally {
+      setLoadingTable(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTable();
+  }, [loadTable]);
+
+  function toggleLang(code: string) {
+    setActiveLangs((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+  }
+
+  const handleStartEdit = useCallback((key: string, lang: string, currentValue: string) => {
+    setEditingCell({ key, lang });
+    setEditDraft(currentValue);
+  }, []);
+
+  const handleSave = useCallback(async (key: string, lang: string, value: string) => {
+    const cellKey = `${key}:${lang}`;
+    setEditingCell(null);
+
+    if (!value.trim()) return;
+
+    setCellStates((prev) => ({ ...prev, [cellKey]: "saving" }));
+    try {
+      const resp = await apiRequest("PATCH", "/api/admin/translations/key", { key, lang, value: value.trim() });
+      if (!resp.ok) throw new Error("Errore salvataggio");
+      setTableData((prev) =>
+        prev.map((row) =>
+          row.key === key ? { ...row, [lang]: value.trim() } : row
+        )
+      );
+      setCellStates((prev) => ({ ...prev, [cellKey]: "ok" }));
+      setTimeout(() => {
+        setCellStates((prev) => {
+          const next = { ...prev };
+          if (next[cellKey] === "ok") delete next[cellKey];
+          return next;
+        });
+      }, 2500);
+    } catch {
+      setCellStates((prev) => ({ ...prev, [cellKey]: "error" }));
+      setTimeout(() => {
+        setCellStates((prev) => {
+          const next = { ...prev };
+          if (next[cellKey] === "error") delete next[cellKey];
+          return next;
+        });
+      }, 3000);
+    }
+  }, []);
+
+  const activeLangList = TABLE_LANGS.filter((l) => activeLangs.has(l.code));
+  const totalWidth = COL_POSITION + COL_IT + activeLangList.length * COL_LANG;
+
+  const renderHeader = () => (
+    <View style={[styles.tableRow, styles.tableHeaderRow, { width: totalWidth }]}>
+      <View style={[styles.tableHeaderCell, { width: COL_POSITION }]}>
+        <Text style={styles.tableHeaderText}>Posizione</Text>
+      </View>
+      <View style={[styles.tableHeaderCell, { width: COL_IT }]}>
+        <Text style={styles.tableHeaderText}>IT</Text>
+      </View>
+      {activeLangList.map((l) => (
+        <View key={l.code} style={[styles.tableHeaderCell, { width: COL_LANG }]}>
+          <Text style={styles.tableHeaderText}>{l.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+
+  const renderRow = useCallback(({ item }: { item: TableRow }) => {
+    return (
+      <View style={[styles.tableRow, { width: totalWidth }]}>
+        <View style={[styles.tableCell, { width: COL_POSITION }]}>
+          <Text style={styles.tableCellKey} numberOfLines={2}>{item.position}</Text>
+          <Text style={styles.tableCellSubKey} numberOfLines={1}>{item.key}</Text>
+        </View>
+        <TableCell value={item.it} width={COL_IT} editable={false} rowKey={item.key} />
+        {activeLangList.map((l) => {
+          const cellKey = `${item.key}:${l.code}`;
+          const isEditing = editingCell?.key === item.key && editingCell?.lang === l.code;
+          const langVal = item[l.code as keyof TableRow] as string;
+          return (
+            <TableCell
+              key={l.code}
+              value={langVal}
+              width={COL_LANG}
+              editable
+              rowKey={item.key}
+              lang={l.code}
+              onSave={handleSave}
+              cellState={cellStates[cellKey]}
+              isEditing={isEditing}
+              editDraft={isEditing ? editDraft : undefined}
+              onStartEdit={() => handleStartEdit(item.key, l.code, langVal)}
+              onDraftChange={setEditDraft}
+            />
+          );
+        })}
+      </View>
+    );
+  }, [activeLangList, editingCell, editDraft, cellStates, handleSave, handleStartEdit, totalWidth]);
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <View style={[styles.stepBadge, { backgroundColor: Colors.accent }]}>
+          <MaterialCommunityIcons name="table-edit" size={16} color="#fff" />
+        </View>
+        <View style={styles.cardHeaderText}>
+          <Text style={styles.cardTitle}>Tabella Live</Text>
+          <Text style={styles.cardDesc}>Modifica singole traduzioni direttamente. Tocca una cella per editarla.</Text>
+        </View>
+      </View>
+
+      <View style={styles.langChipsRow}>
+        <View style={[styles.langChip, styles.langChipFixed]}>
+          <Text style={styles.langChipTextFixed}>IT</Text>
+        </View>
+        {TABLE_LANGS.map((l) => {
+          const active = activeLangs.has(l.code);
+          return (
+            <TouchableOpacity
+              key={l.code}
+              style={[styles.langChip, active && styles.langChipActive]}
+              onPress={() => toggleLang(l.code)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.langChipText, active && styles.langChipTextActive]}>{l.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <TouchableOpacity
+        style={[styles.button, loadingTable && styles.buttonDisabled]}
+        onPress={loadTable}
+        disabled={loadingTable}
+        activeOpacity={0.7}
+      >
+        {loadingTable ? (
+          <ActivityIndicator color="#fff" size="small" />
+        ) : (
+          <>
+            <MaterialCommunityIcons name="refresh" size={16} color="#fff" />
+            <Text style={styles.buttonText}>{tableData.length > 0 ? "Aggiorna Tabella" : "Carica Tabella"}</Text>
+          </>
+        )}
+      </TouchableOpacity>
+
+      {tableError ? (
+        <View style={[styles.resultBox, styles.resultBoxError]}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#F44336" />
+          <Text style={[styles.resultText, styles.resultTextError]}>{tableError}</Text>
+        </View>
+      ) : null}
+
+      {tableData.length > 0 ? (
+        <View style={styles.tableContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator>
+            <View>
+              {renderHeader()}
+              <FlatList
+                data={tableData}
+                renderItem={renderRow}
+                keyExtractor={(item) => item.key}
+                style={{ maxHeight: 520 }}
+                nestedScrollEnabled
+                removeClippedSubviews={false}
+              />
+            </View>
+          </ScrollView>
+        </View>
+      ) : null}
+
+      <View style={styles.sectionDivider} />
+
+      <TouchableOpacity
+        style={[styles.button, styles.buttonSecondary, restartStatus === "loading" && styles.buttonDisabled]}
+        onPress={onRestartPress}
+        disabled={restartStatus === "loading"}
+        activeOpacity={0.7}
+      >
+        {restartStatus === "loading" ? (
+          <ActivityIndicator color={Colors.accent} size="small" />
+        ) : (
+          <>
+            <MaterialCommunityIcons name="restart" size={16} color={Colors.accent} />
+            <Text style={styles.buttonSecondaryText}>Riavvia Backend</Text>
+          </>
+        )}
+      </TouchableOpacity>
+
+      {restartResult ? (
+        <View style={[styles.resultBox, restartStatus === "success" ? styles.resultBoxSuccess : styles.resultBoxError]}>
+          <MaterialCommunityIcons
+            name={restartStatus === "success" ? "check-circle-outline" : "alert-circle-outline"}
+            size={16}
+            color={restartStatus === "success" ? "#4CAF50" : "#F44336"}
+          />
+          <Text style={[styles.resultText, restartStatus === "success" ? styles.resultTextSuccess : styles.resultTextError]}>
+            {restartResult}
+          </Text>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -560,6 +925,12 @@ export default function TraduzioniScreen() {
           </View>
         </View>
       ) : null}
+
+      <LiveTableSection
+        restartStatus={restartStatus}
+        restartResult={restartResult}
+        onRestartPress={handleRestart}
+      />
     </ScrollView>
   );
 }
@@ -611,6 +982,12 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: "#fff", fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  buttonSecondary: {
+    backgroundColor: "transparent",
+    borderWidth: 1.5,
+    borderColor: Colors.accent,
+  },
+  buttonSecondaryText: { color: Colors.accent, fontSize: 14, fontFamily: "Inter_600SemiBold" },
   secondaryButton: {
     backgroundColor: "transparent",
     borderRadius: 10,
@@ -665,4 +1042,126 @@ const styles = StyleSheet.create({
   infoBannerText: { flex: 1 },
   infoBannerTitle: { fontSize: 13, color: Colors.text, fontFamily: "Inter_600SemiBold", marginBottom: 4 },
   infoBannerBody: { fontSize: 12, color: Colors.textSecondary, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  langChipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  langChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.background,
+  },
+  langChipActive: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent + "15",
+  },
+  langChipFixed: {
+    borderColor: Colors.textSecondary,
+    backgroundColor: Colors.surface,
+    opacity: 0.7,
+  },
+  langChipText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary,
+  },
+  langChipTextActive: {
+    color: Colors.accent,
+  },
+  langChipTextFixed: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary,
+  },
+  tableContainer: {
+    marginTop: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: "hidden",
+  },
+  tableRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  tableHeaderRow: {
+    backgroundColor: Colors.accent,
+  },
+  tableHeaderCell: {
+    padding: 8,
+    justifyContent: "center",
+    borderRightWidth: 1,
+    borderRightColor: "rgba(255,255,255,0.2)",
+  },
+  tableHeaderText: {
+    color: "#fff",
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+  },
+  tableCell: {
+    padding: 8,
+    justifyContent: "center",
+    borderRightWidth: 1,
+    borderRightColor: Colors.border,
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 4,
+  },
+  tableCellText: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.text,
+    flex: 1,
+  },
+  tableCellEmpty: {
+    color: Colors.textSecondary,
+    fontStyle: "italic",
+  },
+  tableCellKey: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.text,
+    lineHeight: 16,
+  },
+  tableCellSubKey: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  tableCellTappable: {
+    backgroundColor: "transparent",
+  },
+  tableCellEditing: {
+    backgroundColor: Colors.accent + "10",
+    padding: 4,
+  },
+  tableCellInput: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.text,
+    minHeight: 36,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    borderRadius: 4,
+    backgroundColor: Colors.background,
+  },
+  tableCellSaving: {
+    backgroundColor: Colors.accent + "08",
+  },
+  tableCellOk: {
+    backgroundColor: "#4CAF5010",
+  },
+  tableCellError: {
+    backgroundColor: "#F4433610",
+  },
 });
