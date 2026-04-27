@@ -770,6 +770,27 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] ota_releases:", e);
         }
 
+        // Startup cleanup: remove superseded/draft OTA releases older than 90 days
+        try {
+          const cleanupResult = await pool.query(
+            `DELETE FROM ota_releases
+             WHERE status IN ('superseded', 'draft')
+               AND published_at < NOW() - INTERVAL '90 days'
+             RETURNING id, version, status, published_at`
+          );
+          const deletedRows = cleanupResult.rows as Array<{ id: string; version: string; status: string; published_at: string }>;
+          if (deletedRows.length > 0) {
+            console.log(`[OTA-CLEANUP] Removed ${deletedRows.length} stale OTA release(s) older than 90 days:`);
+            for (const row of deletedRows) {
+              console.log(`  → id=${row.id} version=${row.version} status=${row.status} published_at=${row.published_at}`);
+            }
+          } else {
+            console.log("[OTA-CLEANUP] No stale OTA releases to remove at startup.");
+          }
+        } catch (e) {
+          console.warn("[OTA-CLEANUP] Startup OTA release cleanup failed:", e);
+        }
+
         try {
           await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_home_enabled BOOLEAN NOT NULL DEFAULT false`);
           await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS home_latitude DOUBLE PRECISION`);
@@ -1330,6 +1351,39 @@ function setupErrorHandler(app: express.Application) {
             setInterval(runRotate, 24 * 60 * 60 * 1000);
           }, 10 * 60 * 1000);
           console.log("[INIT] Phase 11.5 log rotation scheduled (10min delay, then every 24h)");
+        }
+
+        // Phase 12 — OTA release auto-cleanup every 24h
+        // Deletes rows with status IN ('superseded', 'draft') published more than 90 days ago.
+        // First run is delayed 15 minutes after boot to stagger with other maintenance jobs.
+        {
+          const runOtaCleanup = async () => {
+            try {
+              const result = await pool.query(
+                `DELETE FROM ota_releases
+                 WHERE status IN ('superseded', 'draft')
+                   AND published_at < NOW() - INTERVAL '90 days'
+                 RETURNING id, version, status, published_at`
+              );
+              const rows = result.rows as Array<{ id: string; version: string; status: string; published_at: string }>;
+              if (rows.length > 0) {
+                console.log(`[OTA-CLEANUP] Periodic: removed ${rows.length} stale OTA release(s) older than 90 days:`);
+                for (const row of rows) {
+                  console.log(`  → id=${row.id} version=${row.version} status=${row.status} published_at=${row.published_at}`);
+                }
+              } else {
+                console.log("[OTA-CLEANUP] Periodic: no stale OTA releases found.");
+              }
+            } catch (err) {
+              console.warn("[OTA-CLEANUP] Periodic cleanup error:", err);
+            }
+          };
+          // First run after 15 minutes, then every 24 hours
+          setTimeout(() => {
+            runOtaCleanup();
+            setInterval(runOtaCleanup, 24 * 60 * 60 * 1000);
+          }, 15 * 60 * 1000);
+          console.log("[INIT] Phase 12 OTA release auto-cleanup scheduled (15min delay, then every 24h)");
         }
       })().catch((err) => {
         console.error("[INIT] Startup phase chain error:", err);
