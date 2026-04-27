@@ -716,8 +716,22 @@ router.get("/map/pending-locations", requireAuth, async (req: Request, res: Resp
 router.get("/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const clubId = req.params.id;
+    const userId = req.session.userId!;
+
     const [club] = await db.select().from(motoClubs).where(eq(motoClubs.id, clubId)).limit(1);
     if (!club) return res.status(404).json({ message: "Club non trovato" });
+
+    // Only active members may access the full club record (member list + internal fields).
+    // Non-members must use GET /:id/public which returns a curated safe subset.
+    const [membership] = await db.select({ id: motoClubMembers.id })
+      .from(motoClubMembers)
+      .where(and(
+        eq(motoClubMembers.clubId, clubId),
+        eq(motoClubMembers.userId, userId),
+        eq(motoClubMembers.status, "active"),
+      ))
+      .limit(1);
+    if (!membership) return res.status(403).json({ message: "Non sei membro di questo club" });
 
     const membersRaw = await db.select({
       member: motoClubMembers,
