@@ -105,6 +105,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const repeatModeRef = useRef<RepeatMode>("off");
   const isPlayingRef = useRef(false);
   const sleepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadGenRef = useRef(0);
 
   useEffect(() => { queueRef.current = queue; }, [queue]);
   useEffect(() => { queueIndexRef.current = queueIndex; }, [queueIndex]);
@@ -142,6 +143,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       listenerRef.current?.remove();
       listenerRef.current = null;
+      try { playerRef.current?.pause(); } catch (err) { console.debug("[Player] unmount pause error:", err); }
       playerRef.current?.remove();
       playerRef.current = null;
     };
@@ -191,14 +193,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       listenerRef.current = null;
     }
     if (playerRef.current) {
+      try { playerRef.current.pause(); } catch (err) { console.debug("[Player] destroyPlayer pause error:", err); }
+      playerRef.current.loop = false;
       playerRef.current.remove();
       playerRef.current = null;
     }
   }, []);
 
   const loadAndPlay = useCallback(async (track: PlayerTrack, trackIndex: number) => {
+    const gen = ++loadGenRef.current;
     try {
       destroyPlayer();
+
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+        shouldPlayInBackground: true,
+        interruptionMode: "duckOthers",
+      });
+
+      if (gen !== loadGenRef.current) return;
 
       const player = createAudioPlayer({ uri: track.url });
       playerRef.current = player;
@@ -236,9 +250,22 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [play, pause]);
 
   const stop = useCallback(() => {
+    loadGenRef.current++;
+    if (sleepTimerRef.current) {
+      clearTimeout(sleepTimerRef.current);
+      sleepTimerRef.current = null;
+    }
+    setSleepTimerEnd(null);
+    setSleepTimerMinutes(null);
     try {
       destroyPlayer();
     } catch (err) { console.warn("[Player] stop error:", err); }
+    setAudioModeAsync({
+      allowsRecording: false,
+      playsInSilentMode: false,
+      shouldPlayInBackground: false,
+      interruptionMode: "duckOthers",
+    }).catch((err) => console.warn("[Player] audio mode reset error:", err));
     setCurrentTrack(null);
     setQueue([]);
     queueRef.current = [];
