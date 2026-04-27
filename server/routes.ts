@@ -368,12 +368,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(204).end();
       }
 
-      if (runtimeVersion && runtimeVersion !== _expectedRuntimeVersion) {
-        return res.status(204).end();
-      }
-
+      // The DB query filters by runtime_version, so no early-exit gate is needed here.
+      // Requests from any runtimeVersion cycle are served their own matching release (or 204).
+      const effectiveRv = runtimeVersion ?? _expectedRuntimeVersion;
       const result = await pool.query(
-        "SELECT * FROM ota_releases WHERE status = 'active' ORDER BY published_at DESC LIMIT 1"
+        "SELECT * FROM ota_releases WHERE status = 'active' AND runtime_version = $1 ORDER BY published_at DESC LIMIT 1",
+        [effectiveRv]
       );
 
       if (!result.rows.length) {

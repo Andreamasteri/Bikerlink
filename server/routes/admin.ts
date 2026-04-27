@@ -3548,11 +3548,12 @@ router.post("/ota/upload", otaUpload.single("bundle"), async (req: Request, res:
 
 router.post("/ota", async (req: Request, res: Response) => {
   try {
-    const { version, bundlePath, releaseNotes } = req.body;
+    const { version, bundlePath, releaseNotes, runtimeVersion } = req.body;
     if (!version || !bundlePath) return res.status(400).json({ message: "version e bundlePath obbligatori" });
+    if (!runtimeVersion) return res.status(400).json({ message: "runtimeVersion obbligatorio" });
     const result = await db.execute(sql`
-      INSERT INTO ota_releases (version, bundle_path, release_notes, status, created_by)
-      VALUES (${version}, ${bundlePath}, ${releaseNotes || null}, 'draft', ${req.session.userId!})
+      INSERT INTO ota_releases (version, runtime_version, bundle_path, release_notes, status, created_by)
+      VALUES (${version}, ${runtimeVersion}, ${bundlePath}, ${releaseNotes || null}, 'draft', ${req.session.userId!})
       RETURNING *
     `);
     return res.json(result.rows[0]);

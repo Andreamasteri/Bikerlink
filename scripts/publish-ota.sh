@@ -23,6 +23,19 @@ BACKEND_URL="${BIKERLINK_BACKEND_URL:-http://localhost:5000}"
 COOKIE_JAR="/tmp/ota-publish-cookies-$$.txt"
 DIST_DIR="dist-ota"
 
+RUNTIME_VERSION=$(node -e "
+  try {
+    const j = JSON.parse(require('fs').readFileSync('app.json','utf8'));
+    const rv = j?.expo?.runtimeVersion ?? null;
+    if (!rv) { console.error('runtimeVersion non trovato in app.json'); process.exit(1); }
+    process.stdout.write(rv);
+  } catch(e) { console.error('Impossibile leggere app.json: ' + e.message); process.exit(1); }
+" 2>&1)
+if [ $? -ne 0 ]; then
+  echo "   ERRORE: $RUNTIME_VERSION"
+  exit 1
+fi
+
 ADMIN_EMAIL="${BIKERLINK_ADMIN_EMAIL:-}"
 ADMIN_PASSWORD="${BIKERLINK_ADMIN_PASSWORD:-}"
 
@@ -165,9 +178,10 @@ echo "   Bundle URL: $BUNDLE_URL"
 # Step 5: Create release (draft) then publish explicitly
 echo "[5/6] Creazione release OTA..."
 NOTES_JSON=$(node -e "process.stdout.write(JSON.stringify(process.argv[1]))" -- "$RELEASE_NOTES")
+RV_JSON=$(node -e "process.stdout.write(JSON.stringify(process.argv[1]))" -- "$RUNTIME_VERSION")
 CREATE_RESPONSE=$(curl -s -H "Cookie: $SESSION_COOKIE" -H "X-Forwarded-Proto: https" -X POST "$BACKEND_URL/api/admin/ota" \
   -H "Content-Type: application/json" \
-  -d "{\"version\":\"$VERSION\",\"bundlePath\":\"$BUNDLE_URL\",\"releaseNotes\":$NOTES_JSON}")
+  -d "{\"version\":\"$VERSION\",\"runtimeVersion\":$RV_JSON,\"bundlePath\":\"$BUNDLE_URL\",\"releaseNotes\":$NOTES_JSON}")
 RELEASE_ID=$(echo "$CREATE_RESPONSE" | jq -r '.id // empty' 2>/dev/null)
 if [ -z "$RELEASE_ID" ]; then
   echo "   ERRORE creazione release: $CREATE_RESPONSE"

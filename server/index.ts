@@ -667,6 +667,27 @@ function setupErrorHandler(app: express.Application) {
             )
           `);
           await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_releases_status_idx ON ota_releases (status)`);
+          await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS runtime_version VARCHAR(50)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_releases_rv_status_idx ON ota_releases (runtime_version, status)`);
+          // Targeted backfill: set runtime_version only on the currently ACTIVE release
+          // if it has NULL runtime_version (i.e. published before this column existed).
+          // Historical releases from other cycles are intentionally left NULL — the strict
+          // runtime_version = $1 filter in /api/expo-updates will simply not serve them.
+          try {
+            const appJson = JSON.parse(fs.readFileSync(path.resolve("app.json"), "utf8"));
+            const currentRv: string = appJson?.expo?.runtimeVersion ?? "8.0.0";
+            const backfillResult = await db.execute(sql`
+              UPDATE ota_releases
+              SET runtime_version = ${currentRv}, updated_at = NOW()
+              WHERE status = 'active' AND runtime_version IS NULL
+            `);
+            const count = (backfillResult as { rowCount?: number }).rowCount ?? 0;
+            if (count > 0) {
+              console.log(`[MIGRATION] ota_releases: backfilled runtime_version='${currentRv}' on active release`);
+            }
+          } catch (backfillErr) {
+            console.warn("[MIGRATION] ota_releases backfill runtime_version:", backfillErr);
+          }
         } catch (e) {
           console.warn("[MIGRATION] ota_releases:", e);
         }

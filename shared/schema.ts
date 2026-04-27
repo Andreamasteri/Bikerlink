@@ -1076,6 +1076,7 @@ export const otaReleases = pgTable("ota_releases", {
     .primaryKey()
     .default(sql`gen_random_uuid()`),
   version: varchar("version", { length: 50 }).notNull(),
+  runtimeVersion: varchar("runtime_version", { length: 50 }),
   bundlePath: text("bundle_path"),
   releaseNotes: text("release_notes"),
   scheduledAt: timestamp("scheduled_at"),
@@ -1087,6 +1088,7 @@ export const otaReleases = pgTable("ota_releases", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   index("ota_releases_status_idx").on(table.status),
+  index("ota_releases_rv_status_idx").on(table.runtimeVersion, table.status),
 ]);
 
 export type OtaRelease = typeof otaReleases.$inferSelect;
