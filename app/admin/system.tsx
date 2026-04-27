@@ -17,7 +17,7 @@ import Colors from "@/constants/colors";
 import { useNavigation } from "expo-router";
 import Constants from "expo-constants";
 import otaUpdatesRaw from "@/ota-updates.json";
-import { getApiUrl } from "@/lib/query-client";
+import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import { evaluateUpdateOutcome, type UpdateOutcome } from "@/lib/semver";
 import {
   triggerSoftPreview,
@@ -265,9 +265,49 @@ export default function SystemScreen() {
     }
   }, [nativeAndroidLatest, nativeAndroidMin, nativeAndroidUrl, nativeIosLatest, nativeIosMin, nativeIosUrl]);
 
-  const { data, isLoading, isError, refetch, isFetching } = useQuery<SystemHealth>({
+  const { data, isLoading, error, refetch, isFetching } = useQuery<SystemHealth, Error & { code?: string; status?: number; reason?: string }>({
     queryKey: ["/api/admin/system-health"],
+    queryFn: async ({ signal }) => {
+      const url = new URL("/api/admin/system-health", getApiUrl());
+      let res: Response;
+      try {
+        res = await fetch(url.toString(), {
+          headers: authFetchHeaders(),
+          credentials: "include",
+          signal,
+        });
+      } catch (e: any) {
+        if (e?.name === "AbortError") throw e;
+        const err = new Error("network_unavailable") as Error & { code?: string };
+        err.code = "network";
+        throw err;
+      }
+      if (res.status === 401 || res.status === 403) {
+        let reason: string | undefined;
+        try {
+          const body = await res.json();
+          reason = body?.reason;
+        } catch {}
+        const err = new Error(res.status === 401 ? "session_expired" : "forbidden") as Error & { code?: string; status?: number; reason?: string };
+        err.code = res.status === 401 ? "session_expired" : "forbidden";
+        err.status = res.status;
+        err.reason = reason;
+        throw err;
+      }
+      if (!res.ok) {
+        const err = new Error(`server_${res.status}`) as Error & { code?: string; status?: number };
+        err.code = "server_error";
+        err.status = res.status;
+        throw err;
+      }
+      return (await res.json()) as SystemHealth;
+    },
     refetchInterval: 30000,
+    retry: (count, e: any) => {
+      const code = e?.code;
+      if (code === "session_expired" || code === "forbidden") return false;
+      return count < 2;
+    },
   });
 
   const { data: restartHistory } = useQuery<RestartHistory>({
@@ -337,11 +377,42 @@ export default function SystemScreen() {
     );
   }
 
-  if (isError || !data) {
+  if (error || !data) {
+    const code = (error as any)?.code as string | undefined;
+    const status = (error as any)?.status as number | undefined;
+    const reason = (error as any)?.reason as string | undefined;
+    let title = "Errore nel caricamento dei dati";
+    let hint = "";
+    let iconColor = "#FF4444";
+    if (code === "session_expired") {
+      title = "Sessione scaduta";
+      hint = "La tua sessione admin non è più valida. Torna alla home, esci e rientra con le credenziali admin per riaprire il monitor.";
+      iconColor = "#FFA500";
+    } else if (code === "forbidden") {
+      title = "Accesso non autorizzato";
+      hint = reason === "not_admin"
+        ? "Il tuo account non ha i permessi di amministratore."
+        : "Il server ha rifiutato la richiesta (403).";
+    } else if (code === "server_error") {
+      title = `Errore server (HTTP ${status ?? "?"})`;
+      hint = "Il backend ha risposto con un errore. Riprova tra qualche secondo o controlla i log di produzione.";
+    } else if (code === "network") {
+      title = "Server non raggiungibile";
+      hint = "Verifica la connessione e riprova.";
+    } else if (error?.message) {
+      hint = String(error.message);
+    } else {
+      hint = "Risposta vuota dal server.";
+    }
     return (
       <View style={[styles.center, { paddingTop: topPadding }]}>
-        <Ionicons name="warning-outline" size={40} color="#FF4444" />
-        <Text style={styles.errorText}>Errore nel caricamento dei dati</Text>
+        <Ionicons name="warning-outline" size={40} color={iconColor} />
+        <Text style={styles.errorText}>{title}</Text>
+        {hint ? (
+          <Text style={[styles.loadingText, { textAlign: "center", paddingHorizontal: 24, marginTop: 4 }]}>
+            {hint}
+          </Text>
+        ) : null}
         <TouchableOpacity style={styles.retryBtn} onPress={handleRefresh}>
           <Text style={styles.retryBtnText}>Riprova</Text>
         </TouchableOpacity>

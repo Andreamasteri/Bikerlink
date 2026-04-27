@@ -85,17 +85,28 @@ async function assignFakeUserToClubs(userId: string): Promise<ClubAssignStats> {
 }
 
 function requireAdmin(req: Request, res: Response, next: Function) {
+  const path = req.originalUrl || req.url;
+  const ua = (req.headers["user-agent"] || "").toString().slice(0, 80);
+  const hasBearer = !!req.headers.authorization;
+  const hasCookie = !!(req.headers.cookie && req.headers.cookie.includes("connect.sid="));
   if (!req.session.userId) {
-    return res.status(401).json({ message: "Non autenticato" });
+    console.warn(`[admin-auth] 401 no-session path=${path} bearer=${hasBearer} cookie=${hasCookie} ua="${ua}"`);
+    return res.status(401).json({ message: "Sessione scaduta. Effettua di nuovo l'accesso.", reason: "no_session" });
   }
   storage.getUser(req.session.userId).then((user) => {
-    if (!user || user.role !== "admin") {
-      return res.status(403).json({ message: "Accesso non autorizzato" });
+    if (!user) {
+      console.warn(`[admin-auth] 403 user-not-found path=${path} userId=${req.session.userId}`);
+      return res.status(403).json({ message: "Account non trovato.", reason: "user_not_found" });
+    }
+    if (user.role !== "admin") {
+      console.warn(`[admin-auth] 403 not-admin path=${path} userId=${user.id} role=${user.role}`);
+      return res.status(403).json({ message: "Accesso riservato agli amministratori.", reason: "not_admin" });
     }
     (req as any).currentUser = user;
     next();
-  }).catch(() => {
-    return res.status(500).json({ message: "Errore autenticazione admin" });
+  }).catch((err) => {
+    console.error(`[admin-auth] 500 db-error path=${path} userId=${req.session.userId}`, err);
+    return res.status(500).json({ message: "Errore autenticazione admin", reason: "db_error" });
   });
 }
 

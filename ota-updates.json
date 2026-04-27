@@ -5212,5 +5212,31 @@
     "apkUrl": null,
     "status": "published",
     "publishedAt": "2026-04-27T11:25:18.856Z"
+  },
+  {
+    "updateNumber": 8,
+    "version": "1.8.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-8 rv8.0.0: System Monitor — errori chiari (sessione/403/5xx) + log diagnostici admin",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "note": "Task #1051: il pulsante 'Riprova' nel pannello admin → System Monitor mostrava un errore generico anche quando la sessione era scaduta. Ora il fetch /api/admin/system-health distingue 401 (sessione scaduta), 403 (non admin), 5xx (errore server) e network. La schermata di errore mostra titolo, descrizione e azione corretta. Server: requireAdmin emette log [admin-auth] con motivo (no_session/not_admin/db_error) e include 'reason' nel JSON di risposta. CURRENT_OTA_NUMBER=8.",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "ed134c38-01d0-4d22-9894-74da9d572a02",
+    "bundleUrl": "private/ota/ota-1.8.0-1777290574878.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "7617b305b72e66e290a94955203b861deac5ae6d",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 40,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-04-27T11:49:59.840Z"
   }
 ]
