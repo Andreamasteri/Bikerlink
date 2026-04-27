@@ -143,12 +143,12 @@ outputType = "console"
 name = "APK Build Watch"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "CI=1 EAS_NO_VCS=1 EXPO_PUBLIC_DOMAIN=biker-link.replit.app npx eas-cli@18 build --platform android --profile release-apk --non-interactive --wait"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/build-apk.sh release-apk"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"

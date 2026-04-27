@@ -29,7 +29,7 @@ backend custom `https://biker-link.replit.app/api/expo-updates` (Expo Updates Pr
 - **Piattaforma**: Android only (iOS non supportato per OTA)
 - **Canale EAS**: `preview`
 - **Runtime Version**: `8.0.0` (ciclo corrente, APK v41) ← CICLO V3
-- **APK corrente**: versionCode **41**, versionName **3.0.0** (build inviata 2026-04-27T13:40Z — buildId: `b754683e-75b0-49b5-b246-b534d0a55585`, EAS: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/b754683e-75b0-49b5-b246-b534d0a55585 — build in corso, APK URL da aggiornare dopo completamento)
+- **APK corrente**: versionCode **41**, versionName **3.0.0** (buildId: `e03f51d8-9f2b-496f-bba2-e0fe90b69fb7`, EAS: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7, APK: https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk — completata 2026-04-27, arm64-v8a + NewArch + expo-audio, OTA-13 inclusa)
 - **APK precedente (v40)**: versionCode **40**, versionName **3.0.0** (buildId: `ba5205c6-0cc8-41ce-ba8c-8e68a117dabf`, APK: https://expo.dev/artifacts/eas/p1rG9wd7hZg7oPG1WEc4kM.apk)
 - **OTA corrente**: OTA-13 rv8.0.0 (bundle custom attivo — EAS Updates dismesso, Task #980)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates` (Expo Updates Protocol v1)
@@ -233,7 +233,7 @@ Questo previene lacune documentali come quella di APK v37 (build ID mai registra
 - Ciclo 8.x: OTA 1–13 (APK versionCode 39–41, rv 8.0.0) ← CORRENTE (V3)
   - APK v39: STABILE — versionName 3.0.0, buildId: b167f108-813d-4981-893a-2896c0268a5b (completata 2026-04-26T12:35Z), APK: https://expo.dev/artifacts/eas/nUADFAf6ddBUzcbZMjKBxR.apk
   - APK v40: STABILE — versionName 3.0.0, buildId: ba5205c6-0cc8-41ce-ba8c-8e68a117dabf, APK: https://expo.dev/artifacts/eas/p1rG9wd7hZg7oPG1WEc4kM.apk
-  - APK v41: IN BUILD — versionName 3.0.0, buildId: b754683e-75b0-49b5-b246-b534d0a55585 (inviata 2026-04-27T13:40Z), APK URL da aggiornare — arm64-v8a + NewArch + OTA-13 inclusa
+  - APK v41: STABILE — versionName 3.0.0, buildId: e03f51d8-9f2b-496f-bba2-e0fe90b69fb7, APK: https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk (completata 2026-04-27) — arm64-v8a + NewArch + expo-audio (expo-av rimosso Task #1052) + OTA-13
 
 ## ⚠️ ANALISI ARCHITETTURA (DEFINITIVA)
 React Native 0.82+ ha rimosso il supporto Old Architecture. Il flag newArchEnabled=false
