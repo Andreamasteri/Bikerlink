@@ -5340,7 +5340,32 @@
     "apkBuildId": null,
     "apkVersionCode": 40,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-27T12:14:14.037Z"
+  },
+  {
+    "updateNumber": 13,
+    "version": "1.13.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-13 rv8.0.0: persistenza eventi OTA su DB + bottone Forza controllo OTA + invalidate cache hash post-publish",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "note": "Task #1050: nuova tabella ota_events per persistere telemetria OTA dei dispositivi (sopravvive ai riavvii del backend), GET /api/admin/ota-events admin-only, POST /api/admin/ota-error con rate limit 60/min/IP. Pannello admin: nuova card 'Aggiornamenti OTA' con bottone 'Forza controllo OTA' (runManualOtaCheck force:true) + lista eventi server-side con refresh 10s. Backend: app.locals.invalidateExpoUpdateHash invocato dentro POST /ota/:id/publish per evitare hash stantii dopo ripubblicazioni (causa root del fermo a OTA-4). /api/expo-updates?debug=1 admin-only logga ota_events canonici (phase=server-check, source=server) anche su 204/304. CURRENT_OTA_NUMBER=13.",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "3e4494e06a5b8f85c2e02bff92384e6348fdb21c",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkVersionCode": 40,
+    "apkUrl": null,
+    "status": "pending"
   }
 ]
