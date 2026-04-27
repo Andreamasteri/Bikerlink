@@ -52,10 +52,6 @@ args = "Error Monitor"
 task = "workflow.run"
 args = "ota-guard"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "APK Build Watch"
-
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -138,17 +134,6 @@ args = "SKIP_LIVE_CHECK=1 bash scripts/validate-ota.sh"
 
 [workflows.workflow.metadata]
 outputType = "console"
-
-[[workflows.workflow]]
-name = "APK Build Watch"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/build-apk.sh release-apk"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
