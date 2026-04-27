@@ -56,7 +56,18 @@ fi
 echo "  ✔  Autorizzazione trovata — file eliminato (token monouso)"
 rm -f "$AUTH_FILE"
 
-# ── 2a. Guardia migrazioni DB (primo step post-auth) ────────────────────────
+# ── 2a. Pre-build change detector ───────────────────────────────────────────
+echo "  Avvio controllo variazioni dall'ultima build riuscita..."
+if bash scripts/pre-build-check.sh; then
+  echo "  ✔  Pre-build check completato"
+else
+  echo ""
+  echo "  ✖  BUILD BLOCCATA — expo-doctor ha rilevato problemi critici."
+  echo "  Esegui 'npx expo-doctor@latest' per i dettagli e correggi prima di buildare."
+  exit 1
+fi
+
+# ── 2b. Guardia migrazioni DB (primo step post-auth) ────────────────────────
 echo "  Avvio verifica schema DB vs migrazioni Phase 1..."
 if bash scripts/db-migration-guard.sh; then
   echo "  ✔  Guardia migrazioni DB superata"
@@ -204,6 +215,11 @@ if [ $BUILD_EXIT -eq 0 ]; then
   echo "$TIMESTAMP  APK BUILD INVIATA (--no-wait) — profilo=$PROFILE commit=$COMMIT utente=$AUTHORIZED_BY" >> "$LOG_FILE"
   echo ""
   echo "  ✅ Build inviata ai server EAS — controlla https://expo.dev per lo stato."
+  echo ""
+  echo "  Salvataggio snapshot build (per pre-build-check prossima run)..."
+  bash scripts/save-build-snapshot.sh "" "" 2>/dev/null || true
+  echo "  ⚠  Ricorda: dopo che EAS completa la build, aggiorna lo snapshot con:"
+  echo "     bash scripts/save-build-snapshot.sh <BUILD_ID> <APK_URL>"
 else
   echo "$TIMESTAMP  APK BUILD FALLITA (exit=$BUILD_EXIT) — profilo=$PROFILE commit=$COMMIT utente=$AUTHORIZED_BY" >> "$LOG_FILE"
   echo ""

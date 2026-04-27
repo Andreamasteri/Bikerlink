@@ -166,6 +166,32 @@ Dopo APK v38 installato sui dispositivi: gli aggiornamenti OTA sono completament
 - I nuovi installati con APK v38 riceveranno tutti gli aggiornamenti via backend custom
 - I dispositivi su OTA-152 (APK v37) necessitano di reinstallare APK v38 manualmente
 
+## 🔍 Pre-Build Change Detector (Task #1052 lesson learned)
+
+Prima di ogni build APK, lo script `build-apk.sh` esegue automaticamente
+`scripts/pre-build-check.sh` che confronta lo stato corrente con l'ultima
+snapshot di build riuscita (`.local/build-snapshot.json`).
+
+Il check rileva automaticamente:
+- Versioni dei pacchetti critici cambiate (expo, react-native, expo-audio, ecc.)
+- EAS CLI aggiornata tra una build e l'altra
+- Patch files aggiunte/rimosse (un patch dimenticato blocca l'install!)
+- Peer dependency mancanti (expo-doctor)
+- Cambiamenti Node.js
+
+**Dopo ogni build riuscita**, aggiorna la snapshot con:
+```bash
+bash scripts/save-build-snapshot.sh <BUILD_ID> <APK_URL>
+```
+
+**Per controllare variazioni manualmente** (senza avviare la build):
+```bash
+bash scripts/pre-build-check.sh         # solo report, non blocca
+bash scripts/pre-build-check.sh --strict # blocca se ci sono warning
+```
+
+Le snapshot archiviate sono in `.local/build-snapshots-archive/`.
+
 ## 🏗️ Build APK — default dimagrito (Task #1017)
 
 Da Task #1017 in poi, **ogni build APK BikerLink usa il profilo dimagrito di default**:
