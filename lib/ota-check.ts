@@ -3,7 +3,14 @@ import { Platform } from "react-native";
 import { getApiUrl } from "@/lib/query-client";
 
 export type OtaTriggerSource = "startup" | "appstate" | "login" | "register" | "manual";
-export type OtaPhase = "check" | "fetch" | "reload" | "no-update" | "fetch-not-new" | "fetched";
+export type OtaPhase = "check" | "fetch" | "reload" | "no-update" | "fetch-not-new" | "fetched" | "skipped";
+
+export interface OtaManualResult {
+  ok: boolean;
+  phase: OtaPhase;
+  error?: string;
+  skipped?: "dev" | "web";
+}
 
 let lastCheckAt = 0;
 let consecutiveFailures = 0;
@@ -40,16 +47,19 @@ function reportOtaEvent(payload: {
 export async function triggerOtaCheck(
   source: OtaTriggerSource,
   options?: { force?: boolean; delayMs?: number },
-): Promise<void> {
-  if (__DEV__ || Platform.OS === "web") return;
+): Promise<OtaManualResult> {
+  if (__DEV__) return { ok: false, phase: "skipped", skipped: "dev" };
+  if (Platform.OS === "web") return { ok: false, phase: "skipped", skipped: "web" };
   if (options?.delayMs && options.delayMs > 0) {
     await new Promise((r) => setTimeout(r, options.delayMs));
   }
-  if (inFlight) return;
+  if (inFlight) return { ok: false, phase: "check", error: "already in flight" };
 
   const now = Date.now();
   const cooldown = consecutiveFailures >= 3 ? COOLDOWN_AFTER_FAILURES_MS : COOLDOWN_NORMAL_MS;
-  if (!options?.force && now - lastCheckAt < cooldown) return;
+  if (!options?.force && now - lastCheckAt < cooldown) {
+    return { ok: false, phase: "check", error: "cooldown" };
+  }
 
   inFlight = true;
   lastCheckAt = now;
@@ -63,7 +73,7 @@ export async function triggerOtaCheck(
     if (!check.isAvailable) {
       consecutiveFailures = 0;
       reportOtaEvent({ phase: "no-update", source, currentUpdateId, runtimeVersion });
-      return;
+      return { ok: true, phase: "no-update" };
     }
 
     phase = "fetch";
@@ -71,13 +81,15 @@ export async function triggerOtaCheck(
     if (!fetched.isNew) {
       consecutiveFailures = 0;
       reportOtaEvent({ phase: "fetch-not-new", source, currentUpdateId, runtimeVersion });
-      return;
+      return { ok: true, phase: "fetch-not-new" };
     }
 
     reportOtaEvent({ phase: "fetched", source, currentUpdateId, runtimeVersion });
 
     phase = "reload";
     await Updates.reloadAsync();
+    // reloadAsync non ritorna sotto normali condizioni — l'app si riavvia.
+    return { ok: true, phase: "reload" };
   } catch (err) {
     consecutiveFailures += 1;
     const errMsg = `[${phase}/${source}] ${String(err)}`;
@@ -89,9 +101,18 @@ export async function triggerOtaCheck(
       error: errMsg,
       failCount: consecutiveFailures,
     });
+    return { ok: false, phase, error: errMsg };
   } finally {
     inFlight = false;
   }
+}
+
+/**
+ * Trigger manuale dal pannello admin: bypassa il cooldown e ritorna l'esito
+ * sincronizzato (così la UI può mostrare un toast con phase + eventuale errore).
+ */
+export async function runManualOtaCheck(): Promise<OtaManualResult> {
+  return triggerOtaCheck("manual", { force: true });
 }
 
 export function resetOtaCooldown() {

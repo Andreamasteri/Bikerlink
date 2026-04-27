@@ -25,6 +25,7 @@ import {
   triggerForcedPreview,
   forceRecheck,
 } from "@/components/NativeUpdateChecker";
+import { runManualOtaCheck } from "@/lib/ota-check";
 
 // ── Module-scope per garantire identità stabile della classe tra i render.
 // Dichiarare AdminFetchError dentro il componente farebbe sì che `instanceof`
@@ -78,6 +79,25 @@ interface OtaErrorEntry {
   updateId: string;
   runtimeVersion: string;
   timestamp: string;
+}
+
+interface OtaEventRow {
+  id: string;
+  created_at: string;
+  phase: string;
+  source: string | null;
+  platform: string | null;
+  runtime_version: string | null;
+  current_update_id: string | null;
+  release_id: string | null;
+  error: string | null;
+  fail_count: number;
+  ip: string | null;
+}
+
+interface OtaEventsResponse {
+  events: OtaEventRow[];
+  limit: number;
 }
 
 interface SystemHealth {
@@ -358,6 +378,41 @@ export default function SystemScreen() {
     refetchInterval: 60000,
   });
 
+  const {
+    data: otaEventsData,
+    refetch: refetchOtaEvents,
+    isFetching: isFetchingOtaEvents,
+  } = useQuery<OtaEventsResponse>({
+    queryKey: ["/api/admin/ota-events"],
+    refetchInterval: 10000,
+  });
+
+  const [isManualOtaRunning, setIsManualOtaRunning] = useState(false);
+  const handleManualOtaCheck = useCallback(async () => {
+    setIsManualOtaRunning(true);
+    try {
+      const result = await runManualOtaCheck();
+      if (result.skipped === "dev") {
+        Alert.alert("OTA non disponibile", "Il check OTA è disabilitato in modalità sviluppo.");
+      } else if (result.skipped === "web") {
+        Alert.alert("OTA non disponibile", "Il check OTA è disabilitato sul web.");
+      } else if (result.ok) {
+        Alert.alert(
+          "Check OTA completato",
+          `Esito: ${result.phase}` + (result.phase === "reload" ? "\nL'app sta per ricaricarsi." : ""),
+        );
+      } else {
+        Alert.alert("Check OTA fallito", `Phase: ${result.phase}\n${result.error ?? "Errore sconosciuto"}`);
+      }
+      // Aggiorna la lista eventi (anche in caso di errore: l'evento è stato loggato).
+      setTimeout(() => { refetchOtaEvents(); }, 800);
+    } catch (e) {
+      Alert.alert("Errore", `Impossibile avviare il check OTA: ${String(e)}`);
+    } finally {
+      setIsManualOtaRunning(false);
+    }
+  }, [refetchOtaEvents]);
+
   const mergedEvents = useMemo<SystemEvent[]>(() => {
     const backendEvents: SystemEvent[] = data?.events ?? [];
     const otaEvents: SystemEvent[] = otaUpdates
@@ -565,6 +620,68 @@ export default function SystemScreen() {
               ))}
             </View>
           )}
+
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="cloud-done-outline" size={18} color={Colors.accent} />
+              <Text style={styles.cardTitle}>Aggiornamenti OTA</Text>
+              <View style={[styles.badge, { backgroundColor: Colors.accent }]}>
+                <Text style={styles.badgeText}>{otaEventsData?.events.length ?? 0}</Text>
+              </View>
+              <TouchableOpacity onPress={() => refetchOtaEvents()} disabled={isFetchingOtaEvents} style={{ marginLeft: 8 }}>
+                {isFetchingOtaEvents ? (
+                  <ActivityIndicator size="small" color={Colors.accent} />
+                ) : (
+                  <Ionicons name="refresh" size={18} color={Colors.accent} />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.actionBtnWide, isManualOtaRunning && { opacity: 0.6 }]}
+              onPress={handleManualOtaCheck}
+              disabled={isManualOtaRunning}
+              testID="force-ota-check-btn"
+            >
+              {isManualOtaRunning ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="cloud-download-outline" size={16} color="#fff" />
+                  <Text style={styles.actionBtnText}>Forza controllo OTA</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <Text style={styles.hintText}>
+              Bypassa il cooldown e contatta /api/expo-updates. L&apos;esito viene loggato in DB e mostrato sotto.
+            </Text>
+
+            {(otaEventsData?.events ?? []).length === 0 ? (
+              <Text style={[styles.hintText, { marginTop: 12 }]}>Nessun evento OTA registrato.</Text>
+            ) : (
+              (otaEventsData?.events ?? []).slice(0, 100).map((e) => {
+                const isErr = !!e.error && !e.error.startsWith("ok:");
+                const color = isErr ? "#FF4444" : "#44AA44";
+                const icon: keyof typeof Ionicons.glyphMap = isErr ? "alert-circle-outline" : "checkmark-circle-outline";
+                return (
+                  <View key={e.id} style={styles.restartRow}>
+                    <Ionicons name={icon} size={14} color={color} />
+                    <View style={{ flex: 1, marginLeft: 6 }}>
+                      <Text style={[styles.restartReason, { fontSize: 11 }]} numberOfLines={2}>
+                        {e.phase}{e.source ? ` · ${e.source}` : ""}{e.platform ? ` · ${e.platform}` : ""}
+                        {e.error ? ` — ${e.error}` : ""}
+                      </Text>
+                      <Text style={styles.restartTime}>
+                        rv={e.runtime_version ?? "?"} · uid={(e.current_update_id ?? "?").substring(0, 12)}
+                        {e.release_id ? ` · rel=${e.release_id.substring(0, 8)}` : ""}
+                        {e.fail_count > 0 ? ` · fail#${e.fail_count}` : ""} · {formatTimestamp(e.created_at)}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </View>
 
           <View style={styles.card}>
             <View style={styles.cardHeader}>

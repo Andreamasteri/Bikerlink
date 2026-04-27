@@ -7,7 +7,7 @@ import bcrypt from "bcryptjs";
 import { uploadBuffer, objectExists } from "../objectStorage";
 import { storage } from "../storage";
 import { db } from "../db";
-import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots } from "@shared/schema";
+import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents } from "@shared/schema";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { eq, and, ne, desc, sql, count, notExists, inArray, lte, isNull, or, ilike } from "drizzle-orm";
 import { sendEmail } from "../email";
@@ -109,8 +109,46 @@ function requireAdmin(req: Request, res: Response, next: Function) {
   });
 }
 
-router.post("/ota-error", (req: Request, res: Response) => {
+// Retention massima righe ota_events (cleanup soft a ogni inserimento).
+const OTA_EVENTS_DB_RETENTION = 1000;
+
+function clientIp(req: Request): string | undefined {
+  const fwd = req.headers["x-forwarded-for"];
+  if (typeof fwd === "string") return fwd.split(",")[0]?.trim().substring(0, 64);
+  return (req.ip || req.socket?.remoteAddress || "").toString().substring(0, 64) || undefined;
+}
+
+// Rate limiter in-memory per /ota-error (endpoint pubblico): max 60 req/60s/IP.
+// Mappa IP -> array di timestamp (ms). Cleanup probabilistico inline.
+const otaErrorRateMap = new Map<string, number[]>();
+const OTA_ERROR_RATE_WINDOW_MS = 60_000;
+const OTA_ERROR_RATE_MAX = 60;
+function checkOtaErrorRate(ip: string | undefined): boolean {
+  if (!ip) return true; // Senza IP non blocchiamo (proxy mal configurato).
+  const now = Date.now();
+  const arr = otaErrorRateMap.get(ip) ?? [];
+  const fresh = arr.filter((t) => now - t < OTA_ERROR_RATE_WINDOW_MS);
+  if (fresh.length >= OTA_ERROR_RATE_MAX) {
+    otaErrorRateMap.set(ip, fresh);
+    return false;
+  }
+  fresh.push(now);
+  otaErrorRateMap.set(ip, fresh);
+  // Cleanup probabilistico mappa (evita crescita illimitata).
+  if (Math.random() < 0.01 && otaErrorRateMap.size > 500) {
+    for (const [k, v] of otaErrorRateMap) {
+      if (v.every((t) => now - t > OTA_ERROR_RATE_WINDOW_MS)) otaErrorRateMap.delete(k);
+    }
+  }
+  return true;
+}
+
+router.post("/ota-error", async (req: Request, res: Response) => {
   try {
+    const ip = clientIp(req);
+    if (!checkOtaErrorRate(ip)) {
+      return res.status(429).json({ message: "Troppi eventi OTA: rallenta." });
+    }
     const { error, failCount, updateId, runtimeVersion, phase, source, platform } = req.body as {
       error?: string;
       failCount?: number;
@@ -131,15 +169,64 @@ router.post("/ota-error", (req: Request, res: Response) => {
       platform: platform ? String(platform).substring(0, 16) : undefined,
       timestamp: new Date().toISOString(),
     };
+    // Tieni l'array in memoria come fallback per /system-health (UI legacy).
     otaErrors.push(entry);
     if (otaErrors.length > OTA_ERRORS_MAX) otaErrors.splice(0, otaErrors.length - OTA_ERRORS_MAX);
     const isOk = entry.error.startsWith("ok:");
     const tag = isOk ? "OTA-EVENT" : "OTA-ERROR";
     const fn = isOk ? console.log : console.warn;
     fn(`[${tag}] rv=${entry.runtimeVersion} uid=${entry.updateId} src=${entry.source ?? "?"} ph=${entry.phase ?? "?"} pf=${entry.platform ?? "?"} fail#${entry.failCount}: ${entry.error}`);
+
+    // Persisti su DB (sopravvive ai riavvii del backend).
+    try {
+      await db.insert(otaEvents).values({
+        phase: (entry.phase ?? "unknown").substring(0, 32),
+        source: entry.source?.substring(0, 32),
+        platform: entry.platform?.substring(0, 16),
+        runtimeVersion: entry.runtimeVersion.substring(0, 32),
+        currentUpdateId: entry.updateId.substring(0, 64),
+        error: entry.error,
+        failCount: entry.failCount,
+        ip: clientIp(req),
+      });
+      // Retention soft: cleanup probabilistico (~1/50 insert) per evitare
+      // contention DB sotto burst di traffico (l'endpoint è pubblico).
+      if (Math.random() < 0.02) {
+        await db.execute(sql`
+          DELETE FROM ota_events
+          WHERE id IN (
+            SELECT id FROM ota_events
+            ORDER BY created_at DESC
+            OFFSET ${OTA_EVENTS_DB_RETENTION}
+          )
+        `).catch(() => {});
+      }
+    } catch (dbErr) {
+      console.error("[OTA-EVENT] DB insert failed:", dbErr);
+    }
+
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// GET /api/admin/ota-events?limit=100 — Lista eventi OTA persistiti su DB
+// (ordinati dal più recente). Protetto dal middleware admin (registrato a valle).
+router.get("/ota-events", async (req: Request, res: Response) => {
+  try {
+    const limitRaw = parseInt(String(req.query.limit ?? "100"), 10);
+    const limit = Math.min(Math.max(isNaN(limitRaw) ? 100 : limitRaw, 1), 500);
+    const result = await db.execute(sql`
+      SELECT id, created_at, phase, source, platform, runtime_version, current_update_id, release_id, error, fail_count, ip
+      FROM ota_events
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `);
+    return res.json({ events: result.rows, limit });
+  } catch (err) {
+    console.error("[OTA-EVENTS] read error:", err);
+    return res.status(500).json({ message: "Errore lettura eventi OTA" });
   }
 });
 
@@ -3596,6 +3683,31 @@ router.post("/ota/:id/publish", async (req: Request, res: Response) => {
       RETURNING *
     `);
     if (!result.rows.length) return res.status(404).json({ message: "Release non trovata" });
+    // Invalida l'intera cache hash dei manifest /api/expo-updates: la release
+    // appena pubblicata potrebbe avere lo stesso releaseId di una entry vecchia
+    // (impossibile in pratica, UUID), ma soprattutto rimuove vecchie inactive
+    // che restavano in cache occupando memoria. Best-effort.
+    try {
+      const inv = (req.app as any).locals?.invalidateExpoUpdateHash;
+      if (typeof inv === "function") inv();
+    } catch (e) {
+      console.error("[OTA] cache invalidate failed:", e);
+    }
+    // Logga l'evento di publish nella timeline ota_events.
+    try {
+      const row = result.rows[0] as { id?: string; runtime_version?: string; version?: string };
+      await db.insert(otaEvents).values({
+        phase: "admin-publish",
+        source: "admin",
+        platform: "android",
+        runtimeVersion: (row.runtime_version ?? "?").substring(0, 32),
+        releaseId: row.id ? String(row.id).substring(0, 64) : undefined,
+        error: `ok:published version=${row.version ?? "?"}`,
+        failCount: 0,
+      });
+    } catch (e) {
+      console.error("[OTA] event log on publish failed:", e);
+    }
     return res.json(result.rows[0]);
   } catch (error) {
     console.error("[OTA] Publish error:", error);

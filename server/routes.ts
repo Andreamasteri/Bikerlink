@@ -356,6 +356,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // In-memory SHA-256 cache: releaseId → base64url hash
   const _expoUpdateHashCache = new Map<string, string>();
 
+  // Esposto al router admin per invalidare la cache dopo publish/rollback.
+  // L'admin chiama app.locals.invalidateExpoUpdateHash(id?) — se omesso, svuota tutto.
+  (app as any).locals.invalidateExpoUpdateHash = (releaseId?: string) => {
+    if (releaseId) {
+      const had = _expoUpdateHashCache.delete(releaseId);
+      console.log(`[expo-updates] cache invalidate id=${releaseId} hit=${had}`);
+    } else {
+      const size = _expoUpdateHashCache.size;
+      _expoUpdateHashCache.clear();
+      console.log(`[expo-updates] cache invalidate ALL (cleared ${size} entries)`);
+    }
+  };
+
   // Read the expected runtimeVersion from app.json once at startup so that
   // bumping the cycle in app.json automatically updates this endpoint too.
   const _expectedRuntimeVersion: string = (() => {
@@ -368,6 +381,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   })();
 
   app.get("/api/expo-updates", async (req: Request, res: Response) => {
+    const debug = req.query.debug === "1";
+    const logEvent = async (phase: string, releaseId: string | null, errMsg?: string) => {
+      if (!debug) return;
+      try {
+        const { otaEvents } = await import("@shared/schema");
+        const { db } = await import("./db");
+        await db.insert(otaEvents).values({
+          phase: `server:${phase}`.substring(0, 32),
+          source: "server-debug",
+          platform: ((req.headers["expo-platform"] as string) ?? "?").substring(0, 16),
+          runtimeVersion: ((req.headers["expo-runtime-version"] as string) ?? "?").substring(0, 32),
+          currentUpdateId: ((req.headers["expo-current-update-id"] as string) ?? "?").substring(0, 64),
+          releaseId: releaseId ? releaseId.substring(0, 64) : undefined,
+          error: errMsg ? errMsg.substring(0, 500) : undefined,
+          failCount: 0,
+          ip: ((req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
+            ?? req.ip
+            ?? "").toString().substring(0, 64) || undefined,
+        });
+      } catch (e) {
+        console.error("[expo-updates debug log] insert failed:", e);
+      }
+    };
+
     try {
       const runtimeVersion = req.headers["expo-runtime-version"] as string | undefined;
       const platform = req.headers["expo-platform"] as string | undefined;
@@ -376,6 +413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Only serve Android OTA bundles — iOS publishing is handled separately
       if (platform && platform !== "android") {
+        await logEvent("204-not-android", null);
         return res.status(204).end();
       }
 
@@ -388,27 +426,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (!result.rows.length) {
+        await logEvent("204-no-release", null);
         return res.status(204).end();
       }
 
       const release = result.rows[0];
 
       if (currentUpdateId && currentUpdateId === release.id) {
+        await logEvent("204-already-current", String(release.id));
         return res.status(204).end();
       }
 
       if (ifNoneMatch && ifNoneMatch === `"${release.id}"`) {
+        await logEvent("304-etag-match", String(release.id));
         return res.status(304).end();
       }
 
       let sha256Hash = _expoUpdateHashCache.get(release.id);
+      let cacheHit = true;
       if (!sha256Hash) {
+        cacheHit = false;
         const { downloadBuffer } = await import("./objectStorage");
         const bundleBuffer = await downloadBuffer(release.bundle_path as string);
         sha256Hash = crypto.createHash("sha256").update(bundleBuffer).digest("base64url");
         _expoUpdateHashCache.set(release.id as string, sha256Hash);
         console.log(`[expo-updates] Computed SHA-256 for release ${release.id}: ${sha256Hash.substring(0, 12)}...`);
       }
+      await logEvent(cacheHit ? "200-manifest-cached" : "200-manifest-fresh", String(release.id));
 
       const BASE_URL = "https://biker-link.replit.app";
       const bundleUrl = `${BASE_URL}/api/expo-updates/assets/${encodeURIComponent(release.id as string)}`;

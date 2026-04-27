@@ -1094,6 +1094,27 @@ export const otaReleases = pgTable("ota_releases", {
 export type OtaRelease = typeof otaReleases.$inferSelect;
 export type InsertOtaRelease = typeof otaReleases.$inferInsert;
 
+export const otaEvents = pgTable("ota_events", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  phase: varchar("phase", { length: 32 }).notNull(),
+  source: varchar("source", { length: 32 }),
+  platform: varchar("platform", { length: 16 }),
+  runtimeVersion: varchar("runtime_version", { length: 32 }),
+  currentUpdateId: varchar("current_update_id", { length: 64 }),
+  releaseId: varchar("release_id", { length: 64 }),
+  error: text("error"),
+  failCount: integer("fail_count").notNull().default(0),
+  ip: varchar("ip", { length: 64 }),
+}, (table) => [
+  index("ota_events_created_at_idx").on(table.createdAt),
+]);
+
+export type OtaEvent = typeof otaEvents.$inferSelect;
+export type InsertOtaEvent = typeof otaEvents.$inferInsert;
+
 // Renamed from userSpotifyTokens / user_spotify_tokens (legacy Spotify era)
 export const userMusicTokens = pgTable("user_music_tokens", {
   userId: varchar("user_id", { length: 36 })
