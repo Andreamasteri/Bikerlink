@@ -123,15 +123,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     })
   );
 
-  app.use(async (req: any, _res: any, next: any) => {
+  app.use(async (req: any, res: any, next: any) => {
     if (req.session?.userId) {
       const userId: string = req.session.userId;
       const foundInTracker = onlineTracker.touch(userId);
       try {
         const user = await storage.getUser(userId);
-        if (user && user.status !== "active") {
-          onlineTracker.setOffline(userId);
-        } else if (user && user.status === "active") {
+        // Task #1078: account non attivo (suspended/blocked/deleted) o utente
+        // cancellato → distruggi la sessione e rifiuta la richiesta.
+        // Senza questo, una sessione creata prima del ban resta valida fino a 1
+        // anno (rolling: true rinnova la scadenza ad ogni request).
+        if (!user || user.status !== "active") {
+          if (user) onlineTracker.setOffline(userId);
+          return req.session.destroy(() => {
+            try { res.clearCookie("connect.sid", { path: "/" }); } catch {}
+            const reason = !user ? "user-not-found" : `status-${user.status}`;
+            return res.status(401).json({ message: "Sessione non più valida", reason });
+          });
+        }
+        if (user.status === "active") {
           if (!foundInTracker) {
             const profile = await storage.getUserProfile(userId).catch(() => null);
             onlineTracker.setOnline(userId, {

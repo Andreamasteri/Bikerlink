@@ -258,6 +258,13 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Credenziali non valide" });
     }
 
+    // Task #1078: gli account fake (community seeded/admin) sono persone gestite
+    // dalla piattaforma, non utenti reali — non devono mai poter effettuare login.
+    // Risposta generica per non rivelare la natura "fake" dell'account.
+    if (user.isFake) {
+      return res.status(401).json({ message: "Credenziali non valide" });
+    }
+
     if (user.status === "blocked" || user.status === "suspended") {
       return res.status(403).json({ message: "Account sospeso o bloccato" });
     }

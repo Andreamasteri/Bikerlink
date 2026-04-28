@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import crypto from "node:crypto";
 import { db } from "./db";
 import { users, userProfiles, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -108,7 +109,11 @@ async function seedFakeUsers() {
   }
 
   console.log("Hashing password...");
-  const hashedPassword = await bcrypt.hash("fakeuser2025!", 12);
+  // Task #1078: password random non condivisa, non persistita altrove. Gli account
+  // fake sono comunque bloccati al login da auth.ts (isFake check) — questo è
+  // defense-in-depth nel caso quel guard venga rimosso accidentalmente in futuro.
+  const fakeSecret = crypto.randomBytes(32).toString("base64url");
+  const hashedPassword = await bcrypt.hash(fakeSecret, 12);
 
   console.log("Seeding 20 bikers...");
   for (const biker of bikers) {

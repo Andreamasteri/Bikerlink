@@ -101,6 +101,13 @@ function requireAdmin(req: Request, res: Response, next: Function) {
       console.warn(`[admin-auth] 403 reason=not-admin path=${path} sid=${sid} userId=${user.id} role=${user.role}`);
       return res.status(403).json({ message: "Accesso riservato agli amministratori.", reason: "not-admin" });
     }
+    // Task #1078: defense-in-depth — admin sospeso/bloccato non deve continuare
+    // a chiamare endpoint privilegiati anche se la sessione è ancora viva.
+    // (Il middleware globale in routes.ts dovrebbe già averla distrutta.)
+    if (user.status !== "active") {
+      console.warn(`[admin-auth] 403 reason=not-active path=${path} sid=${sid} userId=${user.id} status=${user.status}`);
+      return res.status(403).json({ message: "Account non attivo.", reason: "not-active" });
+    }
     (req as any).currentUser = user;
     next();
   }).catch((err) => {
@@ -2057,7 +2064,11 @@ router.post("/stregatti", async (req: Request, res: Response) => {
       return res.status(409).json({ message: "Nickname già in uso" });
     }
     const email = `fake_${nickname.toLowerCase().replace(/[^a-z0-9]/g, "")}@fakeuser.bikerlink.it`;
-    const hashedPassword = await bcrypt.hash("fakeuser2025!", 10);
+    // Task #1078: password random non condivisa, non persistita altrove. Gli account
+    // fake sono comunque bloccati al login da auth.ts (isFake check) — questo è
+    // defense-in-depth nel caso quel guard venga rimosso accidentalmente in futuro.
+    const fakeSecret = (await import("node:crypto")).randomBytes(32).toString("base64url");
+    const hashedPassword = await bcrypt.hash(fakeSecret, 10);
     const country = req.body.country || "IT";
     const user = await storage.createUser({
       nickname,

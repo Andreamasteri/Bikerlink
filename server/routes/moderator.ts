@@ -24,6 +24,13 @@ async function requireModerator(req: Request, res: Response): Promise<string | n
     res.status(403).json({ message: "Accesso non autorizzato" });
     return null;
   }
+  // Task #1078: defense-in-depth — moderatore sospeso/bloccato non deve continuare
+  // a esercitare azioni di moderazione anche se la sessione è ancora viva.
+  // (Il middleware globale in routes.ts dovrebbe già averla distrutta.)
+  if (user.status !== "active") {
+    res.status(403).json({ message: "Account non attivo" });
+    return null;
+  }
   return userId;
 }
 
