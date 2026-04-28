@@ -127,16 +127,21 @@ echo "  ✔  versionName sincronizzato e verificato: $VERSION_NAME (app.json →
 GIT_COMMITTED="no"
 if git diff --quiet HEAD -- app.json android/app/build.gradle 2>/dev/null; then
   echo "  ℹ  Nessun commit necessario (app.json e build.gradle già allineati con git)"
-  GIT_COMMITTED="already-aligned"
 else
-  git add app.json android/app/build.gradle 2>/dev/null
   COMMIT_MSG="chore: bump version to $VERSION_NAME (versionCode $VERSION_CODE) [build-apk]"
-  if git commit -m "$COMMIT_MSG" 2>/dev/null; then
-    echo "  ✔  Versioni committate: $COMMIT_MSG"
-    GIT_COMMITTED="yes"
+  ADD_EXIT=0
+  git add app.json android/app/build.gradle 2>/dev/null || ADD_EXIT=$?
+  if [ $ADD_EXIT -ne 0 ]; then
+    echo "  ⚠  git add fallito (exit=$ADD_EXIT) — build continua con file locali"
   else
-    echo "  ⚠  Commit fallito (git non configurato o niente da committare) — build continua con file locali"
-    GIT_COMMITTED="no"
+    COMMIT_EXIT=0
+    git commit -m "$COMMIT_MSG" 2>/dev/null || COMMIT_EXIT=$?
+    if [ $COMMIT_EXIT -eq 0 ]; then
+      echo "  ✔  Versioni committate: $COMMIT_MSG"
+      GIT_COMMITTED="yes"
+    else
+      echo "  ⚠  Commit fallito (exit=$COMMIT_EXIT, git non configurato?) — build continua con file locali"
+    fi
   fi
 fi
 
