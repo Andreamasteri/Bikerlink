@@ -14,7 +14,7 @@ import { eq, and, ne, desc, sql, count, notExists, inArray, lte, isNull, or, ili
 import { sendEmail } from "../email";
 import { MOTORCYCLES, pickRandomN, getMotoYear } from "../mass-seed-data";
 import { getLastMatchingCycleMeta, runBikerBikerMatching, runWishlistMatching, runMatchingForUser } from "../matching-engine";
-import { isProtectedUser } from "../constants";
+import { isProtectedUser, PROTECTED_EMAILS } from "../constants";
 import { closeSseClient } from "../chat-sse";
 import { SERVER_START_TIME, uptimeState } from "../uptime";
 import { downloadBuffer } from "../objectStorage";
@@ -350,19 +350,34 @@ router.delete("/purge-non-admin-users", async (req: Request, res: Response) => {
   try {
     const adminId = req.session.userId!;
 
+    // Account riservati (Apple/Google reviewer) — protetti dalla purga
+    const protectedEmails = PROTECTED_EMAILS.map((e) => e.toLowerCase());
+
     const { deletedCount } = await db.transaction(async (tx) => {
-      // Step 1: null events.approved_by per utenti non-admin (FK NO ACTION)
+      // Step 1: null events.approved_by per utenti non-admin (esclude reviewer protetti)
       await tx.execute(sql`
         UPDATE events SET approved_by = NULL
-        WHERE approved_by IN (SELECT id FROM users WHERE role != 'admin')
+        WHERE approved_by IN (
+          SELECT id FROM users
+          WHERE role != 'admin'
+            AND LOWER(email) NOT IN ${sql.raw(`(${protectedEmails.map((e) => `'${e.replace(/'/g, "''")}'`).join(",")})`)}
+        )
       `);
 
-      // Step 2: conta utenti da eliminare (dentro la tx — snapshot coerente)
-      const countResult = await tx.execute(sql`SELECT COUNT(*) AS cnt FROM users WHERE role != 'admin'`);
+      // Step 2: conta utenti da eliminare (esclude reviewer protetti)
+      const countResult = await tx.execute(sql`
+        SELECT COUNT(*) AS cnt FROM users
+        WHERE role != 'admin'
+          AND LOWER(email) NOT IN ${sql.raw(`(${protectedEmails.map((e) => `'${e.replace(/'/g, "''")}'`).join(",")})`)}
+      `);
       const deletedCount = Number((countResult.rows[0] as { cnt: string }).cnt);
 
-      // Step 3: elimina tutti gli utenti non-admin (CASCADE gestisce le FK correlate)
-      await tx.execute(sql`DELETE FROM users WHERE role != 'admin'`);
+      // Step 3: elimina utenti non-admin (esclude reviewer protetti — CASCADE FK correlate)
+      await tx.execute(sql`
+        DELETE FROM users
+        WHERE role != 'admin'
+          AND LOWER(email) NOT IN ${sql.raw(`(${protectedEmails.map((e) => `'${e.replace(/'/g, "''")}'`).join(",")})`)}
+      `);
 
       // Step 4: elimina conversazioni orfane (senza partecipanti)
       await tx.execute(sql`
@@ -370,7 +385,7 @@ router.delete("/purge-non-admin-users", async (req: Request, res: Response) => {
         WHERE id NOT IN (SELECT DISTINCT conversation_id FROM conversation_participants)
       `);
 
-      // Step 5: invalida tutte le sessioni attive
+      // Step 5: invalida tutte le sessioni attive (anche reviewer rifaranno login)
       await tx.execute(sql`DELETE FROM session`);
 
       // Step 6: log in moderator_logs (targetId = adminId — operazione system, notNull)
@@ -379,14 +394,14 @@ router.delete("/purge-non-admin-users", async (req: Request, res: Response) => {
         action: "purge_non_admin_users",
         targetType: "system",
         targetId: adminId,
-        details: `Purga DB: eliminati ${deletedCount} utenti non-admin + tutte le sessioni`,
+        details: `Purga DB: eliminati ${deletedCount} utenti non-admin (esclusi ${protectedEmails.length} reviewer protetti) + tutte le sessioni`,
       });
 
       return { deletedCount };
     });
 
-    console.log(`[PURGE] ${deletedCount} utenti non-admin eliminati dall'admin ${adminId}`);
-    return res.json({ purged: true, deletedUsers: deletedCount });
+    console.log(`[PURGE] ${deletedCount} utenti non-admin eliminati dall'admin ${adminId} (reviewer protetti: ${protectedEmails.join(", ")})`);
+    return res.json({ purged: true, deletedUsers: deletedCount, protectedEmails });
   } catch (err) {
     console.error("[PURGE] errore durante purga utenti:", err);
     return res.status(500).json({ message: "Errore durante la purga utenti" });
