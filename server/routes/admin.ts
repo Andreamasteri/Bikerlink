@@ -1,4 +1,5 @@
-import { Router, type Request, type Response } from "express";
+import express, { Router, type Request, type Response } from "express";
+import rateLimit from "express-rate-limit";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
@@ -45,6 +46,71 @@ interface StartupBeaconEntry {
 }
 const startupBeacons: StartupBeaconEntry[] = [];
 const BEACONS_MAX = 50;
+
+// SECURITY (Task #1082) — POST /startup-beacon hardening.
+// The endpoint is intentionally public (clients ping during startup before
+// having a session). Without per-route limits the global JSON parser
+// (express.json({ limit: "10mb" })) let an unauthenticated attacker push
+// up to 50 × 10 MB blobs into the in-memory startupBeacons ring buffer
+// (~500 MB attacker-retained), and pollute admin diagnostics with arbitrary
+// keys via `...rest`.
+//
+// Defenses applied:
+//   1. Per-route JSON parser capped at 8 KB (overrides the 10 MB global).
+//   2. IP rate limit: 30 requests / 5 min — generous for legit startup
+//      retries, lethal for spray-attacks.
+//   3. Sanitization of the attacker-controlled `data` field:
+//        - max 20 keys
+//        - each key truncated to 64 chars
+//        - each value coerced & truncated (strings 200 chars, primitives
+//          kept as-is, objects/arrays JSON-stringified then truncated)
+//        - aggregate stringified payload capped at 1 KB; if it overflows
+//          the field is dropped and replaced by `{ __truncated: true }`.
+const startupBeaconJson = express.json({ limit: "8kb" });
+const startupBeaconLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 30,
+  message: { message: "Too many startup beacons" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const BEACON_DATA_MAX_KEYS = 20;
+const BEACON_DATA_KEY_MAX = 64;
+const BEACON_DATA_VALUE_MAX = 200;
+const BEACON_DATA_TOTAL_MAX = 1024;
+
+function sanitizeBeaconData(rest: Record<string, unknown>): Record<string, unknown> | undefined {
+  const keys = Object.keys(rest);
+  if (keys.length === 0) return undefined;
+  const sanitized: Record<string, unknown> = {};
+  let count = 0;
+  for (const rawKey of keys) {
+    if (count >= BEACON_DATA_MAX_KEYS) break;
+    const key = String(rawKey).substring(0, BEACON_DATA_KEY_MAX);
+    const v = rest[rawKey];
+    if (v === null || typeof v === "boolean" || typeof v === "number") {
+      sanitized[key] = v;
+    } else if (typeof v === "string") {
+      sanitized[key] = v.substring(0, BEACON_DATA_VALUE_MAX);
+    } else {
+      try {
+        sanitized[key] = JSON.stringify(v).substring(0, BEACON_DATA_VALUE_MAX);
+      } catch {
+        sanitized[key] = "[unserializable]";
+      }
+    }
+    count++;
+  }
+  try {
+    if (JSON.stringify(sanitized).length > BEACON_DATA_TOTAL_MAX) {
+      return { __truncated: true };
+    }
+  } catch {
+    return { __truncated: true };
+  }
+  return sanitized;
+}
 
 interface ClubAssignStats {
   assigned: number;
@@ -236,15 +302,16 @@ router.post("/client-error", (req: Request, res: Response) => {
   }
 });
 
-router.post("/startup-beacon", (req: Request, res: Response) => {
+router.post("/startup-beacon", startupBeaconLimiter, startupBeaconJson, (req: Request, res: Response) => {
   try {
-    const { step, ts, recovered, platform, ...rest } = req.body as {
+    const body = (req.body ?? {}) as {
       step?: string;
       ts?: number;
       recovered?: boolean;
       platform?: string;
       [key: string]: unknown;
     };
+    const { step, ts, recovered, platform, ...rest } = body;
     if (!step) return res.status(400).json({ message: "step is required" });
     const tsNum = typeof ts === "number" ? ts : Date.now();
     const entry: StartupBeaconEntry = {
@@ -253,7 +320,7 @@ router.post("/startup-beacon", (req: Request, res: Response) => {
       isoTime: new Date(tsNum).toISOString(),
       recovered: !!recovered,
       platform: platform ? String(platform).substring(0, 16) : undefined,
-      data: Object.keys(rest).length > 0 ? rest as Record<string, unknown> : undefined,
+      data: sanitizeBeaconData(rest as Record<string, unknown>),
       receivedAt: new Date().toISOString(),
     };
     startupBeacons.push(entry);

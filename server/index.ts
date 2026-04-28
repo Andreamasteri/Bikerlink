@@ -65,14 +65,23 @@ function setupCors(app: express.Application) {
 }
 
 function setupBodyParsing(app: express.Application) {
-  app.use(
-    express.json({
-      limit: "10mb",
-      verify: (req, _res, buf) => {
-        req.rawBody = buf;
-      },
-    }),
-  );
+  // SECURITY (Task #1082): the global 10 MB JSON parser is intentionally
+  // skipped on the public `POST /api/admin/startup-beacon` route — that
+  // route applies its own much smaller 8 KB parser (see
+  // server/routes/admin.ts) so unauthenticated clients cannot push
+  // 10 MB blobs into the in-memory startupBeacons buffer.
+  const globalJson = express.json({
+    limit: "10mb",
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  });
+  app.use((req, res, next) => {
+    if (req.method === "POST" && req.path === "/api/admin/startup-beacon") {
+      return next();
+    }
+    return globalJson(req, res, next);
+  });
 
   app.use(express.urlencoded({ extended: false }));
 }

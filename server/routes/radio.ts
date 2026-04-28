@@ -4,6 +4,7 @@ import { userLastfmSessions, userMusicTracks } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import dnsPromises from "dns/promises";
 import net from "net";
+import { Agent } from "undici";
 
 const router = Router();
 
@@ -412,6 +413,43 @@ function isPrivateIP(ip: string): boolean {
   return true; // not parseable → treat as blocked
 }
 
+// SSRF defense — connect-time DNS guard.
+// `validateStreamUrl()` resolves DNS once before the fetch, but Node's fetch
+// then resolves DNS *again* at connect time. Between the two lookups an
+// attacker who controls the authoritative DNS for a hostname can flip the
+// answer (DNS rebinding) and force the connect to land on a private IP.
+// To eliminate this TOCTOU window we route every fetch through an undici
+// Agent whose `connect.lookup` is the only DNS resolution that actually
+// matters for the socket — and that lookup *itself* drops every private
+// address. Even a perfectly-timed rebind can no longer steer the connect
+// to 127.0.0.1 / 169.254.169.254 / 10.x.x.x / etc.
+const safeDispatcher = new Agent({
+  connect: {
+    lookup: (hostname: string, options: any, callback: any) => {
+      dnsPromises.lookup(hostname, { all: true, verbatim: true })
+        .then(addrs => {
+          let pool = addrs.filter(a => !isPrivateIP(a.address));
+          const family = options?.family;
+          if (family === 4) pool = pool.filter(a => a.family === 4);
+          else if (family === 6) pool = pool.filter(a => a.family === 6);
+          if (pool.length === 0) {
+            return callback(new Error("SSRF: hostname resolves only to blocked addresses"));
+          }
+          // Honor `all` flag: undici (and net.connect lookup) call with
+          // `all: true` to receive the full address list and pick one
+          // themselves; otherwise use the legacy 3-arg form.
+          if (options?.all) {
+            callback(null, pool);
+          } else {
+            const first = pool[0];
+            callback(null, first.address, first.family);
+          }
+        })
+        .catch(err => callback(err as Error));
+    },
+  },
+});
+
 // Validate a URL: resolve hostname via DNS and ensure no resolved address is
 // private/loopback/link-local. Closes (a) DNS rebinding attacks, (b) decimal/
 // octal/hex IPv4 encodings that bypass naive regex blocking, (c) hostnames
@@ -490,6 +528,8 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
 
   try {
     // redirect: "manual" prevents auto-following — we re-validate any redirect target
+    // dispatcher: safeDispatcher closes the DNS-rebinding TOCTOU between
+    // validateStreamUrl()'s lookup and fetch's connect-time lookup.
     const upstream = await fetch(streamUrl, {
       headers: {
         "User-Agent": "BikerLink/4.0.0",
@@ -497,7 +537,8 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
       },
       signal: controller.signal,
       redirect: "manual",
-    });
+      dispatcher: safeDispatcher,
+    } as Parameters<typeof fetch>[1]);
 
     let finalResponse = upstream;
 
@@ -528,7 +569,8 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
           },
           signal: controller2.signal,
           redirect: "manual",
-        });
+          dispatcher: safeDispatcher,
+        } as Parameters<typeof fetch>[1]);
         clearTimeout(timer2);
         if (finalResponse.status >= 300 && finalResponse.status < 400) {
           return res.status(400).json({ error: "Too many redirects" });
