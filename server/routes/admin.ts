@@ -8,6 +8,7 @@ import bcrypt from "bcryptjs";
 import { uploadBuffer, objectExists, isValidOtaBundlePath } from "../objectStorage";
 import { storage } from "../storage";
 import { db } from "../db";
+import { getTrustedClientIp } from "../lib/abuse-rate-limit";
 import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents } from "@shared/schema";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { eq, and, ne, desc, sql, count, notExists, inArray, lte, isNull, or, ilike } from "drizzle-orm";
@@ -220,16 +221,16 @@ function requireAdmin(req: Request, res: Response, next: Function) {
 const OTA_EVENTS_DB_RETENTION = 1000;
 
 function clientIp(req: Request): string | undefined {
-  // Task #1126 (Telemetry and Reporting Abuse): always use req.ip — resolved by
-  // Express via `trust proxy = 1` (set in server/index.ts and server/routes.ts).
-  // NEVER parse X-Forwarded-For directly: an internet attacker fully controls
-  // that header and can rotate the value across requests, defeating the
-  // OTA_ERROR_RATE_MAX per-IP limit on /api/admin/ota-error and poisoning the
-  // `ip` field persisted in ota_events with arbitrary spoofed addresses.
-  // With trust proxy=1 the real proxy hop is stripped and req.ip becomes the
-  // right-most XFF entry — i.e. the client IP appended by our reverse proxy —
-  // which the attacker cannot influence.
-  return (req.ip || req.socket?.remoteAddress || "").toString().substring(0, 64) || undefined;
+  // Task #1126 (Telemetry and Reporting Abuse): delegate to the centralized
+  // `getTrustedClientIp` helper. That helper documents the trust-proxy
+  // contract and is the single chokepoint for IP derivation across all
+  // public telemetry endpoints. Used here both for the per-IP rate-limit
+  // key on /api/admin/ota-error AND for the `ip` value persisted in the
+  // ota_events table — neither must ever be derived from raw
+  // `X-Forwarded-For` parsing because that header is attacker-controlled
+  // and a rotated value would defeat OTA_ERROR_RATE_MAX and poison the
+  // operator telemetry table with spoofed source addresses.
+  return getTrustedClientIp(req);
 }
 
 // Rate limiter in-memory per /ota-error (endpoint pubblico): max 60 req/60s/IP.

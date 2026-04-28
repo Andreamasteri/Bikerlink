@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { sendEmail } from "../email";
 import { storage } from "../storage";
+import { getTrustedClientIp } from "../lib/abuse-rate-limit";
 
 const ADMIN_EMAIL = "bikerlinkapp@gmail.com";
 const router = Router();
@@ -76,19 +77,14 @@ function buildErrorEmailHtml(payload: {
 
 router.post("/", async (req: Request, res: Response) => {
   try {
-    // Task #1126 (Telemetry and Reporting Abuse): the rate-limit key MUST be
-    // derived from req.ip — which Express resolves via `trust proxy = 1` set in
-    // server/index.ts and server/routes.ts — and NEVER from the raw
-    // `x-forwarded-for` header. With trust proxy=1, Express skips the
-    // connecting socket as one trusted hop and uses the right-most XFF entry,
-    // which our reverse proxy appends with the actual client IP. Parsing the
-    // raw header (e.g. `req.headers["x-forwarded-for"].split(",")[0]`) would
-    // pick an attacker-controlled left-most entry, allowing a single attacker
-    // to rotate the spoofed value across requests and bypass RATE_LIMIT_MAX.
-    // Falling back to req.socket.remoteAddress preserves rate-limiting in the
-    // (unsupported) no-proxy case; the literal "unknown" bucket ensures any
-    // stragglers without an identifiable source still share a single limit.
-    const ip = req.ip ?? req.socket?.remoteAddress ?? "unknown";
+    // Task #1126 (Telemetry and Reporting Abuse): use the centralized
+    // `getTrustedClientIp` helper instead of inline `req.ip ?? remoteAddress`
+    // (or, far worse, raw `req.headers["x-forwarded-for"]` parsing). The
+    // helper documents the trust-proxy contract that makes this safe and is
+    // the single chokepoint that future code review must police.
+    // The literal "unknown" bucket ensures requests without an identifiable
+    // source still share a single per-IP limit instead of bypassing it.
+    const ip = getTrustedClientIp(req) ?? "unknown";
 
     if (isRateLimited(ip)) {
       return res.status(429).json({ message: "Troppe richieste" });

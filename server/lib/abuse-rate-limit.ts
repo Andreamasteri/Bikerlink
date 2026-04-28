@@ -1,3 +1,38 @@
+import type { Request } from "express";
+
+// Task #1126: centralized helper that returns the trusted client IP for use
+// as a rate-limit key or for persistence in telemetry tables. ALL public
+// telemetry endpoints (/api/errors, /api/admin/ota-error,
+// /api/admin/client-error, /api/feedback, /api/reports, …) must derive
+// their IP via this helper instead of reading `req.headers["x-forwarded-for"]`
+// directly.
+//
+// Why this matters: the raw X-Forwarded-For header is fully attacker-
+// controlled. Code that rate-limited on `xff.split(",")[0]` could be defeated
+// by rotating the spoofed value across requests, allowing one attacker to
+// blow past per-IP caps and flood the operator email transport / poison
+// stored telemetry with arbitrary "source" addresses.
+//
+// `req.ip` is safe in this app because:
+//   - server/index.ts and server/routes.ts both call `app.set("trust proxy", 1)`,
+//   - so Express skips exactly one trusted hop (our reverse proxy) and uses
+//     the right-most XFF entry — i.e. the client IP that the proxy itself
+//     appended — as `req.ip`. Attacker-controlled left-most entries are
+//     ignored.
+//
+// Concentrating the derivation here means a future maintainer who needs the
+// client IP can simply call this function instead of reaching for headers,
+// and any regression toward raw-header parsing becomes easy to grep for and
+// reject in code review.
+export function getTrustedClientIp(req: Request): string | undefined {
+  // Fall back to the raw socket address only if Express was somehow unable to
+  // resolve req.ip (e.g. trust-proxy misconfiguration). The substring cap
+  // keeps a malformed value from blowing up downstream string columns or
+  // log lines.
+  const ip = (req.ip ?? req.socket?.remoteAddress ?? "").toString().substring(0, 64);
+  return ip.length > 0 ? ip : undefined;
+}
+
 // Task #1125: shared in-memory per-user + per-IP rate limit for abuse-prone
 // authenticated endpoints.
 //
