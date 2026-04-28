@@ -23,7 +23,7 @@ backend custom `https://biker-link.replit.app/api/expo-updates` (Expo Updates Pr
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
 - **Runtime Version**: `8.0.0` (ciclo corrente, APK v43) ← CICLO V3
-- **APK corrente**: versionCode **43**, versionName **3.2.0** (buildId: `38cb1b32-4316-4f63-9799-1b9ab36888e8`, APK: https://expo.dev/artifacts/eas/81L2RgW8kFuzUiRzACfAEm.apk)
+- **APK corrente**: versionCode **43**, versionName **3.2.0** (buildId: `38cb1b32-4316-4f63-9799-1b9ab36888e8`, APK: https://expo.dev/artifacts/eas/81L2RgW8kFuzUiRzACfAEm.apk — STABILE)
 - **OTA corrente**: OTA-19 (releaseId: `2edb9ef2-9680-4398-9da4-e6e18fe1dd75`)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates`
 - **Admin email**: `admin@bikerlink.it`

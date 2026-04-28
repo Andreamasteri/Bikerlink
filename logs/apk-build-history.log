@@ -62,3 +62,4 @@
 2026-04-28T16:33:51Z  APK BUILD AVVIATA — profilo=release-apk commit=4fa800b utente=runner
 2026-04-28T16:33:51Z  APK BUILD INVIATA (--no-wait) — profilo=release-apk commit=4fa800b utente=runner
 2026-04-28T16:50:42Z  APK BUILD COMPLETATA — profilo=release-apk versionCode=43 versionName=3.2.0 buildId=38cb1b32-4316-4f63-9799-1b9ab36888e8 APK=https://expo.dev/artifacts/eas/81L2RgW8kFuzUiRzACfAEm.apk
+2026-04-28T16:51:27Z  APK BUILD COMPLETATA (FINISHED) — buildId=38cb1b32-4316-4f63-9799-1b9ab36888e8 versionCode=43 versionName=3.2.0 APK=https://expo.dev/artifacts/eas/81L2RgW8kFuzUiRzACfAEm.apk snapshot=SALVATA
