@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { storage } from "../storage";
 import { sendEmail } from "../email";
-import { reportRateLimiter } from "../lib/abuse-rate-limit";
+import { reportRateLimiter, getTrustedClientIp } from "../lib/abuse-rate-limit";
 
 const ADMIN_EMAIL = "bikerlinkapp@gmail.com";
 
@@ -77,7 +77,9 @@ router.post("/", async (req: Request, res: Response) => {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
-    const ip = req.ip ?? req.socket?.remoteAddress ?? "";
+    // Task #1126: derive the rate-limit IP via the centralized helper so all
+    // public telemetry endpoints share the same trust-proxy contract.
+    const ip = getTrustedClientIp(req) ?? "";
     if (reportRateLimiter.isOverLimit(userId, ip)) {
       return res.status(429).json({ message: "Hai inviato troppe segnalazioni. Riprova tra un'ora." });
     }

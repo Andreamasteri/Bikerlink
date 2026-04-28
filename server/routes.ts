@@ -17,6 +17,7 @@ import connectPgSimple from "connect-pg-simple";
 import multer from "multer";
 import { pool } from "./db";
 import { storage } from "./storage";
+import { getTrustedClientIp } from "./lib/abuse-rate-limit";
 import authRoutes from "./routes/auth";
 import userRoutes from "./routes/users";
 import motorcycleRoutes from "./routes/motorcycles";
@@ -444,10 +445,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           releaseId: releaseId ? releaseId.substring(0, 64) : undefined,
           error: detail.substring(0, 500),
           failCount: 0,
-          // Task #1118: usa req.ip (set da Express con trust proxy=1) — non
-          // X-Forwarded-For grezzo, che è spoofabile e renderebbe inaffidabile
-          // il campo ip persistito su ota_events per l'incident response.
-          ip: (req.ip ?? req.socket?.remoteAddress ?? "").toString().substring(0, 64) || undefined,
+          // Task #1118 / #1126: derive the persisted ip via the centralized
+          // getTrustedClientIp helper. Never parse X-Forwarded-For directly —
+          // it is attacker-controlled and would let a spoofed left-most entry
+          // poison the ota_events incident-response data.
+          ip: getTrustedClientIp(req),
         });
       } catch (e) {
         console.error("[expo-updates debug log] insert failed:", e);

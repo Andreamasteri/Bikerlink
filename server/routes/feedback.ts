@@ -1,7 +1,7 @@
 import express, { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { sendEmail } from "../email";
-import { feedbackRateLimiter } from "../lib/abuse-rate-limit";
+import { feedbackRateLimiter, getTrustedClientIp } from "../lib/abuse-rate-limit";
 
 const ADMIN_EMAIL = "bikerlinkapp@gmail.com";
 
@@ -63,7 +63,9 @@ router.post("/", feedbackJson, async (req: Request, res: Response) => {
     // sending quota legitimate signups depend on. The limit is shared
     // process-wide via abuse-rate-limit so future feedback variants
     // (e.g. a CSAT survey) can opt into the same bucket.
-    const ip = req.ip ?? req.socket?.remoteAddress ?? "";
+    // Task #1126: derive the rate-limit IP via the centralized helper so all
+    // public telemetry endpoints share the same trust-proxy contract.
+    const ip = getTrustedClientIp(req) ?? "";
     if (feedbackRateLimiter.isOverLimit(req.session.userId, ip)) {
       return res.status(429).json({
         message: "Hai inviato troppe segnalazioni. Riprova più tardi.",

@@ -11,7 +11,7 @@ import { db } from "../db";
 import { eq, and, desc } from "drizzle-orm";
 import { uploadBuffer, downloadBuffer, deleteObject } from "../objectStorage";
 import { onlineTracker } from "../online-tracker";
-import { reportRateLimiter } from "../lib/abuse-rate-limit";
+import { reportRateLimiter, getTrustedClientIp } from "../lib/abuse-rate-limit";
 
 const router = Router();
 
@@ -1178,7 +1178,9 @@ router.post("/:id/report", requireAuth, async (req: Request, res: Response) => {
     // legacy URL the production app actually wires the report button to
     // (app/profile/[id].tsx). Sharing state via abuse-rate-limit means
     // 10 reports total across both routes triggers the 429.
-    const ip = req.ip ?? req.socket?.remoteAddress ?? "";
+    // Task #1126: derive the rate-limit IP via the centralized helper so all
+    // public telemetry endpoints share the same trust-proxy contract.
+    const ip = getTrustedClientIp(req) ?? "";
     if (reportRateLimiter.isOverLimit(reporterId, ip)) {
       return res.status(429).json({ message: "Hai inviato troppe segnalazioni. Riprova tra un'ora." });
     }
