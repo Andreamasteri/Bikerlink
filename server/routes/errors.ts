@@ -76,8 +76,18 @@ function buildErrorEmailHtml(payload: {
 
 router.post("/", async (req: Request, res: Response) => {
   try {
-    // Use req.ip (set by Express when trust proxy=1) — not the raw X-Forwarded-For
-    // header which an attacker can spoof to bypass the per-IP rate limit.
+    // Task #1126 (Telemetry and Reporting Abuse): the rate-limit key MUST be
+    // derived from req.ip — which Express resolves via `trust proxy = 1` set in
+    // server/index.ts and server/routes.ts — and NEVER from the raw
+    // `x-forwarded-for` header. With trust proxy=1, Express skips the
+    // connecting socket as one trusted hop and uses the right-most XFF entry,
+    // which our reverse proxy appends with the actual client IP. Parsing the
+    // raw header (e.g. `req.headers["x-forwarded-for"].split(",")[0]`) would
+    // pick an attacker-controlled left-most entry, allowing a single attacker
+    // to rotate the spoofed value across requests and bypass RATE_LIMIT_MAX.
+    // Falling back to req.socket.remoteAddress preserves rate-limiting in the
+    // (unsupported) no-proxy case; the literal "unknown" bucket ensures any
+    // stragglers without an identifiable source still share a single limit.
     const ip = req.ip ?? req.socket?.remoteAddress ?? "unknown";
 
     if (isRateLimited(ip)) {

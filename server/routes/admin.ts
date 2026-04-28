@@ -220,8 +220,15 @@ function requireAdmin(req: Request, res: Response, next: Function) {
 const OTA_EVENTS_DB_RETENTION = 1000;
 
 function clientIp(req: Request): string | undefined {
-  // Use req.ip set by Express (trust proxy=1) — never parse X-Forwarded-For directly
-  // because an attacker controls that header value and can rotate it to bypass rate limits.
+  // Task #1126 (Telemetry and Reporting Abuse): always use req.ip — resolved by
+  // Express via `trust proxy = 1` (set in server/index.ts and server/routes.ts).
+  // NEVER parse X-Forwarded-For directly: an internet attacker fully controls
+  // that header and can rotate the value across requests, defeating the
+  // OTA_ERROR_RATE_MAX per-IP limit on /api/admin/ota-error and poisoning the
+  // `ip` field persisted in ota_events with arbitrary spoofed addresses.
+  // With trust proxy=1 the real proxy hop is stripped and req.ip becomes the
+  // right-most XFF entry — i.e. the client IP appended by our reverse proxy —
+  // which the attacker cannot influence.
   return (req.ip || req.socket?.remoteAddress || "").toString().substring(0, 64) || undefined;
 }
 
