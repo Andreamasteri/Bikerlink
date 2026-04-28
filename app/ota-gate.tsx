@@ -45,6 +45,8 @@ export default function OtaGateScreen() {
       clearTimeout(safetyTimer);
       if (result.phase === "reload") {
         setStatus("Aggiornamento in corso...");
+        // fallback: reloadAsync non ritorna normalmente, ma se lo facesse navighiamo dopo 3s
+        setTimeout(() => navigate(), 3_000);
       } else {
         navigate();
       }

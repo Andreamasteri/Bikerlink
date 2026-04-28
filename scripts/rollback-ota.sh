@@ -117,26 +117,35 @@ echo "   ✔ OTA-$TARGET_OTA riattivata (status: active)"
 
 # ─── Aggiorna lib/ota.ts ──────────────────────────────────
 echo "[3/4] Aggiornamento CURRENT_OTA_NUMBER=$TARGET_OTA in lib/ota.ts..."
+OTA_TS_FILE="$OTA_TS_FILE" \
+OTA_TARGET="$TARGET_OTA" \
 node -e "
   const fs = require('fs');
-  let content = fs.readFileSync('$OTA_TS_FILE','utf8');
-  content = content.replace(/CURRENT_OTA_NUMBER\s*=\s*[0-9]+/, 'CURRENT_OTA_NUMBER = $TARGET_OTA');
-  fs.writeFileSync('$OTA_TS_FILE', content);
+  const targetNum = parseInt(process.env.OTA_TARGET, 10);
+  let content = fs.readFileSync(process.env.OTA_TS_FILE, 'utf8');
+  content = content.replace(/CURRENT_OTA_NUMBER\s*=\s*[0-9]+/, 'CURRENT_OTA_NUMBER = ' + targetNum);
+  fs.writeFileSync(process.env.OTA_TS_FILE, content);
   console.log('OK');
-" 2>/dev/null || echo "   ⚠ Impossibile aggiornare lib/ota.ts — aggiornare manualmente"
+" || { echo "   ERRORE: impossibile aggiornare lib/ota.ts — aggiornare manualmente prima di continuare"; exit 1; }
 echo "   ✔ CURRENT_OTA_NUMBER=$TARGET_OTA"
 
 # ─── Aggiorna ota-updates.json ────────────────────────────
 echo "[4/4] Aggiornamento ota-updates.json..."
+OTA_UPDATES_FILE="$OTA_UPDATES_FILE" \
+OTA_RUNTIME_VERSION="$RUNTIME_VERSION" \
+OTA_CURRENT="$CURRENT_OTA" \
+OTA_TARGET="$TARGET_OTA" \
 node -e "
   const fs = require('fs');
-  const rv = '$RUNTIME_VERSION';
-  const data = JSON.parse(fs.readFileSync('$OTA_UPDATES_FILE','utf8'));
+  const rv = process.env.OTA_RUNTIME_VERSION;
+  const targetNum = parseInt(process.env.OTA_TARGET, 10);
+  const currentNum = process.env.OTA_CURRENT ? parseInt(process.env.OTA_CURRENT, 10) : null;
+  const data = JSON.parse(fs.readFileSync(process.env.OTA_UPDATES_FILE, 'utf8'));
 
   // Segna la entry corrente come rolled-back
-  if ('$CURRENT_OTA' !== '') {
+  if (currentNum !== null) {
     for (let i = data.length - 1; i >= 0; i--) {
-      if (data[i].runtimeVersion === rv && data[i].updateNumber === parseInt('$CURRENT_OTA') &&
+      if (data[i].runtimeVersion === rv && data[i].updateNumber === currentNum &&
           (data[i].status === 'published' || data[i].status === 'active')) {
         data[i].status = 'rolled-back';
         break;
@@ -145,17 +154,20 @@ node -e "
   }
 
   // Segna la entry target come published
+  let found = false;
   for (let i = data.length - 1; i >= 0; i--) {
-    if (data[i].runtimeVersion === rv && data[i].updateNumber === $TARGET_OTA) {
+    if (data[i].runtimeVersion === rv && data[i].updateNumber === targetNum) {
       data[i].status = 'published';
       data[i].publishedAt = new Date().toISOString();
+      found = true;
       break;
     }
   }
+  if (!found) { process.stderr.write('Entry OTA-' + targetNum + ' non trovata\n'); process.exit(1); }
 
-  fs.writeFileSync('$OTA_UPDATES_FILE', JSON.stringify(data, null, 2) + '\n');
+  fs.writeFileSync(process.env.OTA_UPDATES_FILE, JSON.stringify(data, null, 2) + '\n');
   console.log('OK');
-" 2>/dev/null || echo "   ⚠ Impossibile aggiornare ota-updates.json — aggiornare manualmente"
+" || { echo "   ERRORE: impossibile aggiornare ota-updates.json — aggiornare manualmente"; exit 1; }
 echo "   ✔ ota-updates.json aggiornato"
 
 echo ""

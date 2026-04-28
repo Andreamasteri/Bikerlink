@@ -62,17 +62,31 @@ export async function triggerOtaCheck(
   source: OtaTriggerSource,
   options?: { force?: boolean; delayMs?: number },
 ): Promise<OtaManualResult> {
-  if (__DEV__) return { ok: false, phase: "skipped", skipped: "dev" };
-  if (Platform.OS === "web") return { ok: false, phase: "skipped", skipped: "web" };
+  if (__DEV__) {
+    const r: OtaManualResult = { ok: false, phase: "skipped", skipped: "dev" };
+    _emitOtaResult(r);
+    return r;
+  }
+  if (Platform.OS === "web") {
+    const r: OtaManualResult = { ok: false, phase: "skipped", skipped: "web" };
+    _emitOtaResult(r);
+    return r;
+  }
   if (options?.delayMs && options.delayMs > 0) {
     await new Promise((r) => setTimeout(r, options.delayMs));
   }
-  if (inFlight) return { ok: false, phase: "check", error: "already in flight" };
+  if (inFlight) {
+    const r: OtaManualResult = { ok: false, phase: "check", error: "already in flight" };
+    _emitOtaResult(r);
+    return r;
+  }
 
   const now = Date.now();
   const cooldown = consecutiveFailures >= 3 ? COOLDOWN_AFTER_FAILURES_MS : COOLDOWN_NORMAL_MS;
   if (!options?.force && now - lastCheckAt < cooldown) {
-    return { ok: false, phase: "check", error: "cooldown" };
+    const r: OtaManualResult = { ok: false, phase: "check", error: "cooldown" };
+    _emitOtaResult(r);
+    return r;
   }
 
   inFlight = true;
