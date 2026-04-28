@@ -31,12 +31,49 @@ const essentialUsers: EssentialUserDef[] = [
   },
 ];
 
+// Deny-list di password storiche già hardcoded nel codice (rimosse) e
+// pattern banali. Se l'env var contiene una di queste, il seed viene
+// rifiutato con errore — impedisce la regressione del Critical findings
+// del task #1074.
+const FORBIDDEN_SEED_PASSWORDS = new Set<string>([
+  "wF5ws73,d;*E",
+  "mod2025!",
+  "admin",
+  "password",
+  "123456",
+  "changeme",
+]);
+const MIN_SEED_PASSWORD_LENGTH = 12;
+
+function isPasswordTooWeak(pw: string): string | null {
+  if (pw.length < MIN_SEED_PASSWORD_LENGTH) {
+    return `length < ${MIN_SEED_PASSWORD_LENGTH}`;
+  }
+  if (FORBIDDEN_SEED_PASSWORDS.has(pw)) {
+    return "matches a previously-leaked / banned default";
+  }
+  return null;
+}
+
 export async function autoSeedEssentialUsers() {
   try {
     for (const userData of essentialUsers) {
       const seedPassword = process.env[userData.passwordEnvVar];
       if (!seedPassword) {
+        // Skip silently in production paths: a missing env var means the
+        // operator does NOT want this account (re)created automatically.
+        // Privileged accounts must be provisioned out-of-band.
         console.warn(`[auto-seed] Skipping ${userData.role} seed: ${userData.passwordEnvVar} env var not set`);
+        continue;
+      }
+
+      const weakReason = isPasswordTooWeak(seedPassword);
+      if (weakReason) {
+        // SECURITY: refuse to seed/recreate a privileged account with a
+        // weak or known-leaked credential, even if the env var is set.
+        console.error(
+          `[auto-seed] REFUSING to seed ${userData.role} (${userData.email}): ${userData.passwordEnvVar} ${weakReason}`,
+        );
         continue;
       }
 
@@ -47,7 +84,10 @@ export async function autoSeedEssentialUsers() {
         .limit(1);
 
       if (existing.length > 0) {
-        // Account already exists — respect any manually changed password, do not reset.
+        // Account already exists — respect any manually changed password,
+        // never re-hash/overwrite. This prevents the previous "force-reset
+        // on every boot" behaviour where a rotated admin password would
+        // be silently reverted to the embedded seed value.
         continue;
       }
 
@@ -68,7 +108,9 @@ export async function autoSeedEssentialUsers() {
 
       await db.insert(userProfiles).values({ userId: user.id });
 
-      console.log(`Auto-seeded essential user: ${user.nickname} (${user.role})`);
+      // AUDIT: log the bootstrap event so an operator can detect
+      // unexpected privileged-account creation across boots.
+      console.log(`[auto-seed][AUDIT] Bootstrapped privileged user: ${user.nickname} role=${user.role} email=${user.email}`);
     }
   } catch (err) {
     console.error("Auto-seed essential users failed:", err);
@@ -406,6 +448,16 @@ export async function seedAppleReviewerAccount(): Promise<void> {
   const appleReviewerPassword = process.env.APPLE_REVIEWER_PASSWORD;
   if (!appleReviewerPassword) {
     console.warn("[SEED] APPLE_REVIEWER_PASSWORD env var not set — skipping Apple Reviewer seed");
+    return;
+  }
+
+  // SECURITY: stessa policy di autoSeedEssentialUsers — rifiuta seed con
+  // credenziali deboli o storicamente-leaked. L'account Apple Reviewer è
+  // un account user normale (no role admin) ma resta gating per evitare
+  // che venga creato con password banali.
+  const weakReason = isPasswordTooWeak(appleReviewerPassword);
+  if (weakReason) {
+    console.error(`[SEED] REFUSING to seed Apple Reviewer: APPLE_REVIEWER_PASSWORD ${weakReason}`);
     return;
   }
 
