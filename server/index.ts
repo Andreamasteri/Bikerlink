@@ -4,7 +4,7 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 import { registerRoutes } from "./routes";
 import { initState } from "./init-state";
 import { startMatchingEngine, stopMatchingEngine } from "./matching-engine";
-import { autoSeedEssentialUsers, autoSeedFakeUsers, seedAppleReviewerAccount, seedGooglePlayReviewerAccount } from "./auto-seed";
+import { autoSeedEssentialUsers, autoSeedFakeUsers, seedAppleReviewerAccount, seedGooglePlayReviewerAccount, ensureBikerLinkOfficialOnBoot } from "./auto-seed";
 import { db, pool } from "./db";
 import { sql, eq, and } from "drizzle-orm";
 import { motoClubs, motoClubMembers, conversations, conversationParticipants, motorcyclePhotos, userMotorcycles } from "@shared/schema";
@@ -1149,6 +1149,11 @@ function setupErrorHandler(app: express.Application) {
           await seedGooglePlayReviewerAccount();
         } catch (e) {
           console.warn("[INIT] seedGooglePlayReviewerAccount error:", e);
+        }
+        try {
+          await ensureBikerLinkOfficialOnBoot();
+        } catch (e) {
+          console.warn("[INIT] ensureBikerLinkOfficialOnBoot error:", e);
         }
         try {
           const { storage } = await import("./storage");

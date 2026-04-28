@@ -373,12 +373,12 @@ router.delete("/purge-non-admin-users", async (req: Request, res: Response) => {
       // Step 5: invalida tutte le sessioni attive
       await tx.execute(sql`DELETE FROM session`);
 
-      // Step 6: log in moderator_logs
+      // Step 6: log in moderator_logs (targetId = adminId — operazione system, notNull)
       await tx.insert(moderatorLogs).values({
         moderatorId: adminId,
         action: "purge_non_admin_users",
         targetType: "system",
-        targetId: null,
+        targetId: adminId,
         details: `Purga DB: eliminati ${deletedCount} utenti non-admin + tutte le sessioni`,
       });
 
