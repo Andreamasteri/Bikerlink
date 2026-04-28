@@ -187,8 +187,8 @@ function requireAdmin(req: Request, res: Response, next: Function) {
 const OTA_EVENTS_DB_RETENTION = 1000;
 
 function clientIp(req: Request): string | undefined {
-  const fwd = req.headers["x-forwarded-for"];
-  if (typeof fwd === "string") return fwd.split(",")[0]?.trim().substring(0, 64);
+  // Use req.ip set by Express (trust proxy=1) — never parse X-Forwarded-For directly
+  // because an attacker controls that header value and can rotate it to bypass rate limits.
   return (req.ip || req.socket?.remoteAddress || "").toString().substring(0, 64) || undefined;
 }
 

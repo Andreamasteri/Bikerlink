@@ -59,16 +59,39 @@ function requireAuth(req: Request, res: Response): string | null {
   return req.session.userId;
 }
 
+// Per-user in-memory rate limit: max 10 reports per hour to prevent email/DB flooding.
+const REPORT_RATE_MAX = 10;
+const REPORT_RATE_WINDOW_MS = 60 * 60 * 1000;
+const reportRateMap = new Map<string, { count: number; resetAt: number }>();
+
+function isReportRateLimited(userId: string): boolean {
+  const now = Date.now();
+  const entry = reportRateMap.get(userId);
+  if (!entry || now > entry.resetAt) {
+    reportRateMap.set(userId, { count: 1, resetAt: now + REPORT_RATE_WINDOW_MS });
+    return false;
+  }
+  if (entry.count >= REPORT_RATE_MAX) return true;
+  entry.count++;
+  return false;
+}
+
+const DESCRIPTION_MAX_LEN = 2000;
+
 const createReportSchema = z.object({
   reportedUserId: z.string().min(1, "ID utente segnalato obbligatorio"),
   reason: z.string().min(1, "Motivo obbligatorio").max(100),
-  description: z.string().optional(),
+  description: z.string().max(DESCRIPTION_MAX_LEN, `La descrizione non può superare ${DESCRIPTION_MAX_LEN} caratteri`).optional(),
 });
 
 router.post("/", async (req: Request, res: Response) => {
   try {
     const userId = requireAuth(req, res);
     if (!userId) return;
+
+    if (isReportRateLimited(userId)) {
+      return res.status(429).json({ message: "Hai inviato troppe segnalazioni. Riprova tra un'ora." });
+    }
 
     const parsed = createReportSchema.safeParse(req.body);
     if (!parsed.success) {

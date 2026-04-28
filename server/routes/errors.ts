@@ -76,9 +76,9 @@ function buildErrorEmailHtml(payload: {
 
 router.post("/", async (req: Request, res: Response) => {
   try {
-    const ip = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim()
-      ?? req.socket?.remoteAddress
-      ?? "unknown";
+    // Use req.ip (set by Express when trust proxy=1) — not the raw X-Forwarded-For
+    // header which an attacker can spoof to bypass the per-IP rate limit.
+    const ip = req.ip ?? req.socket?.remoteAddress ?? "unknown";
 
     if (isRateLimited(ip)) {
       return res.status(429).json({ message: "Troppe richieste" });
