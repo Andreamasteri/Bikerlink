@@ -43,8 +43,10 @@ yarn-error.*
 
 .env
 
-# Stress test logs
-logs/
+# Stress test logs (keep apk-build-history.log tracked)
+logs/*.log
+logs/*.txt
+!logs/apk-build-history.log
 
 # Static build (generated artifacts — non includere nel repo)
 static-build/
