@@ -120,6 +120,26 @@ if [ "$ACTUAL_NAME" != "$VERSION_NAME" ]; then
 fi
 echo "  ✔  versionName sincronizzato e verificato: $VERSION_NAME (app.json → build.gradle)"
 
+# ── 2c. Auto-commit file di versione prima di inviare a EAS ─────────────────
+# EAS archivia il progetto dal filesystem ma usa i file git-tracciati come base.
+# Se app.json e build.gradle non sono committati, EAS compila con i valori vecchi
+# (problema riscontrato nella build v43: APK mostrava v41/3.1.0 invece di v43/3.2.0).
+GIT_COMMITTED="no"
+if git diff --quiet HEAD -- app.json android/app/build.gradle 2>/dev/null; then
+  echo "  ℹ  Nessun commit necessario (app.json e build.gradle già allineati con git)"
+  GIT_COMMITTED="already-aligned"
+else
+  git add app.json android/app/build.gradle 2>/dev/null
+  COMMIT_MSG="chore: bump version to $VERSION_NAME (versionCode $VERSION_CODE) [build-apk]"
+  if git commit -m "$COMMIT_MSG" 2>/dev/null; then
+    echo "  ✔  Versioni committate: $COMMIT_MSG"
+    GIT_COMMITTED="yes"
+  else
+    echo "  ⚠  Commit fallito (git non configurato o niente da committare) — build continua con file locali"
+    GIT_COMMITTED="no"
+  fi
+fi
+
 # ── 3. Validazione profilo ──────────────────────────────────────────────────
 # Task #1017: profili ammessi sono solo "release-apk" (default APK dimagrita) e
 # "production" (AAB Play Store). Il vecchio "preview" è stato rimosso per evitare
@@ -196,7 +216,7 @@ mkdir -p logs
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 AUTHORIZED_BY=$(whoami 2>/dev/null || echo "unknown")
-echo "$TIMESTAMP  APK BUILD AVVIATA — profilo=$PROFILE commit=$COMMIT utente=$AUTHORIZED_BY" >> "$LOG_FILE"
+echo "$TIMESTAMP  APK BUILD AVVIATA — profilo=$PROFILE commit=$COMMIT utente=$AUTHORIZED_BY versionName=$VERSION_NAME versionCode=$VERSION_CODE committed=$GIT_COMMITTED" >> "$LOG_FILE"
 echo "  ✔  Evento loggato in $LOG_FILE"
 
 # ── 5. Riepilogo pre-build ───────────────────────────────────────────────────
@@ -226,7 +246,7 @@ set -e
 
 # ── 7. Log risultato ─────────────────────────────────────────────────────────
 if [ $BUILD_EXIT -eq 0 ]; then
-  echo "$TIMESTAMP  APK BUILD INVIATA (--no-wait) — profilo=$PROFILE commit=$COMMIT utente=$AUTHORIZED_BY" >> "$LOG_FILE"
+  echo "$TIMESTAMP  APK BUILD INVIATA (--no-wait) — profilo=$PROFILE commit=$COMMIT utente=$AUTHORIZED_BY versionName=$VERSION_NAME versionCode=$VERSION_CODE committed=$GIT_COMMITTED" >> "$LOG_FILE"
   echo ""
   echo "  ✅ Build inviata ai server EAS — controlla https://expo.dev per lo stato."
   echo ""
