@@ -154,3 +154,7 @@ BIKERLINK_BACKEND_URL = "https://biker-link.replit.app"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 5999
+externalPort = 3001
