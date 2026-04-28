@@ -327,7 +327,11 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
 
   const handleMessage = useCallback((event: WebViewMessageEvent) => {
     try {
-      const msg = JSON.parse(event.nativeEvent.data) as { type: string; lat?: number; lng?: number; markerType?: string; id?: string };
+      const msg = JSON.parse(event.nativeEvent.data) as { type: string; lat?: number; lng?: number; markerType?: string; id?: string; omsReady?: boolean; nearbyDistance?: number; error?: string };
+      if (msg.type === "omsStatus") {
+        console.log("[InteractiveMap] omsStatus", { omsReady: msg.omsReady, nearbyDistance: msg.nearbyDistance, error: msg.error });
+        return;
+      }
       if (msg.type === "mapReady") {
         sendStartupBeacon("mapview_ready");
         onReady?.();

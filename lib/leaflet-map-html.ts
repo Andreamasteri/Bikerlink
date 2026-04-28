@@ -16,7 +16,10 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 <div id="map"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-/* OverlappingMarkerSpiderfier-Leaflet v0.2.7 — embedded inline (Task #1077).
+/* OverlappingMarkerSpiderfier-Leaflet — embedded inline (Task #1077).
+   Source: npm package overlapping-marker-spiderfier-leaflet@0.2.7 (dist/oms.min.js).
+   Note: il package.json e' v0.2.7 ma il VERSION constant nel sorgente
+   minificato resta "0.2.6" — upstream non ha mai bumpato la stringa interna.
    Original: https://github.com/jawj/OverlappingMarkerSpiderfier-Leaflet (MIT).
    Bundled per evitare dipendenza fragile da CDN unpkg in WebView (baseUrl="").
    La precedente OTA-2..OTA-15 caricava /dist/oms.min.js che NON ESISTE su unpkg
