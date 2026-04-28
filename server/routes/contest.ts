@@ -2,8 +2,11 @@ import { Router, type Request, type Response } from "express";
 import path from "path";
 import multer from "multer";
 import { storage } from "../storage";
-import { uploadBuffer, downloadBuffer } from "../objectStorage";
+import { uploadBuffer, downloadBuffer, deleteObject } from "../objectStorage";
 import { allLimited } from "../lib/concurrency";
+import { db } from "../db";
+import { photoContestEntries } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 const router = Router();
 
@@ -195,6 +198,13 @@ router.delete("/entries/:id", async (req: Request, res: Response) => {
     }
 
     await storage.deletePhotoContestEntry(id);
+    // Also remove the image from object storage so the URL cannot be accessed after deletion
+    if (entry.photoUrl) {
+      const photoFilename = entry.photoUrl.split("/").pop();
+      if (photoFilename) {
+        await deleteObject(`public/contest/${photoFilename}`).catch(() => {});
+      }
+    }
     return res.json({ message: "Foto eliminata" });
   } catch (error) {
     console.error("Contest delete entry error:", error);
@@ -204,7 +214,29 @@ router.delete("/entries/:id", async (req: Request, res: Response) => {
 
 router.get("/photos/:filename", async (req: Request, res: Response) => {
   try {
+    // Require authentication — URLs must not be accessible to logged-out third parties
+    const userId = requireAuth(req, res);
+    if (!userId) return;
+
     const filename = req.params.filename;
+    // Basic filename sanity check to prevent path traversal
+    if (!filename || filename.includes("/") || filename.includes("..")) {
+      return res.status(400).end();
+    }
+
+    // Check that the entry still exists in the DB and is approved.
+    // Covers: user-deleted entries (DB row gone) and moderator-rejected entries (isApproved=false).
+    const photoUrl = `/api/contest/photos/${filename}`;
+    const [entry] = await db
+      .select({ id: photoContestEntries.id, isApproved: photoContestEntries.isApproved })
+      .from(photoContestEntries)
+      .where(eq(photoContestEntries.photoUrl, photoUrl))
+      .limit(1);
+
+    if (!entry || entry.isApproved === false) {
+      return res.status(404).json({ message: "Foto non trovata" });
+    }
+
     const objectPath = `public/contest/${filename}`;
     const buffer = await downloadBuffer(objectPath);
     const ext = path.extname(filename).toLowerCase();
@@ -216,7 +248,7 @@ router.get("/photos/:filename", async (req: Request, res: Response) => {
     };
     const contentType = mimeTypes[ext] ?? "image/jpeg";
     res.set("Content-Type", contentType);
-    res.set("Cache-Control", "public, max-age=31536000, immutable");
+    res.set("Cache-Control", "private, no-store");
     return res.send(buffer);
   } catch {
     return res.status(404).json({ message: "Foto non trovata" });
