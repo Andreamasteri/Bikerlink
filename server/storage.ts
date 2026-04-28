@@ -529,7 +529,18 @@ export class DatabaseStorage implements IStorage {
 
   async getUserProfilesByIds(ids: string[]): Promise<UserProfile[]> {
     if (ids.length === 0) return [];
-    return db.select().from(userProfiles).where(inArray(userProfiles.userId, ids));
+    const rows = await db.select().from(userProfiles).where(inArray(userProfiles.userId, ids));
+    // Task #1124 vuln 1: defense-in-depth privacy mask. Match enrichment in
+    // /api/proposals/garage-matches and /api/proposals/biker-matches loads
+    // the other side's profile through this helper and copies otherLat,
+    // otherLng and a derived distanceKm into the response. Without masking
+    // here, hideFromMap=true users would still leak their exact stored
+    // coordinates (and a haversine distance to the caller) every time a
+    // match exists between them. The other singular-profile helpers already
+    // pass through maskHiddenLocation/maskHiddenLocationRows; this brings the
+    // bulk variant in line so future bulk consumers cannot regress the same
+    // privacy promise.
+    return rows.map((p) => maskHiddenLocation(p));
   }
 
   async createUserProfile(data: InsertUserProfile): Promise<UserProfile> {

@@ -356,6 +356,34 @@ router.post("/matches/:id/accept", requireAuth, async (req: Request, res: Respon
       return res.status(403).json({ message: "Non autorizzato" });
     }
 
+    // Task #1124 vuln 2: re-check the club boundary at accept time. The
+    // matching engine now refuses to create cross-club / non-member matches,
+    // but legacy rows from before this fix can still be sitting in
+    // proposal_matches. We must not let a former member (or an outsider
+    // matched against a club proposal by a buggy past run) flip a pending
+    // match to "accepted", because the accepted branch creates a group
+    // conversation and enrolls both userIds — that would expose private
+    // club ride details and let an outsider start chatting with current
+    // members.
+    const proposal1 = await storage.getProposal(match.proposalId1);
+    const proposal2 = await storage.getProposal(match.proposalId2);
+    if (proposal1?.clubId && !(await isActiveClubMember(userId, proposal1.clubId))) {
+      return res.status(403).json({ message: "Non sei più membro del club di questa proposta" });
+    }
+    if (proposal2?.clubId && !(await isActiveClubMember(userId, proposal2.clubId))) {
+      return res.status(403).json({ message: "Non sei più membro del club di questa proposta" });
+    }
+    // Also verify the OTHER side is still a member of the relevant club, so
+    // we don't enroll an ex-member into a brand-new conversation just because
+    // the caller is still in good standing.
+    const otherUserId = isUser1 ? match.userId2 : match.userId1;
+    if (proposal1?.clubId && !(await isActiveClubMember(otherUserId, proposal1.clubId))) {
+      return res.status(403).json({ message: "L'altra persona non è più membro del club" });
+    }
+    if (proposal2?.clubId && !(await isActiveClubMember(otherUserId, proposal2.clubId))) {
+      return res.status(403).json({ message: "L'altra persona non è più membro del club" });
+    }
+
     const updateData: Record<string, unknown> = {};
     if (isUser1) updateData.acceptedByUser1 = true;
     if (isUser2) updateData.acceptedByUser2 = true;
@@ -366,8 +394,6 @@ router.post("/matches/:id/accept", requireAuth, async (req: Request, res: Respon
     if (newAcceptedByUser1 && newAcceptedByUser2) {
       updateData.status = "accepted";
 
-      const proposal1 = await storage.getProposal(match.proposalId1);
-      const proposal2 = await storage.getProposal(match.proposalId2);
       const chatTitle = `Match: ${proposal1?.title || "Proposta"} ↔ ${proposal2?.title || "Proposta"}`;
 
       const conv = await storage.createConversation({

@@ -1,5 +1,59 @@
 import { storage } from "./storage";
-import type { Proposal } from "@shared/schema";
+import { db } from "./db";
+import { motoClubMembers, type Proposal } from "@shared/schema";
+import { and, eq, inArray } from "drizzle-orm";
+
+/**
+ * Task #1124 vuln 2: club-boundary enforcement for proposal matching.
+ *
+ * Pre-fetches active membership rows for `(userId in userIds, clubId in clubIds,
+ * status='active')` and returns a Set of `${userId}:${clubId}` keys for O(1)
+ * lookup inside the matching loops. Used to block:
+ *   - matches where exactly one side has a clubId (public<->club leak)
+ *   - matches where the two clubIds differ (cross-club leak)
+ *   - matches where either user has dropped active membership in the proposal's
+ *     club between proposal creation and the matching cycle
+ *
+ * Without this gate the engine pairs club proposals against any compatible
+ * proposal globally, and then GET /api/proposals/matches and the accept route
+ * become an exfiltration primitive for club-only ride details.
+ */
+async function getActiveClubMembershipKeys(
+  userIds: string[],
+  clubIds: string[],
+): Promise<Set<string>> {
+  if (userIds.length === 0 || clubIds.length === 0) return new Set();
+  const rows = await db
+    .select({ userId: motoClubMembers.userId, clubId: motoClubMembers.clubId })
+    .from(motoClubMembers)
+    .where(and(
+      inArray(motoClubMembers.userId, userIds),
+      inArray(motoClubMembers.clubId, clubIds),
+      eq(motoClubMembers.status, "active"),
+    ));
+  return new Set(rows.map((r) => `${r.userId}:${r.clubId}`));
+}
+
+/**
+ * Returns true when two proposals belong to the same club scope:
+ *   - both have no clubId (public matching), OR
+ *   - both have the same clubId AND both authors are still active members.
+ *
+ * Caller must pass a precomputed membership-key set
+ * (see getActiveClubMembershipKeys).
+ */
+function clubScopeAllows(
+  p1: Proposal,
+  p2: Proposal,
+  membershipKeys: Set<string>,
+): boolean {
+  const c1 = p1.clubId ?? null;
+  const c2 = p2.clubId ?? null;
+  if (c1 === null && c2 === null) return true;
+  if (c1 !== c2) return false;
+  // c1 === c2 and not null
+  return membershipKeys.has(`${p1.userId}:${c1}`) && membershipKeys.has(`${p2.userId}:${c2}`);
+}
 
 function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
@@ -91,6 +145,14 @@ async function runMatching(): Promise<number> {
     if (activeProposals.length < 2) return 0;
 
     const existingKeys = await storage.getAllExistingProposalMatchKeys();
+    // Task #1124 vuln 2: prefetch active club memberships ONLY for the
+    // (userId, clubId) pairs that appear on club-scoped proposals. This is
+    // tiny in practice (most proposals are public) and lets us reject
+    // cross-club / non-member matches in O(1) inside the loop.
+    const clubProposals = activeProposals.filter((p) => !!p.clubId);
+    const clubUserIds = [...new Set(clubProposals.map((p) => p.userId))];
+    const clubIds = [...new Set(clubProposals.map((p) => p.clubId as string))];
+    const membershipKeys = await getActiveClubMembershipKeys(clubUserIds, clubIds);
     let matchCount = 0;
 
     for (let i = 0; i < activeProposals.length; i++) {
@@ -99,6 +161,12 @@ async function runMatching(): Promise<number> {
         const p2 = activeProposals[j];
 
         if (!areCompatible(p1, p2)) continue;
+        // Task #1124 vuln 2: enforce club boundary. Blocks public<->club,
+        // cross-club, and former-member matches BEFORE the row is created
+        // — the safest place since downstream consumers (GET
+        // /api/proposals/matches, accept, reject, conversation creation)
+        // historically have not reliably re-checked membership.
+        if (!clubScopeAllows(p1, p2, membershipKeys)) continue;
 
         if (existingKeys.has(`${p1.id}:${p2.id}`)) continue;
 
@@ -532,12 +600,20 @@ export async function runProposalMatchingForUser(userId: string): Promise<number
     if (userProposals.length === 0) return 0;
 
     const existingKeys = await storage.getAllExistingProposalMatchKeys();
+    // Task #1124 vuln 2: same club-membership prefetch as runMatching().
+    // Prevents the on-demand /api/matching/trigger path from creating
+    // matches that cross the club boundary.
+    const clubProposals = activeProposals.filter((p) => !!p.clubId);
+    const clubUserIds = [...new Set(clubProposals.map((p) => p.userId))];
+    const clubIds = [...new Set(clubProposals.map((p) => p.clubId as string))];
+    const membershipKeys = await getActiveClubMembershipKeys(clubUserIds, clubIds);
     let matchCount = 0;
 
     for (const up of userProposals) {
       for (const other of activeProposals) {
         if (other.userId === userId) continue;
         if (!areCompatible(up, other)) continue;
+        if (!clubScopeAllows(up, other, membershipKeys)) continue;
 
         const p1Id = up.id < other.id ? up.id : other.id;
         const p2Id = up.id < other.id ? other.id : up.id;
