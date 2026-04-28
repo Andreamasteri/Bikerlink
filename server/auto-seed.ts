@@ -260,11 +260,12 @@ export async function autoSeedFakeUsers() {
     }
 
     console.log("Auto-seeding fake users...");
-    // Task #1078: password random non condivisa, non persistita altrove. Gli account
-    // fake sono comunque bloccati al login da auth.ts (isFake check) — questo è
-    // defense-in-depth nel caso quel guard venga rimosso accidentalmente in futuro.
-    const fakeSecret = crypto.randomBytes(32).toString("base64url");
-    const hashedPassword = await bcrypt.hash(fakeSecret, 12);
+    // Task #1078: ogni account fake riceve una password random (256-bit) UNICA,
+    // non condivisa fra account, non persistita altrove. Gli account fake sono
+    // comunque bloccati al login da auth.ts (isFake check) — questo è
+    // defense-in-depth nel caso quel guard venga rimosso accidentalmente.
+    const makeFakeHash = () =>
+      bcrypt.hash(crypto.randomBytes(32).toString("base64url"), 12);
     let seedSuccessCount = 0;
 
     for (const biker of fakeBikers) {
@@ -279,7 +280,7 @@ export async function autoSeedFakeUsers() {
           .values({
             nickname: biker.nickname,
             email,
-            password: hashedPassword,
+            password: await makeFakeHash(),
             userType: "biker",
             sex: biker.sex,
             role: "user",
@@ -330,7 +331,7 @@ export async function autoSeedFakeUsers() {
           .values({
             nickname: zav.nickname,
             email,
-            password: hashedPassword,
+            password: await makeFakeHash(),
             userType: "zavorrina",
             sex: zav.sex,
             role: "user",
@@ -389,7 +390,7 @@ export async function autoSeedFakeUsers() {
           .values({
             nickname: coppia.nickname,
             email,
-            password: hashedPassword,
+            password: await makeFakeHash(),
             userType: "coppia",
             sex: null,
             coupleSexConfig: "MF",
