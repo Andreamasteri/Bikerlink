@@ -71,11 +71,6 @@ const resendResetLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Task #1121 (vuln 1): rate limit per IP sull'endpoint di verifica email.
-// I codici sono solo 24-bit (6 hex chars) → senza throttling un attacker
-// può trasformare la verifica email in un account-takeover bruteforcando
-// il token. 10 tentativi/15min/IP, combinato col counter per-userId qui
-// sotto, rende il bruteforce online impraticabile.
 const verifyEmailLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
@@ -84,10 +79,6 @@ const verifyEmailLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Task #1121 (vuln 1): l'attacker può anche provare a forzare l'emissione
-// di nuovi codici (per estendere la finestra d'attacco e per enumerare gli
-// account ancora unverified). 5/ora/IP è sufficiente per l'uso legittimo
-// (ritardi SMTP, refresh manuale) ma blocca lo scan/bruteforce.
 const resendVerificationLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
@@ -96,13 +87,9 @@ const resendVerificationLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Task #1121 (vuln 1): contatore in-memory dei tentativi falliti per
-// userId. Difesa di secondo livello rispetto al rate limit per IP: anche
-// se l'attacker ruota gli IP (botnet), il singolo userId può essere
-// bersagliato al massimo VERIFY_MAX_ATTEMPTS volte prima che TUTTI i suoi
-// token attivi vengano cancellati e l'attacker debba forzare un resend
-// (a sua volta rate-limitato per IP). La finestra si resetta dopo
-// VERIFY_ATTEMPT_WINDOW_MS o dopo una verifica andata a buon fine.
+// Per-userId failure counter: difesa contro brute force distribuito su più IP
+// (il rate limit per IP da solo non basterebbe). Dopo VERIFY_MAX_ATTEMPTS
+// tentativi falliti i token attivi vengono cancellati.
 const VERIFY_MAX_ATTEMPTS = 5;
 const VERIFY_ATTEMPT_WINDOW_MS = 30 * 60 * 1000;
 const verifyAttempts = new Map<string, { count: number; firstAt: number }>();
@@ -511,30 +498,19 @@ router.post("/reset-password", resetPasswordLimiter, async (req: Request, res: R
     await storage.updateUser(user.id, { password: hashedPassword } as any);
     await storage.markPasswordResetTokenUsedById(resetToken.id);
 
-    // Task #1121 (vuln 2): la modifica password DEVE invalidare ogni sessione
-    // pre-esistente. I token Bearer hanno TTL 1 anno con `rolling: true`,
-    // quindi senza questa pulizia un attacker che ha sottratto un token resta
-    // autenticato anche dopo che il vero proprietario ha resettato la password.
-    // La rimozione viene fatta PRIMA di emettere la nuova sessione: la sessione
-    // del caller a questo punto è ancora anonima (no userId nel JSON), quindi
-    // la query `sess->>'userId' = $1` non la tocca.
-    //
-    // FAIL-CLOSED: se la revoca fallisce (errore DB) rispondiamo 500 senza
-    // emettere il nuovo token. La password è già cambiata — l'utente può
-    // ritentare login/reset, e nel frattempo l'attacker non riceve un nuovo
-    // sessionToken da questo endpoint. Senza questo guardrail si entrerebbe
-    // in uno stato in cui password=nuova ma sessione_attacker=ancora valida.
+    // Revoca tutte le sessioni pre-esistenti prima di emettere il nuovo
+    // token. Fail-closed: se la revoca fallisce non rilasciamo la sessione.
     let revoked = 0;
     try {
       revoked = await revokeAllUserSessions(user.id);
     } catch (e) {
-      console.error("[PASSWORD RESET] revokeAllUserSessions failed — refusing to issue new session:", e);
+      console.error("[PASSWORD RESET] revokeAllUserSessions failed:", e);
       return res.status(500).json({
         message: "Password aggiornata ma impossibile invalidare le sessioni esistenti. Riprova il login.",
       });
     }
     if (revoked > 0) {
-      console.log(`[PASSWORD RESET] Revoked ${revoked} existing session(s) for user ${user.id}`);
+      console.log(`[PASSWORD RESET] Revoked ${revoked} session(s) for user ${user.id}`);
     }
 
     req.session.userId = user.id;
@@ -599,34 +575,21 @@ router.post("/verify-email", verifyEmailLimiter, async (req: Request, res: Respo
       return res.status(400).json({ message: "Email e codice richiesti" });
     }
 
-    // Risposta generica per non rivelare quali email esistono come account
-    // unverified: l'attacker non deve poter enumerare i bersagli.
     const user = await storage.getUserByEmail(email.trim().toLowerCase());
     if (!user) {
       return res.status(400).json({ message: "Codice non valido" });
     }
 
-    // Task #1121 (vuln 1): se questo userId ha già superato il limite di
-    // tentativi falliti nella finestra corrente, rifiuta SENZA confrontare
-    // il codice. Questa è la difesa che blocca un attacker distribuito su
-    // più IP (che bypasserebbe il rate limiter per IP).
     if (isVerifyLockedOut(user.id)) {
-      // Bonifica difensiva: cancella anche i token attivi così l'attacker
-      // perde lo stato e deve forzare un resend (rate-limitato per IP).
       await storage.deleteEmailVerificationTokens(user.id).catch(() => {});
-      return res.status(429).json({
-        message: "Troppi tentativi. Richiedi un nuovo codice.",
-      });
+      return res.status(429).json({ message: "Troppi tentativi. Richiedi un nuovo codice." });
     }
 
     const verif = await storage.getEmailVerificationToken(String(token).toUpperCase());
     if (!verif || verif.userId !== user.id) {
       const attempts = recordVerifyFailure(user.id);
       if (attempts >= VERIFY_MAX_ATTEMPTS) {
-        // Soglia raggiunta proprio con questo tentativo: invalida ogni token
-        // attivo per costringere il prossimo round a passare per resend.
         await storage.deleteEmailVerificationTokens(user.id).catch(() => {});
-        console.warn(`[EMAIL VERIFICATION] Lockout su userId=${user.id} dopo ${attempts} tentativi falliti`);
       }
       return res.status(400).json({ message: "Codice non valido" });
     }
@@ -659,9 +622,7 @@ router.post("/resend-verification", resendVerificationLimiter, async (req: Reque
       return res.status(400).json({ message: "Email richiesta" });
     }
 
-    // Task #1121 (vuln 1): risposta generica per non rivelare se l'email è
-    // registrata né se è già verificata (entrambe le condizioni leakerebbero
-    // informazioni utili a un attacker per enumerare gli account).
+    // Risposta generica per evitare enumerazione degli account.
     const genericResponse = { message: "Se l'email è registrata e in attesa di verifica, riceverai un nuovo codice." };
 
     const user = await storage.getUserByEmail(email.trim().toLowerCase());
@@ -670,9 +631,6 @@ router.post("/resend-verification", resendVerificationLimiter, async (req: Reque
     }
 
     await storage.deleteEmailVerificationTokens(user.id);
-    // Un nuovo codice resetta anche il counter di tentativi, perché il vecchio
-    // token non è più valido e l'attacker dovrebbe ricominciare lo spazio di
-    // ricerca da zero (su uno spazio di 24-bit indipendente).
     clearVerifyAttempts(user.id);
     const token = crypto.randomBytes(3).toString("hex").toUpperCase();
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);

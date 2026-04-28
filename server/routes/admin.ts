@@ -18,6 +18,7 @@ import { isProtectedUser, PROTECTED_EMAILS } from "../constants";
 import { closeSseClient } from "../chat-sse";
 import { SERVER_START_TIME, uptimeState } from "../uptime";
 import { downloadBuffer } from "../objectStorage";
+import { revokeAllUserSessions } from "../session-utils";
 import { cacheAdImage } from "./ads";
 import { allSettledLimited } from "../lib/concurrency";
 
@@ -590,16 +591,8 @@ router.put("/users/:id/password", async (req: Request, res: Response) => {
     if (!user) {
       return res.status(404).json({ message: "Utente non trovato" });
     }
-    // Task #1121 (vuln 2): l'emergency reset admin DEVE invalidare ogni
-    // sessione esistente del target. I token Bearer hanno TTL 1 anno con
-    // `rolling: true`: senza questa pulizia l'utente compromesso resterebbe
-    // raggiungibile dall'attacker anche dopo l'intervento dell'admin.
-    //
-    // FAIL-CLOSED: se la revoca fallisce rispondiamo 500 e logghiamo. La
-    // password è già stata aggiornata, ma comunicare al moderatore l'errore
-    // permette di ritentare manualmente (es. via SQL diretto sulla session
-    // table) prima che l'attacker possa continuare a sfruttare il token.
-    const { revokeAllUserSessions } = await import("../session-utils");
+    // Revoca le sessioni del target. Fail-closed: se fallisce, log e 500
+    // così il moderatore sa che serve un intervento manuale.
     let revoked = 0;
     try {
       revoked = await revokeAllUserSessions(id);
@@ -610,7 +603,7 @@ router.put("/users/:id/password", async (req: Request, res: Response) => {
         action: "reset_password_partial",
         targetType: "user",
         targetId: id,
-        details: "Password resettata MA revoca sessioni fallita — intervento manuale richiesto",
+        details: "Password resettata ma revoca sessioni fallita — intervento manuale richiesto",
       }).catch(() => {});
       return res.status(500).json({
         message: "Password aggiornata ma impossibile invalidare le sessioni esistenti dell'utente. Riprova o intervieni manualmente.",
