@@ -24,6 +24,14 @@ export function removeSseClient(userId: string, connId: string): void {
   }
 }
 
+export function closeSseClient(userId: string): void {
+  const entry = sseClients.get(userId);
+  if (entry) {
+    try { entry.res.end(); } catch {}
+    sseClients.delete(userId);
+  }
+}
+
 export interface ChatSseEvent {
   type: "new_message" | "conversation_update";
   conversationId: string;

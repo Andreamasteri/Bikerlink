@@ -15,6 +15,7 @@ import { sendEmail } from "../email";
 import { MOTORCYCLES, pickRandomN, getMotoYear } from "../mass-seed-data";
 import { getLastMatchingCycleMeta, runBikerBikerMatching, runWishlistMatching, runMatchingForUser } from "../matching-engine";
 import { isProtectedUser } from "../constants";
+import { closeSseClient } from "../chat-sse";
 import { SERVER_START_TIME, uptimeState } from "../uptime";
 import { downloadBuffer } from "../objectStorage";
 import { cacheAdImage } from "./ads";
@@ -426,6 +427,9 @@ router.put("/users/:id/status", async (req: Request, res: Response) => {
       targetId: id,
       details: `Status cambiato a ${status}`,
     });
+    if (status === "suspended" || status === "blocked") {
+      closeSseClient(id);
+    }
     const { password: _, ...safeUser } = user;
     return res.json(safeUser);
   } catch (error) {
