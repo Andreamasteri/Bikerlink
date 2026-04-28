@@ -594,8 +594,28 @@ router.put("/users/:id/password", async (req: Request, res: Response) => {
     // sessione esistente del target. I token Bearer hanno TTL 1 anno con
     // `rolling: true`: senza questa pulizia l'utente compromesso resterebbe
     // raggiungibile dall'attacker anche dopo l'intervento dell'admin.
+    //
+    // FAIL-CLOSED: se la revoca fallisce rispondiamo 500 e logghiamo. La
+    // password è già stata aggiornata, ma comunicare al moderatore l'errore
+    // permette di ritentare manualmente (es. via SQL diretto sulla session
+    // table) prima che l'attacker possa continuare a sfruttare il token.
     const { revokeAllUserSessions } = await import("../session-utils");
-    const revoked = await revokeAllUserSessions(id);
+    let revoked = 0;
+    try {
+      revoked = await revokeAllUserSessions(id);
+    } catch (e) {
+      console.error(`[ADMIN PASSWORD RESET] Session revocation failed for user ${id}:`, e);
+      await storage.createModeratorLog({
+        moderatorId: req.session.userId!,
+        action: "reset_password_partial",
+        targetType: "user",
+        targetId: id,
+        details: "Password resettata MA revoca sessioni fallita — intervento manuale richiesto",
+      }).catch(() => {});
+      return res.status(500).json({
+        message: "Password aggiornata ma impossibile invalidare le sessioni esistenti dell'utente. Riprova o intervieni manualmente.",
+      });
+    }
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
       action: "reset_password",

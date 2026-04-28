@@ -518,7 +518,21 @@ router.post("/reset-password", resetPasswordLimiter, async (req: Request, res: R
     // La rimozione viene fatta PRIMA di emettere la nuova sessione: la sessione
     // del caller a questo punto è ancora anonima (no userId nel JSON), quindi
     // la query `sess->>'userId' = $1` non la tocca.
-    const revoked = await revokeAllUserSessions(user.id);
+    //
+    // FAIL-CLOSED: se la revoca fallisce (errore DB) rispondiamo 500 senza
+    // emettere il nuovo token. La password è già cambiata — l'utente può
+    // ritentare login/reset, e nel frattempo l'attacker non riceve un nuovo
+    // sessionToken da questo endpoint. Senza questo guardrail si entrerebbe
+    // in uno stato in cui password=nuova ma sessione_attacker=ancora valida.
+    let revoked = 0;
+    try {
+      revoked = await revokeAllUserSessions(user.id);
+    } catch (e) {
+      console.error("[PASSWORD RESET] revokeAllUserSessions failed — refusing to issue new session:", e);
+      return res.status(500).json({
+        message: "Password aggiornata ma impossibile invalidare le sessioni esistenti. Riprova il login.",
+      });
+    }
     if (revoked > 0) {
       console.log(`[PASSWORD RESET] Revoked ${revoked} existing session(s) for user ${user.id}`);
     }

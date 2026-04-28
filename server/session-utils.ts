@@ -11,8 +11,13 @@ import { pool } from "./db";
  * con `rolling: true`), quindi senza questa pulizia un attacker che ha
  * sottratto un token resta autenticato anche dopo il reset password.
  *
- * Ritorna il numero di righe cancellate. Errori vengono loggati ma non
- * propagati: la mancata revoca non deve bloccare il reset password.
+ * Ritorna il numero di righe cancellate. Eventuali errori del DB vengono
+ * loggati e PROPAGATI al caller (fail-closed): un fallimento silenzioso
+ * lascerebbe il post-reset in uno stato inconsistente in cui la password
+ * è cambiata ma le vecchie sessioni dell'attacker sono ancora valide.
+ * I caller (reset-password, admin reset) devono trattare un'eccezione
+ * come errore di flusso e rispondere 500, in modo che l'operatore possa
+ * ritentare l'operazione.
  *
  * Opzionalmente è possibile preservare una specifica `excludeSid` (es. la
  * sessione del caller dopo che è già stata associata al nuovo userId) per
@@ -33,7 +38,7 @@ export async function revokeAllUserSessions(
     const r = await pool.query(`DELETE FROM session WHERE ${where}`, params);
     return r.rowCount ?? 0;
   } catch (e) {
-    console.error("[session-utils] revokeAllUserSessions failed:", e);
-    return 0;
+    console.error("[session-utils] revokeAllUserSessions failed for user", userId, e);
+    throw e;
   }
 }
