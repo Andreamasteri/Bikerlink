@@ -46,14 +46,17 @@ Production assumptions for this scan:
 
 - Treat any production startup seeding or reviewer/demo-account provisioning as a first-class auth risk; default or resettable credentials are in scope even when introduced as operational convenience.
 - Treat platform-created fake or synthetic users as real production principals if they can log in or interact with ordinary users; shared credentials on those accounts are in scope.
+- Treat email-verification and password-recovery codes as authentication factors: short codes, missing attempt limits, or flows that automatically create a session on success are in scope as account-takeover risks.
 - Treat exact user coordinates, club rosters/proposals, profile photos, garage photos, and chat attachments as sensitive data that require server-side audience checks, not just frontend hiding or unguessable URLs.
 - Treat any proxy/fetch endpoint that accepts attacker-controlled destinations as SSRF-prone unless it validates resolved IPs, redirect targets, and response-handling boundaries.
 - Re-check current account status on authenticated requests; blocking or suspension is not an effective control if long-lived sessions remain usable after the status change.
+- Treat user safety controls such as blocking as message-delivery boundaries that must be enforced consistently across text, image, and attachment endpoints, not only on one send path or on later read paths.
 - Treat public or pre-auth operational telemetry ingestion as an availability surface that needs payload caps, rate limits, and strict field truncation.
 - Re-check long-lived authenticated channels such as SSE or other streaming responses when account status changes; per-request session invalidation alone does not revoke already-open streams.
 - Treat `hideFromMap` as protection against derived distance leakage as well as raw coordinate leakage across every discovery and availability endpoint.
 - Treat club-scoped proposals as private club objects whose active-membership checks must be enforced on create, read, and join flows, not only on list endpoints.
 - Treat public or low-friction telemetry and reporting endpoints that trigger email or durable storage as abuse surfaces: they should rely on trusted proxy-derived client identity (`req.ip`/Express proxy handling), and authenticated reporting still needs quotas and body caps.
+- Treat admin-authored OTA metadata and moderator-authored client-rendered URLs as untrusted inputs that cross into public endpoints or end-user devices; privileged content pipelines still need server-side source restrictions.
 
 ## Threat Categories
 
