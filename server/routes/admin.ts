@@ -590,12 +590,18 @@ router.put("/users/:id/password", async (req: Request, res: Response) => {
     if (!user) {
       return res.status(404).json({ message: "Utente non trovato" });
     }
+    // Task #1121 (vuln 2): l'emergency reset admin DEVE invalidare ogni
+    // sessione esistente del target. I token Bearer hanno TTL 1 anno con
+    // `rolling: true`: senza questa pulizia l'utente compromesso resterebbe
+    // raggiungibile dall'attacker anche dopo l'intervento dell'admin.
+    const { revokeAllUserSessions } = await import("../session-utils");
+    const revoked = await revokeAllUserSessions(id);
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
       action: "reset_password",
       targetType: "user",
       targetId: id,
-      details: "Password resettata dall'admin",
+      details: `Password resettata dall'admin (sessioni revocate: ${revoked})`,
     });
     const { password: _pw, ...safeUser } = user;
     return res.json(safeUser);
