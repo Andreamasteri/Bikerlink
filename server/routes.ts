@@ -454,6 +454,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     };
 
+    // Task #1119: helper centralizzato per gli header del protocollo Expo Updates v0.
+    // DEVE essere applicato a TUTTE le risposte (200/204/304), non solo al 200 con
+    // manifest. Il client SDK 55, se non riceve `expo-protocol-version` dal server,
+    // assume v1 strict e si aspetta una risposta multipart/mixed con directive
+    // `noUpdateAvailable`. Trovando 204 vuoto rigetta con "Failed to check for
+    // update", rendendo il sistema OTA inutilizzabile per i device già allineati.
+    const setExpoUpdatesHeaders = (etag?: string) => {
+      res.setHeader("expo-protocol-version", "0");
+      res.setHeader("expo-sfv-version", "0");
+      res.setHeader("cache-control", "private, max-age=0");
+      if (etag) res.setHeader("etag", etag);
+    };
+
     try {
       const runtimeVersion = req.headers["expo-runtime-version"] as string | undefined;
       const platform = req.headers["expo-platform"] as string | undefined;
@@ -463,6 +476,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Only serve Android OTA bundles — iOS publishing is handled separately
       if (platform && platform !== "android") {
         await logEvent("204-not-android", null);
+        setExpoUpdatesHeaders();
         return res.status(204).end();
       }
 
@@ -476,6 +490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!result.rows.length) {
         await logEvent("204-no-release", null);
+        setExpoUpdatesHeaders();
         return res.status(204).end();
       }
 
@@ -483,11 +498,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (currentUpdateId && currentUpdateId === release.id) {
         await logEvent("204-already-current", String(release.id));
+        setExpoUpdatesHeaders();
         return res.status(204).end();
       }
 
       if (ifNoneMatch && ifNoneMatch === `"${release.id}"`) {
         await logEvent("304-etag-match", String(release.id));
+        // 304 mantiene l'etag per permettere al client di confermare il match.
+        setExpoUpdatesHeaders(`"${release.id}"`);
         return res.status(304).end();
       }
 
@@ -532,13 +550,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       };
 
-      // expo-protocol-version: 0 — compatibile con risposta JSON semplice (single-manifest).
+      // Task #1119: gli stessi header v0 sono ora dichiarati da `setExpoUpdatesHeaders`
+      // anche su 204/304 (non solo qui sul 200). Senza protocol-version sui 204/304,
+      // SDK 55 cade in v1 strict e si aspetta multipart/mixed con directive
+      // `noUpdateAvailable`, rigettando ogni check successivo al primo allineamento.
       // Protocollo v1 richiederebbe multipart/mixed, che NON serviamo: dichiarare v1
       // su body JSON causa il rifiuto di reloadAsync() in expo-updates SDK 55.0.21.
-      res.setHeader("expo-protocol-version", "0");
-      res.setHeader("expo-sfv-version", "0");
-      res.setHeader("cache-control", "private, max-age=0");
-      res.setHeader("etag", `"${release.id}"`);
+      setExpoUpdatesHeaders(`"${release.id}"`);
       return res.json(manifest);
     } catch (error) {
       console.error("[expo-updates] Error:", error);

@@ -159,6 +159,31 @@ bash scripts/build-apk.sh production  # AAB Play Store
 
 ---
 
+## 🛠️ Troubleshooting
+
+### Sintomo: utenti vedono `[check/...] Error: Call to function 'ExpoUpdates.checkForUpdateAsync' has been rejected. Failed to check for update.` nel pannello System Monitor (fasi `startup`/`login`/`appstate`/`manual`).
+
+**Causa**: l'endpoint `/api/expo-updates` non sta dichiarando `expo-protocol-version: 0` su tutte le risposte. Quando il client SDK 55 non riceve l'header, assume protocollo v1 strict e si aspetta `multipart/mixed` con directive `noUpdateAvailable`. Trovando un 204/304 vuoto rigetta il check.
+
+**Verifica**:
+```bash
+# 200 con manifest (deve già funzionare)
+curl -i -H "expo-runtime-version: 8.0.0" -H "expo-platform: android" \
+  https://biker-link.replit.app/api/expo-updates | grep -i expo-protocol-version
+
+# 204 already-current (il caso che si rompe per primo)
+curl -i -H "expo-runtime-version: 8.0.0" -H "expo-platform: android" \
+  -H "expo-current-update-id: <ultimo-release-id-attivo>" \
+  https://biker-link.replit.app/api/expo-updates | grep -i expo-protocol-version
+
+# 304 etag-match
+curl -i -H "expo-runtime-version: 8.0.0" -H "expo-platform: android" \
+  -H 'if-none-match: "<ultimo-release-id-attivo>"' \
+  https://biker-link.replit.app/api/expo-updates | grep -i expo-protocol-version
+```
+
+Tutte e tre le risposte devono contenere `expo-protocol-version: 0`. Se manca su 204 o 304, il fix di Task #1119 (`server/routes.ts` helper `setExpoUpdatesHeaders`) è regredito o non è stato deployato.
+
 ## Cicli precedenti (storico)
 - Ciclo 2.x: OTA 1–21, 23 (rv 2.0.0)
 - Ciclo 3.x: OTA 24–36 (rv 3.0.0)
