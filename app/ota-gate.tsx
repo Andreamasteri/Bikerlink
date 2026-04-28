@@ -5,20 +5,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { Ionicons } from "@expo/vector-icons";
+import { subscribeOtaResult } from "@/lib/ota-check";
 
-const DEFAULT_WAIT_SECONDS = 10;
+const SAFETY_TIMEOUT_MS = 15_000;
 
 export default function OtaGateScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useColors();
-  const [secondsLeft, setSecondsLeft] = useState<number>(DEFAULT_WAIT_SECONDS);
   const navigated = useRef(false);
   const dotAnim = useRef(new Animated.Value(0)).current;
-
-  const { data: waitData } = useQuery<{ seconds: number }>({
-    queryKey: ["/api/settings/ota-wait-seconds"],
-  });
+  const [status, setStatus] = useState<string>("Controllo aggiornamenti...");
 
   const { data: gateData, error: gateError } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/ota-gate-enabled"],
@@ -26,28 +23,38 @@ export default function OtaGateScreen() {
     retry: 1,
   });
 
-  useEffect(() => {
-    if (waitData?.seconds !== undefined) {
-      setSecondsLeft(Math.max(0, waitData.seconds));
-    }
-  }, [waitData?.seconds]);
-
-  useEffect(() => {
-    if (secondsLeft <= 0) return;
-    const timer = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [secondsLeft]);
-
-  useEffect(() => {
+  const navigate = () => {
     if (navigated.current) return;
-    const countdownDone = secondsLeft <= 0;
-    const adminDisabled = gateData?.enabled === false;
-    const endpointUnavailable = !!gateError;
-    if (countdownDone || adminDisabled || endpointUnavailable) {
-      navigated.current = true;
-      router.replace("/(tabs)");
+    navigated.current = true;
+    router.replace("/(tabs)");
+  };
+
+  useEffect(() => {
+    if (gateData?.enabled === false || !!gateError) {
+      navigate();
     }
-  }, [secondsLeft, gateData?.enabled, gateError]);
+  }, [gateData?.enabled, gateError]);
+
+  useEffect(() => {
+    const safetyTimer = setTimeout(() => {
+      setStatus("Timeout — continuando...");
+      navigate();
+    }, SAFETY_TIMEOUT_MS);
+
+    const unsub = subscribeOtaResult((result) => {
+      clearTimeout(safetyTimer);
+      if (result.phase === "reload") {
+        setStatus("Aggiornamento in corso...");
+      } else {
+        navigate();
+      }
+    });
+
+    return () => {
+      clearTimeout(safetyTimer);
+      unsub();
+    };
+  }, []);
 
   useEffect(() => {
     const pulse = Animated.loop(
@@ -68,10 +75,7 @@ export default function OtaGateScreen() {
       <Animated.View style={[styles.iconWrap, { opacity: dotAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }]}>
         <Ionicons name="cloud-download-outline" size={64} color={colors.accent} />
       </Animated.View>
-      <Text style={[styles.title, { color: colors.text }]}>Controllo aggiornamenti...</Text>
-      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-        {secondsLeft > 0 ? `Attendere ${secondsLeft}s` : "Applicazione aggiornamento..."}
-      </Text>
+      <Text style={[styles.title, { color: colors.text }]}>{status}</Text>
       <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 24 }} />
       <Text style={[styles.hint, { color: colors.textSecondary }]}>
         L'app si aggiornerà automaticamente
@@ -93,10 +97,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: "700",
-    textAlign: "center",
-  },
-  subtitle: {
-    fontSize: 16,
     textAlign: "center",
   },
   hint: {

@@ -502,7 +502,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       await logEvent(cacheHit ? "200-manifest-cached" : "200-manifest-fresh", String(release.id));
 
-      const BASE_URL = "https://biker-link.replit.app";
+      const BASE_URL = process.env.BIKERLINK_PUBLIC_URL ?? "https://biker-link.replit.app";
       const bundleUrl = `${BASE_URL}/api/expo-updates/assets/${encodeURIComponent(release.id as string)}`;
 
       const createdAt: string = release.published_at

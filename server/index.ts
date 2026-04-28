@@ -828,18 +828,28 @@ function setupErrorHandler(app: express.Application) {
         }
 
         // Startup cleanup: remove superseded/draft OTA releases older than 90 days
+        // + delete corresponding bundles from object storage (best-effort)
         try {
           const cleanupResult = await pool.query(
             `DELETE FROM ota_releases
              WHERE status IN ('superseded', 'draft')
                AND published_at < NOW() - INTERVAL '90 days'
-             RETURNING id, version, status, published_at`
+             RETURNING id, version, status, published_at, bundle_path`
           );
-          const deletedRows = cleanupResult.rows as Array<{ id: string; version: string; status: string; published_at: string }>;
+          const deletedRows = cleanupResult.rows as Array<{ id: string; version: string; status: string; published_at: string; bundle_path: string | null }>;
           if (deletedRows.length > 0) {
             console.log(`[OTA-CLEANUP] Removed ${deletedRows.length} stale OTA release(s) older than 90 days:`);
+            const { deleteObject } = await import("./objectStorage");
             for (const row of deletedRows) {
               console.log(`  → id=${row.id} version=${row.version} status=${row.status} published_at=${row.published_at}`);
+              if (row.bundle_path) {
+                try {
+                  await deleteObject(row.bundle_path);
+                  console.log(`  → [OTA-CLEANUP] Deleted bundle from object storage: ${row.bundle_path}`);
+                } catch (storageErr) {
+                  console.warn(`  → [OTA-CLEANUP] Could not delete bundle ${row.bundle_path} (best-effort):`, storageErr);
+                }
+              }
             }
           } else {
             console.log("[OTA-CLEANUP] No stale OTA releases to remove at startup.");

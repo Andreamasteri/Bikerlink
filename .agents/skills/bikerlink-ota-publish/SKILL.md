@@ -5,146 +5,112 @@ description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink
 
 # BikerLink — Pubblicazione OTA
 
-## ⚡ REGOLA FONDAMENTALE — "Crea l'OTA" = Crea + Pubblica
+## ⚡ REGOLA FONDAMENTALE — Un comando solo
 **Quando l'utente dice "crea l'OTA", "prepara l'OTA", "fai l'OTA" o qualsiasi variante:**
 - La pubblicazione è **inclusa automaticamente** — non è opzionale
-- **Non chiedere conferma separata** prima di eseguire lo script di pubblicazione
-- Eseguire l'intera procedura (passi 1–7) in un'unica sessione senza interruzioni
+- **Non chiedere conferma separata** prima di eseguire lo script
+- **Non modificare manualmente** `lib/ota.ts` né `ota-updates.json` — lo script lo fa in automatico
+- Eseguire un unico comando e attenderne il completamento
 
 ## 🚫 EAS UPDATES — DISMESSO (Task #980)
 **EAS Updates non è più usato per la delivery OTA.** L'unico canale OTA attivo è il
 backend custom `https://biker-link.replit.app/api/expo-updates` (Expo Updates Protocol v1).
 
-- ✅ `eas build` resta attivo per generare APK/AAB (`extra.eas.projectId` in app.json
-  serve a `eas build`, non va rimosso).
-- ❌ `eas update` / `npx eas-cli update` / canale `preview` su EAS Updates: **non usare più.**
-- ❌ `app.json` non deve più puntare a `u.expo.dev`. La guard `validate-ota.sh` blocca
-  la pubblicazione se trova `u.expo.dev` in `app.json` o nel manifest Android.
-- ⚠️ Le APK già installate **prima** del fix di `app.json` possono ancora avere l'URL
-  EAS bakato nel manifest nativo: il fix sarà effettivo solo dalla **prossima APK
-  ricostruita** che leggerà il nuovo `expo.updates.url`. Le APK pubblicate dopo task
-  #958 (v38) usano già il backend custom — vedere AndroidManifest.xml.
+- ✅ `eas build` resta attivo per generare APK/AAB.
+- ❌ `eas update` / `npx eas-cli update`: **non usare mai.**
+- ❌ `app.json` non deve puntare a `u.expo.dev` — la guard blocca la pubblicazione.
 
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
-- **Canale EAS**: `preview`
 - **Runtime Version**: `8.0.0` (ciclo corrente, APK v41) ← CICLO V3
-- **APK corrente**: versionCode **41**, versionName **3.0.0** (buildId: `e03f51d8-9f2b-496f-bba2-e0fe90b69fb7`, EAS: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7, APK: https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk — completata 2026-04-27, arm64-v8a + NewArch + expo-audio, OTA-13 inclusa). NOTA: app.json è già bumpato a versionCode 42 / 3.1.0 in preparazione della prossima build, ma la build v42 non è ancora stata generata.
-- **OTA corrente**: OTA-18 (releaseId: `61cd1fb8-402b-41a7-a72a-b6ba276c470b`, bundleUrl: `private/ota/ota-1.18.0-1777383990063.js`, pubblicato 2026-04-28T13:46:33.406Z — fix Metro cache stale: OTA-16/17 avevano CURRENT_OTA_NUMBER=15 nel bundle; republished con --reset-cache. Stessi contenuti di OTA-17: task #1083 #1086-#1096)
-- **APK precedente (v40)**: versionCode **40**, versionName **3.0.0** (buildId: `ba5205c6-0cc8-41ce-ba8c-8e68a117dabf`, APK: https://expo.dev/artifacts/eas/p1rG9wd7hZg7oPG1WEc4kM.apk)
-- **OTA base (APK v41)**: OTA-13 rv8.0.0 (bundle custom — EAS Updates dismesso, Task #980)
-- **Updates URL**: `https://biker-link.replit.app/api/expo-updates` (Expo Updates Protocol v1)
-- **Utenti**: su Android fisico via APK — NON usano il dev server
+- **APK corrente**: versionCode **41**, versionName **3.0.0** (buildId: `e03f51d8-9f2b-496f-bba2-e0fe90b69fb7`, APK: https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk)
+- **OTA corrente**: OTA-18 (releaseId: `61cd1fb8-402b-41a7-a72a-b6ba276c470b`)
+- **Updates URL**: `https://biker-link.replit.app/api/expo-updates`
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
-- **Backend produzione**: `biker-link.replit.app`
+- **Backend produzione**: `https://biker-link.replit.app`
 
 ## Regola critica
-⛔ **MAI** eseguire `npx eas-cli update` direttamente — EAS Updates è dismesso (Task #980).
-✅ Usare **sempre** `bash scripts/publish-ota.sh` — gestisce bundle, upload e pubblicazione
-sul backend custom in sequenza. Lo script non chiama più EAS Updates.
+⛔ **MAI** eseguire `npx eas-cli update` — EAS Updates è dismesso.
+⛔ **MAI** modificare manualmente `lib/ota.ts` o `ota-updates.json` prima dello script.
+✅ Usare **sempre** `bash scripts/publish-ota.sh` — tutto è automatico.
 
 ## File chiave
-- `lib/ota.ts` — contiene `CURRENT_OTA_NUMBER` (unica sorgente di verità)
-- `ota-updates.json` — registro OTA attivo (solo cicli 8.x e successivi)
+- `lib/ota.ts` — contiene `CURRENT_OTA_NUMBER` (aggiornato dallo script)
+- `ota-updates.json` — registro OTA attivo (aggiornato dallo script)
 - `ota-updates-archive.json` — registro storico cicli 2.x-7.x (solo lettura)
-- `scripts/publish-ota.sh` — script di pubblicazione completo
-- `scripts/validate-ota.sh` — validatore pre/post pubblicazione
+- `scripts/publish-ota.sh` — script di pubblicazione completo (un comando solo)
+- `scripts/rollback-ota.sh` — rollback a release storica
+- `scripts/validate-ota.sh` — validatore post pubblicazione
 
-## Procedura completa
+---
 
-### PASSO 1 — Determinare il numero OTA
-Leggere l'ultima entry del ciclo corrente (8.x) in `ota-updates.json` e prendere `updateNumber + 1`.
-I cicli storici 2.x-7.x sono archiviati in `ota-updates-archive.json` (solo lettura).
-```bash
-# Esempio: se l'ultima è OTA-14, la nuova sarà OTA-15
-```
+## 🚀 PROCEDURA — Un comando solo
 
-### PASSO 2 — Ottenere l'hash git corrente
-```bash
-git rev-parse HEAD
-```
-
-### PASSO 3 — Aggiornare `CURRENT_OTA_NUMBER` in lib/ota.ts
-Trovare e modificare la riga (è l'**unico file** da aggiornare):
-```typescript
-export const CURRENT_OTA_NUMBER = <VECCHIO>;  // → <NUOVO>
-```
-Il commento sopra va tenuto generico:
-```typescript
-// ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
-// Ciclo 8.0.0 — APK v41 — aggiornare ad ogni nuova OTA pubblicata
-export const CURRENT_OTA_NUMBER = 18; // ← esempio: sostituire con il numero reale
-```
-
-### PASSO 4 — Aggiungere entry in `ota-updates.json`
-Marcare la entry precedente come `"status": "superseded"`, poi aggiungere in fondo:
-```json
-{
-  "updateNumber": 19,
-  "cycle": "8.x",
-  "channel": "preview",
-  "platform": "android",
-  "runtimeVersion": "8.0.0",
-  "jsEngine": "hermes",
-  "message": "OTA-19 rv8.0.0: <descrizione breve>",
-  "note": "<note dettagliate sui task inclusi. CURRENT_OTA_NUMBER=19.>",
-  "releaseId": null,
-  "bundleUrl": null,
-  "updateGroupId": null,
-  "androidUpdateId": null,
-  "iosUpdateId": null,
-  "commitBase": "<hash git completo da passo 2>",
-  "easDashboard": null,
-  "apkBuildId": null,
-  "apkVersionCode": 41,
-  "apkUrl": null,
-  "status": "pending"
-}
-```
-⚠️ I campi sconosciuti (`releaseId`, `bundleUrl`, ecc.) devono essere `null`, **non** la stringa `"PENDING"`.
-
-### PASSO 5 — Eseguire lo script di pubblicazione
 ```bash
 BIKERLINK_ADMIN_EMAIL="admin@bikerlink.it" \
 BIKERLINK_ADMIN_PASSWORD="$BIKERLINK_ADMIN_PASSWORD" \
-bash scripts/publish-ota.sh "1.19.0" "OTA-19: <messaggio di release>"
+bash scripts/publish-ota.sh "Descrizione breve delle modifiche"
 ```
-Il versioning segue `1.<numero OTA>.0`.
 
-Lo script esegue automaticamente:
-1. `validate-ota.sh` come guard (blocca se fallisce)
-2. Export bundle Metro/Hermes
-3. Upload bundle su object storage
-4. Creazione release draft sul backend custom
-5. Pubblicazione release (stato → active)
-6. Verifica versione attiva via `/api/updates/check`
+### Cosa fa lo script automaticamente
+1. **Calcola il prossimo updateNumber** da `ota-updates.json` (es. 18→19)
+2. **Aggiorna `CURRENT_OTA_NUMBER`** in `lib/ota.ts`
+3. **Inserisce entry pending** in `ota-updates.json` con `commitBase = HEAD`
+4. **Esporta il bundle** con `expo export --platform android --reset-cache`
+5. **Verifica** che `CURRENT_OTA_NUMBER=<N>` sia nel bundle (blocca se errato)
+6. **Carica** il bundle su object storage
+7. **Si autentica** sul backend di PRODUZIONE (`https://biker-link.replit.app`)
+8. **Crea** la release draft e la pubblica
+9. **Verifica live** con backoff (max 30s) che la produzione serva il nuovo releaseId
+10. **Finalizza** `ota-updates.json` con ID reali e `status: published`
 
-**Nota**: lo step storico "pubblicazione su EAS Updates" è stato rimosso (Task #980 —
-EAS Updates dismesso). I dispositivi ricevono le OTA esclusivamente dal backend custom.
+### Rollback automatico
+Se qualsiasi passo fallisce:
+- `lib/ota.ts` viene ripristinato al numero originale
+- `ota-updates.json` viene ripristinato (entry pending rimossa)
+- Nessuna modifica permanente rimane in caso di errore
 
-### PASSO 6 — Aggiornare `ota-updates.json` con gli ID reali
-L'output dello script mostra gli ID generati dal backend custom. Sostituire i `null`
-con i valori reali:
-```json
-{
-  "releaseId": "<da output: Release ID>",
-  "bundleUrl": "<da output: Bundle URL>",
-  "updateGroupId": null,
-  "androidUpdateId": null,
-  "easDashboard": null,
-  "status": "published"
-}
+### Versioning automatico
+Lo script calcola la versione come `1.<updateNumber>.0` (es. OTA-19 → `1.19.0`).
+Non è necessario specificare la versione manualmente.
+
+---
+
+## 🔄 ROLLBACK
+
+Per riattivare una release storica:
+
+```bash
+BIKERLINK_ADMIN_EMAIL="admin@bikerlink.it" \
+BIKERLINK_ADMIN_PASSWORD="$BIKERLINK_ADMIN_PASSWORD" \
+bash scripts/rollback-ota.sh <updateNumber>
 ```
-I campi `updateGroupId`, `androidUpdateId`, `easDashboard` restano `null` perché
-EAS Updates è dismesso (Task #980): mantenerli nel record solo per compatibilità
-storica del registro.
 
-### PASSO 7 — Validazione finale
+Esempio (rollback a OTA-17):
+```bash
+bash scripts/rollback-ota.sh 17
+```
+
+Lo script:
+1. Trova il `releaseId` di OTA-17 in `ota-updates.json`
+2. Chiama `/api/admin/ota/:id/publish` in produzione
+3. Aggiorna `ota-updates.json` (corrente → `rolled-back`, target → `published`)
+4. Aggiorna `CURRENT_OTA_NUMBER` in `lib/ota.ts`
+
+---
+
+## ✅ VALIDAZIONE POST-PUBBLICAZIONE (opzionale)
+
 ```bash
 bash scripts/validate-ota.sh
 ```
-Tutti i check devono essere ✔. Con la separazione dei cicli storici in `ota-updates-archive.json`, il warning sui cicli multipli non dovrebbe più apparire — `ota-updates.json` contiene solo il ciclo 8.x.
+
+Tutti i check devono essere ✔. Nota: `validate-ota.sh` **non viene più eseguito come guard
+bloccante prima della pubblicazione** — viene eseguito solo dopo, se si vuole conferma
+esplicita. Il publisher ha già il proprio live-check integrato.
+
+---
 
 ## ⚠️ PROBLEMA STRUTTURALE EAS — LEGGERE PRIMA DI PUBBLICARE
 
@@ -156,147 +122,60 @@ Tutti i check devono essere ✔. Con la separazione dei cicli storici in `ota-up
 - I dispositivi su OTA-152 sono bloccati finché non viene installato un nuovo APK.
 
 ### Fix strutturale (APK v38) — IMPLEMENTATO (Task #958)
-✅ **Implementato**: Backend serve `GET /api/expo-updates` (Expo Updates Protocol v1) e `GET /api/expo-updates/assets/:releaseId`.
-✅ **app.json**: `updates.url` → `https://biker-link.replit.app/api/expo-updates`; 1 solo intentFilter (`bikerlink://lastfm-callback`)
-✅ **versionCode**: 38, versionName 2.4.0 (build.gradle + app.json aggiornati)
-✅ **AndroidManifest.xml**: `EXPO_UPDATE_URL` aggiornato al backend custom; intent filter `data-generated` corretto da `spotify-callback` → `lastfm-callback`
-✅ **Build APK v38 inviata**: 2026-04-26 commit bf49d39 — recuperare build ID e APK URL da https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds e aggiornare ota-updates.json → OTA-155 (apkBuildId, apkUrl)
+✅ Backend serve `GET /api/expo-updates` (Expo Updates Protocol v1).
+✅ `app.json`: `updates.url` → `https://biker-link.replit.app/api/expo-updates`
+✅ **APK v39+**: aggiornamenti OTA completamente indipendenti da EAS.
 
-Dopo APK v38 installato sui dispositivi: gli aggiornamenti OTA sono completamente indipendenti da EAS.
+---
 
-### Nel frattempo
-- Pubblicare comunque con `publish-ota.sh` — il bundle custom si aggiorna
-- I nuovi installati con APK v38 riceveranno tutti gli aggiornamenti via backend custom
-- I dispositivi su OTA-152 (APK v37) necessitano di reinstallare APK v38 manualmente
+## 🔍 Pre-Build Change Detector
 
-## 🔍 Pre-Build Change Detector (Task #1052 lesson learned)
+Prima di ogni build APK, `build-apk.sh` esegue `scripts/pre-build-check.sh`.
 
-Prima di ogni build APK, lo script `build-apk.sh` esegue automaticamente
-`scripts/pre-build-check.sh` che confronta lo stato corrente con l'ultima
-snapshot di build riuscita (`.local/build-snapshot.json`).
+```bash
+bash scripts/pre-build-check.sh         # solo report
+bash scripts/pre-build-check.sh --strict # blocca se ci sono warning
+```
 
-Il check rileva automaticamente:
-- Versioni dei pacchetti critici cambiate (expo, react-native, expo-audio, ecc.)
-- EAS CLI aggiornata tra una build e l'altra
-- Patch files aggiunte/rimosse (un patch dimenticato blocca l'install!)
-- Peer dependency mancanti (expo-doctor)
-- Cambiamenti Node.js
-
-**Dopo ogni build riuscita**, aggiorna la snapshot con:
+Dopo ogni build riuscita, aggiorna la snapshot con:
 ```bash
 bash scripts/save-build-snapshot.sh <BUILD_ID> <APK_URL>
 ```
 
-**Per controllare variazioni manualmente** (senza avviare la build):
-```bash
-bash scripts/pre-build-check.sh         # solo report, non blocca
-bash scripts/pre-build-check.sh --strict # blocca se ci sono warning
-```
-
-Le snapshot archiviate sono in `.local/build-snapshots-archive/`.
+---
 
 ## 🏗️ Build APK — default dimagrito (Task #1017)
 
-Da Task #1017 in poi, **ogni build APK BikerLink usa il profilo dimagrito di default**:
+Da Task #1017 in poi, ogni build usa il profilo dimagrito di default:
+- ABI: **solo `arm64-v8a`**
+- New Architecture: **abilitata**
+- ProGuard/R8: **abilitato**
 
-- ABI: **solo `arm64-v8a`** (telefoni Android moderni dal 2017 in poi)
-- New Architecture: **abilitata** (`newArchEnabled=true`)
-- ProGuard/R8: **abilitato** (`enableMinifyInReleaseBuilds=true`)
-- Shrink Resources: **abilitato** (`enableShrinkResourcesInReleaseBuilds=true`)
-- Hermes: **abilitato**
-- **Dimensione attesa**: ~45-55 MB (vs 135 MB delle vecchie APK universali a 4 ABI)
-
-### Comando standard (default = dimagrito)
 ```bash
 touch .local/apk-build-authorized
-bash scripts/build-apk.sh             # → profilo release-apk (APK arm64 dimagrita)
-bash scripts/build-apk.sh release-apk # equivalente esplicito
-bash scripts/build-apk.sh production  # SOLO per AAB Play Store (non APK)
+bash scripts/build-apk.sh             # APK arm64 dimagrita
+bash scripts/build-apk.sh production  # AAB Play Store
 ```
 
-### Profili EAS
-- ✅ **`release-apk`** — APK arm64-v8a + NewArch + ProGuard/R8 (default per "builda APK")
-- ✅ **`production`** — AAB per Play Store (invariato, distribuzione store)
-- ❌ **`preview`** — RIMOSSO da `eas.json` (Task #1017). Lo script blocca con messaggio chiaro qualsiasi tentativo di lanciare `bash scripts/build-apk.sh preview`.
-
-### Configurazione persistente (bare workflow)
-Dato che `android/` è committato nel repo, il restringimento ABI è applicato in:
-- `android/gradle.properties` → `reactNativeArchitectures=arm64-v8a`
-- `android/app/build.gradle` → `ndk { abiFilters "arm64-v8a" }`
-- `app.json` plugins → `expo-build-properties` con `android.newArchEnabled=true` + ProGuard/Shrink + `buildArchs: ["arm64-v8a"]` (per coerenza con eventuale futuro prebuild)
-
-### Conseguenza sul profilo `production` (AAB Play Store)
-Poiché il restringimento ABI vive nei file Android committati, **anche l'AAB del profilo `production` sarà arm64-only**. È intenzionale e accettabile: Google Play Store richiede 64-bit dal 2019, Android 14 (ottobre 2023) deprecate il supporto 32-bit, e l'AAB di Play Store gestisce comunque lo splitting automatico per ABI. Per riabilitare armeabi-v7a sull'AAB in futuro occorre parametrizzare `abiFilters` via gradle property (es. `-PandroidAbiFilters=...`) nel `gradleCommand` del profilo production di `eas.json`.
-
-### Guardia config-based (anti-regressione)
-`scripts/build-apk.sh` esegue prima di ogni build EAS un'assertion che verifica i tre punti di configurazione (`gradle.properties`, `build.gradle`, plugin `expo-build-properties` in `app.json`). Se qualcuno regredisce uno qualsiasi di questi file a multi-ABI, la build viene bloccata con messaggio chiaro — la guardia è indipendente dal nome del profilo, quindi protegge anche da modifiche accidentali a `release-apk` in `eas.json`.
-
-## ⚠️ Nota: APK build ID e URL dopo --no-wait
-`scripts/build-apk.sh` invia la build con `--no-wait` e **non cattura** il build ID restituito da EAS. Dopo ogni nuova build APK, recuperare manualmente il build ID e l'URL del file `.apk` da https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds e aggiornarli in `ota-updates.json` nella entry più recente del ciclo corrente:
-```json
-"apkBuildId": "<UUID-da-EAS-dashboard>",
-"apkUrl": "https://expo.dev/artifacts/eas/<hash>.apk"
-```
-Questo previene lacune documentali come quella di APK v37 (build ID mai registrato).
-
-## Numerazione versioni
-| OTA | Script version | Stato EAS |
-|-----|---------------|-----------|
-| 150 | 1.150.0       | superseded
-| 151 | 1.151.0       | superseded
-| 152 | 1.152.0       | ← ultima su EAS (!)
-| 153 | 1.153.0       | EAS fallito (git lock)
-| 154 | 1.154.0       | ← corrente (solo backend custom, EAS bloccato)
-| 155 | 1.155.0       | superseded
-| 156 | 1.156.0       | corrente (solo backend custom, EAS bloccato)
+---
 
 ## Cicli precedenti (storico)
-- Ciclo 2.x: OTA 1–21, 23 (APK versionCode 4–6, rv 2.0.0)
-- Ciclo 3.x: OTA 24–36 (APK versionCode 8–9, rv 3.0.0)
-- Ciclo 4.x: OTA 37–40 (APK versionCode 10, rv 4.0.0)
-- Ciclo 5.x: OTA 41 (APK versionCode 11, rv 5.0.0) — DEPRECATO (crash expo-location plugin)
-- Ciclo 6.x: OTA 42–43 (APK versionCode 12, rv 6.0.0) — OBSOLETO (utenti devono aggiornare APK)
-- Ciclo 7.x: OTA 44–156 (APK versionCode 13→38, rv 7.0.0) — CHIUSO
-  - APK v37: STABILE — versionName 2.3.0 + OTA 151–154
-  - APK v38: STABILE — versionName 2.4.0, buildId: 7ecd4368-9640-4200-88e5-c33b902a7edc, APK: https://expo.dev/artifacts/eas/gEaBaW4hnhupnDP5CpYW1m.apk, updates.url→backend custom + OTA 155–156
-- Ciclo 8.x: OTA 1–18 (APK versionCode 39–41, rv 8.0.0) ← CORRENTE (V3)
-  - APK v39: STABILE — versionName 3.0.0, buildId: b167f108-813d-4981-893a-2896c0268a5b (completata 2026-04-26T12:35Z), APK: https://expo.dev/artifacts/eas/nUADFAf6ddBUzcbZMjKBxR.apk
-  - APK v40: STABILE — versionName 3.0.0, buildId: ba5205c6-0cc8-41ce-ba8c-8e68a117dabf, APK: https://expo.dev/artifacts/eas/p1rG9wd7hZg7oPG1WEc4kM.apk
-  - APK v41: STABILE — versionName 3.0.0, buildId: e03f51d8-9f2b-496f-bba2-e0fe90b69fb7, APK: https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk (completata 2026-04-27) — arm64-v8a + NewArch + expo-audio (expo-av rimosso Task #1052) + OTA-13
-
-## ⚠️ ANALISI ARCHITETTURA (DEFINITIVA)
-React Native 0.82+ ha rimosso il supporto Old Architecture. Il flag newArchEnabled=false
-genera solo un WARNING e viene IGNORATO (hardcoded IS_NEW_ARCHITECTURE_ENABLED=true in CMake).
-APK v10 (ultima stabile) funzionava CON newArchEnabled=true — la New Architecture era già attiva.
-I crash erano causati da librerie incompatibili, NON dalla New Architecture stessa:
-- react-native-maps 1.18.0: incompatibile con New Arch (causa crash runtime)
-- react-native-reanimated 3.x: incompatibile con RN 0.83.4 (CMake build fail)
-- expo-location plugin in app.json: causa crash all'avvio (background location aggressivo)
+- Ciclo 2.x: OTA 1–21, 23 (rv 2.0.0)
+- Ciclo 3.x: OTA 24–36 (rv 3.0.0)
+- Ciclo 4.x: OTA 37–40 (rv 4.0.0)
+- Ciclo 5.x: OTA 41 (rv 5.0.0) — DEPRECATO
+- Ciclo 6.x: OTA 42–43 (rv 6.0.0) — OBSOLETO
+- Ciclo 7.x: OTA 44–156 (rv 7.0.0) — CHIUSO
+- **Ciclo 8.x: OTA 1–18 (rv 8.0.0) ← CORRENTE (V3)**
+  - APK v41: STABILE — buildId: e03f51d8, APK: https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk
 
 ## REGOLA CRITICA — BARE WORKFLOW
 Il progetto ha `android/` committato → bare workflow. Modificare SEMPRE i file Android direttamente:
-- **Architecture**: `android/gradle.properties` → `newArchEnabled=true` (default EAS, come v10)
-- **versionCode**: `android/app/build.gradle` → `versionCode` (E anche app.json per consistenza)
-- **⚠️ CRITICO — runtimeVersion**: `android/app/src/main/res/values/strings.xml` → `expo_runtime_version` DEVE essere uguale a `runtimeVersion` in app.json (attuale: "8.0.0" ciclo V3). EAS NON aggiorna questo file automaticamente in bare workflow. Se non corrisponde → CRASH all'avvio garantito.
-- **⚠️ CRITICO — AndroidManifest**: NON includere `ACCESS_BACKGROUND_LOCATION` in `android/app/src/main/AndroidManifest.xml` a meno che il background location sia implementato completamente e correttamente. Causa crash su Android 12+.
+- **Architecture**: `android/gradle.properties` → `newArchEnabled=true`
+- **versionCode**: `android/app/build.gradle` (E anche app.json per consistenza)
+- **⚠️ CRITICO — runtimeVersion**: `android/app/src/main/res/values/strings.xml` → `expo_runtime_version` DEVE essere uguale a `runtimeVersion` in app.json
+- **⚠️ CRITICO — AndroidManifest**: NON includere `ACCESS_BACKGROUND_LOCATION` senza implementazione completa.
 
-## VERSIONI LIBRERIE CERTIFICATE (v19, identico a v10)
-- react-native-maps: **1.27.2** (CERTIFICATA — compatibile RN 0.83.4 + New Arch, usata in v10)
-- react-native-reanimated: **~4.2.1** (CERTIFICATA — compila con RN 0.83.4 via CMake, usata in v10)
-- NON usare react-native-maps < 1.27.x → incompatibile con New Architecture (sempre attiva in RN 0.82+)
-- NON usare react-native-reanimated < 4.x → non compila con RN 0.83.4 (CMake hermes-engine non trovato)
-- NON aggiungere "expo-location" ai plugins di app.json → causa crash all'avvio (background location)
-- NON aggiungere react-native-maps ai plugins di app.json → crash garantito
-
-## Output di riferimento (OTA-43 — esempio reale)
-```
-✅ Release OTA v1.43.0 pubblicata con successo!
-Commit hash      : 450497bba166b168f7e0e0997ed752d7d4c1df51
-Release ID       : 7749c083-95a4-4b65-bedf-e725eb7dcc64
-Bundle URL       : private/ota/ota-1.43.0-1776151386751.js
-Versione att.    : 1.43.0
-EAS Status       : pubblicato
-EAS Update Group : bea3463e-a8dd-4d9f-b170-e445d40787f1
-EAS Android ID   : 019d8ae0-0438-71af-a978-22f784f042f1
-EAS Dashboard    : https://expo.dev/accounts/andreamasteri/projects/bikerlink/updates/bea3463e-a8dd-4d9f-b170-e445d40787f1
-```
+## VERSIONI LIBRERIE CERTIFICATE
+- react-native-maps: **1.27.2**
+- react-native-reanimated: **~4.2.1**

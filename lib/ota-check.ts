@@ -5,6 +5,20 @@ import { getApiUrl } from "@/lib/query-client";
 export type OtaTriggerSource = "startup" | "appstate" | "login" | "register" | "manual";
 export type OtaPhase = "check" | "fetch" | "reload" | "no-update" | "fetch-not-new" | "fetched" | "skipped";
 
+type OtaResultListener = (result: OtaManualResult) => void;
+const _otaResultListeners = new Set<OtaResultListener>();
+
+export function subscribeOtaResult(listener: OtaResultListener): () => void {
+  _otaResultListeners.add(listener);
+  return () => { _otaResultListeners.delete(listener); };
+}
+
+function _emitOtaResult(result: OtaManualResult) {
+  for (const listener of _otaResultListeners) {
+    try { listener(result); } catch {}
+  }
+}
+
 export interface OtaManualResult {
   ok: boolean;
   phase: OtaPhase;
@@ -73,7 +87,9 @@ export async function triggerOtaCheck(
     if (!check.isAvailable) {
       consecutiveFailures = 0;
       reportOtaEvent({ phase: "no-update", source, currentUpdateId, runtimeVersion });
-      return { ok: true, phase: "no-update" };
+      const r: OtaManualResult = { ok: true, phase: "no-update" };
+      _emitOtaResult(r);
+      return r;
     }
 
     phase = "fetch";
@@ -81,7 +97,9 @@ export async function triggerOtaCheck(
     if (!fetched.isNew) {
       consecutiveFailures = 0;
       reportOtaEvent({ phase: "fetch-not-new", source, currentUpdateId, runtimeVersion });
-      return { ok: true, phase: "fetch-not-new" };
+      const r: OtaManualResult = { ok: true, phase: "fetch-not-new" };
+      _emitOtaResult(r);
+      return r;
     }
 
     reportOtaEvent({ phase: "fetched", source, currentUpdateId, runtimeVersion });
@@ -89,7 +107,9 @@ export async function triggerOtaCheck(
     phase = "reload";
     await Updates.reloadAsync();
     // reloadAsync non ritorna sotto normali condizioni — l'app si riavvia.
-    return { ok: true, phase: "reload" };
+    const r: OtaManualResult = { ok: true, phase: "reload" };
+    _emitOtaResult(r);
+    return r;
   } catch (err) {
     consecutiveFailures += 1;
     const errMsg = `[${phase}/${source}] ${String(err)}`;
@@ -101,7 +121,9 @@ export async function triggerOtaCheck(
       error: errMsg,
       failCount: consecutiveFailures,
     });
-    return { ok: false, phase, error: errMsg };
+    const r: OtaManualResult = { ok: false, phase, error: errMsg };
+    _emitOtaResult(r);
+    return r;
   } finally {
     inFlight = false;
   }

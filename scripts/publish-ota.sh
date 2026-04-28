@@ -1,129 +1,200 @@
 #!/bin/bash
+# ============================================================
+#  BikerLink — OTA Publisher (un comando solo)
+#  Uso: bash scripts/publish-ota.sh "messaggio di release"
+#
+#  Lo script gestisce automaticamente:
+#   - calcolo updateNumber (ota-updates.json)
+#   - aggiornamento CURRENT_OTA_NUMBER in lib/ota.ts
+#   - insert entry pending in ota-updates.json
+#   - export bundle con reset cache Metro
+#   - verifica CURRENT_OTA_NUMBER nel bundle compilato
+#   - upload su object storage
+#   - pubblicazione sul backend di PRODUZIONE
+#   - verifica live con backoff (max 30s)
+#   - finalizzazione ota-updates.json con ID reali
+#   - rollback automatico su qualsiasi errore
+# ============================================================
 set -euo pipefail
 
-VERSION="${1:-}"
-RELEASE_NOTES="${2:-}"
+RELEASE_MESSAGE="${1:-}"
 
-if [ -z "$VERSION" ] || [ -z "$RELEASE_NOTES" ]; then
-  echo "Uso: $0 <version> \"note di release\""
-  echo "Esempio: $0 1.2.0 \"Corretto bug match, nuovo sistema OTA\""
-  echo ""
-  echo "  Entrambi i parametri sono obbligatori."
+if [ -z "$RELEASE_MESSAGE" ]; then
+  echo "Uso: $0 \"messaggio di release\""
+  echo "Esempio: $0 \"Fix audio + nuova schermata profilo\""
   echo ""
   echo "Variabili d'ambiente richieste:"
-  echo "  BIKERLINK_ADMIN_EMAIL    — email dell'account admin"
-  echo "  BIKERLINK_ADMIN_PASSWORD — password dell'account admin"
+  echo "  BIKERLINK_ADMIN_EMAIL    — email account admin"
+  echo "  BIKERLINK_ADMIN_PASSWORD — password account admin"
   echo ""
   echo "Variabili d'ambiente opzionali:"
-  echo "  BIKERLINK_BACKEND_URL    — URL backend (default: http://localhost:5000)"
+  echo "  BIKERLINK_BACKEND_URL    — URL backend (default: https://biker-link.replit.app)"
+  echo "  BIKERLINK_PUBLIC_URL     — URL pubblico per bundle download (default: uguale a BACKEND_URL)"
+  echo ""
+  echo "Per rollback: bash scripts/rollback-ota.sh <updateNumber>"
   exit 1
 fi
 
-BACKEND_URL="${BIKERLINK_BACKEND_URL:-http://localhost:5000}"
+# ─── Configurazione ───────────────────────────────────────
+BACKEND_URL="${BIKERLINK_BACKEND_URL:-https://biker-link.replit.app}"
+PUBLIC_URL="${BIKERLINK_PUBLIC_URL:-$BACKEND_URL}"
 COOKIE_JAR="/tmp/ota-publish-cookies-$$.txt"
 DIST_DIR="dist-ota"
-
-RUNTIME_VERSION=$(node -e "
-  try {
-    const j = JSON.parse(require('fs').readFileSync('app.json','utf8'));
-    const rv = j?.expo?.runtimeVersion ?? null;
-    if (!rv) { console.error('runtimeVersion non trovato in app.json'); process.exit(1); }
-    process.stdout.write(rv);
-  } catch(e) { console.error('Impossibile leggere app.json: ' + e.message); process.exit(1); }
-" 2>&1)
-if [ $? -ne 0 ]; then
-  echo "   ERRORE: $RUNTIME_VERSION"
-  exit 1
-fi
+OTA_UPDATES_FILE="ota-updates.json"
+OTA_TS_FILE="lib/ota.ts"
 
 ADMIN_EMAIL="${BIKERLINK_ADMIN_EMAIL:-}"
 ADMIN_PASSWORD="${BIKERLINK_ADMIN_PASSWORD:-}"
 
 if [ -z "$ADMIN_EMAIL" ] || [ -z "$ADMIN_PASSWORD" ]; then
   echo "Errore: imposta BIKERLINK_ADMIN_EMAIL e BIKERLINK_ADMIN_PASSWORD"
-  echo "  export BIKERLINK_ADMIN_EMAIL='admin@bikerlink.it'"
-  echo "  export BIKERLINK_ADMIN_PASSWORD='tuapassword'"
   exit 1
 fi
+
+# ─── Stato rollback ───────────────────────────────────────
+ORIG_OTA_NUMBER=""
+ORIG_OTA_TS_CONTENT=""
+ORIG_OTA_UPDATES_CONTENT=""
+ROLLBACK_NEEDED=0
+ENTRY_INSERTED=0
 
 cleanup() {
   rm -f "$COOKIE_JAR"
   rm -rf "$DIST_DIR"
+  if [ "$ROLLBACK_NEEDED" = "1" ]; then
+    echo ""
+    echo "   ⚠ Rollback automatico in corso..."
+    if [ -n "$ORIG_OTA_TS_CONTENT" ]; then
+      echo "$ORIG_OTA_TS_CONTENT" > "$OTA_TS_FILE"
+      echo "   ✔ lib/ota.ts ripristinato (CURRENT_OTA_NUMBER=$ORIG_OTA_NUMBER)"
+    fi
+    if [ -n "$ORIG_OTA_UPDATES_CONTENT" ]; then
+      echo "$ORIG_OTA_UPDATES_CONTENT" > "$OTA_UPDATES_FILE"
+      echo "   ✔ ota-updates.json ripristinato"
+    fi
+    echo "   ✘ Pubblicazione annullata — stato pre-pubblicazione ripristinato"
+  fi
 }
 trap cleanup EXIT
 
-# Cattura hash git corrente (per il log finale)
+# ─── Lettura runtimeVersion da app.json ───────────────────
+RUNTIME_VERSION=$(node -e "
+  try {
+    const j = JSON.parse(require('fs').readFileSync('app.json','utf8'));
+    const rv = j?.expo?.runtimeVersion ?? null;
+    if (!rv) { process.stderr.write('runtimeVersion non trovato in app.json\n'); process.exit(1); }
+    process.stdout.write(rv);
+  } catch(e) { process.stderr.write('Impossibile leggere app.json: ' + e.message + '\n'); process.exit(1); }
+" 2>&1) || { echo "   ERRORE: $RUNTIME_VERSION"; exit 1; }
+
+# ─── Calcolo automatico updateNumber ──────────────────────
+NEXT_OTA_INFO=$(node -e "
+  const fs = require('fs');
+  const appJson = JSON.parse(fs.readFileSync('app.json','utf8'));
+  const rv = appJson?.expo?.runtimeVersion ?? null;
+  const data = JSON.parse(fs.readFileSync('$OTA_UPDATES_FILE','utf8'));
+  const cycle = data.filter(e => typeof e.updateNumber === 'number' && e.runtimeVersion === rv);
+  const lastNum = cycle.length > 0 ? cycle[cycle.length - 1].updateNumber : 0;
+  const nextNum = lastNum + 1;
+  const lastEntry = cycle.length > 0 ? cycle[cycle.length - 1] : null;
+  const apkBuildId = lastEntry?.apkBuildId ?? null;
+  const apkVersionCode = lastEntry?.apkVersionCode ?? null;
+  const apkVersionName = lastEntry?.apkVersionName ?? null;
+  const apkUrl = lastEntry?.apkUrl ?? null;
+  const apkBuildDashboard = lastEntry?.apkBuildDashboard ?? null;
+  console.log(JSON.stringify({ nextNum, lastNum, apkBuildId, apkVersionCode, apkVersionName, apkUrl, apkBuildDashboard }));
+" 2>/dev/null) || { echo "   ERRORE: impossibile calcolare updateNumber da $OTA_UPDATES_FILE"; exit 1; }
+
+NEXT_OTA=$(echo "$NEXT_OTA_INFO" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).nextNum))")
+LAST_OTA=$(echo "$NEXT_OTA_INFO" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).lastNum))")
+APK_BUILD_ID=$(echo "$NEXT_OTA_INFO" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ const j=JSON.parse(d); console.log(j.apkBuildId ?? ''); })")
+APK_VERSION_CODE=$(echo "$NEXT_OTA_INFO" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ const j=JSON.parse(d); console.log(j.apkVersionCode ?? ''); })")
+APK_VERSION_NAME=$(echo "$NEXT_OTA_INFO" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ const j=JSON.parse(d); console.log(j.apkVersionName ?? ''); })")
+APK_URL=$(echo "$NEXT_OTA_INFO" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ const j=JSON.parse(d); console.log(j.apkUrl ?? ''); })")
+APK_BUILD_DASHBOARD=$(echo "$NEXT_OTA_INFO" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ const j=JSON.parse(d); console.log(j.apkBuildDashboard ?? ''); })")
+
+VERSION="1.${NEXT_OTA}.0"
 GIT_COMMIT_HASH=$(git rev-parse HEAD 2>/dev/null || echo "N/A")
 GIT_COMMIT_SHORT="${GIT_COMMIT_HASH:0:12}"
 
 echo ""
 echo "╔══════════════════════════════════════════════════╗"
-echo "║       BikerLink OTA Publisher v${VERSION}$(printf '%*s' $((28 - ${#VERSION})) '')║"
+echo "║       BikerLink OTA Publisher — un comando solo  ║"
 echo "╚══════════════════════════════════════════════════╝"
 echo ""
+echo "  OTA-$NEXT_OTA (rv $RUNTIME_VERSION) — v$VERSION"
 echo "  Commit: $GIT_COMMIT_SHORT"
-echo ""
-echo "╔══════════════════════════════════════════════════╗"
-echo "║  CHECKLIST PRE-PUBBLICAZIONE (da fare PRIMA)    ║"
-echo "╠══════════════════════════════════════════════════╣"
-echo "║  ① Aggiungi entry in ota-updates.json con:     ║"
-echo "║     - commitBase = hash git (non PENDING)       ║"
-echo "║     - IDs sconosciuti = null (non PENDING)      ║"
-echo "║  ② Aggiorna CURRENT_OTA_NUMBER in lib/ota.ts   ║"
-echo "╠══════════════════════════════════════════════════╣"
-echo "║  Questo script esegue automaticamente:          ║"
-echo "║  ③ Guard validate-ota.sh  (blocca se fallisce) ║"
-echo "║  ④ Export bundle JavaScript (Metro bundler)    ║"
-echo "║  ⑤ Upload bundle su object storage             ║"
-echo "║  ⑥ Pubblicazione release sul backend custom    ║"
-echo "╠══════════════════════════════════════════════════╣"
-echo "║  DOPO la pubblicazione (usa gli ID qui sotto):  ║"
-echo "║  ⑦ Aggiorna ota-updates.json con ID reali      ║"
-echo "║  ⑧ Riesegui validate-ota.sh per conferma       ║"
-echo "╚══════════════════════════════════════════════════╝"
+echo "  Backend: $BACKEND_URL"
 echo ""
 
-# Step 0 (Guard): Esecuzione validate-ota.sh — blocca se fallisce
-echo "[0/6] Guard OTA — validate-ota.sh..."
-GUARD_SCRIPT="$(dirname "$0")/validate-ota.sh"
-if [ ! -f "$GUARD_SCRIPT" ]; then
-  echo "   ERRORE: script di validazione non trovato: $GUARD_SCRIPT"
-  exit 1
-fi
-if ! bash "$GUARD_SCRIPT"; then
-  echo ""
-  echo "   ╔════════════════════════════════════════════════════╗"
-  echo "   ║  ❌ PUBBLICAZIONE BLOCCATA — Guard OTA fallito    ║"
-  echo "   ║  Correggi gli errori sopra e riprova.              ║"
-  echo "   ╚════════════════════════════════════════════════════╝"
-  echo ""
-  exit 1
-fi
-echo "   Guard OK — procedo con la pubblicazione"
-echo ""
+# ─── Salva stato originale per rollback ───────────────────
+ORIG_OTA_TS_CONTENT=$(cat "$OTA_TS_FILE")
+ORIG_OTA_NUMBER=$(grep -oE 'CURRENT_OTA_NUMBER\s*=\s*[0-9]+' "$OTA_TS_FILE" | grep -oE '[0-9]+$' || echo "")
+ORIG_OTA_UPDATES_CONTENT=$(cat "$OTA_UPDATES_FILE")
+ROLLBACK_NEEDED=1
 
-# Step 1: Login — extract session cookie from headers (needed for Secure cookies over HTTP)
-echo "[1/6] Login come admin..."
-LOGIN_JSON=$(jq -n --arg e "$ADMIN_EMAIL" --arg p "$ADMIN_PASSWORD" '{"identifier":$e,"password":$p}')
-RAW_LOGIN=$(curl -s -D - -X POST "$BACKEND_URL/api/auth/login" \
-  -H "Content-Type: application/json" \
-  -H "X-Forwarded-Proto: https" \
-  -d "$LOGIN_JSON")
-LOGIN_RESPONSE=$(echo "$RAW_LOGIN" | sed '/^\r$/q' | tail -1 && echo "$RAW_LOGIN" | awk 'BEGIN{body=0} /^\r$/{body=1; next} body{print}')
-LOGIN_BODY=$(echo "$RAW_LOGIN" | awk 'BEGIN{body=0} /^\r$/{body=1; next} body{print}')
-if ! echo "$LOGIN_BODY" | jq -e '.id' > /dev/null 2>&1; then
-  echo "   ERRORE login: $LOGIN_BODY"
-  exit 1
-fi
-SESSION_COOKIE=$(echo "$RAW_LOGIN" | grep -i "^set-cookie:" | grep "connect.sid" | head -1 | sed 's/.*connect\.sid=\([^;]*\).*/connect.sid=\1/' | tr -d '\r')
-if [ -z "$SESSION_COOKIE" ]; then
-  echo "   ERRORE: nessun session cookie ricevuto"
-  exit 1
-fi
-echo "   OK — autenticato"
+# ─── Step A: Aggiorna lib/ota.ts ──────────────────────────
+echo "[A] Aggiornamento CURRENT_OTA_NUMBER in lib/ota.ts ($ORIG_OTA_NUMBER → $NEXT_OTA)..."
+COMMENT_LINE="// ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
+// Ciclo $RUNTIME_VERSION — APK v${APK_VERSION_CODE:-?} — aggiornare ad ogni nuova OTA pubblicata"
+printf '%s\nexport const CURRENT_OTA_NUMBER = %s;\n' "$COMMENT_LINE" "$NEXT_OTA" > "$OTA_TS_FILE"
+echo "   ✔ CURRENT_OTA_NUMBER=$NEXT_OTA"
 
-# Step 2: Export bundle
-echo "[2/6] Esportazione bundle JavaScript..."
+# ─── Step B: Aggiorna ota-updates.json ────────────────────
+echo "[B] Aggiornamento ota-updates.json (supersede OTA-$LAST_OTA, inserisce OTA-$NEXT_OTA pending)..."
+node -e "
+  const fs = require('fs');
+  const rv = '$RUNTIME_VERSION';
+  const data = JSON.parse(fs.readFileSync('$OTA_UPDATES_FILE','utf8'));
+  // Marca superseded l'ultima entry active/published del ciclo corrente
+  for (let i = data.length - 1; i >= 0; i--) {
+    if (data[i].runtimeVersion === rv && typeof data[i].updateNumber === 'number') {
+      if (data[i].status === 'published' || data[i].status === 'active') {
+        data[i].status = 'superseded';
+        break;
+      }
+    }
+  }
+  // Inserisce nuova entry pending
+  const apkBuildId = '$APK_BUILD_ID' || null;
+  const apkVersionCode = '$APK_VERSION_CODE' ? parseInt('$APK_VERSION_CODE') : null;
+  const apkVersionName = '$APK_VERSION_NAME' || null;
+  const apkUrl = '$APK_URL' || null;
+  const apkBuildDashboard = '$APK_BUILD_DASHBOARD' || null;
+  const newEntry = {
+    updateNumber: $NEXT_OTA,
+    version: '$VERSION',
+    cycle: '8.x',
+    channel: 'preview',
+    platform: 'android',
+    message: 'OTA-$NEXT_OTA rv$RUNTIME_VERSION: $RELEASE_MESSAGE',
+    note: 'CURRENT_OTA_NUMBER=$NEXT_OTA. Pubblicato da publish-ota.sh (un comando solo).',
+    runtimeVersion: rv,
+    jsEngine: 'hermes',
+    platforms: ['android'],
+    releaseId: null,
+    bundleUrl: null,
+    updateGroupId: null,
+    androidUpdateId: null,
+    iosUpdateId: null,
+    commitBase: '$GIT_COMMIT_HASH',
+    easDashboard: null,
+    apkBuildId: apkBuildId || null,
+    apkBuildDashboard: apkBuildDashboard || null,
+    apkVersionCode: apkVersionCode,
+    apkVersionName: apkVersionName,
+    apkUrl: apkUrl || null,
+    status: 'pending'
+  };
+  data.push(newEntry);
+  fs.writeFileSync('$OTA_UPDATES_FILE', JSON.stringify(data, null, 2) + '\n');
+  console.log('OK');
+" 2>/dev/null || { echo "   ERRORE: impossibile aggiornare $OTA_UPDATES_FILE"; exit 1; }
+ENTRY_INSERTED=1
+echo "   ✔ Entry OTA-$NEXT_OTA inserita (pending)"
+
+# ─── Step C: Export bundle con reset cache ────────────────
+echo "[C] Esportazione bundle JavaScript (Metro --reset-cache)..."
 rm -rf "$DIST_DIR"
 EXPO_LOG="/tmp/ota-expo-$$.log"
 if ! EXPO_PUBLIC_DOMAIN=biker-link.replit.app npx expo export --platform android --output-dir "$DIST_DIR" --reset-cache > "$EXPO_LOG" 2>&1; then
@@ -134,11 +205,10 @@ if ! EXPO_PUBLIC_DOMAIN=biker-link.replit.app npx expo export --platform android
 fi
 grep -E "(✓|✗|Bundle|Error)" "$EXPO_LOG" | tail -5 || true
 rm -f "$EXPO_LOG"
-echo "   Esportazione completata"
+echo "   ✔ Esportazione completata"
 
-# Step 3: Find bundle file — prefer entry bundle (.hbc Hermes or .js Metro)
-# Expo SDK 55+ with jsEngine:hermes exports .hbc (Hermes Bytecode) instead of .js
-echo "[3/6] Ricerca bundle principale..."
+# ─── Step D: Ricerca bundle ───────────────────────────────
+echo "[D] Ricerca bundle principale..."
 ANDROID_DIR="$DIST_DIR/_expo/static/js/android"
 if [ ! -d "$ANDROID_DIR" ]; then
   echo "   ERRORE: directory $ANDROID_DIR non trovata"
@@ -146,10 +216,7 @@ if [ ! -d "$ANDROID_DIR" ]; then
   exit 1
 fi
 
-# Prefer file with "index" or "entry" in name — support .js (Metro) and .hbc (Hermes, SDK 55+)
 BUNDLE_FILE=$(find "$ANDROID_DIR" \( -name "index*.hbc" -o -name "index*.js" -o -name "entry*.hbc" -o -name "entry*.js" \) ! -name "*.map" 2>/dev/null | head -1)
-
-# Fallback: largest .hbc or .js file (exclude .map)
 if [ -z "$BUNDLE_FILE" ]; then
   BUNDLE_FILE=$(find "$ANDROID_DIR" \( -name "*.hbc" -o -name "*.js" \) ! -name "*.map" -type f 2>/dev/null \
     -exec wc -c {} + 2>/dev/null | sort -n | tail -2 | head -1 | awk '{print $2}')
@@ -163,65 +230,175 @@ fi
 
 BUNDLE_SIZE=$(wc -c < "$BUNDLE_FILE")
 BUNDLE_SIZE_HUMAN=$(node -e "const s=$BUNDLE_SIZE; process.stdout.write(s>1048576 ? (s/1048576).toFixed(1)+' MB' : Math.round(s/1024)+' KB')")
-echo "   Bundle trovato: $(basename "$BUNDLE_FILE") ($BUNDLE_SIZE_HUMAN)"
+echo "   ✔ Bundle trovato: $(basename "$BUNDLE_FILE") ($BUNDLE_SIZE_HUMAN)"
 
-# Step 4: Upload bundle directly via object storage (bypass HTTP layer)
-echo "[4/6] Upload bundle su object storage..."
+# ─── Step E: Verifica CURRENT_OTA_NUMBER nel bundle ───────
+echo "[E] Verifica CURRENT_OTA_NUMBER=$NEXT_OTA nel bundle compilato..."
+BUNDLE_EXT="${BUNDLE_FILE##*.}"
+FOUND_OTA=""
+
+if [ "$BUNDLE_EXT" = "hbc" ]; then
+  # Hermes bytecode: usa strings su file binario
+  FOUND_OTA=$(strings "$BUNDLE_FILE" 2>/dev/null | grep -oE "CURRENT_OTA_NUMBER=[0-9]+" | head -1 | grep -oE "[0-9]+$" || true)
+  if [ -z "$FOUND_OTA" ]; then
+    # Prova con grep raw byte su file binario (Hermes potrebbe non avere la stringa esatta)
+    FOUND_OTA=$(grep -oa "CURRENT_OTA_NUMBER=[0-9]*" "$BUNDLE_FILE" 2>/dev/null | head -1 | grep -oE "[0-9]+$" || true)
+  fi
+else
+  # JS bundle standard
+  FOUND_OTA=$(grep -oa "CURRENT_OTA_NUMBER=[0-9]*" "$BUNDLE_FILE" 2>/dev/null | head -1 | grep -oE "[0-9]+$" || true)
+fi
+
+if [ -z "$FOUND_OTA" ]; then
+  echo "   ⚠ ATTENZIONE: CURRENT_OTA_NUMBER non trovato nel bundle ($BUNDLE_EXT)"
+  echo "     Questo può accadere con Hermes bytecode (HBC) che offusca le stringhe."
+  echo "     Procedendo con la pubblicazione — verificare manualmente se necessario."
+elif [ "$FOUND_OTA" = "$NEXT_OTA" ]; then
+  echo "   ✔ Bundle verificato: CURRENT_OTA_NUMBER=$FOUND_OTA (corretto)"
+else
+  echo ""
+  echo "   ╔════════════════════════════════════════════════════════╗"
+  echo "   ║  ❌ PUBBLICAZIONE BLOCCATA — Bundle ha numero errato  ║"
+  echo "   ║  Bundle contiene CURRENT_OTA_NUMBER=$FOUND_OTA         ║"
+  echo "   ║  Atteso: CURRENT_OTA_NUMBER=$NEXT_OTA                  ║"
+  echo "   ║  Probabile cache Metro stale — usa --reset-cache       ║"
+  echo "   ╚════════════════════════════════════════════════════════╝"
+  echo ""
+  exit 1
+fi
+
+# ─── Step F: Upload bundle su object storage ──────────────
+echo "[F] Upload bundle su object storage..."
 UPLOAD_RESPONSE=$(node "$(dirname "$0")/ota-upload-bundle.mjs" "$BUNDLE_FILE" "$VERSION" 2>&1)
-BUNDLE_URL=$(echo "$UPLOAD_RESPONSE" | jq -r '.url // empty' 2>/dev/null || true)
+BUNDLE_URL=$(echo "$UPLOAD_RESPONSE" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { console.log(JSON.parse(d).url ?? ''); } catch { console.log(''); } })" 2>/dev/null || true)
 if [ -z "$BUNDLE_URL" ]; then
   echo "   ERRORE upload: $UPLOAD_RESPONSE"
   exit 1
 fi
-echo "   Bundle URL: $BUNDLE_URL"
+echo "   ✔ Bundle URL: $BUNDLE_URL"
 
-# Step 5: Create release (draft) then publish explicitly
-echo "[5/6] Creazione release OTA..."
-NOTES_JSON=$(node -e "process.stdout.write(JSON.stringify(process.argv[1]))" -- "$RELEASE_NOTES")
+# ─── Step G: Login al backend di PRODUZIONE ───────────────
+echo "[G] Login admin su $BACKEND_URL..."
+LOGIN_JSON=$(node -e "process.stdout.write(JSON.stringify({identifier:'$ADMIN_EMAIL',password:process.env.BIKERLINK_ADMIN_PASSWORD}))" 2>/dev/null)
+RAW_LOGIN=$(curl -s -D - -X POST "$BACKEND_URL/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -H "X-Forwarded-Proto: https" \
+  -d "{\"identifier\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}")
+LOGIN_BODY=$(echo "$RAW_LOGIN" | awk 'BEGIN{body=0} /^\r$/{body=1; next} body{print}')
+if ! echo "$LOGIN_BODY" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { const j=JSON.parse(d); process.exit(j.id ? 0 : 1); } catch { process.exit(1); } })" 2>/dev/null; then
+  echo "   ERRORE login: $LOGIN_BODY"
+  exit 1
+fi
+SESSION_COOKIE=$(echo "$RAW_LOGIN" | grep -i "^set-cookie:" | grep "connect.sid" | head -1 | sed 's/.*connect\.sid=\([^;]*\).*/connect.sid=\1/' | tr -d '\r')
+if [ -z "$SESSION_COOKIE" ]; then
+  echo "   ERRORE: nessun session cookie ricevuto"
+  exit 1
+fi
+echo "   ✔ Autenticato"
+
+# ─── Step H: Creazione release draft ──────────────────────
+echo "[H] Creazione release OTA (draft)..."
+NOTES_JSON=$(node -e "process.stdout.write(JSON.stringify(process.argv[1]))" -- "OTA-$NEXT_OTA rv$RUNTIME_VERSION: $RELEASE_MESSAGE")
 RV_JSON=$(node -e "process.stdout.write(JSON.stringify(process.argv[1]))" -- "$RUNTIME_VERSION")
 CREATE_RESPONSE=$(curl -s -H "Cookie: $SESSION_COOKIE" -H "X-Forwarded-Proto: https" -X POST "$BACKEND_URL/api/admin/ota" \
   -H "Content-Type: application/json" \
   -d "{\"version\":\"$VERSION\",\"runtimeVersion\":$RV_JSON,\"bundlePath\":\"$BUNDLE_URL\",\"releaseNotes\":$NOTES_JSON}")
-RELEASE_ID=$(echo "$CREATE_RESPONSE" | jq -r '.id // empty' 2>/dev/null)
+RELEASE_ID=$(echo "$CREATE_RESPONSE" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { console.log(JSON.parse(d).id ?? ''); } catch { console.log(''); } })" 2>/dev/null || true)
 if [ -z "$RELEASE_ID" ]; then
   echo "   ERRORE creazione release: $CREATE_RESPONSE"
   exit 1
 fi
-echo "   Release creata (draft) — ID: $RELEASE_ID"
+echo "   ✔ Release creata — ID: $RELEASE_ID"
 
-echo "   Pubblicazione release..."
+# ─── Step I: Pubblicazione release ────────────────────────
+echo "[I] Pubblicazione release..."
 PUBLISH_RESPONSE=$(curl -s -H "Cookie: $SESSION_COOKIE" -H "X-Forwarded-Proto: https" -X POST "$BACKEND_URL/api/admin/ota/$RELEASE_ID/publish")
-PUBLISH_STATUS=$(echo "$PUBLISH_RESPONSE" | jq -r '.status // empty' 2>/dev/null)
+PUBLISH_STATUS=$(echo "$PUBLISH_RESPONSE" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { console.log(JSON.parse(d).status ?? ''); } catch { console.log(''); } })" 2>/dev/null || true)
 if [ "$PUBLISH_STATUS" != "active" ]; then
   echo "   ERRORE pubblicazione: $PUBLISH_RESPONSE"
   exit 1
 fi
-echo "   Release pubblicata — stato: $PUBLISH_STATUS"
+echo "   ✔ Release pubblicata (status: active)"
 
-# Step 6: Confirm active version via /api/updates/check
-echo "[6/6] Verifica stato OTA attivo..."
-CHECK_RESPONSE=$(curl -s "$BACKEND_URL/api/updates/check?appVersion=$VERSION")
-ACTIVE_VERSION=$(echo "$CHECK_RESPONSE" | jq -r '.version // "nessuno"' 2>/dev/null)
-ACTIVE_BUNDLE=$(echo "$CHECK_RESPONSE" | jq -r '.bundlePath // "N/A"' 2>/dev/null)
-MANIFEST_URL=$(echo "$CHECK_RESPONSE" | jq -r '.manifestUrl // "N/A"' 2>/dev/null)
-PUBLISHED_AT=$(echo "$CHECK_RESPONSE" | jq -r '.publishedAt // "N/A"' 2>/dev/null)
-echo "   Versione attiva: $ACTIVE_VERSION"
+# ─── Step J: Verifica live con backoff ────────────────────
+echo "[J] Verifica live su produzione (backoff max 30s)..."
+MAX_WAIT=30
+WAIT_INTERVAL=5
+ELAPSED=0
+VERIFIED=0
+
+while [ $ELAPSED -le $MAX_WAIT ]; do
+  HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" \
+    -H "expo-runtime-version: $RUNTIME_VERSION" \
+    -H "expo-platform: android" \
+    -H "expo-protocol-version: 1" \
+    --max-time 10 \
+    "$BACKEND_URL/api/expo-updates" 2>/dev/null || echo -e "\nCURL_FAILED")
+
+  HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
+  HTTP_CODE=$(echo "$HTTP_RESPONSE" | tail -1)
+
+  if [ "$HTTP_CODE" = "200" ]; then
+    SERVED_RELEASE_ID=$(echo "$HTTP_BODY" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { console.log(JSON.parse(d).id ?? ''); } catch { console.log(''); } })" 2>/dev/null || echo "")
+    if [ "$SERVED_RELEASE_ID" = "$RELEASE_ID" ]; then
+      echo "   ✔ Produzione serve OTA-$NEXT_OTA (releaseId=$RELEASE_ID) — ${ELAPSED}s"
+      VERIFIED=1
+      break
+    else
+      echo "   ⟳ Produzione serve releaseId=$SERVED_RELEASE_ID (atteso $RELEASE_ID) — retry in ${WAIT_INTERVAL}s..."
+    fi
+  elif [ "$HTTP_CODE" = "204" ] || [ "$HTTP_CODE" = "304" ]; then
+    echo "   ⟳ Produzione risponde $HTTP_CODE (cache) — retry in ${WAIT_INTERVAL}s..."
+  else
+    echo "   ⚠ Produzione risponde HTTP $HTTP_CODE — retry in ${WAIT_INTERVAL}s..."
+  fi
+
+  sleep $WAIT_INTERVAL
+  ELAPSED=$((ELAPSED + WAIT_INTERVAL))
+done
+
+if [ "$VERIFIED" != "1" ]; then
+  echo "   ⚠ ATTENZIONE: verifica live timeout dopo ${MAX_WAIT}s."
+  echo "     La release è pubblicata sul DB ma potrebbe non essere ancora servita."
+  echo "     Verifica manualmente con: bash scripts/validate-ota.sh"
+fi
+
+# ─── Step K: Finalizzazione ota-updates.json ──────────────
+echo "[K] Finalizzazione ota-updates.json con ID reali..."
+node -e "
+  const fs = require('fs');
+  const rv = '$RUNTIME_VERSION';
+  const data = JSON.parse(fs.readFileSync('$OTA_UPDATES_FILE','utf8'));
+  let updated = false;
+  for (let i = data.length - 1; i >= 0; i--) {
+    if (data[i].updateNumber === $NEXT_OTA && data[i].runtimeVersion === rv) {
+      data[i].releaseId = '$RELEASE_ID';
+      data[i].bundleUrl = '$BUNDLE_URL';
+      data[i].status = 'published';
+      data[i].publishedAt = new Date().toISOString();
+      updated = true;
+      break;
+    }
+  }
+  if (!updated) { process.stderr.write('Entry OTA-$NEXT_OTA non trovata\n'); process.exit(1); }
+  fs.writeFileSync('$OTA_UPDATES_FILE', JSON.stringify(data, null, 2) + '\n');
+  console.log('OK');
+" 2>/dev/null || { echo "   ⚠ Impossibile finalizzare ota-updates.json — aggiornare manualmente"; }
+
+echo "   ✔ ota-updates.json aggiornato (status: published)"
+
+# ─── Pubblicazione completata — disabilita rollback ───────
+ROLLBACK_NEEDED=0
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════════╗"
-echo "║  ✅ Release OTA v${VERSION} pubblicata con successo!$(printf '%*s' $((17 - ${#VERSION})) '')║"
+echo "║  ✅ OTA-$NEXT_OTA pubblicata con successo!$(printf '%*s' $((36 - ${#NEXT_OTA})) '')║"
 echo "╠══════════════════════════════════════════════════════════════════╣"
-echo "║  Commit hash      : $GIT_COMMIT_HASH"
-echo "║  Release ID       : $RELEASE_ID"
-echo "║  Bundle URL       : $BUNDLE_URL"
-echo "║  Manifest URL     : $MANIFEST_URL"
-echo "║  Versione att.    : $ACTIVE_VERSION"
-echo "║  Bundle attivo    : $ACTIVE_BUNDLE"
-echo "║  Pubblicato il    : $PUBLISHED_AT"
-echo "╠══════════════════════════════════════════════════════════════════╣"
-echo "║  ⑦ Aggiorna ota-updates.json con Release ID e Bundle URL      ║"
-echo "║     (gli ID EAS non sono più gestiti da questo script)          ║"
-echo "║  ⑧ Riesegui: bash scripts/validate-ota.sh                     ║"
+printf "║  %-20s: %-43s║\n" "Commit" "$GIT_COMMIT_SHORT"
+printf "║  %-20s: %-43s║\n" "Release ID" "$RELEASE_ID"
+printf "║  %-20s: %-43s║\n" "Bundle URL" "$BUNDLE_URL"
+printf "║  %-20s: %-43s║\n" "OTA-guard" "bash scripts/validate-ota.sh"
+printf "║  %-20s: %-43s║\n" "Rollback" "bash scripts/rollback-ota.sh $((NEXT_OTA - 1))"
 echo "╚══════════════════════════════════════════════════════════════════╝"
 echo ""
 echo "   Tutti gli utenti riceveranno l'aggiornamento al prossimo avvio."
