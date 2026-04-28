@@ -586,28 +586,21 @@ router.put("/users/:id/password", async (req: Request, res: Response) => {
     if (isProtectedUser(targetUser.nickname)) {
       return res.status(403).json({ message: "Utente di sistema non modificabile" });
     }
-    const hashedPassword = await bcrypt.hash(password, 12);
-    const user = await storage.updateUser(id, { password: hashedPassword });
-    if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
-    }
-    // Revoca le sessioni del target. Fail-closed: se fallisce, log e 500
-    // così il moderatore sa che serve un intervento manuale.
+    // Fail-closed: revoca PRIMA dell'update password. Se la revoca fallisce,
+    // la password resta invariata: nessun gap di sicurezza.
     let revoked = 0;
     try {
       revoked = await revokeAllUserSessions(id);
     } catch (e) {
       console.error(`[ADMIN PASSWORD RESET] Session revocation failed for user ${id}:`, e);
-      await storage.createModeratorLog({
-        moderatorId: req.session.userId!,
-        action: "reset_password_partial",
-        targetType: "user",
-        targetId: id,
-        details: "Password resettata ma revoca sessioni fallita — intervento manuale richiesto",
-      }).catch(() => {});
       return res.status(500).json({
-        message: "Password aggiornata ma impossibile invalidare le sessioni esistenti dell'utente. Riprova o intervieni manualmente.",
+        message: "Errore temporaneo nella revoca delle sessioni. Riprova tra qualche istante.",
       });
+    }
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const user = await storage.updateUser(id, { password: hashedPassword });
+    if (!user) {
+      return res.status(404).json({ message: "Utente non trovato" });
     }
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,

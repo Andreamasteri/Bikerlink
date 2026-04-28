@@ -149,7 +149,7 @@ export default function VerifyEmailScreen() {
           <Ionicons name="key-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
           <TextInput
             style={styles.input}
-            placeholder="Codice a 6 caratteri"
+            placeholder="Codice a 8 caratteri"
             placeholderTextColor={Colors.textSecondary}
             value={token}
             onChangeText={(text) => setToken(text.toUpperCase())}
