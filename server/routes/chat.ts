@@ -553,19 +553,24 @@ router.post("/conversations", async (req: Request, res: Response) => {
 
     if (conversationType === "contact" && participantIds?.length === 1) {
       const targetUserId = participantIds[0];
-      const targetConvs = await storage.getConversations(targetUserId);
-      const existingContactConv = targetConvs.find((c) => c.conversationType === "contact");
 
-      if (existingContactConv) {
-        const parts = await storage.getConversationParticipants(existingContactConv.id);
-        const alreadyParticipant = parts.some((p) => p.userId === userId);
-        if (!alreadyParticipant) {
-          await storage.addConversationParticipant({
-            conversationId: existingContactConv.id,
-            userId,
-          });
+      // SECURITY (Task #1079): cerca una conversazione "contact" esistente
+      // SOLO fra le conversazioni del richiedente (userId), e solo se e' un
+      // thread STRETTAMENTE a 2 partecipanti contenente esattamente userId e
+      // targetUserId. La logica precedente leggeva storage.getConversations(
+      // targetUserId) e aggiungeva il richiedente a QUALSIASI thread "contact"
+      // del target, permettendo a un attaccante di entrare in conversazioni
+      // private fra terzi (BOLA / broken object-level authorization),
+      // leggerne il backlog e scrivere nuovi messaggi.
+      const requesterConvs = await storage.getConversations(userId);
+      for (const conv of requesterConvs) {
+        if (conv.conversationType !== "contact") continue;
+        const parts = await storage.getConversationParticipants(conv.id);
+        if (parts.length !== 2) continue;
+        const ids = parts.map((p) => p.userId);
+        if (ids.includes(userId) && ids.includes(targetUserId)) {
+          return res.json(conv);
         }
-        return res.json(existingContactConv);
       }
 
       const conv = await storage.createConversation({
