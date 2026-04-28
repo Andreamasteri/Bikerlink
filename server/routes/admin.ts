@@ -1769,7 +1769,15 @@ router.post("/advertisements", adUpload.single("image"), async (req: Request, re
     if (!name) {
       return res.status(400).json({ message: "Nome campagna obbligatorio" });
     }
-    const imageUrl = req.file ? await uploadAdImageToObjectStorage(req.file.buffer, req.file.originalname, req.file.mimetype) : (req.body.imageUrl || null);
+    let imageUrl: string | null = null;
+    if (req.file) {
+      imageUrl = await uploadAdImageToObjectStorage(req.file.buffer, req.file.originalname, req.file.mimetype);
+    } else if (req.body.imageUrl) {
+      if (!String(req.body.imageUrl).startsWith("/api/ads/images/")) {
+        return res.status(400).json({ message: "imageUrl non valido: sono accettati solo percorsi interni" });
+      }
+      imageUrl = req.body.imageUrl;
+    }
     const campaign = await storage.createAdCampaign({
       name,
       sponsor: sponsor || "Syneco Lubrificanti",
@@ -1821,6 +1829,9 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
       const existing = await storage.getAdCampaign(id);
       updates.imageVersion = ((existing?.imageVersion ?? 0) + 1);
     } else if (req.body.imageUrl !== undefined) {
+      if (req.body.imageUrl !== null && req.body.imageUrl !== "" && !String(req.body.imageUrl).startsWith("/api/ads/images/")) {
+        return res.status(400).json({ message: "imageUrl non valido: sono accettati solo percorsi interni" });
+      }
       updates.imageUrl = req.body.imageUrl;
     }
     if (req.body.bumpImageVersion === true || req.body.bumpImageVersion === "true") {

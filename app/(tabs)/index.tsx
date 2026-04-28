@@ -1167,7 +1167,7 @@ export default function MapScreen() {
           <Pressable style={styles.adBanner} onPress={() => handleAdClick(myAds[adIndex % myAds.length])}>
             {(myAds[adIndex % myAds.length] as any)?.imageUrl && adImageError !== (myAds[adIndex % myAds.length] as any)?.id ? (
               <Image
-                source={{ uri: (() => { const ad = myAds[adIndex % myAds.length] as any; const v = ad.imageVersion ?? 0; const base = ad.imageUrl.startsWith("http") ? ad.imageUrl : `${getApiUrl().replace(/\/$/, "")}${ad.imageUrl}`; return `${base}${base.includes("?") ? "&" : "?"}v=${v}`; })() }}
+                source={{ uri: (() => { const ad = myAds[adIndex % myAds.length] as any; const v = ad.imageVersion ?? 0; const rawUrl: string = ad.imageUrl; if (!rawUrl.startsWith("/api/ads/images/")) return ""; const base = `${getApiUrl().replace(/\/$/, "")}${rawUrl}`; return `${base}${base.includes("?") ? "&" : "?"}v=${v}`; })() }}
                 style={styles.adImage}
                 resizeMode="cover"
                 onError={() => {
