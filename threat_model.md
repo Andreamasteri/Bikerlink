@@ -50,6 +50,10 @@ Production assumptions for this scan:
 - Treat any proxy/fetch endpoint that accepts attacker-controlled destinations as SSRF-prone unless it validates resolved IPs, redirect targets, and response-handling boundaries.
 - Re-check current account status on authenticated requests; blocking or suspension is not an effective control if long-lived sessions remain usable after the status change.
 - Treat public or pre-auth operational telemetry ingestion as an availability surface that needs payload caps, rate limits, and strict field truncation.
+- Re-check long-lived authenticated channels such as SSE or other streaming responses when account status changes; per-request session invalidation alone does not revoke already-open streams.
+- Treat `hideFromMap` as protection against derived distance leakage as well as raw coordinate leakage across every discovery and availability endpoint.
+- Treat club-scoped proposals as private club objects whose active-membership checks must be enforced on create, read, and join flows, not only on list endpoints.
+- Treat public or low-friction telemetry and reporting endpoints that trigger email or durable storage as abuse surfaces: they should rely on trusted proxy-derived client identity (`req.ip`/Express proxy handling), and authenticated reporting still needs quotas and body caps.
 
 ## Threat Categories
 
