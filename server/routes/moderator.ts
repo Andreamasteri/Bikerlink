@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import path from "path";
+import * as fs from "fs";
 import { storage } from "../storage";
 import { uploadBuffer, deleteObject } from "../objectStorage";
 import { cacheAdImage } from "./ads";
