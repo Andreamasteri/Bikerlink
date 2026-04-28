@@ -723,7 +723,10 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
     // We also use an explicit field whitelist (no `{ ...club }` spread) so that admin/moderator-only
     // columns (proposedLatitude/Longitude/Address/By/At — see /map/pending-locations) are never
     // leaked through this member-facing endpoint, even if new privileged columns are added later.
-    const [club] = await db.select({
+    // SECURITY (Task #1081): proposedLatitude e' selezionata SOLO per derivare il
+    // boolean `hasPendingLocationProposal` (la UI ha bisogno di sapere "se" ma
+    // non "dove"). Il valore raw non viene mai serializzato in risposta.
+    const [clubRow] = await db.select({
       id: motoClubs.id,
       name: motoClubs.name,
       clubType: motoClubs.clubType,
@@ -744,8 +747,11 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
       longitude: motoClubs.longitude,
       createdAt: motoClubs.createdAt,
       updatedAt: motoClubs.updatedAt,
+      _proposedLatitude: motoClubs.proposedLatitude,
     }).from(motoClubs).where(eq(motoClubs.id, clubId)).limit(1);
-    if (!club) return res.status(404).json({ message: "Club non trovato" });
+    if (!clubRow) return res.status(404).json({ message: "Club non trovato" });
+    const { _proposedLatitude, ...club } = clubRow;
+    const hasPendingLocationProposal = _proposedLatitude != null;
 
     const [membership] = await db.select({ id: motoClubMembers.id })
       .from(motoClubMembers)
@@ -774,7 +780,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
       joinedAt: r.member.joinedAt,
     }));
 
-    return res.json({ ...club, members, memberCount: members.length });
+    return res.json({ ...club, hasPendingLocationProposal, members, memberCount: members.length });
   } catch (e) {
     return res.status(500).json({ message: "Errore interno" });
   }
@@ -867,8 +873,39 @@ router.get("/:id/detail", requireAuth, async (req: Request, res: Response) => {
     const limit = Math.min(parseInt(String(req.query.limit ?? "30"), 10) || 30, 50);
     const offset = Math.max(parseInt(String(req.query.offset ?? "0"), 10) || 0, 0);
 
-    const [club] = await db.select().from(motoClubs).where(eq(motoClubs.id, clubId)).limit(1);
-    if (!club) return res.status(404).json({ message: "Club non trovato" });
+    // SECURITY (Task #1081): whitelist esplicita allineata a GET /:id. La
+    // versione precedente faceva `db.select().from(motoClubs)` (intero record),
+    // esponendo a qualsiasi membro attivo i campi di moderazione
+    // (proposedLatitude/Longitude/Address/By/At) e identificatori interni
+    // (createdBy). I dettagli della proposta restano disponibili SOLO su
+    // /api/motoclubs/map/pending-locations (admin/moderator). La UI membro
+    // riceve solo il boolean `hasPendingLocationProposal`.
+    const [clubRow] = await db.select({
+      id: motoClubs.id,
+      name: motoClubs.name,
+      clubType: motoClubs.clubType,
+      brandName: motoClubs.brandName,
+      modelName: motoClubs.modelName,
+      region: motoClubs.region,
+      country: motoClubs.country,
+      description: motoClubs.description,
+      logoUrl: motoClubs.logoUrl,
+      coverUrl: motoClubs.coverUrl,
+      isApproved: motoClubs.isApproved,
+      isFeatured: motoClubs.isFeatured,
+      memberCount: motoClubs.memberCount,
+      activityScore: motoClubs.activityScore,
+      conversationId: motoClubs.conversationId,
+      parentClubId: motoClubs.parentClubId,
+      latitude: motoClubs.latitude,
+      longitude: motoClubs.longitude,
+      createdAt: motoClubs.createdAt,
+      updatedAt: motoClubs.updatedAt,
+      _proposedLatitude: motoClubs.proposedLatitude,
+    }).from(motoClubs).where(eq(motoClubs.id, clubId)).limit(1);
+    if (!clubRow) return res.status(404).json({ message: "Club non trovato" });
+    const { _proposedLatitude, ...club } = clubRow;
+    const hasPendingLocationProposal = _proposedLatitude != null;
 
     const [membership] = await db.select({ id: motoClubMembers.id })
       .from(motoClubMembers)
@@ -903,7 +940,7 @@ router.get("/:id/detail", requireAuth, async (req: Request, res: Response) => {
       .offset(offset);
 
     const total = Number(totalCount);
-    return res.json({ ...club, members: memberships, totalCount: total, hasMore: offset + limit < total });
+    return res.json({ ...club, hasPendingLocationProposal, members: memberships, totalCount: total, hasMore: offset + limit < total });
   } catch (e) {
     console.error("[GET /:id/detail]", e);
     return res.status(500).json({ message: "Errore interno" });

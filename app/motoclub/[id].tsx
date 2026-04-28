@@ -49,9 +49,7 @@ interface ClubDetail {
   conversationId: string | null;
   latitude: number | null;
   longitude: number | null;
-  proposedLatitude: number | null;
-  proposedLongitude: number | null;
-  proposedAddress: string | null;
+  hasPendingLocationProposal?: boolean;
   members: Member[];
   totalCount: number;
   hasMore: boolean;
@@ -544,13 +542,13 @@ export default function ClubDetailScreen() {
                     <Text style={styles.locationText}>Nessuna sede fisssata</Text>
                   </View>
                 )}
-                {club.proposedLatitude != null && (
+                {club.hasPendingLocationProposal && (
                   <View style={styles.locationRow}>
                     <MaterialCommunityIcons name="clock-outline" size={16} color="#F59E0B" />
                     <Text style={[styles.locationText, { color: "#F59E0B" }]}>Proposta in attesa di approvazione</Text>
                   </View>
                 )}
-                {club.proposedLatitude == null && (
+                {!club.hasPendingLocationProposal && (
                   <TouchableOpacity
                     style={styles.proposeBtn}
                     onPress={() => setShowProposeModal(true)}
