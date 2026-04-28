@@ -558,7 +558,35 @@
     "apkVersionCode": 41,
     "apkVersionName": null,
     "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-28T17:15:03.977Z"
+  },
+  {
+    "updateNumber": 21,
+    "version": "1.21.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-21 rv8.0.0: OTA-21 rv8.0.0: security — codice verifica email 8 char + validazione URL annunci",
+    "note": "CURRENT_OTA_NUMBER=21. Pubblicato da publish-ota.sh (un comando solo).",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "2616b3ec-dd98-43b7-ba37-a05473b2e857",
+    "bundleUrl": "private/ota/ota-1.21.0-1777416877386.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "f475591a4ffffdbb84c1ff6c9fbbd6b9f1a5fa91",
+    "easDashboard": null,
+    "apkBuildId": "e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkVersionCode": 41,
+    "apkVersionName": null,
+    "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
+    "status": "published",
+    "publishedAt": "2026-04-28T22:54:43.310Z"
   }
 ]
