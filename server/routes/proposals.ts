@@ -37,6 +37,20 @@ function isCoordOld(updatedAt: Date | null | undefined, maxAgeSec: number): bool
 const BIKER_SEARCH_TYPES = ["find_a_friend", "find_a_guest", "hitcher", "hitchhiker"];
 const ZAVORRINA_SEARCH_TYPES = ["find_a_biker", "hitchhiker"];
 
+/** Returns true only if userId holds an active membership in clubId. */
+async function isActiveClubMember(userId: string, clubId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ userId: motoClubMembers.userId })
+    .from(motoClubMembers)
+    .where(and(
+      eq(motoClubMembers.userId, userId),
+      eq(motoClubMembers.clubId, clubId),
+      eq(motoClubMembers.status, "active"),
+    ))
+    .limit(1);
+  return !!row;
+}
+
 router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const status = (req.query.status as string) || undefined;
@@ -608,10 +622,17 @@ router.post("/reset-and-rematch", requireAuth, async (req: Request, res: Respons
 
 router.get("/:id", requireAuth, async (req: Request, res: Response) => {
   try {
+    const userId = req.session.userId!;
     const proposalId = req.params.id as string;
     const proposal = await storage.getProposal(proposalId);
     if (!proposal) {
       return res.status(404).json({ message: "Proposta non trovata" });
+    }
+
+    // Club-scoped proposals are only visible to active members of that club
+    if (proposal.clubId) {
+      const isMember = await isActiveClubMember(userId, proposal.clubId);
+      if (!isMember) return res.status(403).json({ message: "Accesso riservato ai membri del club" });
     }
 
     const participants = await storage.getProposalParticipants(proposal.id);
@@ -670,6 +691,12 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
     if (!proposalType || !title) {
       return res.status(400).json({ message: "Tipo e titolo sono obbligatori" });
+    }
+
+    // Club-scoped proposals may only be created by active members of that club
+    if (clubId) {
+      const isMember = await isActiveClubMember(userId, clubId);
+      if (!isMember) return res.status(403).json({ message: "Devi essere membro attivo del club per creare questa proposta" });
     }
 
     if (searchType) {
@@ -791,6 +818,12 @@ router.post("/:id/join", requireAuth, async (req: Request, res: Response) => {
 
     if (proposal.status !== "active") {
       return res.status(400).json({ message: "La proposta non è più attiva" });
+    }
+
+    // Club-scoped proposals may only be joined by active members of that club
+    if (proposal.clubId) {
+      const isMember = await isActiveClubMember(userId, proposal.clubId);
+      if (!isMember) return res.status(403).json({ message: "Devi essere membro attivo del club per partecipare" });
     }
 
     const participants = await storage.getProposalParticipants(proposal.id);
