@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import path from "path";
 import { storage } from "../storage";
-import { uploadBuffer } from "../objectStorage";
+import { uploadBuffer, deleteObject } from "../objectStorage";
 import { cacheAdImage } from "./ads";
 
 const router = Router();
@@ -118,6 +118,24 @@ router.put("/photos/:id/reject", async (req: Request, res: Response) => {
         return res.status(404).json({ message: "Foto non trovata" });
       }
       await storage.updateContestEntryApproval(id, false);
+      // Defense-in-depth: rimuovi anche il file dal bucket object-storage.
+      // L'endpoint GET /api/contest/photos/:filename già blocca con 404 quando
+      // isApproved=false, ma eliminare il file garantisce che la foto rifiutata
+      // non resti raggiungibile via futuri endpoint o pre-signed URL.
+      if (entry.photoUrl) {
+        const photoFilename = entry.photoUrl.split("/").pop();
+        if (photoFilename) {
+          await deleteObject(`public/contest/${photoFilename}`).catch((err) => {
+            // Log per audit/incident response: il reject DB è già avvenuto e l'endpoint
+            // contest.ts blocca comunque l'accesso (isApproved !== true). Manteniamo
+            // l'idempotenza ma non perdiamo visibilità sui fallimenti del bucket.
+            console.warn(
+              `[moderator/reject_contest] Object delete failed for ${photoFilename} (entry ${id}):`,
+              err?.message ?? err
+            );
+          });
+        }
+      }
     } else {
       const photo = await storage.getUserPhoto(id);
       if (!photo) {

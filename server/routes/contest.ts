@@ -233,7 +233,10 @@ router.get("/photos/:filename", async (req: Request, res: Response) => {
       .where(eq(photoContestEntries.photoUrl, photoUrl))
       .limit(1);
 
-    if (!entry || entry.isApproved === false) {
+    // Fail-closed: nega tutto ciò che non è esplicitamente approvato.
+    // Se in futuro lo schema permettesse isApproved nullable o pending,
+    // vogliamo comunque non servire la foto.
+    if (!entry || entry.isApproved !== true) {
       return res.status(404).json({ message: "Foto non trovata" });
     }
 

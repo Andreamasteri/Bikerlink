@@ -1096,18 +1096,24 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
 
     let authorized = !!participants.find((p) => p.userId === userId);
 
-    // Block check: for direct/private/contact conversations with exactly 2 participants,
-    // deny image access if the requester has been blocked by (or has blocked) the other
-    // participant. Participant rows are not removed on block, so without this check a
-    // blocked user can still fetch previously-seen image URLs.
+    // Block check (fail-closed, anti-regressione Task #1115): per QUALUNQUE
+    // conversazione direct/private/contact, se il requester ha una relazione di
+    // blocco (in entrambe le direzioni) con UNO QUALSIASI degli altri partecipanti,
+    // l'accesso all'immagine viene negato. Non assumiamo l'invariante
+    // "direct => exactly 2 participants": se in futuro venisse violata, vogliamo
+    // comunque negare l'accesso. Le conversazioni motoclub bypassano per design
+    // (block enforcement solo su chat 1:1 / privata).
     const isDirectConv = conversation?.conversationType === "direct"
       || conversation?.conversationType === "private"
       || conversation?.conversationType === "contact";
-    if (authorized && isDirectConv && participants.length === 2) {
-      const otherParticipant = participants.find((p) => p.userId !== userId);
-      if (otherParticipant) {
-        const blocked = await storage.isBlocked(userId, otherParticipant.userId);
-        if (blocked) authorized = false;
+    if (authorized && isDirectConv) {
+      const otherParticipants = participants.filter((p) => p.userId !== userId);
+      for (const other of otherParticipants) {
+        const blocked = await storage.isBlocked(userId, other.userId);
+        if (blocked) {
+          authorized = false;
+          break;
+        }
       }
     }
 
