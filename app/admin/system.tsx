@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   TextInput,
   Alert,
+  Modal,
+  KeyboardAvoidingView,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -243,55 +245,64 @@ export default function SystemScreen() {
 
   const [isCleanupRunning, setIsCleanupRunning] = useState(false);
   const [isPurging, setIsPurging] = useState(false);
+  const [purgeModalVisible, setPurgeModalVisible] = useState(false);
+  const [purgeConfirmText, setPurgeConfirmText] = useState("");
+
+  const executePurge = useCallback(async () => {
+    if (purgeConfirmText.trim().toUpperCase() !== "PURGA") {
+      Alert.alert("Conferma errata", "Devi scrivere esattamente PURGA per procedere.");
+      return;
+    }
+    setPurgeModalVisible(false);
+    setPurgeConfirmText("");
+    setIsPurging(true);
+    try {
+      const res = await fetch(
+        new URL("/api/admin/purge-non-admin-users", getApiUrl()).toString(),
+        {
+          method: "DELETE",
+          credentials: "include",
+          headers: { "X-Confirm-Purge": "PURGE-CONFIRMED" },
+        }
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        Alert.alert("Errore", (body as { message?: string }).message ?? "Errore server");
+        return;
+      }
+      const body = await res.json() as { purged: boolean; deletedUsers: number };
+      Alert.alert(
+        "Purga completata",
+        `Eliminati ${body.deletedUsers} utenti non-admin.\nLe sessioni sono state invalidate.\nVerrai reindirizzato al login.`,
+        [
+          {
+            text: "OK",
+            onPress: async () => {
+              try { await logoutMutation.mutateAsync(); } catch {}
+              router.replace("/(auth)/login");
+            },
+          },
+        ]
+      );
+    } catch {
+      Alert.alert("Errore", "Impossibile contattare il server.");
+    } finally {
+      setIsPurging(false);
+    }
+  }, [purgeConfirmText, logoutMutation, router]);
 
   const handlePurgeNonAdminUsers = useCallback(() => {
     Alert.alert(
       "Purga DB utenti",
-      "Questa azione elimina TUTTI gli utenti non-admin (moderatori, utenti normali) e invalida tutte le sessioni attive. L'operazione è irreversibile.\n\nConfermi la PURGA?",
+      "Questa azione elimina TUTTI gli utenti non-admin (moderatori, utenti normali) e invalida tutte le sessioni attive. L'operazione è irreversibile.",
       [
         { text: "Annulla", style: "cancel" },
         {
-          text: "PURGA",
+          text: "Continua",
           style: "destructive",
           onPress: () => {
-            Alert.alert(
-              "Conferma finale",
-              "Stai per eliminare tutti gli utenti non-admin. Scrivi PURGA per confermare.",
-              [
-                { text: "Annulla", style: "cancel" },
-                {
-                  text: "Conferma eliminazione",
-                  style: "destructive",
-                  onPress: async () => {
-                    setIsPurging(true);
-                    try {
-                      const res = await fetch(
-                        new URL("/api/admin/purge-non-admin-users", getApiUrl()).toString(),
-                        {
-                          method: "DELETE",
-                          credentials: "include",
-                          headers: { "X-Confirm-Purge": "PURGE-CONFIRMED" },
-                        }
-                      );
-                      if (!res.ok) {
-                        const body = await res.json().catch(() => ({}));
-                        Alert.alert("Errore", (body as { message?: string }).message ?? "Errore server");
-                        return;
-                      }
-                      const body = await res.json() as { purged: boolean; deletedUsers: number };
-                      Alert.alert(
-                        "Purga completata",
-                        `Eliminati ${body.deletedUsers} utenti non-admin.\nLe sessioni sono state invalidate.\nGli account reviewer verranno ri-creati al prossimo riavvio del backend.`
-                      );
-                    } catch {
-                      Alert.alert("Errore", "Impossibile contattare il server.");
-                    } finally {
-                      setIsPurging(false);
-                    }
-                  },
-                },
-              ]
-            );
+            setPurgeConfirmText("");
+            setPurgeModalVisible(true);
           },
         },
       ]
@@ -602,7 +613,56 @@ export default function SystemScreen() {
   }
 
   return (
-    <FlatList
+    <>
+      <Modal
+        visible={purgeModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setPurgeModalVisible(false); setPurgeConfirmText(""); }}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={styles.modalBox}>
+            <Ionicons name="nuclear-outline" size={32} color="#FF4444" />
+            <Text style={styles.modalTitle}>Conferma purga</Text>
+            <Text style={styles.modalBody}>
+              Stai per eliminare tutti gli utenti non-admin. Questa operazione è irreversibile.{"\n\n"}
+              Scrivi <Text style={{ color: "#FF4444", fontFamily: "Inter_700Bold" }}>PURGA</Text> nel campo qui sotto per confermare.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              value={purgeConfirmText}
+              onChangeText={setPurgeConfirmText}
+              placeholder="PURGA"
+              placeholderTextColor={Colors.textMuted ?? "#666"}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: Colors.surface }]}
+                onPress={() => { setPurgeModalVisible(false); setPurgeConfirmText(""); }}
+              >
+                <Text style={[styles.modalBtnText, { color: Colors.text }]}>Annulla</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalBtn,
+                  { backgroundColor: purgeConfirmText.trim().toUpperCase() === "PURGA" ? "#CC0000" : "#555" },
+                ]}
+                onPress={executePurge}
+              >
+                <Text style={styles.modalBtnText}>Elimina tutto</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <FlatList
       data={mergedEvents}
       keyExtractor={(item, index) => `${item.timestamp}-${index}`}
       contentContainerStyle={[
@@ -1122,6 +1182,7 @@ export default function SystemScreen() {
       }
       showsVerticalScrollIndicator={false}
     />
+    </>
   );
 }
 
@@ -1455,5 +1516,66 @@ const styles = StyleSheet.create({
     color: Colors.textMuted ?? "#888",
     fontFamily: "Inter_500Medium",
     fontSize: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  modalBox: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#FF4444",
+  },
+  modalTitle: {
+    color: "#FF4444",
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    textAlign: "center",
+  },
+  modalBody: {
+    color: Colors.text,
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  modalInput: {
+    backgroundColor: Colors.background,
+    color: Colors.text,
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 2,
+    borderColor: "#FF4444",
+    width: "100%",
+    textAlign: "center",
+    letterSpacing: 2,
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 10,
+    width: "100%",
+  },
+  modalBtn: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  modalBtnText: {
+    color: "#fff",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
   },
 });

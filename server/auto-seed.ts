@@ -604,9 +604,9 @@ export async function seedGooglePlayReviewerAccount(): Promise<void> {
     await db.insert(userProfiles).values({
       userId: user.id,
       isAvailable: true,
-      latitude: 45.4654,
-      longitude: 9.1859,
-      bio: "Account di test per la review di Google Play. Motociclista appassionato con anni di esperienza sulle strade lombarde.",
+      latitude: 43.7696,
+      longitude: 11.2558,
+      bio: "Account di test per la review di Google Play. Motociclista appassionato con anni di esperienza sulle strade toscane.",
       searchPreference: "both",
     }).onConflictDoNothing();
 
