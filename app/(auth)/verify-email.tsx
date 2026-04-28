@@ -59,7 +59,7 @@ export default function VerifyEmailScreen() {
 
   const handleVerify = async () => {
     if (!token.trim()) { setError("Inserisci il codice di verifica"); return; }
-    if (token.trim().length !== 6) { setError("Il codice deve essere di 6 caratteri"); return; }
+    if (token.trim().length !== 8) { setError("Il codice deve essere di 8 caratteri"); return; }
     setError("");
     setIsVerifying(true);
     try {
@@ -155,7 +155,7 @@ export default function VerifyEmailScreen() {
             onChangeText={(text) => setToken(text.toUpperCase())}
             autoCapitalize="characters"
             autoCorrect={false}
-            maxLength={6}
+            maxLength={8}
             testID="verify-code-input"
           />
         </View>

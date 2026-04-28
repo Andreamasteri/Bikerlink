@@ -241,7 +241,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     const emailVerificationEnabled = emailVerifSetting?.value === "true";
 
     if (emailVerificationEnabled && !isPrimal) {
-      const token = crypto.randomBytes(3).toString("hex").toUpperCase();
+      const token = crypto.randomBytes(4).toString("hex").toUpperCase();
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
       await storage.createEmailVerificationToken(user.id, token, expiresAt);
       const emailSent = await sendVerificationEmail(user.email, user.nickname, token);
@@ -494,24 +494,25 @@ router.post("/reset-password", resetPasswordLimiter, async (req: Request, res: R
       return res.status(400).json({ message: "Codice scaduto — richiedi un nuovo codice" });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
-    await storage.updateUser(user.id, { password: hashedPassword } as any);
-    await storage.markPasswordResetTokenUsedById(resetToken.id);
-
-    // Revoca tutte le sessioni pre-esistenti prima di emettere il nuovo
-    // token. Fail-closed: se la revoca fallisce non rilasciamo la sessione.
+    // Fail-closed: revoca le sessioni esistenti PRIMA di cambiare la password.
+    // Se la revoca fallisce, la password resta invariata e nessun gap di
+    // sicurezza viene introdotto (no transazione DB necessaria).
     let revoked = 0;
     try {
       revoked = await revokeAllUserSessions(user.id);
     } catch (e) {
-      console.error("[PASSWORD RESET] revokeAllUserSessions failed:", e);
+      console.error("[PASSWORD RESET] revokeAllUserSessions failed — password NOT changed:", e);
       return res.status(500).json({
-        message: "Password aggiornata ma impossibile invalidare le sessioni esistenti. Riprova il login.",
+        message: "Errore temporaneo nella revoca delle sessioni. Riprova tra qualche istante.",
       });
     }
     if (revoked > 0) {
       console.log(`[PASSWORD RESET] Revoked ${revoked} session(s) for user ${user.id}`);
     }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+    await storage.updateUser(user.id, { password: hashedPassword } as any);
+    await storage.markPasswordResetTokenUsedById(resetToken.id);
 
     req.session.userId = user.id;
     await new Promise<void>((resolve, reject) => {
@@ -632,7 +633,7 @@ router.post("/resend-verification", resendVerificationLimiter, async (req: Reque
 
     await storage.deleteEmailVerificationTokens(user.id);
     clearVerifyAttempts(user.id);
-    const token = crypto.randomBytes(3).toString("hex").toUpperCase();
+    const token = crypto.randomBytes(4).toString("hex").toUpperCase();
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
     await storage.createEmailVerificationToken(user.id, token, expiresAt);
     const emailSent = await sendVerificationEmail(user.email, user.nickname, token);
