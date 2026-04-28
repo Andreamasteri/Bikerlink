@@ -7,7 +7,8 @@ import { startMatchingEngine, stopMatchingEngine } from "./matching-engine";
 import { autoSeedEssentialUsers, autoSeedFakeUsers, seedAppleReviewerAccount } from "./auto-seed";
 import { db, pool } from "./db";
 import { sql, eq, and } from "drizzle-orm";
-import { motoClubs, motoClubMembers, conversations, conversationParticipants } from "@shared/schema";
+import { motoClubs, motoClubMembers, conversations, conversationParticipants, motorcyclePhotos, userMotorcycles } from "@shared/schema";
+import { storage } from "./storage";
 import { seedMotoclubs } from "./routes/motoclubs";
 import * as fs from "fs";
 import * as path from "path";
@@ -298,6 +299,43 @@ function configureExpoAndLanding(app: express.Application) {
   }
 
   app.use("/assets", express.static(path.resolve(process.cwd(), "assets")));
+
+  // SECURITY (Task #1080): le foto extra delle moto vengono scritte come
+  // /uploads/motorcycles/<random>.webp. Servire questo path come static
+  // pubblico permetteva a chiunque (anche logged-out) di scaricare
+  // un'immagine appreso il filename, bypassando le ACL del garage. Ora
+  // intercetto la sotto-cartella PRIMA della static middleware, richiedo
+  // sessione valida + ownership del proprietario della moto, e
+  // costringo cache privata. Le altre /uploads/* (es: /uploads/contest/)
+  // continuano a usare la static middleware sottostante.
+  app.get("/uploads/motorcycles/:filename", async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Non autenticato" });
+      }
+      const requesterId = req.session.userId;
+      const filename = req.params.filename;
+      if (filename.includes("/") || filename.includes("..")) {
+        return res.status(404).json({ message: "Foto non trovata" });
+      }
+      const photoUrl = `/uploads/motorcycles/${filename}`;
+      const [row] = await db
+        .select({ ownerId: userMotorcycles.userId })
+        .from(motorcyclePhotos)
+        .innerJoin(userMotorcycles, eq(motorcyclePhotos.motorcycleId, userMotorcycles.id))
+        .where(eq(motorcyclePhotos.photoUrl, photoUrl))
+        .limit(1);
+      if (!row || row.ownerId !== requesterId) {
+        return res.status(404).json({ message: "Foto non trovata" });
+      }
+      res.set("Cache-Control", "private, max-age=3600");
+      return next();
+    } catch (err) {
+      console.error("[uploads/motorcycles auth] error:", err);
+      return res.status(500).json({ message: "Errore interno del server" });
+    }
+  });
+
   app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
   app.use(express.static(path.resolve(process.cwd(), "static-build")));
 
