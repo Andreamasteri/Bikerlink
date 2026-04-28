@@ -77,6 +77,38 @@ const startupBeaconLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// SECURITY (Task #1125) — POST /ota-error and /client-error are public
+// telemetry sinks. Both used to fall back to the global 10 MB JSON parser
+// (server/index.ts) and only ota-error had a manual per-IP gate that ran
+// AFTER parsing. Now both routes:
+//   1. Are excluded from the global parser (server/index.ts).
+//   2. Use a small per-route JSON parser sized to the legitimate payload.
+//      ota-error fields are explicitly truncated to a few hundred chars,
+//      so 8 KB is comfortable. client-error includes a stack and component
+//      stack truncated to 2 KB + 1 KB downstream, so 16 KB leaves slack.
+//   3. Run an express-rate-limit BEFORE the parser so an attacker pays the
+//      429 in O(1) instead of provoking a multi-MB parse on every loop.
+// Upper-bounded windows + small caps mean a single IP can no longer flood
+// logs (client-error) or pollute ota_events / in-memory ring buffers
+// (ota-error) without hitting a hard limit.
+const otaErrorJson = express.json({ limit: "8kb" });
+const otaErrorLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: { message: "Troppi eventi OTA: rallenta." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const clientErrorJson = express.json({ limit: "16kb" });
+const clientErrorLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { received: true },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 const BEACON_DATA_MAX_KEYS = 20;
 const BEACON_DATA_KEY_MAX = 64;
 const BEACON_DATA_VALUE_MAX = 200;
@@ -218,8 +250,13 @@ function checkOtaErrorRate(ip: string | undefined): boolean {
   return true;
 }
 
-router.post("/ota-error", async (req: Request, res: Response) => {
+router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, res: Response) => {
   try {
+    // Task #1125: keep the legacy in-memory per-IP gate as defense-in-depth
+    // alongside the new express-rate-limit middleware. The middleware is
+    // the primary gate (it runs before the JSON parser); this map stays
+    // useful as a secondary safety net behind any proxy that strips
+    // X-Forwarded-For inconsistently.
     const ip = clientIp(req);
     if (!checkOtaErrorRate(ip)) {
       return res.status(429).json({ message: "Troppi eventi OTA: rallenta." });
@@ -286,7 +323,7 @@ router.post("/ota-error", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/client-error", (req: Request, res: Response) => {
+router.post("/client-error", clientErrorLimiter, clientErrorJson, (req: Request, res: Response) => {
   try {
     const { message, stack, componentStack, platform, appVersion, isFatal } = req.body || {};
     console.error("[CLIENT-ERROR]", JSON.stringify({

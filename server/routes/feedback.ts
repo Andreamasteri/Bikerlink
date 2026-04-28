@@ -1,8 +1,19 @@
-import { Router, type Request, type Response } from "express";
+import express, { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { sendEmail } from "../email";
+import { feedbackRateLimiter } from "../lib/abuse-rate-limit";
 
 const ADMIN_EMAIL = "bikerlinkapp@gmail.com";
+
+// Task #1125: per-route caps. The global parser bypass in server/index.ts
+// excludes POST /api/feedback so this limit actually applies. 16 KB is
+// roughly 10x the natural ticket size while still being trivially cheap
+// to parse on every spammed request.
+const FEEDBACK_BODY_LIMIT = "16kb";
+const FEEDBACK_SUBJECT_MAX_LEN = 200;
+const FEEDBACK_MESSAGE_MAX_LEN = 4000;
+const ALLOWED_TICKET_TYPES = new Set(["bug", "suggestion", "feedback", "other"]);
+const feedbackJson = express.json({ limit: FEEDBACK_BODY_LIMIT });
 
 const TICKET_TYPE_LABELS: Record<string, string> = {
   bug: "Bug Report",
@@ -39,31 +50,66 @@ function buildFeedbackEmailHtml(nickname: string, ticketType: string, subject: s
 
 const router = Router();
 
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", feedbackJson, async (req: Request, res: Response) => {
   try {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Non autenticato" });
     }
 
-    const { ticketType, subject, message } = req.body;
+    // Task #1125: per-user + per-IP throttle. Each accepted feedback
+    // ticket triggers an outbound email through the shared Gmail
+    // transporter that also sends password resets and email
+    // verifications, so unbounded ticket creation drains the same
+    // sending quota legitimate signups depend on. The limit is shared
+    // process-wide via abuse-rate-limit so future feedback variants
+    // (e.g. a CSAT survey) can opt into the same bucket.
+    const ip = req.ip ?? req.socket?.remoteAddress ?? "";
+    if (feedbackRateLimiter.isOverLimit(req.session.userId, ip)) {
+      return res.status(429).json({
+        message: "Hai inviato troppe segnalazioni. Riprova più tardi.",
+      });
+    }
 
-    if (!subject || !message) {
+    const { ticketType, subject, message } = req.body ?? {};
+
+    // Task #1125: tight server-side type/length validation. The body
+    // parser already caps the request at 16 KB, but a single 4 KB
+    // message field is enough for a real bug report and small enough
+    // that storage and the rendered HTML email cannot be weaponised.
+    if (typeof subject !== "string" || typeof message !== "string") {
       return res.status(400).json({ message: "Oggetto e messaggio sono obbligatori" });
     }
+    const trimmedSubject = subject.trim();
+    const trimmedMessage = message.trim();
+    if (!trimmedSubject || !trimmedMessage) {
+      return res.status(400).json({ message: "Oggetto e messaggio sono obbligatori" });
+    }
+    if (trimmedSubject.length > FEEDBACK_SUBJECT_MAX_LEN) {
+      return res.status(400).json({
+        message: `L'oggetto non può superare ${FEEDBACK_SUBJECT_MAX_LEN} caratteri`,
+      });
+    }
+    if (trimmedMessage.length > FEEDBACK_MESSAGE_MAX_LEN) {
+      return res.status(400).json({
+        message: `Il messaggio non può superare ${FEEDBACK_MESSAGE_MAX_LEN} caratteri`,
+      });
+    }
+    const safeTicketType = typeof ticketType === "string" && ALLOWED_TICKET_TYPES.has(ticketType)
+      ? ticketType
+      : "feedback";
 
     const ticket = await storage.createFeedbackTicket({
       userId: req.session.userId,
-      ticketType: ticketType || "feedback",
-      subject,
-      message,
+      ticketType: safeTicketType,
+      subject: trimmedSubject,
+      message: trimmedMessage,
     });
 
     try {
       const user = await storage.getUser(req.session.userId);
       const nickname = user?.nickname || "Utente sconosciuto";
-      const type = ticketType || "feedback";
-      const emailSubject = `[BikerLink] ${TICKET_TYPE_LABELS[type] || type}: ${subject}`;
-      const html = buildFeedbackEmailHtml(nickname, type, subject, message);
+      const emailSubject = `[BikerLink] ${TICKET_TYPE_LABELS[safeTicketType] || safeTicketType}: ${trimmedSubject}`;
+      const html = buildFeedbackEmailHtml(nickname, safeTicketType, trimmedSubject, trimmedMessage);
       sendEmail(ADMIN_EMAIL, emailSubject, html).catch((err) =>
         console.error("[EMAIL] Errore invio notifica feedback:", err)
       );

@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { storage } from "../storage";
 import { sendEmail } from "../email";
+import { reportRateLimiter } from "../lib/abuse-rate-limit";
 
 const ADMIN_EMAIL = "bikerlinkapp@gmail.com";
 
@@ -59,38 +60,10 @@ function requireAuth(req: Request, res: Response): string | null {
   return req.session.userId;
 }
 
-// Per-user rate limit: max 10 reports per hour to prevent email/DB flooding.
-const REPORT_RATE_MAX = 10;
-const REPORT_RATE_WINDOW_MS = 60 * 60 * 1000;
-const reportRateMap = new Map<string, { count: number; resetAt: number }>();
-
-// Secondary per-IP rate limit: max 20 reports per hour to reduce multi-account abuse.
-const REPORT_IP_RATE_MAX = 20;
-const reportIpRateMap = new Map<string, { count: number; resetAt: number }>();
-
-function checkReportRateMap(
-  map: Map<string, { count: number; resetAt: number }>,
-  key: string,
-  max: number,
-): boolean {
-  const now = Date.now();
-  const entry = map.get(key);
-  if (!entry || now > entry.resetAt) {
-    map.set(key, { count: 1, resetAt: now + REPORT_RATE_WINDOW_MS });
-    return false; // not limited
-  }
-  if (entry.count >= max) return true; // limited
-  entry.count++;
-  return false;
-}
-
-function isReportRateLimited(userId: string, ip: string): boolean {
-  // Block if either per-user or per-IP limit is exceeded
-  if (checkReportRateMap(reportRateMap, userId, REPORT_RATE_MAX)) return true;
-  if (ip && checkReportRateMap(reportIpRateMap, ip, REPORT_IP_RATE_MAX)) return true;
-  return false;
-}
-
+// Task #1125: rate-limit state lives in server/lib/abuse-rate-limit.ts so
+// the legacy /api/users/:id/report endpoint shares the SAME counters as
+// this newer endpoint. Without that shared state an attacker could file
+// 10 reports here, then 10 more on the legacy route, doubling the limit.
 const DESCRIPTION_MAX_LEN = 2000;
 
 const createReportSchema = z.object({
@@ -105,7 +78,7 @@ router.post("/", async (req: Request, res: Response) => {
     if (!userId) return;
 
     const ip = req.ip ?? req.socket?.remoteAddress ?? "";
-    if (isReportRateLimited(userId, ip)) {
+    if (reportRateLimiter.isOverLimit(userId, ip)) {
       return res.status(429).json({ message: "Hai inviato troppe segnalazioni. Riprova tra un'ora." });
     }
 

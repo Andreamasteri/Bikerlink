@@ -66,24 +66,38 @@ function setupCors(app: express.Application) {
 }
 
 function setupBodyParsing(app: express.Application) {
-  // SECURITY (Task #1082): the global 10 MB JSON parser is intentionally
-  // skipped on the public `POST /api/admin/startup-beacon` route — that
-  // route applies its own much smaller 8 KB parser (see
-  // server/routes/admin.ts) so unauthenticated clients cannot push
-  // 10 MB blobs into the in-memory startupBeacons buffer.
+  // SECURITY (Task #1082, #1125): the global 10 MB JSON parser is bypassed
+  // on selected public/abuse-prone routes so the route can install a much
+  // smaller per-route parser and run its rate limiter before the body is
+  // ever parsed.
+  //   - /api/admin/startup-beacon (Task #1082) — public diagnostics.
+  //   - /api/admin/ota-error      (Task #1125) — public OTA telemetry.
+  //   - /api/admin/client-error   (Task #1125) — public client crash sink.
+  //   - /api/feedback             (Task #1125) — authenticated but
+  //                                              unthrottled and triggers
+  //                                              an outbound email per call.
+  // Without this bypass an attacker pays the cost of a 10 MB JSON parse
+  // (CPU, memory, log noise) before the route can decide to drop the
+  // request, which is exactly the abuse vector the threat model calls out.
   const globalJson = express.json({
     limit: "10mb",
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
   });
-  // Path normalized (lowercased + trailing-slash stripped) so a variant like
-  // `/api/admin/startup-beacon/` cannot bypass the per-route 8 KB cap and
-  // hit the 10 MB global parser first.
+  // Path normalized (lowercased + trailing-slash stripped) so a variant
+  // like `/api/admin/ota-error/` cannot bypass the per-route cap and hit
+  // the 10 MB global parser first.
+  const SMALL_BODY_POST_PATHS = new Set<string>([
+    "/api/admin/startup-beacon",
+    "/api/admin/ota-error",
+    "/api/admin/client-error",
+    "/api/feedback",
+  ]);
   app.use((req, res, next) => {
     if (req.method === "POST") {
       const normalized = (req.path || "").toLowerCase().replace(/\/+$/, "");
-      if (normalized === "/api/admin/startup-beacon") {
+      if (SMALL_BODY_POST_PATHS.has(normalized)) {
         return next();
       }
     }

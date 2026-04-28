@@ -11,6 +11,7 @@ import { db } from "../db";
 import { eq, and, desc } from "drizzle-orm";
 import { uploadBuffer, downloadBuffer, deleteObject } from "../objectStorage";
 import { onlineTracker } from "../online-tracker";
+import { reportRateLimiter } from "../lib/abuse-rate-limit";
 
 const router = Router();
 
@@ -1170,6 +1171,17 @@ router.post("/:id/report", requireAuth, async (req: Request, res: Response) => {
     const reporterId = req.session.userId!;
     const reportedUserId = req.params.id as string;
     const { reason, description } = req.body;
+
+    // Task #1125: throttle the legacy profile-report endpoint with the
+    // SAME shared limiter as POST /api/reports. Without this, a script
+    // could bypass the new endpoint's per-user/per-IP cap by hitting the
+    // legacy URL the production app actually wires the report button to
+    // (app/profile/[id].tsx). Sharing state via abuse-rate-limit means
+    // 10 reports total across both routes triggers the 429.
+    const ip = req.ip ?? req.socket?.remoteAddress ?? "";
+    if (reportRateLimiter.isOverLimit(reporterId, ip)) {
+      return res.status(429).json({ message: "Hai inviato troppe segnalazioni. Riprova tra un'ora." });
+    }
 
     if (reporterId === reportedUserId) {
       return res.status(400).json({ message: "Non puoi segnalare te stesso" });
