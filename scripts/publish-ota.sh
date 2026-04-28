@@ -142,10 +142,23 @@ echo "   ✔ CURRENT_OTA_NUMBER=$NEXT_OTA"
 
 # ─── Step B: Aggiorna ota-updates.json ────────────────────
 echo "[B] Aggiornamento ota-updates.json (supersede OTA-$LAST_OTA, inserisce OTA-$NEXT_OTA pending)..."
+OTA_UPDATES_FILE="$OTA_UPDATES_FILE" \
+OTA_NEXT="$NEXT_OTA" \
+OTA_VERSION="$VERSION" \
+OTA_RUNTIME_VERSION="$RUNTIME_VERSION" \
+OTA_COMMIT="$GIT_COMMIT_HASH" \
+OTA_APK_BUILD_ID="$APK_BUILD_ID" \
+OTA_APK_VERSION_CODE="$APK_VERSION_CODE" \
+OTA_APK_VERSION_NAME="$APK_VERSION_NAME" \
+OTA_APK_URL="$APK_URL" \
+OTA_APK_BUILD_DASHBOARD="$APK_BUILD_DASHBOARD" \
+OTA_RELEASE_MESSAGE="$RELEASE_MESSAGE" \
 node -e "
   const fs = require('fs');
-  const rv = '$RUNTIME_VERSION';
-  const data = JSON.parse(fs.readFileSync('$OTA_UPDATES_FILE','utf8'));
+  const rv = process.env.OTA_RUNTIME_VERSION;
+  const nextNum = parseInt(process.env.OTA_NEXT, 10);
+  const releaseMsg = process.env.OTA_RELEASE_MESSAGE;
+  const data = JSON.parse(fs.readFileSync(process.env.OTA_UPDATES_FILE, 'utf8'));
   // Marca superseded l'ultima entry active/published del ciclo corrente
   for (let i = data.length - 1; i >= 0; i--) {
     if (data[i].runtimeVersion === rv && typeof data[i].updateNumber === 'number') {
@@ -155,20 +168,16 @@ node -e "
       }
     }
   }
-  // Inserisce nuova entry pending
-  const apkBuildId = '$APK_BUILD_ID' || null;
-  const apkVersionCode = '$APK_VERSION_CODE' ? parseInt('$APK_VERSION_CODE') : null;
-  const apkVersionName = '$APK_VERSION_NAME' || null;
-  const apkUrl = '$APK_URL' || null;
-  const apkBuildDashboard = '$APK_BUILD_DASHBOARD' || null;
+  // Inserisce nuova entry pending — tutti i valori passati via env (nessuna interpolazione shell)
+  const apkVersionCode = process.env.OTA_APK_VERSION_CODE ? parseInt(process.env.OTA_APK_VERSION_CODE, 10) : null;
   const newEntry = {
-    updateNumber: $NEXT_OTA,
-    version: '$VERSION',
+    updateNumber: nextNum,
+    version: process.env.OTA_VERSION,
     cycle: '8.x',
     channel: 'preview',
     platform: 'android',
-    message: 'OTA-$NEXT_OTA rv$RUNTIME_VERSION: $RELEASE_MESSAGE',
-    note: 'CURRENT_OTA_NUMBER=$NEXT_OTA. Pubblicato da publish-ota.sh (un comando solo).',
+    message: JSON.stringify('OTA-' + nextNum + ' rv' + rv + ': ' + releaseMsg).slice(1, -1),
+    note: 'CURRENT_OTA_NUMBER=' + nextNum + '. Pubblicato da publish-ota.sh (un comando solo).',
     runtimeVersion: rv,
     jsEngine: 'hermes',
     platforms: ['android'],
@@ -177,19 +186,19 @@ node -e "
     updateGroupId: null,
     androidUpdateId: null,
     iosUpdateId: null,
-    commitBase: '$GIT_COMMIT_HASH',
+    commitBase: process.env.OTA_COMMIT,
     easDashboard: null,
-    apkBuildId: apkBuildId || null,
-    apkBuildDashboard: apkBuildDashboard || null,
+    apkBuildId: process.env.OTA_APK_BUILD_ID || null,
+    apkBuildDashboard: process.env.OTA_APK_BUILD_DASHBOARD || null,
     apkVersionCode: apkVersionCode,
-    apkVersionName: apkVersionName,
-    apkUrl: apkUrl || null,
+    apkVersionName: process.env.OTA_APK_VERSION_NAME || null,
+    apkUrl: process.env.OTA_APK_URL || null,
     status: 'pending'
   };
   data.push(newEntry);
-  fs.writeFileSync('$OTA_UPDATES_FILE', JSON.stringify(data, null, 2) + '\n');
+  fs.writeFileSync(process.env.OTA_UPDATES_FILE, JSON.stringify(data, null, 2) + '\n');
   console.log('OK');
-" 2>/dev/null || { echo "   ERRORE: impossibile aggiornare $OTA_UPDATES_FILE"; exit 1; }
+" || { echo "   ERRORE: impossibile aggiornare $OTA_UPDATES_FILE"; exit 1; }
 ENTRY_INSERTED=1
 echo "   ✔ Entry OTA-$NEXT_OTA inserita (pending)"
 
@@ -250,9 +259,14 @@ else
 fi
 
 if [ -z "$FOUND_OTA" ]; then
-  echo "   ⚠ ATTENZIONE: CURRENT_OTA_NUMBER non trovato nel bundle ($BUNDLE_EXT)"
-  echo "     Questo può accadere con Hermes bytecode (HBC) che offusca le stringhe."
-  echo "     Procedendo con la pubblicazione — verificare manualmente se necessario."
+  echo ""
+  echo "   ╔════════════════════════════════════════════════════════╗"
+  echo "   ║  ❌ PUBBLICAZIONE BLOCCATA — marker non trovato       ║"
+  echo "   ║  CURRENT_OTA_NUMBER non trovato nel bundle ($BUNDLE_EXT)   ║"
+  echo "   ║  Potrebbe essere cache Metro stale — riprovare.       ║"
+  echo "   ╚════════════════════════════════════════════════════════╝"
+  echo ""
+  exit 1
 elif [ "$FOUND_OTA" = "$NEXT_OTA" ]; then
   echo "   ✔ Bundle verificato: CURRENT_OTA_NUMBER=$FOUND_OTA (corretto)"
 else
@@ -358,32 +372,54 @@ while [ $ELAPSED -le $MAX_WAIT ]; do
 done
 
 if [ "$VERIFIED" != "1" ]; then
-  echo "   ⚠ ATTENZIONE: verifica live timeout dopo ${MAX_WAIT}s."
-  echo "     La release è pubblicata sul DB ma potrebbe non essere ancora servita."
-  echo "     Verifica manualmente con: bash scripts/validate-ota.sh"
+  echo ""
+  echo "   ╔════════════════════════════════════════════════════════╗"
+  echo "   ║  ❌ PUBBLICAZIONE BLOCCATA — verifica live fallita    ║"
+  echo "   ║  La produzione non serve OTA-$NEXT_OTA dopo ${MAX_WAIT}s.     ║"
+  echo "   ║  La release è nel DB ma NON attiva in produzione.     ║"
+  echo "   ║  Verifica: bash scripts/validate-ota.sh               ║"
+  echo "   ╚════════════════════════════════════════════════════════╝"
+  echo ""
+  exit 1
 fi
 
 # ─── Step K: Finalizzazione ota-updates.json ──────────────
 echo "[K] Finalizzazione ota-updates.json con ID reali..."
+OTA_UPDATES_FILE="$OTA_UPDATES_FILE" \
+OTA_NEXT="$NEXT_OTA" \
+OTA_RUNTIME_VERSION="$RUNTIME_VERSION" \
+OTA_RELEASE_ID="$RELEASE_ID" \
+OTA_BUNDLE_URL="$BUNDLE_URL" \
 node -e "
   const fs = require('fs');
-  const rv = '$RUNTIME_VERSION';
-  const data = JSON.parse(fs.readFileSync('$OTA_UPDATES_FILE','utf8'));
+  const rv = process.env.OTA_RUNTIME_VERSION;
+  const nextNum = parseInt(process.env.OTA_NEXT, 10);
+  const data = JSON.parse(fs.readFileSync(process.env.OTA_UPDATES_FILE, 'utf8'));
   let updated = false;
   for (let i = data.length - 1; i >= 0; i--) {
-    if (data[i].updateNumber === $NEXT_OTA && data[i].runtimeVersion === rv) {
-      data[i].releaseId = '$RELEASE_ID';
-      data[i].bundleUrl = '$BUNDLE_URL';
+    if (data[i].updateNumber === nextNum && data[i].runtimeVersion === rv) {
+      data[i].releaseId = process.env.OTA_RELEASE_ID;
+      data[i].bundleUrl = process.env.OTA_BUNDLE_URL;
       data[i].status = 'published';
       data[i].publishedAt = new Date().toISOString();
       updated = true;
       break;
     }
   }
-  if (!updated) { process.stderr.write('Entry OTA-$NEXT_OTA non trovata\n'); process.exit(1); }
-  fs.writeFileSync('$OTA_UPDATES_FILE', JSON.stringify(data, null, 2) + '\n');
+  if (!updated) { process.stderr.write('Entry OTA-' + nextNum + ' non trovata\n'); process.exit(1); }
+  fs.writeFileSync(process.env.OTA_UPDATES_FILE, JSON.stringify(data, null, 2) + '\n');
   console.log('OK');
-" 2>/dev/null || { echo "   ⚠ Impossibile finalizzare ota-updates.json — aggiornare manualmente"; }
+" || {
+  echo ""
+  echo "   ╔════════════════════════════════════════════════════════╗"
+  echo "   ║  ❌ PUBBLICAZIONE BLOCCATA — finalizzazione fallita   ║"
+  echo "   ║  ota-updates.json non aggiornato — rollback attivo.   ║"
+  echo "   ║  La release è pubblica in prod: $RELEASE_ID  ║"
+  echo "   ║  Aggiornare manualmente ota-updates.json.             ║"
+  echo "   ╚════════════════════════════════════════════════════════╝"
+  echo ""
+  exit 1
+}
 
 echo "   ✔ ota-updates.json aggiornato (status: published)"
 
