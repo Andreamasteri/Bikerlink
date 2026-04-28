@@ -421,7 +421,34 @@
     "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
     "apkVersionCode": 41,
     "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-28T00:02:18.222Z"
+  },
+  {
+    "updateNumber": 16,
+    "version": "1.16.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-16 rv8.0.0: Fix ventaglio biker sovrapposti — OMS bundlato inline (CDN unpkg /oms.min.js era 404)",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "note": "Task #1077: il ventaglio biker non ha mai funzionato in produzione perché la WebView caricava lo script https://unpkg.com/overlapping-marker-spiderfier-leaflet@0.2.7/dist/oms.min.js — questo URL restituisce 404 (il file pubblicato sul package è dist/oms.js senza .min). Di conseguenza OverlappingMarkerSpiderfier non veniva mai definito e il fallback al click classico veniva sempre attivato (vedi OTA-2..OTA-15 tutte rotte). Fix in lib/leaflet-map-html.ts: (1) plugin OMS v0.2.7 bundlato inline (5374 byte) — nessuna dipendenza CDN runtime; (2) nearbyDistance 22 -> 34px per allinearla alla dimensione effettiva delle icone (30px); (3) postMsg diagnostico {type:'omsStatus', omsReady, error} all'avvio per autodiagnosi futura. CURRENT_OTA_NUMBER=16.",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "6160f0a1-0ad1-4dca-94a3-a1f39b0581d6",
+    "bundleUrl": "private/ota/ota-1.16.0-1777361549873.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "40fa99ab1febc3aaeaaf51c81ecd420f3a6adf69",
+    "easDashboard": null,
+    "apkBuildId": "e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkVersionCode": 41,
+    "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
+    "status": "published",
+    "publishedAt": "2026-04-28T07:32:32.614Z"
   }
 ]
