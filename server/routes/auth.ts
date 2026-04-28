@@ -569,11 +569,17 @@ router.post("/resend-reset-code", resendResetLimiter, async (req: Request, res: 
   }
 });
 
+const VERIFY_TOKEN_RE = /^[A-F0-9]{8}$/;
+
 router.post("/verify-email", verifyEmailLimiter, async (req: Request, res: Response) => {
   try {
     const { email, token } = req.body;
     if (!email || !token) {
       return res.status(400).json({ message: "Email e codice richiesti" });
+    }
+    const normalizedToken = String(token).trim().toUpperCase();
+    if (!VERIFY_TOKEN_RE.test(normalizedToken)) {
+      return res.status(400).json({ message: "Codice non valido" });
     }
 
     const user = await storage.getUserByEmail(email.trim().toLowerCase());
@@ -586,7 +592,7 @@ router.post("/verify-email", verifyEmailLimiter, async (req: Request, res: Respo
       return res.status(429).json({ message: "Troppi tentativi. Richiedi un nuovo codice." });
     }
 
-    const verif = await storage.getEmailVerificationToken(String(token).toUpperCase());
+    const verif = await storage.getEmailVerificationToken(normalizedToken);
     if (!verif || verif.userId !== user.id) {
       const attempts = recordVerifyFailure(user.id);
       if (attempts >= VERIFY_MAX_ATTEMPTS) {
