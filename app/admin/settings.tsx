@@ -10,6 +10,7 @@ import Colors from "@/constants/colors";
 import { THEMES, THEME_META, ThemeName } from "@/constants/colors";
 import { useTheme } from "@/lib/theme-context";
 import { getApiUrl, queryClient, apiRequest } from "@/lib/query-client";
+import { useAuth } from "@/lib/auth-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface AppSetting {
@@ -282,6 +283,8 @@ function PdfDocumentAdminSection({
 
 export default function AdminSettings() {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const { currentTheme, setTheme, colors: themeColors } = useTheme();
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -312,6 +315,7 @@ export default function AdminSettings() {
 
   const { data: settings = [], isLoading } = useQuery<AppSetting[]>({
     queryKey: ["/api/admin/settings"],
+    enabled: isAdmin,
   });
 
   const { data: adsEnabledData } = useQuery<{ enabled: boolean }>({
@@ -346,6 +350,7 @@ export default function AdminSettings() {
 
   const { data: coordMaxAgeData } = useQuery<{ value: number }>({
     queryKey: ["/api/admin/settings/coordinates_max_age_seconds"],
+    enabled: isAdmin,
   });
   const [coordMaxAgeInput, setCoordMaxAgeInput] = useState("");
   useEffect(() => {
@@ -358,11 +363,13 @@ export default function AdminSettings() {
     enabled: boolean; interval: number; maxRecords: number; mode: string; selectedUsers: string[];
   }>({
     queryKey: ["/api/admin/coordinate-history/settings"],
+    enabled: isAdmin,
   });
   const { data: coordHistoryStats } = useQuery<{
     totalRecords: number; trackedUsers: number; oldestRecord: string | null; newestRecord: string | null;
   }>({
     queryKey: ["/api/admin/coordinate-history/stats"],
+    enabled: isAdmin,
   });
   const [chIntervalInput, setChIntervalInput] = useState("");
   const [chMaxRecordsInput, setChMaxRecordsInput] = useState("");
@@ -408,6 +415,7 @@ export default function AdminSettings() {
     ghostModeContinue: boolean;
   }>({
     queryKey: ["/api/admin/settings/bg-location"],
+    enabled: isAdmin,
   });
   const [bgIntervalInput, setBgIntervalInput] = useState("");
   const [bgNotificationTextInput, setBgNotificationTextInput] = useState("");
