@@ -1465,8 +1465,8 @@ const styles = StyleSheet.create({
   },
   profileHeader: {
     alignItems: "center",
-    padding: 24,
-    paddingTop: 12,
+    padding: 16,
+    paddingTop: 6,
   },
   avatar: {
     width: 96,
@@ -1491,7 +1491,7 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: 16,
-    marginTop: 8,
+    marginTop: 4,
   },
   accordionHeader: {
     flexDirection: "row",
@@ -1543,8 +1543,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: Colors.accent + "55",
-    paddingVertical: 6,
-    paddingHorizontal: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -1564,7 +1564,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 10,
   },
   bioText: {
     fontSize: 14,
