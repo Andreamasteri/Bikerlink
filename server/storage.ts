@@ -396,6 +396,44 @@ export interface IStorage {
   deleteBikerBikerMatchesBetween(userId1: string, userId2: string): Promise<number>;
 }
 
+/**
+ * Defense-in-depth privacy mask for stored map coordinates.
+ *
+ * Returns the profile with `latitude` and `longitude` cleared whenever the user has set
+ * `hideFromMap = true`. The UI surfaces this setting as "Non mostrarmi sulla mappa" and
+ * promises that the user's marker will not be visible to other users (see app/(tabs)/profile.tsx).
+ *
+ * Discovery handlers (/api/users/search, /api/users/online-list,
+ * /api/users/{biker,zavorrine}-available-list) already strip these fields when building
+ * their JSON response, but applying the mask at the storage layer guarantees the privacy
+ * promise even if a future endpoint forgets to filter, and keeps any distance ordering
+ * computed from these coordinates from leaking the precise location indirectly.
+ *
+ * `distance` is also nulled on the returned row when the field is present, so callers that
+ * pass through the raw row do not expose a derived metric tied to the hidden coordinates.
+ */
+function maskHiddenLocation<T extends { hideFromMap?: boolean | null; latitude?: number | null; longitude?: number | null } | null | undefined>(
+  profile: T,
+): T {
+  if (!profile) return profile;
+  if (!profile.hideFromMap) return profile;
+  return { ...profile, latitude: null, longitude: null };
+}
+
+function maskHiddenLocationRows<T extends { profile?: { hideFromMap?: boolean | null; latitude?: number | null; longitude?: number | null } | null; distance?: number | null }>(
+  rows: T[],
+): T[] {
+  return rows.map((row) => {
+    const masked = maskHiddenLocation(row.profile);
+    if (masked === row.profile && !row.profile?.hideFromMap) return row;
+    return {
+      ...row,
+      profile: masked,
+      ...(row.profile?.hideFromMap ? { distance: null } : {}),
+    };
+  });
+}
+
 export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
@@ -477,7 +515,10 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .limit(20);
-    return results.map(r => ({ user: r.user, profile: r.profile }));
+    // Defense-in-depth: never return stored coordinates for users who opted out of map visibility.
+    // Callers (e.g. /api/users/search) also strip these fields, but enforcing it at the storage
+    // layer prevents future regressions if a new endpoint forgets to apply the privacy mask.
+    return results.map(r => ({ user: r.user, profile: maskHiddenLocation(r.profile) }));
   }
 
   async getUserProfile(userId: string): Promise<UserProfile | undefined> {
@@ -1165,7 +1206,8 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
       .where(and(...conditions))
       .orderBy(sql`distance`);
-    return results;
+    // Defense-in-depth: strip stored coordinates and derived distance for users with hideFromMap=true.
+    return maskHiddenLocationRows(results);
   }
 
   async getAvailableUsersList(lat?: number, lng?: number): Promise<any[]> {
@@ -1568,12 +1610,14 @@ export class DatabaseStorage implements IStorage {
     if (countries && countries.length > 0) {
       conditions.push(inArray(users.country, countries));
     }
-    return db
+    const rows = await db
       .select({ user: users, profile: userProfiles, distance: distanceExpr })
       .from(userProfiles)
       .innerJoin(users, eq(users.id, userProfiles.userId))
       .where(and(...conditions))
       .orderBy(sql`distance`);
+    // Defense-in-depth: strip stored coordinates and derived distance for users with hideFromMap=true.
+    return maskHiddenLocationRows(rows);
   }
 
   async getAvailableZavorrinaList(lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<any[]> {
@@ -1593,12 +1637,14 @@ export class DatabaseStorage implements IStorage {
     if (countries && countries.length > 0) {
       conditions.push(inArray(users.country, countries));
     }
-    return db
+    const rows = await db
       .select({ user: users, profile: userProfiles, distance: distanceExpr })
       .from(userProfiles)
       .innerJoin(users, eq(users.id, userProfiles.userId))
       .where(and(...conditions))
       .orderBy(sql`distance`);
+    // Defense-in-depth: strip stored coordinates and derived distance for users with hideFromMap=true.
+    return maskHiddenLocationRows(rows);
   }
 
   async createEmailVerificationToken(userId: string, token: string, expiresAt: Date): Promise<void> {

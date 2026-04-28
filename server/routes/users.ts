@@ -645,12 +645,16 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
         : sqlTag<number>`0`.as("distance");
       const offlineConds: any[] = [eq(usersTable.status, "active"), or(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt)), eq(usersTable.ghostMode, false), notInArr(usersTable.role, ["admin"])];
       if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
-      const offlineResults = await db
+      const offlineResultsRaw = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
         .from(usersTable)
         .leftJoin(profilesTable, eq(profilesTable.userId, usersTable.id))
         .where(and(...offlineConds))
         .orderBy(sqlTag`distance`);
+      // Defense-in-depth: strip stored coordinates and derived distance for users with hideFromMap=true.
+      const offlineResults = offlineResultsRaw.map((r: any) => r.profile?.hideFromMap
+        ? { ...r, profile: { ...r.profile, latitude: null, longitude: null }, distance: null }
+        : r);
       const offlineOnly = offlineResults.filter((r: any) => !onlineIdSet.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...allResults, ...offlineOnly];
     }
@@ -765,12 +769,16 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
         : sqlTag<number>`0`.as("distance");
       const bikerConds: any[] = [eq(usersTable.status, "active"), or(eq(usersTable.userType, "biker"), eq(usersTable.userType, "coppia")), eq(usersTable.ghostMode, false), notInArr(usersTable.role, ["admin"])];
       if (countriesParam && countriesParam.length > 0) bikerConds.push(inArr(usersTable.country, countriesParam));
-      const allBikers = await db
+      const allBikersRaw = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
         .from(profilesTable)
         .innerJoin(usersTable, eq(usersTable.id, profilesTable.userId))
         .where(and(...bikerConds))
         .orderBy(sqlTag`distance`);
+      // Defense-in-depth: strip stored coordinates and derived distance for users with hideFromMap=true.
+      const allBikers = allBikersRaw.map((r: any) => r.profile?.hideFromMap
+        ? { ...r, profile: { ...r.profile, latitude: null, longitude: null }, distance: null }
+        : r);
       const onlineIds = new Set(onlineResults.map((r: any) => r.user.id));
       const offlineOnly = allBikers.filter((r: any) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
@@ -835,12 +843,16 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
         : sqlTag<number>`0`.as("distance");
       const zavConds: any[] = [eq(usersTable.status, "active"), eq(usersTable.userType, "zavorrina"), eq(usersTable.ghostMode, false), notInArr(usersTable.role, ["admin"])];
       if (countriesParam && countriesParam.length > 0) zavConds.push(inArr(usersTable.country, countriesParam));
-      const allZav = await db
+      const allZavRaw = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
         .from(profilesTable)
         .innerJoin(usersTable, eq(usersTable.id, profilesTable.userId))
         .where(and(...zavConds))
         .orderBy(sqlTag`distance`);
+      // Defense-in-depth: strip stored coordinates and derived distance for users with hideFromMap=true.
+      const allZav = allZavRaw.map((r: any) => r.profile?.hideFromMap
+        ? { ...r, profile: { ...r.profile, latitude: null, longitude: null }, distance: null }
+        : r);
       const onlineIds = new Set(onlineResults.map((r: any) => r.user.id));
       const offlineOnly = allZav.filter((r: any) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];

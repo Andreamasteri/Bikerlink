@@ -718,11 +718,35 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
     const clubId = req.params.id;
     const userId = req.session.userId!;
 
-    const [club] = await db.select().from(motoClubs).where(eq(motoClubs.id, clubId)).limit(1);
-    if (!club) return res.status(404).json({ message: "Club non trovato" });
-
     // Only active members may access the full club record (member list + internal fields).
     // Non-members must use GET /:id/public which returns a curated safe subset.
+    // We also use an explicit field whitelist (no `{ ...club }` spread) so that admin/moderator-only
+    // columns (proposedLatitude/Longitude/Address/By/At — see /map/pending-locations) are never
+    // leaked through this member-facing endpoint, even if new privileged columns are added later.
+    const [club] = await db.select({
+      id: motoClubs.id,
+      name: motoClubs.name,
+      clubType: motoClubs.clubType,
+      brandName: motoClubs.brandName,
+      modelName: motoClubs.modelName,
+      region: motoClubs.region,
+      country: motoClubs.country,
+      description: motoClubs.description,
+      logoUrl: motoClubs.logoUrl,
+      coverUrl: motoClubs.coverUrl,
+      isApproved: motoClubs.isApproved,
+      isFeatured: motoClubs.isFeatured,
+      memberCount: motoClubs.memberCount,
+      activityScore: motoClubs.activityScore,
+      conversationId: motoClubs.conversationId,
+      parentClubId: motoClubs.parentClubId,
+      latitude: motoClubs.latitude,
+      longitude: motoClubs.longitude,
+      createdAt: motoClubs.createdAt,
+      updatedAt: motoClubs.updatedAt,
+    }).from(motoClubs).where(eq(motoClubs.id, clubId)).limit(1);
+    if (!club) return res.status(404).json({ message: "Club non trovato" });
+
     const [membership] = await db.select({ id: motoClubMembers.id })
       .from(motoClubMembers)
       .where(and(
@@ -736,11 +760,9 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
     const membersRaw = await db.select({
       member: motoClubMembers,
       user: users,
-      profile: userProfiles,
     })
       .from(motoClubMembers)
       .innerJoin(users, eq(users.id, motoClubMembers.userId))
-      .leftJoin(userProfiles, eq(userProfiles.userId, motoClubMembers.userId))
       .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active")));
 
     const members = membersRaw.map(r => ({
