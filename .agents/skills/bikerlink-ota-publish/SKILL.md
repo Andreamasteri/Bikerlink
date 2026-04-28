@@ -30,7 +30,7 @@ backend custom `https://biker-link.replit.app/api/expo-updates` (Expo Updates Pr
 - **Canale EAS**: `preview`
 - **Runtime Version**: `8.0.0` (ciclo corrente, APK v41) ← CICLO V3
 - **APK corrente**: versionCode **41**, versionName **3.0.0** (buildId: `e03f51d8-9f2b-496f-bba2-e0fe90b69fb7`, EAS: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7, APK: https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk — completata 2026-04-27, arm64-v8a + NewArch + expo-audio, OTA-13 inclusa). NOTA: app.json è già bumpato a versionCode 42 / 3.1.0 in preparazione della prossima build, ma la build v42 non è ancora stata generata.
-- **OTA corrente**: OTA-15 (releaseId: `123bc007-6b24-4d1d-b221-2cfe3e873573`, pubblicato 2026-04-28 — set completo fix audio: stop/overlap [#1061] + costanti audio mode [#1064] + background/lock screen MediaSession [#1065])
+- **OTA corrente**: OTA-18 (releaseId: `61cd1fb8-402b-41a7-a72a-b6ba276c470b`, bundleUrl: `private/ota/ota-1.18.0-1777383990063.js`, pubblicato 2026-04-28T13:46:33.406Z — fix Metro cache stale: OTA-16/17 avevano CURRENT_OTA_NUMBER=15 nel bundle; republished con --reset-cache. Stessi contenuti di OTA-17: task #1083 #1086-#1096)
 - **APK precedente (v40)**: versionCode **40**, versionName **3.0.0** (buildId: `ba5205c6-0cc8-41ce-ba8c-8e68a117dabf`, APK: https://expo.dev/artifacts/eas/p1rG9wd7hZg7oPG1WEc4kM.apk)
 - **OTA base (APK v41)**: OTA-13 rv8.0.0 (bundle custom — EAS Updates dismesso, Task #980)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates` (Expo Updates Protocol v1)
@@ -74,21 +74,21 @@ Il commento sopra va tenuto generico:
 ```typescript
 // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
 // Ciclo 8.0.0 — APK v41 — aggiornare ad ogni nuova OTA pubblicata
-export const CURRENT_OTA_NUMBER = 15;
+export const CURRENT_OTA_NUMBER = 18; // ← esempio: sostituire con il numero reale
 ```
 
 ### PASSO 4 — Aggiungere entry in `ota-updates.json`
 Marcare la entry precedente come `"status": "superseded"`, poi aggiungere in fondo:
 ```json
 {
-  "updateNumber": 15,
+  "updateNumber": 19,
   "cycle": "8.x",
   "channel": "preview",
   "platform": "android",
   "runtimeVersion": "8.0.0",
   "jsEngine": "hermes",
-  "message": "OTA-15 rv8.0.0: <descrizione breve>",
-  "note": "<note dettagliate sui task inclusi. CURRENT_OTA_NUMBER=15.>",
+  "message": "OTA-19 rv8.0.0: <descrizione breve>",
+  "note": "<note dettagliate sui task inclusi. CURRENT_OTA_NUMBER=19.>",
   "releaseId": null,
   "bundleUrl": null,
   "updateGroupId": null,
@@ -108,7 +108,7 @@ Marcare la entry precedente come `"status": "superseded"`, poi aggiungere in fon
 ```bash
 BIKERLINK_ADMIN_EMAIL="admin@bikerlink.it" \
 BIKERLINK_ADMIN_PASSWORD="$BIKERLINK_ADMIN_PASSWORD" \
-bash scripts/publish-ota.sh "1.15.0" "OTA-15: <messaggio di release>"
+bash scripts/publish-ota.sh "1.19.0" "OTA-19: <messaggio di release>"
 ```
 Il versioning segue `1.<numero OTA>.0`.
 
@@ -259,7 +259,7 @@ Questo previene lacune documentali come quella di APK v37 (build ID mai registra
 - Ciclo 7.x: OTA 44–156 (APK versionCode 13→38, rv 7.0.0) — CHIUSO
   - APK v37: STABILE — versionName 2.3.0 + OTA 151–154
   - APK v38: STABILE — versionName 2.4.0, buildId: 7ecd4368-9640-4200-88e5-c33b902a7edc, APK: https://expo.dev/artifacts/eas/gEaBaW4hnhupnDP5CpYW1m.apk, updates.url→backend custom + OTA 155–156
-- Ciclo 8.x: OTA 1–13 (APK versionCode 39–41, rv 8.0.0) ← CORRENTE (V3)
+- Ciclo 8.x: OTA 1–18 (APK versionCode 39–41, rv 8.0.0) ← CORRENTE (V3)
   - APK v39: STABILE — versionName 3.0.0, buildId: b167f108-813d-4981-893a-2896c0268a5b (completata 2026-04-26T12:35Z), APK: https://expo.dev/artifacts/eas/nUADFAf6ddBUzcbZMjKBxR.apk
   - APK v40: STABILE — versionName 3.0.0, buildId: ba5205c6-0cc8-41ce-ba8c-8e68a117dabf, APK: https://expo.dev/artifacts/eas/p1rG9wd7hZg7oPG1WEc4kM.apk
   - APK v41: STABILE — versionName 3.0.0, buildId: e03f51d8-9f2b-496f-bba2-e0fe90b69fb7, APK: https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk (completata 2026-04-27) — arm64-v8a + NewArch + expo-audio (expo-av rimosso Task #1052) + OTA-13

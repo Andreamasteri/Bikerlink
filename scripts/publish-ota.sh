@@ -126,7 +126,7 @@ echo "   OK — autenticato"
 echo "[2/6] Esportazione bundle JavaScript..."
 rm -rf "$DIST_DIR"
 EXPO_LOG="/tmp/ota-expo-$$.log"
-if ! EXPO_PUBLIC_DOMAIN=biker-link.replit.app npx expo export --platform android --output-dir "$DIST_DIR" > "$EXPO_LOG" 2>&1; then
+if ! EXPO_PUBLIC_DOMAIN=biker-link.replit.app npx expo export --platform android --output-dir "$DIST_DIR" --reset-cache > "$EXPO_LOG" 2>&1; then
   echo "   ERRORE: expo export fallito"
   tail -20 "$EXPO_LOG"
   rm -f "$EXPO_LOG"

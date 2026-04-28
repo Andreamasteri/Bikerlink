@@ -448,7 +448,61 @@
     "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
     "apkVersionCode": 41,
     "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-28T07:32:32.614Z"
+  },
+  {
+    "updateNumber": 17,
+    "version": "1.17.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-17 rv8.0.0: sicurezza, autorizzazioni, fix profilo — task #1083 #1086-#1096",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "note": "Task #1077 (già in OTA-16), #1083 (profilo spaziatura tab bar), #1086 (seeded/demo credentials), #1087 (chat authorization), #1088 (auth session control), #1089 (public endpoints SSRF), #1090 (security scan), #1091 (auth session control rev.), #1092 (media access control), #1093 (motoclub proposal authorization), #1094 (telemetry reporting abuse), #1095/#1096 (user discovery location privacy). CURRENT_OTA_NUMBER=17.",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "1cdc2578-dda3-43b7-b77a-29f5074d7866",
+    "bundleUrl": "private/ota/ota-1.17.0-1777383023991.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "9dd27a2b8a2fd1f92395c6795dfd79df6343493d",
+    "easDashboard": null,
+    "apkBuildId": "e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkVersionCode": 41,
+    "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
+    "status": "superseded",
+    "publishedAt": "2026-04-28T13:30:27.019Z"
+  },
+  {
+    "updateNumber": 18,
+    "version": "1.18.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-18 rv8.0.0: fix bundle OTA-17 (Metro cache stale — CURRENT_OTA_NUMBER mostrava 15)",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "note": "Fix: OTA-17 aveva CURRENT_OTA_NUMBER=15 nel bundle a causa di Metro transform cache stale. Ripubblicazione con --reset-cache. Stessi task inclusi di OTA-17: #1083 #1086-#1096. CURRENT_OTA_NUMBER=18.",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "61cd1fb8-402b-41a7-a72a-b6ba276c470b",
+    "bundleUrl": "private/ota/ota-1.18.0-1777383990063.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "9dd27a2b8a2fd1f92395c6795dfd79df6343493d",
+    "easDashboard": null,
+    "apkBuildId": "e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkVersionCode": 41,
+    "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
+    "status": "published",
+    "publishedAt": "2026-04-28T13:46:33.406Z"
   }
 ]
