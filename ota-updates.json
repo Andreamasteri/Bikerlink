@@ -399,13 +399,17 @@
   },
   {
     "updateNumber": 15,
+    "version": "1.15.0",
     "cycle": "8.x",
     "channel": "preview",
     "platform": "android",
+    "message": "OTA-15 rv8.0.0: Fix audio — stop/overlap/background/lock screen controls",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
-    "message": "OTA-15 rv8.0.0: Fix audio — stop/overlap/background/lock screen controls",
     "note": "Set completo di fix audio: task #1061 (STOP audio non funzionante + sovrapposizione tracce risolti), #1064 (costanti AUDIO_MODE_ACTIVE/AUDIO_MODE_INACTIVE centralizzate per setAudioModeAsync), #1065 (audio in background + controlli MediaSession su lock screen via Android foreground service). CURRENT_OTA_NUMBER=15.",
+    "platforms": [
+      "android"
+    ],
     "releaseId": "123bc007-6b24-4d1d-b221-2cfe3e873573",
     "bundleUrl": "private/ota/ota-1.15.0-1777334535384.js",
     "updateGroupId": null,
