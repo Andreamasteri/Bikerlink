@@ -7,12 +7,13 @@ import { startMatchingEngine, stopMatchingEngine } from "./matching-engine";
 import { autoSeedEssentialUsers, autoSeedFakeUsers, seedAppleReviewerAccount, seedGooglePlayReviewerAccount, ensureBikerLinkOfficialOnBoot } from "./auto-seed";
 import { db, pool } from "./db";
 import { sql, eq, and } from "drizzle-orm";
-import { motoClubs, motoClubMembers, conversations, conversationParticipants, motorcyclePhotos, userMotorcycles } from "@shared/schema";
+import { motoClubs, motoClubMembers, conversations, conversationParticipants, motorcyclePhotos, userMotorcycles, userPhotos } from "@shared/schema";
 import { seedMotoclubs } from "./routes/motoclubs";
 import * as fs from "fs";
 import * as path from "path";
 import { initUptimeTracking, startMetroMonitor, stopMetroMonitor } from "./uptime";
 import { matchEnrichmentSemaphore, MATCH_ENRICHMENT_GLOBAL_LIMIT } from "./lib/concurrency";
+import { storage } from "./storage";
 
 const app = express();
 const log = console.log;
@@ -346,6 +347,49 @@ function configureExpoAndLanding(app: express.Application) {
       return next();
     } catch (err) {
       console.error("[uploads/motorcycles auth] error:", err);
+      return res.status(500).json({ message: "Errore interno del server" });
+    }
+  });
+
+  // Task #1122: foto profilo legacy salvate come /uploads/photos/<file>.
+  // La static middleware le servirebbe a chiunque (anche logged-out),
+  // bypassando i controlli database (approvazione, blocco) presenti su
+  // /api/users/photos/:filename. Intercetta PRIMA della static: richiedi
+  // sessione, verifica esistenza row in user_photos, isApproved, e che
+  // il proprietario non abbia bloccato il requester.
+  app.get("/uploads/photos/:filename", async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Non autenticato" });
+      }
+      const requesterId = req.session.userId;
+      const filename = req.params.filename;
+      if (!filename || filename.includes("/") || filename.includes("..")) {
+        return res.status(404).json({ message: "Foto non trovata" });
+      }
+      const photoUrl = `/uploads/photos/${filename}`;
+      const [row] = await db
+        .select({ userId: userPhotos.userId, isApproved: userPhotos.isApproved })
+        .from(userPhotos)
+        .where(eq(userPhotos.photoUrl, photoUrl))
+        .limit(1);
+      if (!row) {
+        return res.status(404).json({ message: "Foto non trovata" });
+      }
+      const isOwner = row.userId === requesterId;
+      if (!isOwner) {
+        if (!row.isApproved) {
+          return res.status(404).json({ message: "Foto non trovata" });
+        }
+        const blocked = await storage.hasBlockedUser(row.userId, requesterId);
+        if (blocked) {
+          return res.status(403).json({ message: "Non puoi visualizzare questa foto" });
+        }
+      }
+      res.set("Cache-Control", "private, max-age=3600");
+      return next();
+    } catch (err) {
+      console.error("[uploads/photos auth] error:", err);
       return res.status(500).json({ message: "Errore interno del server" });
     }
   });

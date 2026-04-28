@@ -142,6 +142,20 @@ router.put("/photos/:id/reject", async (req: Request, res: Response) => {
         return res.status(404).json({ message: "Foto non trovata" });
       }
       await storage.deleteUserPhoto(id);
+      // Task #1122: per le foto legacy locali, cancella anche il file da disco.
+      // Senza questo, l'URL `/uploads/photos/<file>` resterebbe raggiungibile
+      // (anche se ora è gated, qualunque bypass futuro lo riesporrebbe).
+      // Le foto su object-storage (`/api/users/photos/...`) non vengono toccate
+      // qui: la moderazione le rende già 404 via DB e non condividono filename.
+      const url = photo.photoUrl;
+      if (url && url.startsWith("/uploads/photos/")) {
+        try {
+          const filePath = path.join(process.cwd(), url);
+          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        } catch (e) {
+          console.warn(`[moderator/reject_photo] legacy file delete failed for ${url}:`, e);
+        }
+      }
     }
 
     await storage.createModeratorLog({

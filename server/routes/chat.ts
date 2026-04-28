@@ -1027,9 +1027,30 @@ router.post("/conversations/:id/images", chatImageUpload.single("image"), async 
 
     const conversationId = req.params.id as string;
 
-    const participants = await storage.getConversationParticipants(conversationId);
+    const [conversation, participants] = await Promise.all([
+      storage.getConversation(conversationId),
+      storage.getConversationParticipants(conversationId),
+    ]);
     if (!participants.find((p) => p.userId === userId)) {
       return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+    }
+
+    // Task #1122: il send-text ha già il block check; senza questo gate
+    // un utente bloccato può continuare a inviare immagini sfruttando la
+    // sua vecchia conversation_participants row.
+    const isDirectConv = conversation && (
+      conversation.conversationType === "direct" ||
+      conversation.conversationType === "private" ||
+      conversation.conversationType === "contact"
+    );
+    if (isDirectConv) {
+      const otherParticipants = participants.filter((p) => p.userId !== userId);
+      for (const other of otherParticipants) {
+        const blocked = await storage.isBlocked(userId, other.userId);
+        if (blocked) {
+          return res.status(403).json({ message: "Utente bloccato" });
+        }
+      }
     }
 
     const ext = req.file.mimetype === "image/png" ? "png" : req.file.mimetype === "image/gif" ? "gif" : "jpg";

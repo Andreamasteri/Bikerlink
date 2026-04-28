@@ -163,10 +163,31 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
-    // Sanitize filename: reject path traversal and directory separators
     const { filename } = req.params;
     if (!filename || /[/\\.]\./.test(filename) || filename.includes("..")) {
       return res.status(400).json({ message: "Nome file non valido" });
+    }
+
+    // Task #1122: l'URL del poster deve restare valido solo finché l'evento
+    // parent è approvato. Se l'evento è stato rifiutato/cancellato la riga
+    // event_images potrebbe essere ancora presente, ma il file non deve più
+    // essere accessibile a utenti normali (stale-URL bypass).
+    const imageUrl = `/api/events/images/${filename}`;
+    const [parent] = await db
+      .select({ status: events.status, creatorId: events.creatorId })
+      .from(eventImages)
+      .innerJoin(events, eq(events.id, eventImages.eventId))
+      .where(eq(eventImages.imageUrl, imageUrl))
+      .limit(1);
+
+    if (!parent) {
+      return res.status(404).json({ message: "Immagine non trovata" });
+    }
+    if (parent.status !== "approved" && parent.creatorId !== userId) {
+      const allowed = await isAdminOrModUser(userId);
+      if (!allowed) {
+        return res.status(404).json({ message: "Immagine non trovata" });
+      }
     }
 
     const { downloadBuffer } = await import("../objectStorage");
