@@ -511,7 +511,7 @@ export async function seedAppleReviewerAccount(): Promise<void> {
         eulaAccepted: true,
         privacyAccepted: true,
         consentAcceptedAt: new Date(),
-        isFake: true,
+        isFake: false,
         invitationCode: APPLE_REVIEW_INVITE_CODE,
       })
       .returning({ id: users.id });
@@ -625,13 +625,13 @@ export async function seedGooglePlayReviewerAccount(): Promise<void> {
         userType: "biker",
         sex: "M",
         birthYear: 1991,
-        region: "Lombardia",
+        region: "Toscana",
         country: "IT",
         emailVerified: true,
         eulaAccepted: true,
         privacyAccepted: true,
         consentAcceptedAt: new Date(),
-        isFake: true,
+        isFake: false,
         invitationCode: GOOGLE_REVIEW_INVITE_CODE,
       })
       .returning({ id: users.id });

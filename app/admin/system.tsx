@@ -248,67 +248,6 @@ export default function SystemScreen() {
   const [purgeModalVisible, setPurgeModalVisible] = useState(false);
   const [purgeConfirmText, setPurgeConfirmText] = useState("");
 
-  const executePurge = useCallback(async () => {
-    if (purgeConfirmText.trim().toUpperCase() !== "PURGA") {
-      Alert.alert("Conferma errata", "Devi scrivere esattamente PURGA per procedere.");
-      return;
-    }
-    setPurgeModalVisible(false);
-    setPurgeConfirmText("");
-    setIsPurging(true);
-    try {
-      const res = await fetch(
-        new URL("/api/admin/purge-non-admin-users", getApiUrl()).toString(),
-        {
-          method: "DELETE",
-          credentials: "include",
-          headers: { "X-Confirm-Purge": "PURGE-CONFIRMED" },
-        }
-      );
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        Alert.alert("Errore", (body as { message?: string }).message ?? "Errore server");
-        return;
-      }
-      const body = await res.json() as { purged: boolean; deletedUsers: number };
-      Alert.alert(
-        "Purga completata",
-        `Eliminati ${body.deletedUsers} utenti non-admin.\nLe sessioni sono state invalidate.\nVerrai reindirizzato al login.`,
-        [
-          {
-            text: "OK",
-            onPress: async () => {
-              try { await logoutMutation.mutateAsync(); } catch {}
-              router.replace("/(auth)/login");
-            },
-          },
-        ]
-      );
-    } catch {
-      Alert.alert("Errore", "Impossibile contattare il server.");
-    } finally {
-      setIsPurging(false);
-    }
-  }, [purgeConfirmText, logoutMutation, router]);
-
-  const handlePurgeNonAdminUsers = useCallback(() => {
-    Alert.alert(
-      "Purga DB utenti",
-      "Questa azione elimina TUTTI gli utenti non-admin (moderatori, utenti normali) e invalida tutte le sessioni attive. L'operazione è irreversibile.",
-      [
-        { text: "Annulla", style: "cancel" },
-        {
-          text: "Continua",
-          style: "destructive",
-          onPress: () => {
-            setPurgeConfirmText("");
-            setPurgeModalVisible(true);
-          },
-        },
-      ]
-    );
-  }, []);
-
   const handleCacheCleanup = useCallback(async () => {
     setIsCleanupRunning(true);
     try {
@@ -376,6 +315,67 @@ export default function SystemScreen() {
   const router = useRouter();
   const { sessionExpired, logoutMutation, user } = useAuth();
   const isAdmin = user?.role === "admin";
+
+  const executePurge = useCallback(async () => {
+    if (purgeConfirmText.trim().toUpperCase() !== "PURGA") {
+      Alert.alert("Conferma errata", "Devi scrivere esattamente PURGA per procedere.");
+      return;
+    }
+    setPurgeModalVisible(false);
+    setPurgeConfirmText("");
+    setIsPurging(true);
+    try {
+      const res = await fetch(
+        new URL("/api/admin/purge-non-admin-users", getApiUrl()).toString(),
+        {
+          method: "DELETE",
+          credentials: "include",
+          headers: { "X-Confirm-Purge": "PURGE-CONFIRMED" },
+        }
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        Alert.alert("Errore", (body as { message?: string }).message ?? "Errore server");
+        return;
+      }
+      const body = await res.json() as { purged: boolean; deletedUsers: number };
+      Alert.alert(
+        "Purga completata",
+        `Eliminati ${body.deletedUsers} utenti non-admin.\nLe sessioni sono state invalidate.\nVerrai reindirizzato al login.`,
+        [
+          {
+            text: "OK",
+            onPress: async () => {
+              try { await logoutMutation.mutateAsync(); } catch {}
+              router.replace("/(auth)/login");
+            },
+          },
+        ]
+      );
+    } catch {
+      Alert.alert("Errore", "Impossibile contattare il server.");
+    } finally {
+      setIsPurging(false);
+    }
+  }, [purgeConfirmText, logoutMutation, router]);
+
+  const handlePurgeNonAdminUsers = useCallback(() => {
+    Alert.alert(
+      "Purga DB utenti",
+      "Questa azione elimina TUTTI gli utenti non-admin (moderatori, utenti normali) e invalida tutte le sessioni attive. L'operazione è irreversibile.",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Continua",
+          style: "destructive",
+          onPress: () => {
+            setPurgeConfirmText("");
+            setPurgeModalVisible(true);
+          },
+        },
+      ]
+    );
+  }, []);
 
   const fetchSystemHealth = useCallback(async (signal?: AbortSignal): Promise<SystemHealth> => {
     const url = new URL("/api/admin/system-health", getApiUrl());
