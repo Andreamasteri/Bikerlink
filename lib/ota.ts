@@ -6,7 +6,7 @@
 // #1086-#1096 (spaziatura tab bar profilo, seeded/demo credentials, chat authorization,
 // auth session control, public endpoints SSRF, security scan, media access control,
 // motoclub proposal authorization, telemetry reporting abuse, user discovery location
-// privacy). OTA-18: fix Metro cache stale (OTA-16 e OTA-17 avevano
-// CURRENT_OTA_NUMBER=15 nel bundle — ripubblicato con --reset-cache).
+// privacy). OTA-18: fix Metro cache stale (OTA-16/17 avevano numero errato
+// nel bundle Hermes — ripubblicato con --reset-cache).
 // Aggiornare ad ogni nuova OTA pubblicata.
 export const CURRENT_OTA_NUMBER = 18;
