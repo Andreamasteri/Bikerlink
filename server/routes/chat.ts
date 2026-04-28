@@ -1074,7 +1074,9 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
     if (!userId) return;
 
     const filename = req.params.filename as string;
-    if (!filename || filename.includes("..")) return res.status(400).end();
+    if (!filename || !/^chat-[0-9a-f-]{36}-[0-9]+-[a-z0-9]+\.(jpg|jpeg|png|gif|webp)$/i.test(filename)) {
+      return res.status(400).end();
+    }
 
     const convMatch = filename.match(
       /^chat-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-/i
@@ -1082,10 +1084,34 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
     if (!convMatch) return res.status(403).end();
     const conversationId = convMatch[1];
 
-    const participants = await storage.getConversationParticipants(conversationId);
-    if (!participants.find((p) => p.userId === userId)) {
-      return res.status(403).end();
+    const [conversation, participants] = await Promise.all([
+      storage.getConversation(conversationId),
+      storage.getConversationParticipants(conversationId),
+    ]);
+
+    let authorized = !!participants.find((p) => p.userId === userId);
+
+    if (!authorized && conversation?.conversationType === "motoclub") {
+      const clubRow = await db
+        .select({ id: motoClubs.id })
+        .from(motoClubs)
+        .where(eq(motoClubs.conversationId, conversationId))
+        .limit(1);
+      if (clubRow[0]) {
+        const membership = await db
+          .select({ userId: motoClubMembers.userId })
+          .from(motoClubMembers)
+          .where(and(
+            eq(motoClubMembers.clubId, clubRow[0].id),
+            eq(motoClubMembers.userId, userId),
+            eq(motoClubMembers.status, "active"),
+          ))
+          .limit(1);
+        if (membership[0]) authorized = true;
+      }
     }
+
+    if (!authorized) return res.status(403).end();
 
     const objectPath = `public/chat-images/${filename}`;
     const buffer = await downloadBuffer(objectPath);
