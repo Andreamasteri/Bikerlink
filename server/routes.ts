@@ -600,7 +600,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.sendFile(templatePath);
   });
 
-  app.get("/apple-review", (_req, res) => {
+  // SECURITY (Task #1086): Apple review page now requires a secret access token.
+  // The token is stored in APPLE_REVIEW_PAGE_TOKEN env var and must be provided
+  // as ?token=<value> in the URL. Without a valid token the route returns 404 —
+  // indistinguishable from a non-existent page to an internet scanner.
+  // The token (and the demo account credentials) must be shared exclusively via
+  // the App Store Connect review notes, never embedded in code or public pages.
+  // If the env var is not set the page is unconditionally hidden (404).
+  app.get("/apple-review", (req, res) => {
+    const pageToken = process.env.APPLE_REVIEW_PAGE_TOKEN;
+    if (!pageToken || req.query.token !== pageToken) {
+      return res.status(404).send("Not found");
+    }
     const templatePath = path.resolve(
       process.cwd(),
       "server",
