@@ -394,7 +394,30 @@
     "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
     "apkVersionCode": 41,
     "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-27T20:36:23.243Z"
+  },
+  {
+    "updateNumber": 15,
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "message": "OTA-15 rv8.0.0: Fix audio — stop/overlap/background/lock screen controls",
+    "note": "Set completo di fix audio: task #1061 (STOP audio non funzionante + sovrapposizione tracce risolti), #1064 (costanti AUDIO_MODE_ACTIVE/AUDIO_MODE_INACTIVE centralizzate per setAudioModeAsync), #1065 (audio in background + controlli MediaSession su lock screen via Android foreground service). CURRENT_OTA_NUMBER=15.",
+    "releaseId": "123bc007-6b24-4d1d-b221-2cfe3e873573",
+    "bundleUrl": "private/ota/ota-1.15.0-1777334535384.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "e53ba9f4040ca5edafece382ec664a0c0e2ee498",
+    "easDashboard": null,
+    "apkBuildId": "e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkVersionCode": 41,
+    "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
+    "status": "published",
+    "publishedAt": "2026-04-28T00:02:18.222Z"
   }
 ]
