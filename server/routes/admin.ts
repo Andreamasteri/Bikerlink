@@ -335,6 +335,59 @@ router.post("/startup-beacon", startupBeaconLimiter, startupBeaconJson, (req: Re
 
 router.use(requireAdmin);
 
+// DELETE /api/admin/purge-non-admin-users
+// Elimina tutti gli utenti non-admin dal DB (CASCADE su tutte le tabelle correlate).
+// Richiede header X-Confirm-Purge: PURGE-CONFIRMED per prevenire invocazioni accidentali.
+// events.approved_by usa NO ACTION — viene nullato prima del DELETE.
+// Tutte le sessioni attive vengono invalidate. L'operazione è loggata in moderator_logs.
+router.delete("/purge-non-admin-users", async (req: Request, res: Response) => {
+  const confirmHeader = req.headers["x-confirm-purge"];
+  if (confirmHeader !== "PURGE-CONFIRMED") {
+    return res.status(400).json({ message: "Conferma mancante. Invia header X-Confirm-Purge: PURGE-CONFIRMED" });
+  }
+
+  try {
+    const adminId = req.session.userId!;
+
+    // Step 1: null events.approved_by per utenti non-admin (FK NO ACTION)
+    await db.execute(sql`
+      UPDATE events SET approved_by = NULL
+      WHERE approved_by IN (SELECT id FROM users WHERE role != 'admin')
+    `);
+
+    // Step 2: conta utenti da eliminare
+    const countResult = await db.execute(sql`SELECT COUNT(*) AS cnt FROM users WHERE role != 'admin'`);
+    const deletedCount = Number((countResult.rows[0] as { cnt: string }).cnt);
+
+    // Step 3: elimina tutti gli utenti non-admin (CASCADE gestisce le FK correlate)
+    await db.execute(sql`DELETE FROM users WHERE role != 'admin'`);
+
+    // Step 4: elimina conversazioni orfane (senza partecipanti)
+    await db.execute(sql`
+      DELETE FROM conversations
+      WHERE id NOT IN (SELECT DISTINCT conversation_id FROM conversation_participants)
+    `);
+
+    // Step 5: invalida tutte le sessioni attive
+    await db.execute(sql`DELETE FROM session`);
+
+    // Step 6: log in moderator_logs
+    await db.insert(moderatorLogs).values({
+      moderatorId: adminId,
+      action: "purge_non_admin_users",
+      targetType: "system",
+      targetId: null,
+      details: `Purga DB: eliminati ${deletedCount} utenti non-admin + tutte le sessioni`,
+    });
+
+    console.log(`[PURGE] ${deletedCount} utenti non-admin eliminati dall'admin ${adminId}`);
+    return res.json({ purged: true, deletedUsers: deletedCount });
+  } catch (err) {
+    console.error("[PURGE] errore durante purga utenti:", err);
+    return res.status(500).json({ message: "Errore durante la purga utenti" });
+  }
+});
+
 // GET /api/admin/ota-events?limit=100 — Lista eventi OTA persistiti su DB
 // (ordinati dal più recente). Admin-only (montato dopo router.use(requireAdmin)).
 router.get("/ota-events", async (req: Request, res: Response) => {

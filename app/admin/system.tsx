@@ -242,6 +242,61 @@ export default function SystemScreen() {
   }, [nativeVerData, installedPlatform, installedVersion]);
 
   const [isCleanupRunning, setIsCleanupRunning] = useState(false);
+  const [isPurging, setIsPurging] = useState(false);
+
+  const handlePurgeNonAdminUsers = useCallback(() => {
+    Alert.alert(
+      "Purga DB utenti",
+      "Questa azione elimina TUTTI gli utenti non-admin (moderatori, utenti normali) e invalida tutte le sessioni attive. L'operazione è irreversibile.\n\nConfermi la PURGA?",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "PURGA",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Conferma finale",
+              "Stai per eliminare tutti gli utenti non-admin. Scrivi PURGA per confermare.",
+              [
+                { text: "Annulla", style: "cancel" },
+                {
+                  text: "Conferma eliminazione",
+                  style: "destructive",
+                  onPress: async () => {
+                    setIsPurging(true);
+                    try {
+                      const res = await fetch(
+                        new URL("/api/admin/purge-non-admin-users", getApiUrl()).toString(),
+                        {
+                          method: "DELETE",
+                          credentials: "include",
+                          headers: { "X-Confirm-Purge": "PURGE-CONFIRMED" },
+                        }
+                      );
+                      if (!res.ok) {
+                        const body = await res.json().catch(() => ({}));
+                        Alert.alert("Errore", (body as { message?: string }).message ?? "Errore server");
+                        return;
+                      }
+                      const body = await res.json() as { purged: boolean; deletedUsers: number };
+                      Alert.alert(
+                        "Purga completata",
+                        `Eliminati ${body.deletedUsers} utenti non-admin.\nLe sessioni sono state invalidate.\nGli account reviewer verranno ri-creati al prossimo riavvio del backend.`
+                      );
+                    } catch {
+                      Alert.alert("Errore", "Impossibile contattare il server.");
+                    } finally {
+                      setIsPurging(false);
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  }, []);
 
   const handleCacheCleanup = useCallback(async () => {
     setIsCleanupRunning(true);
@@ -308,7 +363,8 @@ export default function SystemScreen() {
   }, [nativeAndroidLatest, nativeAndroidMin, nativeAndroidUrl, nativeIosLatest, nativeIosMin, nativeIosUrl]);
 
   const router = useRouter();
-  const { sessionExpired, logoutMutation } = useAuth();
+  const { sessionExpired, logoutMutation, user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   const fetchSystemHealth = useCallback(async (signal?: AbortSignal): Promise<SystemHealth> => {
     const url = new URL("/api/admin/system-health", getApiUrl());
@@ -1010,6 +1066,33 @@ export default function SystemScreen() {
               )}
             </TouchableOpacity>
           </View>
+
+          {isAdmin && (
+            <View style={[styles.card, { borderWidth: 1, borderColor: "#FF4444" }]}>
+              <View style={styles.cardHeader}>
+                <Ionicons name="nuclear-outline" size={18} color="#FF4444" />
+                <Text style={[styles.cardTitle, { color: "#FF4444" }]}>Purga DB utenti</Text>
+              </View>
+              <Text style={styles.hintText}>
+                Elimina TUTTI gli utenti non-admin (moderatori + utenti normali) e invalida le sessioni attive. Gli account reviewer vengono ri-creati al riavvio del backend. Operazione irreversibile.
+              </Text>
+              <TouchableOpacity
+                style={[styles.actionBtnWide, { marginTop: 12, backgroundColor: "#CC0000" }, isPurging && { opacity: 0.5 }]}
+                onPress={handlePurgeNonAdminUsers}
+                disabled={isPurging}
+                testID="purge-users-btn"
+              >
+                {isPurging ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="trash-bin-outline" size={16} color="#fff" />
+                    <Text style={styles.actionBtnText}>Purga tutti gli utenti non-admin</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
 
           <Text style={styles.sectionTitle}>Ultimi eventi ({mergedEvents.length})</Text>
         </>
