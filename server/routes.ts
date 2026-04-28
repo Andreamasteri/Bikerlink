@@ -444,9 +444,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           releaseId: releaseId ? releaseId.substring(0, 64) : undefined,
           error: detail.substring(0, 500),
           failCount: 0,
-          ip: ((req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
-            ?? req.ip
-            ?? "").toString().substring(0, 64) || undefined,
+          // Task #1118: usa req.ip (set da Express con trust proxy=1) — non
+          // X-Forwarded-For grezzo, che è spoofabile e renderebbe inaffidabile
+          // il campo ip persistito su ota_events per l'incident response.
+          ip: (req.ip ?? req.socket?.remoteAddress ?? "").toString().substring(0, 64) || undefined,
         });
       } catch (e) {
         console.error("[expo-updates debug log] insert failed:", e);
