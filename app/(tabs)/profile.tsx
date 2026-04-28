@@ -1422,12 +1422,15 @@ export default function ProfileScreen() {
           <Text style={styles.versionLabel}>Versione OTA</Text>
           <Text style={styles.versionValue}>{CURRENT_OTA_NUMBER === 0 ? "APK embed (rv5.0.0)" : `OTA-${CURRENT_OTA_NUMBER}`}</Text>
         </View>
-        <View style={{ flexDirection: "row", gap: 8 }}>
+        <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
           <Text style={styles.versionLabel}>Commit EAS</Text>
           <Text style={styles.versionValue}>
             {Updates.updateId ? Updates.updateId.substring(0, 8) : "embedded"}
           </Text>
         </View>
+        <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", fontStyle: "italic", color: colors.accent }}>
+          Beta
+        </Text>
       </View>
       <View style={{ height: 40 }} />
     </ScrollView>

@@ -247,15 +247,19 @@ BUNDLE_EXT="${BUNDLE_FILE##*.}"
 FOUND_OTA=""
 
 if [ "$BUNDLE_EXT" = "hbc" ]; then
-  # Hermes bytecode: usa strings su file binario
-  FOUND_OTA=$(strings "$BUNDLE_FILE" 2>/dev/null | grep -oE "CURRENT_OTA_NUMBER=[0-9]+" | head -1 | grep -oE "[0-9]+$" || true)
+  # Hermes bytecode: usa strings su file binario.
+  # NOTA: ota-updates.json è importato dall'app (ota-history.tsx, system.tsx),
+  # quindi il bundle contiene anche le note delle release precedenti con
+  # "CURRENT_OTA_NUMBER=<N_vecchio>". Cerchiamo il MASSIMO valore trovato
+  # (che corrisponde alla release appena aggiornata in lib/ota.ts).
+  FOUND_OTA=$(strings "$BUNDLE_FILE" 2>/dev/null | grep -oE "CURRENT_OTA_NUMBER=[0-9]+" | grep -oE "[0-9]+$" | sort -n | tail -1 || true)
   if [ -z "$FOUND_OTA" ]; then
-    # Prova con grep raw byte su file binario (Hermes potrebbe non avere la stringa esatta)
-    FOUND_OTA=$(grep -oa "CURRENT_OTA_NUMBER=[0-9]*" "$BUNDLE_FILE" 2>/dev/null | head -1 | grep -oE "[0-9]+$" || true)
+    # Prova con grep raw byte su file binario
+    FOUND_OTA=$(grep -oa "CURRENT_OTA_NUMBER=[0-9]*" "$BUNDLE_FILE" 2>/dev/null | grep -oE "[0-9]+$" | sort -n | tail -1 || true)
   fi
 else
   # JS bundle standard
-  FOUND_OTA=$(grep -oa "CURRENT_OTA_NUMBER=[0-9]*" "$BUNDLE_FILE" 2>/dev/null | head -1 | grep -oE "[0-9]+$" || true)
+  FOUND_OTA=$(grep -oa "CURRENT_OTA_NUMBER=[0-9]*" "$BUNDLE_FILE" 2>/dev/null | grep -oE "[0-9]+$" | sort -n | tail -1 || true)
 fi
 
 if [ -z "$FOUND_OTA" ]; then
