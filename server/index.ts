@@ -8,7 +8,6 @@ import { autoSeedEssentialUsers, autoSeedFakeUsers, seedAppleReviewerAccount } f
 import { db, pool } from "./db";
 import { sql, eq, and } from "drizzle-orm";
 import { motoClubs, motoClubMembers, conversations, conversationParticipants, motorcyclePhotos, userMotorcycles } from "@shared/schema";
-import { storage } from "./storage";
 import { seedMotoclubs } from "./routes/motoclubs";
 import * as fs from "fs";
 import * as path from "path";

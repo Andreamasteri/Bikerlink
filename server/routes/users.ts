@@ -6,7 +6,7 @@ import { storage } from "../storage";
 import { isProtectedUser } from "../constants";
 import { createRegionalClubInvite } from "./motoclubs";
 import type { InsertReport } from "@shared/schema";
-import { userLastfmSessions, userMusicTracks, motoClubMembers, motoClubs } from "@shared/schema";
+import { userLastfmSessions, userMusicTracks, motoClubMembers, motoClubs, userPhotos } from "@shared/schema";
 import { db } from "../db";
 import { eq, and, desc } from "drizzle-orm";
 import { uploadBuffer, downloadBuffer, deleteObject } from "../objectStorage";
@@ -1053,7 +1053,6 @@ router.get("/photos/:filename", async (req: Request, res: Response) => {
     const filename = req.params.filename;
     const photoUrl = `/api/users/photos/${filename}`;
 
-    const { userPhotos } = await import("@shared/schema");
     const [photoRow] = await db
       .select({ userId: userPhotos.userId, isApproved: userPhotos.isApproved })
       .from(userPhotos)
