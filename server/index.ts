@@ -76,9 +76,15 @@ function setupBodyParsing(app: express.Application) {
       req.rawBody = buf;
     },
   });
+  // Path normalized (lowercased + trailing-slash stripped) so a variant like
+  // `/api/admin/startup-beacon/` cannot bypass the per-route 8 KB cap and
+  // hit the 10 MB global parser first.
   app.use((req, res, next) => {
-    if (req.method === "POST" && req.path === "/api/admin/startup-beacon") {
-      return next();
+    if (req.method === "POST") {
+      const normalized = (req.path || "").toLowerCase().replace(/\/+$/, "");
+      if (normalized === "/api/admin/startup-beacon") {
+        return next();
+      }
     }
     return globalJson(req, res, next);
   });
