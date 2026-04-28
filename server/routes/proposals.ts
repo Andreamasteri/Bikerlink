@@ -122,10 +122,27 @@ router.get("/matches", requireAuth, async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const matches = await storage.getProposalMatches(userId);
 
+    // Defense-in-depth (Task #1116): il matching engine non filtra per club, quindi
+    // un match cross-club (es. proposta pubblica vs proposta club-scoped) potrebbe
+    // esporre dettagli completi della proposta club-scoped (clubId, indirizzi,
+    // creatorNickname) a un non-membro tramite proposal1/proposal2.
+    // Pre-carichiamo le membership attive del caller e filtriamo i match in cui
+    // almeno una delle due proposte è in un club di cui non è membro.
+    const userMemberships = await db
+      .select({ clubId: motoClubMembers.clubId })
+      .from(motoClubMembers)
+      .where(and(eq(motoClubMembers.userId, userId), eq(motoClubMembers.status, "active")));
+    const memberClubIds = new Set(userMemberships.map((m) => m.clubId));
+
     const results = await allLimited(
       matches.map((match) => async () => {
         const proposal1 = await storage.getProposal(match.proposalId1);
         const proposal2 = await storage.getProposal(match.proposalId2);
+
+        // Filtra match che leakano proposte club-scoped a non-membri.
+        if (proposal1?.clubId && !memberClubIds.has(proposal1.clubId)) return null;
+        if (proposal2?.clubId && !memberClubIds.has(proposal2.clubId)) return null;
+
         const user1 = await storage.getUser(match.userId1);
         const user2 = await storage.getUser(match.userId2);
 
@@ -141,7 +158,7 @@ router.get("/matches", requireAuth, async (req: Request, res: Response) => {
       })
     );
 
-    return res.json(results);
+    return res.json(results.filter(Boolean));
   } catch (error) {
     console.error("Get matches error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -765,6 +782,18 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
     }
     if (proposal.userId !== userId) {
       return res.status(403).json({ message: "Non autorizzato" });
+    }
+
+    // Defense-in-depth (Task #1116): allinea PUT alle altre operazioni club-scoped.
+    // Se il creator è stato espulso/rimosso dal club dopo aver creato la proposta,
+    // la GET /:id e la POST /:id/join già negano accesso a non-membri; senza
+    // questa check, il creator espulso resterebbe l'unico in grado di modificare
+    // una proposta dentro un club a cui non appartiene più.
+    if (proposal.clubId) {
+      const isMember = await isActiveClubMember(userId, proposal.clubId);
+      if (!isMember) {
+        return res.status(403).json({ message: "Devi essere membro attivo del club per modificare questa proposta" });
+      }
     }
 
     const b = req.body;
