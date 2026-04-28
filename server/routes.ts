@@ -600,16 +600,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.sendFile(templatePath);
   });
 
-  // SECURITY (Task #1086): Apple review page now requires a secret access token.
-  // The token is stored in APPLE_REVIEW_PAGE_TOKEN env var and must be provided
-  // as ?token=<value> in the URL. Without a valid token the route returns 404 —
-  // indistinguishable from a non-existent page to an internet scanner.
-  // The token (and the demo account credentials) must be shared exclusively via
-  // the App Store Connect review notes, never embedded in code or public pages.
-  // If the env var is not set the page is unconditionally hidden (404).
+  // SECURITY (Task #1086): Apple review page requires a secret access token.
+  // The token is stored in APPLE_REVIEW_PAGE_TOKEN env var and must be
+  // provided as ?token=<value> in the URL. Without a valid token the route
+  // returns 404 — indistinguishable from a non-existent page.
+  //
+  // Trade-off: query-param tokens appear in server access logs and browser
+  // history. Mitigations applied:
+  //   - Minimum 24-char token enforced at startup (short tokens are brute-
+  //     forceable from logs; 24 chars of random = 144+ bits of entropy with
+  //     a URL-safe base64 set).
+  //   - Timing-safe comparison (crypto.timingSafeEqual) to prevent
+  //     length/timing oracle attacks against the token value.
+  //   - 404 response leaks nothing about the token or the page existence.
+  // APPLE_REVIEW_PAGE_TOKEN must be rotated per review cycle and shared
+  // exclusively via App Store Connect review notes (never in code/commits).
   app.get("/apple-review", (req, res) => {
     const pageToken = process.env.APPLE_REVIEW_PAGE_TOKEN;
-    if (!pageToken || req.query.token !== pageToken) {
+    const provided = typeof req.query.token === "string" ? req.query.token : "";
+    const MIN_TOKEN_LEN = 24;
+    let valid = false;
+    if (pageToken && pageToken.length >= MIN_TOKEN_LEN && provided.length > 0) {
+      try {
+        const a = Buffer.from(pageToken);
+        const b = Buffer.from(provided.padEnd(pageToken.length, "\0").substring(0, pageToken.length));
+        valid = a.length === b.length && crypto.timingSafeEqual(a, b) && provided === pageToken;
+      } catch {
+        valid = false;
+      }
+    }
+    if (!valid) {
       return res.status(404).send("Not found");
     }
     const templatePath = path.resolve(
