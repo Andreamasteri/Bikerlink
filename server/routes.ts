@@ -567,15 +567,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/expo-updates/assets/:releaseId", async (req: Request, res: Response) => {
     try {
       const { releaseId } = req.params;
+      // Task #1123: this route is unauthenticated (the OTA client has no
+      // session) and downloads the file with the privileged storage client.
+      // It therefore must (a) only serve releases that are CURRENTLY active
+      // — draft/inactive/revoked releases must not leak — and (b) re-validate
+      // the bundle_path against the OTA prefix allowlist as defense-in-depth
+      // in case any legacy or out-of-band INSERT bypassed the admin gate.
       const result = await pool.query(
-        "SELECT bundle_path FROM ota_releases WHERE id = $1",
+        "SELECT bundle_path FROM ota_releases WHERE id = $1 AND status = 'active'",
         [releaseId]
       );
       if (!result.rows.length || !result.rows[0].bundle_path) {
         return res.status(404).end();
       }
-      const { downloadBuffer } = await import("./objectStorage");
-      const bundleBuffer = await downloadBuffer(result.rows[0].bundle_path as string);
+      const bundlePath = result.rows[0].bundle_path as string;
+      const { downloadBuffer, isValidOtaBundlePath } = await import("./objectStorage");
+      if (!isValidOtaBundlePath(bundlePath)) {
+        console.error(
+          `[expo-updates/assets] Refusing to serve release ${releaseId}: bundle_path failed validator: ${bundlePath}`,
+        );
+        return res.status(404).end();
+      }
+      const bundleBuffer = await downloadBuffer(bundlePath);
       res.setHeader("content-type", "application/javascript");
       res.setHeader("cache-control", "public, max-age=31536000, immutable");
       return res.end(bundleBuffer);

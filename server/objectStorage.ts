@@ -60,6 +60,24 @@ export async function getPublicUrl(objectPath: string): Promise<string> {
   return file.publicUrl();
 }
 
+// Task #1123: OTA bundle path validator. The OTA upload route writes bundles
+// strictly under `private/ota/<filename>.js` (server/routes/admin.ts /ota/upload).
+// Both the metadata insert and the public asset serve path MUST validate any
+// `bundle_path` against this regex before passing it to the privileged
+// object-storage client. Without this gate an admin (or attacker with an
+// admin session) could publish an OTA release whose `bundlePath` points at
+// arbitrary private objects (`.private/backups/...`, internal media, etc),
+// turning the unauthenticated `/api/expo-updates/assets/:releaseId` route into
+// a public file-serving primitive for anything readable by the server.
+const OTA_BUNDLE_REGEX = /^private\/ota\/[A-Za-z0-9._-]+\.js$/;
+
+export function isValidOtaBundlePath(p: unknown): p is string {
+  if (typeof p !== "string") return false;
+  if (p.length === 0 || p.length > 256) return false;
+  if (p.includes("..")) return false;
+  return OTA_BUNDLE_REGEX.test(p);
+}
+
 export async function listObjects(prefix: string): Promise<StorageFile[]> {
   const client = getClient();
   const result = await client.list({ prefix });

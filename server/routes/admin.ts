@@ -5,7 +5,7 @@ import fs from "fs";
 import path from "path";
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, ShadingType, AlignmentType, TextRun, HeightRule } from "docx";
 import bcrypt from "bcryptjs";
-import { uploadBuffer, objectExists } from "../objectStorage";
+import { uploadBuffer, objectExists, isValidOtaBundlePath } from "../objectStorage";
 import { storage } from "../storage";
 import { db } from "../db";
 import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents } from "@shared/schema";
@@ -3822,9 +3822,20 @@ const otaUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 
 router.post("/ota/upload", otaUpload.single("bundle"), async (req: Request, res: Response) => {
   try {
     if (!req.file) return res.status(400).json({ message: "File bundle mancante" });
-    const version = (req.query.version as string) || "unknown";
-    const filename = `ota-${version}-${Date.now()}.js`;
+    // Task #1123: sanitize the version string before composing the object path.
+    // The resulting path must satisfy isValidOtaBundlePath (regex
+    // /^private\/ota\/[A-Za-z0-9._-]+\.js$/) so that the matching insert+serve
+    // gates accept it. Strip any character outside [A-Za-z0-9._-] to defeat
+    // path-traversal attempts via ?version=../foo and to keep filenames
+    // round-trip safe through downstream URL/path joins.
+    const rawVersion = (req.query.version as string) || "unknown";
+    const safeVersion = rawVersion.replace(/[^A-Za-z0-9._-]/g, "_").substring(0, 64) || "unknown";
+    const filename = `ota-${safeVersion}-${Date.now()}.js`;
     const objectPath = `private/ota/${filename}`;
+    if (!isValidOtaBundlePath(objectPath)) {
+      console.error("[OTA] Upload rejected: composed path failed validator:", objectPath);
+      return res.status(400).json({ message: "Nome bundle non valido" });
+    }
     await uploadBuffer(objectPath, req.file.buffer, "application/javascript");
     return res.json({ url: objectPath, filename });
   } catch (error) {
@@ -3838,6 +3849,17 @@ router.post("/ota", async (req: Request, res: Response) => {
     const { version, bundlePath, releaseNotes, runtimeVersion } = req.body;
     if (!version || !bundlePath) return res.status(400).json({ message: "version e bundlePath obbligatori" });
     if (!runtimeVersion) return res.status(400).json({ message: "runtimeVersion obbligatorio" });
+    // Task #1123: PRIMARY GATE — refuse to insert any release whose
+    // bundle_path is not a legitimate `private/ota/<file>.js` produced by
+    // /ota/upload. Without this an admin (or attacker with an admin session)
+    // could pass `bundlePath: ".private/backups/db.sql"` and the unauth'd
+    // /api/expo-updates/assets/:releaseId route would happily download it
+    // through the privileged storage client. See objectStorage.ts.
+    if (!isValidOtaBundlePath(bundlePath)) {
+      return res.status(400).json({
+        message: "bundlePath non valido: deve corrispondere a private/ota/<file>.js prodotto da /api/admin/ota/upload",
+      });
+    }
     const result = await db.execute(sql`
       INSERT INTO ota_releases (version, runtime_version, bundle_path, release_notes, status, created_by)
       VALUES (${version}, ${runtimeVersion}, ${bundlePath}, ${releaseNotes || null}, 'draft', ${req.session.userId!})
