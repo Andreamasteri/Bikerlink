@@ -24,7 +24,7 @@ backend custom `https://biker-link.replit.app/api/expo-updates` (Expo Updates Pr
 - **Piattaforma**: Android only (iOS non supportato per OTA)
 - **Runtime Version**: `8.0.0` (ciclo corrente, APK v41) ← CICLO V3
 - **APK corrente**: versionCode **41**, versionName **3.0.0** (buildId: `e03f51d8-9f2b-496f-bba2-e0fe90b69fb7`, APK: https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk)
-- **OTA corrente**: OTA-18 (releaseId: `61cd1fb8-402b-41a7-a72a-b6ba276c470b`)
+- **OTA corrente**: OTA-19 (releaseId: `2edb9ef2-9680-4398-9da4-e6e18fe1dd75`)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates`
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
@@ -166,7 +166,7 @@ bash scripts/build-apk.sh production  # AAB Play Store
 - Ciclo 5.x: OTA 41 (rv 5.0.0) — DEPRECATO
 - Ciclo 6.x: OTA 42–43 (rv 6.0.0) — OBSOLETO
 - Ciclo 7.x: OTA 44–156 (rv 7.0.0) — CHIUSO
-- **Ciclo 8.x: OTA 1–18 (rv 8.0.0) ← CORRENTE (V3)**
+- **Ciclo 8.x: OTA 1–19 (rv 8.0.0) ← CORRENTE (V3)**
   - APK v41: STABILE — buildId: e03f51d8, APK: https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk
 
 ## REGOLA CRITICA — BARE WORKFLOW

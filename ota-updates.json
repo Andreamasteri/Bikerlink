@@ -367,7 +367,7 @@
     "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
     "apkVersionCode": 41,
     "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-27T13:16:36.616Z"
   },
   {
@@ -502,7 +502,35 @@
     "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
     "apkVersionCode": 41,
     "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-28T13:46:33.406Z"
+  },
+  {
+    "updateNumber": 19,
+    "version": "1.19.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-19 rv8.0.0: Hardening pipeline OTA + fix ota-gate web/dev (no wait 15s)",
+    "note": "CURRENT_OTA_NUMBER=19. Pubblicato da publish-ota.sh (un comando solo).",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "2edb9ef2-9680-4398-9da4-e6e18fe1dd75",
+    "bundleUrl": "private/ota/ota-1.19.0-1777392096569.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "3845b8e3fb5224998b81de8c77d12e6a5329503e",
+    "easDashboard": null,
+    "apkBuildId": "e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkVersionCode": 41,
+    "apkVersionName": null,
+    "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
+    "status": "published",
+    "publishedAt": "2026-04-28T16:01:42.341Z"
   }
 ]
