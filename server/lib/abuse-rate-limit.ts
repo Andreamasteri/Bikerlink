@@ -47,11 +47,30 @@ function check(map: Map<string, Bucket>, key: string, max: number, windowMs: num
   return false;
 }
 
+// Probabilistic pruning of expired buckets. Called from inside isOverLimit,
+// so it runs lazily on traffic — no setInterval timer to leak across hot
+// reloads — and only after the map grows past PRUNE_THRESHOLD so normal
+// low-traffic operation has zero overhead. This addresses long-uptime
+// memory growth when many distinct attacker IPs / userIds churn through
+// the limiter.
+const PRUNE_PROBABILITY = 0.01;
+const PRUNE_THRESHOLD = 500;
+function maybePrune(map: Map<string, Bucket>): void {
+  if (map.size < PRUNE_THRESHOLD) return;
+  if (Math.random() >= PRUNE_PROBABILITY) return;
+  const now = Date.now();
+  for (const [k, v] of map) {
+    if (now > v.resetAt) map.delete(k);
+  }
+}
+
 export function createUserIpRateLimiter(quota: UserIpQuota): UserIpRateLimiter {
   const userMap = new Map<string, Bucket>();
   const ipMap = new Map<string, Bucket>();
   return {
     isOverLimit(userId: string, ip: string | undefined): boolean {
+      maybePrune(userMap);
+      maybePrune(ipMap);
       // Order matters: increment the user counter first so a single client
       // cannot shield a per-IP burst by switching IPs (still bounded by
       // per-user). Both gates are evaluated; either one trips the limit.
