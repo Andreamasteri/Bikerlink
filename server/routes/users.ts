@@ -724,7 +724,11 @@ router.get("/available-list", requireAuth, async (req: Request, res: Response) =
           bio: item.profile?.bio || null,
           moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
           ridingStyle: firstMoto?.ridingStyle || null,
-          distance: lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null,
+          // Privacy: null out distance for users who opted out of map visibility (maskHiddenLocationRows
+          // already sets item.distance=null for those rows, but guard here prevents null→0 coercion)
+          distance: (lat != null && lng != null && !item.profile?.hideFromMap && typeof item.distance === "number" && Number.isFinite(item.distance))
+            ? Math.round(item.distance * 10) / 10
+            : null,
           isAvailable: true,
           lastLoginAt: item.user.lastLoginAt ?? null,
         };
