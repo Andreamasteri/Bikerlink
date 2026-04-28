@@ -36,6 +36,15 @@ export default function OtaGateScreen() {
   }, [gateData?.enabled, gateError]);
 
   useEffect(() => {
+    // In DEV mode o su web non ci sono OTA reali: triggerOtaCheck ritorna
+    // immediatamente con phase "skipped" e l'emit avviene tipicamente prima
+    // che questa schermata sia montata. Per non far attendere l'utente i
+    // 15s del safety timeout, navighiamo subito.
+    if (__DEV__ || Platform.OS === "web") {
+      navigate();
+      return;
+    }
+
     const safetyTimer = setTimeout(() => {
       setStatus("Timeout — continuando...");
       navigate();
