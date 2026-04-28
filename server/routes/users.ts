@@ -115,20 +115,21 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance");
       const rows = await db
-        .select({ user: usersTable, distance: distanceExpr })
+        .select({ user: usersTable, distance: distanceExpr, hideFromMap: profilesTable.hideFromMap })
         .from(usersTable)
         .leftJoin(profilesTable, eq(profilesTable.userId, usersTable.id))
         .where(and(
           notInArr(usersTable.id, [requesterId, ...Array.from(blockedSet)]),
         ))
         .orderBy(sqlTag`distance`);
-      type UserDistanceRow = { user: { id: string; nickname: string; avatarUrl: string | null; userType: string }; distance: number | null };
+      type UserDistanceRow = { user: { id: string; nickname: string; avatarUrl: string | null; userType: string }; distance: number | null; hideFromMap: boolean | null };
       return res.json((rows as UserDistanceRow[]).map((r) => ({
         id: r.user.id,
         nickname: r.user.nickname,
         avatarUrl: r.user.avatarUrl,
         userType: r.user.userType,
-        distance: typeof r.distance === "number" && Number.isFinite(r.distance) ? Math.round(r.distance * 10) / 10 : null,
+        // Privacy: do not leak derived distance for users who opted out of map visibility
+        distance: r.hideFromMap ? null : (typeof r.distance === "number" && Number.isFinite(r.distance) ? Math.round(r.distance * 10) / 10 : null),
       })));
     }
 

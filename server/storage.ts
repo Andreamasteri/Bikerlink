@@ -1221,7 +1221,8 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(users, eq(users.id, userProfiles.userId))
       .where(and(eq(users.status, "active"), eq(userProfiles.isAvailable, true), eq(users.ghostMode, false), notInArray(users.role, ["admin"])))
       .orderBy(sql`distance`);
-    return results;
+    // Privacy: null out derived distance for users who opted out of map visibility
+    return maskHiddenLocationRows(results);
   }
 
   async getUnapprovedUserPhotos(): Promise<UserPhoto[]> {
