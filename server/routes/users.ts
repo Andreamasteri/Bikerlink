@@ -1036,7 +1036,45 @@ router.post("/me/photos", requireAuth, async (req: Request, res: Response) => {
 
 router.get("/photos/:filename", async (req: Request, res: Response) => {
   try {
+    // SECURITY (Task #1080): l'endpoint serviva qualsiasi file in
+    // public/photos/* a chiunque (anche logged-out) con
+    // Cache-Control public/immutable. Cosi' un URL appreso da un profilo
+    // visibile poteva essere riaperto da terzi non autenticati, condiviso
+    // fuori app, o riusato dopo che la vittima aveva bloccato l'attaccante,
+    // bypassando il gate di /api/users/:id/public.
+    // Ora: 1) richiede sessione valida; 2) verifica che il chiamante non
+    // sia bloccato dal proprietario; 3) richiede che la foto sia approvata
+    // (oppure che il chiamante sia il proprietario stesso); 4) caching
+    // privato cosi' nessun proxy condiviso conserva una copia.
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Non autenticato" });
+    }
+    const requesterId = req.session.userId;
     const filename = req.params.filename;
+    const photoUrl = `/api/users/photos/${filename}`;
+
+    const { userPhotos } = await import("@shared/schema");
+    const [photoRow] = await db
+      .select({ userId: userPhotos.userId, isApproved: userPhotos.isApproved })
+      .from(userPhotos)
+      .where(eq(userPhotos.photoUrl, photoUrl))
+      .limit(1);
+
+    if (!photoRow) {
+      return res.status(404).json({ message: "Foto non trovata" });
+    }
+
+    const isOwner = photoRow.userId === requesterId;
+    if (!isOwner) {
+      if (!photoRow.isApproved) {
+        return res.status(404).json({ message: "Foto non trovata" });
+      }
+      const blocked = await storage.hasBlockedUser(photoRow.userId, requesterId);
+      if (blocked) {
+        return res.status(403).json({ message: "Non puoi visualizzare questa foto" });
+      }
+    }
+
     const objectPath = `public/photos/${filename}`;
     const buffer = await downloadBuffer(objectPath);
     const ext = path.extname(filename).toLowerCase();
@@ -1048,7 +1086,7 @@ router.get("/photos/:filename", async (req: Request, res: Response) => {
     };
     const contentType = mimeTypes[ext] ?? "image/jpeg";
     res.set("Content-Type", contentType);
-    res.set("Cache-Control", "public, max-age=31536000, immutable");
+    res.set("Cache-Control", "private, max-age=3600");
     return res.send(buffer);
   } catch {
     return res.status(404).json({ message: "Foto non trovata" });

@@ -300,6 +300,7 @@ export interface IStorage {
   getAvailableZavorrinaList(lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<any[]>;
 
   getMotorcyclePhotos(motorcycleId: string): Promise<MotorcyclePhoto[]>;
+  getMotorcyclePhoto(id: string): Promise<MotorcyclePhoto | undefined>;
   addMotorcyclePhoto(data: InsertMotorcyclePhoto): Promise<MotorcyclePhoto>;
   deleteMotorcyclePhoto(id: string): Promise<void>;
   getMotorcyclePhotoCount(motorcycleId: string): Promise<number>;
@@ -1289,6 +1290,11 @@ export class DatabaseStorage implements IStorage {
 
   async getMotorcyclePhotos(motorcycleId: string): Promise<MotorcyclePhoto[]> {
     return db.select().from(motorcyclePhotos).where(eq(motorcyclePhotos.motorcycleId, motorcycleId)).orderBy(asc(motorcyclePhotos.sortOrder));
+  }
+
+  async getMotorcyclePhoto(id: string): Promise<MotorcyclePhoto | undefined> {
+    const [photo] = await db.select().from(motorcyclePhotos).where(eq(motorcyclePhotos.id, id)).limit(1);
+    return photo;
   }
 
   async addMotorcyclePhoto(data: InsertMotorcyclePhoto): Promise<MotorcyclePhoto> {

@@ -195,7 +195,21 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
 
 router.get("/:id/photos", requireAuth, async (req: Request, res: Response) => {
   try {
+    const userId = req.session.userId!;
     const motoId = req.params.id as string;
+
+    // SECURITY (Task #1080): solo il proprietario della moto puo' elencare le
+    // foto del suo garage. La logica precedente esponeva l'intero record-set
+    // a qualsiasi utente autenticato che indovinasse / leggesse l'ID della
+    // moto (recuperabile via /api/users/:id/public.motorcycles), permettendo
+    // enumerazione di URL pubblici stabili e dell'ID-foto necessario per la
+    // cancellazione (vedi DELETE qui sotto). 404 anziche' 403 per evitare
+    // di confermare l'esistenza di moto altrui.
+    const moto = await storage.getUserMotorcycle(motoId);
+    if (!moto || moto.userId !== userId) {
+      return res.status(404).json({ message: "Moto non trovata" });
+    }
+
     const photos = await storage.getMotorcyclePhotos(motoId);
     return res.json(photos);
   } catch (error) {
@@ -248,7 +262,25 @@ router.post("/:id/photos", requireAuth, async (req: Request, res: Response) => {
 
 router.delete("/:id/photos/:photoId", requireAuth, async (req: Request, res: Response) => {
   try {
+    const userId = req.session.userId!;
+    const motoId = req.params.id as string;
     const photoId = req.params.photoId as string;
+
+    // SECURITY (Task #1080): verifica integrita' / ownership prima della
+    // delete. La logica precedente accettava solo `requireAuth` e cancellava
+    // qualunque photoId, anche di moto altrui — vandalismo cross-utente.
+    // Defense in depth: 1) la foto deve esistere, 2) deve appartenere alla
+    // moto in :id (impedisce mismatch URL-vs-photo), 3) la moto deve essere
+    // di proprieta' del richiedente.
+    const photo = await storage.getMotorcyclePhoto(photoId);
+    if (!photo || photo.motorcycleId !== motoId) {
+      return res.status(404).json({ message: "Foto non trovata" });
+    }
+    const moto = await storage.getUserMotorcycle(motoId);
+    if (!moto || moto.userId !== userId) {
+      return res.status(404).json({ message: "Foto non trovata" });
+    }
+
     await storage.deleteMotorcyclePhoto(photoId);
     return res.json({ message: "Foto eliminata" });
   } catch (error) {
