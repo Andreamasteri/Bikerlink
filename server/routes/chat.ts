@@ -1096,11 +1096,14 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
 
     let authorized = !!participants.find((p) => p.userId === userId);
 
-    // Block check: for direct/private/contact conversations, deny image access if the
-    // requester has been blocked by (or has blocked) the other participant. Participant
-    // rows are not removed on block, so without this check a blocked user can still
-    // fetch previously-seen image URLs.
-    if (authorized && conversation?.conversationType !== "motoclub") {
+    // Block check: for direct/private/contact conversations with exactly 2 participants,
+    // deny image access if the requester has been blocked by (or has blocked) the other
+    // participant. Participant rows are not removed on block, so without this check a
+    // blocked user can still fetch previously-seen image URLs.
+    const isDirectConv = conversation?.conversationType === "direct"
+      || conversation?.conversationType === "private"
+      || conversation?.conversationType === "contact";
+    if (authorized && isDirectConv && participants.length === 2) {
       const otherParticipant = participants.find((p) => p.userId !== userId);
       if (otherParticipant) {
         const blocked = await storage.isBlocked(userId, otherParticipant.userId);
