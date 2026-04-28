@@ -107,6 +107,19 @@ if [ "$ACTUAL" != "$VERSION_CODE" ]; then
 fi
 echo "  ✔  versionCode sincronizzato e verificato: $VERSION_CODE (app.json → build.gradle)"
 
+VERSION_NAME=$(jq -r '.expo.version' app.json)
+if [ -z "$VERSION_NAME" ] || [ "$VERSION_NAME" = "null" ]; then
+  echo "  ✖  version in app.json non trovata o nulla."
+  exit 1
+fi
+sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION_NAME\"/" android/app/build.gradle
+ACTUAL_NAME=$(grep 'versionName ' android/app/build.gradle | grep -oP '"[^"]+"' | tr -d '"' | head -1)
+if [ "$ACTUAL_NAME" != "$VERSION_NAME" ]; then
+  echo "  ✖  Sync versionName FALLITO: atteso $VERSION_NAME, trovato '$ACTUAL_NAME' in build.gradle"
+  exit 1
+fi
+echo "  ✔  versionName sincronizzato e verificato: $VERSION_NAME (app.json → build.gradle)"
+
 # ── 3. Validazione profilo ──────────────────────────────────────────────────
 # Task #1017: profili ammessi sono solo "release-apk" (default APK dimagrita) e
 # "production" (AAB Play Store). Il vecchio "preview" è stato rimosso per evitare
@@ -206,7 +219,8 @@ npx eas-cli@18 build \
   --platform android \
   --profile "$PROFILE" \
   --non-interactive \
-  --no-wait
+  --no-wait \
+  --clear-cache
 BUILD_EXIT=$?
 set -e
 

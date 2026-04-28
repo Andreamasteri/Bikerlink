@@ -22,8 +22,8 @@ backend custom `https://biker-link.replit.app/api/expo-updates` (Expo Updates Pr
 
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
-- **Runtime Version**: `8.0.0` (ciclo corrente, APK v41) ← CICLO V3
-- **APK corrente**: versionCode **41**, versionName **3.0.0** (buildId: `e03f51d8-9f2b-496f-bba2-e0fe90b69fb7`, APK: https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk)
+- **Runtime Version**: `8.0.0` (ciclo corrente, APK v43) ← CICLO V3
+- **APK corrente**: versionCode **43**, versionName **3.2.0** (buildId: `38cb1b32-4316-4f63-9799-1b9ab36888e8`, APK: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/38cb1b32-4316-4f63-9799-1b9ab36888e8 — in build sui server EAS)
 - **OTA corrente**: OTA-19 (releaseId: `2edb9ef2-9680-4398-9da4-e6e18fe1dd75`)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates`
 - **Admin email**: `admin@bikerlink.it`
@@ -168,6 +168,7 @@ bash scripts/build-apk.sh production  # AAB Play Store
 - Ciclo 7.x: OTA 44–156 (rv 7.0.0) — CHIUSO
 - **Ciclo 8.x: OTA 1–19 (rv 8.0.0) ← CORRENTE (V3)**
   - APK v41: STABILE — buildId: e03f51d8, APK: https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk
+  - APK v43 (3.2.0): IN BUILD — buildId: 38cb1b32-4316-4f63-9799-1b9ab36888e8, SDK55 + NewArch + ARM64 + cache pulita
 
 ## REGOLA CRITICA — BARE WORKFLOW
 Il progetto ha `android/` committato → bare workflow. Modificare SEMPRE i file Android direttamente:
