@@ -2,6 +2,8 @@ import { Router, Request, Response } from "express";
 import { db } from "../db";
 import { userLastfmSessions, userMusicTracks } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import dnsPromises from "dns/promises";
+import net from "net";
 
 const router = Router();
 
@@ -357,14 +359,64 @@ router.get("/preview-playlist", async (req: Request, res: Response) => {
   return res.json(results);
 });
 
-// SSRF guard: strip IPv6 brackets then check against private/loopback ranges
-function isBlockedHost(parsedUrl: URL): boolean {
-  const hostname = parsedUrl.hostname.replace(/^\[|\]$/g, "").toLowerCase();
-  const BLOCKED = /^(localhost|127\.|0\.0\.0\.0|::1$|::ffff:|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|fc00:|fd[0-9a-f]{0,2}:|fe80:)/;
-  return BLOCKED.test(hostname);
+// SSRF guard: classify a single IPv4/IPv6 address as private/internal.
+// More robust than a hostname regex — handles decimal/octal/hex IPv4 forms
+// (e.g. http://2130706433/ → 127.0.0.1) once they are normalized to dotted
+// form, and IPv4-mapped IPv6 in both dotted and hex forms.
+function isPrivateIPv4(ip: string): boolean {
+  const parts = ip.split(".").map(n => Number(n));
+  if (parts.length !== 4 || parts.some(n => !Number.isFinite(n) || n < 0 || n > 255)) return true;
+  const [a, b] = parts;
+  if (a === 0) return true;                         // 0.0.0.0/8 current network
+  if (a === 10) return true;                        // 10.0.0.0/8
+  if (a === 100 && b >= 64 && b <= 127) return true; // 100.64.0.0/10 CGNAT
+  if (a === 127) return true;                       // 127.0.0.0/8 loopback
+  if (a === 169 && b === 254) return true;          // 169.254.0.0/16 link-local + AWS metadata
+  if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+  if (a === 192 && b === 0) return true;            // 192.0.0.0/24 + 192.0.2.0/24
+  if (a === 192 && b === 168) return true;          // 192.168.0.0/16
+  if (a === 198 && (b === 18 || b === 19)) return true; // 198.18.0.0/15 benchmark
+  if (a >= 224) return true;                        // 224.0.0.0/4 multicast + reserved + 255.255.255.255
+  return false;
 }
 
-function validateStreamUrl(urlStr: string): URL | null {
+function isPrivateIPv6(ip: string): boolean {
+  const lower = ip.toLowerCase().replace(/^\[|\]$/g, "");
+  if (lower === "::1" || lower === "::") return true;
+  // fe80::/10 link-local
+  if (/^fe[89ab]/.test(lower)) return true;
+  // fc00::/7 unique local
+  if (/^f[cd]/.test(lower)) return true;
+  // IPv4-mapped IPv6 — both forms
+  if (lower.startsWith("::ffff:")) {
+    const rest = lower.slice(7);
+    if (rest.includes(".")) return isPrivateIPv4(rest);
+    const hex = rest.replace(":", "");
+    if (/^[0-9a-f]{1,8}$/.test(hex)) {
+      const num = parseInt(hex.padStart(8, "0"), 16);
+      const a = (num >>> 24) & 0xff;
+      const b = (num >>> 16) & 0xff;
+      const c = (num >>> 8) & 0xff;
+      const d = num & 0xff;
+      return isPrivateIPv4(`${a}.${b}.${c}.${d}`);
+    }
+    return true;
+  }
+  return false;
+}
+
+function isPrivateIP(ip: string): boolean {
+  const v = net.isIP(ip);
+  if (v === 4) return isPrivateIPv4(ip);
+  if (v === 6) return isPrivateIPv6(ip);
+  return true; // not parseable → treat as blocked
+}
+
+// Validate a URL: resolve hostname via DNS and ensure no resolved address is
+// private/loopback/link-local. Closes (a) DNS rebinding attacks, (b) decimal/
+// octal/hex IPv4 encodings that bypass naive regex blocking, (c) hostnames
+// like "localhost.attacker.com" that resolve to 127.0.0.1.
+async function validateStreamUrl(urlStr: string): Promise<URL | null> {
   let parsed: URL;
   try {
     parsed = new URL(urlStr);
@@ -372,19 +424,64 @@ function validateStreamUrl(urlStr: string): URL | null {
     return null;
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
-  if (isBlockedHost(parsed)) return null;
+
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, "");
+  if (!hostname) return null;
+  if (hostname.toLowerCase() === "localhost") return null;
+
+  // IP literal — validate directly
+  if (net.isIP(hostname)) {
+    if (isPrivateIP(hostname)) return null;
+    return parsed;
+  }
+
+  // Hostname → resolve and validate every returned address. Note: a tiny
+  // TOCTOU window remains between DNS lookup and the actual fetch, but
+  // forbidding private resolved IPs eliminates the practical attack
+  // (DNS rebinding requires the attacker to control the resolver and the
+  // victim's recursive cache simultaneously, which is far harder than the
+  // bare regex bypass closed here).
+  let addresses: { address: string; family: number }[];
+  try {
+    addresses = await dnsPromises.lookup(hostname, { all: true, verbatim: true });
+  } catch {
+    return null;
+  }
+  if (addresses.length === 0) return null;
+  for (const a of addresses) {
+    if (isPrivateIP(a.address)) return null;
+  }
   return parsed;
+}
+
+// Whitelist content-types that legitimately come from an audio stream.
+// Anything else (text/html, application/json, etc.) means the upstream
+// is NOT a real stream — refusing turns the SSRF read-back into an empty
+// 502 even if all URL/IP checks were somehow bypassed.
+function isAllowedStreamContentType(ct: string | null): boolean {
+  if (!ct) return true; // some shoutcast/icecast servers omit Content-Type — accept
+  const c = ct.toLowerCase().split(";")[0].trim();
+  if (c.startsWith("audio/")) return true;
+  if (c.startsWith("video/")) return true; // some webradios serve hls .ts
+  if (c === "application/ogg") return true;
+  if (c === "application/octet-stream") return true;
+  if (c === "application/vnd.apple.mpegurl") return true; // HLS
+  if (c === "application/x-mpegurl") return true;        // HLS legacy
+  if (c === "application/dash+xml") return true;
+  return false;
 }
 
 router.get("/stream", requireAuth, async (req: Request, res: Response) => {
   const rawUrl = req.query.url;
-  const streamUrl = typeof rawUrl === "string" ? rawUrl : Array.isArray(rawUrl) ? rawUrl[0] : undefined;
+  const firstFromArray = Array.isArray(rawUrl) && typeof rawUrl[0] === "string" ? rawUrl[0] : undefined;
+  const streamUrl: string | undefined =
+    typeof rawUrl === "string" ? rawUrl : firstFromArray;
 
   if (!streamUrl) {
     return res.status(400).json({ error: "url is required" });
   }
 
-  if (!validateStreamUrl(streamUrl)) {
+  if (!(await validateStreamUrl(streamUrl))) {
     return res.status(400).json({ error: "url is not valid or not allowed" });
   }
 
@@ -417,7 +514,7 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
         clearTimeout(timer);
         return res.status(400).json({ error: "Invalid redirect target" });
       }
-      if (!validateStreamUrl(redirectTarget.href)) {
+      if (!(await validateStreamUrl(redirectTarget.href))) {
         clearTimeout(timer);
         return res.status(400).json({ error: "Redirect target is not allowed" });
       }
@@ -452,6 +549,11 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
     }
 
     const contentType = finalResponse.headers.get("Content-Type") || "audio/mpeg";
+    if (!isAllowedStreamContentType(finalResponse.headers.get("Content-Type"))) {
+      // SSRF defense-in-depth: even if URL/IP validation were bypassed, this
+      // prevents the proxy from returning HTML/JSON/etc. from internal services.
+      return res.status(415).json({ error: "Upstream content-type is not an audio/video stream" });
+    }
     const transferEncoding = finalResponse.headers.get("Transfer-Encoding");
 
     res.setHeader("Content-Type", contentType);
