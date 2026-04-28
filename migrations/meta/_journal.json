@@ -5,50 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1773836597511,
-      "tag": "0000_open_shotgun",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1742327400000,
-      "tag": "0001_user_blocks",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1742553600000,
-      "tag": "0002_gdpr_consent_fields",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1776067401647,
-      "tag": "0004_user_favorites",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1745376000000,
-      "tag": "0006_arcade_scores",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1745557200000,
-      "tag": "0009_rename_spotify_identifiers",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1777670000000,
-      "tag": "0012_ota_events",
+      "when": 1777335517698,
+      "tag": "0000_baseline",
       "breakpoints": true
     }
   ]
