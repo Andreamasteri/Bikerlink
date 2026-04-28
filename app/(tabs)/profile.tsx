@@ -1428,7 +1428,7 @@ export default function ProfileScreen() {
             {Updates.updateId ? Updates.updateId.substring(0, 8) : "embedded"}
           </Text>
         </View>
-        <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", fontStyle: "italic", color: colors.accent }}>
+        <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", fontStyle: "italic", color: "#FF6600" }}>
           Beta
         </Text>
       </View>
