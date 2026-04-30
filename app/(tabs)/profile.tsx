@@ -126,7 +126,7 @@ export default function ProfileScreen() {
   const locale = useLocale();
   const { enabled: mapsEnabled, userChoiceEnabled } = useMapConfig();
   const { currentTheme, setTheme, userSwitchingEnabled } = useTheme();
-  const { taskbarStyle, setTaskbarStyle, adminDefault, userHasCustomized } = useTaskbarStyle();
+  const { taskbarStyle, setTaskbarStyle, adminDefault } = useTaskbarStyle();
   const { timeFormat, speedUnit, distanceUnit, setTimeFormat, setSpeedUnit, setDistanceUnit } = useUnits();
   const [unitsExpanded, setUnitsExpanded] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
