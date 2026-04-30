@@ -56,6 +56,8 @@ interface OtaErrorEntry {
   timestamp: string;
   // Task #1148: diagnostica avanzata, tutti opzionali e già troncati a monte.
   errorCode?: string;
+  errorCause?: string;
+  errorUserInfo?: string;
   nativeStack?: string;
   updateUrl?: string;
   networkInfo?: string;
@@ -301,7 +303,7 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
     const {
       error, failCount, updateId, runtimeVersion, phase, source, platform,
       // Task #1148: nuovi campi diagnostici opzionali (tutti troncati sotto).
-      errorCode, nativeStack, updateUrl, networkInfo, probe,
+      errorCode, errorCause, errorUserInfo, nativeStack, updateUrl, networkInfo, probe,
     } = req.body as {
       error?: string;
       failCount?: number;
@@ -311,6 +313,8 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
       source?: string;
       platform?: string;
       errorCode?: string;
+      errorCause?: string;
+      errorUserInfo?: string;
       nativeStack?: string;
       updateUrl?: string;
       networkInfo?: string;
@@ -335,6 +339,8 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
     } : undefined;
     const sanitizedDiag = {
       errorCode: typeof errorCode === "string" ? errorCode.substring(0, 64) : undefined,
+      errorCause: typeof errorCause === "string" ? errorCause.substring(0, 300) : undefined,
+      errorUserInfo: typeof errorUserInfo === "string" ? errorUserInfo.substring(0, 500) : undefined,
       nativeStack: typeof nativeStack === "string" ? nativeStack.substring(0, 1500) : undefined,
       updateUrl: typeof updateUrl === "string" ? updateUrl.substring(0, 256) : undefined,
       networkInfo: typeof networkInfo === "string" ? networkInfo.substring(0, 64) : undefined,

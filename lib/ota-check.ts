@@ -106,7 +106,7 @@ async function runProbe(currentUpdateId: string, runtimeVersion: string): Promis
         "expo-runtime-version": runtimeVersion,
         "expo-platform": "android",
         "expo-current-update-id": currentUpdateId,
-        "expo-protocol-version": "0",
+        "expo-protocol-version": "1",
         "expo-expect-signature": "false",
         "accept": "application/expo+json,application/json",
       },
@@ -160,6 +160,8 @@ interface ReportPayload {
   error?: string;
   failCount?: number;
   errorCode?: string;
+  errorCause?: string;
+  errorUserInfo?: string;
   nativeStack?: string;
   updateUrl?: string;
   networkInfo?: string;
@@ -181,6 +183,8 @@ function reportOtaEvent(payload: ReportPayload) {
         platform: Platform.OS,
         // Task #1148: nuovi campi diagnostici (tutti opzionali, troncati lato server).
         errorCode: payload.errorCode,
+        errorCause: payload.errorCause,
+        errorUserInfo: payload.errorUserInfo,
         nativeStack: payload.nativeStack,
         updateUrl: payload.updateUrl,
         networkInfo: payload.networkInfo,
@@ -286,6 +290,8 @@ export async function triggerOtaCheck(
       error: errMsg,
       failCount: consecutiveFailures,
       errorCode: details.code,
+      errorCause: details.cause,
+      errorUserInfo: details.userInfo,
       nativeStack: details.nativeStack,
       updateUrl,
       networkInfo: netInfo,

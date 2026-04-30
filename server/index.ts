@@ -886,6 +886,17 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] ota_releases:", e);
         }
 
+        // Task #1148: aggiungi colonna `diagnostics` JSONB su ota_events.
+        // È nullable e con default IF NOT EXISTS, quindi sicura su DB esistenti
+        // (produzione) dove `db:push` non viene eseguito al rilascio. Senza
+        // questa migrazione il SELECT in /api/admin/ota-events e l'INSERT in
+        // /api/admin/ota-error fallirebbero con "column diagnostics does not exist".
+        try {
+          await db.execute(sql`ALTER TABLE ota_events ADD COLUMN IF NOT EXISTS diagnostics jsonb`);
+        } catch (e) {
+          console.warn("[MIGRATION] ota_events.diagnostics:", e);
+        }
+
         // Startup cleanup: remove superseded/draft OTA releases older than 90 days
         // + delete corresponding bundles from object storage (best-effort)
         try {

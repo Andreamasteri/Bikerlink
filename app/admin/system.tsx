@@ -1213,7 +1213,28 @@ function OtaDiagnosticsCard({ events }: { events: OtaEventRow[] }) {
   const [stackOpen, setStackOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const lastErrorEvent = useMemo(() => {
-    return events.find((e) => !!e.error && !e.error.startsWith("ok:")) ?? null;
+    // Task #1148: il pannello mostra solo i fallimenti CLIENT veri, non le righe
+    // di sampling del server (`server-anon-check`/`server-check`) che memorizzano
+    // status come "204-no-release" o "200-manifest-cached" nel campo error.
+    // Criterio: presenza di `diagnostics` (popolato solo dal client nel ramo
+    // catch di triggerOtaCheck) e phase != server-*. Fallback al primo error
+    // non-ok se nessun evento ha ancora diagnostics (compat con dati storici).
+    const withDiag = events.find(
+      (e) =>
+        !!e.diagnostics &&
+        e.phase !== "server-check" &&
+        e.phase !== "server-anon-check",
+    );
+    if (withDiag) return withDiag;
+    return (
+      events.find(
+        (e) =>
+          !!e.error &&
+          !e.error.startsWith("ok:") &&
+          e.phase !== "server-check" &&
+          e.phase !== "server-anon-check",
+      ) ?? null
+    );
   }, [events]);
 
   const handleCopy = useCallback(async () => {

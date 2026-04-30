@@ -496,6 +496,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentUpdateId = req.headers["expo-current-update-id"] as string | undefined;
       const ifNoneMatch = req.headers["if-none-match"] as string | undefined;
 
+      // Task #1148: anomaly logging — header mancanti e runtime mismatch sono
+      // sempre loggati (vedi `isAnomaly` in logEvent). Servono per individuare
+      // device male configurati o build con runtimeVersion sbagliato.
+      if (!runtimeVersion || !platform) {
+        await logEvent(
+          "missing-headers",
+          null,
+          `rv=${runtimeVersion ?? "absent"} pf=${platform ?? "absent"}`,
+        );
+      } else if (runtimeVersion !== _expectedRuntimeVersion) {
+        await logEvent(
+          "runtime-mismatch",
+          null,
+          `client=${runtimeVersion} server=${_expectedRuntimeVersion}`,
+        );
+      }
+
       // Only serve Android OTA bundles — iOS publishing is handled separately
       if (platform && platform !== "android") {
         await logEvent("204-not-android", null);
@@ -583,6 +600,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json(manifest);
     } catch (error) {
       console.error("[expo-updates] Error:", error);
+      // Task #1148: errori 500 sono SEMPRE loggati (isAnomaly = status startsWith "5")
+      // così che le anomalie del backend OTA siano visibili dal pannello admin
+      // anche per richieste di client anonimi che non possono passare ?debug=1.
+      try {
+        await logEvent("500-internal-error", null, String((error as Error)?.message ?? error).substring(0, 200));
+      } catch {
+        // best-effort: non vogliamo mai che il logging mascheri il 500 al client
+      }
       return res.status(500).json({ message: "Internal server error" });
     }
   });
