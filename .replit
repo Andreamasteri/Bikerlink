@@ -151,6 +151,9 @@ NODE_ENV = "production"
 BIKERLINK_ADMIN_EMAIL = "admin@bikerlink.it"
 BIKERLINK_BACKEND_URL = "https://biker-link.replit.app"
 
+[userenv.development]
+DEV_SYNC_ALLOWED = "1"
+
 [[ports]]
 localPort = 5000
 externalPort = 80

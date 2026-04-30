@@ -59,8 +59,14 @@ async function readJsonSetting<T>(key: string): Promise<T | null> {
 }
 
 function isProductionEnvironment(): boolean {
+  // REPLIT_DEPLOYMENT="1" è impostato solo nella deployed app Replit (mai in dev workspace)
   if (process.env.REPLIT_DEPLOYMENT === "1") return true;
+  // REPLIT_INTERNAL_APP_DOMAIN è impostato solo nell'ambiente di produzione Replit
   if (process.env.REPLIT_INTERNAL_APP_DOMAIN) return true;
+  // NODE_ENV="production" NON è un indicatore affidabile in questo progetto:
+  // start-backend.sh lo imposta anche nel dev workspace.
+  // DEV_SYNC_ALLOWED=1 permette override esplicito se NODE_ENV=production ma siamo in dev.
+  if (process.env.NODE_ENV === "production" && !process.env.DEV_SYNC_ALLOWED) return true;
   return false;
 }
 
@@ -113,7 +119,7 @@ export async function syncProdToDev(): Promise<{ ok: boolean; error?: string }> 
     console.log("[sync-service] pg_dump completato");
 
     await execAsync(
-      `psql "${urls.devUrl}" -f "${tmpSql}" --no-password -v ON_ERROR_STOP=0`
+      `psql "${urls.devUrl}" -f "${tmpSql}" --no-password -v ON_ERROR_STOP=1`
     );
     console.log("[sync-service] psql restore completato");
 
