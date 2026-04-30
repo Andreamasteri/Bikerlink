@@ -32,7 +32,7 @@
     },
     "android": {
       "package": "com.bikerlink.app",
-      "versionCode": 43,
+      "versionCode": 44,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",

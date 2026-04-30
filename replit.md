@@ -172,27 +172,26 @@ Configurazione applicata in:
 - **Build EAS** (preview/production): `eas.json` → `android.jsEngine: "hermes"` — le APK/AAB usano Hermes.
 - **Expo Go**: Metro gestisce automaticamente il bundling senza bisogno di configurazione esplicita jsEngine.
 
-## Ciclo APK corrente — v11 (rv 5.0.0)
+## Ciclo APK corrente — v44 (rv 8.0.0)
 
 | Campo | Valore |
 |---|---|
-| versionCode | 11 |
-| version | 1.2.0 |
-| runtimeVersion | 5.0.0 |
-| EAS Build ID | `6ea14cd7-6eb4-405c-b7e8-45698408d742` |
-| EAS Dashboard | https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/6ea14cd7-6eb4-405c-b7e8-45698408d742 |
-| apkUrl | https://expo.dev/artifacts/eas/eEkRqCLJGNDSrAmCtZVecY.apk |
-| Avviata il | 2026-04-13 |
-| Profilo | preview (APK Android) |
+| versionCode | 44 |
+| version | 3.3.0 |
+| runtimeVersion | 8.0.0 |
+| EAS Build ID | `b148edc3-de25-4f55-b5c4-c4466b4ccc0b` |
+| EAS Dashboard | https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/b148edc3-de25-4f55-b5c4-c4466b4ccc0b |
+| apkUrl | _pendente — disponibile a build EAS completata (~30-45 min)_ |
+| Avviata il | 2026-04-30 |
+| Profilo | release-apk (APK arm64-v8a only, ProGuard, NewArch, ~50MB) |
 | Cache | --clear-cache (Gradle remota) |
-| validate-ota.sh | ✅ PASSED (exit 0) — NEW_CYCLE per rv=5.0.0, tutti i 7 check superati |
-| Primo OTA del ciclo | OTA-41 (aggiornare CURRENT_OTA_NUMBER = 41 quando si pubblica) |
+| Motivo rebuild | Almeno un device Android (utente) ancora piantato su OTA-19 anche dopo il deploy del fix backend OTA Protocol v1 (Task #1150). Serve APK baseline pulita da installare manualmente. |
 
-**Note ciclo 5.x:**
-- CURRENT_OTA_NUMBER = 0 in profile.tsx finché non viene pubblicata la prima OTA
-- Il registro ota-updates.json resta vuoto per rv=5.0.0 fino alla prima OTA-41
-- validate-ota.sh gestisce il ciclo vuoto con la path NEW_CYCLE (exit 0) — confermato ✅
-- Quando l'APK v11 è pronto, aggiornare la riga `apkUrl` con il link diretto `.apk`
-- apkBuildId + apkUrl definitivi compariranno nella prima entry OTA-41 del ciclo 5.x
+**Note ciclo 8.x — APK v44:**
+- L'APK contiene baked il bundle JS aggiornato (post Task #1150) — il client al primo avvio chiamerà `/api/expo-updates` col Protocol v1 corretto e uscirà dallo stato piantato
+- runtimeVersion 8.0.0 invariato — APK v44 resta compatibile con OTA-22/23 già pubblicate
+- Bump versionCode 43→44 obbligato dal vincolo monotonico crescente di Google Play (anche se l'APK 43 reale non è mai stato distribuito su store)
+- ⚠️ Build inviato in modalità "manual" (sandbox del main agent ha bloccato il git commit automatico interno a `build-apk.sh` ai passi 2c — bump versionCode in `app.json` e `android/app/build.gradle` resta UNCOMMITTED nel working tree, da committare e pushare in un task successivo)
+- Quando EAS completa la build, aggiornare la riga `apkUrl` con il link `https://expo.dev/artifacts/eas/XXX.apk`
 
-**Ciclo precedente:** APK v10 / rv 4.0.0 / OTA-40 (ultima) — apkBuildId `7a08598a-3a00-4169-aed1-b1d4ab6e8e7c`
+**Ciclo precedente:** APK v43 / rv 8.0.0 / 3.2.0 — apkBuildId `38cb1b32-4316-4f63-9799-1b9ab36888e8`, APK https://expo.dev/artifacts/eas/81L2RgW8kFuzUiRzACfAEm.apk (STABILE)

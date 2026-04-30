@@ -65,3 +65,5 @@
 2026-04-28T16:51:27Z  APK BUILD COMPLETATA (FINISHED) — buildId=38cb1b32-4316-4f63-9799-1b9ab36888e8 versionCode=43 versionName=3.2.0 APK=https://expo.dev/artifacts/eas/81L2RgW8kFuzUiRzACfAEm.apk snapshot=SALVATA
 2026-04-28T23:09:56Z  APK BUILD AVVIATA — profilo=release-apk commit=3e0ad44 utente=runner versionName=3.3.0 versionCode=43 committed=no
 2026-04-28T23:09:56Z  APK BUILD INVIATA (--no-wait) — profilo=release-apk commit=3e0ad44 utente=runner versionName=3.3.0 versionCode=43 committed=no
+2026-04-30T18:01:22Z  APK BUILD MANUAL (sandbox skip auto-commit) — profilo=release-apk commit=1e61243d versionName=3.3.0 versionCode=44 committed=no
+2026-04-30T18:03:23Z  APK BUILD INVIATA (manual --no-wait, sandbox skip auto-commit) — profilo=release-apk buildId=b148edc3-de25-4f55-b5c4-c4466b4ccc0b versionName=3.3.0 versionCode=44 dashboard=https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/b148edc3-de25-4f55-b5c4-c4466b4ccc0b
