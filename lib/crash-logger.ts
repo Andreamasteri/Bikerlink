@@ -6,6 +6,8 @@ import { apiRequest } from "@/lib/query-client";
 const SESSION_KEY = "@bikerlink/crash_session";
 const QUEUE_KEY = "@bikerlink/crash_queue";
 const MAX_QUEUE = 100;
+const BATCH_SIZE = 50;
+const RETRY_INTERVAL_MS = 5 * 60 * 1000;
 
 export type CrashType = "crash_system" | "crash_js" | "clean_close";
 
@@ -60,6 +62,7 @@ function getDeviceModel(): string | null {
 
 let _currentSession: CrashSessionMeta | null = null;
 let _appStateSubscription: { remove: () => void } | null = null;
+let _retryTimer: ReturnType<typeof setInterval> | null = null;
 let _initialized = false;
 
 async function readQueue(): Promise<CrashLogEntry[]> {
@@ -74,11 +77,12 @@ async function readQueue(): Promise<CrashLogEntry[]> {
 
 async function writeQueue(queue: CrashLogEntry[]): Promise<void> {
   try {
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue.slice(-MAX_QUEUE)));
+    const trimmed = queue.slice(-MAX_QUEUE);
+    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(trimmed));
   } catch {}
 }
 
-async function enqueue(entry: CrashLogEntry): Promise<void> {
+export async function enqueueCrashEntry(entry: CrashLogEntry): Promise<void> {
   const queue = await readQueue();
   queue.push(entry);
   await writeQueue(queue);
@@ -116,15 +120,18 @@ export async function markJsError(error: Error, stack?: string): Promise<void> {
     sessionStartedAt: _currentSession.startedAt,
     sessionEndedAt: new Date().toISOString(),
   };
-  await enqueue(entry);
+  await enqueueCrashEntry(entry);
 }
 
 export async function flushQueue(): Promise<void> {
   try {
-    const queue = await readQueue();
-    if (queue.length === 0) return;
-    await apiRequest("POST", "/api/crash-logs", { logs: queue });
-    await writeQueue([]);
+    let queue = await readQueue();
+    while (queue.length > 0) {
+      const batch = queue.slice(0, BATCH_SIZE);
+      await apiRequest("POST", "/api/crash-logs", { logs: batch });
+      queue = queue.slice(BATCH_SIZE);
+      await writeQueue(queue);
+    }
   } catch {}
 }
 
@@ -152,7 +159,7 @@ export async function initCrashLogger(userId: string): Promise<void> {
       sessionStartedAt: prevSession.startedAt,
       sessionEndedAt: null,
     };
-    await enqueue(entry);
+    await enqueueCrashEntry(entry);
   }
 
   _currentSession = {
@@ -170,21 +177,7 @@ export async function initCrashLogger(userId: string): Promise<void> {
     if (state === "background" || state === "inactive") {
       if (_currentSession && !_currentSession.clean) {
         _currentSession.clean = true;
-        const endedAt = new Date().toISOString();
         await saveCurrentSession();
-        const cleanEntry: CrashLogEntry = {
-          sessionId: _currentSession.sessionId,
-          crashType: "clean_close",
-          appVersion: getAppVersion(),
-          platform: Platform.OS,
-          osVersion: getOsVersion(),
-          deviceModel: getDeviceModel(),
-          errorMessage: null,
-          stackTrace: null,
-          sessionStartedAt: _currentSession.startedAt,
-          sessionEndedAt: endedAt,
-        };
-        await enqueue(cleanEntry);
       }
     }
     if (state === "active") {
@@ -196,6 +189,11 @@ export async function initCrashLogger(userId: string): Promise<void> {
     }
   });
 
+  if (_retryTimer) clearInterval(_retryTimer);
+  _retryTimer = setInterval(() => {
+    flushQueue().catch(() => {});
+  }, RETRY_INTERVAL_MS);
+
   await flushQueue();
 }
 
@@ -205,5 +203,9 @@ export function resetCrashLogger(): void {
   if (_appStateSubscription) {
     _appStateSubscription.remove();
     _appStateSubscription = null;
+  }
+  if (_retryTimer) {
+    clearInterval(_retryTimer);
+    _retryTimer = null;
   }
 }
