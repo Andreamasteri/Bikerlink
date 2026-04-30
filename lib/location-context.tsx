@@ -7,6 +7,7 @@ import { sendStartupBeacon } from "@/lib/startup-beacon";
 interface LocationContextType {
   hasLocationPermission: boolean;
   hasBackgroundPermission: boolean;
+  backgroundPermissionChecked: boolean;
   backgroundPermissionRevoked: boolean;
   gpsRequired: boolean;
   isGpsGateActive: boolean;
@@ -17,6 +18,7 @@ interface LocationContextType {
 const LocationContext = createContext<LocationContextType>({
   hasLocationPermission: true,
   hasBackgroundPermission: false,
+  backgroundPermissionChecked: false,
   backgroundPermissionRevoked: false,
   gpsRequired: true,
   isGpsGateActive: false,
@@ -45,6 +47,7 @@ function isWebPermissionsAvailable(): boolean {
 export function LocationProvider({ children }: { children: React.ReactNode }) {
   const [hasPermission, setHasPermission] = useState(true);
   const [hasBackgroundPermission, setHasBackgroundPermission] = useState(false);
+  const [backgroundPermissionChecked, setBackgroundPermissionChecked] = useState(false);
   const [backgroundPermissionRevoked, setBackgroundPermissionRevoked] = useState(false);
   const appState = useRef(AppState.currentState);
   const permissionStatusRef = useRef<PermissionStatus | null>(null);
@@ -76,7 +79,10 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const checkBackgroundPermission = useCallback(async () => {
-    if (Platform.OS === "web") return;
+    if (Platform.OS === "web") {
+      setBackgroundPermissionChecked(true);
+      return;
+    }
     try {
       const { status } = await Location.getBackgroundPermissionsAsync();
       const granted = status === "granted";
@@ -90,6 +96,8 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       }
     } catch {
       setHasBackgroundPermission(false);
+    } finally {
+      setBackgroundPermissionChecked(true);
     }
   }, []);
 
@@ -219,6 +227,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     <LocationContext.Provider value={{
       hasLocationPermission: hasPermission,
       hasBackgroundPermission,
+      backgroundPermissionChecked,
       backgroundPermissionRevoked,
       gpsRequired,
       isGpsGateActive,

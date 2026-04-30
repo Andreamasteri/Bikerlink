@@ -269,10 +269,10 @@ function AppStateHandler() {
 }
 
 function GpsAlwaysGate({ isAuthenticated }: { isAuthenticated: boolean }) {
-  const { hasBackgroundPermission, backgroundPermissionRevoked } = useLocationGate();
+  const { hasBackgroundPermission, backgroundPermissionChecked, backgroundPermissionRevoked } = useLocationGate();
   const [dismissed, setDismissed] = useState(false);
 
-  if (Platform.OS === "web" || !isAuthenticated || hasBackgroundPermission) return null;
+  if (Platform.OS === "web" || !isAuthenticated || !backgroundPermissionChecked || hasBackgroundPermission) return null;
   if (!dismissed) return <AlwaysPermissionNotice onDismiss={() => setDismissed(true)} />;
   if (backgroundPermissionRevoked) return <BackgroundRevocationBanner />;
   return null;
