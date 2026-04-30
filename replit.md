@@ -181,7 +181,7 @@ Configurazione applicata in:
 | runtimeVersion | 8.0.0 |
 | EAS Build ID | `b148edc3-de25-4f55-b5c4-c4466b4ccc0b` |
 | EAS Dashboard | https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/b148edc3-de25-4f55-b5c4-c4466b4ccc0b |
-| apkUrl | _pendente — disponibile a build EAS completata (~30-45 min)_ |
+| apkUrl | https://expo.dev/artifacts/eas/nTJjWowt3HRSs7BqRvdCRi.apk |
 | Avviata il | 2026-04-30 |
 | Profilo | release-apk (APK arm64-v8a only, ProGuard, NewArch, ~50MB) |
 | Cache | --clear-cache (Gradle remota) |
@@ -191,7 +191,6 @@ Configurazione applicata in:
 - L'APK contiene baked il bundle JS aggiornato (post Task #1150) — il client al primo avvio chiamerà `/api/expo-updates` col Protocol v1 corretto e uscirà dallo stato piantato
 - runtimeVersion 8.0.0 invariato — APK v44 resta compatibile con OTA-22/23 già pubblicate
 - Bump versionCode 43→44 obbligato dal vincolo monotonico crescente di Google Play (anche se l'APK 43 reale non è mai stato distribuito su store)
-- ⚠️ Build inviato in modalità "manual" (sandbox del main agent ha bloccato il git commit automatico interno a `build-apk.sh` ai passi 2c — bump versionCode in `app.json` e `android/app/build.gradle` resta UNCOMMITTED nel working tree, da committare e pushare in un task successivo)
-- Quando EAS completa la build, aggiornare la riga `apkUrl` con il link `https://expo.dev/artifacts/eas/XXX.apk`
+- L'APK arm64 dimagrita (~50MB) è installabile direttamente dall'utente per side-load sui device piantati su OTA-19
 
 **Ciclo precedente:** APK v43 / rv 8.0.0 / 3.2.0 — apkBuildId `38cb1b32-4316-4f63-9799-1b9ab36888e8`, APK https://expo.dev/artifacts/eas/81L2RgW8kFuzUiRzACfAEm.apk (STABILE)

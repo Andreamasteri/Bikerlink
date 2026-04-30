@@ -67,3 +67,4 @@
 2026-04-28T23:09:56Z  APK BUILD INVIATA (--no-wait) — profilo=release-apk commit=3e0ad44 utente=runner versionName=3.3.0 versionCode=43 committed=no
 2026-04-30T18:01:22Z  APK BUILD MANUAL (sandbox skip auto-commit) — profilo=release-apk commit=1e61243d versionName=3.3.0 versionCode=44 committed=no
 2026-04-30T18:03:23Z  APK BUILD INVIATA (manual --no-wait, sandbox skip auto-commit) — profilo=release-apk buildId=b148edc3-de25-4f55-b5c4-c4466b4ccc0b versionName=3.3.0 versionCode=44 dashboard=https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/b148edc3-de25-4f55-b5c4-c4466b4ccc0b
+2026-04-30 18:14:46Z | b148edc3-de25-4f55-b5c4-c4466b4ccc0b | FINISHED | versionCode=44 versionName=3.3.0 | duration=12min | apkUrl=https://expo.dev/artifacts/eas/nTJjWowt3HRSs7BqRvdCRi.apk | curl_check=HTTP_307_redirect_to_CDN_OK | task=#1151

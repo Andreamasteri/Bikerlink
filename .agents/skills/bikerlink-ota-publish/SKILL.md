@@ -35,7 +35,7 @@ backend custom `https://biker-link.replit.app/api/expo-updates` (Expo Updates Pr
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
 - **Runtime Version**: `8.0.0` (ciclo corrente, APK v44) ← CICLO V3
-- **APK corrente**: versionCode **44**, versionName **3.3.0** (buildId: `b148edc3-de25-4f55-b5c4-c4466b4ccc0b`, dashboard: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/b148edc3-de25-4f55-b5c4-c4466b4ccc0b — IN BUILD, apkUrl pendente fino a EAS completion)
+- **APK corrente**: versionCode **44**, versionName **3.3.0** (buildId: `b148edc3-de25-4f55-b5c4-c4466b4ccc0b`, APK: https://expo.dev/artifacts/eas/nTJjWowt3HRSs7BqRvdCRi.apk — STABILE, baseline pulita per device piantati su OTA-19)
 - **APK precedente (STABILE distribuita)**: versionCode 43, versionName 3.2.0 (buildId: `38cb1b32-4316-4f63-9799-1b9ab36888e8`, APK: https://expo.dev/artifacts/eas/81L2RgW8kFuzUiRzACfAEm.apk)
 - **OTA corrente**: OTA-22 (releaseId: `e0f8cb2c-fff1-4361-870b-8b97c3f3f274`)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates`
@@ -207,7 +207,7 @@ Tutte e tre le risposte devono contenere `expo-protocol-version: 0`. Se manca su
 - **Ciclo 8.x: OTA 1–22 (rv 8.0.0) ← CORRENTE (V3)**
   - APK v41: STABILE — buildId: e03f51d8, APK: https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk
   - APK v43 (3.2.0): STABILE — buildId: 38cb1b32-4316-4f63-9799-1b9ab36888e8, APK: https://expo.dev/artifacts/eas/81L2RgW8kFuzUiRzACfAEm.apk
-  - APK v44 (3.3.0): IN BUILD — buildId: b148edc3-de25-4f55-b5c4-c4466b4ccc0b, dashboard: https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/b148edc3-de25-4f55-b5c4-c4466b4ccc0b (apkUrl pendente, baseline pulita per device piantati su OTA-19 — Task #1151)
+  - APK v44 (3.3.0): STABILE — buildId: b148edc3-de25-4f55-b5c4-c4466b4ccc0b, APK: https://expo.dev/artifacts/eas/nTJjWowt3HRSs7BqRvdCRi.apk (baseline pulita per device piantati su OTA-19 — Task #1151)
 
 ## REGOLA CRITICA — BARE WORKFLOW
 Il progetto ha `android/` committato → bare workflow. Modificare SEMPRE i file Android direttamente:
