@@ -808,6 +808,25 @@ export default function AdminSettings() {
     onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
+  const { data: syncStatus, refetch: refetchSyncStatus } = useQuery<{
+    available: boolean;
+    inProgress: boolean;
+    lastSync: { startedAt: string; finishedAt?: string; ok: boolean; error?: string } | null;
+    nextScheduledAt: string | null;
+  }>({
+    queryKey: ["/api/admin/sync-status"],
+    refetchInterval: 10000,
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/sync-prod-to-dev", {}),
+    onSuccess: () => {
+      refetchSyncStatus();
+      Alert.alert("Sync completato", "Database di sviluppo aggiornato con i dati di produzione.");
+    },
+    onError: (e: Error) => Alert.alert("Errore sync", e.message),
+  });
+
   const disableFeatureMutation = useMutation({
     mutationFn: async (key: string) => {
       const baseUrl = getApiUrl();
@@ -3393,6 +3412,68 @@ export default function AdminSettings() {
             <Text style={styles.saveBtnText}>Salva</Text>
           </TouchableOpacity>
         </View>
+      </View>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="sync-outline" size={20} color={Colors.accent} />
+            <Text style={styles.synecoLabel}>Sync Produzione → Sviluppo</Text>
+          </View>
+        </View>
+        {!syncStatus?.available ? (
+          <Text style={styles.synecoDesc}>
+            Non disponibile — impostare PROD_DATABASE_URL (diverso da DATABASE_URL) nell'ambiente di sviluppo.
+          </Text>
+        ) : (
+          <>
+            {syncStatus.lastSync ? (
+              <View style={{ marginBottom: 6 }}>
+                <Text style={styles.synecoDesc}>
+                  Ultimo sync: {new Date(syncStatus.lastSync.startedAt).toLocaleString("it-IT")}{" "}
+                  {syncStatus.lastSync.ok
+                    ? <Text style={{ color: Colors.accent }}>✓ OK</Text>
+                    : <Text style={{ color: Colors.error ?? "#e74c3c" }}>✗ Errore</Text>}
+                </Text>
+                {!syncStatus.lastSync.ok && syncStatus.lastSync.error && (
+                  <Text style={[styles.synecoDesc, { color: Colors.error ?? "#e74c3c", marginTop: 2 }]} numberOfLines={2}>
+                    {syncStatus.lastSync.error}
+                  </Text>
+                )}
+              </View>
+            ) : (
+              <Text style={styles.synecoDesc}>Nessun sync eseguito finora.</Text>
+            )}
+            {syncStatus.nextScheduledAt && (
+              <Text style={styles.synecoDesc}>
+                Prossimo sync automatico: {new Date(syncStatus.nextScheduledAt).toLocaleString("it-IT")}
+              </Text>
+            )}
+            <TouchableOpacity
+              style={[styles.saveBtn, { marginTop: 10, alignSelf: "flex-start" as const, flexDirection: "row" as const, alignItems: "center" as const, gap: 6, opacity: (syncStatus.inProgress || syncMutation.isPending) ? 0.5 : 1 }]}
+              onPress={() => {
+                Alert.alert(
+                  "Sync produzione → sviluppo",
+                  "Il database di sviluppo verrà sovrascritto con i dati di produzione. Continuare?",
+                  [
+                    { text: "Annulla", style: "cancel" },
+                    { text: "Sincronizza", style: "destructive", onPress: () => syncMutation.mutate() },
+                  ]
+                );
+              }}
+              disabled={syncStatus.inProgress || syncMutation.isPending}
+            >
+              {(syncStatus.inProgress || syncMutation.isPending) ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Ionicons name="sync" size={16} color="#fff" />
+              )}
+              <Text style={styles.saveBtnText}>
+                {(syncStatus.inProgress || syncMutation.isPending) ? "Sync in corso..." : "Sincronizza ora"}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       <View style={styles.sectionHeaderRow}>

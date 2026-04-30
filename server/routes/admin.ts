@@ -3797,6 +3797,41 @@ router.post("/backup/frequency", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/sync-status", async (_req: Request, res: Response) => {
+  try {
+    const { getSyncStatus } = await import("../sync-service");
+    return res.json(await getSyncStatus());
+  } catch (error) {
+    console.error("Admin sync-status error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/sync-prod-to-dev", async (req: Request, res: Response) => {
+  try {
+    const { syncProdToDev, isSyncAvailable } = await import("../sync-service");
+    if (!isSyncAvailable()) {
+      return res.status(403).json({ message: "Sync non disponibile: controllare PROD_DATABASE_URL o verificare l'ambiente" });
+    }
+    const result = await syncProdToDev();
+    if (result.ok) {
+      await storage.createModeratorLog({
+        moderatorId: req.session.userId!,
+        action: "sync_prod_to_dev",
+        targetType: "system",
+        targetId: "database",
+        details: "Sync manuale produzione → sviluppo completato",
+      });
+      return res.json({ ok: true });
+    } else {
+      return res.status(500).json({ message: result.error ?? "Errore sconosciuto durante il sync" });
+    }
+  } catch (error: any) {
+    console.error("Admin sync-prod-to-dev error:", error);
+    return res.status(500).json({ message: error.message || "Errore interno del server" });
+  }
+});
+
 router.post("/reconcile-club-invites", async (req: Request, res: Response) => {
   try {
     const userId = req.body.userId || req.session.userId!;

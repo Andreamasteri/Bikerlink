@@ -1683,5 +1683,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }).catch(() => {});
 
+  import("./sync-service").then(({ startSyncScheduler }) => {
+    startSyncScheduler();
+  }).catch(() => {});
+
   return httpServer;
 }
