@@ -76,7 +76,7 @@ export default function EditProfileScreen() {
   const params = useLocalSearchParams();
   const { user, logoutMutation } = useAuth();
   const { language, setLanguage } = useLanguage();
-  const { speedUnit, setSpeedUnit, setDistanceUnit, setTimeFormat } = useUnits();
+  const { speedUnit, setSystem } = useUnits();
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -867,17 +867,7 @@ export default function EditProfileScreen() {
                       alignItems: "center",
                       gap: 2,
                     }}
-                    onPress={() => {
-                      if (isMetric) {
-                        setSpeedUnit("kmh");
-                        setDistanceUnit("km_m");
-                        setTimeFormat("24h");
-                      } else {
-                        setSpeedUnit("mph");
-                        setDistanceUnit("mi_ft");
-                        setTimeFormat("12h");
-                      }
-                    }}
+                    onPress={() => setSystem(system)}
                   >
                     <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: isSelected ? Colors.accent : Colors.text }}>{label}</Text>
                     <Text style={{ fontSize: 11, color: Colors.textSecondary }}>{desc}</Text>

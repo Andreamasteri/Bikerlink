@@ -15,6 +15,7 @@ interface UnitsContextType extends UnitsPreferences {
   setTimeFormat: (v: TimeFormat) => void;
   setSpeedUnit: (v: SpeedUnit) => void;
   setDistanceUnit: (v: DistanceUnit) => void;
+  setSystem: (system: "metric" | "imperial") => void;
   applyCountryDefault: (country: string) => void;
 }
 
@@ -47,6 +48,7 @@ const UnitsContext = createContext<UnitsContextType>({
   setTimeFormat: () => {},
   setSpeedUnit: () => {},
   setDistanceUnit: () => {},
+  setSystem: () => {},
   applyCountryDefault: () => {},
 });
 
@@ -95,6 +97,18 @@ export function UnitsProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
   }, []);
 
+  // Atomic setter: aggiorna tutti e 3 i valori + scrive AsyncStorage una sola volta
+  const setSystem = useCallback((system: "metric" | "imperial") => {
+    const next: UnitsPreferences = system === "imperial"
+      ? { timeFormat: "12h", speedUnit: "mph", distanceUnit: "mi_ft" }
+      : { timeFormat: "24h", speedUnit: "kmh", distanceUnit: "km_m" };
+    setTimeFormatState(next.timeFormat);
+    setSpeedUnitState(next.speedUnit);
+    setDistanceUnitState(next.distanceUnit);
+    setHasStoredPreference(true);
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
+  }, []);
+
   const applyCountryDefault = useCallback((country: string) => {
     if (!storageLoaded || hasStoredPreference) return;
     if (IMPERIAL_COUNTRIES.has(country)) {
@@ -115,7 +129,7 @@ export function UnitsProvider({ children }: { children: React.ReactNode }) {
   }, [storageLoaded, hasStoredPreference]);
 
   return (
-    <UnitsContext.Provider value={{ timeFormat, speedUnit, distanceUnit, setTimeFormat, setSpeedUnit, setDistanceUnit, applyCountryDefault }}>
+    <UnitsContext.Provider value={{ timeFormat, speedUnit, distanceUnit, setTimeFormat, setSpeedUnit, setDistanceUnit, setSystem, applyCountryDefault }}>
       {children}
     </UnitsContext.Provider>
   );
