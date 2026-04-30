@@ -1687,8 +1687,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     startSyncScheduler();
   }).catch(() => {});
 
-  const crashLogsRouter = (await import("./routes/crash-logs")).default;
-  app.use("/api/crash-logs", crashLogsRouter);
+  const { publicRouter: crashLogsPublic, adminRouter: crashLogsAdmin } = await import("./routes/crash-logs");
+  app.use("/api/crash-logs", crashLogsPublic);
+  app.use("/api/admin/crash-logs", crashLogsAdmin);
 
   return httpServer;
 }

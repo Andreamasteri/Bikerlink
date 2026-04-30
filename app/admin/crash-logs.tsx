@@ -7,11 +7,14 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  TextInput,
+  ScrollView,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
+import { apiRequest } from "@/lib/query-client";
 
 type CrashType = "crash_system" | "crash_js";
 
@@ -25,11 +28,11 @@ interface CrashLogRow {
   osVersion: string | null;
   deviceModel: string | null;
   errorMessage: string | null;
+  stackTrace: string | null;
   sessionStartedAt: string | null;
   sessionEndedAt: string | null;
   reportedAt: string;
   nickname: string | null;
-  avatarUrl: string | null;
 }
 
 interface CrashLogsResponse {
@@ -39,28 +42,26 @@ interface CrashLogsResponse {
   limit: number;
 }
 
-const FILTERS: { label: string; value: "" | CrashType }[] = [
+const TYPE_FILTERS: { label: string; value: "" | CrashType }[] = [
   { label: "Tutti", value: "" },
   { label: "Sistema", value: "crash_system" },
   { label: "JS Error", value: "crash_js" },
 ];
 
+const LIMIT = 20;
+
 function CrashTypeBadge({ type }: { type: CrashType }) {
-  const colors = useColors();
   const isJs = type === "crash_js";
+  const bg = isJs ? "#FF444422" : "#FF6B3522";
+  const color = isJs ? "#FF4444" : "#FF6B35";
   return (
-    <View
-      style={[
-        badgeStyles.badge,
-        { backgroundColor: isJs ? "#FF4444" + "22" : "#FF6B35" + "22" },
-      ]}
-    >
+    <View style={[badgeStyles.badge, { backgroundColor: bg }]}>
       <MaterialCommunityIcons
         name={isJs ? "code-braces" : "phone-alert"}
         size={12}
-        color={isJs ? "#FF4444" : "#FF6B35"}
+        color={color}
       />
-      <Text style={[badgeStyles.text, { color: isJs ? "#FF4444" : "#FF6B35" }]}>
+      <Text style={[badgeStyles.text, { color }]}>
         {isJs ? "JS Error" : "Sistema"}
       </Text>
     </View>
@@ -77,22 +78,35 @@ const badgeStyles = StyleSheet.create({
     paddingVertical: 3,
     alignSelf: "flex-start",
   },
-  text: {
-    fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
-  },
+  text: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
 });
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
-  const date = d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" });
-  const time = d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
-  return `${date} ${time}`;
+  return (
+    d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }) +
+    " " +
+    d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })
+  );
+}
+
+function formatDuration(startIso: string | null, endIso: string | null): string | null {
+  if (!startIso) return null;
+  const start = new Date(startIso).getTime();
+  const end = endIso ? new Date(endIso).getTime() : null;
+  if (!end) return null;
+  const sec = Math.round((end - start) / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  const rem = sec % 60;
+  if (min < 60) return `${min}m ${rem}s`;
+  return `${Math.floor(min / 60)}h ${min % 60}m`;
 }
 
 function CrashLogCard({ item }: { item: CrashLogRow }) {
   const colors = useColors();
   const [expanded, setExpanded] = useState(false);
+  const duration = formatDuration(item.sessionStartedAt, item.sessionEndedAt ?? item.reportedAt);
 
   return (
     <TouchableOpacity
@@ -113,176 +127,231 @@ function CrashLogCard({ item }: { item: CrashLogRow }) {
       </View>
 
       <View style={cardStyles.meta}>
-        {item.platform && (
+        {item.platform ? (
           <View style={cardStyles.metaItem}>
             <Ionicons name="phone-portrait-outline" size={12} color={colors.textSecondary} />
             <Text style={[cardStyles.metaText, { color: colors.textSecondary }]}>
-              {item.platform}
-              {item.osVersion ? ` ${item.osVersion}` : ""}
+              {item.platform}{item.osVersion ? ` ${item.osVersion}` : ""}
             </Text>
           </View>
-        )}
-        {item.deviceModel && (
+        ) : null}
+        {item.deviceModel ? (
           <View style={cardStyles.metaItem}>
             <MaterialCommunityIcons name="cellphone" size={12} color={colors.textSecondary} />
             <Text style={[cardStyles.metaText, { color: colors.textSecondary }]}>{item.deviceModel}</Text>
           </View>
-        )}
-        {item.appVersion && (
+        ) : null}
+        {item.appVersion ? (
           <View style={cardStyles.metaItem}>
             <MaterialCommunityIcons name="tag-outline" size={12} color={colors.textSecondary} />
             <Text style={[cardStyles.metaText, { color: colors.textSecondary }]}>v{item.appVersion}</Text>
           </View>
-        )}
+        ) : null}
+        {duration ? (
+          <View style={cardStyles.metaItem}>
+            <Ionicons name="timer-outline" size={12} color={colors.textSecondary} />
+            <Text style={[cardStyles.metaText, { color: colors.textSecondary }]}>Sessione {duration}</Text>
+          </View>
+        ) : null}
       </View>
 
-      {item.errorMessage && (
+      {item.errorMessage ? (
         <Text
           style={[cardStyles.errorMessage, { color: "#FF4444", backgroundColor: "#FF444411" }]}
           numberOfLines={expanded ? undefined : 2}
         >
           {item.errorMessage}
         </Text>
-      )}
+      ) : null}
 
-      {expanded && item.sessionStartedAt && (
+      {expanded && item.stackTrace ? (
+        <Text
+          style={[cardStyles.stackTrace, { color: colors.textSecondary, backgroundColor: colors.background }]}
+          selectable
+        >
+          {item.stackTrace}
+        </Text>
+      ) : null}
+
+      {expanded && item.sessionStartedAt ? (
         <Text style={[cardStyles.sessionInfo, { color: colors.textSecondary }]}>
           Sessione iniziata: {formatDate(item.sessionStartedAt)}
         </Text>
-      )}
+      ) : null}
 
-      {expanded && item.sessionId && (
+      {expanded ? (
         <Text style={[cardStyles.sessionInfo, { color: colors.textSecondary }]}>
-          Session ID: {item.sessionId}
+          Session: {item.sessionId}
         </Text>
-      )}
+      ) : null}
     </TouchableOpacity>
   );
 }
 
 const cardStyles = StyleSheet.create({
-  card: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 14,
-    marginBottom: 10,
-    gap: 8,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  headerLeft: {
-    gap: 6,
-  },
-  nickname: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-  },
-  date: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-  },
-  meta: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  metaItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  metaText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-  },
-  errorMessage: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    borderRadius: 6,
-    padding: 8,
-    lineHeight: 18,
-  },
-  sessionInfo: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-  },
+  card: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 10, gap: 8 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  headerLeft: { gap: 6 },
+  nickname: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  date: { fontFamily: "Inter_400Regular", fontSize: 12 },
+  meta: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  metaItem: { flexDirection: "row", alignItems: "center", gap: 4 },
+  metaText: { fontFamily: "Inter_400Regular", fontSize: 12 },
+  errorMessage: { fontFamily: "Inter_400Regular", fontSize: 12, borderRadius: 6, padding: 8, lineHeight: 18 },
+  stackTrace: { fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }), fontSize: 11, borderRadius: 6, padding: 8, lineHeight: 16 },
+  sessionInfo: { fontFamily: "Inter_400Regular", fontSize: 11 },
 });
 
 export default function CrashLogsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+
   const [filterType, setFilterType] = useState<"" | CrashType>("");
+  const [filterUser, setFilterUser] = useState("");
+  const [filterVersion, setFilterVersion] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
   const [page, setPage] = useState(1);
-  const LIMIT = 20;
+  const [showFilters, setShowFilters] = useState(false);
 
   function buildQueryString() {
-    const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
-    if (filterType) params.set("crashType", filterType);
-    return params.toString();
+    const p = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
+    if (filterType) p.set("crashType", filterType);
+    if (filterUser.trim()) p.set("userId", filterUser.trim());
+    if (filterVersion.trim()) p.set("appVersion", filterVersion.trim());
+    if (filterDateFrom.trim()) p.set("dateFrom", filterDateFrom.trim());
+    if (filterDateTo.trim()) p.set("dateTo", filterDateTo.trim());
+    return p.toString();
   }
 
-  const { data: fetchedData, isLoading, isError } = useQuery<CrashLogsResponse>({
-    queryKey: ["/api/crash-logs/admin", filterType, page],
+  const { data, isLoading, isError, refetch } = useQuery<CrashLogsResponse>({
+    queryKey: ["/api/admin/crash-logs", filterType, filterUser, filterVersion, filterDateFrom, filterDateTo, page],
     queryFn: async () => {
-      const { getApiUrl } = await import("@/lib/query-client");
-      const res = await fetch(
-        new URL(`/api/crash-logs/admin?${buildQueryString()}`, getApiUrl()).toString(),
-        { credentials: "include" }
-      );
-      if (!res.ok) throw new Error("Errore fetch");
-      return res.json();
+      const res = await apiRequest("GET", `/api/admin/crash-logs?${buildQueryString()}`);
+      return res.json() as Promise<CrashLogsResponse>;
     },
     staleTime: 30_000,
   });
 
-  const logs = fetchedData?.logs ?? [];
-  const total = fetchedData?.total ?? 0;
+  const logs = data?.logs ?? [];
+  const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
+
+  const hasActiveFilters = !!(filterUser.trim() || filterVersion.trim() || filterDateFrom.trim() || filterDateTo.trim());
+
+  function resetFilters() {
+    setFilterUser("");
+    setFilterVersion("");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+    setFilterType("");
+    setPage(1);
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View
-        style={[
-          styles.filterBar,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-          Platform.OS === "web" && { marginTop: 0 },
-        ]}
-      >
-        {FILTERS.map((f) => (
+      <View style={[styles.typeBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {TYPE_FILTERS.map((f) => (
           <TouchableOpacity
             key={f.value}
             style={[
-              styles.filterBtn,
+              styles.typeBtn,
               filterType === f.value && { backgroundColor: colors.accent + "22" },
             ]}
-            onPress={() => {
-              setFilterType(f.value);
-              setPage(1);
-            }}
+            onPress={() => { setFilterType(f.value); setPage(1); }}
           >
-            <Text
-              style={[
-                styles.filterBtnText,
-                { color: filterType === f.value ? colors.accent : colors.textSecondary },
-              ]}
-            >
+            <Text style={[styles.typeBtnText, { color: filterType === f.value ? colors.accent : colors.textSecondary }]}>
               {f.label}
             </Text>
           </TouchableOpacity>
         ))}
+        <TouchableOpacity
+          style={[
+            styles.typeBtn,
+            showFilters && { backgroundColor: colors.accent + "22" },
+            { marginLeft: "auto" },
+          ]}
+          onPress={() => setShowFilters((v) => !v)}
+        >
+          <Ionicons
+            name={hasActiveFilters ? "filter" : "filter-outline"}
+            size={16}
+            color={hasActiveFilters ? colors.accent : colors.textSecondary}
+          />
+        </TouchableOpacity>
       </View>
 
-      {isLoading && !fetchedData ? (
+      {showFilters && (
+        <View style={[styles.filtersPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.filterRow}>
+            <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>User ID</Text>
+            <TextInput
+              style={[styles.filterInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+              value={filterUser}
+              onChangeText={(v) => { setFilterUser(v); setPage(1); }}
+              placeholder="es. abc123..."
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+          <View style={styles.filterRow}>
+            <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Versione</Text>
+            <TextInput
+              style={[styles.filterInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+              value={filterVersion}
+              onChangeText={(v) => { setFilterVersion(v); setPage(1); }}
+              placeholder="es. 1.2.3"
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+          <View style={styles.filterRow}>
+            <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Da</Text>
+            <TextInput
+              style={[styles.filterInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+              value={filterDateFrom}
+              onChangeText={(v) => { setFilterDateFrom(v); setPage(1); }}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+          <View style={styles.filterRow}>
+            <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>A</Text>
+            <TextInput
+              style={[styles.filterInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+              value={filterDateTo}
+              onChangeText={(v) => { setFilterDateTo(v); setPage(1); }}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+          {hasActiveFilters && (
+            <TouchableOpacity onPress={resetFilters} style={styles.resetBtn}>
+              <Text style={{ color: colors.accent, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
+                Azzera filtri
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {isLoading && !data ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.accent} />
         </View>
-      ) : isError && !fetchedData ? (
+      ) : isError && !data ? (
         <View style={styles.center}>
           <MaterialCommunityIcons name="alert-circle-outline" size={40} color={colors.textSecondary} />
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Errore caricamento dati</Text>
+          <TouchableOpacity onPress={() => refetch()} style={[styles.retryBtn, { backgroundColor: colors.accent }]}>
+            <Text style={styles.retryBtnText}>Riprova</Text>
+          </TouchableOpacity>
         </View>
       ) : logs.length === 0 ? (
         <View style={styles.center}>
@@ -294,13 +363,12 @@ export default function CrashLogsScreen() {
           data={logs}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <CrashLogCard item={item} />}
-          contentContainerStyle={[
-            styles.list,
-            { paddingBottom: insets.bottom + 20, paddingTop: Platform.OS === "web" ? 8 : 8 },
-          ]}
+          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 20 }]}
           ListHeaderComponent={
             <Text style={[styles.totalText, { color: colors.textSecondary }]}>
-              {total} crash {filterType ? `(${filterType === "crash_js" ? "JS Error" : "Sistema"})` : "totali"}
+              {total} crash
+              {filterType ? ` · ${filterType === "crash_js" ? "JS Error" : "Sistema"}` : ""}
+              {filterVersion.trim() ? ` · v${filterVersion.trim()}` : ""}
             </Text>
           }
           ListFooterComponent={
@@ -333,62 +401,53 @@ export default function CrashLogsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  filterBar: {
+  container: { flex: 1 },
+  typeBar: {
     flexDirection: "row",
-    gap: 6,
-    padding: 12,
+    gap: 4,
+    padding: 10,
     borderBottomWidth: 1,
-  },
-  filterBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-  },
-  filterBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-  },
-  center: {
-    flex: 1,
     alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-    padding: 32,
+    ...(Platform.OS === "web" ? { paddingTop: 10 } : {}),
   },
-  emptyText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 15,
-    textAlign: "center",
+  typeBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
+  typeBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  filtersPanel: {
+    borderBottomWidth: 1,
+    padding: 12,
+    gap: 10,
   },
-  list: {
-    paddingHorizontal: 16,
-  },
-  totalText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    marginBottom: 12,
-    marginTop: 4,
-  },
-  pagination: {
+  filterRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 16,
-    paddingTop: 16,
+    gap: 10,
   },
-  pageBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pageText: {
+  filterLabel: {
     fontFamily: "Inter_500Medium",
-    fontSize: 14,
+    fontSize: 13,
+    width: 60,
   },
+  filterInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+  },
+  resetBtn: {
+    alignSelf: "flex-end",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 32 },
+  emptyText: { fontFamily: "Inter_400Regular", fontSize: 15, textAlign: "center" },
+  retryBtn: { borderRadius: 8, paddingHorizontal: 20, paddingVertical: 10 },
+  retryBtnText: { color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  list: { paddingHorizontal: 16, paddingTop: 8 },
+  totalText: { fontFamily: "Inter_400Regular", fontSize: 13, marginBottom: 12, marginTop: 4 },
+  pagination: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 16, paddingTop: 16 },
+  pageBtn: { width: 36, height: 36, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  pageText: { fontFamily: "Inter_500Medium", fontSize: 14 },
 });

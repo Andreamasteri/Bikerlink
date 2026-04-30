@@ -156,13 +156,31 @@ export async function initCrashLogger(userId: string): Promise<void> {
   }
   _appStateSubscription = AppState.addEventListener("change", async (state) => {
     if (state === "background" || state === "inactive") {
-      await markClean();
+      if (_currentSession && !_currentSession.clean) {
+        _currentSession.clean = true;
+        const endedAt = new Date().toISOString();
+        await saveCurrentSession();
+        const cleanEntry: CrashLogEntry = {
+          sessionId: _currentSession.sessionId,
+          crashType: "clean_close",
+          appVersion: getAppVersion(),
+          platform: Platform.OS,
+          osVersion: getOsVersion(),
+          deviceModel: getDeviceModel(),
+          errorMessage: null,
+          stackTrace: null,
+          sessionStartedAt: _currentSession.startedAt,
+          sessionEndedAt: endedAt,
+        };
+        await enqueue(cleanEntry);
+      }
     }
     if (state === "active") {
       if (_currentSession) {
         _currentSession.clean = false;
         await saveCurrentSession();
       }
+      await flushQueue();
     }
   });
 
