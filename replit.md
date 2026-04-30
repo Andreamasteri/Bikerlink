@@ -189,7 +189,7 @@ Configurazione applicata in:
 
 **Note ciclo 8.x — APK v44:**
 - L'APK contiene baked il bundle JS aggiornato (post Task #1150) — il client al primo avvio chiamerà `/api/expo-updates` col Protocol v1 corretto e uscirà dallo stato piantato
-- runtimeVersion 8.0.0 invariato — APK v44 resta compatibile con OTA-22/23 già pubblicate
+- runtimeVersion 8.0.0 invariato — APK v44 resta compatibile con OTA-22 già pubblicata (e con qualsiasi OTA futura sullo stesso runtime 8.0.0)
 - Bump versionCode 43→44 obbligato dal vincolo monotonico crescente di Google Play (anche se l'APK 43 reale non è mai stato distribuito su store)
 - L'APK arm64 dimagrita (~50MB) è installabile direttamente dall'utente per side-load sui device piantati su OTA-19
 
