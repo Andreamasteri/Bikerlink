@@ -721,7 +721,7 @@ router.post("/heartbeat", async (req: Request, res: Response) => {
       lastAppVersion,
       lastPlatform,
       ...(lastOtaNumber !== undefined ? { lastOtaNumber } : {}),
-    } as any);
+    });
     onlineTracker.touch(userId);
     return res.json({ ok: true });
   } catch {
