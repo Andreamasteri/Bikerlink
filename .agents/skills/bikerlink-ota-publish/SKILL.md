@@ -3,8 +3,6 @@ name: bikerlink-ota-publish
 description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink (Expo/Android). Usa questa skill ogni volta che l'utente chiede di pubblicare una OTA, rilasciare un aggiornamento, distribuire modifiche agli utenti Android, o aggiornare il numero OTA.
 ---
 
-# BikerLink — Pubblicazione OTA
-
 ## ⛔ REGOLA UTENTE — NON eseguire durante un task
 
 **Questa skill NON deve essere eseguita come parte di un task di sviluppo.**
@@ -16,6 +14,8 @@ Motivazione: esportare il bundle a fine task rischia di includere commit parzial
 **Azione corretta**: al termine del task, proponi la pubblicazione OTA come follow-up separato. Aspetta conferma esplicita prima di procedere.
 
 ---
+
+# BikerLink — Pubblicazione OTA
 
 ## ⚡ REGOLA FONDAMENTALE — Un comando solo
 **Quando l'utente dice "crea l'OTA", "prepara l'OTA", "fai l'OTA" o qualsiasi variante:**
