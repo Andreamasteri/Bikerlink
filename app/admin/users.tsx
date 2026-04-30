@@ -92,7 +92,7 @@ export default function AdminUsers() {
   const [editEmail, setEditEmail] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [searchText, setSearchText] = useState("");
-  const [hideFake, setHideFake] = useState(false);
+  const [hideFake, setHideFake] = useState(true);
 
   const { data: users = [], isLoading } = useQuery<AdminUser[]>({
     queryKey: ["/api/admin/users"],
