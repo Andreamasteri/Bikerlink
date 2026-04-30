@@ -1732,8 +1732,6 @@ router.put("/settings/theme_default", async (req: Request, res: Response) => {
   }
 });
 
-// Task #1132: default stile taskbar — valore che viene usato come default per gli
-// utenti che non hanno mai scelto manualmente la propria preferenza.
 router.put("/settings/default_taskbar_style", async (req: Request, res: Response) => {
   try {
     const { value } = req.body as { value: string };

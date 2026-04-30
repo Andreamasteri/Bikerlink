@@ -783,7 +783,6 @@ export default function AdminSettings() {
     onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
-  // Task #1132: default taskbar style
   const { data: allSettingsData } = useQuery<{ defaultTaskbarStyle?: string }>({
     queryKey: ["/api/settings/all"],
     staleTime: 120000,
@@ -794,9 +793,10 @@ export default function AdminSettings() {
     { value: "altro" as const, label: "Altro..." },
     { value: "raggruppa" as const, label: "Raggruppa" },
   ] as const;
-  const validTaskbarValues = TASKBAR_OPTIONS.map((o) => o.value);
-  const currentTaskbarDefault = validTaskbarValues.includes(allSettingsData?.defaultTaskbarStyle as any)
-    ? (allSettingsData!.defaultTaskbarStyle as typeof validTaskbarValues[number])
+  type TaskbarDefaultValue = typeof TASKBAR_OPTIONS[number]["value"];
+  const validTaskbarValues: readonly string[] = TASKBAR_OPTIONS.map((o) => o.value);
+  const currentTaskbarDefault: TaskbarDefaultValue = validTaskbarValues.includes(allSettingsData?.defaultTaskbarStyle ?? "")
+    ? (allSettingsData!.defaultTaskbarStyle as TaskbarDefaultValue)
     : "tutti";
 
   const taskbarDefaultMutation = useMutation({
@@ -1796,7 +1796,6 @@ export default function AdminSettings() {
         })}
       </View>
 
-      {/* Task #1132: Pulsanti Taskbar (default admin) */}
       <View style={[styles.sectionHeaderRow, { marginTop: 8 }]}>
         <Ionicons name="grid" size={20} color={Colors.accent} />
         <Text style={styles.sectionTitle}>Pulsanti Taskbar (default)</Text>

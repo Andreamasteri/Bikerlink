@@ -1288,16 +1288,30 @@ export default function ProfileScreen() {
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { textAlign: "center" }]}>Pulsanti Taskbar</Text>
-        {!userHasCustomized && (
-          <Text style={taskbarStyles.adminDefaultLabel}>
-            default impostato dall&apos;admin: {adminDefault}
-          </Text>
-        )}
-        {userHasCustomized && adminDefault !== taskbarStyle && (
-          <Text style={taskbarStyles.adminDefaultLabel}>
-            default admin: {adminDefault}
-          </Text>
-        )}
+        {(() => {
+          const TASKBAR_LABELS: Record<string, string> = {
+            tutti: "Tutti",
+            scorri: "Scorri",
+            altro: "Altro...",
+            raggruppa: "Raggruppa",
+          };
+          const adminLabel = TASKBAR_LABELS[adminDefault] ?? adminDefault;
+          if (!userHasCustomized) {
+            return (
+              <Text style={taskbarStyles.adminDefaultLabel}>
+                default admin: {adminLabel}
+              </Text>
+            );
+          }
+          if (adminDefault !== taskbarStyle) {
+            return (
+              <Text style={taskbarStyles.adminDefaultLabel}>
+                default admin: {adminLabel}
+              </Text>
+            );
+          }
+          return null;
+        })()}
         <View style={taskbarStyles.row}>
           {([
             { value: "tutti" as TaskbarStyle, label: "Tutti" },

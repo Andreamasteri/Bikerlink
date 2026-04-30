@@ -27,8 +27,6 @@ export function TaskbarStyleProvider({ children }: { children: React.ReactNode }
   const [userHasCustomized, setUserHasCustomized] = useState(false);
   const [asyncStorageLoaded, setAsyncStorageLoaded] = useState(false);
 
-  // Task #1132: legge il default admin da /api/settings/all (stesso queryKey
-  // usato da lib/settings-context.ts — condivide la cache React Query).
   const { data: settingsData } = useQuery<{ defaultTaskbarStyle?: TaskbarStyle }>({
     queryKey: ["/api/settings/all"],
     staleTime: 120000,
