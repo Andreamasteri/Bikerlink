@@ -123,8 +123,6 @@ export async function markJsError(error: Error, stack?: string): Promise<void> {
     sessionEndedAt: new Date().toISOString(),
   };
   await enqueueCrashEntry(entry);
-  _currentSession.clean = true;
-  await saveCurrentSession();
 }
 
 export async function flushQueue(): Promise<void> {
@@ -194,7 +192,7 @@ export async function initCrashLogger(userId: string): Promise<void> {
   }
   _appStateSubscription = AppState.addEventListener("change", async (state) => {
     if (state === "background" || state === "inactive") {
-      if (_currentSession && !_currentSession.clean) {
+      if (_currentSession && !_currentSession.clean && !_currentSession.jsError) {
         _currentSession.clean = true;
         await saveCurrentSession();
       }
