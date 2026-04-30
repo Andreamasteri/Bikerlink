@@ -18,6 +18,7 @@ import * as Location from "expo-location";
 import * as Updates from "expo-updates";
 import Constants from "expo-constants";
 import { triggerOtaCheck } from "@/lib/ota-check";
+import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 
 let Notifications: typeof import("expo-notifications") | null = null;
 try {
@@ -79,7 +80,7 @@ async function sendHeartbeat() {
   try {
     const appVersion = Constants.expoConfig?.version ?? "0.0.0";
     const platform = Platform.OS;
-    await apiRequest("POST", "/api/auth/heartbeat", { appVersion, platform });
+    await apiRequest("POST", "/api/auth/heartbeat", { appVersion, platform, otaNumber: CURRENT_OTA_NUMBER });
   } catch {}
 }
 

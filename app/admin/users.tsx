@@ -3,8 +3,10 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, TextI
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Constants from "expo-constants";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
+import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 
 interface AdminUser {
   id: string;
@@ -16,6 +18,8 @@ interface AdminUser {
   status: string;
   createdAt: string;
   lastLoginAt?: string | null;
+  lastAppVersion?: string | null;
+  lastOtaNumber?: number | null;
   isFake?: boolean;
   isPrimal?: boolean;
   hasLastfmData?: boolean;
@@ -343,6 +347,22 @@ export default function AdminUsers() {
               ? `Ultimo accesso: ${new Date(item.lastLoginAt).toLocaleString("it-IT", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}`
               : "Mai connesso"}
           </Text>
+          {(() => {
+            const hasVer = !!item.lastAppVersion && item.lastAppVersion !== "unknown";
+            const hasOta = item.lastOtaNumber != null;
+            if (!hasVer && !hasOta) {
+              return <Text style={styles.versionMissing}>v— / OTA —</Text>;
+            }
+            const verOk = item.lastAppVersion === CURRENT_APP_VERSION;
+            const otaOk = item.lastOtaNumber === CURRENT_OTA_NUMBER;
+            const allOk = verOk && otaOk;
+            const color = allOk ? Colors.success : Colors.error;
+            return (
+              <Text style={[styles.versionBadge, { color, textDecorationLine: allOk ? "none" : "underline" as const }]}>
+                {hasVer ? `v${item.lastAppVersion}` : "v—"} / {hasOta ? `OTA-${item.lastOtaNumber}` : "OTA —"}
+              </Text>
+            );
+          })()}
         </View>
         <View style={styles.actions}>
           <TouchableOpacity onPress={() => openEditModal(item)} style={styles.actionBtn}>
@@ -535,6 +555,8 @@ export default function AdminUsers() {
       </ScrollView>
     );
   }
+
+  const CURRENT_APP_VERSION = Constants.expoConfig?.version ?? "0.0.0";
 
   const n = (slot: { real: number; fake: number }) =>
     hideFake ? slot.real : slot.real + slot.fake;
@@ -985,6 +1007,8 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   badgeText: { fontFamily: "Inter_500Medium", fontSize: 11 },
   lastLogin: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 6 },
+  versionBadge: { fontFamily: "Inter_500Medium", fontSize: 11, marginTop: 3 },
+  versionMissing: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 3 },
   actions: { flexDirection: "column", gap: 10 },
   actionBtn: { padding: 4 },
   loadingText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", marginTop: 40 },

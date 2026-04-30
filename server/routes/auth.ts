@@ -701,7 +701,7 @@ router.post("/heartbeat", async (req: Request, res: Response) => {
   try {
     const userId = req.session?.userId;
     if (!userId) return res.status(401).json({ ok: false });
-    const body = (req.body ?? {}) as { appVersion?: unknown; platform?: unknown };
+    const body = (req.body ?? {}) as { appVersion?: unknown; platform?: unknown; otaNumber?: unknown };
     const semverRe = /^\d+\.\d+\.\d+$/;
     const platformAllowed = new Set(["android", "ios", "web"]);
     const lastAppVersion =
@@ -712,10 +712,15 @@ router.post("/heartbeat", async (req: Request, res: Response) => {
       typeof body.platform === "string" && platformAllowed.has(body.platform)
         ? body.platform
         : "unknown";
+    const lastOtaNumber =
+      typeof body.otaNumber === "number" && Number.isInteger(body.otaNumber) && body.otaNumber > 0
+        ? body.otaNumber
+        : undefined;
     await storage.updateUser(userId, {
       lastLoginAt: new Date(),
       lastAppVersion,
       lastPlatform,
+      ...(lastOtaNumber !== undefined ? { lastOtaNumber } : {}),
     } as any);
     onlineTracker.touch(userId);
     return res.json({ ok: true });
