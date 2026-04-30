@@ -1,65 +1,212 @@
-import nodemailer, { type Attachment, type SendMailOptions } from "nodemailer";
+import nodemailer, { type SendMailOptions } from "nodemailer";
+
+// Tipo Attachment locale: nodemailer non lo esporta più dai tipi pubblici, ma
+// la struttura accettata da sendMail è questa (sottoinsieme dei campi usati qui).
+type Attachment = {
+  filename: string;
+  content: Buffer | string;
+  cid?: string;
+  contentType?: string;
+};
 import fs from "fs";
 import path from "path";
 import sharp from "sharp";
 import { storage } from "./storage";
 
-async function getEmailCredentials(): Promise<{ user: string; pass: string } | null> {
+// Task #56: diagnostica strutturata invio email.
+// Classificazione errori per dare all'admin informazioni azionabili:
+//   - 'no-credentials' : nessuna credenziale Gmail né in DB né in env
+//   - 'auth'           : EAUTH/535 — App Password revocata o errata
+//   - 'network'        : ETIMEDOUT/ECONNECTION/ENOTFOUND — rete/firewall
+//   - 'other'          : tutto il resto (invalid recipient, quota, ecc.)
+export type EmailErrorCode = "no-credentials" | "auth" | "network" | "other";
+
+export interface EmailSendResult {
+  ok: boolean;
+  messageId?: string;
+  errorCode?: EmailErrorCode;
+  error?: string;
+  smtpResponse?: string;
+  recipient?: string;
+  source?: "db" | "env" | "none";
+}
+
+export interface EmailDiagnostics {
+  credentials: {
+    present: boolean;
+    source: "db" | "env" | "none";
+    maskedUser: string | null;
+  };
+  lastSend: {
+    status: "ok" | "error" | null;
+    errorCode: EmailErrorCode | null;
+    error: string | null;
+    recipient: string | null;
+    at: string | null;
+  };
+}
+
+interface EmailCredentials {
+  user: string;
+  pass: string;
+  source: "db" | "env";
+}
+
+async function getEmailCredentials(): Promise<EmailCredentials | null> {
   try {
     const userSetting = await storage.getAppSetting("gmail_user");
     const passSetting = await storage.getAppSetting("gmail_app_password");
     if (userSetting?.value && passSetting?.value) {
-      return { user: userSetting.value, pass: passSetting.value };
+      return { user: userSetting.value, pass: passSetting.value, source: "db" };
     }
-  } catch (e) {
+  } catch {
     // fallback to env vars
   }
 
   const user = process.env.GMAIL_USER;
   const pass = process.env.GMAIL_APP_PASSWORD;
   if (user && pass) {
-    return { user, pass };
+    return { user, pass, source: "env" };
   }
 
   return null;
 }
 
-async function createTransporter() {
+function maskEmail(email: string | null | undefined): string | null {
+  if (!email) return null;
+  const [local, domain] = email.split("@");
+  if (!local || !domain) return email.substring(0, 3) + "***";
+  return local.substring(0, Math.min(3, local.length)) + "***@" + domain;
+}
+
+function classifyEmailError(err: unknown): { code: EmailErrorCode; message: string; smtpResponse?: string } {
+  const e = err as { code?: string; responseCode?: number; response?: string; message?: string } | null;
+  const message = e?.message ?? String(err);
+  const smtpResponse = typeof e?.response === "string" ? e.response : undefined;
+
+  // nodemailer / Gmail SMTP auth failures
+  if (e?.code === "EAUTH" || e?.responseCode === 535 || /5\.7\.8/.test(smtpResponse ?? "") || /Username and Password not accepted/i.test(message)) {
+    return { code: "auth", message, smtpResponse };
+  }
+
+  // network-level failures
+  const networkCodes = new Set(["ETIMEDOUT", "ESOCKET", "ECONNECTION", "ECONNREFUSED", "ENOTFOUND", "EDNS", "EAI_AGAIN"]);
+  if (e?.code && networkCodes.has(e.code)) {
+    return { code: "network", message, smtpResponse };
+  }
+
+  return { code: "other", message, smtpResponse };
+}
+
+async function recordEmailSendStatus(result: EmailSendResult): Promise<void> {
+  try {
+    await storage.upsertAppSetting("email_last_send_status", result.ok ? "ok" : "error");
+    await storage.upsertAppSetting("email_last_send_error", result.ok ? "" : (result.error ?? "unknown"));
+    await storage.upsertAppSetting("email_last_send_error_code", result.ok ? "" : (result.errorCode ?? "other"));
+    await storage.upsertAppSetting("email_last_send_recipient", result.recipient ?? "");
+    await storage.upsertAppSetting("email_last_send_at", new Date().toISOString());
+  } catch (e) {
+    // Non bloccare l'invio email se la persistenza fallisce
+    console.warn("[EMAIL] Impossibile persistere stato ultimo invio:", e);
+  }
+}
+
+export async function getEmailDiagnostics(): Promise<EmailDiagnostics> {
+  const creds = await getEmailCredentials();
+  const status = await storage.getAppSetting("email_last_send_status").catch(() => undefined);
+  const error = await storage.getAppSetting("email_last_send_error").catch(() => undefined);
+  const errorCode = await storage.getAppSetting("email_last_send_error_code").catch(() => undefined);
+  const recipient = await storage.getAppSetting("email_last_send_recipient").catch(() => undefined);
+  const at = await storage.getAppSetting("email_last_send_at").catch(() => undefined);
+
+  return {
+    credentials: {
+      present: !!creds,
+      source: creds?.source ?? "none",
+      maskedUser: maskEmail(creds?.user ?? null),
+    },
+    lastSend: {
+      status: (status?.value as "ok" | "error" | undefined) ?? null,
+      errorCode: ((errorCode?.value || null) as EmailErrorCode | null) || null,
+      error: error?.value || null,
+      recipient: recipient?.value || null,
+      at: at?.value || null,
+    },
+  };
+}
+
+async function createTransporter(): Promise<{ transporter: nodemailer.Transporter; creds: EmailCredentials } | null> {
   const creds = await getEmailCredentials();
   if (!creds) {
     console.warn("[EMAIL] Credenziali Gmail non configurate. Email non inviata.");
     return null;
   }
 
-  return nodemailer.createTransport({
+  const transporter = nodemailer.createTransport({
     service: "gmail",
-    auth: {
-      user: creds.user,
-      pass: creds.pass,
-    },
+    auth: { user: creds.user, pass: creds.pass },
   });
+
+  return { transporter, creds };
 }
 
-export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
-  const transporter = await createTransporter();
-  if (!transporter) return false;
-
-  const creds = await getEmailCredentials();
-  if (!creds) return false;
+/**
+ * Invia un'email e ritorna risultato strutturato + persiste l'esito in app_settings
+ * (chiavi email_last_send_status/error/error_code/recipient/at).
+ */
+export async function sendEmailDetailed(to: string, subject: string, html: string): Promise<EmailSendResult> {
+  const t = await createTransporter();
+  if (!t) {
+    const result: EmailSendResult = {
+      ok: false,
+      errorCode: "no-credentials",
+      error: "Credenziali Gmail non configurate (né in DB app_settings né in env GMAIL_USER/GMAIL_APP_PASSWORD).",
+      recipient: to,
+      source: "none",
+    };
+    await recordEmailSendStatus(result);
+    return result;
+  }
 
   try {
-    await transporter.sendMail({
-      from: `"BikerLink" <${creds.user}>`,
+    const info = await t.transporter.sendMail({
+      from: `"BikerLink" <${t.creds.user}>`,
       to,
       subject,
       html,
     });
-    console.log(`[EMAIL] Email inviata a ${to}: ${subject}`);
-    return true;
+    console.log(`[EMAIL] Email inviata a ${to}: ${subject} (msgId=${info.messageId})`);
+    const result: EmailSendResult = {
+      ok: true,
+      messageId: info.messageId,
+      recipient: to,
+      source: t.creds.source,
+    };
+    await recordEmailSendStatus(result);
+    return result;
   } catch (error) {
-    console.error(`[EMAIL] Errore invio email a ${to}:`, error);
-    return false;
+    const cls = classifyEmailError(error);
+    console.error(`[EMAIL] Errore invio a ${to} (${cls.code}): ${cls.message}${cls.smtpResponse ? " | smtp: " + cls.smtpResponse : ""}`);
+    const result: EmailSendResult = {
+      ok: false,
+      errorCode: cls.code,
+      error: cls.message,
+      smtpResponse: cls.smtpResponse,
+      recipient: to,
+      source: t.creds.source,
+    };
+    await recordEmailSendStatus(result);
+    return result;
   }
+}
+
+/**
+ * Wrapper compat: ritorna boolean per i call site esistenti che non hanno bisogno
+ * della diagnostica dettagliata. Lo stato dell'ultimo invio viene comunque persistito.
+ */
+export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
+  const r = await sendEmailDetailed(to, subject, html);
+  return r.ok;
 }
 
 export async function sendVerificationEmail(to: string, nickname: string, token: string): Promise<boolean> {
@@ -103,11 +250,9 @@ export async function sendInvitationGiftEmail(
   giftMessage: string | null,
   expiryDate: Date
 ): Promise<boolean> {
-  const transporter = await createTransporter();
-  if (!transporter) return false;
-
-  const creds = await getEmailCredentials();
-  if (!creds) return false;
+  const t = await createTransporter();
+  if (!t) return false;
+  const { transporter, creds } = t;
 
   const expiryStr = expiryDate.toLocaleDateString("it-IT", {
     day: "2-digit",

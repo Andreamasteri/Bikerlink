@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import rateLimit from "express-rate-limit";
+import rateLimit, { MemoryStore } from "express-rate-limit";
 import signature from "cookie-signature";
 import { registerSchema, loginSchema } from "@shared/schema";
 import { storage } from "../storage";
@@ -71,28 +71,41 @@ const resendResetLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Task #56 — store espliciti così l'admin può introspect/reset (vedi /api/admin/email-rate-limit-*).
+// Limit: verify-email = 10/15min/IP, resend-verification = 5/h/IP.
+// Durante test interni queste soglie si raggiungono in fretta: usare il pulsante
+// "Reset rate limit" del pannello admin invece di aspettare il window.
+export const verifyEmailStore = new MemoryStore();
+export const resendVerificationStore = new MemoryStore();
+export const VERIFY_EMAIL_WINDOW_MS = 15 * 60 * 1000;
+export const VERIFY_EMAIL_MAX = 10;
+export const RESEND_VERIFICATION_WINDOW_MS = 60 * 60 * 1000;
+export const RESEND_VERIFICATION_MAX = 5;
+
 const verifyEmailLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
+  windowMs: VERIFY_EMAIL_WINDOW_MS,
+  max: VERIFY_EMAIL_MAX,
   message: { message: "Troppi tentativi. Riprova più tardi." },
   standardHeaders: true,
   legacyHeaders: false,
+  store: verifyEmailStore,
 });
 
 const resendVerificationLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 5,
+  windowMs: RESEND_VERIFICATION_WINDOW_MS,
+  max: RESEND_VERIFICATION_MAX,
   message: { message: "Troppi tentativi. Riprova più tardi." },
   standardHeaders: true,
   legacyHeaders: false,
+  store: resendVerificationStore,
 });
 
 // Per-userId failure counter: difesa contro brute force distribuito su più IP
 // (il rate limit per IP da solo non basterebbe). Dopo VERIFY_MAX_ATTEMPTS
 // tentativi falliti i token attivi vengono cancellati.
-const VERIFY_MAX_ATTEMPTS = 5;
-const VERIFY_ATTEMPT_WINDOW_MS = 30 * 60 * 1000;
-const verifyAttempts = new Map<string, { count: number; firstAt: number }>();
+export const VERIFY_MAX_ATTEMPTS = 5;
+export const VERIFY_ATTEMPT_WINDOW_MS = 30 * 60 * 1000;
+export const verifyAttempts = new Map<string, { count: number; firstAt: number }>();
 
 function recordVerifyFailure(userId: string): number {
   const now = Date.now();
@@ -105,7 +118,7 @@ function recordVerifyFailure(userId: string): number {
   return entry.count;
 }
 
-function clearVerifyAttempts(userId: string): void {
+export function clearVerifyAttempts(userId: string): void {
   verifyAttempts.delete(userId);
 }
 
@@ -251,13 +264,27 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
         console.warn(`[EMAIL VERIFICATION] Email NON inviata a utente ${user.id} - fallback notifica admin`);
       }
 
+      // Task #56: notifica admin con motivo reale (non più "SMTP non configurato" generico).
+      let emailStatusMsg = " (email inviata)";
+      if (!emailSent) {
+        const errCode = (await storage.getAppSetting("email_last_send_error_code").catch(() => undefined))?.value || "other";
+        const errMsg = (await storage.getAppSetting("email_last_send_error").catch(() => undefined))?.value || "errore sconosciuto";
+        const codeLabel: Record<string, string> = {
+          "no-credentials": "credenziali Gmail non configurate",
+          "auth": "autenticazione Gmail rifiutata (App Password revocata o errata)",
+          "network": "errore di rete verso Gmail",
+          "other": "errore SMTP",
+        };
+        emailStatusMsg = ` (email NON inviata — ${codeLabel[errCode] ?? errCode}: ${errMsg.substring(0, 200)})`;
+      }
+
       try {
         const adminUser = await storage.getUserByNickname("admin");
         if (adminUser) {
           await storage.createNotification({
             userId: adminUser.id,
             title: "Nuova registrazione - Verifica Email",
-            body: `L'utente ${user.nickname} (${user.email}) si è registrato. Codice verifica: ${token}${emailSent ? " (email inviata)" : " (email NON inviata - SMTP non configurato)"}`,
+            body: `L'utente ${user.nickname} (${user.email}) si è registrato. Codice verifica: ${token}${emailStatusMsg}`,
             notificationType: "system",
             referenceType: "user",
             referenceId: user.id,

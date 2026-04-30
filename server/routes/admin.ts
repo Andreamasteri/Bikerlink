@@ -12,7 +12,19 @@ import { getTrustedClientIp } from "../lib/abuse-rate-limit";
 import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents } from "@shared/schema";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { eq, and, ne, desc, sql, count, notExists, inArray, lte, isNull, or, ilike } from "drizzle-orm";
-import { sendEmail } from "../email";
+import { sendEmail, sendEmailDetailed, getEmailDiagnostics } from "../email";
+import {
+  verifyEmailStore,
+  resendVerificationStore,
+  verifyAttempts,
+  clearVerifyAttempts,
+  VERIFY_EMAIL_WINDOW_MS,
+  VERIFY_EMAIL_MAX,
+  RESEND_VERIFICATION_WINDOW_MS,
+  RESEND_VERIFICATION_MAX,
+  VERIFY_MAX_ATTEMPTS,
+  VERIFY_ATTEMPT_WINDOW_MS,
+} from "./auth";
 import { MOTORCYCLES, pickRandomN, getMotoYear } from "../mass-seed-data";
 import { getLastMatchingCycleMeta, runBikerBikerMatching, runWishlistMatching, runMatchingForUser } from "../matching-engine";
 import { isProtectedUser, PROTECTED_EMAILS } from "../constants";
@@ -1283,6 +1295,161 @@ router.put("/settings/email-config", async (req: Request, res: Response) => {
     return res.json({ message: "Configurazione email aggiornata" });
   } catch (error) {
     console.error("Update email config error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+// =============================================================================
+// Task #56 — Diagnostica e osservabilità sistema email
+// =============================================================================
+
+// Stato completo invio email: credenziali, sorgente (db/env), esito ultimo invio
+// reale (incluso messaggio di errore SMTP esatto se fallito).
+router.get("/email-status", async (_req: Request, res: Response) => {
+  try {
+    const diag = await getEmailDiagnostics();
+    return res.json(diag);
+  } catch (error) {
+    console.error("Get email status error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+// Invia un'email di test e ritorna il risultato strutturato (incluso errore SMTP
+// completo se fallisce). Default destinatario: bikerlinkapp@gmail.com.
+router.post("/email-test", async (req: Request, res: Response) => {
+  try {
+    const rawTo = typeof req.body?.to === "string" ? req.body.to.trim() : "";
+    const to = rawTo || "bikerlinkapp@gmail.com";
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRe.test(to)) {
+      return res.status(400).json({ ok: false, error: "Indirizzo email destinatario non valido" });
+    }
+    const subject = `BikerLink — Email di test (${new Date().toLocaleString("it-IT", { timeZone: "Europe/Rome" })})`;
+    const html = `
+      <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;padding:20px;">
+        <h2 style="color:#FF6B35;">🏍️ BikerLink — Test invio email</h2>
+        <p>Questo è un invio di test generato dal pannello admin per verificare che il transporter Gmail funzioni correttamente.</p>
+        <p style="color:#666;font-size:12px;">Timestamp server: ${new Date().toISOString()}</p>
+      </div>`;
+    const result = await sendEmailDetailed(to, subject, html);
+    return res.json(result);
+  } catch (error) {
+    console.error("Email test error:", error);
+    return res.status(500).json({ ok: false, error: "Errore interno del server" });
+  }
+});
+
+// Stato dei rate limiter coinvolti nella verifica email.
+// Limit attuali: verify-email = 10/15min/IP, resend-verification = 5/h/IP,
+// per-userId verifyAttempts = 5 fallimenti / 30min (oltre cancella i token).
+router.get("/email-rate-limit-status", async (_req: Request, res: Response) => {
+  try {
+    const verifyEmailEntries: Array<{ ip: string; count: number; resetAt: string | null }> = [];
+    const resendEntries: Array<{ ip: string; count: number; resetAt: string | null }> = [];
+
+    // express-rate-limit MemoryStore espone `hits: Record<string, number>` e
+    // `resetTime: Date`; in v7 le chiavi sono accessibili direttamente.
+    const veStore = verifyEmailStore as unknown as { hits?: Record<string, number>; resetTime?: Date };
+    const reStore = resendVerificationStore as unknown as { hits?: Record<string, number>; resetTime?: Date };
+
+    for (const [ip, count] of Object.entries(veStore.hits ?? {})) {
+      verifyEmailEntries.push({ ip, count, resetAt: veStore.resetTime?.toISOString() ?? null });
+    }
+    for (const [ip, count] of Object.entries(reStore.hits ?? {})) {
+      resendEntries.push({ ip, count, resetAt: reStore.resetTime?.toISOString() ?? null });
+    }
+
+    const now = Date.now();
+    const userLockouts: Array<{ userId: string; nickname?: string; count: number; firstAt: string; remainingMs: number; lockedOut: boolean }> = [];
+    for (const [userId, entry] of verifyAttempts.entries()) {
+      const elapsed = now - entry.firstAt;
+      if (elapsed > VERIFY_ATTEMPT_WINDOW_MS) continue;
+      const u = await storage.getUser(userId).catch(() => null);
+      userLockouts.push({
+        userId,
+        nickname: u?.nickname,
+        count: entry.count,
+        firstAt: new Date(entry.firstAt).toISOString(),
+        remainingMs: Math.max(0, VERIFY_ATTEMPT_WINDOW_MS - elapsed),
+        lockedOut: entry.count >= VERIFY_MAX_ATTEMPTS,
+      });
+    }
+
+    return res.json({
+      verifyEmail: {
+        max: VERIFY_EMAIL_MAX,
+        windowMs: VERIFY_EMAIL_WINDOW_MS,
+        entries: verifyEmailEntries,
+      },
+      resendVerification: {
+        max: RESEND_VERIFICATION_MAX,
+        windowMs: RESEND_VERIFICATION_WINDOW_MS,
+        entries: resendEntries,
+      },
+      userLockouts: {
+        max: VERIFY_MAX_ATTEMPTS,
+        windowMs: VERIFY_ATTEMPT_WINDOW_MS,
+        entries: userLockouts,
+      },
+    });
+  } catch (error) {
+    console.error("Email rate limit status error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+// Reset dei contatori in-memory dei rate limiter email.
+// Body: { scope: 'verify' | 'resend' | 'user-lockouts' | 'all', ip?: string, userId?: string }
+// - scope=verify  : reset rate limit /verify-email per IP (o tutti se ip non specificato)
+// - scope=resend  : reset rate limit /resend-verification per IP (o tutti)
+// - scope=user-lockouts : cancella verifyAttempts per userId (o tutti)
+// - scope=all     : cancella tutto
+router.post("/email-rate-limit-reset", async (req: Request, res: Response) => {
+  try {
+    const { scope, ip, userId } = req.body as { scope?: string; ip?: string; userId?: string };
+    if (!scope) {
+      return res.status(400).json({ message: "Parametro 'scope' richiesto" });
+    }
+    const validScopes = new Set(["verify", "resend", "user-lockouts", "all"]);
+    if (!validScopes.has(scope)) {
+      return res.status(400).json({ message: "Scope non valido. Usa: verify | resend | user-lockouts | all" });
+    }
+
+    const cleared: string[] = [];
+
+    if (scope === "verify" || scope === "all") {
+      if (ip) {
+        await verifyEmailStore.resetKey(ip);
+        cleared.push(`verifyEmail[${ip}]`);
+      } else {
+        await verifyEmailStore.resetAll();
+        cleared.push("verifyEmail[*]");
+      }
+    }
+    if (scope === "resend" || scope === "all") {
+      if (ip) {
+        await resendVerificationStore.resetKey(ip);
+        cleared.push(`resendVerification[${ip}]`);
+      } else {
+        await resendVerificationStore.resetAll();
+        cleared.push("resendVerification[*]");
+      }
+    }
+    if (scope === "user-lockouts" || scope === "all") {
+      if (userId) {
+        clearVerifyAttempts(userId);
+        cleared.push(`userLockout[${userId}]`);
+      } else {
+        verifyAttempts.clear();
+        cleared.push("userLockouts[*]");
+      }
+    }
+
+    console.log(`[admin] email rate limit reset: ${cleared.join(", ")}`);
+    return res.json({ message: "Rate limit resettati", cleared });
+  } catch (error) {
+    console.error("Email rate limit reset error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

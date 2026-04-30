@@ -32,6 +32,7 @@ export default function VerifyEmailScreen() {
   const [resendSuccess, setResendSuccess] = useState(false);
   const [emailConfigured, setEmailConfigured] = useState<boolean | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [showNoEmailHint, setShowNoEmailHint] = useState(false);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -39,6 +40,10 @@ export default function VerifyEmailScreen() {
       .then((r) => r.json())
       .then((d) => setEmailConfigured(d.configured ?? false))
       .catch(() => setEmailConfigured(false));
+
+    // Task #56: dopo 60s mostra un avviso più prominente "Non hai ricevuto l'email?"
+    const t = setTimeout(() => setShowNoEmailHint(true), 60000);
+    return () => clearTimeout(t);
   }, []);
 
   const startCooldown = () => {
@@ -57,6 +62,21 @@ export default function VerifyEmailScreen() {
 
   useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current); }, []);
 
+  // Task #56: il backend ritorna "Troppi tentativi" su 429. Lo riconosciamo e
+  // mostriamo un messaggio più chiaro con hint a usare il cooldown.
+  const friendlyError = (raw: string): string => {
+    if (/troppi tentativi/i.test(raw)) {
+      return "Hai richiesto troppi codici in poco tempo. Riprova tra qualche minuto o contatta l'amministratore.";
+    }
+    if (/codice scaduto/i.test(raw)) {
+      return "Il codice è scaduto. Premi 'Reinvia codice' per riceverne uno nuovo.";
+    }
+    if (/codice non valido/i.test(raw)) {
+      return "Codice non valido. Controlla di averlo digitato correttamente o richiedine uno nuovo.";
+    }
+    return raw;
+  };
+
   const handleVerify = async () => {
     if (!token.trim()) { setError("Inserisci il codice di verifica"); return; }
     if (token.trim().length !== 8) { setError("Il codice deve essere di 8 caratteri"); return; }
@@ -74,7 +94,9 @@ export default function VerifyEmailScreen() {
     } catch (err: any) {
       const msg = err?.message || "Errore durante la verifica";
       const cleaned = msg.replace(/^\d+:\s*/, "");
-      try { setError(JSON.parse(cleaned).message || cleaned); } catch { setError(cleaned); }
+      let finalMsg = cleaned;
+      try { finalMsg = JSON.parse(cleaned).message || cleaned; } catch {}
+      setError(friendlyError(finalMsg));
     } finally {
       setIsVerifying(false);
     }
@@ -91,7 +113,9 @@ export default function VerifyEmailScreen() {
     } catch (err: any) {
       const msg = err?.message || "Errore durante l'invio";
       const cleaned = msg.replace(/^\d+:\s*/, "");
-      try { setError(JSON.parse(cleaned).message || cleaned); } catch { setError(cleaned); }
+      let finalMsg = cleaned;
+      try { finalMsg = JSON.parse(cleaned).message || cleaned; } catch {}
+      setError(friendlyError(finalMsg));
     } finally {
       setIsResending(false);
     }
@@ -130,6 +154,15 @@ export default function VerifyEmailScreen() {
         <Text style={styles.emailText}>{email}</Text>
         <Text style={styles.emailWarning}>Attenzione, se non ti è arrivato il messaggio, controlla che l'email inserita sia corretta</Text>
         <Text style={styles.spamHint}>Controlla anche la cartella spam.</Text>
+
+        {showNoEmailHint && !resendSuccess ? (
+          <View style={styles.noEmailHint}>
+            <Ionicons name="information-circle" size={18} color={Colors.accent} />
+            <Text style={styles.noEmailHintText}>
+              Non hai ancora ricevuto l'email? Controlla la cartella spam, poi premi "Reinvia codice" qui sotto.
+            </Text>
+          </View>
+        ) : null}
 
         {error ? (
           <View style={styles.errorBanner}>
@@ -212,6 +245,12 @@ const styles = StyleSheet.create({
   emailText: { fontFamily: "Inter_700Bold", fontSize: 30, color: Colors.text, textAlign: "center", marginBottom: 8 },
   emailWarning: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, textAlign: "center", textDecorationLine: "underline", marginBottom: 4 },
   spamHint: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, textAlign: "center", marginBottom: 24 },
+  noEmailHint: {
+    flexDirection: "row", alignItems: "flex-start", gap: 8,
+    backgroundColor: "rgba(255,107,53,0.10)", padding: 12, borderRadius: 10,
+    borderLeftWidth: 3, borderLeftColor: Colors.accent, marginBottom: 16,
+  },
+  noEmailHintText: { flex: 1, fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text, lineHeight: 18 },
   errorBanner: {
     flexDirection: "row", alignItems: "center", gap: 8,
     backgroundColor: "rgba(244,67,54,0.1)", padding: 12, borderRadius: 10, marginBottom: 16,
