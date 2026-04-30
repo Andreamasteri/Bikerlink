@@ -199,20 +199,18 @@ Tutte e tre le risposte devono contenere `expo-protocol-version: 0`. Se manca su
 
 ### Sintomo: verifica live (Step J di publish-ota.sh) va in timeout anche se la release è pubblicata
 
-**Causa**: Lo step J invia `expo-protocol-version: 1` e si aspetta una risposta JSON diretta, ma il backend risponde con `multipart/mixed` (Expo Protocol v1). Il parsing `JSON.parse(body)` fallisce silenziosamente, l'ID non viene estratto, il loop di retry continua fino al timeout.
+**Causa (storica — ora risolta)**: Lo step J inviava `expo-protocol-version: 1` e tentava `JSON.parse(body)` sul body intero, ma il backend risponde con `multipart/mixed` (Expo Protocol v1). Il parse falliva silenziosamente, l'ID non veniva estratto, il loop di retry continuava fino al timeout.
 
-**Conseguenza pratica**: La release è **già pubblicata in produzione** (step I ha avuto successo). Il rollback automatico non tocca il backend remoto — tocca solo `lib/ota.ts` e `ota-updates.json` locali.
+**Fix applicato**: Step J ora estrae il `releaseId` con `grep -oP '"id"\s*:\s*"\K<uuid-pattern>'` sul body grezzo, compatibile sia con risposte JSON pure che con `multipart/mixed`.
 
-**Fix manuale post-timeout**:
+**Se il timeout si ripresenta** (la release non è realmente pubblicata), verificare manualmente:
 1. Verificare che la produzione serva la nuova release:
    ```bash
    curl -si -H "expo-runtime-version: 8.0.0" -H "expo-platform: android" \
      -H "expo-protocol-version: 1" https://biker-link.replit.app/api/expo-updates | grep '"id"'
    ```
-2. Se l'ID è corretto, aggiornare manualmente `ota-updates.json` (entry pending → published con releaseId e bundleUrl).
-3. Verificare che `lib/ota.ts` abbia `CURRENT_OTA_NUMBER` corretto (lo script lo imposta prima dell'export, quindi sopravvive al timeout se il rollback non lo ha resettato).
-
-**Fix strutturale da implementare** (task futuro): Modificare step J per estrarre il `releaseId` dal corpo multipart (cercare la stringa `"id":"` all'interno del body grezzo anziché fare `JSON.parse`).
+2. Se l'ID è corretto ma lo script è fallito, aggiornare manualmente `ota-updates.json` (entry pending → published con releaseId e bundleUrl).
+3. Verificare che `lib/ota.ts` abbia `CURRENT_OTA_NUMBER` corretto.
 
 ## Cicli precedenti (storico)
 - Ciclo 2.x: OTA 1–21, 23 (rv 2.0.0)

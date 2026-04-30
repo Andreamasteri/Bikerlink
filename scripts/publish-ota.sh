@@ -357,7 +357,7 @@ while [ $ELAPSED -le $MAX_WAIT ]; do
   HTTP_CODE=$(echo "$HTTP_RESPONSE" | tail -1)
 
   if [ "$HTTP_CODE" = "200" ]; then
-    SERVED_RELEASE_ID=$(echo "$HTTP_BODY" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { console.log(JSON.parse(d).id ?? ''); } catch { console.log(''); } })" 2>/dev/null || echo "")
+    SERVED_RELEASE_ID=$(echo "$HTTP_BODY" | grep -oP '"id"\s*:\s*"\K[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1 || echo "")
     if [ "$SERVED_RELEASE_ID" = "$RELEASE_ID" ]; then
       echo "   ✔ Produzione serve OTA-$NEXT_OTA (releaseId=$RELEASE_ID) — ${ELAPSED}s"
       VERIFIED=1
