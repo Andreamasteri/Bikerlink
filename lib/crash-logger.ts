@@ -98,7 +98,7 @@ async function saveCurrentSession(): Promise<void> {
 }
 
 export async function markClean(): Promise<void> {
-  if (!_currentSession) return;
+  if (!_currentSession || _currentSession.jsError) return;
   _currentSession.clean = true;
   await saveCurrentSession();
 }
@@ -155,8 +155,12 @@ export async function initCrashLogger(userId: string): Promise<void> {
     if (raw) prevSession = JSON.parse(raw) as CrashSessionMeta;
   } catch {}
 
-  if (prevSession && !prevSession.clean) {
-    const crashType: CrashType = prevSession.jsError ? "crash_js" : "crash_system";
+  if (prevSession) {
+    const crashType: CrashType = prevSession.clean
+      ? "clean_close"
+      : prevSession.jsError
+      ? "crash_js"
+      : "crash_system";
     const existingQueue = await readQueue();
     const alreadyQueued = existingQueue.some(
       (e) => e.sessionId === prevSession.sessionId && e.crashType === crashType
