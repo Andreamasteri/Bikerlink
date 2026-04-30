@@ -143,7 +143,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         if (user.status === "active") {
-          if (!foundInTracker) {
+          if (user.role === "admin") {
+            onlineTracker.setOffline(userId);
+          } else if (!foundInTracker) {
             const profile = await storage.getUserProfile(userId).catch(() => null);
             onlineTracker.setOnline(userId, {
               role: user.role ?? "user",
