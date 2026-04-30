@@ -1,6 +1,5 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
-import { createProxyMiddleware } from "http-proxy-middleware";
 import { registerRoutes } from "./routes";
 import { initState } from "./init-state";
 import { startMatchingEngine, stopMatchingEngine } from "./matching-engine";
@@ -291,12 +290,6 @@ function configureExpoAndLanding(app: express.Application) {
     }
 
     if (req.path === "/") {
-      // In dev mode (nessun static-build e non siamo in production), lascia che il proxy Metro serva l'app Expo.
-      // isProduction = true se NODE_ENV="production" oppure se REPLIT_INTERNAL_APP_DOMAIN è impostato
-      // (Replit lo setta solo nel container di produzione, non in sviluppo).
-      const staticBuildIndex = path.resolve(process.cwd(), "static-build", "index.html");
-      const isProduction = process.env.NODE_ENV === "production" || !!process.env.REPLIT_INTERNAL_APP_DOMAIN;
-      if (!isProduction && !fs.existsSync(staticBuildIndex)) return next();
       return serveLandingPage({
         req,
         res,
@@ -409,70 +402,6 @@ function configureExpoAndLanding(app: express.Application) {
   });
 
   app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
-  app.use(express.static(path.resolve(process.cwd(), "static-build")));
-
-  const webBuildDir = path.resolve(process.cwd(), "static-build", "web");
-  const noCacheHtml = (res: express.Response, filePath: string) => {
-    if (filePath.endsWith(".html")) {
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
-    }
-  };
-  app.use("/web", express.static(webBuildDir, { setHeaders: noCacheHtml }));
-  app.use(express.static(webBuildDir, { index: false, setHeaders: noCacheHtml }));
-  app.use("/web", (_req: Request, res: Response) => {
-    const indexPath = path.join(webBuildDir, "index.html");
-    if (fs.existsSync(indexPath)) {
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
-      res.sendFile(indexPath);
-    } else {
-      res.status(404).send("Web build not available");
-    }
-  });
-
-  // SPA fallback: serve index.html per rotte sconosciute quando static-build esiste.
-  // In dev (no static-build): proxy a Metro :8081 tramite createProxyMiddleware —
-  // permette al canvas Replit di raggiungere le rotte Expo Router (/welcome, ecc.).
-  const spaFallbackIndex = path.resolve(process.cwd(), "static-build", "index.html");
-  // isProductionMode = true se NODE_ENV="production" oppure se Replit ha impostato REPLIT_INTERNAL_APP_DOMAIN
-  // (presente solo nel container di produzione, non in sviluppo).
-  const isProductionMode = process.env.NODE_ENV === "production" || !!process.env.REPLIT_INTERNAL_APP_DOMAIN;
-  const devProxyActive = !isProductionMode && !fs.existsSync(spaFallbackIndex);
-  if (isProductionMode) {
-    log("Production mode — Metro proxy disabilitato");
-  } else if (devProxyActive) {
-    log("Dev proxy → Metro :8081 attivo (static-build non trovato)");
-  }
-  const metroProxy = devProxyActive
-    ? createProxyMiddleware<Request, Response>({
-        target: "http://127.0.0.1:8081",
-        changeOrigin: true,
-        on: {
-          error: (_err, _req, res) => {
-            (res as Response)
-              .status(502)
-              .send(
-                "Metro non disponibile. Avvia il workflow 'Start Frontend'."
-              );
-          },
-        },
-      })
-    : null;
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    if (req.path.startsWith("/api")) return next();
-    if (req.path.startsWith("/uploads")) return next();
-    if (fs.existsSync(spaFallbackIndex)) {
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
-      return res.sendFile(spaFallbackIndex);
-    }
-    if (metroProxy) return metroProxy(req, res, next);
-    next();
-  });
 
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }
@@ -582,21 +511,6 @@ function setupErrorHandler(app: express.Application) {
   configureExpoAndLanding(app);
 
   const server = await registerRoutes(app);
-
-  const webBuildIndex = path.join(path.resolve(process.cwd(), "static-build", "web"), "index.html");
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    if (req.method !== "GET" && req.method !== "HEAD") return next();
-    if (req.path.startsWith("/api/")) return next();
-    if (req.path === "/" || req.path === "/manifest" || req.path === "/healthz") return next();
-    if (req.path.match(/\.\w+$/)) return next();
-    if (fs.existsSync(webBuildIndex)) {
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
-      return res.sendFile(webBuildIndex);
-    }
-    next();
-  });
 
   setupErrorHandler(app);
 
