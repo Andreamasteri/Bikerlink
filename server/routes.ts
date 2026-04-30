@@ -477,24 +477,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     };
 
-    // Task #1119: helper centralizzato per gli header del protocollo Expo Updates v0.
-    // DEVE essere applicato a TUTTE le risposte (200/204/304), non solo al 200 con
-    // manifest. Il client SDK 55, se non riceve `expo-protocol-version` dal server,
-    // assume v1 strict e si aspetta una risposta multipart/mixed con directive
-    // `noUpdateAvailable`. Trovando 204 vuoto rigetta con "Failed to check for
-    // update", rendendo il sistema OTA inutilizzabile per i device già allineati.
+    // Task #1150: switch to Expo Updates Protocol v1 (multipart/mixed).
+    // Background: prima dichiaravamo `expo-protocol-version: 0` (legacy classic)
+    // ma servivamo un body JSON con la struttura del protocollo v1
+    // (`launchAsset`/`assets`/`extra.expoClient`). Questa combinazione è invalida
+    // per spec e da SDK 55.0.21 il client la rigetta sistematicamente con
+    // `ExpoUpdates.checkForUpdateAsync rejected → Failed to check for update`,
+    // bloccando l'intera flotta sull'ultima OTA installata. La fix corretta è
+    // adottare multipart/mixed v1 reale — sia per la consegna del manifest
+    // (parte `manifest`) sia per il "no update" (parte `directive` con
+    // `noUpdateAvailable`). In v1 il protocollo non usa 204 / 304 / If-None-Match:
+    // il server risponde sempre 200 con la directive appropriata.
     const setExpoUpdatesHeaders = (etag?: string) => {
-      res.setHeader("expo-protocol-version", "0");
+      res.setHeader("expo-protocol-version", "1");
       res.setHeader("expo-sfv-version", "0");
       res.setHeader("cache-control", "private, max-age=0");
       if (etag) res.setHeader("etag", etag);
+    };
+
+    const writeMultipartResponse = (
+      parts: Array<{ name: string; contentType: string; body: string }>,
+    ) => {
+      const CRLF = "\r\n";
+      const boundary = `----expo-updates-${crypto.randomBytes(12).toString("hex")}`;
+      const segments = parts.map(
+        (p) =>
+          `--${boundary}${CRLF}` +
+          `content-disposition: form-data; name="${p.name}"${CRLF}` +
+          `content-type: ${p.contentType}${CRLF}${CRLF}` +
+          p.body,
+      );
+      const body = segments.join(CRLF) + `${CRLF}--${boundary}--${CRLF}`;
+      // Important: serve as Buffer + setHeader (not res.type/.send(string)) so
+      // Express does NOT append `; charset=utf-8` to a multipart Content-Type
+      // (RFC 2046 forbids charset on multipart) and does NOT auto-generate a
+      // weak ETag that would interfere with expo-updates' own etag header.
+      const buf = Buffer.from(body, "utf8");
+      res.removeHeader("ETag");
+      res.setHeader("content-type", `multipart/mixed; boundary=${boundary}`);
+      res.setHeader("content-length", String(buf.length));
+      res.status(200).end(buf);
+    };
+
+    const sendNoUpdateDirective = (etag?: string) => {
+      setExpoUpdatesHeaders(etag);
+      writeMultipartResponse([
+        {
+          name: "directive",
+          contentType: "application/json; charset=utf-8",
+          body: JSON.stringify({ type: "noUpdateAvailable" }),
+        },
+      ]);
     };
 
     try {
       const runtimeVersion = req.headers["expo-runtime-version"] as string | undefined;
       const platform = req.headers["expo-platform"] as string | undefined;
       const currentUpdateId = req.headers["expo-current-update-id"] as string | undefined;
-      const ifNoneMatch = req.headers["if-none-match"] as string | undefined;
 
       // Task #1148: anomaly logging — header mancanti e runtime mismatch sono
       // sempre loggati (vedi `isAnomaly` in logEvent). Servono per individuare
@@ -513,15 +552,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       }
 
-      // Only serve Android OTA bundles — iOS publishing is handled separately
+      // Only serve Android OTA bundles — iOS publishing is handled separately.
+      // In protocol v1 anche il "no update" è una risposta 200 multipart con
+      // directive `noUpdateAvailable`, non un 204 vuoto.
       if (platform && platform !== "android") {
-        await logEvent("204-not-android", null);
-        setExpoUpdatesHeaders();
-        return res.status(204).end();
+        await logEvent("noUpdate-not-android", null);
+        return sendNoUpdateDirective();
       }
 
       // The DB query filters by runtime_version, so no early-exit gate is needed here.
-      // Requests from any runtimeVersion cycle are served their own matching release (or 204).
+      // Requests from any runtimeVersion cycle are served their own matching release.
       const effectiveRv = runtimeVersion ?? _expectedRuntimeVersion;
       const result = await pool.query(
         "SELECT * FROM ota_releases WHERE status = 'active' AND runtime_version = $1 ORDER BY published_at DESC LIMIT 1",
@@ -529,24 +569,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (!result.rows.length) {
-        await logEvent("204-no-release", null);
-        setExpoUpdatesHeaders();
-        return res.status(204).end();
+        await logEvent("noUpdate-no-release", null);
+        return sendNoUpdateDirective();
       }
 
       const release = result.rows[0];
 
       if (currentUpdateId && currentUpdateId === release.id) {
-        await logEvent("204-already-current", String(release.id));
-        setExpoUpdatesHeaders();
-        return res.status(204).end();
-      }
-
-      if (ifNoneMatch && ifNoneMatch === `"${release.id}"`) {
-        await logEvent("304-etag-match", String(release.id));
-        // 304 mantiene l'etag per permettere al client di confermare il match.
-        setExpoUpdatesHeaders(`"${release.id}"`);
-        return res.status(304).end();
+        await logEvent("noUpdate-already-current", String(release.id));
+        return sendNoUpdateDirective(`"${release.id}"`);
       }
 
       let sha256Hash = _expoUpdateHashCache.get(release.id);
@@ -590,14 +621,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       };
 
-      // Task #1119: gli stessi header v0 sono ora dichiarati da `setExpoUpdatesHeaders`
-      // anche su 204/304 (non solo qui sul 200). Senza protocol-version sui 204/304,
-      // SDK 55 cade in v1 strict e si aspetta multipart/mixed con directive
-      // `noUpdateAvailable`, rigettando ogni check successivo al primo allineamento.
-      // Protocollo v1 richiederebbe multipart/mixed, che NON serviamo: dichiarare v1
-      // su body JSON causa il rifiuto di reloadAsync() in expo-updates SDK 55.0.21.
+      // Risposta v1: parte unica `manifest` con il JSON. Il client SDK 55 sa
+      // estrarla, validare l'hash di `launchAsset` e scaricare il bundle.
       setExpoUpdatesHeaders(`"${release.id}"`);
-      return res.json(manifest);
+      writeMultipartResponse([
+        {
+          name: "manifest",
+          contentType: "application/json; charset=utf-8",
+          body: JSON.stringify(manifest),
+        },
+      ]);
+      return;
     } catch (error) {
       console.error("[expo-updates] Error:", error);
       // Task #1148: errori 500 sono SEMPRE loggati (isAnomaly = status startsWith "5")
