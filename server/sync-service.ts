@@ -1,13 +1,10 @@
-import { exec } from "child_process";
-import { promisify } from "util";
+import { spawn } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
 import { db } from "./db";
 import { appSettings } from "@shared/schema";
 import { eq } from "drizzle-orm";
-
-const execAsync = promisify(exec);
 
 const INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 ore
 
@@ -58,15 +55,19 @@ async function readJsonSetting<T>(key: string): Promise<T | null> {
   }
 }
 
+/**
+ * Rileva se siamo nell'ambiente di produzione Replit.
+ *
+ * In questo progetto start-backend.sh imposta NODE_ENV=production anche nel
+ * dev workspace, quindi NODE_ENV NON è un indicatore affidabile.
+ * I soli flag su cui fare affidamento sono quelli iniettati dall'infrastruttura
+ * Replit esclusivamente nella deployed app:
+ *   - REPLIT_DEPLOYMENT="1"  (flag canonico per le deployed app Replit)
+ *   - REPLIT_INTERNAL_APP_DOMAIN  (dominio interno, impostato solo in produzione)
+ */
 function isProductionEnvironment(): boolean {
-  // REPLIT_DEPLOYMENT="1" è impostato solo nella deployed app Replit (mai in dev workspace)
   if (process.env.REPLIT_DEPLOYMENT === "1") return true;
-  // REPLIT_INTERNAL_APP_DOMAIN è impostato solo nell'ambiente di produzione Replit
   if (process.env.REPLIT_INTERNAL_APP_DOMAIN) return true;
-  // NODE_ENV="production" NON è un indicatore affidabile in questo progetto:
-  // start-backend.sh lo imposta anche nel dev workspace.
-  // DEV_SYNC_ALLOWED=1 permette override esplicito se NODE_ENV=production ma siamo in dev.
-  if (process.env.NODE_ENV === "production" && !process.env.DEV_SYNC_ALLOWED) return true;
   return false;
 }
 
@@ -82,6 +83,29 @@ export function isSyncAvailable(): boolean {
   if (isProductionEnvironment()) return false;
   const urls = getSyncUrls();
   return urls !== null;
+}
+
+/**
+ * Esegue un child process con argomenti separati (nessuna interpolazione di stringa)
+ * e restituisce stdout/stderr completi. Rigetta la promise se il processo esce con
+ * codice != 0.
+ */
+function runProcess(bin: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    proc.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });
+    proc.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
+    proc.on("close", (code) => {
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        reject(new Error(`${bin} exited with code ${code}\n${stderr}`));
+      }
+    });
+    proc.on("error", reject);
+  });
 }
 
 export async function syncProdToDev(): Promise<{ ok: boolean; error?: string }> {
@@ -113,14 +137,25 @@ export async function syncProdToDev(): Promise<{ ok: boolean; error?: string }> 
   try {
     console.log("[sync-service] Avvio sync produzione → sviluppo...");
 
-    await execAsync(
-      `pg_dump "${urls.prodUrl}" --clean --if-exists -f "${tmpSql}" --no-password --no-owner --no-privileges`
-    );
+    // pg_dump: dump completo del database di produzione in un file SQL
+    await runProcess("pg_dump", [
+      urls.prodUrl,
+      "--clean",
+      "--if-exists",
+      "--no-owner",
+      "--no-privileges",
+      "-f", tmpSql,
+      "--no-password",
+    ]);
     console.log("[sync-service] pg_dump completato");
 
-    await execAsync(
-      `psql "${urls.devUrl}" -f "${tmpSql}" --no-password -v ON_ERROR_STOP=1`
-    );
+    // psql: restore sul database di sviluppo — ON_ERROR_STOP=1 per fail-fast
+    await runProcess("psql", [
+      urls.devUrl,
+      "-f", tmpSql,
+      "--no-password",
+      "-v", "ON_ERROR_STOP=1",
+    ]);
     console.log("[sync-service] psql restore completato");
 
     const meta: SyncMeta = { startedAt, finishedAt: new Date().toISOString(), ok: true };
