@@ -783,7 +783,7 @@ export default function AdminSettings() {
     onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
-  const { data: allSettingsData } = useQuery<{ defaultTaskbarStyle?: string; unitsPrefEnabled?: boolean }>({
+  const { data: allSettingsData } = useQuery<{ unitsPrefEnabled?: boolean }>({
     queryKey: ["/api/settings/all"],
     staleTime: 120000,
   });
@@ -3929,43 +3929,3 @@ const bgLocationStyles = StyleSheet.create({
   },
 });
 
-const taskbarAdminStyles = StyleSheet.create({
-  hint: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginBottom: 10,
-    marginTop: -4,
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    paddingVertical: 8,
-    marginBottom: 4,
-  },
-  optionCol: {
-    alignItems: "center",
-    gap: 6,
-    flex: 1,
-  },
-  dot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: Colors.accent,
-  },
-  dotSelected: {
-    backgroundColor: Colors.accent,
-  },
-  dotUnselected: {
-    backgroundColor: "transparent",
-  },
-  label: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 11,
-    color: Colors.textSecondary,
-    textAlign: "center",
-  },
-});
