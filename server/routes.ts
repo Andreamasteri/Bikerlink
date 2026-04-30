@@ -184,6 +184,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const CURRENT_APP_VERSION = "3.3.0";
+  app.get("/api/version/latest", (_req: Request, res: Response) => {
+    return res.json({ latestVersion: CURRENT_APP_VERSION });
+  });
+
   app.use("/api/auth", authRoutes);
   app.use("/api/users", userRoutes);
   app.use("/api/motorcycles", motorcycleRoutes);

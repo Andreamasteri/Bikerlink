@@ -13,6 +13,8 @@ import { getApiUrl } from "@/lib/query-client";
 import { Platform, AppState, ActivityIndicator, View, Text, StyleSheet } from "react-native";
 import NativeUpdateChecker from "@/components/NativeUpdateChecker";
 import MatchPopupAlert from "@/components/MatchPopupAlert";
+import UpdateNudgeModal from "@/components/UpdateNudgeModal";
+import { useUpdateCheck } from "@/hooks/useUpdateCheck";
 import AlwaysPermissionNotice from "@/components/AlwaysPermissionNotice";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
@@ -405,6 +407,14 @@ function AdminUptimeOverlay() {
   return <UptimeWidget />;
 }
 
+function UpdateNudgeWrapper() {
+  const { user } = useAuth();
+  const { needsUpdate } = useUpdateCheck();
+  const [dismissed, setDismissed] = useState(false);
+  if (Platform.OS === "web" || !user || !needsUpdate || dismissed) return null;
+  return <UpdateNudgeModal onDismiss={() => setDismissed(true)} />;
+}
+
 function ChatSseGate({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   return (
@@ -557,6 +567,7 @@ export default function RootLayout() {
                     <BackgroundNotificationHandler />
                     <LanguageKeyedRoot />
                     <MatchPopupAlert />
+                    <UpdateNudgeWrapper />
                   </MapReadyGate>
                 </StartupGate>
                 </GestureHandlerRootView>
