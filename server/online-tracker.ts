@@ -1,4 +1,5 @@
 interface TrackedUser {
+  role: string;
   userType: string;
   isAvailable: boolean;
   ghostMode: boolean;
@@ -25,6 +26,7 @@ class OnlineTracker {
   }
 
   setOnline(userId: string, data: Omit<TrackedUser, "lastSeen">): void {
+    if (data.role === "admin") return;
     this.users.set(userId, { ...data, lastSeen: new Date() });
   }
 
@@ -65,6 +67,7 @@ class OnlineTracker {
   countOnlineUsers(countries?: string[]): number {
     let count = 0;
     for (const entry of this.users.values()) {
+      if (entry.role === "admin") continue;
       if (entry.ghostMode) continue;
       if (countries && countries.length > 0 && (!entry.country || !countries.includes(entry.country))) continue;
       count++;
@@ -75,6 +78,7 @@ class OnlineTracker {
   countAvailableBikers(countries?: string[]): number {
     let count = 0;
     for (const entry of this.users.values()) {
+      if (entry.role === "admin") continue;
       if (!entry.isAvailable || entry.ghostMode) continue;
       if (entry.userType !== "biker" && entry.userType !== "coppia") continue;
       if (countries && countries.length > 0 && (!entry.country || !countries.includes(entry.country))) continue;
@@ -86,6 +90,7 @@ class OnlineTracker {
   countAvailableZavorrine(countries?: string[]): number {
     let count = 0;
     for (const entry of this.users.values()) {
+      if (entry.role === "admin") continue;
       if (!entry.isAvailable || entry.ghostMode) continue;
       if (entry.userType !== "zavorrina") continue;
       if (countries && countries.length > 0 && (!entry.country || !countries.includes(entry.country))) continue;
@@ -97,6 +102,7 @@ class OnlineTracker {
   getOnlineUserIds(countries?: string[]): string[] {
     const ids: string[] = [];
     for (const [userId, entry] of this.users) {
+      if (entry.role === "admin") continue;
       if (entry.ghostMode) continue;
       if (countries && countries.length > 0 && (!entry.country || !countries.includes(entry.country))) continue;
       ids.push(userId);
@@ -107,6 +113,7 @@ class OnlineTracker {
   getAvailableBikerIds(countries?: string[]): string[] {
     const ids: string[] = [];
     for (const [userId, entry] of this.users) {
+      if (entry.role === "admin") continue;
       if (!entry.isAvailable || entry.ghostMode) continue;
       if (entry.userType !== "biker" && entry.userType !== "coppia") continue;
       if (countries && countries.length > 0 && (!entry.country || !countries.includes(entry.country))) continue;
@@ -118,6 +125,7 @@ class OnlineTracker {
   getAvailableZavorrinaIds(countries?: string[]): string[] {
     const ids: string[] = [];
     for (const [userId, entry] of this.users) {
+      if (entry.role === "admin") continue;
       if (!entry.isAvailable || entry.ghostMode) continue;
       if (entry.userType !== "zavorrina") continue;
       if (countries && countries.length > 0 && (!entry.country || !countries.includes(entry.country))) continue;

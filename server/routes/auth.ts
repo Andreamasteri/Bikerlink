@@ -386,6 +386,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     const isGhost = userRecord?.ghostMode ?? false;
     const isAvail = !isGhost && (userProfile?.isAvailable ?? false);
     onlineTracker.setOnline(user.id, {
+      role: userRecord?.role ?? user.role ?? "user",
       userType: userRecord?.userType ?? user.userType ?? "biker",
       isAvailable: isAvail,
       ghostMode: isGhost,
