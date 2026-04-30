@@ -1,7 +1,7 @@
-import { Router, type Request, type Response, type NextFunction, type RequestHandler } from "express";
+import { Router, type Request, type Response, type RequestHandler } from "express";
 import { db } from "../db";
 import { appCrashLogs, users } from "@shared/schema";
-import { eq, desc, and, gte, lte, inArray, count } from "drizzle-orm";
+import { eq, desc, and, gte, lte, inArray, count, sql } from "drizzle-orm";
 import { storage } from "../storage";
 
 const MAX_BATCH = 50;
@@ -139,13 +139,25 @@ adminRouter.get("/", requireAdmin, (req: Request, res: Response): void => {
       .limit(limit)
       .offset(offset),
     db.select({ count: count() }).from(appCrashLogs).where(where),
+    db
+      .select({
+        platform: appCrashLogs.platform,
+        deviceModel: appCrashLogs.deviceModel,
+        total: count(),
+      })
+      .from(appCrashLogs)
+      .where(where)
+      .groupBy(appCrashLogs.platform, appCrashLogs.deviceModel)
+      .orderBy(desc(sql`count(*)`))
+      .limit(10),
   ])
-    .then(([rows, countRows]) => {
+    .then(([rows, countRows, deviceRows]) => {
       res.json({
         logs: rows,
         total: countRows[0]?.count ?? 0,
         page,
         limit,
+        deviceStats: deviceRows,
       });
     })
     .catch((err) => {

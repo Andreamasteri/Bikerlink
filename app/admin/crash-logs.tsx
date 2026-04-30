@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Platform,
   TextInput,
-  ScrollView,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -35,11 +34,18 @@ interface CrashLogRow {
   nickname: string | null;
 }
 
+interface DeviceStat {
+  platform: string | null;
+  deviceModel: string | null;
+  total: number;
+}
+
 interface CrashLogsResponse {
   logs: CrashLogRow[];
   total: number;
   page: number;
   limit: number;
+  deviceStats: DeviceStat[];
 }
 
 const TYPE_FILTERS: { label: string; value: "" | CrashType }[] = [
@@ -365,11 +371,33 @@ export default function CrashLogsScreen() {
           renderItem={({ item }) => <CrashLogCard item={item} />}
           contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 20 }]}
           ListHeaderComponent={
-            <Text style={[styles.totalText, { color: colors.textSecondary }]}>
-              {total} crash
-              {filterType ? ` · ${filterType === "crash_js" ? "JS Error" : "Sistema"}` : ""}
-              {filterVersion.trim() ? ` · v${filterVersion.trim()}` : ""}
-            </Text>
+            <View>
+              <Text style={[styles.totalText, { color: colors.textSecondary }]}>
+                {total} crash
+                {filterType ? ` · ${filterType === "crash_js" ? "JS Error" : "Sistema"}` : ""}
+                {filterVersion.trim() ? ` · v${filterVersion.trim()}` : ""}
+              </Text>
+              {data?.deviceStats && data.deviceStats.length > 0 && (
+                <View style={[styles.deviceStatsContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Text style={[styles.deviceStatsTitle, { color: colors.textSecondary }]}>
+                    Top dispositivi
+                  </Text>
+                  {data.deviceStats.map((stat, i) => {
+                    const label = [stat.platform, stat.deviceModel].filter(Boolean).join(" · ") || "Sconosciuto";
+                    return (
+                      <View key={i} style={styles.deviceStatRow}>
+                        <Text style={[styles.deviceStatLabel, { color: colors.text }]} numberOfLines={1}>
+                          {label}
+                        </Text>
+                        <View style={[styles.deviceStatBadge, { backgroundColor: "#FF6B3522" }]}>
+                          <Text style={[styles.deviceStatCount, { color: "#FF6B35" }]}>{stat.total}</Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
           }
           ListFooterComponent={
             totalPages > 1 ? (
@@ -450,4 +478,38 @@ const styles = StyleSheet.create({
   pagination: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 16, paddingTop: 16 },
   pageBtn: { width: 36, height: 36, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   pageText: { fontFamily: "Inter_500Medium", fontSize: 14 },
+  deviceStatsContainer: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  deviceStatsTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  deviceStatRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  deviceStatLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    flex: 1,
+  },
+  deviceStatBadge: {
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  deviceStatCount: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+  },
 });

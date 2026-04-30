@@ -99,12 +99,24 @@ export async function markClean(): Promise<void> {
 
 export async function markJsError(error: Error, stack?: string): Promise<void> {
   if (!_currentSession) return;
-  _currentSession.clean = false;
-  _currentSession.jsError = {
-    message: (error.message ?? "").slice(0, 500),
-    stack: (stack ?? error.stack ?? "").slice(0, 3000),
-  };
+  const errMsg = (error.message ?? "").slice(0, 500);
+  const errStack = (stack ?? error.stack ?? "").slice(0, 3000);
+  _currentSession.jsError = { message: errMsg, stack: errStack };
+  _currentSession.clean = true;
   await saveCurrentSession();
+  const entry: CrashLogEntry = {
+    sessionId: _currentSession.sessionId,
+    crashType: "crash_js",
+    appVersion: getAppVersion(),
+    platform: Platform.OS,
+    osVersion: getOsVersion(),
+    deviceModel: getDeviceModel(),
+    errorMessage: errMsg || null,
+    stackTrace: errStack || null,
+    sessionStartedAt: _currentSession.startedAt,
+    sessionEndedAt: new Date().toISOString(),
+  };
+  await enqueue(entry);
 }
 
 export async function flushQueue(): Promise<void> {
