@@ -26,6 +26,7 @@ import { useLanguage } from "@/lib/language-context";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import { EUROPEAN_COUNTRIES, getRegionsForCountry, findCountryByRegion } from "@/lib/countries-regions";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
+import { useUnits } from "@/lib/units-context";
 
 interface ProfileData {
   id: string;
@@ -75,6 +76,7 @@ export default function EditProfileScreen() {
   const params = useLocalSearchParams();
   const { user, logoutMutation } = useAuth();
   const { language, setLanguage } = useLanguage();
+  const { speedUnit, setSpeedUnit, setDistanceUnit, setTimeFormat } = useUnits();
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -839,6 +841,50 @@ export default function EditProfileScreen() {
                 })}
               </View>
             )}
+          </View>
+
+          <View style={{ height: 16 }} />
+          <View style={{ marginBottom: 4 }}>
+            <Text style={{ fontSize: 11, color: Colors.textSecondary, marginBottom: 10, letterSpacing: 0.5 }}>SISTEMA DI MISURA</Text>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              {([
+                { system: "metric" as const, label: "Metrico", desc: "km/h · km · 24h" },
+                { system: "imperial" as const, label: "Imperiale", desc: "mph · mi · 12h" },
+              ]).map(({ system, label, desc }) => {
+                const isMetric = system === "metric";
+                const isSelected = isMetric ? speedUnit === "kmh" : speedUnit === "mph";
+                return (
+                  <Pressable
+                    key={system}
+                    style={{
+                      flex: 1,
+                      borderRadius: 10,
+                      borderWidth: 1.5,
+                      borderColor: isSelected ? Colors.accent : Colors.border,
+                      backgroundColor: isSelected ? Colors.accent + "14" : "transparent",
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      alignItems: "center",
+                      gap: 2,
+                    }}
+                    onPress={() => {
+                      if (isMetric) {
+                        setSpeedUnit("kmh");
+                        setDistanceUnit("km_m");
+                        setTimeFormat("24h");
+                      } else {
+                        setSpeedUnit("mph");
+                        setDistanceUnit("mi_ft");
+                        setTimeFormat("12h");
+                      }
+                    }}
+                  >
+                    <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: isSelected ? Colors.accent : Colors.text }}>{label}</Text>
+                    <Text style={{ fontSize: 11, color: Colors.textSecondary }}>{desc}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
 
           {adminWidgetEnabled && Platform.OS !== "web" && (

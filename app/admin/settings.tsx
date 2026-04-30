@@ -783,30 +783,11 @@ export default function AdminSettings() {
     onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
-  const { data: allSettingsData } = useQuery<{ defaultTaskbarStyle?: string }>({
+  const { data: allSettingsData } = useQuery<{ defaultTaskbarStyle?: string; unitsPrefEnabled?: boolean }>({
     queryKey: ["/api/settings/all"],
     staleTime: 120000,
   });
-  const TASKBAR_OPTIONS = [
-    { value: "tutti" as const, label: "Tutti" },
-    { value: "scorri" as const, label: "Scorri" },
-    { value: "altro" as const, label: "Altro..." },
-    { value: "raggruppa" as const, label: "Raggruppa" },
-  ] as const;
-  type TaskbarDefaultValue = typeof TASKBAR_OPTIONS[number]["value"];
-  const validTaskbarValues: readonly string[] = TASKBAR_OPTIONS.map((o) => o.value);
-  const currentTaskbarDefault: TaskbarDefaultValue = validTaskbarValues.includes(allSettingsData?.defaultTaskbarStyle ?? "")
-    ? (allSettingsData!.defaultTaskbarStyle as TaskbarDefaultValue)
-    : "tutti";
-
-  const taskbarDefaultMutation = useMutation({
-    mutationFn: (value: string) =>
-      apiRequest("PUT", "/api/admin/settings/default_taskbar_style", { value }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
-    },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
-  });
+  const unitsPrefEnabled = allSettingsData?.unitsPrefEnabled === true;
 
   const { data: syncStatus, refetch: refetchSyncStatus } = useQuery<{
     available: boolean;
@@ -880,6 +861,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/phone-field-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/user-available-on-login"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/floating-widget"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
       setProtectedToggle(null);
       setProtectedPassword("");
@@ -1805,40 +1787,6 @@ export default function AdminSettings() {
           );
         })}
       </View>
-
-      <View style={[styles.sectionHeaderRow, { marginTop: 8 }]}>
-        <Ionicons name="grid" size={20} color={Colors.accent} />
-        <Text style={styles.sectionTitle}>Pulsanti Taskbar (default)</Text>
-      </View>
-      <Text style={taskbarAdminStyles.hint}>
-        Stile predefinito per chi non ha ancora scelto manualmente la propria preferenza.
-      </Text>
-      <View style={taskbarAdminStyles.row}>
-        {TASKBAR_OPTIONS.map((opt) => {
-          const isSelected = currentTaskbarDefault === opt.value;
-          return (
-            <Pressable
-              key={opt.value}
-              style={taskbarAdminStyles.optionCol}
-              onPress={() => taskbarDefaultMutation.mutate(opt.value)}
-              disabled={taskbarDefaultMutation.isPending}
-            >
-              <View
-                style={[
-                  taskbarAdminStyles.dot,
-                  isSelected ? taskbarAdminStyles.dotSelected : taskbarAdminStyles.dotUnselected,
-                ]}
-              />
-              <Text style={[taskbarAdminStyles.label, isSelected && { color: Colors.accent }]}>
-                {opt.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      {taskbarDefaultMutation.isPending && (
-        <ActivityIndicator color={Colors.accent} size="small" style={{ marginBottom: 8 }} />
-      )}
 
       <View style={styles.sectionHeaderRow}>
         <Ionicons name="apps" size={20} color={Colors.accent} />
@@ -3131,6 +3079,27 @@ export default function AdminSettings() {
             </View>
           </View>
         )}
+      </View>
+
+      <View style={styles.paypalCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="speedometer-outline" size={20} color={Colors.accent} />
+            <Text style={styles.synecoLabel}>Preferenze Unità</Text>
+          </View>
+          <Switch
+            value={unitsPrefEnabled}
+            onValueChange={(val) => setProtectedToggle({ key: "units_preference_enabled", value: val, label: "Preferenze Unità" })}
+            trackColor={{ false: Colors.border, true: Colors.accent }}
+            thumbColor={unitsPrefEnabled ? Colors.text : Colors.textSecondary}
+            disabled={protectedToggleMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {unitsPrefEnabled
+            ? "Gli utenti vedono la sezione 'Preferenze unità' nel profilo e possono cambiare sistema di misura."
+            : "Sezione 'Preferenze unità' nascosta nel profilo. Il sistema di misura si imposta solo in Modifica Profilo."}
+        </Text>
       </View>
 
       <View style={styles.sectionHeaderRow}>

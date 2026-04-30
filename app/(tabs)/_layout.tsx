@@ -229,7 +229,7 @@ export default function TabLayout() {
         </View>
       )}
       <Tabs
-        tabBar={taskbarStyle !== "tutti" ? renderCustomTabBar : undefined}
+        tabBar={renderCustomTabBar}
         screenOptions={{
           tabBarActiveTintColor: colors.accent,
           tabBarInactiveTintColor: colors.textSecondary,

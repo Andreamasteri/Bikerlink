@@ -126,14 +126,22 @@ export default function ProfileScreen() {
   const locale = useLocale();
   const { enabled: mapsEnabled, userChoiceEnabled } = useMapConfig();
   const { currentTheme, setTheme, userSwitchingEnabled } = useTheme();
-  const { taskbarStyle, setTaskbarStyle, adminDefault } = useTaskbarStyle();
-  const { timeFormat, speedUnit, distanceUnit, setTimeFormat, setSpeedUnit, setDistanceUnit } = useUnits();
+  const { taskbarStyle, setTaskbarStyle } = useTaskbarStyle();
+  const { timeFormat, speedUnit, distanceUnit, setTimeFormat, setSpeedUnit, setDistanceUnit, applyCountryDefault } = useUnits();
   const [unitsExpanded, setUnitsExpanded] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isDownloadingManual, setIsDownloadingManual] = useState(false);
   const [isDownloadingEula, setIsDownloadingEula] = useState(false);
   const [isDownloadingPrivacy, setIsDownloadingPrivacy] = useState(false);
   const [isExportingData, setIsExportingData] = useState(false);
+
+  const { data: allSettingsData } = useQuery<{ unitsPrefEnabled?: boolean }>({
+    queryKey: ["/api/settings/all"],
+    staleTime: 120000,
+    retry: false,
+  });
+
+  const unitsPrefEnabled = allSettingsData?.unitsPrefEnabled === true;
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -147,6 +155,14 @@ export default function ProfileScreen() {
   useEffect(() => {
     setFailedPhotos(new Set());
   }, [profileQuery.dataUpdatedAt]);
+
+  // Apply country-based unit defaults (only once, only if no stored preference)
+  useEffect(() => {
+    if (profile?.country) {
+      applyCountryDefault(profile.country);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.country, applyCountryDefault]);
 
   const currentUserType = profile?.userType ?? user?.userType ?? "biker";
   const currentSex = profile?.sex ?? (user as any)?.sex;
@@ -1153,6 +1169,7 @@ export default function ProfileScreen() {
         </View>
       )}
 
+      {unitsPrefEnabled && (
       <View style={styles.section}>
         <Pressable style={styles.accordionHeader} onPress={() => setUnitsExpanded(v => !v)}>
           <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Preferenze unità</Text>
@@ -1246,6 +1263,7 @@ export default function ProfileScreen() {
           </View>
         )}
       </View>
+      )}
 
       <View style={styles.section}>
         <Pressable style={styles.accordionHeader} onPress={() => setDocsExpanded(v => !v)}>
@@ -1287,54 +1305,27 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { textAlign: "center" }]}>Pulsanti Taskbar</Text>
-        {(() => {
-          const TASKBAR_LABELS: Record<string, string> = {
-            tutti: "Tutti",
-            scorri: "Scorri",
-            altro: "Altro...",
-            raggruppa: "Raggruppa",
-          };
-          const adminLabel = TASKBAR_LABELS[adminDefault] ?? adminDefault;
-          return (
-            <Text style={taskbarStyles.adminDefaultLabel}>
-              default admin: {adminLabel}
-            </Text>
-          );
-        })()}
-        <View style={taskbarStyles.row}>
-          {([
-            { value: "tutti" as TaskbarStyle, label: "Tutti" },
-            { value: "scorri" as TaskbarStyle, label: "Scorri" },
-            { value: "altro" as TaskbarStyle, label: "Altro..." },
-            { value: "raggruppa" as TaskbarStyle, label: "Raggruppa" },
-          ]).map((opt) => {
-            const isSelected = taskbarStyle === opt.value;
-            return (
-              <Pressable
-                key={opt.value}
-                style={taskbarStyles.optionCol}
-                onPress={() => setTaskbarStyle(opt.value)}
-              >
-                <View
-                  style={[
-                    taskbarStyles.dot,
-                    isSelected
-                      ? taskbarStyles.dotSelected
-                      : taskbarStyles.dotUnselected,
-                  ]}
-                />
-                <Text
-                  style={[
-                    taskbarStyles.dotLabel,
-                    isSelected && { color: Colors.accent },
-                  ]}
+        <View style={taskbarStyles.inlineRow}>
+          <Text style={taskbarStyles.inlineLabel}>Taskbar</Text>
+          <View style={taskbarStyles.inlinePills}>
+            {([
+              { value: "raggruppa" as TaskbarStyle, label: "Raggruppa" },
+              { value: "scorri" as TaskbarStyle, label: "Scorri" },
+            ]).map((opt) => {
+              const isSelected = taskbarStyle === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  style={[taskbarStyles.pill, isSelected && taskbarStyles.pillSelected]}
+                  onPress={() => setTaskbarStyle(opt.value)}
                 >
-                  {opt.label}
-                </Text>
-              </Pressable>
-            );
-          })}
+                  <Text style={[taskbarStyles.pillLabel, isSelected && { color: Colors.accent }]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
       </View>
 
@@ -2202,42 +2193,36 @@ const styles = StyleSheet.create({
 });
 
 const taskbarStyles = StyleSheet.create({
-  row: {
+  inlineRow: {
     flexDirection: "row",
-    justifyContent: "space-around",
     alignItems: "center",
-    paddingVertical: 8,
+    justifyContent: "space-between",
+    paddingVertical: 4,
   },
-  optionCol: {
-    alignItems: "center",
-    gap: 6,
-    flex: 1,
+  inlineLabel: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: Colors.text,
   },
-  dot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: Colors.accent,
+  inlinePills: {
+    flexDirection: "row",
+    gap: 8,
   },
-  dotSelected: {
-    backgroundColor: Colors.accent,
-  },
-  dotUnselected: {
+  pill: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
     backgroundColor: "transparent",
   },
-  dotLabel: {
-    fontSize: 11,
+  pillSelected: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent + "14",
+  },
+  pillLabel: {
+    fontSize: 13,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
-    textAlign: "center",
-  },
-  adminDefaultLabel: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    textAlign: "center",
-    marginBottom: 4,
-    opacity: 0.75,
   },
 });

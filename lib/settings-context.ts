@@ -14,6 +14,7 @@ interface AppSettings {
   mapsEnabled: boolean;
   mapsProvider: MapProvider;
   defaultTaskbarStyle: TaskbarStyle;
+  unitsPrefEnabled: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -26,7 +27,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   sosEnabled: true,
   mapsEnabled: true,
   mapsProvider: "carto_light",
-  defaultTaskbarStyle: "tutti",
+  defaultTaskbarStyle: "raggruppa",
+  unitsPrefEnabled: false,
 };
 
 export function useAppSettings() {

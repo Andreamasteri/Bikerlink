@@ -75,7 +75,6 @@ export default function CustomTabBar({
 }: CustomTabBarProps) {
   const colors = useColors();
   const [communityOpen, setCommunityOpen] = useState(false);
-  const [showAltroOverride, setShowAltroOverride] = useState<boolean | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   const barStyle = {
@@ -85,16 +84,6 @@ export default function CustomTabBar({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   };
-
-  if (style === "tutti") {
-    return (
-      <View style={[staticStyles.bar, barStyle]}>
-        {tabs.map((tab) => (
-          <TabIcon key={tab.name} tab={tab} isActive={tab.isFocused} />
-        ))}
-      </View>
-    );
-  }
 
   if (style === "scorri") {
     const screenWidth = Dimensions.get("window").width;
@@ -135,41 +124,6 @@ export default function CustomTabBar({
             size={18}
             color={colors.textSecondary}
           />
-        </Pressable>
-      </View>
-    );
-  }
-
-  if (style === "altro") {
-    const firstFive = tabs.slice(0, 5);
-    const rest = tabs.slice(5);
-    const restHasFocused = rest.some((t) => t.isFocused);
-    const showAltro = showAltroOverride !== null ? showAltroOverride : restHasFocused;
-    const displayTabs = showAltro ? rest : firstFive;
-    const altroActive = showAltro || restHasFocused;
-
-    return (
-      <View style={[staticStyles.bar, barStyle]}>
-        {displayTabs.map((tab) => (
-          <TabIcon key={tab.name} tab={tab} isActive={tab.isFocused} />
-        ))}
-        <Pressable
-          style={staticStyles.tabItem}
-          onPress={() => setShowAltroOverride((prev) => !(prev !== null ? prev : restHasFocused))}
-        >
-          <Ionicons
-            name={showAltro ? "grid" : "ellipsis-horizontal"}
-            size={24}
-            color={altroActive ? colors.accent : colors.textSecondary}
-          />
-          <Text
-            style={[
-              staticStyles.tabLabel,
-              { color: altroActive ? colors.accent : colors.textSecondary },
-            ]}
-          >
-            Altro...
-          </Text>
         </Pressable>
       </View>
     );

@@ -1277,7 +1277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/settings/all", async (_req, res) => {
     const VALID_TASKBAR = ["tutti", "scorri", "altro", "raggruppa"];
     try {
-      const [syneco, emailVerification, chatbot, autoMatching, customRoutes, paypal, sosEnabled, mapsEnabled, mapsProvider, defaultTaskbar] = await Promise.all([
+      const [syneco, emailVerification, chatbot, autoMatching, customRoutes, paypal, sosEnabled, mapsEnabled, mapsProvider, defaultTaskbar, unitsPref] = await Promise.all([
         storage.getAppSetting("syneco_branding_visible"),
         storage.getAppSetting("email_verification_enabled"),
         storage.getAppSetting("chatbot_enabled"),
@@ -1288,6 +1288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getAppSetting("maps_enabled"),
         storage.getAppSetting("maps_provider"),
         storage.getAppSetting("default_taskbar_style"),
+        storage.getAppSetting("units_preference_enabled"),
       ]);
       res.json({
         synecoBranding: syneco?.value === "true",
@@ -1300,6 +1301,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mapsEnabled: mapsEnabled?.value !== "false",
         mapsProvider: mapsProvider?.value || "carto_light",
         defaultTaskbarStyle: VALID_TASKBAR.includes(defaultTaskbar?.value ?? "") ? defaultTaskbar!.value : "tutti",
+        unitsPrefEnabled: unitsPref?.value === "true",
       });
     } catch {
       res.json({
@@ -1313,6 +1315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mapsEnabled: true,
         mapsProvider: "carto_light",
         defaultTaskbarStyle: "tutti",
+        unitsPrefEnabled: false,
       });
     }
   });

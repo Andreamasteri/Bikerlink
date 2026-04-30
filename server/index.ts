@@ -1160,7 +1160,9 @@ function setupErrorHandler(app: express.Application) {
           const showSearchPrefSetting = await storage.getAppSetting("show_search_preference");
           if (!showSearchPrefSetting) await storage.upsertAppSetting("show_search_preference", "false");
           const mapsUserChoiceSetting = await storage.getAppSetting("maps_user_choice_enabled");
-          if (!mapsUserChoiceSetting) await storage.upsertAppSetting("maps_user_choice_enabled", "true");
+          if (!mapsUserChoiceSetting) await storage.upsertAppSetting("maps_user_choice_enabled", "false");
+          const unitsPrefSetting = await storage.getAppSetting("units_preference_enabled");
+          if (!unitsPrefSetting) await storage.upsertAppSetting("units_preference_enabled", "false");
           const musicProviderSetting = await storage.getAppSetting("music_provider");
           if (!musicProviderSetting) await storage.upsertAppSetting("music_provider", "lastfm");
         } catch (e) {
