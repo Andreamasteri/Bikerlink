@@ -39,6 +39,7 @@ const adminGroups: AdminGroup[] = [
     items: [
       { key: "users", label: "Utenti", icon: "people", iconSet: "MaterialIcons", route: "/admin/users" },
       { key: "stregatti", label: "Stregatti", icon: "robot", iconSet: "MaterialCommunityIcons", route: "/admin/stregatti" },
+      { key: "blocks", label: "Blocchi", icon: "ban", iconSet: "Ionicons", route: "/admin/blocks" },
       { key: "reports", label: "Bugs & Co", icon: "flag", iconSet: "MaterialIcons", route: "/admin/reports" },
     ],
   },

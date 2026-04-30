@@ -394,6 +394,21 @@ export interface IStorage {
   getBlockedUserIds(userId: string): Promise<string[]>;
   getBlockedUsersByBlocker(blockerId: string): Promise<Array<{ id: string; nickname: string; userType: string | null; avatarUrl: string | null }>>;
   getAllBlockedPairs(): Promise<Array<{ blockerId: string; blockedId: string }>>;
+  getAdminBlocks(options: { search?: string; page?: number; limit?: number }): Promise<{
+    blocks: Array<{
+      id: string;
+      blockerId: string;
+      blockerNickname: string;
+      blockerAvatarUrl: string | null;
+      blockedId: string;
+      blockedNickname: string;
+      blockedAvatarUrl: string | null;
+      createdAt: string;
+    }>;
+    total: number;
+    hasMore: boolean;
+  }>;
+  deleteBlockById(id: string): Promise<boolean>;
   deleteBikerBikerMatchesBetween(userId1: string, userId2: string): Promise<number>;
 }
 
@@ -2149,6 +2164,104 @@ export class DatabaseStorage implements IStorage {
   async getAllBlockedPairs(): Promise<Array<{ blockerId: string; blockedId: string }>> {
     const rows = await db.select({ blockerId: userBlocks.blockerId, blockedId: userBlocks.blockedId }).from(userBlocks);
     return rows;
+  }
+
+  async getAdminBlocks(options: { search?: string; page?: number; limit?: number }): Promise<{
+    blocks: Array<{
+      id: string;
+      blockerId: string;
+      blockerNickname: string;
+      blockerAvatarUrl: string | null;
+      blockedId: string;
+      blockedNickname: string;
+      blockedAvatarUrl: string | null;
+      createdAt: string;
+    }>;
+    total: number;
+    hasMore: boolean;
+  }> {
+    const pageSize = Math.min(options.limit ?? 20, 100);
+    const pageNum = Math.max(options.page ?? 1, 1);
+    const offset = (pageNum - 1) * pageSize;
+    const searchFilter = options.search?.trim().toLowerCase() ?? "";
+
+    type BlockRow = Record<string, unknown> & {
+      id: string;
+      blockerId: string;
+      blockerNickname: string;
+      blockerAvatarUrl: string | null;
+      blockedId: string;
+      blockedNickname: string;
+      blockedAvatarUrl: string | null;
+      createdAt: Date;
+    };
+    type CountRow = Record<string, unknown> & { cnt: number };
+
+    const rowsResult = searchFilter
+      ? await db.execute<BlockRow>(sql`
+          SELECT
+            ub.id,
+            ub.blocker_id AS "blockerId",
+            u1.nickname AS "blockerNickname",
+            u1.avatar_url AS "blockerAvatarUrl",
+            ub.blocked_id AS "blockedId",
+            u2.nickname AS "blockedNickname",
+            u2.avatar_url AS "blockedAvatarUrl",
+            ub.created_at AS "createdAt"
+          FROM user_blocks ub
+          JOIN users u1 ON u1.id = ub.blocker_id
+          JOIN users u2 ON u2.id = ub.blocked_id
+          WHERE LOWER(u1.nickname) LIKE ${'%' + searchFilter + '%'}
+             OR LOWER(u2.nickname) LIKE ${'%' + searchFilter + '%'}
+          ORDER BY ub.created_at DESC
+          LIMIT ${pageSize} OFFSET ${offset}
+        `)
+      : await db.execute<BlockRow>(sql`
+          SELECT
+            ub.id,
+            ub.blocker_id AS "blockerId",
+            u1.nickname AS "blockerNickname",
+            u1.avatar_url AS "blockerAvatarUrl",
+            ub.blocked_id AS "blockedId",
+            u2.nickname AS "blockedNickname",
+            u2.avatar_url AS "blockedAvatarUrl",
+            ub.created_at AS "createdAt"
+          FROM user_blocks ub
+          JOIN users u1 ON u1.id = ub.blocker_id
+          JOIN users u2 ON u2.id = ub.blocked_id
+          ORDER BY ub.created_at DESC
+          LIMIT ${pageSize} OFFSET ${offset}
+        `);
+
+    const countResult = searchFilter
+      ? await db.execute<CountRow>(sql`
+          SELECT COUNT(*)::int AS cnt
+          FROM user_blocks ub
+          JOIN users u1 ON u1.id = ub.blocker_id
+          JOIN users u2 ON u2.id = ub.blocked_id
+          WHERE LOWER(u1.nickname) LIKE ${'%' + searchFilter + '%'}
+             OR LOWER(u2.nickname) LIKE ${'%' + searchFilter + '%'}
+        `)
+      : await db.execute<CountRow>(sql`SELECT COUNT(*)::int AS cnt FROM user_blocks`);
+
+    const total = Number(countResult.rows[0]?.cnt ?? 0);
+    const blocks = rowsResult.rows.map((r) => ({
+      id: String(r.id),
+      blockerId: String(r.blockerId),
+      blockerNickname: String(r.blockerNickname),
+      blockerAvatarUrl: r.blockerAvatarUrl ? String(r.blockerAvatarUrl) : null,
+      blockedId: String(r.blockedId),
+      blockedNickname: String(r.blockedNickname),
+      blockedAvatarUrl: r.blockedAvatarUrl ? String(r.blockedAvatarUrl) : null,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+    }));
+
+    return { blocks, total, hasMore: offset + blocks.length < total };
+  }
+
+  async deleteBlockById(id: string): Promise<boolean> {
+    const result = await db.delete(userBlocks).where(eq(userBlocks.id, id)).returning();
+    return result.length > 0;
   }
 
   async deleteBikerBikerMatchesBetween(userId1: string, userId2: string): Promise<number> {

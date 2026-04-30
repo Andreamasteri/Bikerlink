@@ -5114,5 +5114,37 @@ router.post("/db/vacuum-full", async (_req: Request, res: Response) => {
   }
 });
 
+// GET /api/admin/blocks?search=&page=1&limit=20
+// Lista di tutti i blocchi tra utenti. Supporta ricerca per nickname e paginazione.
+router.get("/blocks", async (req: Request, res: Response) => {
+  try {
+    const search = typeof req.query.search === "string" ? req.query.search : undefined;
+    const pageRaw = req.query.page ? parseInt(String(req.query.page), 10) : 1;
+    const limitRaw = req.query.limit ? parseInt(String(req.query.limit), 10) : 20;
+    const page = Math.max(1, isNaN(pageRaw) ? 1 : pageRaw);
+    const limit = Math.max(1, Math.min(isNaN(limitRaw) ? 20 : limitRaw, 100));
+    const result = await storage.getAdminBlocks({ search, page, limit });
+    return res.json(result);
+  } catch (err) {
+    console.error("[ADMIN BLOCKS] get error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// DELETE /api/admin/blocks/:id
+// Rimuove un blocco specifico per ID.
+router.delete("/blocks/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ message: "ID blocco mancante" });
+    const deleted = await storage.deleteBlockById(id);
+    if (!deleted) return res.status(404).json({ message: "Blocco non trovato" });
+    return res.json({ deleted: true });
+  } catch (err) {
+    console.error("[ADMIN BLOCKS] delete error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 export default router;
 

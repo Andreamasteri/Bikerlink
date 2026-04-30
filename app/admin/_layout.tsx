@@ -34,6 +34,7 @@ export default function AdminLayout() {
       <Stack.Screen name="gps-errors" options={{ title: "GPS Error Log" }} />
       <Stack.Screen name="sensors" options={{ headerShown: false }} />
       <Stack.Screen name="moderator-logs" options={{ title: "Log Moderatori" }} />
+      <Stack.Screen name="blocks" options={{ title: "Blocchi tra utenti" }} />
     </Stack>
   );
 }
