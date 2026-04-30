@@ -3899,29 +3899,32 @@ const taskbarAdminStyles = StyleSheet.create({
   row: {
     flexDirection: "row",
     justifyContent: "space-around",
-    marginBottom: 12,
+    alignItems: "center",
+    paddingVertical: 8,
+    marginBottom: 4,
   },
   optionCol: {
     alignItems: "center",
-    gap: 4,
+    gap: 6,
+    flex: 1,
   },
   dot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 2,
+    borderColor: Colors.accent,
   },
   dotSelected: {
-    borderColor: Colors.accent,
     backgroundColor: Colors.accent,
   },
   dotUnselected: {
-    borderColor: Colors.textSecondary,
     backgroundColor: "transparent",
   },
   label: {
     fontFamily: "Inter_500Medium",
-    fontSize: 12,
+    fontSize: 11,
     color: Colors.textSecondary,
+    textAlign: "center",
   },
 });

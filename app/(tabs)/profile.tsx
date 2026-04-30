@@ -1296,21 +1296,11 @@ export default function ProfileScreen() {
             raggruppa: "Raggruppa",
           };
           const adminLabel = TASKBAR_LABELS[adminDefault] ?? adminDefault;
-          if (!userHasCustomized) {
-            return (
-              <Text style={taskbarStyles.adminDefaultLabel}>
-                default admin: {adminLabel}
-              </Text>
-            );
-          }
-          if (adminDefault !== taskbarStyle) {
-            return (
-              <Text style={taskbarStyles.adminDefaultLabel}>
-                default admin: {adminLabel}
-              </Text>
-            );
-          }
-          return null;
+          return (
+            <Text style={taskbarStyles.adminDefaultLabel}>
+              default admin: {adminLabel}
+            </Text>
+          );
         })()}
         <View style={taskbarStyles.row}>
           {([
