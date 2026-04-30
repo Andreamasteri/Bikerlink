@@ -614,7 +614,35 @@
     "apkVersionCode": 41,
     "apkVersionName": null,
     "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-30T01:21:54.503Z"
+  },
+  {
+    "updateNumber": 23,
+    "version": "1.23.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-23 rv8.0.0: Diagnostica OTA avanzata + geo-insight admin + counter iscritti + versione/OTA per utente + GPS Sempre avviso + fix counter admin/inattivi",
+    "note": "CURRENT_OTA_NUMBER=23. Pubblicato da publish-ota.sh (un comando solo).",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "043d6e3e-0da8-4096-a5dc-0c9485eb8874",
+    "bundleUrl": "private/ota/ota-1.23.0-1777563470143.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "aab1af0663b83eb676a52cfd392aba0d191e8101",
+    "easDashboard": null,
+    "apkBuildId": "e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkVersionCode": 41,
+    "apkVersionName": null,
+    "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
+    "status": "published",
+    "publishedAt": "2026-04-30T15:37:55.226Z"
   }
 ]
