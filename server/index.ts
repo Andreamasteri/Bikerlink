@@ -731,8 +731,9 @@ function setupErrorHandler(app: express.Application) {
         try {
           await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_app_version VARCHAR(32)`);
           await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_platform VARCHAR(16)`);
+          await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_ota_number INTEGER`);
         } catch (e) {
-          console.warn("[MIGRATION] users.last_app_version/last_platform:", e);
+          console.warn("[MIGRATION] users.last_app_version/last_platform/last_ota_number:", e);
         }
 
         try {
