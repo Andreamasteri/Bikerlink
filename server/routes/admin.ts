@@ -2892,7 +2892,7 @@ function _detectStationarySessions(
 
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
-    const ts = r.createdAt.getTime();
+    const ts = _toMs(r.createdAt);
     const gapMin = (ts - curEnd) / 60000;
     const dist = _hav(curLat, curLng, r.latitude, r.longitude);
     if (dist <= FZ_RADIUS_M && gapMin <= FZ_MAX_GAP_MIN) {
@@ -3007,7 +3007,7 @@ function _kmeansK3(sessions: FzSession[]): Array<{ lat: number; lng: number; wei
 
 router.get("/users/:id/geo-insights", async (req: Request, res: Response) => {
   try {
-    const userId = req.params.id;
+    const userId = String(req.params.id);
     const { coordinateHistory } = await import("@shared/schema");
     const rows = await db
       .select({
@@ -3020,17 +3020,17 @@ router.get("/users/:id/geo-insights", async (req: Request, res: Response) => {
       .orderBy(coordinateHistory.createdAt);
 
     if (rows.length === 0) {
-      return res.json({ zones: [], reason: "no-data" });
+      return res.json([]);
     }
 
-    const sessions = _detectStationarySessions(rows as any);
+    const sessions = _detectStationarySessions(rows);
     if (sessions.length === 0) {
-      return res.json({ zones: [], reason: "no-stationary-sessions" });
+      return res.json([]);
     }
 
     const clusters = _kmeansK3(sessions);
     if (clusters.length === 0) {
-      return res.json({ zones: [], reason: "clustering-empty" });
+      return res.json([]);
     }
 
     // Ordina per minuti totali (durata) discendente; H=longest, W=second, P=third
@@ -3044,7 +3044,7 @@ router.get("/users/:id/geo-insights", async (req: Request, res: Response) => {
       totalMinutes: Math.round(c.weight),
     }));
 
-    return res.json({ zones, reason: "ok", sessionCount: sessions.length, recordCount: rows.length });
+    return res.json(zones);
   } catch (error) {
     console.error("Admin geo-insights error:", error);
     return res.status(500).json({ message: "Errore interno del server" });

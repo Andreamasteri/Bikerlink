@@ -28,10 +28,6 @@ interface GeoZone {
   visitCount: number;
   totalMinutes: number;
 }
-interface GeoInsightResponse {
-  zones: GeoZone[];
-  reason?: string;
-}
 
 interface AdminUser {
   id: string;
@@ -134,7 +130,7 @@ export default function AdminUsers() {
     }
   }, [statsModalVisible]);
 
-  const geoInsightQuery = useQuery<GeoInsightResponse>({
+  const geoInsightQuery = useQuery<GeoZone[]>({
     queryKey: ["/api/admin/users", selectedUser?.id, "geo-insights"],
     enabled: fzEnabled && !!selectedUser && statsModalVisible,
     staleTime: 0,
@@ -611,10 +607,12 @@ export default function AdminUsers() {
   }
 
   function renderGeoInsightSection() {
-    const zones = geoInsightQuery.data?.zones ?? [];
+    const zones: GeoZone[] = geoInsightQuery.data ?? [];
     const loading = fzEnabled && (geoInsightQuery.isLoading || geoInsightQuery.isFetching);
     const errored = fzEnabled && geoInsightQuery.isError;
-    const insufficient = fzEnabled && !loading && !errored && zones.length < 3;
+    // Per spec: se i dati sono insufficienti (< 3), TUTTI i 3 numeri sono grigi
+    // e non toccabili. Idem in loading o errore.
+    const allDisabled = !fzEnabled || loading || errored || zones.length < 3;
     const slots: (GeoZone | null)[] = [zones[0] ?? null, zones[1] ?? null, zones[2] ?? null];
     return (
       <View style={statsStyles.section}>
@@ -634,7 +632,7 @@ export default function AdminUsers() {
         {fzEnabled && (
           <View style={fzStyles.row}>
             {slots.map((z, i) => {
-              const tappable = !loading && !errored && !!z;
+              const tappable = !allDisabled;
               return (
                 <Pressable
                   key={i}
@@ -645,6 +643,8 @@ export default function AdminUsers() {
                     !tappable && fzStyles.chipDisabled,
                     tappable && pressed && { opacity: 0.6 },
                   ]}
+                  // Tooltip-like accessibility hint per "Dati insufficienti"
+                  accessibilityHint={!tappable && zones.length < 3 ? "Dati insufficienti" : undefined}
                 >
                   <Text style={[fzStyles.chipNum, !tappable && fzStyles.chipTextDisabled]}>
                     {i + 1}.
@@ -666,7 +666,7 @@ export default function AdminUsers() {
         {fzEnabled && errored && (
           <Text style={[fzStyles.note, { color: Colors.error }]}>Errore nel calcolo</Text>
         )}
-        {insufficient && (
+        {fzEnabled && !loading && !errored && zones.length < 3 && (
           <Text style={fzStyles.note}>Dati insufficienti</Text>
         )}
       </View>
