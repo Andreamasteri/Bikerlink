@@ -8,13 +8,13 @@ import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 
-let MapView: any = null;
-let MapMarker: any = null;
+let MapView: React.ComponentType<Record<string, unknown>> | null = null;
+let MapMarker: React.ComponentType<Record<string, unknown>> | null = null;
 if (Platform.OS !== "web") {
   try {
     const maps = require("react-native-maps");
-    MapView = maps.default;
-    MapMarker = maps.Marker;
+    MapView = maps.default as React.ComponentType<Record<string, unknown>>;
+    MapMarker = maps.Marker as React.ComponentType<Record<string, unknown>>;
   } catch {
     MapView = null;
     MapMarker = null;
@@ -119,23 +119,59 @@ export default function AdminUsers() {
   const [searchText, setSearchText] = useState("");
   const [hideFake, setHideFake] = useState(true);
 
-  // Geo-insight (effimero, in-RAM, non persistito): si resetta a chiusura scheda utente.
+  // Geo-insight effimero: stato locale che vive solo nella scheda utente.
+  // Niente React Query → niente cache che possa sopravvivere alla chiusura.
   const [fzEnabled, setFzEnabled] = useState(false);
   const [fzMapZone, setFzMapZone] = useState<GeoZone | null>(null);
+  const [fzData, setFzData] = useState<GeoZone[]>([]);
+  const [fzLoading, setFzLoading] = useState(false);
+  const [fzError, setFzError] = useState(false);
 
+  // Reset totale quando la scheda utente viene chiusa (dati ephemeri).
   useEffect(() => {
     if (!statsModalVisible) {
       setFzEnabled(false);
       setFzMapZone(null);
+      setFzData([]);
+      setFzLoading(false);
+      setFzError(false);
     }
   }, [statsModalVisible]);
 
-  const geoInsightQuery = useQuery<GeoZone[]>({
-    queryKey: ["/api/admin/users", selectedUser?.id, "geo-insights"],
-    enabled: fzEnabled && !!selectedUser && statsModalVisible,
-    staleTime: 0,
-    gcTime: 0,
-  });
+  // Quando il toggle viene attivato → fetch on-demand.
+  // Quando viene spento → svuota immediatamente i dati.
+  useEffect(() => {
+    if (!fzEnabled || !selectedUser) {
+      setFzData([]);
+      setFzLoading(false);
+      setFzError(false);
+      return;
+    }
+    let cancelled = false;
+    setFzLoading(true);
+    setFzError(false);
+    (async () => {
+      try {
+        const url = new URL(`/api/admin/users/${selectedUser.id}/geo-insights`, getApiUrl());
+        const res = await fetch(url.toString(), { credentials: "include" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = (await res.json()) as GeoZone[];
+        if (!cancelled) {
+          setFzData(Array.isArray(json) ? json : []);
+          setFzLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setFzError(true);
+          setFzLoading(false);
+          setFzData([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fzEnabled, selectedUser]);
 
   const { data: users = [], isLoading } = useQuery<AdminUser[]>({
     queryKey: ["/api/admin/users"],
@@ -607,9 +643,9 @@ export default function AdminUsers() {
   }
 
   function renderGeoInsightSection() {
-    const zones: GeoZone[] = geoInsightQuery.data ?? [];
-    const loading = fzEnabled && (geoInsightQuery.isLoading || geoInsightQuery.isFetching);
-    const errored = fzEnabled && geoInsightQuery.isError;
+    const zones = fzData;
+    const loading = fzEnabled && fzLoading;
+    const errored = fzEnabled && fzError;
     // Per spec: se i dati sono insufficienti (< 3), TUTTI i 3 numeri sono grigi
     // e non toccabili. Idem in loading o errore.
     const allDisabled = !fzEnabled || loading || errored || zones.length < 3;

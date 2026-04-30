@@ -2982,7 +2982,9 @@ function _kmeansK3(sessions: FzSession[]): Array<{ lat: number; lng: number; wei
     if (!changed) break;
   }
 
-  // Aggrega risultati per cluster
+  // Aggrega risultati per cluster.
+  // count = numero di sessioni stazionarie (visite) finite in questo cluster,
+  // NON il numero di record GPS grezzi.
   const clusters = centers.map(() => ({ lat: 0, lng: 0, weight: 0, count: 0 }));
   const wSums = centers.map(() => ({ wLat: 0, wLng: 0, w: 0, c: 0 }));
   for (let i = 0; i < sessions.length; i++) {
@@ -2990,7 +2992,7 @@ function _kmeansK3(sessions: FzSession[]): Array<{ lat: number; lng: number; wei
     wSums[k].wLat += sessions[i].lat * sessions[i].weight;
     wSums[k].wLng += sessions[i].lng * sessions[i].weight;
     wSums[k].w += sessions[i].weight;
-    wSums[k].c += sessions[i].count;
+    wSums[k].c += 1;
   }
   for (let k = 0; k < centers.length; k++) {
     if (wSums[k].w > 0) {
