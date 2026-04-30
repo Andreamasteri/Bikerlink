@@ -106,7 +106,6 @@ export async function markJsError(error: Error, stack?: string): Promise<void> {
   const errMsg = (error.message ?? "").slice(0, 500);
   const errStack = (stack ?? error.stack ?? "").slice(0, 3000);
   _currentSession.jsError = { message: errMsg, stack: errStack };
-  _currentSession.clean = true;
   await saveCurrentSession();
   const entry: CrashLogEntry = {
     sessionId: _currentSession.sessionId,
@@ -121,6 +120,8 @@ export async function markJsError(error: Error, stack?: string): Promise<void> {
     sessionEndedAt: new Date().toISOString(),
   };
   await enqueueCrashEntry(entry);
+  _currentSession.clean = true;
+  await saveCurrentSession();
 }
 
 export async function flushQueue(): Promise<void> {
@@ -147,19 +148,25 @@ export async function initCrashLogger(userId: string): Promise<void> {
 
   if (prevSession && !prevSession.clean) {
     const crashType: CrashType = prevSession.jsError ? "crash_js" : "crash_system";
-    const entry: CrashLogEntry = {
-      sessionId: prevSession.sessionId,
-      crashType,
-      appVersion: getAppVersion(),
-      platform: Platform.OS,
-      osVersion: getOsVersion(),
-      deviceModel: getDeviceModel(),
-      errorMessage: prevSession.jsError?.message ?? null,
-      stackTrace: prevSession.jsError?.stack ?? null,
-      sessionStartedAt: prevSession.startedAt,
-      sessionEndedAt: null,
-    };
-    await enqueueCrashEntry(entry);
+    const existingQueue = await readQueue();
+    const alreadyQueued = existingQueue.some(
+      (e) => e.sessionId === prevSession.sessionId && e.crashType === crashType
+    );
+    if (!alreadyQueued) {
+      const entry: CrashLogEntry = {
+        sessionId: prevSession.sessionId,
+        crashType,
+        appVersion: getAppVersion(),
+        platform: Platform.OS,
+        osVersion: getOsVersion(),
+        deviceModel: getDeviceModel(),
+        errorMessage: prevSession.jsError?.message ?? null,
+        stackTrace: prevSession.jsError?.stack ?? null,
+        sessionStartedAt: prevSession.startedAt,
+        sessionEndedAt: null,
+      };
+      await enqueueCrashEntry(entry);
+    }
   }
 
   _currentSession = {
