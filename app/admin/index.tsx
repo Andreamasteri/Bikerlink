@@ -66,6 +66,7 @@ const adminGroups: AdminGroup[] = [
       { key: "db-debug", label: "DB Debug", icon: "database", iconSet: "MaterialCommunityIcons", route: "/admin/db-debug" },
       { key: "system", label: "System Monitor", icon: "pulse-outline", iconSet: "Ionicons", route: "/admin/system", accentColor: "#FF4444" },
       { key: "moderator-logs", label: "Log Moderatori", icon: "shield-account-outline", iconSet: "MaterialCommunityIcons", route: "/admin/moderator-logs" },
+      { key: "crash-logs", label: "Log Riavvii", icon: "phone-alert", iconSet: "MaterialCommunityIcons", route: "/admin/crash-logs", accentColor: "#FF6B35" },
     ],
   },
   {

@@ -1,5 +1,6 @@
 import React, { Component, ComponentType, PropsWithChildren } from "react";
 import { ErrorFallback, ErrorFallbackProps } from "@/components/ErrorFallback";
+import { markJsError } from "@/lib/crash-logger";
 
 export type ErrorBoundaryProps = PropsWithChildren<{
   FallbackComponent?: ComponentType<ErrorFallbackProps>;
@@ -33,6 +34,7 @@ export class ErrorBoundary extends Component<
       this.autoRetryCount = 0;
       this.lastErrorKey = errorKey;
     }
+    markJsError(error, info.componentStack).catch(() => {});
     if (typeof this.props.onError === "function") {
       this.props.onError(error, info.componentStack);
     }

@@ -64,6 +64,7 @@ import UptimeWidget from "@/components/UptimeWidget";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { sendStartupBeacon, recoverLastBeacon } from "@/lib/startup-beacon";
 import { isTrackingActive, registerLayoutWatcherCallbacks } from "@/lib/tracking-active";
+import { initCrashLogger, resetCrashLogger, markClean } from "@/lib/crash-logger";
 import {
   BACKGROUND_LOCATION_TASK_NAME,
   startBackgroundLocationTask,
@@ -175,6 +176,8 @@ function AppStateHandler() {
     queryClient.prefetchQuery({ queryKey: ["/api/settings/music-provider"], staleTime: 120_000 }).catch(() => {});
     queryClient.prefetchQuery({ queryKey: ["/api/lastfm/status"], staleTime: 60_000 }).catch(() => {});
 
+    initCrashLogger(user.id).catch(() => {});
+
     sendHeartbeat();
     heartbeatTimerRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
 
@@ -220,6 +223,8 @@ function AppStateHandler() {
       if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
       if (webLocationTimerRef.current) clearInterval(webLocationTimerRef.current);
       stopNativeWatcher();
+      markClean().catch(() => {});
+      resetCrashLogger();
     };
   }, [user]);
 

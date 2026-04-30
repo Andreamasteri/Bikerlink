@@ -35,6 +35,7 @@ export default function AdminLayout() {
       <Stack.Screen name="sensors" options={{ headerShown: false }} />
       <Stack.Screen name="moderator-logs" options={{ title: "Log Moderatori" }} />
       <Stack.Screen name="blocks" options={{ title: "Blocchi tra utenti" }} />
+      <Stack.Screen name="crash-logs" options={{ title: "Log Riavvii App" }} />
     </Stack>
   );
 }

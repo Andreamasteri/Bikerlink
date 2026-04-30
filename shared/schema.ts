@@ -1397,3 +1397,30 @@ export const gpsErrors = pgTable("gps_errors", {
 
 export type GpsError = typeof gpsErrors.$inferSelect;
 export type InsertGpsError = typeof gpsErrors.$inferInsert;
+
+export const appCrashLogs = pgTable("app_crash_logs", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  sessionId: varchar("session_id", { length: 64 }).notNull(),
+  crashType: varchar("crash_type", { length: 20 }).notNull(),
+  appVersion: varchar("app_version", { length: 32 }),
+  platform: varchar("platform", { length: 16 }),
+  osVersion: varchar("os_version", { length: 50 }),
+  deviceModel: varchar("device_model", { length: 100 }),
+  errorMessage: text("error_message"),
+  stackTrace: text("stack_trace"),
+  sessionStartedAt: timestamp("session_started_at"),
+  sessionEndedAt: timestamp("session_ended_at"),
+  reportedAt: timestamp("reported_at").notNull().defaultNow(),
+}, (table) => [
+  index("app_crash_logs_user_id_idx").on(table.userId),
+  index("app_crash_logs_crash_type_idx").on(table.crashType),
+  index("app_crash_logs_reported_at_idx").on(table.reportedAt),
+]);
+
+export type AppCrashLog = typeof appCrashLogs.$inferSelect;
+export type InsertAppCrashLog = typeof appCrashLogs.$inferInsert;
