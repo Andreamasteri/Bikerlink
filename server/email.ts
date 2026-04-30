@@ -455,6 +455,79 @@ export async function sendPasswordResetEmail(to: string, nickname: string, code:
   return sendEmail(to, subject, html);
 }
 
+export async function sendNewEventNotificationEmail(evt: {
+  title: string;
+  eventType: string;
+  eventDate: string;
+  locationName?: string | null;
+  creatorNickname: string;
+}): Promise<void> {
+  const adminEmail = "bikerlinkapp@gmail.com";
+  const esc = (v: string) =>
+    v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+  const now = new Date();
+  const createdAt = now.toLocaleString("it-IT", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome",
+  });
+
+  const typeLabels: Record<string, string> = {
+    raduno: "Raduno", uscita_gruppo: "Uscita di gruppo", festa: "Festa", gara: "Gara", altro: "Altro",
+  };
+
+  const rows = [
+    ["Titolo", esc(evt.title)],
+    ["Tipo", typeLabels[evt.eventType] ?? esc(evt.eventType)],
+    ["Data evento", esc(evt.eventDate)],
+    ["Luogo", evt.locationName ? esc(evt.locationName) : "—"],
+    ["Organizzatore", esc(evt.creatorNickname)],
+    ["Creato il", esc(createdAt)],
+  ];
+
+  const tableRows = rows
+    .map(([label, value]) =>
+      `<tr><td style="padding:8px 12px;color:#aaa;white-space:nowrap;font-size:14px;">${label}</td><td style="padding:8px 12px;color:#fff;font-size:14px;">${value}</td></tr>`
+    )
+    .join("");
+
+  const subject = `[BikerLink] Nuovo evento: ${evt.title}`;
+  const html = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:0 auto;padding:20px;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <h1 style="color:#FF6B35;margin:0;font-size:26px;">🏍️ BikerLink</h1>
+        <p style="color:#888;font-size:13px;margin-top:4px;">Nuovo evento creato e pubblicato</p>
+      </div>
+      <div style="background:#1a1a2e;border-radius:12px;padding:24px;color:#fff;">
+        <h2 style="margin-top:0;font-size:18px;color:#FF6B35;">📅 Nuovo Evento Pubblicato</h2>
+        <table style="width:100%;border-collapse:collapse;">
+          ${tableRows}
+        </table>
+      </div>
+      <p style="text-align:center;color:#666;font-size:11px;margin-top:16px;">
+        © ${now.getFullYear()} BikerLink — notifica automatica
+      </p>
+    </div>
+  `;
+
+  try {
+    const allUsers = await storage.getAllUsers();
+    const adminModEmails = allUsers
+      .filter((u) => (u.role === "admin" || u.role === "moderator") && u.email)
+      .map((u) => u.email as string);
+
+    const recipients = Array.from(new Set([adminEmail, ...adminModEmails]));
+    for (const to of recipients) {
+      sendEmail(to, subject, html).catch((e) =>
+        console.warn("[EMAIL] sendNewEventNotificationEmail error:", e)
+      );
+    }
+  } catch (err) {
+    console.warn("[EMAIL] sendNewEventNotificationEmail fetch users error:", err);
+    sendEmail(adminEmail, subject, html).catch(() => {});
+  }
+}
+
 export async function sendPasswordResetConfirmationEmail(to: string, nickname: string): Promise<boolean> {
   const subject = "BikerLink - Password aggiornata";
   const html = `

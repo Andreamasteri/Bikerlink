@@ -24,9 +24,11 @@ import {
   ilike,
   gte,
   lte,
+  inArray,
 } from "drizzle-orm";
 import { uploadBuffer, deleteObject } from "../objectStorage";
 import { allLimited } from "../lib/concurrency";
+import { sendNewEventNotificationEmail } from "../email";
 
 const router = Router();
 
@@ -455,6 +457,32 @@ router.get("/", async (req: Request, res: Response) => {
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
 
+// GET /api/events/clubs-list — lista club approvati per selezione inviti
+router.get("/clubs-list", async (req: Request, res: Response) => {
+  try {
+    const userId = requireAuth(req, res);
+    if (!userId) return;
+
+    const clubs = await db
+      .select({
+        id: motoClubs.id,
+        name: motoClubs.name,
+        clubType: motoClubs.clubType,
+        region: motoClubs.region,
+        brandName: motoClubs.brandName,
+        memberCount: motoClubs.memberCount,
+      })
+      .from(motoClubs)
+      .where(eq(motoClubs.isApproved, true))
+      .orderBy(asc(motoClubs.name));
+
+    return res.json(clubs);
+  } catch (err) {
+    console.error("[events] GET /clubs-list error:", err);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 // POST /api/events — crea evento
 router.post("/", async (req: Request, res: Response) => {
   try {
@@ -464,14 +492,17 @@ router.post("/", async (req: Request, res: Response) => {
     const {
       title, description, eventType, locationName, latitude, longitude,
       eventDate, eventTime, isRecurring, recurrenceInfo, maxParticipants,
-      websiteUrl, autoInviteReason, autoInviteRegion, autoInviteBrand,
-    } = req.body as Record<string, string | boolean | number | undefined>;
+      websiteUrl, selectedClubIds,
+    } = req.body as Record<string, string | boolean | number | string[] | undefined>;
 
     if (!title || !(title as string).trim()) {
       return res.status(400).json({ message: "Il titolo è obbligatorio" });
     }
     if (!eventDate) {
       return res.status(400).json({ message: "La data è obbligatoria" });
+    }
+    if (!locationName || !(locationName as string).trim()) {
+      return res.status(400).json({ message: "Il luogo dell'evento è obbligatorio" });
     }
     if (websiteUrl && !/^https?:\/\/.+/.test(websiteUrl as string)) {
       return res.status(400).json({ message: "URL sito web non valido (deve iniziare con http/https)" });
@@ -489,12 +520,14 @@ router.post("/", async (req: Request, res: Response) => {
       return res.status(429).json({ message: "Hai raggiunto il limite di 5 eventi al giorno" });
     }
 
+    const creator = await storage.getUser(userId);
+
     const insertData: InsertEvent = {
       title: (title as string).trim(),
       description: description ? (description as string).trim() || null : null,
       eventType: (eventType as string) || "raduno",
       creatorId: userId,
-      locationName: locationName ? (locationName as string).trim() || null : null,
+      locationName: (locationName as string).trim(),
       latitude: latitude != null ? parseFloat(String(latitude)) : null,
       longitude: longitude != null ? parseFloat(String(longitude)) : null,
       eventDate: new Date(eventDate as string),
@@ -503,16 +536,36 @@ router.post("/", async (req: Request, res: Response) => {
       recurrenceInfo: recurrenceInfo ? (recurrenceInfo as string).trim() || null : null,
       maxParticipants: maxParticipants ? parseInt(String(maxParticipants)) : null,
       websiteUrl: websiteUrl ? (websiteUrl as string).trim() || null : null,
-      autoInviteReason: autoInviteReason ? (autoInviteReason as string).trim() || null : null,
-      autoInviteRegion: autoInviteRegion ? (autoInviteRegion as string).trim() || null : null,
-      autoInviteBrand: autoInviteBrand ? (autoInviteBrand as string).trim() || null : null,
-      status: "pending",
+      autoInviteReason: null,
+      autoInviteRegion: null,
+      autoInviteBrand: null,
+      status: "approved",
+      approvedAt: new Date(),
+      approvedBy: userId,
     };
 
     const [newEvent] = await db.insert(events).values(insertData).returning();
+
+    // Inviti club specifici selezionati
+    const clubIds = Array.isArray(selectedClubIds) ? (selectedClubIds as string[]) : [];
+    if (clubIds.length > 0) {
+      sendClubInvitesByIds(newEvent, newEvent.id, clubIds, userId).catch((e) =>
+        console.error("[events] sendClubInvitesByIds error:", e)
+      );
+    }
+
+    // Notifica email ad admin/mod
+    sendNewEventNotificationEmail({
+      title: newEvent.title,
+      eventType: newEvent.eventType,
+      eventDate: newEvent.eventDate.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }),
+      locationName: newEvent.locationName,
+      creatorNickname: creator?.nickname ?? "Utente",
+    }).catch((e) => console.warn("[events] email notification error:", e));
+
     return res.status(201).json({
       event: newEvent,
-      message: "Evento creato! È in attesa di approvazione dai moderatori.",
+      message: "Evento creato e pubblicato con successo!",
     });
   } catch (err) {
     console.error("[events] POST / error:", err);
@@ -897,7 +950,56 @@ router.post("/:id/reject", async (req: Request, res: Response) => {
   }
 });
 
-// ── AUTO-INVITE HELPER ────────────────────────────────────────────────────────
+// ── AUTO-INVITE HELPERS ───────────────────────────────────────────────────────
+
+async function sendClubInvitesByIds(evt: Event, eventId: string, clubIds: string[], senderId: string): Promise<void> {
+  if (!clubIds.length) return;
+  try {
+    const clubs = await db
+      .select({ id: motoClubs.id, name: motoClubs.name, conversationId: motoClubs.conversationId })
+      .from(motoClubs)
+      .where(and(inArray(motoClubs.id, clubIds), eq(motoClubs.isApproved, true)));
+
+    for (const club of clubs) {
+      try {
+        await db.insert(eventClubInvites).values({ eventId, clubId: club.id }).onConflictDoNothing();
+
+        const members = await db.select({ userId: motoClubMembers.userId })
+          .from(motoClubMembers)
+          .where(and(eq(motoClubMembers.clubId, club.id), eq(motoClubMembers.status, "active")));
+
+        // Messaggio nella chat del club
+        if (club.conversationId) {
+          try {
+            await storage.createMessage({
+              conversationId: club.conversationId,
+              senderId,
+              messageType: "text",
+              content: `📅 Il vostro club è stato invitato all'evento "${evt.title}"! Controllatelo nella sezione Events.`,
+            });
+          } catch {}
+        }
+
+        // Notifiche ai singoli membri
+        await allLimited(members.map((member) => async () => {
+          if (member.userId === evt.creatorId) return;
+          try {
+            await storage.createNotification({
+              userId: member.userId,
+              title: "Evento per il tuo club!",
+              body: `Il tuo club "${club.name}" è stato invitato all'evento "${evt.title}".`,
+              notificationType: "event_invite",
+              referenceType: "event",
+              referenceId: eventId,
+            });
+          } catch {}
+        }));
+      } catch {}
+    }
+  } catch (err) {
+    console.error("[events] sendClubInvitesByIds error:", err);
+  }
+}
 
 async function sendClubInvites(evt: Event, approvedEventId: string): Promise<void> {
   try {
@@ -909,12 +1011,11 @@ async function sendClubInvites(evt: Event, approvedEventId: string): Promise<voi
       conditions.push(ilike(motoClubs.brandName, `%${evt.autoInviteBrand}%`));
     }
 
-    // If no filters → invite all clubs; otherwise filter by region/brand
     const clubs = conditions.length > 0
-      ? await db.select({ id: motoClubs.id, name: motoClubs.name })
+      ? await db.select({ id: motoClubs.id, name: motoClubs.name, conversationId: motoClubs.conversationId })
           .from(motoClubs)
           .where(and(...conditions))
-      : await db.select({ id: motoClubs.id, name: motoClubs.name }).from(motoClubs);
+      : await db.select({ id: motoClubs.id, name: motoClubs.name, conversationId: motoClubs.conversationId }).from(motoClubs);
 
     for (const club of clubs) {
       try {

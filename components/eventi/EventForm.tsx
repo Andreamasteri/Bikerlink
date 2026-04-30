@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -14,13 +14,23 @@ import {
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
 import type { EventType, EventDTO } from "@/shared/event-types";
 import { EVENT_TYPE_LABELS } from "@/shared/event-types";
+
+let MapView: any = null;
+let Marker: any = null;
+if (Platform.OS !== "web") {
+  try {
+    const maps = require("react-native-maps");
+    MapView = maps.default;
+    Marker = maps.Marker;
+  } catch {}
+}
 
 interface EventFormProps {
   visible: boolean;
@@ -29,6 +39,15 @@ interface EventFormProps {
 }
 
 const EVENT_TYPES: EventType[] = ["raduno", "uscita_gruppo", "festa", "gara", "altro"];
+
+interface ClubItem {
+  id: string;
+  name: string;
+  clubType: string;
+  region: string | null;
+  brandName: string | null;
+  memberCount: number;
+}
 
 interface FormState {
   title: string;
@@ -43,9 +62,6 @@ interface FormState {
   recurrenceInfo: string;
   maxParticipants: string;
   websiteUrl: string;
-  autoInviteReason: string;
-  autoInviteRegion: string;
-  autoInviteBrand: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -61,9 +77,6 @@ const EMPTY_FORM: FormState = {
   recurrenceInfo: "",
   maxParticipants: "",
   websiteUrl: "",
-  autoInviteReason: "",
-  autoInviteRegion: "",
-  autoInviteBrand: "",
 };
 
 function toFormState(evt: EventDTO): FormState {
@@ -80,11 +93,10 @@ function toFormState(evt: EventDTO): FormState {
     recurrenceInfo: evt.recurrenceInfo ?? "",
     maxParticipants: evt.maxParticipants ? String(evt.maxParticipants) : "",
     websiteUrl: evt.websiteUrl ?? "",
-    autoInviteReason: evt.autoInviteReason ?? "",
-    autoInviteRegion: evt.autoInviteRegion ?? "",
-    autoInviteBrand: evt.autoInviteBrand ?? "",
   };
 }
+
+const ITALY_CENTER = { latitude: 41.9, longitude: 12.5, latitudeDelta: 8, longitudeDelta: 8 };
 
 export default function EventForm({ visible, onClose, editingEvent }: EventFormProps) {
   const insets = useSafeAreaInsets();
@@ -96,17 +108,59 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [showTypePicker, setShowTypePicker] = useState(false);
+  const [showMapPicker, setShowMapPicker] = useState(false);
+  const [mapRegion, setMapRegion] = useState(ITALY_CENTER);
+  const [tempCoords, setTempCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [inviteClubsEnabled, setInviteClubsEnabled] = useState(false);
+  const [selectedClubIds, setSelectedClubIds] = useState<string[]>([]);
+  const [clubSearch, setClubSearch] = useState("");
+
+  const { data: clubsList = [] } = useQuery<ClubItem[]>({
+    queryKey: ["/api/events/clubs-list"],
+    enabled: visible,
+  });
 
   React.useEffect(() => {
     if (visible) {
       setForm(editingEvent ? toFormState(editingEvent) : EMPTY_FORM);
       setPendingImages([]);
       setSubmitted(false);
+      setInviteClubsEnabled(false);
+      setSelectedClubIds([]);
+      setClubSearch("");
+      setTempCoords(null);
     }
   }, [visible, editingEvent]);
 
+  React.useEffect(() => {
+    if (!inviteClubsEnabled) {
+      setSelectedClubIds([]);
+      setClubSearch("");
+    }
+  }, [inviteClubsEnabled]);
+
   const set = (key: keyof FormState, value: string | boolean) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  const toggleClub = useCallback((id: string) => {
+    setSelectedClubIds((prev) =>
+      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
+    );
+  }, []);
+
+  const filteredClubs = clubsList.filter((c) =>
+    c.name.toLowerCase().includes(clubSearch.toLowerCase()) ||
+    (c.region ?? "").toLowerCase().includes(clubSearch.toLowerCase()) ||
+    (c.brandName ?? "").toLowerCase().includes(clubSearch.toLowerCase())
+  );
+
+  const confirmMapCoords = () => {
+    if (tempCoords) {
+      set("latitude", String(tempCoords.latitude.toFixed(6)));
+      set("longitude", String(tempCoords.longitude.toFixed(6)));
+    }
+    setShowMapPicker(false);
+  };
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -117,16 +171,14 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
         description: form.description.trim() || undefined,
         eventDate: form.eventDate.split(".").reverse().join("-"),
         eventTime: form.eventTime.trim() || undefined,
-        locationName: form.locationName.trim() || undefined,
+        locationName: form.locationName.trim(),
         latitude: form.latitude ? parseFloat(form.latitude) : undefined,
         longitude: form.longitude ? parseFloat(form.longitude) : undefined,
         isRecurring: form.isRecurring,
         recurrenceInfo: form.isRecurring ? form.recurrenceInfo.trim() || undefined : undefined,
         maxParticipants: maxP && maxP > 0 ? maxP : undefined,
         websiteUrl: form.websiteUrl.trim() || undefined,
-        autoInviteReason: form.autoInviteReason.trim() || undefined,
-        autoInviteRegion: form.autoInviteRegion.trim() || undefined,
-        autoInviteBrand: form.autoInviteBrand.trim() || undefined,
+        selectedClubIds: inviteClubsEnabled ? selectedClubIds : [],
       };
 
       let evt: EventDTO;
@@ -186,6 +238,10 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
       Alert.alert("Attenzione", "Formato data non valido. Usa GG.MM.AAAA (es. 12.07.2025)");
       return;
     }
+    if (!form.locationName.trim()) {
+      Alert.alert("Attenzione", "Il luogo dell'evento è obbligatorio");
+      return;
+    }
     if (form.websiteUrl && !/^https?:\/\/.+/.test(form.websiteUrl)) {
       Alert.alert("Attenzione", "L'URL del sito deve iniziare con http:// o https://");
       return;
@@ -208,17 +264,25 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
     setPendingImages((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const coordLabel =
+    form.latitude && form.longitude
+      ? `${parseFloat(form.latitude).toFixed(4)}, ${parseFloat(form.longitude).toFixed(4)}`
+      : null;
+
   if (submitted) {
     return (
       <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
         <View style={[styles.successScreen, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
           <Ionicons name="checkmark-circle" size={64} color={Colors.success} />
           <Text style={styles.successTitle}>
-            {isEditing ? "Evento aggiornato!" : "Evento inviato!"}
+            {isEditing ? "Evento aggiornato!" : "Evento pubblicato!"}
           </Text>
           {!isEditing && (
             <Text style={styles.successBody}>
-              Il tuo evento è in attesa di approvazione da parte dei moderatori. Riceverai una notifica quando verrà approvato.
+              Evento creato e pubblicato con successo!
+              {inviteClubsEnabled && selectedClubIds.length > 0
+                ? ` I club selezionati sono stati notificati.`
+                : ""}
             </Text>
           )}
           <Pressable style={styles.successBtn} onPress={onClose}>
@@ -247,7 +311,7 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
             {createMutation.isPending ? (
               <ActivityIndicator size="small" color="#000" />
             ) : (
-              <Text style={styles.saveBtnText}>{isEditing ? "Salva" : "Invia"}</Text>
+              <Text style={styles.saveBtnText}>{isEditing ? "Salva" : "Pubblica"}</Text>
             )}
           </Pressable>
         </View>
@@ -332,7 +396,7 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
             maxLength={5}
           />
 
-          <Text style={styles.label}>Luogo</Text>
+          <Text style={styles.label}>Luogo dell'evento *</Text>
           <TextInput
             style={styles.input}
             value={form.locationName}
@@ -341,25 +405,91 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
             placeholderTextColor={Colors.textSecondary}
           />
 
-          <Text style={styles.label}>Coordinate (opzionale)</Text>
-          <View style={styles.coordRow}>
-            <TextInput
-              style={[styles.input, styles.coordInput]}
-              value={form.latitude}
-              onChangeText={(v) => set("latitude", v)}
-              placeholder="Latitudine (es. 45.4642)"
-              placeholderTextColor={Colors.textSecondary}
-              keyboardType="decimal-pad"
-            />
-            <TextInput
-              style={[styles.input, styles.coordInput]}
-              value={form.longitude}
-              onChangeText={(v) => set("longitude", v)}
-              placeholder="Longitudine (es. 9.1900)"
-              placeholderTextColor={Colors.textSecondary}
-              keyboardType="decimal-pad"
-            />
-          </View>
+          <Text style={styles.label}>Coordinate GPS (opzionale)</Text>
+          {Platform.OS !== "web" && MapView ? (
+            <>
+              <Pressable style={styles.mapPickerBtn} onPress={() => {
+                if (form.latitude && form.longitude) {
+                  const lat = parseFloat(form.latitude);
+                  const lng = parseFloat(form.longitude);
+                  setMapRegion({ latitude: lat, longitude: lng, latitudeDelta: 0.05, longitudeDelta: 0.05 });
+                  setTempCoords({ latitude: lat, longitude: lng });
+                } else {
+                  setMapRegion(ITALY_CENTER);
+                  setTempCoords(null);
+                }
+                setShowMapPicker(true);
+              }}>
+                <Ionicons
+                  name={coordLabel ? "location" : "map-outline"}
+                  size={18}
+                  color={coordLabel ? Colors.accent : Colors.textSecondary}
+                />
+                <Text style={[styles.mapPickerText, coordLabel ? { color: Colors.accent } : {}]}>
+                  {coordLabel ? `📍 ${coordLabel}` : "Seleziona posizione sulla mappa"}
+                </Text>
+                {coordLabel && (
+                  <Pressable
+                    onPress={() => { set("latitude", ""); set("longitude", ""); }}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
+                  </Pressable>
+                )}
+              </Pressable>
+
+              <Modal visible={showMapPicker} animationType="slide" onRequestClose={() => setShowMapPicker(false)}>
+                <View style={[styles.mapModal, { paddingTop: Platform.OS === "ios" ? insets.top : 0 }]}>
+                  <View style={styles.mapHeader}>
+                    <Pressable onPress={() => setShowMapPicker(false)} style={styles.mapHeaderBtn}>
+                      <Text style={styles.mapHeaderBtnText}>Annulla</Text>
+                    </Pressable>
+                    <Text style={styles.mapHeaderTitle}>Tocca per posizionare il pin</Text>
+                    <Pressable onPress={confirmMapCoords} style={[styles.mapHeaderBtn, styles.mapConfirmBtn]}>
+                      <Text style={[styles.mapHeaderBtnText, { color: Colors.accent }]}>Conferma</Text>
+                    </Pressable>
+                  </View>
+                  <MapView
+                    style={{ flex: 1 }}
+                    region={mapRegion}
+                    onRegionChangeComplete={setMapRegion}
+                    onPress={(e: any) => {
+                      const { latitude, longitude } = e.nativeEvent.coordinate;
+                      setTempCoords({ latitude, longitude });
+                    }}
+                  >
+                    {tempCoords && <Marker coordinate={tempCoords} pinColor={Colors.accent} />}
+                  </MapView>
+                  {tempCoords && (
+                    <View style={styles.coordBanner}>
+                      <Text style={styles.coordBannerText}>
+                        {tempCoords.latitude.toFixed(5)}, {tempCoords.longitude.toFixed(5)}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </Modal>
+            </>
+          ) : (
+            <View style={styles.coordRow}>
+              <TextInput
+                style={[styles.input, styles.coordInput]}
+                value={form.latitude}
+                onChangeText={(v) => set("latitude", v)}
+                placeholder="Latitudine"
+                placeholderTextColor={Colors.textSecondary}
+                keyboardType="decimal-pad"
+              />
+              <TextInput
+                style={[styles.input, styles.coordInput]}
+                value={form.longitude}
+                onChangeText={(v) => set("longitude", v)}
+                placeholder="Longitudine"
+                placeholderTextColor={Colors.textSecondary}
+                keyboardType="decimal-pad"
+              />
+            </View>
+          )}
 
           <Text style={styles.sectionTitle}>Dettagli evento</Text>
 
@@ -430,42 +560,73 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
             )}
           </View>
 
-          <Text style={styles.sectionTitle}>Inviti automatici ai club</Text>
-          <Text style={styles.hint}>
-            Se compilato, all'approvazione dell'evento i club verranno automaticamente invitati.
-          </Text>
+          <Text style={styles.sectionTitle}>Invita Motoclub</Text>
 
-          <Text style={styles.label}>Motivo dell'invito</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            value={form.autoInviteReason}
-            onChangeText={(v) => set("autoInviteReason", v)}
-            placeholder="Spiega perché i club dovrebbero partecipare (lascia vuoto per non invitare)"
-            placeholderTextColor={Colors.textSecondary}
-            multiline
-            numberOfLines={3}
-          />
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleLeft}>
+              <Text style={styles.toggleLabel}>Seleziona club da invitare</Text>
+              <Text style={styles.toggleHint}>
+                {inviteClubsEnabled && selectedClubIds.length > 0
+                  ? `${selectedClubIds.length} club selezionat${selectedClubIds.length === 1 ? "o" : "i"}`
+                  : "I club verranno notificati alla creazione"}
+              </Text>
+            </View>
+            <Switch
+              value={inviteClubsEnabled}
+              onValueChange={setInviteClubsEnabled}
+              trackColor={{ true: Colors.accent, false: Colors.border }}
+              thumbColor="#fff"
+            />
+          </View>
 
-          {!!form.autoInviteReason && (
-            <>
-              <Text style={styles.label}>Filtra per regione (opzionale)</Text>
-              <TextInput
-                style={styles.input}
-                value={form.autoInviteRegion}
-                onChangeText={(v) => set("autoInviteRegion", v)}
-                placeholder="Es. Lombardia, Veneto... (vuoto = tutte)"
-                placeholderTextColor={Colors.textSecondary}
-              />
+          {inviteClubsEnabled && (
+            <View style={styles.clubPickerContainer}>
+              <View style={styles.clubSearchRow}>
+                <Ionicons name="search" size={16} color={Colors.textSecondary} style={{ marginRight: 8 }} />
+                <TextInput
+                  style={styles.clubSearchInput}
+                  value={clubSearch}
+                  onChangeText={setClubSearch}
+                  placeholder="Cerca club per nome o regione..."
+                  placeholderTextColor={Colors.textSecondary}
+                />
+                {clubSearch.length > 0 && (
+                  <Pressable onPress={() => setClubSearch("")} hitSlop={8}>
+                    <Ionicons name="close-circle" size={16} color={Colors.textSecondary} />
+                  </Pressable>
+                )}
+              </View>
 
-              <Text style={styles.label}>Filtra per marca moto (opzionale)</Text>
-              <TextInput
-                style={styles.input}
-                value={form.autoInviteBrand}
-                onChangeText={(v) => set("autoInviteBrand", v)}
-                placeholder="Es. Ducati, Honda... (vuoto = tutte)"
-                placeholderTextColor={Colors.textSecondary}
-              />
-            </>
+              {filteredClubs.length === 0 ? (
+                <Text style={styles.clubEmptyText}>Nessun club trovato</Text>
+              ) : (
+                filteredClubs.map((club) => {
+                  const isSelected = selectedClubIds.includes(club.id);
+                  const subtitle = club.brandName
+                    ? `Brand · ${club.brandName}`
+                    : club.region
+                    ? `Regione · ${club.region}`
+                    : club.clubType;
+                  return (
+                    <Pressable
+                      key={club.id}
+                      style={[styles.clubRow, isSelected && styles.clubRowSelected]}
+                      onPress={() => toggleClub(club.id)}
+                    >
+                      <View style={styles.clubRowLeft}>
+                        <Text style={[styles.clubName, isSelected && { color: Colors.accent }]}>
+                          {club.name}
+                        </Text>
+                        <Text style={styles.clubSubtitle}>{subtitle}</Text>
+                      </View>
+                      <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+                        {isSelected && <Ionicons name="checkmark" size={14} color="#000" />}
+                      </View>
+                    </Pressable>
+                  );
+                })
+              )}
+            </View>
           )}
         </ScrollView>
       </View>
@@ -596,6 +757,75 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: Colors.text,
   },
+  mapPickerBtn: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  mapPickerText: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  mapModal: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  mapHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+  },
+  mapHeaderTitle: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: Colors.text,
+  },
+  mapHeaderBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  mapConfirmBtn: {},
+  mapHeaderBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: Colors.textSecondary,
+  },
+  coordBanner: {
+    position: "absolute",
+    bottom: 40,
+    left: 16,
+    right: 16,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  coordBannerText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: "#fff",
+  },
+  coordRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  coordInput: {
+    flex: 1,
+  },
   toggleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -669,6 +899,74 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.accent,
   },
+  clubPickerContainer: {
+    marginTop: 8,
+    backgroundColor: Colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: "hidden",
+  },
+  clubSearchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+  },
+  clubSearchInput: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: Colors.text,
+  },
+  clubEmptyText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    paddingVertical: 16,
+  },
+  clubRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+  },
+  clubRowSelected: {
+    backgroundColor: Colors.surfaceLight,
+  },
+  clubRowLeft: {
+    flex: 1,
+    gap: 2,
+  },
+  clubName: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: Colors.text,
+  },
+  clubSubtitle: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+  },
+  checkboxSelected: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
   successScreen: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -701,12 +999,5 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 16,
     color: "#000",
-  },
-  coordRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  coordInput: {
-    flex: 1,
   },
 });
