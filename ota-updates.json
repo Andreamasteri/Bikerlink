@@ -642,7 +642,35 @@
     "apkVersionCode": 41,
     "apkVersionName": null,
     "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-04-30T15:37:55.226Z"
+  },
+  {
+    "updateNumber": 24,
+    "version": "1.24.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-24 rv8.0.0: Menù profilo: flag admin stile mappa + preferenze unità con default paese (US/GB→imperiale) + taskbar semplificata (raggruppa/scorri) + popup aggiornamento app non bloccante + pulizia codice",
+    "note": "CURRENT_OTA_NUMBER=24. Pubblicato da publish-ota.sh (un comando solo).",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "c304597b-ff8a-4f56-b534-21c05e47c631",
+    "bundleUrl": "private/ota/ota-1.24.0-1777586558136.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "9643c8d8a4ca4f2c77f210c5a68dab41f0d40a66",
+    "easDashboard": null,
+    "apkBuildId": "e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkVersionCode": 41,
+    "apkVersionName": null,
+    "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
+    "status": "published",
+    "publishedAt": "2026-04-30T22:04:14.540Z"
   }
 ]
