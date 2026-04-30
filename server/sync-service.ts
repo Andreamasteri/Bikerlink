@@ -56,18 +56,19 @@ async function readJsonSetting<T>(key: string): Promise<T | null> {
 }
 
 /**
- * Rileva se siamo nell'ambiente di produzione Replit.
+ * Rileva se siamo nell'ambiente di produzione.
  *
- * In questo progetto start-backend.sh imposta NODE_ENV=production anche nel
- * dev workspace, quindi NODE_ENV NON è un indicatore affidabile.
- * I soli flag su cui fare affidamento sono quelli iniettati dall'infrastruttura
- * Replit esclusivamente nella deployed app:
- *   - REPLIT_DEPLOYMENT="1"  (flag canonico per le deployed app Replit)
- *   - REPLIT_INTERNAL_APP_DOMAIN  (dominio interno, impostato solo in produzione)
+ * Guard multiplo e-or su tutti i segnali disponibili:
+ *   - REPLIT_DEPLOYMENT="1"       → deployed app Replit (flag canonico)
+ *   - REPLIT_INTERNAL_APP_DOMAIN  → dominio interno Replit, solo in produzione
+ *   - NODE_ENV="production"       → standard Node.js production flag
+ *     (nel dev workspace start-backend.sh imposta anche NODE_ENV=production,
+ *      ma contestualmente inietta REPLIT_DEV=1 per distinguerlo)
  */
 function isProductionEnvironment(): boolean {
   if (process.env.REPLIT_DEPLOYMENT === "1") return true;
   if (process.env.REPLIT_INTERNAL_APP_DOMAIN) return true;
+  if (process.env.NODE_ENV === "production" && !process.env.REPLIT_DEV) return true;
   return false;
 }
 

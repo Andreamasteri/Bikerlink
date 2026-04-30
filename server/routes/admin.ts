@@ -3813,19 +3813,23 @@ router.post("/sync-prod-to-dev", async (req: Request, res: Response) => {
     if (!isSyncAvailable()) {
       return res.status(403).json({ message: "Sync non disponibile: controllare PROD_DATABASE_URL o verificare l'ambiente" });
     }
-    const result = await syncProdToDev();
-    if (result.ok) {
-      await storage.createModeratorLog({
-        moderatorId: req.session.userId!,
-        action: "sync_prod_to_dev",
-        targetType: "system",
-        targetId: "database",
-        details: "Sync manuale produzione → sviluppo completato",
-      });
-      return res.json({ ok: true });
-    } else {
-      return res.status(500).json({ message: result.error ?? "Errore sconosciuto durante il sync" });
-    }
+    // Avvio asincrono: risponde subito con 202, il sync gira in background
+    // Il client può interrogare /sync-status per seguire l'avanzamento
+    const moderatorId = req.session.userId!;
+    syncProdToDev().then(async (result) => {
+      if (result.ok) {
+        await storage.createModeratorLog({
+          moderatorId,
+          action: "sync_prod_to_dev",
+          targetType: "system",
+          targetId: "database",
+          details: "Sync manuale produzione → sviluppo completato",
+        }).catch(() => {});
+      }
+    }).catch((err) => {
+      console.error("Admin sync-prod-to-dev background error:", err);
+    });
+    return res.status(202).json({ ok: true, message: "Sync avviato — usa /sync-status per seguire l'avanzamento" });
   } catch (error: any) {
     console.error("Admin sync-prod-to-dev error:", error);
     return res.status(500).json({ message: error.message || "Errore interno del server" });
