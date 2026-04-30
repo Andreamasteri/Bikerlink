@@ -31,7 +31,13 @@ const VALID_TIME_FORMATS: TimeFormat[] = ["12h", "24h"];
 const VALID_SPEED_UNITS: SpeedUnit[] = ["kmh", "mph", "knots"];
 const VALID_DISTANCE_UNITS: DistanceUnit[] = ["km_m", "mi_ft", "mi_yd", "nmi_ftm"];
 
+const IMPERIAL_COUNTRY_ALIASES: Record<string, string> = { USA: "US", UK: "GB" };
 const IMPERIAL_COUNTRIES = new Set(["US", "GB"]);
+
+function normalizeCountryCode(country: string): string {
+  const upper = country.toUpperCase();
+  return IMPERIAL_COUNTRY_ALIASES[upper] ?? upper;
+}
 
 function isValidTimeFormat(v: unknown): v is TimeFormat {
   return VALID_TIME_FORMATS.includes(v as TimeFormat);
@@ -111,7 +117,7 @@ export function UnitsProvider({ children }: { children: React.ReactNode }) {
 
   const applyCountryDefault = useCallback((country: string) => {
     if (!storageLoaded || hasStoredPreference) return;
-    if (IMPERIAL_COUNTRIES.has(country)) {
+    if (IMPERIAL_COUNTRIES.has(normalizeCountryCode(country))) {
       const imperial: UnitsPreferences = { timeFormat: "12h", speedUnit: "mph", distanceUnit: "mi_ft" };
       setTimeFormatState("12h");
       setSpeedUnitState("mph");
