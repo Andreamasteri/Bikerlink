@@ -431,17 +431,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
     }
-    // Canonical diagnostic event: phase="server-check", source="server".
+    // Canonical diagnostic event: phase="server-check"|"server-anon-check", source="server".
     // Lo `status` (es: "204-not-android", "304-etag-match") va nel campo `error`
     // come info diagnostica anche quando la richiesta è andata a buon fine.
+    //
+    // Task #1148: logging anonimo con campionamento — anche le richieste senza
+    // ?debug=1 vengono loggate 1 ogni N (env OTA_PROBE_SAMPLE, default 20) per
+    // dare visibilità in produzione senza saturare il DB. Errori (5xx) e
+    // anomalie (header mancanti, runtime mismatch) sono SEMPRE loggati.
+    const requestStartedAt = Date.now();
+    const otaProbeSampleN = (() => {
+      const raw = parseInt(String(process.env.OTA_PROBE_SAMPLE ?? "20"), 10);
+      return Number.isFinite(raw) && raw > 0 ? raw : 20;
+    })();
     const logEvent = async (status: string, releaseId: string | null, errMsg?: string) => {
-      if (!debug) return;
+      // Decide se loggare:
+      // 1) sempre se ?debug=1 admin
+      // 2) sempre se è un errore (5xx) o un'anomalia diagnostica
+      // 3) altrimenti campionato 1/N
+      const isAnomaly = status.startsWith("5") || status === "missing-headers" || status === "runtime-mismatch";
+      const sampled = Math.floor(Math.random() * otaProbeSampleN) === 0;
+      if (!debug && !isAnomaly && !sampled) return;
       try {
         const { otaEvents } = await import("@shared/schema");
         const { db } = await import("./db");
-        const detail = errMsg ? `${status} | ${errMsg}` : status;
+        const durationMs = Date.now() - requestStartedAt;
+        const detail = errMsg ? `${status} | ${errMsg} | ${durationMs}ms` : `${status} | ${durationMs}ms`;
         await db.insert(otaEvents).values({
-          phase: "server-check",
+          phase: debug ? "server-check" : "server-anon-check",
           source: "server",
           platform: ((req.headers["expo-platform"] as string) ?? "?").substring(0, 16),
           runtimeVersion: ((req.headers["expo-runtime-version"] as string) ?? "?").substring(0, 32),

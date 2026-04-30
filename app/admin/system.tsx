@@ -28,6 +28,7 @@ import {
   forceRecheck,
 } from "@/components/NativeUpdateChecker";
 import { runManualOtaCheck } from "@/lib/ota-check";
+import * as Clipboard from "expo-clipboard";
 
 // ── Module-scope per garantire identità stabile della classe tra i render.
 // Dichiarare AdminFetchError dentro il componente farebbe sì che `instanceof`
@@ -83,6 +84,21 @@ interface OtaErrorEntry {
   timestamp: string;
 }
 
+interface OtaProbeView {
+  status?: number;
+  contentType?: string;
+  bodySnippet?: string;
+  durationMs?: number;
+  error?: string;
+}
+interface OtaDiagnosticsView {
+  errorCode?: string;
+  nativeStack?: string;
+  updateUrl?: string;
+  networkInfo?: string;
+  probe?: OtaProbeView;
+}
+
 interface OtaEventRow {
   id: string;
   created_at: string;
@@ -95,6 +111,7 @@ interface OtaEventRow {
   error: string | null;
   fail_count: number;
   ip: string | null;
+  diagnostics: OtaDiagnosticsView | null;
 }
 
 interface OtaEventsResponse {
@@ -737,6 +754,9 @@ export default function SystemScreen() {
             </View>
           )}
 
+          <OtaDiagnosticsCard events={otaEventsData?.events ?? []} />
+
+
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Ionicons name="cloud-done-outline" size={18} color={Colors.accent} />
@@ -1185,6 +1205,180 @@ export default function SystemScreen() {
     </>
   );
 }
+
+// Task #1148: card "Diagnostica OTA" — mostra l'ULTIMO errore con tutti i nuovi
+// campi diagnostici (errorCode, networkInfo, probe, nativeStack collassabile)
+// e un pulsante "Copia diagnostica" che mette il JSON in clipboard.
+function OtaDiagnosticsCard({ events }: { events: OtaEventRow[] }) {
+  const [stackOpen, setStackOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const lastErrorEvent = useMemo(() => {
+    return events.find((e) => !!e.error && !e.error.startsWith("ok:")) ?? null;
+  }, [events]);
+
+  const handleCopy = useCallback(async () => {
+    if (!lastErrorEvent) return;
+    try {
+      await Clipboard.setStringAsync(JSON.stringify(lastErrorEvent, null, 2));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      Alert.alert("Errore", "Impossibile copiare negli appunti.");
+    }
+  }, [lastErrorEvent]);
+
+  if (!lastErrorEvent) {
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="bug-outline" size={18} color={Colors.accent} />
+          <Text style={styles.cardTitle}>Diagnostica OTA</Text>
+        </View>
+        <Text style={styles.hintText}>
+          Nessun errore OTA recente. Quando il check fallisce, qui appariranno
+          codice errore, stato di rete, esito del probe HTTP e stack nativo.
+        </Text>
+      </View>
+    );
+  }
+
+  const diag = lastErrorEvent.diagnostics ?? {};
+  const probe = diag.probe;
+  const probeOk = probe && typeof probe.status === "number" && probe.status >= 200 && probe.status < 400;
+  const probeColor = probe?.error ? "#FF4444" : probeOk ? "#44AA44" : "#FF8C00";
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Ionicons name="bug-outline" size={18} color="#FF4444" />
+        <Text style={[styles.cardTitle, { color: "#FF4444" }]}>Diagnostica OTA</Text>
+        <TouchableOpacity onPress={handleCopy} style={{ marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Ionicons name={copied ? "checkmark-outline" : "copy-outline"} size={16} color={copied ? "#44AA44" : Colors.accent} />
+          <Text style={{ color: copied ? "#44AA44" : Colors.accent, fontSize: 12 }}>
+            {copied ? "Copiato" : "Copia"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <Text style={[styles.hintText, { fontSize: 11, marginBottom: 8 }]}>
+        Ultimo errore: {formatTimestamp(lastErrorEvent.created_at)}
+      </Text>
+
+      {diag.errorCode ? (
+        <View style={otaDiagStyles.row}>
+          <Text style={otaDiagStyles.label}>code</Text>
+          <Text style={[otaDiagStyles.value, { color: "#FF4444", fontWeight: "700" }]}>{diag.errorCode}</Text>
+        </View>
+      ) : null}
+
+      <View style={otaDiagStyles.row}>
+        <Text style={otaDiagStyles.label}>error</Text>
+        <Text style={otaDiagStyles.value} numberOfLines={3}>{lastErrorEvent.error}</Text>
+      </View>
+
+      {diag.networkInfo ? (
+        <View style={otaDiagStyles.row}>
+          <Text style={otaDiagStyles.label}>network</Text>
+          <Text style={otaDiagStyles.value}>{diag.networkInfo}</Text>
+        </View>
+      ) : null}
+
+      {diag.updateUrl ? (
+        <View style={otaDiagStyles.row}>
+          <Text style={otaDiagStyles.label}>updateUrl</Text>
+          <Text style={otaDiagStyles.value} numberOfLines={2}>{diag.updateUrl}</Text>
+        </View>
+      ) : null}
+
+      {probe ? (
+        <View style={otaDiagStyles.probeBox}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
+            <Ionicons
+              name={probe.error ? "close-circle" : probeOk ? "checkmark-circle" : "alert-circle"}
+              size={14}
+              color={probeColor}
+            />
+            <Text style={{ color: probeColor, fontWeight: "700", fontSize: 12 }}>
+              probe HTTP {probe.status ?? "—"}{typeof probe.durationMs === "number" ? ` · ${probe.durationMs}ms` : ""}
+            </Text>
+          </View>
+          {probe.contentType ? (
+            <Text style={otaDiagStyles.probeMeta}>content-type: {probe.contentType}</Text>
+          ) : null}
+          {probe.error ? (
+            <Text style={[otaDiagStyles.probeMeta, { color: "#FF8888" }]}>err: {probe.error}</Text>
+          ) : null}
+          {probe.bodySnippet ? (
+            <Text style={otaDiagStyles.probeBody} numberOfLines={3}>
+              {probe.bodySnippet || "(empty body)"}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
+      {diag.nativeStack ? (
+        <View style={{ marginTop: 8 }}>
+          <TouchableOpacity onPress={() => setStackOpen((v) => !v)} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <Ionicons name={stackOpen ? "chevron-down-outline" : "chevron-forward-outline"} size={14} color={(Colors.textMuted ?? "#666")} />
+            <Text style={{ color: (Colors.textMuted ?? "#666"), fontSize: 12 }}>nativeStack ({diag.nativeStack.length}c)</Text>
+          </TouchableOpacity>
+          {stackOpen ? (
+            <Text style={otaDiagStyles.stack} selectable>{diag.nativeStack}</Text>
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+const otaDiagStyles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    paddingVertical: 3,
+    gap: 8,
+    alignItems: "flex-start",
+  },
+  label: {
+    color: (Colors.textMuted ?? "#666"),
+    fontSize: 11,
+    width: 80,
+    fontVariant: ["tabular-nums"],
+  },
+  value: {
+    color: Colors.text,
+    fontSize: 12,
+    flex: 1,
+    fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
+  },
+  probeBox: {
+    marginTop: 8,
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: "rgba(0,0,0,0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  probeMeta: {
+    color: (Colors.textMuted ?? "#666"),
+    fontSize: 11,
+    fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
+  },
+  probeBody: {
+    color: Colors.text,
+    fontSize: 11,
+    marginTop: 4,
+    fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
+  },
+  stack: {
+    marginTop: 6,
+    color: Colors.text,
+    fontSize: 10,
+    fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
+    backgroundColor: "rgba(0,0,0,0.3)",
+    padding: 6,
+    borderRadius: 4,
+  },
+});
 
 const styles = StyleSheet.create({
   center: {

@@ -37,6 +37,14 @@ import { allSettledLimited } from "../lib/concurrency";
 
 const router = Router();
 
+interface OtaProbeRecord {
+  status?: number;
+  contentType?: string;
+  bodySnippet?: string;
+  durationMs?: number;
+  error?: string;
+}
+
 interface OtaErrorEntry {
   error: string;
   failCount: number;
@@ -46,6 +54,12 @@ interface OtaErrorEntry {
   source?: string;
   platform?: string;
   timestamp: string;
+  // Task #1148: diagnostica avanzata, tutti opzionali e già troncati a monte.
+  errorCode?: string;
+  nativeStack?: string;
+  updateUrl?: string;
+  networkInfo?: string;
+  probe?: OtaProbeRecord;
 }
 const otaErrors: OtaErrorEntry[] = [];
 const OTA_ERRORS_MAX = 100;
@@ -104,7 +118,10 @@ const startupBeaconLimiter = rateLimit({
 // Upper-bounded windows + small caps mean a single IP can no longer flood
 // logs (client-error) or pollute ota_events / in-memory ring buffers
 // (ota-error) without hitting a hard limit.
-const otaErrorJson = express.json({ limit: "8kb" });
+// Task #1148: limite alzato da 8kb a 16kb per ospitare i nuovi campi
+// diagnostici (nativeStack ~1.5kb, probe.bodySnippet 200, ecc.) — tutti
+// comunque troncati esplicitamente prima di essere persistiti.
+const otaErrorJson = express.json({ limit: "16kb" });
 const otaErrorLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
@@ -281,7 +298,11 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
     if (!checkOtaErrorRate(ip)) {
       return res.status(429).json({ message: "Troppi eventi OTA: rallenta." });
     }
-    const { error, failCount, updateId, runtimeVersion, phase, source, platform } = req.body as {
+    const {
+      error, failCount, updateId, runtimeVersion, phase, source, platform,
+      // Task #1148: nuovi campi diagnostici opzionali (tutti troncati sotto).
+      errorCode, nativeStack, updateUrl, networkInfo, probe,
+    } = req.body as {
       error?: string;
       failCount?: number;
       updateId?: string;
@@ -289,8 +310,38 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
       phase?: string;
       source?: string;
       platform?: string;
+      errorCode?: string;
+      nativeStack?: string;
+      updateUrl?: string;
+      networkInfo?: string;
+      probe?: {
+        status?: unknown;
+        contentType?: unknown;
+        bodySnippet?: unknown;
+        durationMs?: unknown;
+        error?: unknown;
+      };
     };
     if (!error) return res.status(400).json({ message: "error is required" });
+
+    // Sanitizza/tronca esplicitamente il blocco diagnostico — anche se il
+    // frontend dovrebbe già farlo, qui è la fonte di verità per i limiti.
+    const sanitizedProbe: OtaProbeRecord | undefined = probe && typeof probe === "object" ? {
+      status: typeof probe.status === "number" ? probe.status : undefined,
+      contentType: typeof probe.contentType === "string" ? probe.contentType.substring(0, 64) : undefined,
+      bodySnippet: typeof probe.bodySnippet === "string" ? probe.bodySnippet.substring(0, 200) : undefined,
+      durationMs: typeof probe.durationMs === "number" ? probe.durationMs : undefined,
+      error: typeof probe.error === "string" ? probe.error.substring(0, 200) : undefined,
+    } : undefined;
+    const sanitizedDiag = {
+      errorCode: typeof errorCode === "string" ? errorCode.substring(0, 64) : undefined,
+      nativeStack: typeof nativeStack === "string" ? nativeStack.substring(0, 1500) : undefined,
+      updateUrl: typeof updateUrl === "string" ? updateUrl.substring(0, 256) : undefined,
+      networkInfo: typeof networkInfo === "string" ? networkInfo.substring(0, 64) : undefined,
+      probe: sanitizedProbe,
+    };
+    const hasDiagnostics = Object.values(sanitizedDiag).some((v) => v !== undefined);
+
     const entry: OtaErrorEntry = {
       error: String(error).substring(0, 500),
       failCount: typeof failCount === "number" ? failCount : 0,
@@ -300,6 +351,7 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
       source: source ? String(source).substring(0, 24) : undefined,
       platform: platform ? String(platform).substring(0, 16) : undefined,
       timestamp: new Date().toISOString(),
+      ...sanitizedDiag,
     };
     // Tieni l'array in memoria come fallback per /system-health (UI legacy).
     otaErrors.push(entry);
@@ -320,6 +372,7 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
         error: entry.error,
         failCount: entry.failCount,
         ip: clientIp(req),
+        diagnostics: hasDiagnostics ? sanitizedDiag : undefined,
       });
       // Retention soft: cleanup probabilistico (~1/50 insert) per evitare
       // contention DB sotto burst di traffico (l'endpoint è pubblico).
@@ -473,7 +526,7 @@ router.get("/ota-events", async (req: Request, res: Response) => {
     const limitRaw = parseInt(String(req.query.limit ?? "100"), 10);
     const limit = Math.min(Math.max(isNaN(limitRaw) ? 100 : limitRaw, 1), 500);
     const result = await db.execute(sql`
-      SELECT id, created_at, phase, source, platform, runtime_version, current_update_id, release_id, error, fail_count, ip
+      SELECT id, created_at, phase, source, platform, runtime_version, current_update_id, release_id, error, fail_count, ip, diagnostics
       FROM ota_events
       ORDER BY created_at DESC
       LIMIT ${limit}
