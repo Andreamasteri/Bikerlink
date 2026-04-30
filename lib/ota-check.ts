@@ -135,21 +135,12 @@ async function runProbe(currentUpdateId: string, runtimeVersion: string): Promis
   }
 }
 
-// Best-effort: se expo-network non è disponibile, ritorna "unknown".
+// Stub: `expo-network` NON è installato in package.json. Un dynamic import con
+// stringa letterale verrebbe risolto comunque da Metro al bundle time e farebbe
+// fallire la build. Per ora ritorna sempre "unknown"; basta installare
+// `expo-network` e riscrivere questa funzione per popolarla davvero.
 async function getNetworkInfo(): Promise<string> {
-  try {
-    // @ts-ignore — pacchetto opzionale, caricato dinamicamente
-    const net = await import("expo-network").catch(() => null);
-    if (!net) return "unknown";
-    const state = await (net as { getNetworkStateAsync?: () => Promise<{ isConnected?: boolean; isInternetReachable?: boolean; type?: string }> }).getNetworkStateAsync?.();
-    if (!state) return "unknown";
-    const conn = state.isConnected ? "online" : "offline";
-    const reach = state.isInternetReachable === false ? "/no-inet" : "";
-    const type = state.type ? `/${state.type}` : "";
-    return `${conn}${reach}${type}`.substring(0, 64);
-  } catch {
-    return "unknown";
-  }
+  return "unknown";
 }
 
 interface ReportPayload {
@@ -164,6 +155,7 @@ interface ReportPayload {
   errorUserInfo?: string;
   nativeStack?: string;
   updateUrl?: string;
+  channel?: string;
   networkInfo?: string;
   probe?: OtaProbeResult;
 }
@@ -231,6 +223,9 @@ export async function triggerOtaCheck(
   const currentUpdateId = Updates.updateId ?? "embedded";
   const runtimeVersion = Updates.runtimeVersion ?? "unknown";
   const updateUrl = (Updates as { updateUrl?: string | null }).updateUrl ?? undefined;
+  // Task #1148: Updates.channel ("default", "preview", ...) aiuta a distinguere
+  // device su build con channel sbagliato — frequente causa di "no update" persistente.
+  const channel = (Updates as { channel?: string | null }).channel ?? undefined;
   let phase: OtaPhase = "check";
 
   // Task #1148: probe + checkForUpdateAsync in parallelo.
@@ -294,6 +289,7 @@ export async function triggerOtaCheck(
       errorUserInfo: details.userInfo,
       nativeStack: details.nativeStack,
       updateUrl,
+      channel,
       networkInfo: netInfo,
       probe: probeRes,
     });

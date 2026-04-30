@@ -93,8 +93,11 @@ interface OtaProbeView {
 }
 interface OtaDiagnosticsView {
   errorCode?: string;
+  errorCause?: string;
+  errorUserInfo?: string;
   nativeStack?: string;
   updateUrl?: string;
+  channel?: string;
   networkInfo?: string;
   probe?: OtaProbeView;
 }
@@ -1296,6 +1299,27 @@ function OtaDiagnosticsCard({ events }: { events: OtaEventRow[] }) {
         <Text style={otaDiagStyles.label}>error</Text>
         <Text style={otaDiagStyles.value} numberOfLines={3}>{lastErrorEvent.error}</Text>
       </View>
+
+      {diag.errorCause ? (
+        <View style={otaDiagStyles.row}>
+          <Text style={otaDiagStyles.label}>cause</Text>
+          <Text style={otaDiagStyles.value} numberOfLines={3}>{diag.errorCause}</Text>
+        </View>
+      ) : null}
+
+      {diag.errorUserInfo ? (
+        <View style={otaDiagStyles.row}>
+          <Text style={otaDiagStyles.label}>userInfo</Text>
+          <Text style={otaDiagStyles.value} numberOfLines={3}>{diag.errorUserInfo}</Text>
+        </View>
+      ) : null}
+
+      {diag.channel ? (
+        <View style={otaDiagStyles.row}>
+          <Text style={otaDiagStyles.label}>channel</Text>
+          <Text style={otaDiagStyles.value}>{diag.channel}</Text>
+        </View>
+      ) : null}
 
       {diag.networkInfo ? (
         <View style={otaDiagStyles.row}>

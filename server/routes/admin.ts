@@ -60,6 +60,7 @@ interface OtaErrorEntry {
   errorUserInfo?: string;
   nativeStack?: string;
   updateUrl?: string;
+  channel?: string;
   networkInfo?: string;
   probe?: OtaProbeRecord;
 }
@@ -303,7 +304,7 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
     const {
       error, failCount, updateId, runtimeVersion, phase, source, platform,
       // Task #1148: nuovi campi diagnostici opzionali (tutti troncati sotto).
-      errorCode, errorCause, errorUserInfo, nativeStack, updateUrl, networkInfo, probe,
+      errorCode, errorCause, errorUserInfo, nativeStack, updateUrl, channel, networkInfo, probe,
     } = req.body as {
       error?: string;
       failCount?: number;
@@ -317,6 +318,7 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
       errorUserInfo?: string;
       nativeStack?: string;
       updateUrl?: string;
+      channel?: string;
       networkInfo?: string;
       probe?: {
         status?: unknown;
@@ -343,6 +345,7 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
       errorUserInfo: typeof errorUserInfo === "string" ? errorUserInfo.substring(0, 500) : undefined,
       nativeStack: typeof nativeStack === "string" ? nativeStack.substring(0, 1500) : undefined,
       updateUrl: typeof updateUrl === "string" ? updateUrl.substring(0, 256) : undefined,
+      channel: typeof channel === "string" ? channel.substring(0, 32) : undefined,
       networkInfo: typeof networkInfo === "string" ? networkInfo.substring(0, 64) : undefined,
       probe: sanitizedProbe,
     };
