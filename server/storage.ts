@@ -1202,7 +1202,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async countOnlineUsers(since: Date, countries?: string[]): Promise<number> {
-    const conditions: any[] = [eq(users.status, "active"), gte(users.lastLoginAt, since), eq(users.ghostMode, false)];
+    const conditions: any[] = [eq(users.status, "active"), gte(users.lastLoginAt, since), eq(users.ghostMode, false), notInArray(users.role, ["admin"])];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(and(...conditions));
     return result[0]?.count ?? 0;
