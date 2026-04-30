@@ -800,17 +800,8 @@ export default function AdminSettings() {
     : "tutti";
 
   const taskbarDefaultMutation = useMutation({
-    mutationFn: async (value: string) => {
-      const url = new URL("/api/admin/settings/default_taskbar_style", getApiUrl());
-      const res = await fetch(url.toString(), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Errore aggiornamento stile taskbar");
-      return res.json();
-    },
+    mutationFn: (value: string) =>
+      apiRequest("PUT", "/api/admin/settings/default_taskbar_style", { value }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
     },
