@@ -535,6 +535,53 @@ router.get("/users", async (_req: Request, res: Response) => {
   }
 });
 
+router.get("/users/stats/summary", async (_req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select({
+        userType: users.userType,
+        sex: users.sex,
+        isFake: users.isFake,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(users)
+      .where(and(ne(users.role, "admin"), ne(users.role, "moderator")))
+      .groupBy(users.userType, users.sex, users.isFake);
+
+    const sum = (type?: string, sex?: string | null, fake?: boolean) =>
+      rows
+        .filter((r) =>
+          (type === undefined || r.userType === type) &&
+          (sex === undefined || r.sex === sex) &&
+          (fake === undefined || r.isFake === fake)
+        )
+        .reduce((s, r) => s + r.count, 0);
+
+    return res.json({
+      totale: {
+        real: sum(undefined, undefined, false),
+        fake: sum(undefined, undefined, true),
+      },
+      biker: {
+        total: { real: sum("biker", undefined, false), fake: sum("biker", undefined, true) },
+        M: { real: sum("biker", "M", false), fake: sum("biker", "M", true) },
+        F: { real: sum("biker", "F", false), fake: sum("biker", "F", true) },
+      },
+      zavorrina: {
+        total: { real: sum("zavorrina", undefined, false), fake: sum("zavorrina", undefined, true) },
+        M: { real: sum("zavorrina", "M", false), fake: sum("zavorrina", "M", true) },
+        F: { real: sum("zavorrina", "F", false), fake: sum("zavorrina", "F", true) },
+      },
+      coppia: {
+        total: { real: sum("coppia", undefined, false), fake: sum("coppia", undefined, true) },
+      },
+    });
+  } catch (err) {
+    console.error("[admin] users stats summary error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 router.put("/users/:id/status", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;

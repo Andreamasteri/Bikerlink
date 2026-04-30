@@ -21,6 +21,23 @@ interface AdminUser {
   hasLastfmData?: boolean;
 }
 
+interface UserSummaryStats {
+  totale: { real: number; fake: number };
+  biker: {
+    total: { real: number; fake: number };
+    M: { real: number; fake: number };
+    F: { real: number; fake: number };
+  };
+  zavorrina: {
+    total: { real: number; fake: number };
+    M: { real: number; fake: number };
+    F: { real: number; fake: number };
+  };
+  coppia: {
+    total: { real: number; fake: number };
+  };
+}
+
 interface UserStats {
   user: {
     id: string;
@@ -81,6 +98,10 @@ export default function AdminUsers() {
     queryKey: ["/api/admin/users"],
   });
 
+  const { data: summary } = useQuery<UserSummaryStats>({
+    queryKey: ["/api/admin/users/stats/summary"],
+  });
+
   const statsQuery = useQuery<UserStats>({
     queryKey: ["/api/admin/users", selectedUser?.id, "stats"],
     enabled: statsModalVisible && !!selectedUser,
@@ -105,7 +126,10 @@ export default function AdminUsers() {
       const res = await apiRequest("PUT", `/api/admin/users/${id}/role`, { role });
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users/stats/summary"] });
+    },
   });
 
   const emailMutation = useMutation({
@@ -139,6 +163,7 @@ export default function AdminUsers() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users/stats/summary"] });
       Alert.alert("Successo", "Profilo eliminato");
     },
     onError: () => Alert.alert("Errore", "Impossibile eliminare il profilo"),
@@ -511,8 +536,55 @@ export default function AdminUsers() {
     );
   }
 
+  const n = (slot: { real: number; fake: number }) =>
+    hideFake ? slot.real : slot.real + slot.fake;
+
   return (
     <View style={styles.container}>
+      {summary && (
+        <View style={summaryStyles.wrapper}>
+          <Text style={summaryStyles.title}>ISCRITTI</Text>
+          <View style={summaryStyles.grid}>
+            <View style={[summaryStyles.card, { borderColor: Colors.accent + "66" }]}>
+              <Text style={[summaryStyles.num, { color: Colors.accent }]}>{n(summary.totale).toLocaleString("it-IT")}</Text>
+              <Text style={summaryStyles.lbl}>Totale</Text>
+            </View>
+            <View style={summaryStyles.card}>
+              <Text style={summaryStyles.num}>{n(summary.biker.total).toLocaleString("it-IT")}</Text>
+              <Text style={summaryStyles.lbl}>Biker</Text>
+            </View>
+            <View style={summaryStyles.card}>
+              <Text style={[summaryStyles.num, { color: Colors.maleIcon }]}>{n(summary.biker.M).toLocaleString("it-IT")}</Text>
+              <Text style={summaryStyles.lbl}>Biker ♂</Text>
+            </View>
+            <View style={summaryStyles.card}>
+              <Text style={[summaryStyles.num, { color: Colors.femaleIcon }]}>{n(summary.biker.F).toLocaleString("it-IT")}</Text>
+              <Text style={summaryStyles.lbl}>Biker ♀</Text>
+            </View>
+            <View style={summaryStyles.card}>
+              <Text style={summaryStyles.num}>{n(summary.zavorrina.total).toLocaleString("it-IT")}</Text>
+              <Text style={summaryStyles.lbl}>Zavorrine</Text>
+            </View>
+            <View style={summaryStyles.card}>
+              <Text style={[summaryStyles.num, { color: Colors.maleIcon }]}>{n(summary.zavorrina.M).toLocaleString("it-IT")}</Text>
+              <Text style={summaryStyles.lbl}>Zav ♂</Text>
+            </View>
+            <View style={summaryStyles.card}>
+              <Text style={[summaryStyles.num, { color: Colors.femaleIcon }]}>{n(summary.zavorrina.F).toLocaleString("it-IT")}</Text>
+              <Text style={summaryStyles.lbl}>Zav ♀</Text>
+            </View>
+            <View style={summaryStyles.card}>
+              <Text style={[summaryStyles.num, { color: Colors.coupleIcon }]}>{n(summary.coppia.total).toLocaleString("it-IT")}</Text>
+              <Text style={summaryStyles.lbl}>Coppie</Text>
+            </View>
+          </View>
+          {!hideFake && (
+            <Text style={summaryStyles.fakeNote}>
+              Incl. fake: {summary.totale.fake.toLocaleString("it-IT")}
+            </Text>
+          )}
+        </View>
+      )}
       <View style={styles.searchRow}>
         <View style={[styles.searchContainer, { flex: 1, margin: 0 }]}>
           <Ionicons name="search" size={18} color={Colors.textSecondary} />
@@ -799,6 +871,58 @@ const statsStyles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textSecondary,
     marginLeft: 8,
+  },
+});
+
+const summaryStyles = StyleSheet.create({
+  wrapper: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  title: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    color: Colors.accent,
+    letterSpacing: 1.5,
+    marginBottom: 10,
+  },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+    minWidth: 72,
+    flex: 1,
+  },
+  num: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    color: Colors.text,
+  },
+  lbl: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textSecondary,
+    marginTop: 2,
+    textAlign: "center",
+  },
+  fakeNote: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 8,
+    textAlign: "right",
   },
 });
 
