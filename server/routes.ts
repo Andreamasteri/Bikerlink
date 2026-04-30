@@ -147,6 +147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const profile = await storage.getUserProfile(userId).catch(() => null);
             onlineTracker.setOnline(userId, {
               role: user.role ?? "user",
+              status: user.status ?? "active",
               userType: user.userType ?? "biker",
               isAvailable: (profile?.isAvailable ?? false) && !(user.ghostMode ?? false),
               ghostMode: user.ghostMode ?? false,
