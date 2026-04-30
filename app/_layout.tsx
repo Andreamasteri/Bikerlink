@@ -13,6 +13,7 @@ import { getApiUrl } from "@/lib/query-client";
 import { Platform, AppState, ActivityIndicator, View, Text, StyleSheet } from "react-native";
 import NativeUpdateChecker from "@/components/NativeUpdateChecker";
 import MatchPopupAlert from "@/components/MatchPopupAlert";
+import AlwaysPermissionNotice from "@/components/AlwaysPermissionNotice";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import * as Updates from "expo-updates";
@@ -267,55 +268,19 @@ function AppStateHandler() {
   return null;
 }
 
-function BackgroundPermissionPrompter() {
-  const { user } = useAuth();
-  const {
-    hasLocationPermission,
-    hasBackgroundPermission,
-    backgroundPermissionRevoked,
-    requestBackgroundPermission,
-  } = useLocationGate();
-  const promptedRef = useRef(false);
+function GpsAlwaysGate({ isAuthenticated }: { isAuthenticated: boolean }) {
+  const { hasBackgroundPermission, backgroundPermissionRevoked } = useLocationGate();
+  const [dismissed, setDismissed] = useState(false);
 
-  useEffect(() => {
-    if (Platform.OS === "web") return;
-    if (!user) return;
-    if (!hasLocationPermission) return;
-    if (hasBackgroundPermission) return;
-    if (backgroundPermissionRevoked) return;
-    if (promptedRef.current) return;
-
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      if (cancelled) return;
-      try {
-        const alreadyPrompted = await AsyncStorage.getItem("@bikerlink/bg_location_prompted");
-        if (alreadyPrompted === "true" || cancelled) return;
-        promptedRef.current = true;
-
-        const domain = process.env.EXPO_PUBLIC_DOMAIN || "biker-link.replit.app";
-        try {
-          const res = await fetch(`https://${domain}/api/admin/settings/bg-location`, {
-            credentials: "include",
-          });
-          if (res.ok) {
-            const s = await res.json();
-            if (s.enabled === false) return;
-          }
-        } catch {}
-
-        await AsyncStorage.setItem("@bikerlink/bg_location_prompted", "true");
-        requestBackgroundPermission().catch(() => {});
-      } catch {}
-    }, 5000);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [user, hasLocationPermission, hasBackgroundPermission, backgroundPermissionRevoked, requestBackgroundPermission]);
-
+  if (Platform.OS === "web" || !isAuthenticated || hasBackgroundPermission) return null;
+  if (!dismissed) return <AlwaysPermissionNotice onDismiss={() => setDismissed(true)} />;
+  if (backgroundPermissionRevoked) return <BackgroundRevocationBanner />;
   return null;
+}
+
+function GpsAlwaysGateWrapper() {
+  const { user } = useAuth();
+  return <GpsAlwaysGate key={user?.id ?? "logged-out"} isAuthenticated={!!user} />;
 }
 
 function BackgroundRevocationBanner() {
@@ -587,8 +552,7 @@ export default function RootLayout() {
                   <NativeUpdateChecker />
                   <MapReadyGate>
                     <AppStateHandler />
-                    <BackgroundPermissionPrompter />
-                    <BackgroundRevocationBanner />
+                    <GpsAlwaysGateWrapper />
                     <AdminUptimeOverlay />
                     <BackgroundNotificationHandler />
                     <LanguageKeyedRoot />
