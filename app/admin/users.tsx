@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, TextInput, Platform, ScrollView } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, TextInput, Platform, ScrollView, Switch, Linking, Pressable } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,6 +7,31 @@ import Constants from "expo-constants";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
+
+let MapView: any = null;
+let MapMarker: any = null;
+if (Platform.OS !== "web") {
+  try {
+    const maps = require("react-native-maps");
+    MapView = maps.default;
+    MapMarker = maps.Marker;
+  } catch {
+    MapView = null;
+    MapMarker = null;
+  }
+}
+
+interface GeoZone {
+  type: "H" | "W" | "P";
+  lat: number;
+  lng: number;
+  visitCount: number;
+  totalMinutes: number;
+}
+interface GeoInsightResponse {
+  zones: GeoZone[];
+  reason?: string;
+}
 
 interface AdminUser {
   id: string;
@@ -97,6 +122,24 @@ export default function AdminUsers() {
   const [editPassword, setEditPassword] = useState("");
   const [searchText, setSearchText] = useState("");
   const [hideFake, setHideFake] = useState(true);
+
+  // Geo-insight (effimero, in-RAM, non persistito): si resetta a chiusura scheda utente.
+  const [fzEnabled, setFzEnabled] = useState(false);
+  const [fzMapZone, setFzMapZone] = useState<GeoZone | null>(null);
+
+  useEffect(() => {
+    if (!statsModalVisible) {
+      setFzEnabled(false);
+      setFzMapZone(null);
+    }
+  }, [statsModalVisible]);
+
+  const geoInsightQuery = useQuery<GeoInsightResponse>({
+    queryKey: ["/api/admin/users", selectedUser?.id, "geo-insights"],
+    enabled: fzEnabled && !!selectedUser && statsModalVisible,
+    staleTime: 0,
+    gcTime: 0,
+  });
 
   const { data: users = [], isLoading } = useQuery<AdminUser[]>({
     queryKey: ["/api/admin/users"],
@@ -552,7 +595,81 @@ export default function AdminUsers() {
             ))}
           </View>
         )}
+
+        {renderGeoInsightSection()}
       </ScrollView>
+    );
+  }
+
+  function openZoneOnMap(z: GeoZone) {
+    if (Platform.OS === "web") {
+      const url = `https://www.google.com/maps/search/?api=1&query=${z.lat},${z.lng}`;
+      Linking.openURL(url).catch(() => {});
+      return;
+    }
+    setFzMapZone(z);
+  }
+
+  function renderGeoInsightSection() {
+    const zones = geoInsightQuery.data?.zones ?? [];
+    const loading = fzEnabled && (geoInsightQuery.isLoading || geoInsightQuery.isFetching);
+    const errored = fzEnabled && geoInsightQuery.isError;
+    const insufficient = fzEnabled && !loading && !errored && zones.length < 3;
+    const slots: (GeoZone | null)[] = [zones[0] ?? null, zones[1] ?? null, zones[2] ?? null];
+    return (
+      <View style={statsStyles.section}>
+        <View style={[statsStyles.row, { paddingVertical: 4 }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Ionicons name="map-outline" size={18} color={Colors.textSecondary} />
+            <Text style={statsStyles.label}>Zone</Text>
+          </View>
+          <Switch
+            value={fzEnabled}
+            onValueChange={setFzEnabled}
+            trackColor={{ false: Colors.border, true: Colors.accent + "88" }}
+            thumbColor={fzEnabled ? Colors.accent : "#888"}
+          />
+        </View>
+
+        {fzEnabled && (
+          <View style={fzStyles.row}>
+            {slots.map((z, i) => {
+              const tappable = !loading && !errored && !!z;
+              return (
+                <Pressable
+                  key={i}
+                  disabled={!tappable}
+                  onPress={() => z && openZoneOnMap(z)}
+                  style={({ pressed }) => [
+                    fzStyles.chip,
+                    !tappable && fzStyles.chipDisabled,
+                    tappable && pressed && { opacity: 0.6 },
+                  ]}
+                >
+                  <Text style={[fzStyles.chipNum, !tappable && fzStyles.chipTextDisabled]}>
+                    {i + 1}.
+                  </Text>
+                  {z && (
+                    <Text style={[fzStyles.chipType, !tappable && fzStyles.chipTextDisabled]}>
+                      {z.type}
+                    </Text>
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+
+        {fzEnabled && loading && (
+          <Text style={fzStyles.note}>Calcolo zone in corso…</Text>
+        )}
+        {fzEnabled && errored && (
+          <Text style={[fzStyles.note, { color: Colors.error }]}>Errore nel calcolo</Text>
+        )}
+        {insufficient && (
+          <Text style={fzStyles.note}>Dati insufficienti</Text>
+        )}
+      </View>
     );
   }
 
@@ -774,9 +891,128 @@ export default function AdminUsers() {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={!!fzMapZone} animationType="fade" transparent onRequestClose={() => setFzMapZone(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={[fzStyles.mapModal, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 10 }]}>
+            <View style={statsStyles.modalHeader}>
+              <Text style={statsStyles.modalTitle}>
+                Zona {fzMapZone?.type ?? ""}
+              </Text>
+              <TouchableOpacity onPress={() => setFzMapZone(null)}>
+                <Ionicons name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ flex: 1 }}>
+              {fzMapZone && MapView ? (
+                <MapView
+                  style={{ flex: 1 }}
+                  initialRegion={{
+                    latitude: fzMapZone.lat,
+                    longitude: fzMapZone.lng,
+                    latitudeDelta: 0.012,
+                    longitudeDelta: 0.012,
+                  }}
+                >
+                  {MapMarker && (
+                    <MapMarker
+                      coordinate={{ latitude: fzMapZone.lat, longitude: fzMapZone.lng }}
+                    />
+                  )}
+                </MapView>
+              ) : (
+                <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+                  <Text style={fzStyles.note}>Mappa non disponibile</Text>
+                </View>
+              )}
+            </View>
+            {fzMapZone && (
+              <View style={fzStyles.mapFooter}>
+                <Text style={fzStyles.mapCoords}>
+                  {fzMapZone.lat.toFixed(6)}, {fzMapZone.lng.toFixed(6)}
+                </Text>
+                <Text style={fzStyles.mapMeta}>
+                  {fzMapZone.visitCount} rilevazioni · {fzMapZone.totalMinutes} min totali
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
+
+const fzStyles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 8,
+  },
+  chip: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.accent + "66",
+    backgroundColor: Colors.surface,
+  },
+  chipDisabled: {
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    opacity: 0.5,
+  },
+  chipNum: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    color: Colors.accent,
+  },
+  chipType: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  chipTextDisabled: {
+    color: Colors.textSecondary,
+  },
+  note: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 8,
+    textAlign: "center" as const,
+  },
+  mapModal: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    marginTop: 60,
+    marginHorizontal: 12,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  mapFooter: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  mapCoords: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.text,
+  },
+  mapMeta: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+});
 
 const statsStyles = StyleSheet.create({
   modalContainer: {

@@ -2829,6 +2829,228 @@ router.get("/users/:id/stats", async (req: Request, res: Response) => {
   }
 });
 
+// ── Geo Insight (admin only): on-demand, in-RAM, no persistence ────────
+// Calcola al volo le 3 zone geografiche più frequentate dell'utente
+// partendo dai dati già in coordinate_history. Algoritmo:
+//   1) raggruppa record consecutivi entro ~400m in "sessioni stazionarie"
+//   2) tiene solo sessioni con durata > 45 minuti
+//   3) clustering greedy k=3 sui centroidi delle sessioni (max-min init)
+//   4) ordina per minuti totali (H = casa, W = lavoro, P = pub)
+const FZ_RADIUS_M = 400;
+const FZ_MIN_SESSION_MIN = 45;
+const FZ_MAX_GAP_MIN = 90; // se la pausa fra due record supera questa soglia, sessione chiusa
+const FZ_KMEANS_ITER = 8;
+
+function _hav(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+interface FzSession {
+  lat: number;
+  lng: number;
+  weight: number; // minuti totali
+  count: number; // numero di record
+}
+
+function _toMs(v: Date | string | number): number {
+  if (v instanceof Date) return v.getTime();
+  if (typeof v === "number") return v;
+  return new Date(v).getTime();
+}
+
+function _detectStationarySessions(
+  rows: Array<{ latitude: number; longitude: number; createdAt: Date | string }>,
+): FzSession[] {
+  if (rows.length === 0) return [];
+  const sessions: FzSession[] = [];
+  let curLat = rows[0].latitude;
+  let curLng = rows[0].longitude;
+  let curStart = _toMs(rows[0].createdAt);
+  let curEnd = curStart;
+  let curCount = 1;
+  let curSumLat = rows[0].latitude;
+  let curSumLng = rows[0].longitude;
+
+  const closeSession = () => {
+    const minutes = (curEnd - curStart) / 60000;
+    if (minutes >= FZ_MIN_SESSION_MIN) {
+      sessions.push({
+        lat: curSumLat / curCount,
+        lng: curSumLng / curCount,
+        weight: minutes,
+        count: curCount,
+      });
+    }
+  };
+
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const ts = r.createdAt.getTime();
+    const gapMin = (ts - curEnd) / 60000;
+    const dist = _hav(curLat, curLng, r.latitude, r.longitude);
+    if (dist <= FZ_RADIUS_M && gapMin <= FZ_MAX_GAP_MIN) {
+      curSumLat += r.latitude;
+      curSumLng += r.longitude;
+      curCount += 1;
+      curLat = curSumLat / curCount;
+      curLng = curSumLng / curCount;
+      curEnd = ts;
+    } else {
+      closeSession();
+      curLat = r.latitude;
+      curLng = r.longitude;
+      curStart = ts;
+      curEnd = ts;
+      curCount = 1;
+      curSumLat = r.latitude;
+      curSumLng = r.longitude;
+    }
+  }
+  closeSession();
+  return sessions;
+}
+
+function _kmeansK3(sessions: FzSession[]): Array<{ lat: number; lng: number; weight: number; count: number }> {
+  if (sessions.length === 0) return [];
+  if (sessions.length <= 3) {
+    return sessions.map((s) => ({ lat: s.lat, lng: s.lng, weight: s.weight, count: s.count }));
+  }
+
+  // Init max-min: parti dalla sessione con peso massimo, poi scegli i 2 centroidi
+  // più lontani da quelli già scelti.
+  const sortedByWeight = [...sessions].sort((a, b) => b.weight - a.weight);
+  const centers: Array<{ lat: number; lng: number }> = [
+    { lat: sortedByWeight[0].lat, lng: sortedByWeight[0].lng },
+  ];
+  while (centers.length < 3) {
+    let bestIdx = -1;
+    let bestMinDist = -1;
+    for (let i = 0; i < sessions.length; i++) {
+      let minD = Infinity;
+      for (const c of centers) {
+        const d = _hav(c.lat, c.lng, sessions[i].lat, sessions[i].lng);
+        if (d < minD) minD = d;
+      }
+      if (minD > bestMinDist) {
+        bestMinDist = minD;
+        bestIdx = i;
+      }
+    }
+    if (bestIdx === -1) break;
+    centers.push({ lat: sessions[bestIdx].lat, lng: sessions[bestIdx].lng });
+  }
+
+  // Itera Lloyd con peso (= durata in minuti)
+  let assign: number[] = new Array(sessions.length).fill(0);
+  for (let it = 0; it < FZ_KMEANS_ITER; it++) {
+    let changed = false;
+    for (let i = 0; i < sessions.length; i++) {
+      let bestK = 0;
+      let bestD = Infinity;
+      for (let k = 0; k < centers.length; k++) {
+        const d = _hav(centers[k].lat, centers[k].lng, sessions[i].lat, sessions[i].lng);
+        if (d < bestD) {
+          bestD = d;
+          bestK = k;
+        }
+      }
+      if (assign[i] !== bestK) {
+        assign[i] = bestK;
+        changed = true;
+      }
+    }
+    // Ricalcolo centroidi (media pesata per durata)
+    const sums = centers.map(() => ({ wLat: 0, wLng: 0, w: 0 }));
+    for (let i = 0; i < sessions.length; i++) {
+      const k = assign[i];
+      sums[k].wLat += sessions[i].lat * sessions[i].weight;
+      sums[k].wLng += sessions[i].lng * sessions[i].weight;
+      sums[k].w += sessions[i].weight;
+    }
+    for (let k = 0; k < centers.length; k++) {
+      if (sums[k].w > 0) {
+        centers[k] = { lat: sums[k].wLat / sums[k].w, lng: sums[k].wLng / sums[k].w };
+      }
+    }
+    if (!changed) break;
+  }
+
+  // Aggrega risultati per cluster
+  const clusters = centers.map(() => ({ lat: 0, lng: 0, weight: 0, count: 0 }));
+  const wSums = centers.map(() => ({ wLat: 0, wLng: 0, w: 0, c: 0 }));
+  for (let i = 0; i < sessions.length; i++) {
+    const k = assign[i];
+    wSums[k].wLat += sessions[i].lat * sessions[i].weight;
+    wSums[k].wLng += sessions[i].lng * sessions[i].weight;
+    wSums[k].w += sessions[i].weight;
+    wSums[k].c += sessions[i].count;
+  }
+  for (let k = 0; k < centers.length; k++) {
+    if (wSums[k].w > 0) {
+      clusters[k] = {
+        lat: wSums[k].wLat / wSums[k].w,
+        lng: wSums[k].wLng / wSums[k].w,
+        weight: wSums[k].w,
+        count: wSums[k].c,
+      };
+    }
+  }
+  return clusters.filter((c) => c.weight > 0);
+}
+
+router.get("/users/:id/geo-insights", async (req: Request, res: Response) => {
+  try {
+    const userId = req.params.id;
+    const { coordinateHistory } = await import("@shared/schema");
+    const rows = await db
+      .select({
+        latitude: coordinateHistory.latitude,
+        longitude: coordinateHistory.longitude,
+        createdAt: coordinateHistory.createdAt,
+      })
+      .from(coordinateHistory)
+      .where(eq(coordinateHistory.userId, userId))
+      .orderBy(coordinateHistory.createdAt);
+
+    if (rows.length === 0) {
+      return res.json({ zones: [], reason: "no-data" });
+    }
+
+    const sessions = _detectStationarySessions(rows as any);
+    if (sessions.length === 0) {
+      return res.json({ zones: [], reason: "no-stationary-sessions" });
+    }
+
+    const clusters = _kmeansK3(sessions);
+    if (clusters.length === 0) {
+      return res.json({ zones: [], reason: "clustering-empty" });
+    }
+
+    // Ordina per minuti totali (durata) discendente; H=longest, W=second, P=third
+    clusters.sort((a, b) => b.weight - a.weight);
+    const labels: Array<"H" | "W" | "P"> = ["H", "W", "P"];
+    const zones = clusters.slice(0, 3).map((c, i) => ({
+      type: labels[i],
+      lat: Number(c.lat.toFixed(6)),
+      lng: Number(c.lng.toFixed(6)),
+      visitCount: c.count,
+      totalMinutes: Math.round(c.weight),
+    }));
+
+    return res.json({ zones, reason: "ok", sessionCount: sessions.length, recordCount: rows.length });
+  } catch (error) {
+    console.error("Admin geo-insights error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/stregatti/toggle-all", async (req: Request, res: Response) => {
   try {
     const { enabled, adminPassword } = req.body;
