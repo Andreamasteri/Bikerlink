@@ -110,6 +110,16 @@ Il seed imposta `emailVerified: true` per tutti gli utenti creati.
 - **Nodemailer**: Module for sending emails.
 - **Gmail SMTP**: Email sending service.
 - **eas-cli**: Command-line interface for Expo Application Services builds.
+## Regole OTA — Leggere Prima di Qualsiasi Lavoro
+
+⛔ **I task NON devono mai includere la pubblicazione di una OTA.**
+
+La pubblicazione OTA è un'operazione separata e dedicata, eseguita **solo su istruzione diretta e esplicita dell'utente**, come operazione a sé stante — mai come parte conclusiva di un task di sviluppo.
+
+**Motivazione**: una OTA esportata a fine task può catturare commit incompleti, conflitti di merge, o codice provvisorio (es. OTA-20 esportata da stato incompleto). Il rischio di distribuire bundle rotti agli utenti Android è reale e difficile da rollbackare in produzione.
+
+**Regola**: se un task include modifiche al codice e l'utente non ha esplicitamente detto "pubblica anche l'OTA" come istruzione separata, il task termina **senza** pubblicare alcuna OTA. L'agente deve proporre la pubblicazione OTA come follow-up distinto, non eseguirla autonomamente.
+
 ## APK Build — Regola Obbligatoria
 
 **Nessuna build APK può essere avviata senza autorizzazione esplicita dell'utente.**
