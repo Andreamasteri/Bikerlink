@@ -19,6 +19,7 @@ export interface CrashSessionMeta {
 }
 
 export interface CrashLogEntry {
+  userId: string;
   sessionId: string;
   crashType: CrashType;
   appVersion: string | null;
@@ -61,6 +62,7 @@ function getDeviceModel(): string | null {
 }
 
 let _currentSession: CrashSessionMeta | null = null;
+let _currentUserId: string | null = null;
 let _appStateSubscription: { remove: () => void } | null = null;
 let _retryTimer: ReturnType<typeof setInterval> | null = null;
 let _initialized = false;
@@ -108,6 +110,7 @@ export async function markJsError(error: Error, stack?: string): Promise<void> {
   _currentSession.jsError = { message: errMsg, stack: errStack };
   await saveCurrentSession();
   const entry: CrashLogEntry = {
+    userId: _currentUserId ?? "unknown",
     sessionId: _currentSession.sessionId,
     crashType: "crash_js",
     appVersion: getAppVersion(),
@@ -125,13 +128,20 @@ export async function markJsError(error: Error, stack?: string): Promise<void> {
 }
 
 export async function flushQueue(): Promise<void> {
+  if (!_currentUserId) return;
+  const uid = _currentUserId;
   try {
     let queue = await readQueue();
-    while (queue.length > 0) {
-      const batch = queue.slice(0, BATCH_SIZE);
+    const mine = queue.filter((e) => e.userId === uid);
+    const others = queue.filter((e) => e.userId !== uid);
+    let offset = 0;
+    while (offset < mine.length) {
+      const batch = mine.slice(offset, offset + BATCH_SIZE);
       await apiRequest("POST", "/api/crash-logs", { logs: batch });
-      queue = queue.slice(BATCH_SIZE);
-      await writeQueue(queue);
+      offset += BATCH_SIZE;
+    }
+    if (offset > 0) {
+      await writeQueue(others);
     }
   } catch {}
 }
@@ -139,6 +149,7 @@ export async function flushQueue(): Promise<void> {
 export async function initCrashLogger(userId: string): Promise<void> {
   if (_initialized) return;
   _initialized = true;
+  _currentUserId = userId;
 
   let prevSession: CrashSessionMeta | null = null;
   try {
@@ -154,6 +165,7 @@ export async function initCrashLogger(userId: string): Promise<void> {
     );
     if (!alreadyQueued) {
       const entry: CrashLogEntry = {
+        userId,
         sessionId: prevSession.sessionId,
         crashType,
         appVersion: getAppVersion(),
@@ -207,6 +219,7 @@ export async function initCrashLogger(userId: string): Promise<void> {
 export function resetCrashLogger(): void {
   _initialized = false;
   _currentSession = null;
+  _currentUserId = null;
   if (_appStateSubscription) {
     _appStateSubscription.remove();
     _appStateSubscription = null;

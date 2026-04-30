@@ -84,6 +84,7 @@ publicRouter.post("/", (req: Request, res: Response): void => {
 
   db.insert(appCrashLogs)
     .values(rows)
+    .onConflictDoNothing()
     .then(() => {
       res.json({ received: rows.length });
     })
@@ -109,7 +110,7 @@ adminRouter.get("/", requireAdmin, (req: Request, res: Response): void => {
       ? eq(appCrashLogs.crashType, crashType)
       : undefined,
     dateFrom ? gte(appCrashLogs.reportedAt, new Date(dateFrom)) : undefined,
-    dateTo ? lte(appCrashLogs.reportedAt, new Date(dateTo)) : undefined,
+    dateTo ? lte(appCrashLogs.reportedAt, new Date(dateTo.length === 10 ? dateTo + "T23:59:59.999Z" : dateTo)) : undefined,
     appVersion ? eq(appCrashLogs.appVersion, appVersion) : undefined,
   );
 

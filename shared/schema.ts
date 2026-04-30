@@ -1420,6 +1420,7 @@ export const appCrashLogs = pgTable("app_crash_logs", {
   index("app_crash_logs_user_id_idx").on(table.userId),
   index("app_crash_logs_crash_type_idx").on(table.crashType),
   index("app_crash_logs_reported_at_idx").on(table.reportedAt),
+  uniqueIndex("app_crash_logs_uniq_session_crash").on(table.userId, table.sessionId, table.crashType),
 ]);
 
 export type AppCrashLog = typeof appCrashLogs.$inferSelect;
