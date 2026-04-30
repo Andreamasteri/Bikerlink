@@ -783,6 +783,40 @@ export default function AdminSettings() {
     onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
+  // Task #1132: default taskbar style
+  const { data: allSettingsData } = useQuery<{ defaultTaskbarStyle?: string }>({
+    queryKey: ["/api/settings/all"],
+    staleTime: 120000,
+  });
+  const TASKBAR_OPTIONS = [
+    { value: "tutti" as const, label: "Tutti" },
+    { value: "scorri" as const, label: "Scorri" },
+    { value: "altro" as const, label: "Altro..." },
+    { value: "raggruppa" as const, label: "Raggruppa" },
+  ] as const;
+  const validTaskbarValues = TASKBAR_OPTIONS.map((o) => o.value);
+  const currentTaskbarDefault = validTaskbarValues.includes(allSettingsData?.defaultTaskbarStyle as any)
+    ? (allSettingsData!.defaultTaskbarStyle as typeof validTaskbarValues[number])
+    : "tutti";
+
+  const taskbarDefaultMutation = useMutation({
+    mutationFn: async (value: string) => {
+      const url = new URL("/api/admin/settings/default_taskbar_style", getApiUrl());
+      const res = await fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Errore aggiornamento stile taskbar");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
+    },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
+  });
+
   const disableFeatureMutation = useMutation({
     mutationFn: async (key: string) => {
       const baseUrl = getApiUrl();
@@ -1761,6 +1795,41 @@ export default function AdminSettings() {
           );
         })}
       </View>
+
+      {/* Task #1132: Pulsanti Taskbar (default admin) */}
+      <View style={[styles.sectionHeaderRow, { marginTop: 8 }]}>
+        <Ionicons name="grid" size={20} color={Colors.accent} />
+        <Text style={styles.sectionTitle}>Pulsanti Taskbar (default)</Text>
+      </View>
+      <Text style={taskbarAdminStyles.hint}>
+        Stile predefinito per chi non ha ancora scelto manualmente la propria preferenza.
+      </Text>
+      <View style={taskbarAdminStyles.row}>
+        {TASKBAR_OPTIONS.map((opt) => {
+          const isSelected = currentTaskbarDefault === opt.value;
+          return (
+            <Pressable
+              key={opt.value}
+              style={taskbarAdminStyles.optionCol}
+              onPress={() => taskbarDefaultMutation.mutate(opt.value)}
+              disabled={taskbarDefaultMutation.isPending}
+            >
+              <View
+                style={[
+                  taskbarAdminStyles.dot,
+                  isSelected ? taskbarAdminStyles.dotSelected : taskbarAdminStyles.dotUnselected,
+                ]}
+              />
+              <Text style={[taskbarAdminStyles.label, isSelected && { color: Colors.accent }]}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      {taskbarDefaultMutation.isPending && (
+        <ActivityIndicator color={Colors.accent} size="small" style={{ marginBottom: 8 }} />
+      )}
 
       <View style={styles.sectionHeaderRow}>
         <Ionicons name="apps" size={20} color={Colors.accent} />
@@ -3817,5 +3886,43 @@ const bgLocationStyles = StyleSheet.create({
   },
   triggerLabelActive: {
     color: Colors.accent,
+  },
+});
+
+const taskbarAdminStyles = StyleSheet.create({
+  hint: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginBottom: 10,
+    marginTop: -4,
+  },
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 12,
+  },
+  optionCol: {
+    alignItems: "center",
+    gap: 4,
+  },
+  dot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+  },
+  dotSelected: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent,
+  },
+  dotUnselected: {
+    borderColor: Colors.textSecondary,
+    backgroundColor: "transparent",
+  },
+  label: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.textSecondary,
   },
 });

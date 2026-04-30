@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import type { TaskbarStyle } from "./taskbar-style-context";
 
 export type MapProvider = "carto_light" | "carto_dark" | "osm";
 
@@ -12,6 +13,7 @@ interface AppSettings {
   sosEnabled: boolean;
   mapsEnabled: boolean;
   mapsProvider: MapProvider;
+  defaultTaskbarStyle: TaskbarStyle;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -24,6 +26,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   sosEnabled: true,
   mapsEnabled: true,
   mapsProvider: "carto_light",
+  defaultTaskbarStyle: "tutti",
 };
 
 export function useAppSettings() {

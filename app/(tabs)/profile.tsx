@@ -126,7 +126,7 @@ export default function ProfileScreen() {
   const locale = useLocale();
   const { enabled: mapsEnabled, userChoiceEnabled } = useMapConfig();
   const { currentTheme, setTheme, userSwitchingEnabled } = useTheme();
-  const { taskbarStyle, setTaskbarStyle } = useTaskbarStyle();
+  const { taskbarStyle, setTaskbarStyle, adminDefault, userHasCustomized } = useTaskbarStyle();
   const { timeFormat, speedUnit, distanceUnit, setTimeFormat, setSpeedUnit, setDistanceUnit } = useUnits();
   const [unitsExpanded, setUnitsExpanded] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -1288,6 +1288,16 @@ export default function ProfileScreen() {
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { textAlign: "center" }]}>Pulsanti Taskbar</Text>
+        {!userHasCustomized && (
+          <Text style={taskbarStyles.adminDefaultLabel}>
+            default impostato dall&apos;admin: {adminDefault}
+          </Text>
+        )}
+        {userHasCustomized && adminDefault !== taskbarStyle && (
+          <Text style={taskbarStyles.adminDefaultLabel}>
+            default admin: {adminDefault}
+          </Text>
+        )}
         <View style={taskbarStyles.row}>
           {([
             { value: "tutti" as TaskbarStyle, label: "Tutti" },
@@ -2217,5 +2227,13 @@ const taskbarStyles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
     textAlign: "center",
+  },
+  adminDefaultLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginBottom: 4,
+    opacity: 0.75,
   },
 });

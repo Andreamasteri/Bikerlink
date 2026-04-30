@@ -1732,6 +1732,30 @@ router.put("/settings/theme_default", async (req: Request, res: Response) => {
   }
 });
 
+// Task #1132: default stile taskbar — valore che viene usato come default per gli
+// utenti che non hanno mai scelto manualmente la propria preferenza.
+router.put("/settings/default_taskbar_style", async (req: Request, res: Response) => {
+  try {
+    const { value } = req.body as { value: string };
+    const valid = ["tutti", "scorri", "altro", "raggruppa"];
+    if (!valid.includes(value)) {
+      return res.status(400).json({ message: "Stile taskbar non valido" });
+    }
+    const setting = await storage.upsertAppSetting("default_taskbar_style", value);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_setting",
+      targetType: "app_setting",
+      targetId: "default_taskbar_style",
+      details: `default_taskbar_style = ${value}`,
+    });
+    return res.json(setting);
+  } catch (error) {
+    console.error("Admin default_taskbar_style error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.get("/settings/matching_countries", async (_req: Request, res: Response) => {
   try {
     const setting = await storage.getAppSetting("matching_countries");
