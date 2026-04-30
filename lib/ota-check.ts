@@ -96,12 +96,19 @@ function extractErrorDetails(err: unknown): OtaErrorDetails {
 // Task #1148: probe HTTP diretto a /api/expo-updates con gli stessi
 // header che expo-updates manda in produzione. Serve a separare problemi
 // di rete/DNS/server da problemi del client expo-updates SDK.
+// Task #1148: probe con timeout duro di 8s tramite AbortController. Senza
+// limite, una rete che hangs (DNS lento, captive portal) ritardarebbe la
+// segnalazione dell'errore OTA finché il fetch non scade da solo (>30s).
+const OTA_PROBE_TIMEOUT_MS = 8000;
 async function runProbe(currentUpdateId: string, runtimeVersion: string): Promise<OtaProbeResult> {
   const start = Date.now();
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), OTA_PROBE_TIMEOUT_MS);
   try {
     const url = new URL("/api/expo-updates", getApiUrl()).toString();
     const res = await fetch(url, {
       method: "GET",
+      signal: controller.signal,
       headers: {
         "expo-runtime-version": runtimeVersion,
         "expo-platform": "android",
@@ -128,10 +135,13 @@ async function runProbe(currentUpdateId: string, runtimeVersion: string): Promis
       durationMs,
     };
   } catch (probeErr) {
+    const aborted = (probeErr as { name?: string })?.name === "AbortError";
     return {
       durationMs: Date.now() - start,
-      error: String(probeErr).substring(0, 200),
+      error: aborted ? `timeout-${OTA_PROBE_TIMEOUT_MS}ms` : String(probeErr).substring(0, 200),
     };
+  } finally {
+    clearTimeout(timeoutHandle);
   }
 }
 
@@ -179,6 +189,7 @@ function reportOtaEvent(payload: ReportPayload) {
         errorUserInfo: payload.errorUserInfo,
         nativeStack: payload.nativeStack,
         updateUrl: payload.updateUrl,
+        channel: payload.channel,
         networkInfo: payload.networkInfo,
         probe: payload.probe,
       }),

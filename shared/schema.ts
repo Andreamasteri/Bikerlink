@@ -1111,13 +1111,17 @@ export const otaEvents = pgTable("ota_events", {
   error: text("error"),
   failCount: integer("fail_count").notNull().default(0),
   ip: varchar("ip", { length: 64 }),
-  // Task #1148: structured diagnostics payload (errorCode, nativeStack,
-  // updateUrl, networkInfo, probe). Tutti i campi sono troncati lato server
-  // prima della scrittura (vedi server/routes/admin.ts /ota-error).
+  // Task #1148: structured diagnostics payload (errorCode/Cause/UserInfo,
+  // nativeStack, updateUrl, channel, networkInfo, probe). Tutti i campi sono
+  // troncati lato server prima della scrittura (vedi server/routes/admin.ts
+  // POST /ota-error).
   diagnostics: jsonb("diagnostics").$type<{
     errorCode?: string;
+    errorCause?: string;
+    errorUserInfo?: string;
     nativeStack?: string;
     updateUrl?: string;
+    channel?: string;
     networkInfo?: string;
     probe?: {
       status?: number;
