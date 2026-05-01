@@ -38,7 +38,31 @@ import { logGpsError } from "@/lib/gps-logger";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Accelerometer } from "expo-sensors";
 import { VolumeManager } from "react-native-volume-manager";
+import * as TaskManager from "expo-task-manager";
 
+// ─── Background location task (must be defined at module top level) ───────────
+
+const BACKGROUND_LOCATION_TASK = "bikerlink-bg-location";
+const BG_POINTS_KEY = "@bikerlink/bg_points_pending";
+
+if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
+  TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
+    if (error || !data) return;
+    const { locations } = data as { locations: Location.LocationObject[] };
+    try {
+      const raw = await AsyncStorage.getItem(BG_POINTS_KEY);
+      const existing: { latitude: number; longitude: number; altitude: number; speedKmh: number; timestamp: string }[] = raw ? JSON.parse(raw) : [];
+      const newPoints = locations.map((loc) => ({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+        altitude: loc.coords.altitude ?? 0,
+        speedKmh: (loc.coords.speed ?? 0) * 3.6,
+        timestamp: new Date(loc.timestamp).toISOString(),
+      }));
+      await AsyncStorage.setItem(BG_POINTS_KEY, JSON.stringify([...existing, ...newPoints]));
+    } catch {}
+  });
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -169,6 +193,25 @@ function getModeConfig(profile: UpdateProfile): {
   return { accuracy: Location.Accuracy.Highest, timeInterval: 2000, distanceInterval: 5 };
 }
 
+function getModeConfigBackground(profile: UpdateProfile): {
+  accuracy: Location.Accuracy;
+  timeInterval: number;
+  distanceInterval: number;
+} {
+  if (profile === "race") {
+    return { accuracy: Location.Accuracy.Balanced, timeInterval: 3000, distanceInterval: 5 };
+  }
+  if (profile === "easy") {
+    return { accuracy: Location.Accuracy.Balanced, timeInterval: 15000, distanceInterval: 30 };
+  }
+  return { accuracy: Location.Accuracy.Balanced, timeInterval: 8000, distanceInterval: 15 };
+}
+
+const PROFILE_BG_NOTIFICATION: Record<UpdateProfile, string> = {
+  easy: "Modalità Easy — risparmio batteria",
+  medium: "Modalità Standard — alta precisione",
+  race: "Modalità Race — massima precisione",
+};
 
 // ─── StatCard ─────────────────────────────────────────────────────────────────
 
@@ -539,6 +582,8 @@ export default function TrackingScreen() {
   const is0100EnabledRef = useRef(false);
   const sensorsEnabledRef = useRef(false);
   const watchSubRef = useRef<Location.LocationSubscription | null>(null);
+  const bgTrackingActiveRef = useRef(false);
+  const onNativeLocationRef = useRef<(loc: Location.LocationObject) => void>(() => {});
   const webWatchIdRef = useRef<number | null>(null);
   const accelSubRef = useRef<{ remove: () => void } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -739,7 +784,7 @@ export default function TrackingScreen() {
     }, 3500);
   }, [bgToastAnim]);
 
-  // ── AppState listener — background GPS point summary ──────────────────────
+  // ── AppState listener — background GPS point summary + battery-aware switch ─
   useEffect(() => {
     // Track previous state so we can distinguish outgoing vs incoming inactive.
     // iOS lifecycle: active → inactive → background (going to bg)
@@ -752,11 +797,43 @@ export default function TrackingScreen() {
       const prevState = prevAppStateRef.current;
       prevAppStateRef.current = nextState;
 
-      // Going to background: only when coming FROM active state
-      if (
-        prevState === "active" &&
-        (nextState === "background" || nextState === "inactive")
-      ) {
+      // Going to background: only when coming FROM active state (Android uses "background"; iOS goes active→inactive→background)
+      if (prevState === "active" && nextState === "background" && Platform.OS === "android") {
+        bgStartPointsRef.current = totalGpsPointsRef.current;
+        // Switch to battery-saving background task with foreground service notification
+        if (phaseRef.current === "active") {
+          void (async () => {
+            // Stop the foreground watchPositionAsync
+            if (watchSubRef.current) {
+              watchSubRef.current.remove();
+              watchSubRef.current = null;
+            }
+            // Clear any previous pending background points
+            await AsyncStorage.setItem(BG_POINTS_KEY, "[]").catch(() => {});
+            // Check background permission before starting
+            const { status } = await Location.getBackgroundPermissionsAsync().catch(() => ({ status: "undetermined" as const }));
+            if (status !== "granted") return;
+            const bgConfig = getModeConfigBackground(profileRef.current);
+            await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+              accuracy: bgConfig.accuracy,
+              timeInterval: bgConfig.timeInterval,
+              distanceInterval: bgConfig.distanceInterval,
+              foregroundService: {
+                notificationTitle: "BikerLink — Percorso attivo",
+                notificationBody: PROFILE_BG_NOTIFICATION[profileRef.current],
+                notificationColor: "#FF6600",
+                killServiceOnDestroy: false,
+              },
+              pausesUpdatesAutomatically: false,
+              activityType: Location.ActivityType.AutomotiveNavigation,
+            }).catch(() => {});
+            bgTrackingActiveRef.current = true;
+          })();
+        }
+      }
+
+      if (prevState === "active" && nextState === "inactive") {
+        // iOS: save background start point on the outgoing transition
         bgStartPointsRef.current = totalGpsPointsRef.current;
       }
 
@@ -770,6 +847,36 @@ export default function TrackingScreen() {
           }
         }
         bgStartPointsRef.current = 0;
+
+        // Stop background task and resume foreground watch (Android only)
+        if (bgTrackingActiveRef.current && phaseRef.current === "active") {
+          bgTrackingActiveRef.current = false;
+          void (async () => {
+            // Stop background task
+            const hasTask = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).catch(() => false);
+            if (hasTask) {
+              await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).catch(() => {});
+            }
+            // Resume foreground watch with the current profile config
+            const fgConfig = getModeConfig(profileRef.current);
+            try {
+              const sub = await Location.watchPositionAsync(
+                { accuracy: fgConfig.accuracy, timeInterval: fgConfig.timeInterval, distanceInterval: fgConfig.distanceInterval },
+                onNativeLocationRef.current,
+              );
+              watchSubRef.current = sub;
+            } catch {}
+            // Read and count background points for the toast (they were already saved to AsyncStorage)
+            try {
+              const raw = await AsyncStorage.getItem(BG_POINTS_KEY);
+              const bgPoints: unknown[] = raw ? JSON.parse(raw) : [];
+              if (bgPoints.length > 0) {
+                totalGpsPointsRef.current += bgPoints.length;
+              }
+              await AsyncStorage.setItem(BG_POINTS_KEY, "[]").catch(() => {});
+            } catch {}
+          })();
+        }
       }
     };
     const sub = AppState.addEventListener("change", handleAppStateChange);
@@ -1089,6 +1196,9 @@ export default function TrackingScreen() {
     [flushPoints, appendPointToOfflineBuffer]
   );
 
+  // Keep stable ref so the AppState effect (background switch) can call it without changing deps
+  useEffect(() => { onNativeLocationRef.current = onNativeLocation; }, [onNativeLocation]);
+
   // ── Web GPS handler ────────────────────────────────────────────────────────
   const onWebLocation = useCallback(
     (pos: GeolocationPosition) => {
@@ -1202,6 +1312,13 @@ export default function TrackingScreen() {
     if (accelSubRef.current) {
       accelSubRef.current.remove();
       accelSubRef.current = null;
+    }
+    // Stop background location task if it was running
+    if (bgTrackingActiveRef.current) {
+      bgTrackingActiveRef.current = false;
+      Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)
+        .then((hasTask) => { if (hasTask) Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).catch(() => {}); })
+        .catch(() => {});
     }
     setTrackingActive(false);
   }, []);
