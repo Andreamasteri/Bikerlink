@@ -124,6 +124,21 @@ interface OtaEventsResponse {
   filters?: { phase: string | null; source: string | null; platform: string | null; updateId: string | null };
 }
 
+interface OtaStatRow {
+  current_update_id: string;
+  release_id: string;
+  runtime_version: string;
+  platform: string;
+  ok_count: string | number;
+  error_count: string | number;
+  unique_devices: string | number;
+  last_seen: string;
+}
+
+interface OtaStatsResponse {
+  stats: OtaStatRow[];
+}
+
 interface SystemHealth {
   backendStartedAt: number;
   backendUptimeSec: number;
@@ -468,6 +483,11 @@ export default function SystemScreen() {
     refetchInterval: 60000,
   });
 
+  const { data: otaStats } = useQuery<OtaStatsResponse>({
+    queryKey: ["/api/admin/ota-stats"],
+    refetchInterval: 30000,
+  });
+
   const [otaFilterPhase, setOtaFilterPhase] = useState("");
   const [otaFilterSource, setOtaFilterSource] = useState("");
   const [otaFilterPlatform, setOtaFilterPlatform] = useState("");
@@ -774,6 +794,8 @@ export default function SystemScreen() {
               ))}
             </View>
           )}
+
+          <OtaAdoptionCard stats={otaStats?.stats ?? []} />
 
           <OtaDiagnosticsCard events={otaEventsData?.events ?? []} />
 
@@ -1274,6 +1296,104 @@ export default function SystemScreen() {
       showsVerticalScrollIndicator={false}
     />
     </>
+  );
+}
+
+// Adoption card: per-update breakdown (ok/error counts, unique devices, platform).
+// Reads from /api/admin/ota-stats. Groups rows by current_update_id + runtime_version,
+// then shows per-platform lines — e.g. "android: 150 ✓  3 ✗  12 dev".
+function OtaAdoptionCard({ stats }: { stats: OtaStatRow[] }) {
+  // Build a map: key = `${current_update_id}|${runtime_version}` → platform rows[]
+  const groups = useMemo(() => {
+    const map = new Map<string, { updateId: string; rv: string; lastSeen: string; rows: OtaStatRow[] }>();
+    for (const row of stats) {
+      const key = `${row.current_update_id}|${row.runtime_version}`;
+      if (!map.has(key)) {
+        map.set(key, { updateId: row.current_update_id, rv: row.runtime_version, lastSeen: row.last_seen, rows: [] });
+      }
+      const g = map.get(key)!;
+      g.rows.push(row);
+      if (new Date(row.last_seen) > new Date(g.lastSeen)) g.lastSeen = row.last_seen;
+    }
+    return Array.from(map.values()).sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime());
+  }, [stats]);
+
+  // Try to resolve current_update_id → OTA number from ota-updates.json
+  const updateIdToOtaNum = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const entry of otaUpdates) {
+      if (entry.androidUpdateId) m.set(entry.androidUpdateId, entry.updateNumber);
+      if (entry.iosUpdateId) m.set(entry.iosUpdateId, entry.updateNumber);
+    }
+    return m;
+  }, []);
+
+  if (groups.length === 0) {
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="trending-up-outline" size={18} color={Colors.accent} />
+          <Text style={styles.cardTitle}>Adozione OTA</Text>
+        </View>
+        <Text style={styles.hintText}>Nessun dato di adozione disponibile.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Ionicons name="trending-up-outline" size={18} color={Colors.accent} />
+        <Text style={styles.cardTitle}>Adozione OTA</Text>
+        <View style={[styles.badge, { backgroundColor: Colors.accent }]}>
+          <Text style={styles.badgeText}>{groups.length}</Text>
+        </View>
+      </View>
+      <Text style={styles.hintText}>
+        Dispositivi raggruppati per versione OTA installata · aggiornato ogni 30s
+      </Text>
+      {groups.slice(0, 10).map((g) => {
+        const otaNum = updateIdToOtaNum.get(g.updateId);
+        const label = otaNum != null
+          ? `OTA-${otaNum}`
+          : g.updateId ? g.updateId.substring(0, 10) + "…" : "sconosciuto";
+        const totalErr = g.rows.reduce((s, r) => s + Number(r.error_count), 0);
+        const totalDev = g.rows.reduce((s, r) => s + Number(r.unique_devices), 0);
+        return (
+          <View key={`${g.updateId}|${g.rv}`} style={{ marginTop: 10 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
+              <View style={[styles.badge, { backgroundColor: totalErr > 0 ? "#AA4400" : "#1a5c2e" }]}>
+                <Text style={styles.badgeText}>{label}</Text>
+              </View>
+              <Text style={[styles.hintText, { marginTop: 0, fontStyle: "normal", flex: 1 }]}>
+                rv {g.rv} · {formatTimestamp(g.lastSeen)}
+              </Text>
+              <Text style={{ color: Colors.textMuted ?? "#888", fontSize: 10 }}>
+                {totalDev} dev
+              </Text>
+            </View>
+            {g.rows.map((r) => (
+              <View key={r.platform} style={[styles.restartRow, { paddingLeft: 8 }]}>
+                <Ionicons
+                  name={r.platform === "android" ? "logo-android" : r.platform === "ios" ? "logo-apple" : "phone-portrait-outline"}
+                  size={13}
+                  color={Colors.textMuted ?? "#888"}
+                />
+                <Text style={[styles.restartReason, { flex: 1, color: Colors.textMuted ?? "#888" }]}>
+                  {r.platform}
+                </Text>
+                <Text style={{ color: "#44AA44", fontFamily: "Inter_600SemiBold", fontSize: 12, marginRight: 10 }}>
+                  {Number(r.ok_count)} ✓
+                </Text>
+                <Text style={{ color: Number(r.error_count) > 0 ? "#FF4444" : Colors.textMuted ?? "#888", fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
+                  {Number(r.error_count)} ✗
+                </Text>
+              </View>
+            ))}
+          </View>
+        );
+      })}
+    </View>
   );
 }
 

@@ -609,6 +609,37 @@ router.get("/ota-adoption", async (_req: Request, res: Response) => {
   }
 });
 
+// GET /api/admin/ota-stats — adoption stats aggregated per update+platform.
+// Groups ota_events by current_update_id/runtime_version/platform and returns
+// ok_count (phase=reload), error_count (phase=error), unique device IPs, last seen.
+router.get("/ota-stats", async (_req: Request, res: Response) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        COALESCE(current_update_id, '') AS current_update_id,
+        COALESCE(release_id, '') AS release_id,
+        COALESCE(runtime_version, '?') AS runtime_version,
+        COALESCE(platform, '?') AS platform,
+        COUNT(*) FILTER (WHERE phase = 'reload') AS ok_count,
+        COUNT(*) FILTER (WHERE phase = 'error') AS error_count,
+        COUNT(DISTINCT ip) AS unique_devices,
+        MAX(created_at) AS last_seen
+      FROM ota_events
+      GROUP BY
+        COALESCE(current_update_id, ''),
+        COALESCE(release_id, ''),
+        COALESCE(runtime_version, '?'),
+        COALESCE(platform, '?')
+      ORDER BY last_seen DESC
+      LIMIT 100
+    `);
+    return res.json({ stats: result.rows });
+  } catch (err) {
+    console.error("[OTA-STATS] read error:", err);
+    return res.status(500).json({ message: "Errore lettura OTA stats" });
+  }
+});
+
 router.post("/verify-password", async (req: Request, res: Response) => {
   try {
     const { password } = req.body;
