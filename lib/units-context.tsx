@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { getApiUrl, authFetchHeaders, queryClient } from "@/lib/query-client";
 
 export type TimeFormat = "12h" | "24h";
 export type SpeedUnit = "kmh" | "mph" | "knots";
@@ -81,8 +81,6 @@ export function UnitsProvider({ children }: { children: React.ReactNode }) {
   const prefsRef = useRef<UnitsPreferences>(DEFAULT_PREFS);
   prefsRef.current = { timeFormat, speedUnit, distanceUnit };
 
-  const serverSyncAttemptedRef = useRef(false);
-
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((raw) => {
@@ -100,11 +98,38 @@ export function UnitsProvider({ children }: { children: React.ReactNode }) {
       .catch(() => { setStorageLoaded(true); });
   }, []);
 
+  // Server hydration: loads prefs from DB when AsyncStorage is empty.
+  // Subscribes to the React Query cache for /api/auth/me so that hydration is
+  // retried when the user logs in (handles the install-before-login case where
+  // the first fetch returns 401 before the session is established).
   useEffect(() => {
-    if (!storageLoaded || hasStoredPreference || serverSyncAttemptedRef.current) return;
-    serverSyncAttemptedRef.current = true;
+    if (!storageLoaded || hasStoredPreference) return;
 
-    try {
+    let cancelled = false;
+    let fetching = false;
+
+    const applyServerPrefs = (data: unknown) => {
+      if (cancelled) return;
+      const up = (data as any)?.profile?.unitsPreference;
+      if (!up) return;
+      let applied = false;
+      if (isValidTimeFormat(up.timeFormat)) { setTimeFormatState(up.timeFormat); applied = true; }
+      if (isValidSpeedUnit(up.speedUnit)) { setSpeedUnitState(up.speedUnit); applied = true; }
+      if (isValidDistanceUnit(up.distanceUnit)) { setDistanceUnitState(up.distanceUnit); applied = true; }
+      if (applied) {
+        const synced: UnitsPreferences = {
+          timeFormat: isValidTimeFormat(up.timeFormat) ? up.timeFormat : DEFAULT_PREFS.timeFormat,
+          speedUnit: isValidSpeedUnit(up.speedUnit) ? up.speedUnit : DEFAULT_PREFS.speedUnit,
+          distanceUnit: isValidDistanceUnit(up.distanceUnit) ? up.distanceUnit : DEFAULT_PREFS.distanceUnit,
+        };
+        AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(synced)).catch(() => {});
+        setHasStoredPreference(true);
+      }
+    };
+
+    const tryFetch = () => {
+      if (fetching || cancelled) return;
+      fetching = true;
       const url = new URL("/api/users/me", getApiUrl());
       fetch(url.toString(), {
         credentials: "include",
@@ -112,25 +137,31 @@ export function UnitsProvider({ children }: { children: React.ReactNode }) {
       })
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
-          if (!data) return;
-          const up = data?.profile?.unitsPreference;
-          if (!up) return;
-          let applied = false;
-          if (isValidTimeFormat(up.timeFormat)) { setTimeFormatState(up.timeFormat); applied = true; }
-          if (isValidSpeedUnit(up.speedUnit)) { setSpeedUnitState(up.speedUnit); applied = true; }
-          if (isValidDistanceUnit(up.distanceUnit)) { setDistanceUnitState(up.distanceUnit); applied = true; }
-          if (applied) {
-            const synced: UnitsPreferences = {
-              timeFormat: isValidTimeFormat(up.timeFormat) ? up.timeFormat : DEFAULT_PREFS.timeFormat,
-              speedUnit: isValidSpeedUnit(up.speedUnit) ? up.speedUnit : DEFAULT_PREFS.speedUnit,
-              distanceUnit: isValidDistanceUnit(up.distanceUnit) ? up.distanceUnit : DEFAULT_PREFS.distanceUnit,
-            };
-            AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(synced)).catch(() => {});
-            setHasStoredPreference(true);
-          }
+          fetching = false;
+          applyServerPrefs(data);
         })
-        .catch(() => {});
-    } catch {}
+        .catch(() => { fetching = false; });
+    };
+
+    // Attempt immediately (handles already-authenticated case)
+    tryFetch();
+
+    // Also retry when /api/auth/me data becomes available (handles login-after-mount)
+    const unsub = queryClient.getQueryCache().subscribe((event: any) => {
+      if (
+        event?.type === "updated" &&
+        Array.isArray(event?.query?.queryKey) &&
+        event.query.queryKey[0] === "/api/auth/me" &&
+        event.query.state.data != null
+      ) {
+        tryFetch();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      unsub();
+    };
   }, [storageLoaded, hasStoredPreference]);
 
   const setTimeFormat = useCallback((v: TimeFormat) => {
