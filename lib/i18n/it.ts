@@ -675,6 +675,18 @@ const it: Record<string, string> = {
   "music.removeTrack": "Rimuovi brano",
   "music.removeTrackMsg": "Vuoi rimuovere \"{name}\" dalla tua Playlist?",
   "music.remove": "Rimuovi",
+  "tracking.recordRide": "Registra Giro e Performance",
+  "common.measurement0100": "MISURAZIONE 0-100",
+  "tracking.navigateCompleteRide": "Naviga completata la corsa",
+  "garage.tabTitle": "Garage",
+  "garage.tabWishlist": "Wishlist",
+  "tracking.gMaxLeft": "G Max Sinistra",
+  "tracking.change": "Cambia",
+  "home.inviteModal": "Invita un amico",
+  "home.easterEggCollect": "Raccogli uovo di Pasqua",
+  "tracking.gMaxRight": "G Max Destra",
+  "home.selectEvent": "Seleziona evento",
+  "home.noFutureRally": "Nessun rally futuro",
 };
 
 export default it;

@@ -675,6 +675,18 @@ const en: Record<string, string> = {
   "music.removeTrack": "Remove track",
   "music.removeTrackMsg": "Do you want to remove \"{name}\" from your Playlist?",
   "music.remove": "Remove",
+  "tracking.recordRide": "Record Ride and Performance",
+  "common.measurement0100": "0-100 MEASUREMENT",
+  "tracking.navigateCompleteRide": "Navigate when the ride is complete",
+  "garage.tabTitle": "Garage",
+  "garage.tabWishlist": "Wishlist",
+  "tracking.gMaxLeft": "G Max Left",
+  "tracking.change": "Change",
+  "home.inviteModal": "Invite a friend",
+  "home.easterEggCollect": "Collect Easter Egg",
+  "tracking.gMaxRight": "G Max Right",
+  "home.selectEvent": "Select event",
+  "home.noFutureRally": "No future rallies",
 };
 
 export default en;

@@ -388,7 +388,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="navigate" size={size} color={color} />
             ),
-            headerTitle: "Registra Giro e Performance",
+            headerTitle: t("tracking.recordRide"),
             href: null,
             headerLeft: () => (
               <Pressable onPress={() => router.back()} style={{ marginLeft: 8 }}>
@@ -400,7 +400,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="garage"
           options={{
-            title: isBikerOrCoppia ? t("profile.title") : "Wishlist",
+            title: isBikerOrCoppia ? t("garage.tabTitle") : t("garage.tabWishlist"),
             tabBarIcon: ({ color, size }) =>
               isBikerOrCoppia ? (
                 <MaterialCommunityIcons name="motorbike" size={size} color={color} />
@@ -426,8 +426,8 @@ export default function TabLayout() {
       {globalSprintMeasuring && (
         <View style={sprintLockOverlayStyles.overlay} pointerEvents="box-only">
           <Text style={sprintLockOverlayStyles.icon}>🏁</Text>
-          <Text style={sprintLockOverlayStyles.title}>MISURAZIONE 0-100</Text>
-          <Text style={sprintLockOverlayStyles.msg}>Naviga completata la corsa</Text>
+          <Text style={sprintLockOverlayStyles.title}>{t("common.measurement0100")}</Text>
+          <Text style={sprintLockOverlayStyles.msg}>{t("tracking.navigateCompleteRide")}</Text>
         </View>
       )}
 
