@@ -143,19 +143,18 @@ export default function BackupScreen() {
         || (type === "db" ? "bikerlink_db.sql.gz" : "bikerlink_media.zip");
 
       const filePath = `${FileSystem.cacheDirectory}${fileName}`;
-        const dl = await FileSystem.downloadAsync(url, filePath, {
-          headers: authFetchHeaders(),
+      const dl = await FileSystem.downloadAsync(url, filePath, {
+        headers: authFetchHeaders(),
+      });
+      if (dl.status !== 200) throw new Error(`HTTP ${dl.status}`);
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(dl.uri, {
+          dialogTitle: `Salva ${fileName}`,
+          mimeType: type === "db" ? "application/gzip" : "application/zip",
         });
-        if (dl.status !== 200) throw new Error(`HTTP ${dl.status}`);
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(dl.uri, {
-            dialogTitle: `Salva ${fileName}`,
-            mimeType: type === "db" ? "application/gzip" : "application/zip",
-          });
-        } else {
-          Alert.alert("Scaricato", `Salvato in: ${dl.uri}`);
-        }
+      } else {
+        Alert.alert("Scaricato", `Salvato in: ${dl.uri}`);
       }
     } catch (err: any) {
       Alert.alert("Errore download", err?.message || "Impossibile scaricare");

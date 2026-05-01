@@ -652,21 +652,20 @@ export default function TraduzioniScreen() {
         getApiUrl()
       );
       const resp = await fetch(url.toString(), { credentials: "include" });
-        if (!resp.ok) throw new Error(await parseBinaryErrorMessage(resp));
-        const arrayBuf = await resp.arrayBuffer();
-        const base64 = await arrayBufferToBase64(arrayBuf);
-        const filePath = `${FileSystem.cacheDirectory}BikerLink_Traduzioni.docx`;
-        await FileSystem.writeAsStringAsync(filePath, base64, { encoding: "base64" });
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(filePath, {
-            mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            dialogTitle: t("admin.saveWord"),
-          });
-          setDocxResult({ ok: true, msg: "File Word pronto da condividere" });
-        } else {
-          setDocxResult({ ok: false, msg: t("admin.sharingUnavailable") });
-        }
+      if (!resp.ok) throw new Error(await parseBinaryErrorMessage(resp));
+      const arrayBuf = await resp.arrayBuffer();
+      const base64 = await arrayBufferToBase64(arrayBuf);
+      const filePath = `${FileSystem.cacheDirectory}BikerLink_Traduzioni.docx`;
+      await FileSystem.writeAsStringAsync(filePath, base64, { encoding: "base64" });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(filePath, {
+          mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          dialogTitle: t("admin.saveWord"),
+        });
+        setDocxResult({ ok: true, msg: "File Word pronto da condividere" });
+      } else {
+        setDocxResult({ ok: false, msg: t("admin.sharingUnavailable") });
       }
     } catch (e: unknown) {
       setDocxResult({ ok: false, msg: extractErrorMessage(e, t("admin.wordDownloadError")) });
