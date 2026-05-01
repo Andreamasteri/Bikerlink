@@ -549,9 +549,9 @@ export default function MapScreen() {
           .then((res) => res.json())
           .then((data: any) => {
             if (data.prizeUnlocked) {
-              Alert.alert("Premio Sbloccato!", data.message || "Hai raccolto 10 Easter Egg!");
+              Alert.alert(t("home.easterEggPrize"), data.message || t("home.easterEgg10Msg"));
             } else {
-              Alert.alert("Easter Egg!", data.message || "Complimenti! Hai raccolto un premio! Continua così!");
+              Alert.alert(t("home.easterEggTitle"), data.message || t("home.easterEggCongrats"));
             }
             queryClient.invalidateQueries({ queryKey: ["/api/easter-eggs/nearby"] });
           })
@@ -1298,13 +1298,13 @@ export default function MapScreen() {
                         <View style={[styles.statusBadge, { backgroundColor: selectedUserDetail.isOnline ? "#4CAF5022" : "#66666622" }]}>
                           <View style={[styles.statusDot, { backgroundColor: selectedUserDetail.isOnline ? Colors.success : "#888" }]} />
                           <Text style={[styles.statusBadgeText, { color: selectedUserDetail.isOnline ? Colors.success : "#888" }]}>
-                            {selectedUserDetail.isOnline ? "Online" : "Offline"}
+                            {selectedUserDetail.isOnline ? t("map.online") : t("map.offline")}
                           </Text>
                         </View>
                         <View style={[styles.statusBadge, { backgroundColor: selectedUserDetail.isAvailable ? "#4CAF5022" : "#66666622" }]}>
                           <View style={[styles.statusDot, { backgroundColor: selectedUserDetail.isAvailable ? Colors.success : "#888" }]} />
                           <Text style={[styles.statusBadgeText, { color: selectedUserDetail.isAvailable ? Colors.success : "#888" }]}>
-                            {selectedUserDetail.isAvailable ? "Disponibile" : "Non disponibile"}
+                            {selectedUserDetail.isAvailable ? t("home.available") : t("map.unavailable")}
                           </Text>
                         </View>
                       </View>

@@ -26,22 +26,22 @@ import { MOTORCYCLE_BRANDS, getModelsForBrand, BRAND_NOTES } from "@/lib/motorcy
 import { useRouter } from "expo-router";
 
 const MOTO_TYPES = [
-  { value: "sportiva", label: "Sportiva" },
-  { value: "supersportiva", label: "Supersportiva" },
-  { value: "custom", label: "Custom" },
-  { value: "harley", label: "Harley" },
-  { value: "touring", label: "Touring" },
-  { value: "naked", label: "Naked" },
-  { value: "enduro", label: "Enduro" },
-  { value: "cafe_racer", label: "Café Racer" },
-  { value: "altro", label: "Altro" },
+  { value: "sportiva" },
+  { value: "supersportiva" },
+  { value: "custom" },
+  { value: "harley" },
+  { value: "touring" },
+  { value: "naked" },
+  { value: "enduro" },
+  { value: "cafe_racer" },
+  { value: "altro" },
 ] as const;
 
 const RIDING_STYLES = [
-  { value: "passeggio", label: "Passeggio" },
-  { value: "tranquilla", label: "Tranquilla" },
-  { value: "allegra", label: "Allegra" },
-  { value: "mozzafiato", label: "Mozzafiato" },
+  { value: "passeggio" },
+  { value: "tranquilla" },
+  { value: "allegra" },
+  { value: "mozzafiato" },
 ] as const;
 
 function WishlistScreen() {
@@ -90,7 +90,7 @@ function WishlistScreen() {
       setEditingMotoId(null);
       if (responseData?.matches && responseData.matches.length > 0) {
         const matchInfo = responseData.matches
-          .map((m: any) => `${m.bikerNickname || "Biker"} ha ${m.brand} ${m.model}`)
+          .map((m: any) => `${m.bikerNickname || "Biker"} ${t("garage.hasBike")} ${m.brand} ${m.model}`)
           .join("\n");
         Alert.alert("Here Comes Your Chance!!", matchInfo);
       }
@@ -427,7 +427,7 @@ function GarageContent() {
 
       if (responseData?.matches && responseData.matches.length > 0) {
         const matchInfo = responseData.matches
-          .map((m: any) => `${m.zavarrinaNickname || "Zavorrina"} cerca ${m.brand} ${m.model}`)
+          .map((m: any) => `${m.zavarrinaNickname || "Zavorrina"} ${t("garage.lookingFor")} ${m.brand} ${m.model}`)
           .join("\n");
         Alert.alert("Here Comes Your Chance!!", matchInfo);
       }

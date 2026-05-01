@@ -428,6 +428,27 @@ const en: Record<string, string> = {
   "profile.revokeConsentTitle": "Withdraw consent",
   "profile.revokeConsentDesc": "The processing of your data is based exclusively on your consent (Art. 7 GDPR).\n\nWithdrawing consent results in the permanent deletion of your account within 30 days, including all associated personal data.\n\nThis process is identical to \"Delete Account\". During the 30 days you can cancel the request by logging in.\n\nDo you confirm the withdrawal of consent and account deletion?",
 
+  "home.available": "Available",
+
+  "tracking.pause": "PAUSE",
+  "tracking.resume": "RESUME",
+  "garage.hasBike": "has",
+  "garage.lookingFor": "is looking for",
+
+  "tracking.sprintAccelerate": "Accelerate! ▶",
+  "tracking.sprintMeasuring": "Measuring...",
+  "tracking.sprintCompleted": "Completed! ✓",
+
+  "tracking.bgNotification.title": "BikerLink — Active Route",
+  "tracking.bgNotification.easy": "Easy Mode — battery saving",
+  "tracking.bgNotification.standard": "Standard Mode — high accuracy",
+  "tracking.bgNotification.race": "Race Mode — maximum accuracy",
+  "tracking.interruptedRideTitle": "Interrupted ride found",
+  "tracking.interruptedRideBody1": "Found an incomplete ride with",
+  "tracking.interruptedRideBody2": "GPS points. Do you want to recover or discard it?",
+  "tracking.discardRide": "Discard",
+  "tracking.recoverRide": "Recover",
+
   "tracking.label.easy": "Easy",
   "tracking.label.standard": "Standard",
   "tracking.label.race": "Race",

@@ -200,11 +200,6 @@ function getModeConfigBackground(profile: UpdateProfile): {
   return { accuracy: Location.Accuracy.High, timeInterval: 8000, distanceInterval: 15 };
 }
 
-const PROFILE_BG_NOTIFICATION: Record<UpdateProfile, string> = {
-  easy: "Modalità Easy — risparmio batteria",
-  medium: "Modalità Standard — alta precisione",
-  race: "Modalità Race — massima precisione",
-};
 
 // ─── StatCard ─────────────────────────────────────────────────────────────────
 
@@ -842,8 +837,8 @@ export default function TrackingScreen() {
               timeInterval: bgConfig.timeInterval,
               distanceInterval: bgConfig.distanceInterval,
               foregroundService: {
-                notificationTitle: "BikerLink — Percorso attivo",
-                notificationBody: PROFILE_BG_NOTIFICATION[profileRef.current],
+                notificationTitle: t("tracking.bgNotification.title"),
+                notificationBody: profileRef.current === "easy" ? t("tracking.bgNotification.easy") : profileRef.current === "medium" ? t("tracking.bgNotification.standard") : t("tracking.bgNotification.race"),
                 notificationColor: "#FF6600",
                 killServiceOnDestroy: false,
               },
@@ -1065,18 +1060,18 @@ export default function TrackingScreen() {
         }
 
         Alert.alert(
-          "Giro interrotto trovato",
-          `Trovato un giro incompleto con ${points.length} punti GPS. Vuoi recuperarlo o scartarlo?`,
+          t("tracking.interruptedRideTitle"),
+          `${t("tracking.interruptedRideBody1")} ${points.length} ${t("tracking.interruptedRideBody2")}`,
           [
             {
-              text: "Scarta",
+              text: t("tracking.discardRide"),
               style: "destructive",
               onPress: async () => {
                 await AsyncStorage.multiRemove(allKeys);
               },
             },
             {
-              text: "Recupera",
+              text: t("tracking.recoverRide"),
               onPress: () => {
                 let totalDistKm = 0;
                 let maxSpeedKmh = 0;
@@ -1904,7 +1899,7 @@ export default function TrackingScreen() {
                 color="#1a1a1a"
               />
               <Text style={styles.pauseBtnLabel}>
-                {phase === "paused" ? "RIPRENDI" : "PAUSA"}
+                {phase === "paused" ? t("tracking.resume") : t("tracking.pause")}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -2109,10 +2104,10 @@ export default function TrackingScreen() {
                     ]}
                   >
                     {sprintPhase === "waiting"
-                      ? "Accelera! ▶"
+                      ? t("tracking.sprintAccelerate")
                       : sprintPhase === "measuring"
-                      ? "In misura..."
-                      : "Completato! ✓"}
+                      ? t("tracking.sprintMeasuring")
+                      : t("tracking.sprintCompleted")}
                   </Text>
                 </View>
 

@@ -428,6 +428,27 @@ const it: Record<string, string> = {
   "profile.revokeConsentTitle": "Revoca consenso",
   "profile.revokeConsentDesc": "Il trattamento dei tuoi dati si basa esclusivamente sul tuo consenso (art. 7 GDPR).\n\nRevocare il consenso comporta la cancellazione definitiva del tuo account entro 30 giorni, con eliminazione di tutti i dati personali associati.\n\nQuesto processo è identico a \"Elimina Account\". Durante i 30 giorni puoi annullare la richiesta effettuando il login.\n\nConfermi la revoca del consenso e la cancellazione dell'account?",
 
+  "home.available": "Disponibile",
+
+  "tracking.pause": "PAUSA",
+  "tracking.resume": "RIPRENDI",
+  "garage.hasBike": "ha",
+  "garage.lookingFor": "cerca",
+
+  "tracking.sprintAccelerate": "Accelera! ▶",
+  "tracking.sprintMeasuring": "In misura...",
+  "tracking.sprintCompleted": "Completato! ✓",
+
+  "tracking.bgNotification.title": "BikerLink — Percorso attivo",
+  "tracking.bgNotification.easy": "Modalità Easy — risparmio batteria",
+  "tracking.bgNotification.standard": "Modalità Standard — alta precisione",
+  "tracking.bgNotification.race": "Modalità Race — massima precisione",
+  "tracking.interruptedRideTitle": "Giro interrotto trovato",
+  "tracking.interruptedRideBody1": "Trovato un giro incompleto con",
+  "tracking.interruptedRideBody2": "punti GPS. Vuoi recuperarlo o scartarlo?",
+  "tracking.discardRide": "Scarta",
+  "tracking.recoverRide": "Recupera",
+
   "tracking.label.easy": "Passeggio",
   "tracking.label.standard": "Standard",
   "tracking.label.race": "Race",
