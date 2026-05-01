@@ -287,7 +287,7 @@ export async function runWishlistMatching(): Promise<number> {
           wish.ridingStyle.toLowerCase() === moto.ridingStyle.toLowerCase()
         );
 
-        await storage.createMatch({
+        const inserted = await storage.createMatch({
           bikerId,
           zavarrinaId,
           bikerMotorcycleId: moto.id,
@@ -298,6 +298,7 @@ export async function runWishlistMatching(): Promise<number> {
 
         existingKeys.add(key);
         matchCount++;
+        if (inserted) sendMatchPushNotifications([bikerId, zavarrinaId]);
       }
     }
 
