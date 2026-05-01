@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 
 const SEEN_KEY = "bikerlink:seenMatchIds";
 const INIT_KEY_PREFIX = "bikerlink:matchAlertInit:v1:";
+const MAX_SEEN_IDS = 500;
 
 function namespacedId(source: string, id: string | number): string {
   return `${source}:${id}`;
@@ -42,7 +43,11 @@ export function useNewMatchAlert() {
       .then(([rawSeen, rawInit]) => {
         if (rawSeen) {
           try {
-            seenRef.current = new Set(JSON.parse(rawSeen));
+            const parsed: string[] = JSON.parse(rawSeen);
+            const capped = parsed.length > MAX_SEEN_IDS
+              ? parsed.slice(parsed.length - MAX_SEEN_IDS)
+              : parsed;
+            seenRef.current = new Set(capped);
           } catch {}
         }
         if (rawInit) {
@@ -58,6 +63,10 @@ export function useNewMatchAlert() {
 
   const addSeen = (ids: string[]) => {
     ids.forEach((id) => seenRef.current.add(id));
+    if (seenRef.current.size > MAX_SEEN_IDS) {
+      const trimmed = [...seenRef.current];
+      seenRef.current = new Set(trimmed.slice(trimmed.length - MAX_SEEN_IDS));
+    }
     AsyncStorage.setItem(SEEN_KEY, JSON.stringify([...seenRef.current])).catch(() => {});
   };
 
