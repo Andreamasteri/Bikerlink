@@ -17,8 +17,10 @@ import { useMutation } from "@tanstack/react-query";
 import { getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
+import { useT } from "@/lib/language-context";
 
 export default function BugReportScreen() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [subject, setSubject] = useState("");
@@ -52,11 +54,11 @@ export default function BugReportScreen() {
 
   const handleSubmit = () => {
     if (!subject.trim()) {
-      Alert.alert("Errore", "Inserisci un oggetto per la segnalazione");
+      Alert.alert(t("common.error"), t("feedback.subjectRequired"));
       return;
     }
     if (!message.trim()) {
-      Alert.alert("Errore", "Descrivi il bug che hai riscontrato");
+      Alert.alert(t("common.error"), t("feedback.describeRequired"));
       return;
     }
     feedbackMutation.mutate();

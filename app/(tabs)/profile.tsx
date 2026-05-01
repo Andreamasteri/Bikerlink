@@ -417,7 +417,7 @@ export default function ProfileScreen() {
             Alert.alert("Download", t("profile.downloadManual") + " ✓");
           }
         } else {
-          Alert.alert("Errore", "Download non riuscito. Riprova più tardi.");
+          Alert.alert(t("common.error"), t("profile.downloadFailed"));
         }
       }
     } catch (e) {
@@ -449,7 +449,7 @@ export default function ProfileScreen() {
         } else if (result.status === 404) {
           Alert.alert("Info", t("profile.eulaNotAvailable"));
         } else {
-          Alert.alert("Errore", "Download non riuscito. Riprova più tardi.");
+          Alert.alert(t("common.error"), t("profile.downloadFailed"));
         }
       }
     } catch (e) {
@@ -481,7 +481,7 @@ export default function ProfileScreen() {
         } else if (result.status === 404) {
           Alert.alert("Info", t("profile.privacyNotAvailable"));
         } else {
-          Alert.alert("Errore", "Download non riuscito. Riprova più tardi.");
+          Alert.alert(t("common.error"), t("profile.downloadFailed"));
         }
       }
     } catch (e) {
@@ -1342,8 +1342,8 @@ export default function ProfileScreen() {
       )}
 
       <View style={styles.section}>
-        <MenuItem icon="bug" label="Segnala un Bug" onPress={() => router.push("/feedback/bug" as any)} color={Colors.accentRed} />
-        <MenuItem icon="bulb" label="Richiedi Funzione" onPress={() => router.push("/feedback/feature" as any)} color={Colors.accent} />
+        <MenuItem icon="bug" label={t("profile.reportBug")} onPress={() => router.push("/feedback/bug" as any)} color={Colors.accentRed} />
+        <MenuItem icon="bulb" label={t("profile.requestFeature")} onPress={() => router.push("/feedback/feature" as any)} color={Colors.accent} />
 
         {(profile?.role === "admin" || (user as any)?.role === "admin") && (
           <MenuItem icon="shield" label="Pannello Admin" onPress={() => router.push("/admin" as any)} color={Colors.accent} />

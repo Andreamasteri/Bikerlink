@@ -22,12 +22,14 @@ import type { EventDTO, EventStatus } from "@/shared/event-types";
 import { EVENT_TYPE_LABELS, EVENT_TYPE_COLORS } from "@/shared/event-types";
 import { useT } from "@/lib/language-context";
 
-const STATUS_LABELS: Record<EventStatus, string> = {
-  pending: "In attesa",
-  approved: "Approvati",
-  rejected: "Rifiutati",
-  cancelled: "Cancellati",
-};
+function getStatusLabels(t: (k: string) => string): Record<EventStatus, string> {
+  return {
+    pending: t("admin.pendingStatus"),
+    approved: t("admin.approvedStatuses"),
+    rejected: t("admin.rejectedStatuses"),
+    cancelled: t("events.cancelled"),
+  };
+}
 
 function formatDate(dateStr: string): string {
   try {
@@ -214,6 +216,7 @@ const card = StyleSheet.create({
 
 export default function AdminEventiScreen() {
   const t = useT();
+  const STATUS_LABELS = getStatusLabels(t);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<"pending" | "all">("pending");
@@ -265,7 +268,7 @@ export default function AdminEventiScreen() {
   const handleRejectConfirm = () => {
     if (!rejectModal) return;
     if (!rejectReason.trim()) {
-      Alert.alert("Attenzione", "Il motivo del rifiuto è obbligatorio");
+      Alert.alert(t("common.warning"), t("admin.rejectionReasonRequired"));
       return;
     }
     rejectMutation.mutate({ id: rejectModal.id, reason: rejectReason.trim() });

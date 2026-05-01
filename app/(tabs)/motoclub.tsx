@@ -492,7 +492,7 @@ export default function MotoclubScreen() {
         {showFilters && (
           <View style={styles.filterRow}>
             <ScrollFilterChip
-              label="Tutti i tipi"
+              label={t("motoclub.allTypes")}
               selected={filterType === ""}
               onPress={() => setFilterType("")}
             />

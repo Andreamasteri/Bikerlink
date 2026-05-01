@@ -119,7 +119,7 @@ export default function CreateRouteScreen() {
       setShowPublishDialog(false);
       router.replace(`/routes/${createdRouteId}` as any);
     } catch (e: any) {
-      Alert.alert("Errore", e.message || "Impossibile aggiornare la visibilità. Puoi cambiarla in seguito dal dettaglio percorso.");
+      Alert.alert(t("common.error"), e.message || t("routes.cannotUpdateVisibilityLater"));
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
       setShowPublishDialog(false);
       router.replace(`/routes/${createdRouteId}` as any);

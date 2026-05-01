@@ -214,7 +214,7 @@ export default function ClubDetailScreen() {
       setShowProposeModal(false);
       setProposeAddress("");
       setProposeCoords(null);
-      Alert.alert("Inviata!", "La proposta di sede è in attesa di approvazione dell'admin.");
+      Alert.alert(t("motoclub.locationProposalSent"), t("motoclub.locationProposalMsg"));
     },
     onError: (e: Error) => Alert.alert("Errore", e.message),
   });

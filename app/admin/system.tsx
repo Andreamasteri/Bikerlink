@@ -498,9 +498,9 @@ export default function SystemScreen() {
     try {
       const result = await runManualOtaCheck();
       if (result.skipped === "dev") {
-        Alert.alert("OTA non disponibile", "Il check OTA è disabilitato in modalità sviluppo.");
+        Alert.alert(t("admin.otaUnavailable"), t("admin.otaDevDisabled"));
       } else if (result.skipped === "web") {
-        Alert.alert("OTA non disponibile", "Il check OTA è disabilitato sul web.");
+        Alert.alert(t("admin.otaUnavailable"), t("admin.otaWebDisabled"));
       } else if (result.ok) {
         Alert.alert(
           "Check OTA completato",
@@ -596,7 +596,7 @@ export default function SystemScreen() {
       hint = t("admin.sessionExpired");
       iconColor = "#FFA500";
     } else if (code === "forbidden") {
-      title = "Accesso non autorizzato";
+      title = t("admin.authError");
       // Accetta sia il formato corrente "not-admin" sia il legacy "not_admin"
       // per garantire la corretta UX se il backend viene rolled-back.
       const isNotAdmin = reason === "not-admin" || reason === "not_admin";
@@ -607,7 +607,7 @@ export default function SystemScreen() {
       title = `Errore server (HTTP ${status ?? "?"})`;
       hint = "Il backend ha risposto con un errore. Riprova tra qualche secondo o controlla i log di produzione.";
     } else if (code === "network") {
-      title = "Server non raggiungibile";
+      title = t("admin.serverUnreachable");
       hint = t("admin.checkConnection");
     } else if (error?.message) {
       hint = String(error.message);

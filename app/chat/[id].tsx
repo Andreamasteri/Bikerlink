@@ -27,6 +27,7 @@ import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
 import FavoriteStar from "@/components/FavoriteStar";
 import { useChatSSE } from "@/hooks/useChatSSE";
+import { useT } from "@/lib/language-context";
 
 interface MessageSender {
   id: string;
@@ -254,6 +255,7 @@ function MotoclubWelcomeBanner({ clubName }: { clubName: string | null }) {
 }
 
 export default function ChatConversationScreen() {
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -365,7 +367,7 @@ export default function ChatConversationScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", id, "messages"] });
-      Alert.alert("Libreria inviata", "La tua libreria è stata condivisa nella chat.");
+      Alert.alert(t("chat.librarySent"), t("chat.librarySentMsg"));
     },
     onError: () => {
       Alert.alert("Errore", "Impossibile condividere la libreria. Riprova.");
@@ -377,7 +379,7 @@ export default function ChatConversationScreen() {
 
   const handleSharePlaylist = useCallback(() => {
     if (!musicConnected) {
-      Alert.alert("Musica non connessa", "Collega Last.fm nel tab Musica.");
+      Alert.alert(t("chat.musicNotConnected"), t("chat.connectLastfmMsg"));
       return;
     }
     if (!isPrivateChat || !otherParticipant) return;
@@ -437,7 +439,7 @@ export default function ChatConversationScreen() {
             insertCoords(position.coords.latitude, position.coords.longitude);
           },
           () => {
-            Alert.alert("Posizione non disponibile", "Abilita la geolocalizzazione nel browser.");
+            Alert.alert(t("chat.locationUnavailable"), t("chat.locationUnavailableWeb"));
           }
         );
       } else {
@@ -448,7 +450,7 @@ export default function ChatConversationScreen() {
         const Location = require("expo-location");
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
-          Alert.alert("Permesso negato", "Abilita la posizione per BikerLink nelle impostazioni del dispositivo.");
+          Alert.alert(t("chat.permissionDenied"), t("chat.locationPermissionMsg"));
           return;
         }
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
@@ -499,7 +501,7 @@ export default function ChatConversationScreen() {
     if (conversation?.conversationType === "motoclub") return "Clubs";
     if (conversation?.conversationType === "contact") {
       const others = conversation.participants.filter((p) => p.id !== userId);
-      if (others.length === 0) return "Chat di contatto";
+      if (others.length === 0) return t("chat.contactChat");
       if (others.length === 1) return `Contatto - ${others[0].nickname}`;
       return `Contatto (${conversation.participants.length})`;
     }

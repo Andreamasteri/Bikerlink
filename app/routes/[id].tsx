@@ -20,6 +20,7 @@ import { useAuth } from "@/lib/auth-context";
 import Colors from "@/constants/colors";
 import { getCurrentLocale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
+import { useT } from "@/lib/language-context";
 
 interface Waypoint {
   id: string;
@@ -79,6 +80,7 @@ const WAYPOINT_TYPE_COLORS: Record<string, string> = {
 };
 
 export default function CustomRouteDetailScreen() {
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -112,7 +114,7 @@ export default function CustomRouteDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes", id] });
     } catch (e: any) {
-      Alert.alert("Errore", e.message || "Impossibile aggiornare la visibilità");
+      Alert.alert(t("common.error"), e.message || t("routes.cannotUpdateVisibility"));
     } finally {
       setIsTogglingVisibility(false);
     }

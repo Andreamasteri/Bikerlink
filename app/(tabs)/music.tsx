@@ -773,7 +773,7 @@ const LastfmLoginModal = React.memo(function LastfmLoginModal({ visible, onClose
       );
     } catch (err) {
       console.error("[Last.fm auth-session]", err);
-      setError((err as Error).message ?? "Autorizzazione non completata. Riprova.");
+      setError((err as Error).message ?? t("music.authIncomplete"));
       setStep("waiting");
     }
   }, [token, queryClient, onClose]);
@@ -1086,7 +1086,7 @@ export default function MusicScreen() {
         setActiveTab("brani");
       })
       .catch(() => {
-        Alert.alert("Playlist non disponibile", "Non è stato possibile caricare questa playlist. Potrebbe essere stata rimossa.");
+        Alert.alert(t("music.playlistUnavailable"), t("music.playlistUnavailableMsg"));
       });
   }, [playlistIdParam]);
 
@@ -1503,7 +1503,7 @@ function BraniTab({
   library: LibraryTrack[];
   libraryLoading: boolean;
   savedIds: Set<string>;
-  onAdd: (t: SearchTrack) => void;
+  onAdd: (track: SearchTrack) => void;
   onRemove: (id: string) => void;
   playlistOverride: { nickname: string; tracks: LibraryTrack[] } | null;
   onResetPlaylist: () => void;
@@ -1866,8 +1866,9 @@ function SearchTrackRow({
   track: SearchTrack;
   isAdded: boolean;
   isAdding: boolean;
-  onAdd: (t: SearchTrack) => void;
+  onAdd: (track: SearchTrack) => void;
 }) {
+  const t = useT();
   const [imgError, setImgError] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [liveArtwork, setLiveArtwork] = useState<string | null>(null);
@@ -1903,9 +1904,9 @@ function SearchTrackRow({
     } catch (err: unknown) {
       clearTimeout(timeout);
       if (err instanceof Error && err.name === "AbortError") {
-        Alert.alert("Timeout", "L'anteprima non risponde. Controlla la connessione e riprova.");
+        Alert.alert(t("common.timeout"), t("music.previewTimeout"));
       } else {
-        Alert.alert("Anteprima non disponibile", "Questo brano non ha un'anteprima disponibile su iTunes.");
+        Alert.alert(t("music.previewUnavailable"), t("music.previewUnavailableMsg"));
       }
     } finally {
       setLoadingPreview(false);
@@ -2022,9 +2023,9 @@ function LibraryTrackRow({
     } catch (err: unknown) {
       clearTimeout(timeout);
       if (err instanceof Error && err.name === "AbortError") {
-        Alert.alert("Timeout", "L'anteprima non risponde. Controlla la connessione e riprova.");
+        Alert.alert(t("common.timeout"), t("music.previewTimeout"));
       } else {
-        Alert.alert("Anteprima non disponibile", "Questo brano non ha un'anteprima disponibile su iTunes.");
+        Alert.alert(t("music.previewUnavailable"), t("music.previewUnavailableMsg"));
       }
     } finally {
       setLoadingPreview(false);
@@ -2353,7 +2354,7 @@ function SharedPlaylistCard({
 
   const handlePreview = useCallback(async () => {
     if (!playerAvailable) {
-      Alert.alert("Player non disponibile", "Il player audio non è disponibile su questo dispositivo.");
+      Alert.alert(t("music.playerUnavailable"), t("music.playerUnavailableMsg"));
       return;
     }
     if (item.tracks.length === 0) return;

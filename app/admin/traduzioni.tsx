@@ -677,7 +677,7 @@ export default function TraduzioniScreen() {
           });
           setDocxResult({ ok: true, msg: "File Word pronto da condividere" });
         } else {
-          setDocxResult({ ok: false, msg: "Condivisione non disponibile su questo dispositivo" });
+          setDocxResult({ ok: false, msg: t("admin.sharingUnavailable") });
         }
       }
     } catch (e: unknown) {

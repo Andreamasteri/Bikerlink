@@ -11,6 +11,7 @@ import { useRouter } from "expo-router";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { useT } from "@/lib/language-context";
 
 type HubCard = {
   key: string;
@@ -22,6 +23,7 @@ type HubCard = {
 };
 
 export default function SensorsHub() {
+  const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -30,7 +32,7 @@ export default function SensorsHub() {
       key: "raw",
       title: "Dati Grezzi",
       description:
-        "Tutti i sensori hardware: accelerometro, giroscopio, magnetometro, barometro, pedometro e altro. Avvia ogni sensore manualmente e ispeziona i dati in tempo reale.",
+        t("admin.sensorsDesc"),
       route: "/admin/sensors/raw",
       accentColor: Colors.accent,
       icon: (

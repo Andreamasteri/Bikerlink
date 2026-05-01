@@ -17,10 +17,12 @@ import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { apiRequest, setSessionToken } from "@/lib/query-client";
 import { queryClient } from "@/lib/query-client";
+import { useT } from "@/lib/language-context";
 
 const RESEND_COOLDOWN = 60;
 
 export default function ForgotPasswordScreen() {
+  const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -290,7 +292,7 @@ export default function ForgotPasswordScreen() {
                   <ActivityIndicator color={Colors.accent} />
                 ) : (
                   <Text style={styles.resendButtonText}>
-                    {resendCooldown > 0 ? `Invia di nuovo tra ${resendCooldown}s` : "Invia di nuovo"}
+                    {resendCooldown > 0 ? `${t("auth.resendIn").replace("{n}", String(resendCooldown))}` : t("auth.resend")}
                   </Text>
                 )}
               </TouchableOpacity>

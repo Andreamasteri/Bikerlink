@@ -10,6 +10,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/query-client";
+import { useT } from "@/lib/language-context";
 
 const PAGE_SIZE = 50;
 
@@ -79,6 +80,7 @@ const avatarStyles = StyleSheet.create({
 });
 
 export default function AdminClubDetail() {
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -162,7 +164,7 @@ export default function AdminClubDetail() {
       setSimCount(1);
       Alert.alert("Fatto", data.message);
     },
-    onError: () => Alert.alert("Errore", "Impossibile simulare attività"),
+    onError: () => Alert.alert(t("common.error"), t("admin.cannotSimulateActivity")),
   });
 
   function handleRemoveMember(member: Member) {

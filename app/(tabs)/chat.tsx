@@ -65,7 +65,7 @@ function getConversationTitle(conv: ConversationItem, userId: string, t: (key: s
   if (conv.conversationType === "motoclub") return conv.title ?? "Clubs";
   if (conv.conversationType === "contact") {
     const others = conv.participants.filter((p) => p.id !== userId);
-    if (others.length === 0) return "Chat di contatto";
+    if (others.length === 0) return t("chat.contactChat");
     if (others.length === 1) return `Contatto - ${others[0].nickname}`;
     return `Contatto (${conv.participants.length})`;
   }

@@ -166,14 +166,14 @@ export default function AdminEasterEggs() {
   }
 
   function handleDelete(egg: EasterEgg) {
-    Alert.alert("Elimina Easter Egg", `Eliminare "${egg.name}"?`, [
+    Alert.alert(t("admin.deleteEggsTitle"), `Eliminare "${egg.name}"?`, [
       { text: t("common.cancel"), style: "cancel" },
       { text: t("common.delete"), style: "destructive", onPress: () => deleteMutation.mutate(egg.id) },
     ]);
   }
 
   function handleBatch() {
-    Alert.alert("Aggiungi 10 Easter Egg", "Verranno creati 10 Easter Egg in posizioni casuali in Italia (raggio 30m, 10 punti ciascuno)", [
+    Alert.alert(t("admin.addEggsTitle"), t("admin.addEggsMsg"), [
       { text: t("common.cancel"), style: "cancel" },
       { text: "Crea 10", onPress: () => batchMutation.mutate() },
     ]);

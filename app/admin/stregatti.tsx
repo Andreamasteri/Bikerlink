@@ -299,7 +299,7 @@ export default function FakeUsersAdmin() {
       const zav = data?.zavarrina ?? 0;
       const total = bb + zav;
       if (total === 0) {
-        setForceMatchingResult({ type: "success", text: "Nessun nuovo match trovato (già esistenti o nessuna coppia compatibile)" });
+        setForceMatchingResult({ type: "success", text: t("admin.noNewMatch") });
       } else {
         setForceMatchingResult({ type: "success", text: `${bb} biker-biker + ${zav} zavarrina match creati` });
       }
@@ -482,12 +482,12 @@ export default function FakeUsersAdmin() {
 
   const handleDeleteAllFakeChats = async () => {
     Alert.alert(
-      "Elimina tutte le chat degli stregatti",
-      "Eliminare TUTTE le conversazioni di TUTTI gli stregatti? L'operazione non è reversibile.",
+      t("admin.deleteAllChatsTitle"),
+      t("admin.deleteAllChatsMsg"),
       [
-        { text: "Annulla", style: "cancel" },
+        { text: t("admin.cancelBtn"), style: "cancel" },
         {
-          text: "Elimina tutto",
+          text: t("admin.deleteAll"),
           style: "destructive",
           onPress: async () => {
             setDeletingAllChats(true);
@@ -514,12 +514,12 @@ export default function FakeUsersAdmin() {
   const handleDeleteFakeChats = async () => {
     if (!selectedUserId) return;
     Alert.alert(
-      "Elimina Chat Stregatto",
-      "Eliminare tutte le conversazioni di questo stregatto? L'operazione non è reversibile.",
+      t("admin.deleteFakeUserChatTitle"),
+      t("admin.deleteFakeUserChatMsg"),
       [
-        { text: "Annulla", style: "cancel" },
+        { text: t("admin.cancelBtn"), style: "cancel" },
         {
-          text: "Elimina",
+          text: t("admin.deleteBtn"),
           style: "destructive",
           onPress: async () => {
             setDeletingChats(true);

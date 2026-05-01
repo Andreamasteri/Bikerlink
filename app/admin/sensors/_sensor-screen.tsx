@@ -267,7 +267,7 @@ function SensorBody({ def }: { def: SensorDefinition }) {
     }
 
     if (!available) {
-      addLog("error", "Sensore non disponibile su questo dispositivo o piattaforma");
+      addLog("error", t("admin.sensorUnavailable"));
       setIsStarting(false);
       return;
     }
@@ -286,7 +286,7 @@ function SensorBody({ def }: { def: SensorDefinition }) {
             ? canAsk
               ? `Permesso Motion Access negato. ${settingsMsg}`
               : `Permesso già negato in precedenza (non ripetibile). ${settingsMsg}`
-            : "Permesso negato per questo sensore."
+            : t("admin.sensorPermissionDenied")
         );
         if (!canAsk && Platform.OS !== "web") {
           addLog("info", "Premi 'Apri Impostazioni' per abilitare il permesso manualmente.");
@@ -348,8 +348,8 @@ function SensorBody({ def }: { def: SensorDefinition }) {
         />
         <Text style={ss.configHint}>
           {def.key === "pedometer"
-            ? "Pedometer non usa interval. Il campo {} è corretto."
-            : "interval: ms tra le letture (es. 100–2000). Modificabile solo quando il sensore è fermo."}
+            ? t("admin.pedometerNoInterval")
+            : t("admin.sensorIntervalDesc")}
         </Text>
       </View>
 

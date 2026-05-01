@@ -3,8 +3,10 @@ import { View, Text, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
 import Colors from "@/constants/colors";
+import { useT } from "@/lib/language-context";
 
 export default function ModeratorLogsRedirect() {
+  const t = useT();
   const router = useRouter();
   const { user } = useAuth();
 
@@ -19,7 +21,7 @@ export default function ModeratorLogsRedirect() {
       <Text style={styles.text}>
         {user?.role === "admin"
           ? "Reindirizzamento in corso…"
-          : "I log moderatori sono disponibili solo per gli amministratori."}
+          : t("moderator.adminOnly")}
       </Text>
     </View>
   );

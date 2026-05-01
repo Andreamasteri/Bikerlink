@@ -58,8 +58,9 @@ function TypeBadge({ type }: { type: string }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const t = useT();
   const color = status === "pending" ? "#F59E0B" : status === "approved" ? Colors.success : Colors.error;
-  const label = status === "pending" ? "In attesa" : status === "approved" ? "Approvata" : "Rifiutata";
+  const label = status === "pending" ? t("admin.pendingStatus") : status === "approved" ? t("admin.approvedStatus") : t("admin.rejectedStatus");
   return (
     <View style={[styles.statusBadge, { backgroundColor: color + "22" }]}>
       <Text style={[styles.statusBadgeText, { color }]}>{label}</Text>
@@ -192,9 +193,9 @@ export default function AdminMotoclubs() {
   });
 
   function handleApprove(req: ClubRequest) {
-    Alert.alert("Approva club", `Approvare "${req.name}"?\n\nVerrà creato un nuovo club e una chat di gruppo dedicata.`, [
+    Alert.alert(t("admin.approveClub"), `Approvare "${req.name}"?\n\nVerrà creato un nuovo club e una chat di gruppo dedicata.`, [
       { text: t("common.cancel"), style: "cancel" },
-      { text: "Approva", onPress: () => approveMutation.mutate(req.id) },
+      { text: t("admin.approve"), onPress: () => approveMutation.mutate(req.id) },
     ]);
   }
 
@@ -367,7 +368,7 @@ export default function AdminMotoclubs() {
               style={[styles.actionPill, { backgroundColor: Colors.success }]}
               onPress={() => Alert.alert("Approva sede", `Approvare la sede proposta per "${item.name}"?`, [
                 { text: t("common.cancel"), style: "cancel" },
-                { text: "Approva", onPress: () => approveLocationMutation.mutate(item.id) },
+                { text: t("admin.approve"), onPress: () => approveLocationMutation.mutate(item.id) },
               ])}
               disabled={approveLocationMutation.isPending}
             >
@@ -376,9 +377,9 @@ export default function AdminMotoclubs() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionPill, { backgroundColor: Colors.error }]}
-              onPress={() => Alert.alert("Rifiuta sede", `Rifiutare la sede proposta per "${item.name}"?`, [
+              onPress={() => Alert.alert(t("admin.rejectLocation"), `Rifiutare la sede proposta per "${item.name}"?`, [
                 { text: t("common.cancel"), style: "cancel" },
-                { text: "Rifiuta", style: "destructive", onPress: () => rejectLocationMutation.mutate(item.id) },
+                { text: t("admin.reject"), style: "destructive", onPress: () => rejectLocationMutation.mutate(item.id) },
               ])}
               disabled={rejectLocationMutation.isPending}
             >

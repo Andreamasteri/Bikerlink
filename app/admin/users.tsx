@@ -296,7 +296,7 @@ export default function AdminUsers() {
   function handleSaveEmail() {
     if (!selectedUser) return;
     if (!editEmail || !editEmail.includes("@")) {
-      Alert.alert("Errore", "Inserisci un'email valida");
+      Alert.alert(t("common.error"), t("admin.emailRequired"));
       return;
     }
     emailMutation.mutate({ id: selectedUser.id, email: editEmail });

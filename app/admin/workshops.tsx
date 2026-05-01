@@ -86,7 +86,7 @@ export default function AdminWorkshops() {
           <View style={styles.badges}>
             <View style={[styles.badge, { backgroundColor: item.isApproved ? Colors.success + "33" : Colors.warning + "33" }]}>
               <Text style={[styles.badgeText, { color: item.isApproved ? Colors.success : Colors.warning }]}>
-                {item.isApproved ? "Approvata" : "In attesa"}
+                {item.isApproved ? t("admin.workshopApproved") : t("admin.workshopPending")}
               </Text>
             </View>
             {item.isSynecoPartner && (

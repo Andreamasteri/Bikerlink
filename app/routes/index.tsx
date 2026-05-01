@@ -18,6 +18,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useSetting } from "@/lib/settings-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
+import { useT } from "@/lib/language-context";
 
 type Visibility = "public" | "friends" | "private";
 
@@ -55,6 +56,7 @@ function visibilityIcon(v: Visibility): React.ComponentProps<typeof Ionicons>["n
 }
 
 export default function RoutesListScreen() {
+  const t = useT();
   const router = useRouter();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -77,7 +79,7 @@ export default function RoutesListScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes", id] });
     },
     onError: () => {
-      Alert.alert("Errore", "Impossibile aggiornare la visibilità. Riprova.");
+      Alert.alert(t("common.error"), t("routes.cannotUpdateVisibilityRetry"));
     },
     onSettled: () => {
       setTogglingId(null);

@@ -21,11 +21,13 @@ interface AppSetting {
   description: string | null;
 }
 
-const defaultSettings = [
-  { key: "splash_message", label: "Messaggio Splash", placeholder: "Messaggio da mostrare nello splash..." },
-  { key: "max_photos_zavorrina", label: "Max foto zavorrina", placeholder: "3" },
-  { key: "max_daily_votes", label: "Max voti giornalieri", placeholder: "10" },
-];
+function getDefaultSettings(t: (k: string) => string) {
+  return [
+    { key: "splash_message", label: t("admin.splashMessage"), placeholder: t("admin.splashPlaceholder") },
+    { key: "max_photos_zavorrina", label: t("admin.maxPhotosZavorrina"), placeholder: "3" },
+    { key: "max_daily_votes", label: t("admin.maxDailyVotes"), placeholder: "10" },
+  ];
+}
 
 function ManualAdminSection() {
   const t = useT();
@@ -535,6 +537,7 @@ const emailStatusStyles = StyleSheet.create({
 
 export default function AdminSettings() {
   const t = useT();
+  const defaultSettings = getDefaultSettings(t);
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -808,7 +811,7 @@ export default function AdminSettings() {
     mutationFn: () => apiRequest("POST", "/api/admin/sync-prod-to-dev", {}),
     onSuccess: () => {
       refetchSyncStatus();
-      Alert.alert("Sync completato", "Database di sviluppo aggiornato con i dati di produzione.");
+      Alert.alert(t("admin.syncCompleted"), t("admin.devSyncMsg"));
     },
     onError: (e: Error) => Alert.alert("Errore sync", e.message),
   });
@@ -1437,7 +1440,7 @@ export default function AdminSettings() {
 
   async function handleSaveEmailConfig() {
     if (!emailConfigAdminPass) {
-      Alert.alert("Errore", "Inserisci la password admin");
+      Alert.alert(t("common.error"), t("admin.passwordRequired"));
       return;
     }
     if (!emailConfigGmail && !emailConfigAppPass) {
@@ -1667,7 +1670,7 @@ export default function AdminSettings() {
                 onPress={handleSave}
                 disabled={updateMutation.isPending}
               >
-                <Text style={styles.saveBtnText}>{updateMutation.isPending ? "..." : "Salva"}</Text>
+                <Text style={styles.saveBtnText}>{updateMutation.isPending ? "..." : t("admin.saveBtn")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1712,7 +1715,7 @@ export default function AdminSettings() {
           <Text style={themeStyles.switchDesc}>
             {themeUserSwitching
               ? "Ogni utente sceglie il proprio stile visivo"
-              : "Tutti gli utenti vedono il tema selezionato qui sotto"}
+              : t("admin.themeForAll")}
           </Text>
         </View>
         <Switch
@@ -1842,7 +1845,7 @@ export default function AdminSettings() {
           />
         </View>
         <Text style={styles.synecoDesc}>
-          {showSearchPrefEnabled ? "La sezione 'Ricerca Match con...' è visibile nel profilo utente" : "La sezione 'Ricerca Match con...' è nascosta dal profilo utente"}
+          {showSearchPrefEnabled ? t("admin.searchMatchVisible") : t("admin.searchMatchHidden")}
         </Text>
       </View>
 
@@ -1977,7 +1980,7 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {matchingCountries.length === 0
-            ? "Tutti i paesi (nessun filtro)"
+            ? t("admin.allCountries")
             : `${matchingCountries.length} ${matchingCountries.length === 1 ? "paese selezionato" : "paesi selezionati"}`}
         </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10, marginBottom: 8 }}>
@@ -2354,7 +2357,7 @@ export default function AdminSettings() {
               </View>
               <Text style={styles.synecoDesc}>Quando inviare la posizione in background:</Text>
               {[
-                { value: "always", label: "Sempre", desc: "Invia la posizione indipendentemente dallo stato" },
+                { value: "always", label: t("admin.alwaysSend"), desc: t("admin.alwaysSendDesc") },
                 { value: "tracking", label: "Solo tracking attivo", desc: "Solo durante la registrazione di un percorso" },
                 { value: "sos", label: "Solo SOS attivo", desc: "Solo durante un'emergenza SOS" },
                 { value: "tracking_or_sos", label: "Tracking O SOS", desc: t("admin.trackingOrSosDesc") },
@@ -2402,7 +2405,7 @@ export default function AdminSettings() {
                   onPress={() => {
                     const val = parseInt(bgIntervalInput, 10);
                     if (isNaN(val) || val < 10 || val > 300) {
-                      Alert.alert("Errore", "Inserisci un valore tra 10 e 300 secondi");
+                      Alert.alert(t("common.error"), t("admin.valueBetween10and300"));
                       return;
                     }
                     bgLocationMutation.mutate({ intervalSeconds: val });
@@ -2457,7 +2460,7 @@ export default function AdminSettings() {
               </View>
               <Text style={styles.synecoDesc}>
                 {bgLocationSettings?.ghostModeContinue
-                  ? "La posizione viene inviata in background anche quando Ghost Mode è attivo"
+                  ? t("admin.ghostBgTracking")
                   : "Il background location si interrompe quando l'utente attiva Ghost Mode"}
               </Text>
             </View>
@@ -2480,7 +2483,7 @@ export default function AdminSettings() {
           />
         </View>
         <Text style={styles.synecoDesc}>
-          {sosEnabled ? "Gli utenti possono inviare e accogliere richieste SOS" : "La funzione SOS è disattivata per tutti"}
+          {sosEnabled ? t("admin.sosActive") : t("admin.sosInactive")}
         </Text>
       </View>
 
@@ -2500,8 +2503,8 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {phoneSensorsEnabled
-            ? "Il toggle G-force BETA è visibile agli utenti nella schermata Registra giro"
-            : "Il toggle G-force BETA è nascosto — gli utenti non vedono questa funzione"}
+            ? t("admin.gforceBetaVisible")
+            : t("admin.gforceBetaHidden")}
         </Text>
       </View>
 
@@ -2575,7 +2578,7 @@ export default function AdminSettings() {
           />
         </View>
         <Text style={styles.synecoDesc}>
-          {mapsEnabled ? "Tile personalizzati attivi sulla mappa" : "Mappa con stile di default (no tile overlay)"}
+          {mapsEnabled ? t("admin.tileMapActive") : t("admin.tileMapInactive")}
         </Text>
         {mapsEnabled && (
           <View style={{ marginTop: 12 }}>
@@ -2656,7 +2659,7 @@ export default function AdminSettings() {
         <Text style={styles.synecoDesc}>
           {mapsUserChoiceEnabled
             ? "Gli utenti possono scegliere il proprio stile mappa"
-            : "Tutti gli utenti vedono il provider di default"}
+            : t("admin.allProviders")}
         </Text>
           </View>
         )}
@@ -2697,7 +2700,7 @@ export default function AdminSettings() {
               onPress={handleSaveHomeMessageText}
               disabled={isSavingHomeMessage}
             >
-              <Text style={styles.saveBtnText}>{isSavingHomeMessage ? "..." : "Salva"}</Text>
+              <Text style={styles.saveBtnText}>{isSavingHomeMessage ? "..." : t("admin.saveBtn")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -2795,9 +2798,9 @@ export default function AdminSettings() {
                 "1. Ogni nuovo utente riceve un codice di verifica a 6 cifre\n" +
                 "2. L'utente deve inserire il codice nella schermata di verifica per completare la registrazione\n" +
                 "3. Il codice scade dopo 30 minuti\n" +
-                "4. L'utente non potrà fare login finché non verifica l'email\n" +
+                t("admin.emailVerifStep4") + "\n" +
                 "5. L'admin riceve una notifica con il codice generato\n" +
-                "6. L'utente può richiedere un nuovo codice dalla schermata di verifica"
+                t("admin.emailVerifStep6")
               )}
               style={{ marginLeft: 6 }}
             >
@@ -2882,7 +2885,7 @@ export default function AdminSettings() {
           />
         </View>
         <Text style={styles.synecoDesc}>
-          {primalEnabled ? "I nuovi utenti registrati saranno marcati come 'Primal'" : "La marcatura Primal è disattivata"}
+          {primalEnabled ? t("admin.primalActive") : t("admin.primalInactive")}
         </Text>
       </View>
 
@@ -2945,7 +2948,7 @@ export default function AdminSettings() {
           )}
         </View>
         <Text style={styles.synecoDesc}>
-          {synecoVisible ? "Il branding Syneco è visibile nell'app" : "Il branding Syneco è nascosto"}
+          {synecoVisible ? t("admin.synecoVisible") : t("admin.synecoHidden")}
         </Text>
       </View>
 
@@ -2969,7 +2972,7 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {donationEnabled
-            ? "Il blocco 'Supporta BikerLink' è visibile nel profilo utente"
+            ? t("admin.supportBlockVisible")
             : t("admin.supportBlockHidden")}
         </Text>
 
@@ -2990,7 +2993,7 @@ export default function AdminSettings() {
               onPress={handleSavePaypal}
               disabled={isSavingPaypal}
             >
-              <Text style={styles.saveBtnText}>{isSavingPaypal ? "..." : "Salva"}</Text>
+              <Text style={styles.saveBtnText}>{isSavingPaypal ? "..." : t("admin.saveBtn")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -3002,7 +3005,7 @@ export default function AdminSettings() {
           </Text>
           <TextInput
             style={[styles.input, { minHeight: 120 }]}
-            placeholder={"Sono un motociclista, non un programmatore professionista.\nSto sviluppando quest'app da solo, per biker e zavorrine, nel mio tempo libero e a titolo gratuito.\nTra sviluppo, debug, server e pubblicazione i costi sono molto più alti del previsto.\nSe l'app ti piace e vuoi che continui a crescere, puoi supportarla con una piccola donazione.\nAnche solo il costo di un caffè fa la differenza.\nOgni utente che contribuirà verrà inserito nella Hall of Fame dei ringraziamenti dell'app.\nSe ognuno mette poco, possiamo fare tanto.\nGrazie davvero.\nCi vediamo su strada."}
+            placeholder={t("admin.donationPlaceholder")}
             placeholderTextColor={Colors.textSecondary}
             value={donationText}
             onChangeText={setDonationText}
@@ -3094,7 +3097,7 @@ export default function AdminSettings() {
           </View>
           <Switch
             value={unitsPrefEnabled}
-            onValueChange={(val) => setProtectedToggle({ key: "units_preference_enabled", value: val, label: "Preferenze Unità" })}
+            onValueChange={(val) => setProtectedToggle({ key: "units_preference_enabled", value: val, label: t("admin.unitPrefsLabel") })}
             trackColor={{ false: Colors.border, true: Colors.accent }}
             thumbColor={unitsPrefEnabled ? Colors.text : Colors.textSecondary}
             disabled={protectedToggleMutation.isPending}
@@ -3102,8 +3105,8 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {unitsPrefEnabled
-            ? "Gli utenti vedono la sezione 'Preferenze unità' nel profilo e possono cambiare sistema di misura."
-            : "Sezione 'Preferenze unità' nascosta nel profilo. Il sistema di misura si imposta solo in Modifica Profilo."}
+            ? t("admin.unitPrefVisible")
+            : t("admin.unitPrefsHidden")}
         </Text>
       </View>
 
@@ -3215,7 +3218,7 @@ export default function AdminSettings() {
                 onPress={handleSaveEmailConfig}
                 disabled={isSavingEmailConfig}
               >
-                <Text style={styles.saveBtnText}>{isSavingEmailConfig ? "..." : "Salva"}</Text>
+                <Text style={styles.saveBtnText}>{isSavingEmailConfig ? "..." : t("admin.saveBtn")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -3268,7 +3271,7 @@ export default function AdminSettings() {
                       onPress={handleSave}
                       disabled={updateMutation.isPending}
                     >
-                      <Text style={styles.saveBtnText}>{updateMutation.isPending ? "..." : "Salva"}</Text>
+                      <Text style={styles.saveBtnText}>{updateMutation.isPending ? "..." : t("admin.saveBtn")}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>

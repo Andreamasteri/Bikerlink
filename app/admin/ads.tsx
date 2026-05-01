@@ -521,7 +521,7 @@ export default function AdminAds() {
     if (skipped > 0) {
       Alert.alert(
         "Immagini troppo grandi",
-        `${skipped} immagin${skipped === 1 ? "e è stata ignorata" : "i sono state ignorate"} perché supera${skipped === 1 ? "" : "no"} il limite di 5 MB.`
+        `${skipped} ${skipped === 1 ? t("admin.imagesSkippedSingular") : t("admin.imagesSkippedPlural")} il limite di 5 MB.`
       );
     }
   }
@@ -666,7 +666,7 @@ export default function AdminAds() {
   }
 
   function handleDelete(campaign: Campaign) {
-    Alert.alert("Elimina campagna", `Eliminare "${campaign.name}"?`, [
+    Alert.alert(t("admin.deleteCampaignTitle"), `Eliminare "${campaign.name}"?`, [
       { text: t("common.cancel"), style: "cancel" },
       { text: t("common.delete"), style: "destructive", onPress: () => deleteMutation.mutate(campaign.id) },
     ]);

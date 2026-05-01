@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/query-client";
+import { useT } from "@/lib/language-context";
 
 interface FeedbackTicket {
   id: string;
@@ -35,19 +36,23 @@ interface FeedbackTicket {
 type FilterStatus = "all" | "open" | "in_progress" | "resolved" | "closed";
 type FilterType = "all" | "bug" | "feature";
 
-const STATUS_FILTERS: { key: FilterStatus; label: string }[] = [
-  { key: "all", label: "Tutti" },
-  { key: "open", label: "Aperti" },
-  { key: "in_progress", label: "In corso" },
-  { key: "resolved", label: "Risolti" },
-  { key: "closed", label: "Chiusi" },
-];
+function getStatusFilters(t: (k: string) => string): { key: FilterStatus; label: string }[] {
+  return [
+    { key: "all", label: t("moderator.statusAll") },
+    { key: "open", label: t("moderator.statusOpen") },
+    { key: "in_progress", label: t("moderator.statusInProgress") },
+    { key: "resolved", label: t("moderator.statusResolved") },
+    { key: "closed", label: t("moderator.statusClosed") },
+  ];
+}
 
-const TYPE_FILTERS: { key: FilterType; label: string; icon: string }[] = [
-  { key: "all", label: "Tutti", icon: "📋" },
-  { key: "bug", label: "Bug", icon: "🐛" },
-  { key: "feature", label: "Richieste", icon: "✨" },
-];
+function getTypeFilters(t: (k: string) => string): { key: FilterType; label: string; icon: string }[] {
+  return [
+    { key: "all", label: t("moderator.typeAll"), icon: "📋" },
+    { key: "bug", label: "Bug", icon: "🐛" },
+    { key: "feature", label: t("moderator.typeRequests"), icon: "✨" },
+  ];
+}
 
 function matchesType(ticketType: string, filter: FilterType): boolean {
   if (filter === "all") return true;
@@ -89,6 +94,9 @@ function TicketCard({ ticket, onOpen }: { ticket: FeedbackTicket; onOpen: (t: Fe
 }
 
 export default function ModeratorFeedback() {
+  const t = useT();
+  const STATUS_FILTERS = getStatusFilters(t);
+  const TYPE_FILTERS = getTypeFilters(t);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("open");
