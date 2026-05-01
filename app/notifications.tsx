@@ -6,7 +6,6 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Platform,
   Alert,
 } from "react-native";
 import { Stack } from "expo-router";
@@ -71,6 +70,13 @@ export default function NotificationsScreen() {
     },
   });
 
+  const deleteOneMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/notifications/${id}`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/notifications"] });
+    },
+  });
+
   const markAllRead = useCallback(async () => {
     const unread = notifications.filter((n) => !n.isRead);
     for (const n of unread) {
@@ -107,10 +113,15 @@ export default function NotificationsScreen() {
     }
   }, [markReadMutation]);
 
+  const handleDeleteOne = useCallback((id: string) => {
+    deleteOneMutation.mutate(id);
+  }, [deleteOneMutation]);
+
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const renderItem = ({ item }: { item: AppNotification }) => {
     const icon = getNotifIcon(item.notificationType);
+    const isDeleting = deleteOneMutation.isPending && deleteOneMutation.variables === item.id;
     return (
       <TouchableOpacity
         style={[
@@ -140,23 +151,26 @@ export default function NotificationsScreen() {
             {timeAgo(item.createdAt)}
           </Text>
         </View>
-        {!item.isRead && (
-          <View style={[styles.unreadDot, { backgroundColor: colors.accent }]} />
-        )}
+        <TouchableOpacity
+          onPress={() => handleDeleteOne(item.id)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          disabled={isDeleting}
+          style={styles.deleteBtn}
+        >
+          <Ionicons
+            name="close-circle-outline"
+            size={20}
+            color={isDeleting ? (colors.textSecondary ?? "#999") : (colors.textSecondary ?? "#999")}
+          />
+        </TouchableOpacity>
       </TouchableOpacity>
     );
   };
 
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background ?? colors.surface, paddingTop: topPad }]}>
+    <View style={[styles.container, { backgroundColor: colors.background ?? colors.surface }]}>
       <Stack.Screen
         options={{
-          headerShown: true,
-          headerTitle: "Notifiche",
-          headerStyle: { backgroundColor: colors.surface },
-          headerTintColor: colors.text,
           headerRight: notifications.length > 0
             ? () => (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
@@ -239,11 +253,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  deleteBtn: {
     flexShrink: 0,
+    paddingLeft: 4,
   },
   empty: {
     flex: 1,

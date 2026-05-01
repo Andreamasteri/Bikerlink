@@ -44,6 +44,27 @@ router.delete("/all", async (req: Request, res: Response) => {
   }
 });
 
+router.delete("/:id", async (req: Request, res: Response) => {
+  try {
+    const userId = requireAuth(req, res);
+    if (!userId) return;
+
+    const id = req.params.id as string;
+
+    const notificationsList = await storage.getNotifications(userId);
+    const notification = notificationsList.find((n) => n.id === id);
+    if (!notification) {
+      return res.status(404).json({ message: "Notifica non trovata" });
+    }
+
+    await db.delete(notifications).where(eq(notifications.id, id));
+    return res.json({ deleted: 1 });
+  } catch (error) {
+    console.error("Delete notification error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/:id/read", async (req: Request, res: Response) => {
   try {
     const userId = requireAuth(req, res);
