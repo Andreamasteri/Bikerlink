@@ -252,7 +252,10 @@ function requireAdmin(req: Request, res: Response, next: Function) {
 // Retention massima righe ota_events — usato come limite per la query admin
 // di visualizzazione. Il cleanup hard è gestito da Phase 12.5 in server/index.ts
 // (ogni 6h, configurabile via env var OTA_EVENTS_RETENTION, default 1000).
-const OTA_EVENTS_DB_RETENTION = parseInt(process.env.OTA_EVENTS_RETENTION ?? "1000", 10);
+const _rawEventsRetention = parseInt(process.env.OTA_EVENTS_RETENTION ?? "1000", 10);
+const OTA_EVENTS_DB_RETENTION = Number.isFinite(_rawEventsRetention) && _rawEventsRetention >= 1
+  ? _rawEventsRetention
+  : 1000;
 
 function clientIp(req: Request): string | undefined {
   // Task #1126 (Telemetry and Reporting Abuse): delegate to the centralized

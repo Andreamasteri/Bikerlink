@@ -1538,7 +1538,13 @@ function setupErrorHandler(app: express.Application) {
         // Runs once at startup (1-min delay) then every 6h. Replaces the old probabilistic
         // soft-delete that fired on ~2% of POST /ota-error inserts (now removed from that handler).
         {
-          const OTA_EVENTS_RETENTION = parseInt(process.env.OTA_EVENTS_RETENTION ?? "1000", 10);
+          const _rawRetention = parseInt(process.env.OTA_EVENTS_RETENTION ?? "1000", 10);
+          const OTA_EVENTS_RETENTION = Number.isFinite(_rawRetention) && _rawRetention >= 1
+            ? _rawRetention
+            : 1000;
+          if (_rawRetention !== OTA_EVENTS_RETENTION) {
+            console.warn(`[OTA-EVENTS-CLEANUP] OTA_EVENTS_RETENTION env var is invalid ("${process.env.OTA_EVENTS_RETENTION}") — falling back to 1000.`);
+          }
           const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
           const runOtaEventsCleanup = async () => {
             try {
