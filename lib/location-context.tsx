@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
-import { Platform, AppState, AppStateStatus, Alert } from "react-native";
+import { Platform, AppState, AppStateStatus } from "react-native";
 import * as Location from "expo-location";
 import { useQuery } from "@tanstack/react-query";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
@@ -130,36 +130,18 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const requestBackgroundPermission = useCallback(async (): Promise<boolean> => {
     if (Platform.OS === "web") return false;
 
-    return new Promise<boolean>((resolve) => {
-      Alert.alert(
-        "Posizione in Background",
-        "BikerLink ha bisogno della tua posizione anche quando l'app è minimizzata per:\n\n• Registrare percorsi in moto senza interruzioni\n• Inviare la posizione durante un'emergenza SOS\n• Mantenere la tua visibilità per la community\n\nTocca Continua e seleziona \"Sempre\" nella schermata successiva.",
-        [
-          {
-            text: "Non ora",
-            style: "cancel",
-            onPress: () => resolve(false),
-          },
-          {
-            text: "Continua",
-            onPress: async () => {
-              try {
-                const { status } = await Location.requestBackgroundPermissionsAsync();
-                const granted = status === "granted";
-                setHasBackgroundPermission(granted);
-                if (granted) {
-                  hadBackgroundPermissionRef.current = true;
-                  setBackgroundPermissionRevoked(false);
-                }
-                resolve(granted);
-              } catch {
-                resolve(false);
-              }
-            },
-          },
-        ]
-      );
-    });
+    try {
+      const { status } = await Location.requestBackgroundPermissionsAsync();
+      const granted = status === "granted";
+      setHasBackgroundPermission(granted);
+      if (granted) {
+        hadBackgroundPermissionRef.current = true;
+        setBackgroundPermissionRevoked(false);
+      }
+      return granted;
+    } catch {
+      return false;
+    }
   }, []);
 
   useEffect(() => {
