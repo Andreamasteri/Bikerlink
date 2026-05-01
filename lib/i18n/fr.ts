@@ -532,11 +532,17 @@ const fr: Record<string, string> = {
   "garage.fillRequired": "",
   "garage.defaultBadge": "",
   "garage.forSaleBadge": "",
-  "match.musicCriteria.songs": "",
+  "match.musicCriteria.tracks": "",
   "match.musicCriteria.genre": "",
   "match.musicCriteria.artist": "",
   "match.anyDistance": "",
   "match.change": "",
+  "home.userAvailable": "",
+  "tracking.rideNamePlaceholder": "",
+  "tracking.publish": "",
+  "tracking.deleteRideTitle": "",
+  "tracking.deleteRideConfirm": "",
+  "tracking.close": "",
 };
 
 export default fr;
