@@ -6,6 +6,7 @@ import { db } from "../db";
 import { userMotorcycles } from "../../shared/schema";
 import { storage } from "../storage";
 import { createClubInvitesForMoto } from "./motoclubs";
+import { sendMatchPushNotifications } from "../push-notifications";
 
 const router = Router();
 
@@ -108,6 +109,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
           referenceType: "match",
           referenceId: motorcycle.id,
         });
+        sendMatchPushNotifications([userId, wm.userId]);
         matches.push({ zavarrinaNickname: zavarrinaUser?.nickname, brand, model, ridingStyle });
       }
     }

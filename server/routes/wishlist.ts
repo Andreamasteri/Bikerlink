@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { storage } from "../storage";
 import { createClubInvitesForMoto } from "./motoclubs";
+import { sendMatchPushNotifications } from "../push-notifications";
 
 const router = Router();
 
@@ -157,6 +158,7 @@ router.post("/motos", requireAuth, async (req: Request, res: Response) => {
           referenceType: "match",
           referenceId: bikerMoto.id,
         });
+        sendMatchPushNotifications([bikerMoto.userId, userId]);
         matches.push({ bikerNickname: bikerUser?.nickname, brand, model, ridingStyle });
       }
     }

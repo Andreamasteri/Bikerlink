@@ -344,7 +344,7 @@ router.put("/me/push-token", requireAuth, async (req: Request, res: Response) =>
     if (!token || typeof token !== "string" || !token.startsWith("ExponentPushToken[")) {
       return res.status(400).json({ message: "Token Expo push non valido" });
     }
-    await storage.updateUser(userId, { expoPushToken: token } as any);
+    await storage.updateUser(userId, { expoPushToken: token });
     return res.json({ ok: true });
   } catch (error) {
     console.error("Push token update error:", error);

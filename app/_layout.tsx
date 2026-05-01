@@ -398,6 +398,15 @@ function PushTokenRegistrar() {
 
     (async () => {
       try {
+        if (Platform.OS === "android") {
+          await Notifications.setNotificationChannelAsync("matches", {
+            name: "Match notifications",
+            importance: Notifications.AndroidImportance.HIGH,
+            sound: "default",
+            vibrationPattern: [0, 250, 250, 250],
+          });
+        }
+
         const { status: existing } = await Notifications.getPermissionsAsync();
         let finalStatus = existing;
         if (existing !== "granted") {
