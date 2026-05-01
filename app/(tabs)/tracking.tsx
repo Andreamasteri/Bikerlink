@@ -13,6 +13,8 @@ import {
   Animated,
   Platform,
   ActivityIndicator,
+  AppState,
+  AppStateStatus,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -575,6 +577,15 @@ export default function TrackingScreen() {
   const handsOffDismissedForRideRef = useRef(false);
   const lastAvgSpeedUpdateRef = useRef(0);
 
+  // Background GPS toast
+  const totalGpsPointsRef = useRef(0);
+  const bgStartPointsRef = useRef(0);
+  const bgPointsCountRef = useRef(0);
+  const bgToastAnim = useRef(new Animated.Value(0)).current;
+  const bgToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [bgToastCount, setBgToastCount] = useState(0);
+  const [bgToastVisible, setBgToastVisible] = useState(false);
+
   // Derived
   const isFermo = currentSpeed <= IDLE_THRESHOLD_KMH;
   const netMs = Math.max(totalMs - displayIdleMs, 0);
@@ -706,6 +717,67 @@ export default function TrackingScreen() {
         .catch(() => {});
     }
   }, []);
+
+  // ── Background GPS toast helper ────────────────────────────────────────────
+  const showBgPointsToast = useCallback((count: number) => {
+    if (count <= 0) return;
+    if (bgToastTimerRef.current) clearTimeout(bgToastTimerRef.current);
+    setBgToastCount(count);
+    setBgToastVisible(true);
+    bgToastAnim.setValue(0);
+    Animated.timing(bgToastAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+    bgToastTimerRef.current = setTimeout(() => {
+      Animated.timing(bgToastAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(() => setBgToastVisible(false));
+    }, 3500);
+  }, [bgToastAnim]);
+
+  // ── AppState listener — background GPS point summary ──────────────────────
+  useEffect(() => {
+    // Track previous state so we can distinguish outgoing vs incoming inactive.
+    // iOS lifecycle: active → inactive → background (going to bg)
+    //                background → inactive → active (coming to fg)
+    // We must only save bgStartPointsRef on the OUTGOING transition (active→*)
+    // and never overwrite it on the incoming inactive→active path.
+    const prevAppStateRef = { current: AppState.currentState };
+
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      const prevState = prevAppStateRef.current;
+      prevAppStateRef.current = nextState;
+
+      // Going to background: only when coming FROM active state
+      if (
+        prevState === "active" &&
+        (nextState === "background" || nextState === "inactive")
+      ) {
+        bgStartPointsRef.current = totalGpsPointsRef.current;
+      }
+
+      // Returning to foreground: nextState active, previous was non-active
+      if (nextState === "active" && prevState !== "active") {
+        if (phaseRef.current === "active" || phaseRef.current === "paused") {
+          const acquired = totalGpsPointsRef.current - bgStartPointsRef.current;
+          bgPointsCountRef.current = acquired;
+          if (acquired > 0) {
+            showBgPointsToast(acquired);
+          }
+        }
+        bgStartPointsRef.current = 0;
+      }
+    };
+    const sub = AppState.addEventListener("change", handleAppStateChange);
+    return () => {
+      sub.remove();
+      if (bgToastTimerRef.current) clearTimeout(bgToastTimerRef.current);
+    };
+  }, [showBgPointsToast]);
 
   // ── Keep refs in sync ─────────────────────────────────────────────────────
   useEffect(() => { profileRef.current = profile; }, [profile]);
@@ -1012,6 +1084,7 @@ export default function TrackingScreen() {
         flushPoints();
       }
       appendPointToOfflineBuffer(point);
+      totalGpsPointsRef.current += 1;
     },
     [flushPoints, appendPointToOfflineBuffer]
   );
@@ -1099,6 +1172,7 @@ export default function TrackingScreen() {
         flushPoints();
       }
       appendPointToOfflineBuffer(point);
+      totalGpsPointsRef.current += 1;
     },
     [flushPoints, appendPointToOfflineBuffer]
   );
@@ -1180,6 +1254,9 @@ export default function TrackingScreen() {
     volumePressTimestampsRef.current = [];
     lastVolumeRef.current = null;
     handsOffDismissedForRideRef.current = false;
+    totalGpsPointsRef.current = 0;
+    bgStartPointsRef.current = 0;
+    bgPointsCountRef.current = 0;
   }, []);
 
   // ── Recalibrate G on-demand ────────────────────────────────────────────────
@@ -2468,6 +2545,33 @@ export default function TrackingScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* ── Background GPS toast ──────────────────────────────────────── */}
+      {bgToastVisible && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.bgToast,
+            {
+              bottom: insets.bottom + (Platform.OS === "web" ? 34 : 0) + 90,
+              opacity: bgToastAnim,
+              transform: [
+                {
+                  translateY: bgToastAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [12, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <Ionicons name="locate" size={14} color={Colors.accent} />
+          <Text style={styles.bgToastText}>
+            Acquisiti {bgToastCount} punti GPS in background
+          </Text>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -3217,5 +3321,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_700Bold" as const,
     color: "#ffffff",
+  },
+  bgToast: {
+    position: "absolute" as const,
+    alignSelf: "center" as const,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    backgroundColor: "rgba(20,20,30,0.92)" as const,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: Colors.accent + "50",
+  },
+  bgToastText: {
+    fontFamily: "Inter_600SemiBold" as const,
+    fontSize: 13,
+    color: Colors.text,
   },
 });
