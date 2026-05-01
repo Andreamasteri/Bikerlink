@@ -101,7 +101,7 @@ export default function FeatureRequestScreen() {
         </View>
 
         <View style={styles.plannedSection}>
-          <Text style={styles.plannedTitle}>Funzionalità in arrivo</Text>
+          <Text style={styles.plannedTitle}>{t("feedback.featuresComingSoon")}</Text>
           <View style={styles.plannedCard}>
             <Ionicons name="logo-paypal" size={20} color={Colors.maleIcon} />
             <View style={styles.plannedInfo}>

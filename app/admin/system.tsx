@@ -666,7 +666,7 @@ export default function SystemScreen() {
             <Ionicons name="nuclear-outline" size={32} color="#FF4444" />
             <Text style={styles.modalTitle}>Conferma purga</Text>
             <Text style={styles.modalBody}>
-              Stai per eliminare tutti gli utenti non-admin. Questa operazione è irreversibile.{"\n\n"}
+              {t("admin.deleteAllUsersConfirm")}{"\n\n"}
               Scrivi <Text style={{ color: "#FF4444", fontFamily: "Inter_700Bold" }}>PURGA</Text> nel campo qui sotto per confermare.
             </Text>
             <TextInput

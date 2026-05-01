@@ -563,7 +563,7 @@ export default function AdminMotoclubs() {
                   <MaterialIcons name="close" size={24} color={Colors.textSecondary} />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.modalSub}>Indica una motivazione opzionale che verrà registrata nel log.</Text>
+              <Text style={styles.modalSub}>{t("admin.optionalReasonHint")}</Text>
               <TextInput
                 style={styles.modalInput}
                 placeholder="Motivazione (opzionale)"

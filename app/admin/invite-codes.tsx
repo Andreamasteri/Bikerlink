@@ -370,7 +370,7 @@ export default function InviteCodesScreen() {
                     autoCapitalize="characters"
                     autoCorrect={false}
                   />
-                  <Text style={styles.fieldHint}>Il codice che verrà inserito dagli utenti al momento della registrazione</Text>
+                  <Text style={styles.fieldHint}>{t("admin.inviteCodeHint")}</Text>
                 </View>
               )}
 
@@ -396,7 +396,7 @@ export default function InviteCodesScreen() {
                   multiline
                   numberOfLines={4}
                 />
-                <Text style={styles.fieldHint}>Verrà mostrato all'utente dopo la registrazione con questo codice</Text>
+                <Text style={styles.fieldHint}>{t("admin.inviteWelcomeHint")}</Text>
               </View>
 
               <View style={styles.field}>
@@ -475,7 +475,7 @@ export default function InviteCodesScreen() {
           <View style={[styles.modalCard, { padding: 28 }]}>
             <Ionicons name="warning" size={40} color={Colors.error} style={{ alignSelf: "center", marginBottom: 12 }} />
             <Text style={[styles.modalTitle, { textAlign: "center", marginBottom: 8 }]}>Eliminare il codice?</Text>
-            <Text style={styles.confirmText}>Questa azione non può essere annullata.</Text>
+            <Text style={styles.confirmText}>{t("common.cannotBeUndone")}</Text>
             <View style={styles.confirmBtns}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmDeleteId(null)}>
                 <Text style={styles.cancelBtnText}>Annulla</Text>

@@ -365,7 +365,7 @@ export default function AdminEventiScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Motivo del rifiuto</Text>
-            <Text style={styles.modalHint}>Spiega all'utente perché l'evento è stato rifiutato.</Text>
+            <Text style={styles.modalHint}>{t("admin.rejectionReasonHint")}</Text>
             <TextInput
               style={styles.modalInput}
               value={rejectReason}

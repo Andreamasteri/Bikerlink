@@ -342,9 +342,9 @@ export default function ContestScreen() {
         : error.message;
       try {
         const parsed = JSON.parse(msg);
-        Alert.alert("Errore", parsed.message || "Impossibile votare");
+        Alert.alert(t("common.error"), parsed.message || t("contest.cannotVote"));
       } catch {
-        Alert.alert("Errore", msg || "Impossibile votare");
+        Alert.alert(t("common.error"), msg || t("contest.cannotVote"));
       }
     },
   });

@@ -1263,7 +1263,7 @@ export default function FakeUsersAdmin() {
           <View style={styles.pwdModalContainer}>
             <Text style={styles.pwdModalTitle}>Generazione Massiva</Text>
             <Text style={styles.pwdModalDesc}>
-              Verranno generati 5000 stregatti distribuiti uniformemente in tutta Europa (88 zone).{"\n\n"}Questo processo richiederà qualche minuto.
+              {t("admin.generateStregatti")}
             </Text>
             <View style={styles.pwdModalButtons}>
               <TouchableOpacity
@@ -1350,7 +1350,7 @@ export default function FakeUsersAdmin() {
           <View style={styles.confirmBox}>
             <Ionicons name="warning" size={36} color={Colors.error} style={{ marginBottom: 12 }} />
             <Text style={styles.confirmTitle}>Elimina tutti gli stregatti?</Text>
-            <Text style={styles.confirmDesc}>Questa azione elimina permanentemente tutti i {totalCount} stregatti e non può essere annullata.</Text>
+            <Text style={styles.confirmDesc}>{t("admin.deleteAllStregatti").replace("{count}", String(totalCount))}</Text>
             <View style={styles.confirmBtns}>
               <TouchableOpacity
                 style={[styles.confirmCancelBtn, deleteAllMutation.isPending && { opacity: 0.4 }]}

@@ -1594,7 +1594,7 @@ export default function MapScreen() {
             {selectedEgg?.collected ? (
               <View style={styles.eggCollectedBadge}>
                 <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
-                <Text style={[styles.eggPoints, { color: Colors.success }]}>Già raccolto</Text>
+                <Text style={[styles.eggPoints, { color: Colors.success }]}>{t("map.alreadyCollected")}</Text>
               </View>
             ) : (
               <Pressable

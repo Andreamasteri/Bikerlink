@@ -43,11 +43,12 @@ function resolveImageUrl(imageUrl: string): string {
 }
 
 function StatusBadge({ status, rejectionReason }: { status: string; rejectionReason?: string | null }) {
+  const t = useT();
   if (status === "approved") return null;
   const map: Record<string, { label: string; color: string }> = {
-    pending: { label: "In attesa di approvazione", color: Colors.warning },
-    rejected: { label: "Rifiutato", color: Colors.error },
-    cancelled: { label: "Cancellato", color: Colors.textSecondary },
+    pending: { label: t("events.pendingApproval"), color: Colors.warning },
+    rejected: { label: t("events.rejected"), color: Colors.error },
+    cancelled: { label: t("events.cancelledStatus"), color: Colors.textSecondary },
   };
   const info = map[status];
   if (!info) return null;
@@ -57,7 +58,7 @@ function StatusBadge({ status, rejectionReason }: { status: string; rejectionRea
         <Text style={[statusStyles.label, { color: info.color }]}>{info.label}</Text>
       </View>
       {status === "rejected" && rejectionReason && (
-        <Text style={statusStyles.reason}>Motivo: {rejectionReason}</Text>
+        <Text style={statusStyles.reason}>{t("events.reason")}: {rejectionReason}</Text>
       )}
     </View>
   );

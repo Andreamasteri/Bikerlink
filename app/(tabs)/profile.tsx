@@ -850,7 +850,7 @@ export default function ProfileScreen() {
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: Colors.accent + "10", borderRadius: 8, padding: 8, marginTop: 4 }}>
               <Ionicons name="information-circle-outline" size={14} color={Colors.accent} />
               <Text style={{ flex: 1, fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary }}>
-                Le modalità Passeggio/Standard/Race nel tracking sovrascrivono temporaneamente questa preferenza.
+                {t("profile.unitsModeOverride")}
               </Text>
             </View>
           </View>
@@ -1172,7 +1172,7 @@ export default function ProfileScreen() {
       {unitsPrefEnabled && (
       <View style={styles.section}>
         <Pressable style={styles.accordionHeader} onPress={() => setUnitsExpanded(v => !v)}>
-          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Preferenze unità</Text>
+          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>{t("profile.unitsPreferences")}</Text>
           <Ionicons name={unitsExpanded ? "chevron-up" : "chevron-down"} size={18} color={colors.textSecondary} />
         </Pressable>
         {unitsExpanded && (
@@ -1205,7 +1205,7 @@ export default function ProfileScreen() {
             </View>
 
             <View>
-              <Text style={[styles.unitsGroupLabel, { color: colors.textSecondary }]}>Velocità</Text>
+              <Text style={[styles.unitsGroupLabel, { color: colors.textSecondary }]}>{t("profile.speed")}</Text>
               <View style={{ gap: 8 }}>
                 {([
                   { value: "kmh" as SpeedUnit, label: "km/h", desc: "Chilometri all'ora" },

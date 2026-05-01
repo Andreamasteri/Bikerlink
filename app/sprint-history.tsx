@@ -19,6 +19,7 @@ import Colors from "@/constants/colors";
 import { useUnits } from "@/lib/units-context";
 import { formatDateTime } from "@/lib/units";
 import { getCurrentLocale } from "@/lib/i18n";
+import { useT } from "@/lib/language-context";
 
 interface SprintResult {
   id: string;
@@ -44,6 +45,7 @@ function getMedalIcon(index: number): { name: IoniconsName; color: string } | nu
 }
 
 export default function SprintHistoryScreen() {
+  const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { speedUnit, timeFormat } = useUnits();
@@ -173,7 +175,7 @@ export default function SprintHistoryScreen() {
           <Ionicons name="timer-outline" size={56} color={Colors.textSecondary} />
           <Text style={styles.emptyTitle}>Nessun sprint ancora</Text>
           <Text style={styles.emptySubtitle}>
-            Abilita la modalità 0-100 nel tracking e completa una sessione
+            {t("sprint.enableHint")}
           </Text>
         </View>
       ) : (

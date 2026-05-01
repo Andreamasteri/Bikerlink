@@ -96,7 +96,7 @@ export default function BugReportScreen() {
         <View style={styles.infoCard}>
           <Ionicons name="information-circle" size={20} color={Colors.accentRed} />
           <Text style={styles.infoText}>
-            Descrivi il problema nel modo più dettagliato possibile. Indica cosa stavi facendo quando si è verificato il bug.
+            {t("feedback.bugDescHint")}
           </Text>
         </View>
 

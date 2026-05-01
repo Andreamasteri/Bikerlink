@@ -456,7 +456,7 @@ export default function ChatConversationScreen() {
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
         insertCoords(loc.coords.latitude, loc.coords.longitude);
       } catch {
-        Alert.alert("Errore posizione", "Impossibile ottenere la posizione GPS. Riprova.");
+        Alert.alert(t("chat.locationError"), t("chat.cannotGetGps"));
       }
     }
   }, []);

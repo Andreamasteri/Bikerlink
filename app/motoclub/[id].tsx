@@ -315,7 +315,7 @@ export default function ClubDetailScreen() {
             <View style={styles.statItem}>
               <Ionicons name="flame" size={20} color="#F59E0B" />
               <Text style={styles.statValue}>{publicClub.activityScore}</Text>
-              <Text style={styles.statLabel}>Attività</Text>
+              <Text style={styles.statLabel}>{t("motoclub.activity")}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
@@ -415,7 +415,7 @@ export default function ClubDetailScreen() {
               <View style={styles.statItem}>
                 <Ionicons name="flame" size={20} color="#F59E0B" />
                 <Text style={styles.statValue}>{club.activityScore ?? 0}</Text>
-                <Text style={styles.statLabel}>Attività</Text>
+                <Text style={styles.statLabel}>{t("motoclub.activity")}</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
@@ -570,7 +570,7 @@ export default function ClubDetailScreen() {
           <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 20 }]}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Proponi sede fisica</Text>
-            <Text style={styles.modalSub}>Indica la posizione della sede fisica di "{club.name}". L'admin approverà la proposta prima che appaia in mappa.</Text>
+            <Text style={styles.modalSub}>{t("motoclub.hqLocationHint").replace("{name}", club.name)}</Text>
 
             <View style={styles.mapPickerContainer}>
               <LeafletPickerMap

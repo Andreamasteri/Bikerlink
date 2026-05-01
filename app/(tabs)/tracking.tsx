@@ -2369,7 +2369,7 @@ export default function TrackingScreen() {
                   <Text style={styles.triggerLabel}>0-{convertSpeed(100, speedUnit).toFixed(0)} {speedUnitLabel(speedUnit)}</Text>
                   {is0100Enabled && (
                     <Text style={[styles.triggerDesc, { color: Colors.accent }]}>
-                      Forza modalità Race
+                      {t("tracking.forceRaceMode")}
                     </Text>
                   )}
                 </View>

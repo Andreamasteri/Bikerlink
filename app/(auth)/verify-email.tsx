@@ -16,11 +16,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQueryClient } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { t as translate } from "@/lib/i18n";
+import { useT } from "@/lib/language-context";
 import { apiRequest, getApiUrl, setSessionToken } from "@/lib/query-client";
 
 const RESEND_COOLDOWN = 60;
 
 export default function VerifyEmailScreen() {
+  const tr = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -146,14 +148,14 @@ export default function VerifyEmailScreen() {
           <View style={styles.warnBanner}>
             <Ionicons name="warning" size={18} color="#F59E0B" />
             <Text style={styles.warnText}>
-              Il servizio email non è configurato. Chiedi all'amministratore di impostare le credenziali Gmail nelle impostazioni.
+              {tr("auth.emailServiceNotConfigured")}
             </Text>
           </View>
         )}
 
         <Text style={styles.subtitle}>Abbiamo inviato un codice di verifica a</Text>
         <Text style={styles.emailText}>{email}</Text>
-        <Text style={styles.emailWarning}>Attenzione, se non ti è arrivato il messaggio, controlla che l'email inserita sia corretta</Text>
+        <Text style={styles.emailWarning}>{tr("auth.checkEmailCorrect")}</Text>
         <Text style={styles.spamHint}>Controlla anche la cartella spam.</Text>
 
         {showNoEmailHint && !resendSuccess ? (

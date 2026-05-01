@@ -870,7 +870,7 @@ export default function TraduzioniScreen() {
           </View>
           <View style={styles.cardHeaderText}>
             <Text style={styles.cardTitle}>Scarica tabella traduzioni</Text>
-            <Text style={styles.cardDesc}>Genera ed esporta in Word per la traduzione esterna. IT è sempre inclusa.</Text>
+            <Text style={styles.cardDesc}>{t("admin.exportWordDesc")}</Text>
           </View>
         </View>
 

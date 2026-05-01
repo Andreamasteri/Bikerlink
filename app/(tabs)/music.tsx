@@ -249,7 +249,7 @@ function TelefonoTab() {
     return (
       <View style={styles.centered}>
         <Ionicons name="phone-portrait-outline" size={48} color={Colors.textSecondary} />
-        <Text style={styles.emptyText}>La libreria locale non è disponibile sul web.</Text>
+        <Text style={styles.emptyText}>{t("music.localLibraryUnavailable")}</Text>
       </View>
     );
   }
@@ -1328,7 +1328,7 @@ export default function MusicScreen() {
             <View style={lastfmBannerStyles.banner}>
               <Ionicons name="warning-outline" size={18} color="#92400e" style={{ marginRight: 8, flexShrink: 0 }} />
               <Text style={lastfmBannerStyles.text}>
-                Attenzione! La prima autenticazione su Last.fm richiede qualche manciata di secondi... portate pazienza, la finestra del browser si chiuderà da sola quando avrà terminato.
+                {t("music.lastfmAuthWarning")}
               </Text>
             </View>
           )}
@@ -1605,7 +1605,7 @@ function BraniTab({
         <Ionicons name="radio" size={52} color={providerColor} />
         <Text style={styles.connectTitle}>Collega {providerName}</Text>
         <Text style={styles.connectDesc}>
-          Collega il tuo account Last.fm per sincronizzare i tuoi brani più ascoltati con i bikers.
+          {t("music.lastfmConnectPrompt")}
         </Text>
         <TouchableOpacity
           style={[styles.connectBtn, { backgroundColor: providerColor }, isConnecting && styles.connectBtnDisabled]}
@@ -1734,7 +1734,7 @@ function BraniTab({
             ) : searchNeedsReconnect ? (
               <View style={styles.reconnectBox}>
                 <Ionicons name="radio" size={32} color={providerColor} style={{ marginBottom: 8 }} />
-                <Text style={styles.reconnectText}>La sessione {providerName} è scaduta.</Text>
+                <Text style={styles.reconnectText}>{t("music.sessionExpired").replace("{provider}", providerName)}</Text>
                 <TouchableOpacity
                   style={[styles.connectBtn, { backgroundColor: providerColor, marginTop: 12 }]}
                   onPress={onConnect}

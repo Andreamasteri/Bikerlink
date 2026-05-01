@@ -154,7 +154,7 @@ export default function CreateMotoclub() {
           <Ionicons name="checkmark-circle" size={64} color={Colors.success} />
           <Text style={styles.successTitle}>Richiesta inviata!</Text>
           <Text style={styles.successDesc}>
-            Riceverai una notifica quando la tua richiesta sarà approvata dall'admin.
+            {t("motoclub.approvalNotif")}
           </Text>
           <TouchableOpacity style={styles.doneBtn} onPress={() => router.back()}>
             <Text style={styles.doneBtnText}>Torna ai Clubs</Text>
@@ -394,7 +394,7 @@ export default function CreateMotoclub() {
           </View>
 
           <Text style={styles.summaryNote}>
-            La richiesta verrà inviata all'admin per approvazione. Riceverai un messaggio quando sarà processata.
+            {t("motoclub.requestSentDesc")}
           </Text>
 
           <TouchableOpacity

@@ -284,8 +284,8 @@ function SensorBody({ def }: { def: SensorDefinition }) {
           "error",
           def.key === "pedometer"
             ? canAsk
-              ? `Permesso Motion Access negato. ${settingsMsg}`
-              : `Permesso già negato in precedenza (non ripetibile). ${settingsMsg}`
+              ? `${t("sensors.pedometerPermDenied")} ${settingsMsg}`
+              : `${t("sensors.permPreviouslyDeniedShort")} ${settingsMsg}`
             : t("admin.sensorPermissionDenied")
         );
         if (!canAsk && Platform.OS !== "web") {

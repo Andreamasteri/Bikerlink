@@ -196,7 +196,7 @@ export default function CreateRouteScreen() {
         <View style={styles.betaWarning}>
           <MaterialCommunityIcons name="alert" size={22} color="#FF6600" />
           <Text style={styles.betaWarningText}>
-            ATTENZIONE!!! QUESTA OPZIONE È ANCORA IN FASE BETA! I COLLEGAMENTI TRA UNA TAPPA E L'ALTRA SONO DIRETTI, NON TENGONO CONTO DELLE STRADE. PER AVERE IL PERCORSO COMPLETO SU GOOGLE MAPS, BASTA SELEZIONARE IL LINK GENERATO
+            {t("routes.betaWarning")}
           </Text>
         </View>
 
@@ -437,7 +437,7 @@ export default function CreateRouteScreen() {
                   activeOpacity={0.7}
                 >
                   <Ionicons name="globe-outline" size={18} color="#fff" />
-                  <Text style={styles.dialogBtnPrimaryText}>Sì, pubblica</Text>
+                  <Text style={styles.dialogBtnPrimaryText}>{t("routes.publishConfirm")}</Text>
                 </TouchableOpacity>
               </View>
             )}

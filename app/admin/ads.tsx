@@ -1069,7 +1069,7 @@ export default function AdminAds() {
               placeholderTextColor={Colors.textSecondary}
             />
 
-            <Text style={styles.settingsLabel}>Modalità</Text>
+            <Text style={styles.settingsLabel}>{t("admin.adMode")}</Text>
             <View style={styles.modeRow}>
               <TouchableOpacity
                 style={[styles.modeBtn, settingsMode === "sequential" && { borderColor: currentTab.color, backgroundColor: currentTab.color + "22" }]}

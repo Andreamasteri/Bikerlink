@@ -414,7 +414,7 @@ export default function CreateProposalScreen() {
               style={styles.input}
               value={title}
               onChangeText={setTitle}
-              placeholder="Es: Giro sui colli toscani"
+              placeholder={t("proposals.exampleTitle")}
               placeholderTextColor={Colors.textSecondary}
               maxLength={200}
             />
@@ -767,7 +767,7 @@ export default function CreateProposalScreen() {
               <View style={styles.switchRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.switchLabel}>Tempo limite rientro</Text>
-                  <Text style={styles.switchSub}>Se attivo, il biker verrà avvisato</Text>
+                  <Text style={styles.switchSub}>{t("proposals.bikerWillBeNotified")}</Text>
                 </View>
                 <Switch
                   value={returnDeadlineEnabled}

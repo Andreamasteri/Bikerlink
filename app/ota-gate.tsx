@@ -90,7 +90,7 @@ export default function OtaGateScreen() {
       <Text style={[styles.title, { color: colors.text }]}>{status}</Text>
       <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 24 }} />
       <Text style={[styles.hint, { color: colors.textSecondary }]}>
-        L'app si aggiornerà automaticamente
+        {t("ota.autoUpdate")}
       </Text>
     </View>
   );

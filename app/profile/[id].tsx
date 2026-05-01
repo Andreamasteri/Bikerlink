@@ -171,7 +171,7 @@ export default function PublicProfileScreen() {
     setMenuVisible(false);
     Alert.alert(
       "Blocca utente",
-      `Sei sicuro di voler bloccare ${profile?.nickname ?? "questo utente"}?\n\nL'utente scomparirà dai match, dal profilo e dalla chat.`,
+      t("profile.blockConfirm").replace("{name}", profile?.nickname ?? t("common.thisUser")),
       [
         { text: t("common.cancel"), style: "cancel" },
         {
@@ -481,7 +481,7 @@ export default function PublicProfileScreen() {
               <View style={styles.reportSuccess}>
                 <Ionicons name="checkmark-circle" size={48} color={Colors.success} />
                 <Text style={styles.reportSuccessTitle}>Segnalazione inviata</Text>
-                <Text style={styles.reportSuccessText}>Grazie per averci aiutato a mantenere la community sicura. La esamineremo al più presto.</Text>
+                <Text style={styles.reportSuccessText}>{t("profile.reportSuccess")}</Text>
                 <TouchableOpacity style={styles.reportCloseBtn} onPress={() => setReportVisible(false)}>
                   <Text style={styles.reportCloseBtnText}>Chiudi</Text>
                 </TouchableOpacity>

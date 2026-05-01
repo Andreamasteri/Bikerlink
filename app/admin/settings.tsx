@@ -1798,7 +1798,7 @@ export default function AdminSettings() {
 
       <View style={styles.sectionHeaderRow}>
         <Ionicons name="apps" size={20} color={Colors.accent} />
-        <Text style={styles.sectionTitle}>Funzionalità App</Text>
+        <Text style={styles.sectionTitle}>{t("admin.appFeatures")}</Text>
       </View>
 
       <View style={styles.accordionPanel}>
@@ -1881,7 +1881,7 @@ export default function AdminSettings() {
         <View style={styles.synecoHeader}>
           <View style={styles.synecoInfo}>
             <Ionicons name="time" size={20} color={Colors.warning} />
-            <Text style={styles.synecoLabel}>Età Max Coordinate (sec)</Text>
+            <Text style={styles.synecoLabel}>{t("admin.maxCoordAge")}</Text>
           </View>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <TextInput
@@ -1901,7 +1901,7 @@ export default function AdminSettings() {
           </View>
         </View>
         <Text style={styles.synecoDesc}>
-          Se le coordinate di un utente sono più vecchie di questa soglia, la distanza mostra "Old Psn" (min 10s, default 300s)
+          {t("admin.coordAgeDesc")}
         </Text>
       </View>
 
@@ -2182,7 +2182,7 @@ export default function AdminSettings() {
                 </View>
               </View>
               <Text style={styles.synecoDesc}>
-                Quanti record mantenere per utente. Record più vecchi vengono eliminati automaticamente (default 60)
+                {t("admin.maxRecordsPerUser")}
               </Text>
             </View>
 
@@ -2190,7 +2190,7 @@ export default function AdminSettings() {
               <View style={styles.synecoHeader}>
                 <View style={styles.synecoInfo}>
                   <Ionicons name="people" size={20} color={Colors.accent} />
-                  <Text style={styles.synecoLabel}>Modalità</Text>
+                  <Text style={styles.synecoLabel}>{t("admin.adModeLabel")}</Text>
                 </View>
                 <View style={{ flexDirection: "row", gap: 8 }}>
                   {(["all", "selected"] as const).map((m) => (
@@ -2352,7 +2352,7 @@ export default function AdminSettings() {
               <View style={styles.synecoHeader}>
                 <View style={styles.synecoInfo}>
                   <Ionicons name="git-branch" size={20} color={Colors.accent} />
-                  <Text style={styles.synecoLabel}>Modalità Trigger</Text>
+                  <Text style={styles.synecoLabel}>{t("admin.triggerMode")}</Text>
                 </View>
               </View>
               <Text style={styles.synecoDesc}>Quando inviare la posizione in background:</Text>
@@ -3069,7 +3069,7 @@ export default function AdminSettings() {
           <View style={styles.accordionPanelContent}>
             <View style={styles.paidCard}>
               <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 14, lineHeight: 18 }}>
-                Il widget flottante è un pallino draggabile visibile sopra ogni schermata (solo su app nativa). Mostra badge con messaggi e notifiche non letti e permette accesso rapido a Chat e Notifiche. Se disabilitato qui, nessun utente lo vedrà indipendentemente dalla propria preferenza.
+                {t("admin.floatingWidgetDesc")}
               </Text>
               <View style={styles.synecoHeader}>
                 <View style={styles.synecoInfo}>
@@ -3093,7 +3093,7 @@ export default function AdminSettings() {
         <View style={styles.synecoHeader}>
           <View style={styles.synecoInfo}>
             <Ionicons name="speedometer-outline" size={20} color={Colors.accent} />
-            <Text style={styles.synecoLabel}>Preferenze Unità</Text>
+            <Text style={styles.synecoLabel}>{t("admin.unitPrefsLabel")}</Text>
           </View>
           <Switch
             value={unitsPrefEnabled}

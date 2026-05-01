@@ -339,7 +339,7 @@ export default function AdminClubDetail() {
             onPress={() => setSimModalVisible(true)}
           >
             <Ionicons name="chatbubbles-outline" size={18} color={Colors.accent} />
-            <Text style={styles.simulateBtnText}>Simula attività chat</Text>
+            <Text style={styles.simulateBtnText}>{t("admin.simulateChatActivity")}</Text>
           </TouchableOpacity>
 
           <View style={[styles.dangerZone, { marginTop: 16, marginBottom: insets.bottom + 20 }]}>
@@ -367,7 +367,7 @@ export default function AdminClubDetail() {
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>Simula attività chat</Text>
+          <Text style={styles.modalTitle}>{t("admin.simulateChatActivity")}</Text>
           <Text style={styles.modalSub}>
             I fake member del club invieranno messaggi nella chat comune.
           </Text>
