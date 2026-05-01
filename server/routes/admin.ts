@@ -616,8 +616,8 @@ router.get("/ota-stats", async (_req: Request, res: Response) => {
   try {
     const result = await db.execute(sql`
       SELECT
-        COALESCE(current_update_id, '') AS current_update_id,
-        COALESCE(release_id, '') AS release_id,
+        current_update_id,
+        MIN(release_id) AS release_id,
         COALESCE(runtime_version, '?') AS runtime_version,
         COALESCE(platform, '?') AS platform,
         COUNT(*) FILTER (WHERE phase = 'reload') AS ok_count,
@@ -625,9 +625,9 @@ router.get("/ota-stats", async (_req: Request, res: Response) => {
         COUNT(DISTINCT ip) AS unique_devices,
         MAX(created_at) AS last_seen
       FROM ota_events
+      WHERE current_update_id IS NOT NULL AND current_update_id <> ''
       GROUP BY
-        COALESCE(current_update_id, ''),
-        COALESCE(release_id, ''),
+        current_update_id,
         COALESCE(runtime_version, '?'),
         COALESCE(platform, '?')
       ORDER BY last_seen DESC
