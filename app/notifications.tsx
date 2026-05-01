@@ -151,6 +151,9 @@ export default function NotificationsScreen() {
             {timeAgo(item.createdAt)}
           </Text>
         </View>
+        {!item.isRead && (
+          <View style={[styles.unreadDot, { backgroundColor: colors.accent }]} />
+        )}
         <TouchableOpacity
           onPress={() => handleDeleteOne(item.id)}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -158,9 +161,9 @@ export default function NotificationsScreen() {
           style={styles.deleteBtn}
         >
           <Ionicons
-            name="close-circle-outline"
-            size={20}
-            color={isDeleting ? (colors.textSecondary ?? "#999") : (colors.textSecondary ?? "#999")}
+            name="trash-outline"
+            size={18}
+            color={isDeleting ? (colors.textSecondary ?? "#999") : "#E63946"}
           />
         </TouchableOpacity>
       </TouchableOpacity>
@@ -252,6 +255,12 @@ const styles = StyleSheet.create({
   time: {
     fontSize: 12,
     marginTop: 2,
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    flexShrink: 0,
   },
   deleteBtn: {
     flexShrink: 0,
