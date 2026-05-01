@@ -74,6 +74,19 @@ function xyzFormat(d: { x: number; y: number; z: number }): string {
   return `x: ${d.x.toFixed(4)}, y: ${d.y.toFixed(4)}, z: ${d.z.toFixed(4)}`;
 }
 
+async function requestSensorPermission(
+  key: SensorKey
+): Promise<{ granted: boolean; required: boolean }> {
+  switch (key) {
+    case "pedometer":
+      if (Platform.OS === "web") return { granted: true, required: false };
+      const { status } = await Pedometer.requestPermissionsAsync();
+      return { granted: status === "granted", required: true };
+    default:
+      return { granted: true, required: false };
+  }
+}
+
 async function checkSensorAvailable(key: SensorKey): Promise<boolean> {
   switch (key) {
     case "accelerometer": return Accelerometer.isAvailableAsync();
@@ -257,25 +270,29 @@ function SensorBody({ def }: { def: SensorDefinition }) {
       return;
     }
 
-    if (def.key === "pedometer" && Platform.OS !== "web") {
-      addLog("info", "Richiesta permesso Motion Access (iOS/Android)…");
-      try {
-        const { status } = await Pedometer.requestPermissionsAsync();
-        if (status !== "granted") {
-          addLog(
-            "error",
-            "Permesso Motion Access negato. Vai in Impostazioni → Privacy → Movimento e fitness e abilita BikerLink."
-          );
-          setIsStarting(false);
-          return;
-        }
-        addLog("success", "Permesso Motion Access concesso");
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        addLog("error", `Errore richiesta permesso: ${msg}`);
+    try {
+      const perm = await requestSensorPermission(def.key);
+      if (perm.required) {
+        addLog("info", "Richiesta permesso sensore…");
+      }
+      if (!perm.granted) {
+        addLog(
+          "error",
+          def.key === "pedometer"
+            ? "Permesso Motion Access negato. Vai in Impostazioni → Privacy → Movimento e fitness e abilita BikerLink."
+            : "Permesso negato per questo sensore."
+        );
         setIsStarting(false);
         return;
       }
+      if (perm.required) {
+        addLog("success", "Permesso concesso");
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      addLog("error", `Errore richiesta permesso: ${msg}`);
+      setIsStarting(false);
+      return;
     }
 
     try {
