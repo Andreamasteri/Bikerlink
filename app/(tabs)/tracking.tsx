@@ -20,9 +20,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import Colors from "@/constants/colors";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, getQueryFn } from "@/lib/query-client";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
+import { useRouter } from "expo-router";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 import { getCurrentLocale } from "@/lib/i18n";
 import { useUnits, SpeedUnit, DistanceUnit } from "@/lib/units-context";
@@ -508,6 +509,7 @@ function RouteMapModal({
 
 export default function TrackingScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { speedUnit, distanceUnit } = useUnits();
   const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
   const tileConfig = getTileConfig(mapsEnabled ? resolvedProvider : "carto_dark");
@@ -574,6 +576,9 @@ export default function TrackingScreen() {
   // Sprint
   const [sprintPhase, setSprintPhase] = useState<"waiting" | "measuring" | "done">("waiting");
   const [sprint0to100Ms, setSprint0to100Ms] = useState<number | null>(null);
+  const [isNewRecord, setIsNewRecord] = useState(false);
+  const recordAnim = useRef(new Animated.Value(0)).current;
+  const personalBestMsRef = useRef<number | null>(null);
 
   // Buffer display
   const [pointsSent, setPointsSent] = useState(0);
@@ -650,6 +655,22 @@ export default function TrackingScreen() {
   const { data: records, refetch: refetchRecords } = useQuery<RouteRecord[]>({
     queryKey: ["/api/routes"],
   });
+
+  // ── Sprint personal best (fetched when 0-100 mode enabled) ────────────────
+  const { data: sprintHistory } = useQuery<Array<{ sprint0to100Ms: number | null }>>({
+    queryKey: ["/api/sprints"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: is0100Enabled,
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    if (sprintHistory && sprintHistory.length > 0 && sprintHistory[0].sprint0to100Ms != null) {
+      personalBestMsRef.current = sprintHistory[0].sprint0to100Ms;
+    } else {
+      personalBestMsRef.current = null;
+    }
+  }, [sprintHistory]);
 
   // ── Admin flag: sensori telefono visibili ──────────────────────────────────
   const { data: phoneSensorsData } = useQuery<{ enabled: boolean }>({
@@ -1217,6 +1238,16 @@ export default function TrackingScreen() {
           setSprint0to100Ms(elapsed);
           sprintPhaseRef.current = "done";
           setSprintPhase("done");
+          // Check if this is a new personal best
+          const prevBest = personalBestMsRef.current;
+          if (prevBest === null || elapsed < prevBest) {
+            setIsNewRecord(true);
+            Animated.sequence([
+              Animated.spring(recordAnim, { toValue: 1, useNativeDriver: true }),
+              Animated.delay(3000),
+              Animated.timing(recordAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
+            ]).start(() => setIsNewRecord(false));
+          }
           stopTrackingInternal();
           return;
         }
@@ -1384,6 +1415,8 @@ export default function TrackingScreen() {
     setPointsSent(0);
     setSprintPhase("waiting");
     setSprint0to100Ms(null);
+    setIsNewRecord(false);
+    recordAnim.setValue(0);
     setAvgSpeedDisplayKmh(0);
 
     totalKmRef.current = 0;
@@ -2027,6 +2060,18 @@ export default function TrackingScreen() {
             {/* Stats — 0-100 sprint mode */}
             {is0100Enabled && (
               <View style={styles.sprintContainer}>
+                {/* Sprint header with history button */}
+                <View style={styles.sprintHeaderRow}>
+                  <Text style={styles.sprintHeaderLabel}>Sprint 0-100</Text>
+                  <TouchableOpacity
+                    onPress={() => router.push("/sprint-history" as any)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    style={styles.sprintHistoryBtn}
+                  >
+                    <Ionicons name="trophy-outline" size={18} color={Colors.accent} />
+                    <Text style={styles.sprintHistoryBtnText}>Storico</Text>
+                  </TouchableOpacity>
+                </View>
                 <View
                   style={[
                     styles.sprintPhaseBadge,
@@ -2071,6 +2116,21 @@ export default function TrackingScreen() {
                   <Text style={styles.sprint0100Time}>
                     0→{convertSpeed(100, speedUnit).toFixed(0)} {speedUnitLabel(speedUnit)} in {(sprint0to100Ms / 1000).toFixed(2)}s
                   </Text>
+                )}
+
+                {isNewRecord && (
+                  <Animated.View
+                    style={[
+                      styles.newRecordBadge,
+                      {
+                        opacity: recordAnim,
+                        transform: [{ scale: recordAnim }],
+                      },
+                    ]}
+                  >
+                    <Ionicons name="trophy" size={16} color="#FFD700" />
+                    <Text style={styles.newRecordText}>Nuovo Record!</Text>
+                  </Animated.View>
                 )}
 
                 {sensorsEnabled && (
@@ -2969,6 +3029,46 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold" as const,
     color: Colors.success,
     textAlign: "center" as const,
+  },
+  sprintHeaderRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "space-between" as const,
+    marginBottom: 2,
+  },
+  sprintHeaderLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold" as const,
+    color: Colors.textSecondary,
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.8,
+  },
+  sprintHistoryBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+  },
+  sprintHistoryBtnText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold" as const,
+    color: Colors.accent,
+  },
+  newRecordBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 6,
+    backgroundColor: "#FFD700" + "22",
+    borderWidth: 1,
+    borderColor: "#FFD700" + "80",
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  newRecordText: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold" as const,
+    color: "#FFD700",
   },
 
   // Map

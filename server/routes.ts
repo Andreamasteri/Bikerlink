@@ -45,6 +45,7 @@ import radioRoutes from "./routes/radio";
 import eventsRoutes from "./routes/events";
 import arcadeRoutes from "./routes/arcade";
 import errorsRoutes from "./routes/errors";
+import sprintsRoutes from "./routes/sprints";
 import { triggerMatchingRun, triggerMatchingForUser } from "./matching-engine";
 import { db } from "./db";
 import { users, userFavorites } from "@shared/schema";
@@ -215,6 +216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/events", eventsRoutes);
   app.use("/api/arcade", arcadeRoutes);
   app.use("/api/errors", errorsRoutes);
+  app.use("/api/sprints", sprintsRoutes);
 
   app.get("/api/media/promo-video", async (_req: Request, res: Response) => {
     try {

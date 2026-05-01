@@ -459,6 +459,7 @@ function RootLayoutNav() {
       <Stack.Screen name="ota-gate" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="feedback/index" options={{ headerShown: true, headerTitle: "Feedback", headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text }} />
       <Stack.Screen name="notifications" options={{ headerShown: true, headerTitle: "Notifiche", headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text }} />
+      <Stack.Screen name="sprint-history" options={{ headerShown: false }} />
     </Stack>
   );
 }
