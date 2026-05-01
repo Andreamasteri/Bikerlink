@@ -1053,8 +1053,8 @@ const el: Record<string, string> = {
   "admin.uploadFolder": "",
   "admin.campaignName": "",
   "tracking.bufferSent": "",
-  "tracking.exportGpx": "",
-  "tracking.exportGpxError": "",
+  "tracking.exportGpx": "Εξαγωγή GPX",
+  "tracking.exportGpxError": "Αδύνατη η εξαγωγή της διαδρομής. Δοκιμάστε ξανά.",
 };
 
 export default el;

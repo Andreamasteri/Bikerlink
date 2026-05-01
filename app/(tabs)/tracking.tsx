@@ -281,7 +281,7 @@ function RecordCard({
         </TouchableOpacity>
         <TouchableOpacity onPress={onExportGpx} style={[styles.publishIconBtn, { backgroundColor: Colors.accent + "18", marginRight: 6, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8 }]} activeOpacity={0.7}>
           <Ionicons name="download-outline" size={16} color={Colors.accent} />
-          <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.accent }}>GPX</Text>
+          <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.accent }}>{t("tracking.exportGpx")}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={onPublish} style={styles.publishIconBtn} activeOpacity={0.7}>
           <Ionicons name="share-outline" size={18} color={Colors.accent} />

@@ -1053,8 +1053,8 @@ const tr: Record<string, string> = {
   "admin.uploadFolder": "",
   "admin.campaignName": "",
   "tracking.bufferSent": "",
-  "tracking.exportGpx": "",
-  "tracking.exportGpxError": "",
+  "tracking.exportGpx": "GPX dışa aktar",
+  "tracking.exportGpxError": "Rota dışa aktarılamadı. Lütfen tekrar deneyin.",
 };
 
 export default tr;

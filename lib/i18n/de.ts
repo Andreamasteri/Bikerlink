@@ -1053,8 +1053,8 @@ const de: Record<string, string> = {
   "admin.uploadFolder": "",
   "admin.campaignName": "",
   "tracking.bufferSent": "",
-  "tracking.exportGpx": "",
-  "tracking.exportGpxError": "",
+  "tracking.exportGpx": "GPX exportieren",
+  "tracking.exportGpxError": "Route konnte nicht exportiert werden. Bitte erneut versuchen.",
 };
 
 export default de;
