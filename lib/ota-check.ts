@@ -1,5 +1,5 @@
 import * as Updates from "expo-updates";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import { getApiUrl } from "@/lib/query-client";
 
 export type OtaTriggerSource = "startup" | "appstate" | "login" | "register" | "manual";
@@ -45,6 +45,25 @@ interface OtaProbeResult {
 let lastCheckAt = 0;
 let consecutiveFailures = 0;
 let inFlight = false;
+
+// Task #1164: riavvio differito — flag attivato dopo il download se l'app
+// è in primo piano. Il reload effettivo scatta quando AppState va in background.
+let _pendingReload = false;
+let _bgListenerSub: ReturnType<typeof AppState.addEventListener> | null = null;
+
+function _scheduleReloadOnBackground() {
+  if (_bgListenerSub) return;
+  _bgListenerSub = AppState.addEventListener("change", (nextState) => {
+    if (_pendingReload && (nextState === "background" || nextState === "inactive")) {
+      _pendingReload = false;
+      if (_bgListenerSub) {
+        _bgListenerSub.remove();
+        _bgListenerSub = null;
+      }
+      Updates.reloadAsync().catch(() => {});
+    }
+  });
+}
 
 const COOLDOWN_NORMAL_MS = 60_000;
 const COOLDOWN_AFTER_FAILURES_MS = 5 * 60_000;
@@ -199,7 +218,7 @@ function reportOtaEvent(payload: ReportPayload) {
 
 export async function triggerOtaCheck(
   source: OtaTriggerSource,
-  options?: { force?: boolean; delayMs?: number },
+  options?: { force?: boolean; delayMs?: number; immediateReload?: boolean },
 ): Promise<OtaManualResult> {
   if (__DEV__) {
     const r: OtaManualResult = { ok: false, phase: "skipped", skipped: "dev" };
@@ -271,12 +290,28 @@ export async function triggerOtaCheck(
       return r;
     }
 
+    consecutiveFailures = 0;
     reportOtaEvent({ phase: "fetched", source, currentUpdateId, runtimeVersion });
+    probePromise.catch(() => {});
+    networkInfoPromise.catch(() => {});
 
-    phase = "reload";
-    await Updates.reloadAsync();
-    // reloadAsync non ritorna sotto normali condizioni — l'app si riavvia.
-    const r: OtaManualResult = { ok: true, phase: "reload" };
+    // Task #1164: riavvio differito al backgrounding.
+    // Se il check è manuale (admin) o l'app è già in background, riavviamo subito.
+    // Altrimenti aspettiamo che l'utente esca dall'app (AppState → background/inactive).
+    const appIsActive = AppState.currentState === "active";
+    if (options?.immediateReload || !appIsActive) {
+      phase = "reload";
+      await Updates.reloadAsync();
+      // reloadAsync non ritorna sotto normali condizioni — l'app si riavvia.
+      const r: OtaManualResult = { ok: true, phase: "reload" };
+      _emitOtaResult(r);
+      return r;
+    }
+
+    // App in primo piano: schedula il reload al prossimo backgrounding.
+    _pendingReload = true;
+    _scheduleReloadOnBackground();
+    const r: OtaManualResult = { ok: true, phase: "fetched" };
     _emitOtaResult(r);
     return r;
   } catch (err) {
@@ -313,11 +348,11 @@ export async function triggerOtaCheck(
 }
 
 /**
- * Trigger manuale dal pannello admin: bypassa il cooldown e ritorna l'esito
- * sincronizzato (così la UI può mostrare un toast con phase + eventuale errore).
+ * Trigger manuale dal pannello admin: bypassa il cooldown e ricarica subito.
+ * La UI può mostrare un toast con phase + eventuale errore.
  */
 export async function runManualOtaCheck(): Promise<OtaManualResult> {
-  return triggerOtaCheck("manual", { force: true });
+  return triggerOtaCheck("manual", { force: true, immediateReload: true });
 }
 
 export function resetOtaCooldown() {
