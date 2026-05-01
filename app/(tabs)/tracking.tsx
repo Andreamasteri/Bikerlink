@@ -199,12 +199,15 @@ function getModeConfigBackground(profile: UpdateProfile): {
   distanceInterval: number;
 } {
   if (profile === "race") {
-    return { accuracy: Location.Accuracy.Balanced, timeInterval: 3000, distanceInterval: 5 };
+    // Race: massima precisione anche in background, intervallo ridotto rispetto al fg
+    return { accuracy: Location.Accuracy.Highest, timeInterval: 3000, distanceInterval: 5 };
   }
   if (profile === "easy") {
-    return { accuracy: Location.Accuracy.Balanced, timeInterval: 15000, distanceInterval: 30 };
+    // Easy: risparmio batteria massimo — accuracy bassa, aggiornamenti radi
+    return { accuracy: Location.Accuracy.Low, timeInterval: 15000, distanceInterval: 30 };
   }
-  return { accuracy: Location.Accuracy.Balanced, timeInterval: 8000, distanceInterval: 15 };
+  // Medium: alta precisione, intervallo moderato
+  return { accuracy: Location.Accuracy.High, timeInterval: 8000, distanceInterval: 15 };
 }
 
 const PROFILE_BG_NOTIFICATION: Record<UpdateProfile, string> = {
@@ -807,7 +810,11 @@ export default function TrackingScreen() {
             const { status } = await Location.getBackgroundPermissionsAsync().catch(() => ({ status: "undetermined" as const }));
             if (status !== "granted") return; // Keep foreground watchPositionAsync alive
 
-            // 2. Try to start background task BEFORE stopping the foreground watch
+            // 2. Clear any stale pending background points BEFORE starting the task
+            //    to avoid early-fire race where new points mix with old data
+            await AsyncStorage.setItem(BG_POINTS_KEY, "[]").catch(() => {});
+
+            // 3. Try to start background task BEFORE stopping the foreground watch
             //    so there is no window without location tracking
             const bgConfig = getModeConfigBackground(profileRef.current);
             const started = await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
@@ -826,13 +833,11 @@ export default function TrackingScreen() {
 
             if (!started) return; // Failed to start — keep foreground watch alive
 
-            // 3. Only stop foreground watch after background task is confirmed running
+            // 4. Only stop foreground watch after background task is confirmed running
             if (watchSubRef.current) {
               watchSubRef.current.remove();
               watchSubRef.current = null;
             }
-            // Clear any stale pending background points from a previous bg session
-            await AsyncStorage.setItem(BG_POINTS_KEY, "[]").catch(() => {});
             // Mark background tracking as active (only on confirmed success)
             bgTrackingActiveRef.current = true;
           })();
