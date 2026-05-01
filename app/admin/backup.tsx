@@ -6,7 +6,7 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import Colors from "@/constants/colors";
 import { getApiUrl, queryClient, apiRequest, authFetchHeaders } from "@/lib/query-client";
