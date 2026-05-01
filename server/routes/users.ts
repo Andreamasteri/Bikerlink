@@ -216,7 +216,22 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
     if (b.maxPickupDistance !== undefined) profileUpdate.maxPickupDistance = b.maxPickupDistance;
     if (b.latitude !== undefined) profileUpdate.latitude = b.latitude;
     if (b.longitude !== undefined) profileUpdate.longitude = b.longitude;
-    if (b.unitsPreference !== undefined) profileUpdate.unitsPreference = b.unitsPreference;
+    if (b.unitsPreference !== undefined) {
+      const up = b.unitsPreference;
+      const VALID_TIME_FORMATS = ["12h", "24h"];
+      const VALID_SPEED_UNITS = ["kmh", "mph", "knots"];
+      const VALID_DISTANCE_UNITS = ["km_m", "mi_ft", "mi_yd", "nmi_ftm"];
+      if (
+        up !== null &&
+        (typeof up !== "object" ||
+          !VALID_TIME_FORMATS.includes(up.timeFormat) ||
+          !VALID_SPEED_UNITS.includes(up.speedUnit) ||
+          !VALID_DISTANCE_UNITS.includes(up.distanceUnit))
+      ) {
+        return res.status(400).json({ message: "Valore unitsPreference non valido" });
+      }
+      profileUpdate.unitsPreference = up;
+    }
 
     if (Object.keys(profileUpdate).length > 0) {
       const existingProfileMe = await storage.getUserProfile(userId);
