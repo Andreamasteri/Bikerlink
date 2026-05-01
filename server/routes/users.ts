@@ -112,7 +112,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     if (lat != null && lng != null) {
       const { db } = await import("../db");
       const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
-      const { eq, and, notInArray: notInArr } = await import("drizzle-orm");
+      const { eq, and, ne, notInArray: notInArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance");
       const rows = await db
@@ -121,6 +121,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
         .leftJoin(profilesTable, eq(profilesTable.userId, usersTable.id))
         .where(and(
           notInArr(usersTable.id, [requesterId, ...Array.from(blockedSet)]),
+          ne(usersTable.role, "admin"),
         ))
         .orderBy(sqlTag`distance`);
       type UserDistanceRow = { user: { id: string; nickname: string; avatarUrl: string | null; userType: string }; distance: number | null; hideFromMap: boolean | null };
@@ -136,7 +137,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 
     const allUsers = await storage.getAllUsers();
     const results = allUsers
-      .filter((u) => !blockedSet.has(u.id) && u.id !== requesterId)
+      .filter((u) => !blockedSet.has(u.id) && u.id !== requesterId && u.role !== "admin")
       .map((u) => ({
         id: u.id,
         nickname: u.nickname,
