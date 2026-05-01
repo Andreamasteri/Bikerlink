@@ -803,18 +803,14 @@ export default function TrackingScreen() {
         // Switch to battery-saving background task with foreground service notification
         if (phaseRef.current === "active") {
           void (async () => {
-            // Stop the foreground watchPositionAsync
-            if (watchSubRef.current) {
-              watchSubRef.current.remove();
-              watchSubRef.current = null;
-            }
-            // Clear any previous pending background points
-            await AsyncStorage.setItem(BG_POINTS_KEY, "[]").catch(() => {});
-            // Check background permission before starting
+            // 1. Check background permission FIRST — do not touch foreground watch if denied
             const { status } = await Location.getBackgroundPermissionsAsync().catch(() => ({ status: "undetermined" as const }));
-            if (status !== "granted") return;
+            if (status !== "granted") return; // Keep foreground watchPositionAsync alive
+
+            // 2. Try to start background task BEFORE stopping the foreground watch
+            //    so there is no window without location tracking
             const bgConfig = getModeConfigBackground(profileRef.current);
-            await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+            const started = await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
               accuracy: bgConfig.accuracy,
               timeInterval: bgConfig.timeInterval,
               distanceInterval: bgConfig.distanceInterval,
@@ -826,7 +822,18 @@ export default function TrackingScreen() {
               },
               pausesUpdatesAutomatically: false,
               activityType: Location.ActivityType.AutomotiveNavigation,
-            }).catch(() => {});
+            }).then(() => true).catch(() => false);
+
+            if (!started) return; // Failed to start — keep foreground watch alive
+
+            // 3. Only stop foreground watch after background task is confirmed running
+            if (watchSubRef.current) {
+              watchSubRef.current.remove();
+              watchSubRef.current = null;
+            }
+            // Clear any stale pending background points from a previous bg session
+            await AsyncStorage.setItem(BG_POINTS_KEY, "[]").catch(() => {});
+            // Mark background tracking as active (only on confirmed success)
             bgTrackingActiveRef.current = true;
           })();
         }
@@ -852,26 +859,41 @@ export default function TrackingScreen() {
         if (bgTrackingActiveRef.current && phaseRef.current === "active") {
           bgTrackingActiveRef.current = false;
           void (async () => {
-            // Stop background task
+            // 1. Stop background location task
             const hasTask = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).catch(() => false);
             if (hasTask) {
               await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).catch(() => {});
             }
-            // Resume foreground watch with the current profile config
+            // 2. Resume foreground watch with the current profile config
             const fgConfig = getModeConfig(profileRef.current);
-            try {
-              const sub = await Location.watchPositionAsync(
-                { accuracy: fgConfig.accuracy, timeInterval: fgConfig.timeInterval, distanceInterval: fgConfig.distanceInterval },
-                onNativeLocationRef.current,
-              );
-              watchSubRef.current = sub;
-            } catch {}
-            // Read and count background points for the toast (they were already saved to AsyncStorage)
+            const fgSub = await Location.watchPositionAsync(
+              { accuracy: fgConfig.accuracy, timeInterval: fgConfig.timeInterval, distanceInterval: fgConfig.distanceInterval },
+              onNativeLocationRef.current,
+            ).catch(() => null);
+            if (fgSub) watchSubRef.current = fgSub;
+
+            // 3. Process accumulated background points through the full ride pipeline
+            //    (distance, map coords, offline buffer, server upload)
             try {
               const raw = await AsyncStorage.getItem(BG_POINTS_KEY);
-              const bgPoints: unknown[] = raw ? JSON.parse(raw) : [];
-              if (bgPoints.length > 0) {
-                totalGpsPointsRef.current += bgPoints.length;
+              const bgPoints: { latitude: number; longitude: number; altitude: number; speedKmh: number; timestamp: string }[] =
+                raw ? JSON.parse(raw) : [];
+              for (const pt of bgPoints) {
+                // Reconstruct a LocationObject so onNativeLocation processes it identically
+                // to foreground points: haversine distance, mapCoords, buffer, flush
+                const fakeLoc: Location.LocationObject = {
+                  coords: {
+                    latitude: pt.latitude,
+                    longitude: pt.longitude,
+                    altitude: pt.altitude,
+                    speed: pt.speedKmh / 3.6,
+                    accuracy: null,
+                    altitudeAccuracy: null,
+                    heading: null,
+                  },
+                  timestamp: new Date(pt.timestamp).getTime(),
+                };
+                onNativeLocationRef.current(fakeLoc);
               }
               await AsyncStorage.setItem(BG_POINTS_KEY, "[]").catch(() => {});
             } catch {}
