@@ -249,8 +249,10 @@ function requireAdmin(req: Request, res: Response, next: Function) {
   });
 }
 
-// Retention massima righe ota_events (cleanup soft a ogni inserimento).
-const OTA_EVENTS_DB_RETENTION = 1000;
+// Retention massima righe ota_events — usato come limite per la query admin
+// di visualizzazione. Il cleanup hard è gestito da Phase 12.5 in server/index.ts
+// (ogni 6h, configurabile via env var OTA_EVENTS_RETENTION, default 1000).
+const OTA_EVENTS_DB_RETENTION = parseInt(process.env.OTA_EVENTS_RETENTION ?? "1000", 10);
 
 function clientIp(req: Request): string | undefined {
   // Task #1126 (Telemetry and Reporting Abuse): delegate to the centralized
@@ -383,18 +385,9 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
         ip: clientIp(req),
         diagnostics: hasDiagnostics ? sanitizedDiag : undefined,
       });
-      // Retention soft: cleanup probabilistico (~1/50 insert) per evitare
-      // contention DB sotto burst di traffico (l'endpoint è pubblico).
-      if (Math.random() < 0.02) {
-        await db.execute(sql`
-          DELETE FROM ota_events
-          WHERE id IN (
-            SELECT id FROM ota_events
-            ORDER BY created_at DESC
-            OFFSET ${OTA_EVENTS_DB_RETENTION}
-          )
-        `).catch(() => {});
-      }
+      // Nota: il cleanup della tabella ota_events è gestito dal job schedulato
+      // in Phase 12.5 di server/index.ts (ogni 6h). Non c'è più cleanup
+      // probabilistico qui per evitare contention DB sull'endpoint pubblico.
     } catch (dbErr) {
       console.error("[OTA-EVENT] DB insert failed:", dbErr);
     }

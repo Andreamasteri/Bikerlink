@@ -1532,10 +1532,14 @@ function setupErrorHandler(app: express.Application) {
           console.log("[INIT] Phase 12 OTA release auto-cleanup scheduled (15min delay, then every 24h)");
         }
 
-        // Phase 12.5 — ota_events periodic cleanup every 24h
-        // Keeps max OTA_EVENTS_DB_RETENTION rows; removes records older than 30 days beyond that cap.
-        // First run delayed 20 minutes to stagger with other maintenance jobs.
+        // Phase 12.5 — ota_events periodic cleanup every 6h
+        // Hard retention: keeps at most OTA_EVENTS_RETENTION rows (env var, default 1000).
+        // Also removes records older than 30 days regardless of row count.
+        // Runs once at startup (1-min delay) then every 6h. Replaces the old probabilistic
+        // soft-delete that fired on ~2% of POST /ota-error inserts (now removed from that handler).
         {
+          const OTA_EVENTS_RETENTION = parseInt(process.env.OTA_EVENTS_RETENTION ?? "1000", 10);
+          const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
           const runOtaEventsCleanup = async () => {
             try {
               const result = await pool.query(
@@ -1543,15 +1547,16 @@ function setupErrorHandler(app: express.Application) {
                  WHERE id IN (
                    SELECT id FROM ota_events
                    ORDER BY created_at DESC
-                   OFFSET 1000
+                   OFFSET $1
                  ) OR created_at < NOW() - INTERVAL '30 days'
-                 RETURNING id`
+                 RETURNING id`,
+                [OTA_EVENTS_RETENTION]
               );
               const count = result.rowCount ?? 0;
               if (count > 0) {
-                console.log(`[OTA-EVENTS-CLEANUP] Removed ${count} old ota_events record(s).`);
+                console.log(`[OTA-EVENTS-CLEANUP] Removed ${count} old ota_events record(s) (retention=${OTA_EVENTS_RETENTION}).`);
               } else {
-                console.log("[OTA-EVENTS-CLEANUP] No old ota_events to remove.");
+                console.log(`[OTA-EVENTS-CLEANUP] No old ota_events to remove (retention=${OTA_EVENTS_RETENTION}).`);
               }
             } catch (err) {
               console.warn("[OTA-EVENTS-CLEANUP] Periodic cleanup error:", err);
@@ -1559,9 +1564,9 @@ function setupErrorHandler(app: express.Application) {
           };
           setTimeout(() => {
             runOtaEventsCleanup();
-            setInterval(runOtaEventsCleanup, 24 * 60 * 60 * 1000);
-          }, 20 * 60 * 1000);
-          console.log("[INIT] Phase 12.5 ota_events cleanup scheduled (20min delay, then every 24h)");
+            setInterval(runOtaEventsCleanup, SIX_HOURS_MS);
+          }, 60 * 1000);
+          console.log(`[INIT] Phase 12.5 ota_events cleanup scheduled (1min delay, then every 6h, retention=${OTA_EVENTS_RETENTION})`);
         }
       })().catch((err) => {
         console.error("[INIT] Startup phase chain error:", err);
