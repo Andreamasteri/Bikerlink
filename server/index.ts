@@ -823,6 +823,17 @@ function setupErrorHandler(app: express.Application) {
           return 90;
         };
 
+        // Seed: ensure ota_cleanup_retention_days exists in app_settings (idempotent, does NOT overwrite)
+        try {
+          const existing = await storage.getAppSetting("ota_cleanup_retention_days");
+          if (!existing) {
+            await storage.upsertAppSetting("ota_cleanup_retention_days", "90");
+            console.log("[OTA-CLEANUP] Seeded ota_cleanup_retention_days=90 in app_settings.");
+          }
+        } catch (e) {
+          console.warn("[OTA-CLEANUP] Could not seed ota_cleanup_retention_days:", e);
+        }
+
         // Startup cleanup: remove superseded/draft OTA releases older than configured retention window
         // + delete corresponding bundles from object storage (best-effort)
         try {
