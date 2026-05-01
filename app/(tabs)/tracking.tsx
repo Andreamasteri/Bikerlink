@@ -427,14 +427,6 @@ function RouteMapModal({
               cacheEnabled={false}
             />
           )}
-          {false && (
-            <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-              <Ionicons name="map-outline" size={48} color={Colors.textSecondary} />
-              <Text style={{ fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, marginTop: 8 }}>
-                Mappa non disponibile su web
-              </Text>
-            </View>
-          )}
         </View>
 
         {/* Stats bar + actions */}

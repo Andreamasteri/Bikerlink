@@ -24,13 +24,11 @@ import { EVENT_TYPE_LABELS } from "@/shared/event-types";
 
 let MapView: any = null;
 let Marker: any = null;
-if (true) {
-  try {
-    const maps = require("react-native-maps");
-    MapView = maps.default;
-    Marker = maps.Marker;
-  } catch {}
-}
+try {
+  const maps = require("react-native-maps");
+  MapView = maps.default;
+  Marker = maps.Marker;
+} catch {}
 
 interface EventFormProps {
   visible: boolean;

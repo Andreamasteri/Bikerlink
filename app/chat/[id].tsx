@@ -8,14 +8,14 @@ import {
   StyleSheet,
   ActivityIndicator,
   Switch,
-
   Alert,
   Modal,
   Image,
   Pressable,
   AppState,
+  Platform,
+  KeyboardAvoidingView,
 } from "react-native";
-import { KeyboardAvoidingView } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -505,8 +505,8 @@ export default function ChatConversationScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior="padding"
-      keyboardVerticalOffset={90}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
       <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>

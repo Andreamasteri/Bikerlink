@@ -7,7 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
-
+  Platform,
   ScrollView,
   Modal,
   FlatList,
@@ -978,7 +978,7 @@ export default function RegisterScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior="padding"
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView
         contentContainerStyle={[

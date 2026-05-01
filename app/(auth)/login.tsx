@@ -7,7 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
-
+  Platform,
   ScrollView,
   Image,
 } from "react-native";
@@ -90,7 +90,7 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior="padding"
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView
         contentContainerStyle={[
