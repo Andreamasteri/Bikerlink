@@ -43,11 +43,7 @@ export function useNewMatchAlert() {
       .then(([rawSeen, rawInit]) => {
         if (rawSeen) {
           try {
-            const parsed: string[] = JSON.parse(rawSeen);
-            const capped = parsed.length > MAX_SEEN_IDS
-              ? parsed.slice(parsed.length - MAX_SEEN_IDS)
-              : parsed;
-            seenRef.current = new Set(capped);
+            seenRef.current = new Set(JSON.parse(rawSeen) as string[]);
           } catch {}
         }
         if (rawInit) {
