@@ -109,7 +109,11 @@ adminRouter.get("/stats", requireAdmin, (_req: Request, res: Response): void => 
     db.execute(sql`
       WITH ranked AS (
         SELECT DISTINCT app_version,
-          ROW_NUMBER() OVER (ORDER BY app_version DESC NULLS LAST) AS rn
+          ROW_NUMBER() OVER (ORDER BY
+            CAST(COALESCE(NULLIF(REGEXP_REPLACE(SPLIT_PART(app_version, '.', 1), '[^0-9]', '', 'g'), ''), '0') AS INTEGER) DESC,
+            CAST(COALESCE(NULLIF(REGEXP_REPLACE(SPLIT_PART(app_version, '.', 2), '[^0-9]', '', 'g'), ''), '0') AS INTEGER) DESC,
+            CAST(COALESCE(NULLIF(REGEXP_REPLACE(SPLIT_PART(app_version, '.', 3), '[^0-9]', '', 'g'), ''), '0') AS INTEGER) DESC
+          ) AS rn
         FROM app_crash_logs
         WHERE crash_type IN ('crash_system','crash_js') AND app_version IS NOT NULL
       )
@@ -123,7 +127,10 @@ adminRouter.get("/stats", requireAdmin, (_req: Request, res: Response): void => 
         AND acl.crash_type IN ('crash_system','crash_js')
       WHERE r.rn <= 3
       GROUP BY r.app_version
-      ORDER BY r.app_version DESC
+      ORDER BY
+        CAST(COALESCE(NULLIF(REGEXP_REPLACE(SPLIT_PART(r.app_version, '.', 1), '[^0-9]', '', 'g'), ''), '0') AS INTEGER) DESC,
+        CAST(COALESCE(NULLIF(REGEXP_REPLACE(SPLIT_PART(r.app_version, '.', 2), '[^0-9]', '', 'g'), ''), '0') AS INTEGER) DESC,
+        CAST(COALESCE(NULLIF(REGEXP_REPLACE(SPLIT_PART(r.app_version, '.', 3), '[^0-9]', '', 'g'), ''), '0') AS INTEGER) DESC
     `),
     // 3. Daily trend — last 14 days
     db.execute(sql`

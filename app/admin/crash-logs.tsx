@@ -82,7 +82,21 @@ function CrashStatsHeader({ stats }: { stats: CrashStatsResponse }) {
   const totalJs = stats.byType.crash_js ?? 0;
   const grandTotal = totalSystem + totalJs;
 
-  const trend = stats.dailyTrend ?? [];
+  const rawTrend = stats.dailyTrend ?? [];
+
+  const trend: DayTrend[] = React.useMemo(() => {
+    const map: Record<string, DayTrend> = {};
+    for (const d of rawTrend) map[d.day] = d;
+    const days: DayTrend[] = [];
+    const now = new Date();
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
+      const key = d.toISOString().slice(0, 10);
+      days.push(map[key] ?? { day: key, crash_system: 0, crash_js: 0 });
+    }
+    return days;
+  }, [rawTrend]);
+
   const maxDay = Math.max(1, ...trend.map((d) => d.crash_system + d.crash_js));
 
   const shortDay = (iso: string) => {
