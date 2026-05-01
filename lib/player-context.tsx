@@ -177,13 +177,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (sleepTimerRef.current) clearTimeout(sleepTimerRef.current);
     if (!sleepTimerEnd) return;
     const ms = sleepTimerEnd - Date.now();
-    if (ms <= 0) { pause(); return; }
+    if (ms <= 0) { stop(); return; }
     sleepTimerRef.current = setTimeout(() => {
-      pause();
-      setSleepTimerEnd(null);
-      setSleepTimerMinutes(null);
+      stop();
     }, ms);
     return () => { if (sleepTimerRef.current) clearTimeout(sleepTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sleepTimerEnd]);
 
   const onPlaybackStatus = useCallback((status: AudioStatus) => {
