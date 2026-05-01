@@ -4,6 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { t } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
 interface Report {
@@ -47,7 +48,7 @@ export default function AdminReports() {
     Alert.alert("Gestisci segnalazione", report.reason, [
       { text: "Risolvi", onPress: () => resolveMutation.mutate({ id: report.id, status: "resolved" }) },
       { text: "Archivia", onPress: () => resolveMutation.mutate({ id: report.id, status: "dismissed" }) },
-      { text: "Annulla", style: "cancel" },
+      { text: t("common.cancel"), style: "cancel" },
     ]);
   }
 

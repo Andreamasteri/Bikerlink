@@ -16,6 +16,7 @@ import { useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
 import { getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
+import { t } from "@/lib/i18n";
 
 export default function FeatureRequestScreen() {
   const insets = useSafeAreaInsets();
@@ -154,7 +155,7 @@ export default function FeatureRequestScreen() {
         <Text style={styles.sectionLabel}>Titolo della richiesta</Text>
         <TextInput
           style={styles.input}
-          placeholder="Es: Aggiungere modalità notturna"
+          placeholder={t("feedback.featurePlaceholder")}
           placeholderTextColor={Colors.textSecondary}
           value={subject}
           onChangeText={setSubject}

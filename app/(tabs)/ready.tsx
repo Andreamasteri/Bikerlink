@@ -118,10 +118,10 @@ export default function ReadyToRideScreen() {
     },
     onSuccess: (_data: boolean, variables: boolean) => {
       invalidateOnlineQueries();
-      showToast(variables ? "Sei disponibile! Appari sulla mappa" : "Non sei più disponibile");
+      showToast(variables ? t("ready.nowAvailable") : t("ready.noLongerAvailable"));
     },
     onError: () => {
-      Alert.alert("Errore", "Impossibile aggiornare la disponibilità. Verifica la connessione.");
+      Alert.alert(t("common.error"), t("ready.toggleError"));
     },
   });
 
@@ -212,12 +212,12 @@ export default function ReadyToRideScreen() {
         />
 
         <Text style={styles.statusText}>
-          {isAvailable ? "Sei disponibile!" : "Non disponibile"}
+          {isAvailable ? t("ready.statusAvailable") : t("map.unavailable")}
         </Text>
         <Text style={styles.statusSubtext}>
           {isAvailable
-            ? "Fai sapere a tutti che sei online e pronto a farti un giro!"
-            : "Tocca il pulsante per renderti disponibile"}
+            ? t("ready.statusSubAvailable")
+            : t("ready.statusSubUnavailable")}
         </Text>
 
         <Pressable
@@ -293,11 +293,11 @@ export default function ReadyToRideScreen() {
               onPress={() => {
                 if (mySosQuery.data) {
                   Alert.alert(
-                    "Annulla SOS",
-                    "Vuoi annullare la tua richiesta SOS?",
+                    t("ready.cancelSosTitle"),
+                    t("ready.cancelSosMsg"),
                     [
-                      { text: "No", style: "cancel" },
-                      { text: "Sì, annulla", style: "destructive", onPress: () => cancelSosMutation.mutate(mySosQuery.data.id) },
+                      { text: t("common.no"), style: "cancel" },
+                      { text: t("ready.cancelSosYes"), style: "destructive", onPress: () => cancelSosMutation.mutate(mySosQuery.data.id) },
                     ]
                   );
                 } else {
@@ -386,11 +386,11 @@ export default function ReadyToRideScreen() {
                   sendSos(location);
                 } else {
                   Alert.alert(
-                    "GPS non disponibile",
-                    "La posizione verrà impostata approssimativamente al centro Italia. Continuare?",
+                    t("tracking.gpsUnavailable"),
+                    t("ready.approxLocationMsg"),
                     [
-                      { text: "Annulla", style: "cancel" },
-                      { text: "Invia comunque", onPress: () => sendSos({ latitude: 42.5, longitude: 12.5 }) },
+                      { text: t("common.cancel"), style: "cancel" },
+                      { text: t("ready.sendAnyway"), onPress: () => sendSos({ latitude: 42.5, longitude: 12.5 }) },
                     ]
                   );
                 }

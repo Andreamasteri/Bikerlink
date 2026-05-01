@@ -8,11 +8,13 @@ import { useAuth } from "@/lib/auth-context";
 import { useLocationGate } from "@/lib/location-context";
 import { useQuery } from "@tanstack/react-query";
 import { useTaskbarStyle } from "@/lib/taskbar-style-context";
+import { useT } from "@/lib/language-context";
 import CustomTabBar, { type TabItem } from "@/components/CustomTabBar";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { registerHandsOffCallback, registerSprintMeasuringCallback } from "@/lib/tracking-active";
 
 export default function TabLayout() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const router = useRouter();
@@ -253,7 +255,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            title: "Mappa",
+            title: t("map.title"),
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="map" size={size} color={color} />
             ),
@@ -301,7 +303,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="eventi"
           options={{
-            title: "Raduni",
+            title: t("events.tabTitle"),
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="calendar" size={size} color={color} />
             ),
@@ -323,7 +325,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="music"
           options={{
-            title: "Musica",
+            title: t("music.tabTitle"),
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="musical-notes-outline" size={size} color={color} />
             ),
@@ -382,7 +384,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="tracking"
           options={{
-            title: "Registra Giro e Performance",
+            title: t("tracking.tabTitle"),
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="navigate" size={size} color={color} />
             ),
@@ -398,25 +400,25 @@ export default function TabLayout() {
         <Tabs.Screen
           name="garage"
           options={{
-            title: isBikerOrCoppia ? "Garage" : "Wishlist",
+            title: isBikerOrCoppia ? t("profile.title") : "Wishlist",
             tabBarIcon: ({ color, size }) =>
               isBikerOrCoppia ? (
                 <MaterialCommunityIcons name="motorbike" size={size} color={color} />
               ) : (
                 <Ionicons name="heart" size={size} color={color} />
               ),
-            headerTitle: isBikerOrCoppia ? "Il Mio Garage" : "La Mia Wishlist",
+            headerTitle: isBikerOrCoppia ? t("garage.myGarage") : t("garage.myWishlist"),
             href: null,
           }}
         />
         <Tabs.Screen
           name="profile"
           options={{
-            title: "Profilo",
+            title: t("profile.title"),
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="person" size={size} color={color} />
             ),
-            headerTitle: "Il Mio Profilo",
+            headerTitle: t("profile.myProfile"),
           }}
         />
       </Tabs>

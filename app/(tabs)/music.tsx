@@ -30,6 +30,7 @@ import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { usePlayer, PlayerTrack, RadioStation } from "@/lib/player-context";
 import { FullPlayerModal, InlineMiniPlayer } from "@/components/MiniPlayer";
 import { useAuth } from "@/lib/auth-context";
+import { useT } from "@/lib/language-context";
 
 const LASTFM_RED = "#D51007";
 
@@ -329,6 +330,7 @@ const teleStyles = StyleSheet.create({
 const LASTFM_SUGGEST_KEY = "radio_use_lastfm";
 
 function MusicRadioTab() {
+  const t = useT();
   const { playRadioStation, selectedGenre, setSelectedGenre, favoriteStationIds, toggleFavorite, currentTrack } = usePlayer();
   const queryClient = useQueryClient();
   const [useLastFm, setUseLastFm] = useState(false);
@@ -428,19 +430,19 @@ function MusicRadioTab() {
         <View style={radioTabStyles.lastFmEmptyContainer}>
           <Text style={radioTabStyles.lastFmEmpty}>
             {lastfmStatus?.username
-              ? `Account: ${lastfmStatus.username} — nessun ascolto o brano salvato trovato.`
-              : "Nessun genere trovato. Ascolta più musica su Last.fm!"}
+              ? t("music.accountNoAudio").replace("{username}", lastfmStatus.username ?? "")
+              : t("music.noGenreFound")}
           </Text>
           {lastfmStatus?.connected && (
             <TouchableOpacity
               onPress={() => {
                 Alert.alert(
-                  "Disconnetti Last.fm",
-                  `Vuoi scollegare l'account ${lastfmStatus.username ?? ""}?`,
+                  t("music.disconnectTitle"),
+                  t("music.disconnectMsg").replace("{username}", lastfmStatus.username ?? ""),
                   [
-                    { text: "Annulla", style: "cancel" },
+                    { text: t("common.cancel"), style: "cancel" },
                     {
-                      text: "Disconnetti",
+                      text: t("music.disconnectConfirm"),
                       style: "destructive",
                       onPress: () => disconnectLastfmMutation.mutate(),
                     },
@@ -719,6 +721,7 @@ interface LastfmLoginModalProps {
 type AuthStep = "idle" | "loading" | "waiting" | "confirming";
 
 const LastfmLoginModal = React.memo(function LastfmLoginModal({ visible, onClose }: LastfmLoginModalProps) {
+  const t = useT();
   const [step, setStep] = useState<AuthStep>("idle");
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -813,9 +816,9 @@ const LastfmLoginModal = React.memo(function LastfmLoginModal({ visible, onClose
           ) : (
             <>
               <Text style={lastfmModalStyles.modalSubtitle}>
-                {"Hai autorizzato BikerLink su Last.fm?\n\n"}
+                {t("music.lastfmAuthorizePrompt")}
                 <Text style={{ color: Colors.textSecondary, fontSize: 13 }}>
-                  {"📧 Se hai appena creato l'account: Last.fm ti ha inviato un'email di verifica. Aprila, clicca il link di conferma, poi torna su Last.fm per autorizzare l'accesso e infine tocca \"Sì, ho autorizzato\" qui sotto."}
+                  {t("music.lastfmVerifyInstruction")}
                 </Text>
               </Text>
               <TouchableOpacity
@@ -828,7 +831,7 @@ const LastfmLoginModal = React.memo(function LastfmLoginModal({ visible, onClose
                 ) : (
                   <>
                     <Ionicons name="checkmark-circle-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
-                    <Text style={lastfmModalStyles.modalConnectBtnText}>Sì, ho autorizzato</Text>
+                    <Text style={lastfmModalStyles.modalConnectBtnText}>{t("music.lastfmAuthorized")}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -980,6 +983,7 @@ const lastfmModalStyles = StyleSheet.create({
 });
 
 export default function MusicScreen() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { tab: tabParam, playlistId: playlistIdParam } = useLocalSearchParams<{ tab?: string; playlistId?: string }>();
@@ -1229,7 +1233,7 @@ export default function MusicScreen() {
       "Disconnetti Last.fm",
       "Rimuovere la connessione Last.fm? I brani salvati verranno eliminati.",
       [
-        { text: "Annulla", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         { text: "Disconnetti", style: "destructive", onPress: () => disconnectMutation.mutate() },
       ]
     );
@@ -1507,6 +1511,7 @@ function BraniTab({
   onDisconnect: () => void;
   onShare: () => void;
 }) {
+  const t = useT();
   const providerColor = LASTFM_RED;
   const providerName = "Last.fm";
   const { playQueue, isAvailable: playerAvailable, currentTrack, isPlaying } = usePlayer();
@@ -1571,13 +1576,13 @@ function BraniTab({
     };
 
     if (currentTrack && isPlaying && currentTrack.source !== "preview") {
-      const sourceLabel = currentTrack.source === "radio" ? "la radio" : "un brano";
+      const sourceLabel = currentTrack.source === "radio" ? t("music.sourceRadio") : t("music.sourceTrack");
       Alert.alert(
-        "Stai già ascoltando",
-        `Stai ascoltando ${sourceLabel}. Vuoi sostituirlo con le anteprime della playlist?`,
+        t("music.alreadyListening"),
+        t("music.replaceWithPlaylistMsg").replace("{source}", sourceLabel),
         [
-          { text: "Annulla", style: "cancel" },
-          { text: "Sostituisci", style: "default", onPress: doPlay },
+          { text: t("common.cancel"), style: "cancel" },
+          { text: t("music.replace"), style: "default", onPress: doPlay },
         ]
       );
     } else {
@@ -1769,7 +1774,7 @@ function BraniTab({
           <View style={styles.emptyLibrary}>
             <Ionicons name="musical-notes" size={32} color={Colors.textSecondary} />
             <Text style={styles.emptyLibraryText}>
-              {playlistOverride ? "Questa playlist è vuota" : "Cerca un brano e aggiungilo alla tua Playlist"}
+              {playlistOverride ? t("music.emptyPlaylist") : t("music.searchAndAdd")}
             </Text>
           </View>
         ) : (
@@ -1980,6 +1985,7 @@ function LibraryTrackRow({
   onRemove: (id: string) => void;
   streamService: StreamService;
 }) {
+  const t = useT();
   const [imgError, setImgError] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [liveArtwork, setLiveArtwork] = useState<string | null>(null);
@@ -2078,11 +2084,11 @@ function LibraryTrackRow({
         style={styles.removeBtn}
         onPress={() => {
           Alert.alert(
-            "Rimuovi brano",
-            `Vuoi rimuovere "${track.trackName}" dalla tua Playlist?`,
+            t("music.removeTrack"),
+            t("music.removeTrackMsg").replace("{name}", track.trackName ?? ""),
             [
-              { text: "Annulla", style: "cancel" },
-              { text: "Rimuovi", style: "destructive", onPress: () => onRemove(track.lastfmTrackId) },
+              { text: t("common.cancel"), style: "cancel" },
+              { text: t("music.remove"), style: "destructive", onPress: () => onRemove(track.lastfmTrackId) },
             ]
           );
         }}
@@ -2126,6 +2132,7 @@ function MatchTab({
   onSetMinSongs: (v: number) => void;
   onSearch: () => void;
 }) {
+  const t = useT();
   const KM_OPTIONS = [50, 100, 300, 9999];
   const MIN_SONGS_OPTIONS = [1, 3, 5, 10];
 
@@ -2305,6 +2312,7 @@ function SharedPlaylistCard({
   onMerge: (id: number) => void;
   isMerging: boolean;
 }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [downloadingTrack, setDownloadingTrack] = useState<string | null>(null);
@@ -2382,13 +2390,13 @@ function SharedPlaylistCard({
     };
 
     if (currentTrack && isPlaying && currentTrack.source !== "preview") {
-      const sourceLabel = currentTrack.source === "radio" ? "la radio" : "un brano";
+      const sourceLabel = currentTrack.source === "radio" ? t("music.sourceRadio") : t("music.sourceTrack");
       Alert.alert(
-        "Stai già ascoltando",
-        `Stai ascoltando ${sourceLabel}. Vuoi sostituirlo con le anteprime di questa playlist?`,
+        t("music.alreadyListening"),
+        t("music.replaceWithPlaylistMsg").replace("{source}", sourceLabel),
         [
-          { text: "Annulla", style: "cancel" },
-          { text: "Sostituisci", style: "default", onPress: doPlay },
+          { text: t("common.cancel"), style: "cancel" },
+          { text: t("music.replace"), style: "default", onPress: doPlay },
         ]
       );
     } else {

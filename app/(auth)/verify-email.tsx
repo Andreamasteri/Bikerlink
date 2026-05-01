@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQueryClient } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
+import { t as translate } from "@/lib/i18n";
 import { apiRequest, getApiUrl, setSessionToken } from "@/lib/query-client";
 
 const RESEND_COOLDOWN = 60;
@@ -66,20 +67,20 @@ export default function VerifyEmailScreen() {
   // mostriamo un messaggio più chiaro con hint a usare il cooldown.
   const friendlyError = (raw: string): string => {
     if (/troppi tentativi/i.test(raw)) {
-      return "Hai richiesto troppi codici in poco tempo. Riprova tra qualche minuto o contatta l'amministratore.";
+      return translate("auth.tooManyCodeRequests");
     }
     if (/codice scaduto/i.test(raw)) {
-      return "Il codice è scaduto. Premi 'Reinvia codice' per riceverne uno nuovo.";
+      return translate("auth.codeExpired");
     }
     if (/codice non valido/i.test(raw)) {
-      return "Codice non valido. Controlla di averlo digitato correttamente o richiedine uno nuovo.";
+      return translate("auth.codeInvalid");
     }
     return raw;
   };
 
   const handleVerify = async () => {
-    if (!token.trim()) { setError("Inserisci il codice di verifica"); return; }
-    if (token.trim().length !== 8) { setError("Il codice deve essere di 8 caratteri"); return; }
+    if (!token.trim()) { setError(translate("auth.codeEnterPrompt")); return; }
+    if (token.trim().length !== 8) { setError(translate("auth.codeLength")); return; }
     setError("");
     setIsVerifying(true);
     try {
@@ -92,7 +93,7 @@ export default function VerifyEmailScreen() {
       queryClient.setQueryData(["/api/auth/me"], user);
       router.replace("/(tabs)");
     } catch (err: any) {
-      const msg = err?.message || "Errore durante la verifica";
+      const msg = err?.message || translate("auth.verifyError");
       const cleaned = msg.replace(/^\d+:\s*/, "");
       let finalMsg = cleaned;
       try { finalMsg = JSON.parse(cleaned).message || cleaned; } catch {}
@@ -111,7 +112,7 @@ export default function VerifyEmailScreen() {
       setResendSuccess(true);
       startCooldown();
     } catch (err: any) {
-      const msg = err?.message || "Errore durante l'invio";
+      const msg = err?.message || translate("auth.sendError");
       const cleaned = msg.replace(/^\d+:\s*/, "");
       let finalMsg = cleaned;
       try { finalMsg = JSON.parse(cleaned).message || cleaned; } catch {}
@@ -159,7 +160,7 @@ export default function VerifyEmailScreen() {
           <View style={styles.noEmailHint}>
             <Ionicons name="information-circle" size={18} color={Colors.accent} />
             <Text style={styles.noEmailHintText}>
-              Non hai ancora ricevuto l'email? Controlla la cartella spam, poi premi "Reinvia codice" qui sotto.
+              {translate("auth.emailNotReceived")}
             </Text>
           </View>
         ) : null}
@@ -182,7 +183,7 @@ export default function VerifyEmailScreen() {
           <Ionicons name="key-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
           <TextInput
             style={styles.input}
-            placeholder="Codice a 8 caratteri"
+            placeholder={translate("auth.codePlaceholder")}
             placeholderTextColor={Colors.textSecondary}
             value={token}
             onChangeText={(text) => setToken(text.toUpperCase())}
@@ -216,7 +217,7 @@ export default function VerifyEmailScreen() {
             <ActivityIndicator color={Colors.accent} />
           ) : (
             <Text style={styles.resendButtonText}>
-              {resendCooldown > 0 ? `Reinvia tra ${resendCooldown}s` : "Reinvia codice"}
+              {resendCooldown > 0 ? translate("auth.resendCooldown").replace("{seconds}", String(resendCooldown)) : translate("auth.resendCode")}
             </Text>
           )}
         </TouchableOpacity>

@@ -16,6 +16,7 @@ import { useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
 import { getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
+import { t } from "@/lib/i18n";
 
 export default function BugReportScreen() {
   const insets = useSafeAreaInsets();
@@ -110,7 +111,7 @@ export default function BugReportScreen() {
         <Text style={styles.sectionLabel}>Descrizione del Bug</Text>
         <TextInput
           style={[styles.input, styles.textArea]}
-          placeholder="Descrivi cosa è successo, quali passi hai fatto, e cosa ti aspettavi..."
+          placeholder={t("feedback.bugPlaceholder")}
           placeholderTextColor={Colors.textSecondary}
           value={message}
           onChangeText={setMessage}

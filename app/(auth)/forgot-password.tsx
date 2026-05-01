@@ -14,6 +14,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { t } from "@/lib/i18n";
 import { apiRequest, setSessionToken } from "@/lib/query-client";
 import { queryClient } from "@/lib/query-client";
 
@@ -254,7 +255,7 @@ export default function ForgotPasswordScreen() {
                 <Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
                 <TextInput
                   style={[styles.input, styles.passwordInput]}
-                  placeholder="Conferma password"
+                  placeholder={t("auth.confirmPassword")}
                   placeholderTextColor={Colors.textSecondary}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}

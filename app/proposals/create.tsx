@@ -565,7 +565,7 @@ export default function CreateProposalScreen() {
               >
                 <Ionicons name={gpsSource === "map" ? "checkmark-circle" : "map"} size={23} color={gpsSource === "map" ? Colors.success : "#000"} />
                 <Text style={styles.gpsButtonText}>
-                  {gpsSource === "map" ? "Mappa" : "Scegli sulla mappa"}
+                  {gpsSource === "map" ? t("map.title") : t("proposals.create.selectOnMap")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -660,7 +660,7 @@ export default function CreateProposalScreen() {
                         color={destinationExtLat != null && destinationExtLng != null ? Colors.success : "#000"}
                       />
                       <Text style={styles.gpsButtonText}>
-                        {destinationExtLat != null && destinationExtLng != null ? "Destinazione impostata" : "Scegli sulla mappa"}
+                        {destinationExtLat != null && destinationExtLng != null ? t("proposals.create.destinationSet") : t("proposals.create.selectOnMap")}
                       </Text>
                     </TouchableOpacity>
 
@@ -752,7 +752,7 @@ export default function CreateProposalScreen() {
                     style={[styles.input, { flex: 1 }]}
                     value={newStop}
                     onChangeText={setNewStop}
-                    placeholder="Aggiungi tappa..."
+                    placeholder={t("proposals.create.addWaypoint")}
                     placeholderTextColor={Colors.textSecondary}
                     onSubmitEditing={handleAddStop}
                   />
@@ -833,7 +833,7 @@ export default function CreateProposalScreen() {
               style={[styles.input, styles.textArea]}
               value={description}
               onChangeText={setDescription}
-              placeholder="Descrivi cosa offri, cerchi o vuoi fare..."
+              placeholder={t("proposals.create.descPlaceholder")}
               placeholderTextColor={Colors.textSecondary}
               multiline
               numberOfLines={4}

@@ -681,8 +681,8 @@ export default function RegisterScreen() {
         {emailVerifEnabled && (
           <TouchableOpacity
             onPress={() => Alert.alert(
-              "Verifica Email",
-              "La verifica dell'email è una sicurezza che il tuo indirizzo sia associato correttamente al tuo account.\n\nTi servirà in caso di reset della password."
+              t("auth.emailVerifyTitle"),
+              t("auth.emailVerifyInfo")
             )}
             style={{ paddingHorizontal: 8 }}
           >
@@ -750,7 +750,7 @@ export default function RegisterScreen() {
         <Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
         <TextInput
           style={[styles.input, styles.passwordInput]}
-          placeholder="Conferma Password"
+          placeholder={t("auth.confirmPassword")}
           placeholderTextColor={Colors.textSecondary}
           value={confirmPassword}
           onChangeText={setConfirmPassword}

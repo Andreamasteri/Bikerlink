@@ -123,11 +123,11 @@ function ConversationRow({ item, userId, onPress, onDelete, t }: { item: Convers
 
   const handleLongPress = () => {
     Alert.alert(
-      "Elimina chat",
-      `Vuoi eliminare questa conversazione con ${title}? Tutti i messaggi verranno cancellati.`,
+      t("chat.deleteTitle"),
+      t("chat.deleteConversationMsg").replace("{name}", title),
       [
-        { text: "Annulla", style: "cancel" },
-        { text: "Elimina", style: "destructive", onPress: () => onDelete(item.id) },
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("common.delete"), style: "destructive", onPress: () => onDelete(item.id) },
       ]
     );
   };

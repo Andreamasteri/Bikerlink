@@ -378,7 +378,7 @@ export default function ProfileScreen() {
       try {
         await AsyncStorage.clear();
         queryClient.clear();
-        Alert.alert("Cache pulita", "Tutti i dati locali sono stati cancellati. L'app si ricarica.");
+        Alert.alert(t("profile.cacheClearedTitle"), t("profile.cacheClearedMsg"));
       } catch {
         Alert.alert("Errore", "Impossibile pulire la cache.");
       }
@@ -389,11 +389,11 @@ export default function ProfileScreen() {
         try { window.sessionStorage.clear(); } catch {}
       }
       queryClient.clear();
-      Alert.alert("Cache pulita", "Tutti i dati locali sono stati cancellati. Ricarica la pagina.");
+      Alert.alert(t("profile.cacheClearedTitle"), t("profile.cacheClearedMsgWeb"));
     } else {
-      Alert.alert("Pulisci cache", "Cancella tutti i dati locali salvati?", [
-        { text: "Annulla", style: "cancel" },
-        { text: "Pulisci", style: "destructive", onPress: doClear },
+      Alert.alert(t("profile.clearCacheTitle"), t("profile.clearCacheMsg"), [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("profile.clearCacheConfirm"), style: "destructive", onPress: doClear },
       ]);
     }
   }, []);
@@ -822,11 +822,11 @@ export default function ProfileScreen() {
         {gpsPrecisionExpanded && (
           <View style={{ paddingTop: 12, gap: 8 }}>
             {([
-              { key: "lowest", label: "Risparmio Batteria", desc: "Aggiornamenti radi, massimo risparmio", icon: "battery-half-outline" },
-              { key: "balanced", label: "Bilanciato", desc: "Precisione e batteria in equilibrio", icon: "compass-outline" },
-              { key: "high", label: "Alta Precisione", desc: "GPS preciso, più consumo", icon: "locate-outline" },
-              { key: "highest", label: "Massima Precisione", desc: "Massima accuratezza, elevato consumo", icon: "navigate-outline" },
-              { key: "bestForNavigation", label: "Navigazione", desc: "Ottimizzato per uso continuativo", icon: "map-outline" },
+              { key: "lowest", label: t("profile.gpsLowestLabel"), desc: t("profile.gpsLowestDesc"), icon: "battery-half-outline" },
+              { key: "balanced", label: t("profile.gpsBalancedLabel"), desc: t("profile.gpsBalancedDesc"), icon: "compass-outline" },
+              { key: "high", label: t("profile.gpsHighLabel"), desc: t("profile.gpsHighDesc"), icon: "locate-outline" },
+              { key: "highest", label: t("profile.gpsHighestLabel"), desc: t("profile.gpsHighestDesc"), icon: "navigate-outline" },
+              { key: "bestForNavigation", label: t("profile.gpsBestForNavLabel"), desc: t("profile.gpsBestForNavDesc"), icon: "map-outline" },
             ] as { key: string; label: string; desc: string; icon: string }[]).map((opt) => {
               const isSelected = gpsPrecision === opt.key;
               return (
@@ -875,7 +875,7 @@ export default function ProfileScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.privacyLabel}>Non mostrarmi sulla mappa</Text>
               <Text style={styles.privacyDesc}>
-                Il tuo segnaposto non sarà visibile sulla mappa degli altri utenti. Continui comunque ad essere conteggiato come online.
+                {t("profile.markerHiddenNote")}
               </Text>
             </View>
           </View>
@@ -1301,7 +1301,7 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <MenuItem icon="create" label="Modifica Profilo" onPress={() => router.push("/profile/edit" as any)} />
+        <MenuItem icon="create" label={t("profile.editProfile")} onPress={() => router.push("/profile/edit" as any)} />
       </View>
 
       <View style={styles.section}>
@@ -1407,7 +1407,7 @@ export default function ProfileScreen() {
           />
           <View style={{ padding: 12, paddingBottom: insets.bottom + 8, backgroundColor: Colors.card }}>
             <Text style={{ textAlign: "center", color: Colors.textSecondary, fontSize: 13 }}>
-              Tocca sulla mappa per spostare il pin
+              {t("profile.tapToMovePin")}
             </Text>
             <Text style={{ textAlign: "center", color: Colors.text, fontSize: 13, marginTop: 4 }}>
               {`${mapPickerCoord.latitude.toFixed(5)}, ${mapPickerCoord.longitude.toFixed(5)}`}

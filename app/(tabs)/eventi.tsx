@@ -20,6 +20,7 @@ import { getApiUrl } from "@/lib/query-client";
 import EventCard from "@/components/eventi/EventCard";
 import EventForm from "@/components/eventi/EventForm";
 import type { EventDTO, EventType } from "@/shared/event-types";
+import { useT } from "@/lib/language-context";
 
 interface EventsPage {
   events: EventDTO[];
@@ -30,17 +31,19 @@ interface EventsPage {
 
 type FilterType = "tutti" | EventType;
 
-const FILTERS: { key: FilterType; label: string }[] = [
-  { key: "tutti", label: "Tutti" },
-  { key: "raduno", label: "Raduno" },
-  { key: "uscita_gruppo", label: "Uscita" },
-  { key: "festa", label: "Festa" },
-  { key: "gara", label: "Gara" },
-  { key: "altro", label: "Altro" },
+const FILTER_KEYS: { key: FilterType; labelKey: string }[] = [
+  { key: "tutti", labelKey: "events.typeAll" },
+  { key: "raduno", labelKey: "events.typeRaduno" },
+  { key: "uscita_gruppo", labelKey: "events.typeUscita" },
+  { key: "festa", labelKey: "events.typeFesta" },
+  { key: "gara", labelKey: "events.typeGara" },
+  { key: "altro", labelKey: "events.typeAltro" },
 ];
 
 export default function EventiScreen() {
+  const t = useT();
   const insets = useSafeAreaInsets();
+  const FILTERS = useMemo(() => FILTER_KEYS.map(f => ({ key: f.key, label: t(f.labelKey) })), [t]);
   const router = useRouter();
   const [filter, setFilter] = useState<FilterType>("tutti");
   const [showForm, setShowForm] = useState(false);

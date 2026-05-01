@@ -17,6 +17,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { t } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
 interface FeedbackTicket {
@@ -234,7 +235,7 @@ export default function ModeratorFeedback() {
                 style={[styles.input, { height: 80 }]}
                 value={note}
                 onChangeText={setNote}
-                placeholder="Aggiungi nota privata..."
+                placeholder={t("moderator.addPrivateNote")}
                 placeholderTextColor={Colors.textSecondary}
                 multiline
               />

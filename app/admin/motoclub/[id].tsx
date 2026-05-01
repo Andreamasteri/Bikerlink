@@ -8,6 +8,7 @@ import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Colors from "@/constants/colors";
+import { t } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
 const PAGE_SIZE = 50;
@@ -177,11 +178,11 @@ export default function AdminClubDetail() {
 
   function handleDeleteClub() {
     Alert.alert(
-      "Elimina club",
-      `Eliminare "${club?.name}"?\n\n${totalCount} ${totalCount === 1 ? "membro verrà rimosso" : "membri verranno rimossi"}. Operazione irreversibile.`,
+      t("admin.deleteClubTitle"),
+      `Eliminare "${club?.name}"?\n\n${totalCount} ${totalCount === 1 ? t("admin.deleteMember") : t("admin.deleteMembers")}. ${t("admin.irreversible")}`,
       [
-        { text: "Annulla", style: "cancel" },
-        { text: "Elimina", style: "destructive", onPress: () => deleteClubMutation.mutate() },
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("common.delete"), style: "destructive", onPress: () => deleteClubMutation.mutate() },
       ]
     );
   }
@@ -348,7 +349,7 @@ export default function AdminClubDetail() {
             >
               <MaterialIcons name="delete-forever" size={20} color="#fff" />
               <Text style={styles.deleteBtnText}>
-                {deleteClubMutation.isPending ? "Eliminazione..." : "Elimina questo club"}
+                {deleteClubMutation.isPending ? t("admin.deleteClubPending") : t("admin.deleteClubBtn")}
               </Text>
             </TouchableOpacity>
           </View>

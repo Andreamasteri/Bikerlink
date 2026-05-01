@@ -382,12 +382,12 @@ export default function ChatConversationScreen() {
     }
     if (!isPrivateChat || !otherParticipant) return;
     Alert.alert(
-      "Invia libreria",
-      `Invia la tua libreria Last.fm (${musicTrackCount} brani) a ${otherParticipant.nickname}?`,
+      t("chat.sendLibraryTitle"),
+      t("chat.sendLibraryMsg").replace("{count}", String(musicTrackCount)).replace("{name}", otherParticipant.nickname ?? ""),
       [
-        { text: "Annulla", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Invia",
+          text: t("chat.send"),
           onPress: () => sharePlaylistMutation.mutate({ toUserId: otherParticipant.id }),
         },
       ]
@@ -396,12 +396,12 @@ export default function ChatConversationScreen() {
 
   const handleDeleteConversation = useCallback(() => {
     Alert.alert(
-      "Elimina chat",
-      "Vuoi eliminare questa conversazione? Tutti i messaggi verranno cancellati.",
+      t("chat.deleteTitle2"),
+      t("chat.deleteConversationSimpleMsg"),
       [
-        { text: "Annulla", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Elimina",
+          text: t("common.delete"),
           style: "destructive",
           onPress: () => deleteConversationMutation.mutate(),
         },

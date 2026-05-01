@@ -20,6 +20,7 @@ import { apiRequest } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { getCurrentLocale } from "@/lib/i18n";
+import { useT } from "@/lib/language-context";
 
 type Club = {
   id: string;
@@ -134,6 +135,7 @@ function ClubCard({
   role?: string;
   conversationId?: string | null;
 }) {
+  const t = useT();
   const isMember = myClubIds.has(club.id);
 
   const cardBodyContent = (
@@ -144,7 +146,7 @@ function ClubCard({
         </Text>
         {club.isFeatured && (
           <View style={styles.featuredPill}>
-            <Text style={styles.featuredText}>⭐ Mese</Text>
+            <Text style={styles.featuredText}>{t("motoclub.featured")}</Text>
           </View>
         )}
         {isMember && conversationId && (
@@ -153,15 +155,15 @@ function ClubCard({
       </View>
       <Text style={styles.cardSub} numberOfLines={1}>
         {club.clubType === "brand"
-          ? `Club ufficiale ${club.brandName}`
+          ? `${t("motoclub.clubOfficialPrefix")} ${club.brandName}`
           : club.clubType === "model"
           ? `${club.brandName} ${club.modelName}`
-          : "Club custom"}
+          : t("motoclub.clubCustom")}
         {club.country ? `  ${countryFlag(club.country)}` : ""}
       </Text>
       <View style={styles.cardStats}>
         <Ionicons name="people" size={12} color={Colors.textSecondary} />
-        <Text style={styles.statText}>{club.memberCount ?? 0} membri</Text>
+        <Text style={styles.statText}>{club.memberCount ?? 0} {t("motoclub.members")}</Text>
         {isMember && joinedAt && (
           <>
             <Text style={styles.dotSep}>·</Text>
@@ -260,6 +262,7 @@ function FeaturedBanner({ club, myClubIds, onJoin }: { club: Club; myClubIds: Se
 }
 
 export default function MotoclubScreen() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -368,12 +371,12 @@ export default function MotoclubScreen() {
     onSuccess: (data) => {
       invalidateClubLists();
       Alert.alert(
-        data.joined > 0 ? "Club trovati!" : "Nessun club",
+        data.joined > 0 ? t("motoclub.clubsFound") : t("motoclub.noClub"),
         data.message
       );
     },
     onError: () => {
-      Alert.alert("Errore", "Impossibile sincronizzare il garage. Riprova.");
+      Alert.alert(t("common.error"), t("motoclub.syncError"));
     },
   });
 
@@ -386,9 +389,9 @@ export default function MotoclubScreen() {
 
   const handleLeave = useCallback(
     (clubId: string, name: string) => {
-      Alert.alert("Lascia Club", `Vuoi uscire da "${name}"?`, [
-        { text: "Annulla", style: "cancel" },
-        { text: "Esci", style: "destructive", onPress: () => leaveMut.mutate(clubId) },
+      Alert.alert(t("motoclub.leaveTitle"), t("motoclub.leaveMsg").replace("{name}", name), [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("motoclub.leaveConfirm"), style: "destructive", onPress: () => leaveMut.mutate(clubId) },
       ]);
     },
     [leaveMut]
@@ -504,7 +507,7 @@ export default function MotoclubScreen() {
               onPress={() => setFilterType("model")}
             />
             <ScrollFilterChip
-              label="Custom"
+              label={t("motoclub.filterCustom")}
               selected={filterType === "custom"}
               onPress={() => setFilterType("custom")}
             />
@@ -590,7 +593,7 @@ export default function MotoclubScreen() {
                     ? <ActivityIndicator size="small" color={Colors.accent} />
                     : <Ionicons name="sync-outline" size={18} color={Colors.accent} />}
                   <Text style={styles.syncBannerText}>
-                    {syncGarageMut.isPending ? "Sincronizzazione..." : "Sincronizza il tuo garage con i club"}
+                    {syncGarageMut.isPending ? t("motoclub.syncing") : t("motoclub.syncGarage")}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -608,8 +611,8 @@ export default function MotoclubScreen() {
               <Ionicons name="shield-outline" size={48} color={Colors.border} />
               <Text style={styles.emptyText}>
                 {tab === "mine"
-                  ? "Non sei ancora iscritto a nessun club.\nCerca un brand o modello!"
-                  : "Nessun club trovato."}
+                  ? t("motoclub.noMineClub")
+                  : t("motoclub.noClubFound")}
               </Text>
             </View>
           }
@@ -664,6 +667,7 @@ function MarketplaceTab({
   onRefresh: () => void;
   bottomInset: number;
 }) {
+  const t = useT();
   const router = useRouter();
   const totalMotos = marketplaceMotos.length;
 
@@ -678,7 +682,7 @@ function MarketplaceTab({
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 16 }}>
             <Ionicons name="pricetag" size={18} color="#FF9800" />
             <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.textSecondary }}>
-              {totalMotos} {totalMotos === 1 ? "moto in vendita" : "moto in vendita"} nei tuoi club
+              {totalMotos} {t("motoclub.motosForSale")}
             </Text>
           </View>
         ) : null
@@ -688,8 +692,8 @@ function MarketplaceTab({
           <Ionicons name="pricetag-outline" size={48} color={Colors.border} />
           <Text style={styles.emptyText}>
             {myClubs.length === 0
-              ? "Iscriviti a un club per vedere il mercatino"
-              : "Nessuna moto in vendita nei tuoi club"}
+              ? t("motoclub.joinClubToSeeMarket")
+              : t("motoclub.noMotoForSale")}
           </Text>
         </View>
       }

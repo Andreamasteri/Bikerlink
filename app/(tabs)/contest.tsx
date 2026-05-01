@@ -392,12 +392,12 @@ export default function ContestScreen() {
   const handleDelete = useCallback(
     (entryId: string) => {
       Alert.alert(
-        "Elimina foto",
-        "Sei sicuro di voler eliminare questa foto dal contest?",
+        t("contest.deletePhoto"),
+        t("contest.deletePhotoConfirm"),
         [
-          { text: "Annulla", style: "cancel" },
+          { text: t("common.cancel"), style: "cancel" },
           {
-            text: "Elimina",
+            text: t("common.delete"),
             style: "destructive",
             onPress: () => deleteMutation.mutate(entryId),
           },
