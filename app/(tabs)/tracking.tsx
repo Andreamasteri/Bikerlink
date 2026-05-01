@@ -586,6 +586,7 @@ export default function TrackingScreen() {
   const sensorsEnabledRef = useRef(false);
   const watchSubRef = useRef<Location.LocationSubscription | null>(null);
   const bgTrackingActiveRef = useRef(false);
+  const bgStartGenRef = useRef(0); // incremented each time we attempt a bg transition; detects stale async completions
   const onNativeLocationRef = useRef<(loc: Location.LocationObject) => void>(() => {});
   const webWatchIdRef = useRef<number | null>(null);
   const accelSubRef = useRef<{ remove: () => void } | null>(null);
@@ -805,14 +806,18 @@ export default function TrackingScreen() {
         bgStartPointsRef.current = totalGpsPointsRef.current;
         // Switch to battery-saving background task with foreground service notification
         if (phaseRef.current === "active") {
+          // Increment generation so we can detect if foreground return races with this async
+          bgStartGenRef.current += 1;
+          const myGen = bgStartGenRef.current;
           void (async () => {
             // 1. Check background permission FIRST — do not touch foreground watch if denied
             const { status } = await Location.getBackgroundPermissionsAsync().catch(() => ({ status: "undetermined" as const }));
-            if (status !== "granted") return; // Keep foreground watchPositionAsync alive
+            if (status !== "granted" || bgStartGenRef.current !== myGen) return;
 
             // 2. Clear any stale pending background points BEFORE starting the task
             //    to avoid early-fire race where new points mix with old data
             await AsyncStorage.setItem(BG_POINTS_KEY, "[]").catch(() => {});
+            if (bgStartGenRef.current !== myGen) return;
 
             // 3. Try to start background task BEFORE stopping the foreground watch
             //    so there is no window without location tracking
@@ -833,7 +838,14 @@ export default function TrackingScreen() {
 
             if (!started) return; // Failed to start — keep foreground watch alive
 
-            // 4. Only stop foreground watch after background task is confirmed running
+            // Stale-check: app may have returned to foreground while startLocationUpdatesAsync was awaited
+            if (bgStartGenRef.current !== myGen) {
+              // Foreground return happened — clean up the background task we just started
+              Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).catch(() => {});
+              return;
+            }
+
+            // 4. Only stop foreground watch after background task is confirmed running and still needed
             if (watchSubRef.current) {
               watchSubRef.current.remove();
               watchSubRef.current = null;
@@ -859,6 +871,9 @@ export default function TrackingScreen() {
           }
         }
         bgStartPointsRef.current = 0;
+
+        // Invalidate any in-flight background-start async (cancellation token)
+        bgStartGenRef.current += 1;
 
         // Stop background task and resume foreground watch (Android only)
         if (bgTrackingActiveRef.current && phaseRef.current === "active") {
