@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Platform,
+
   Alert,
   TextInput,
   Image,
@@ -658,11 +658,7 @@ export default function MatchScreen() {
       return;
     }
     if (totalNew > prevMatchCountRef.current) {
-      if (Platform.OS === "web") {
-        window.alert(`${t("match.newMatchAlert")}\n${t("match.checkTab")}`);
-      } else {
-        Alert.alert(t("match.newMatchAlert"), t("match.checkTab"));
-      }
+      Alert.alert(t("match.newMatchAlert"), t("match.checkTab"));
     }
     prevMatchCountRef.current = totalNew;
   }, [totalNew]);
@@ -885,55 +881,31 @@ export default function MatchScreen() {
       setIsRematching(true);
       resetAndRematchMutation.mutate();
     };
-    if (Platform.OS === "web") {
-      if (window.confirm(t("match.rematchConfirm"))) {
-        doRematch();
-      }
-    } else {
-      Alert.alert(t("match.rematchTitle"), t("match.rematchConfirm"), [
-        { text: t("common.cancel"), style: "cancel" },
-        { text: t("common.confirm"), onPress: doRematch },
-      ]);
-    }
+    Alert.alert(t("match.rematchTitle"), t("match.rematchConfirm"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("common.confirm"), onPress: doRematch },
+    ]);
   }, [resetAndRematchMutation, pendingKm, distanceMode, t]);
 
   const confirmRemoveGarageMatch = useCallback((matchId: string) => {
-    if (Platform.OS === "web") {
-      if (window.confirm(t("match.removeAccepted") + "?")) {
-        removeGarageMatchMutation.mutate(matchId);
-      }
-    } else {
-      Alert.alert(t("match.removeAccepted"), t("match.removeMatchConfirm"), [
-        { text: t("common.cancel"), style: "cancel" },
-        { text: t("match.removeAccepted"), style: "destructive", onPress: () => removeGarageMatchMutation.mutate(matchId) },
-      ]);
-    }
+    Alert.alert(t("match.removeAccepted"), t("match.removeMatchConfirm"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("match.removeAccepted"), style: "destructive", onPress: () => removeGarageMatchMutation.mutate(matchId) },
+    ]);
   }, [removeGarageMatchMutation, t]);
 
   const confirmRemoveBikerMatch = useCallback((matchId: string) => {
-    if (Platform.OS === "web") {
-      if (window.confirm(t("match.removeAccepted") + "?")) {
-        removeBikerMatchMutation.mutate(matchId);
-      }
-    } else {
-      Alert.alert(t("match.removeAccepted"), t("match.removeMatchConfirm"), [
-        { text: t("common.cancel"), style: "cancel" },
-        { text: t("match.removeAccepted"), style: "destructive", onPress: () => removeBikerMatchMutation.mutate(matchId) },
-      ]);
-    }
+    Alert.alert(t("match.removeAccepted"), t("match.removeMatchConfirm"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("match.removeAccepted"), style: "destructive", onPress: () => removeBikerMatchMutation.mutate(matchId) },
+    ]);
   }, [removeBikerMatchMutation, t]);
 
   const confirmRemoveProposalMatch = useCallback((matchId: string) => {
-    if (Platform.OS === "web") {
-      if (window.confirm(t("match.removeAccepted") + "?")) {
-        removeProposalMatchMutation.mutate(matchId);
-      }
-    } else {
-      Alert.alert(t("match.removeAccepted"), t("match.removeMatchConfirm"), [
-        { text: t("common.cancel"), style: "cancel" },
-        { text: t("match.removeAccepted"), style: "destructive", onPress: () => removeProposalMatchMutation.mutate(matchId) },
-      ]);
-    }
+    Alert.alert(t("match.removeAccepted"), t("match.removeMatchConfirm"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("match.removeAccepted"), style: "destructive", onPress: () => removeProposalMatchMutation.mutate(matchId) },
+    ]);
   }, [removeProposalMatchMutation, t]);
 
   const startChatMutation = useMutation({
@@ -953,16 +925,10 @@ export default function MatchScreen() {
 
   const handleUnblock = useCallback((blockedId: string, nickname: string) => {
     const msg = t("match.unblockConfirmMsg").replace("{nickname}", nickname);
-    if (Platform.OS === "web") {
-      if (window.confirm(msg)) {
-        unblockMutation.mutate(blockedId);
-      }
-    } else {
-      Alert.alert(t("match.unblockConfirmTitle"), msg, [
+    Alert.alert(t("match.unblockConfirmTitle"), msg, [
         { text: t("common.cancel"), style: "cancel" },
         { text: t("match.unblock"), onPress: () => unblockMutation.mutate(blockedId) },
       ]);
-    }
   }, [unblockMutation, t]);
 
   const renderItem = useCallback(({ item }: { item: any }) => {
@@ -1193,7 +1159,7 @@ export default function MatchScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: Platform.OS === "web" ? insets.top + 67 : insets.top, backgroundColor: colors.background }, Platform.OS === "web" && { paddingBottom: 34 }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background }]}>
       <InlineMiniPlayer />
       <View style={styles.inlineHeader}>
         <Text style={styles.inlineTitle}>{t("match.title")}</Text>

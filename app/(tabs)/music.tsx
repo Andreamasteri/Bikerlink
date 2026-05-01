@@ -220,7 +220,7 @@ function TelefonoTab() {
   }, [requestPermission, loadAssets]);
 
   useEffect(() => {
-    if (Platform.OS !== "web" && permission?.granted) loadAssets();
+    if (permission?.granted) loadAssets();
   }, [permission?.granted]);
 
   const handlePlayTrack = useCallback((asset: MediaLibrary.Asset) => {
@@ -244,15 +244,6 @@ function TelefonoTab() {
     });
     await playQueue(tracks, 0);
   }, [assets, playQueue, playerAvailable]);
-
-  if (Platform.OS === "web") {
-    return (
-      <View style={styles.centered}>
-        <Ionicons name="phone-portrait-outline" size={48} color={Colors.textSecondary} />
-        <Text style={styles.emptyText}>{t("music.localLibraryUnavailable")}</Text>
-      </View>
-    );
-  }
 
   if (!permission) {
     return (
@@ -1259,7 +1250,7 @@ export default function MusicScreen() {
   }, []);
 
   const savedIds = new Set((tracksQuery.data?.tracks ?? []).map((t) => t.lastfmTrackId));
-  const topPadding = insets.top + (Platform.OS === "web" ? 67 : 0);
+  const topPadding = insets.top;
   const providerColor = LASTFM_RED;
 
   const isConnected = statusQuery.isLoading ? null : (statusQuery.data?.connected ?? false);
@@ -1719,7 +1710,7 @@ function BraniTab({
             autoCorrect={false}
             autoCapitalize="none"
           />
-          {searchInput.length > 0 && Platform.OS !== "ios" && (
+          {searchInput.length > 0 && (
             <TouchableOpacity onPress={() => onSearchChange("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
             </TouchableOpacity>

@@ -130,8 +130,8 @@ export default function VerifyEmailScreen() {
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: Platform.OS === "web" ? 67 + 40 : insets.top + 40,
-            paddingBottom: Platform.OS === "web" ? 34 + 20 : insets.bottom + 20,
+            paddingTop: insets.top + 40,
+            paddingBottom: insets.bottom + 20,
           },
         ]}
         keyboardShouldPersistTaps="handled"

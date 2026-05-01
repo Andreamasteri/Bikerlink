@@ -5,7 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Platform,
+
   Alert,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -427,7 +427,7 @@ export default function SensorsFinal() {
         styles.content,
         {
           paddingBottom: insets.bottom + 24,
-          paddingTop: Platform.OS === "web" ? 67 : 16,
+          paddingTop: 16,
         },
       ]}
     >

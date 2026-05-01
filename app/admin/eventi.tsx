@@ -8,7 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   TextInput,
-  Platform,
+
   RefreshControl,
 } from "react-native";
 import { Image } from "expo-image";
@@ -274,8 +274,8 @@ export default function AdminEventiScreen() {
     rejectMutation.mutate({ id: rejectModal.id, reason: rejectReason.trim() });
   };
 
-  const topInset = Platform.OS === "web" ? 67 : insets.top;
-  const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
+  const topInset = insets.top;
+  const bottomInset = insets.bottom;
 
   const currentData = tab === "pending" ? (pendingQuery.data ?? []) : (allQuery.data ?? []);
   const isLoading = tab === "pending" ? pendingQuery.isLoading : allQuery.isLoading;

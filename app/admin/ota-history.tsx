@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
@@ -80,7 +80,7 @@ export default function OtaHistoryScreen() {
       contentContainerStyle={[
         styles.content,
         {
-          paddingTop: Platform.OS === "web" ? 67 : 0,
+          paddingTop: 0,
           paddingBottom: insets.bottom + 20,
         },
       ]}

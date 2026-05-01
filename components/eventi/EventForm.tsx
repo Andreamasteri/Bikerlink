@@ -24,7 +24,7 @@ import { EVENT_TYPE_LABELS } from "@/shared/event-types";
 
 let MapView: any = null;
 let Marker: any = null;
-if (Platform.OS !== "web") {
+if (true) {
   try {
     const maps = require("react-native-maps");
     MapView = maps.default;
@@ -272,7 +272,7 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
   if (submitted) {
     return (
       <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-        <View style={[styles.successScreen, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
+        <View style={[styles.successScreen, { paddingTop: insets.top }]}>
           <Ionicons name="checkmark-circle" size={64} color={Colors.success} />
           <Text style={styles.successTitle}>
             {isEditing ? "Evento aggiornato!" : "Evento pubblicato!"}
@@ -295,7 +295,7 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={[styles.container, { paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <Pressable onPress={onClose} style={styles.closeBtn}>
             <Ionicons name="close" size={24} color={Colors.text} />
@@ -320,7 +320,7 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
           style={styles.scroll}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 20) },
+            { paddingBottom: insets.bottom + 20 },
           ]}
           keyboardShouldPersistTaps="handled"
         >
@@ -406,7 +406,7 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
           />
 
           <Text style={styles.label}>Coordinate GPS (opzionale)</Text>
-          {Platform.OS !== "web" && MapView ? (
+          {MapView ? (
             <>
               <Pressable style={styles.mapPickerBtn} onPress={() => {
                 if (form.latitude && form.longitude) {

@@ -4,7 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Platform,
+
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -294,7 +294,7 @@ export default function TrackingScreen() {
         </TouchableOpacity>
         {permission.status === "denied" &&
           !permission.canAskAgain &&
-          Platform.OS !== "web" && (
+          (
             <TouchableOpacity
               style={[styles.permButton, { backgroundColor: Colors.surfaceLight }]}
               onPress={() => {

@@ -6,7 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Platform,
+
   Alert,
   Image,
   Modal,
@@ -227,7 +227,7 @@ export default function PublicProfileScreen() {
     }
   };
 
-  const webTopInset = Platform.OS === "web" ? 67 : 0;
+  const webTopInset = 0;
 
   if (isLoading) {
     return (

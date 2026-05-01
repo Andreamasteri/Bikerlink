@@ -6,7 +6,7 @@ import {
   StyleSheet,
   Pressable,
   ActivityIndicator,
-  Platform,
+
   ScrollView,
   Modal,
   Alert,
@@ -188,20 +188,7 @@ export default function MapScreen() {
     try {
       let coords: { latitude: number; longitude: number } | null = null;
 
-      if (Platform.OS === "web") {
-        coords = await new Promise((resolve) => {
-          if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-              (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-              () => resolve(null),
-              { timeout: 5000 }
-            );
-          } else {
-            resolve(null);
-          }
-        });
-      } else {
-        const { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await Location.requestForegroundPermissionsAsync();
         sendStartupBeacon("gps_permission_result", { status });
         if (status !== "granted") return null;
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
@@ -701,7 +688,7 @@ export default function MapScreen() {
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={{ paddingTop: Platform.OS === "web" ? 67 : insets.top, paddingBottom: 16 }}
+      contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 16 }}
     >
       <View style={styles.header}>
         <TouchableOpacity
@@ -824,7 +811,7 @@ export default function MapScreen() {
             searchRadiusKm={mySearchRadius}
             filterBiker={filterBiker}
             filterZavorrina={filterZavorrina}
-            filterBarTopOffset={Platform.OS === "web" ? 67 : insets.top}
+            filterBarTopOffset={insets.top}
             onToggleFilterBiker={() => setFilterBiker((p) => !p)}
             onToggleFilterZavorrina={() => setFilterZavorrina((p) => !p)}
             onUserPress={handleUserPress}
@@ -847,11 +834,11 @@ export default function MapScreen() {
               <ActivityIndicator size="large" color={Colors.accent} />
             </View>
           )}
-          <Pressable style={[styles.closeBtn, { top: Platform.OS === "web" ? 40 : insets.top + 32 }]} onPress={() => setMapFullscreen(false)}>
+          <Pressable style={[styles.closeBtn, { top: insets.top + 32 }]} onPress={() => setMapFullscreen(false)}>
             <Ionicons name="close" size={28} color="#fff" />
           </Pressable>
           <Pressable
-            style={[styles.defineAreaBtn, { bottom: Platform.OS === "web" ? 39 : insets.bottom + 11 }]}
+            style={[styles.defineAreaBtn, { bottom: insets.bottom + 11 }]}
             onPress={() => setShowAreaModal(true)}
           >
             <Ionicons name="globe-outline" size={16} color={Colors.text} />
@@ -861,7 +848,7 @@ export default function MapScreen() {
                 : `${selectedCountries.length} ${t("home.defineAreaCountries")}`}
             </Text>
           </Pressable>
-          <View style={[styles.fullscreenBottomStats, { bottom: Platform.OS === "web" ? 44 : insets.bottom + 16 }]}>
+          <View style={[styles.fullscreenBottomStats, { bottom: insets.bottom + 16 }]}>
             <View style={styles.statsChip}>
               <Ionicons name="radio-button-on" size={12} color={Colors.success} />
               <Text style={styles.statsChipText}>{onlineCount}</Text>
@@ -875,7 +862,7 @@ export default function MapScreen() {
               <Text style={styles.statsChipText}>{zavCount}</Text>
             </View>
           </View>
-          <View style={[styles.fullscreenSearchContainer, { top: Platform.OS === "web" ? 48 : insets.top + 40 }]}>
+          <View style={[styles.fullscreenSearchContainer, { top: insets.top + 40 }]}>
             <View style={styles.fullscreenSearchRow}>
               <Ionicons name="search" size={18} color={Colors.textSecondary} style={{ marginRight: 8 }} />
               <TextInput
@@ -1672,7 +1659,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(30,30,30,0.92)",
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: Platform.OS === "web" ? 10 : 8,
+    paddingVertical: 8,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.15)",
   },
@@ -1682,7 +1669,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: Platform.OS === "web" ? 10 : 8,
+    paddingVertical: 8,
     borderWidth: 1,
     borderColor: Colors.border,
   },

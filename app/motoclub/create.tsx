@@ -7,7 +7,7 @@ import {
   TextInput,
   ScrollView,
   ActivityIndicator,
-  Platform,
+
   Alert,
   FlatList,
 } from "react-native";
@@ -73,21 +73,6 @@ export default function CreateMotoclub() {
   }, []);
 
   const handleGetLocation = async () => {
-    if (Platform.OS === "web") {
-      if (!navigator.geolocation) {
-        Alert.alert("Non disponibile", "Geolocalizzazione non supportata dal browser");
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          setPin({ latitude, longitude });
-          setMapRegion({ latitude, longitude, latitudeDelta: 0.5, longitudeDelta: 0.5 });
-        },
-        () => Alert.alert("Errore", "Impossibile ottenere la posizione")
-      );
-      return;
-    }
     setLoadingLocation(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -149,7 +134,7 @@ export default function CreateMotoclub() {
 
   if (submitted) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.successBox}>
           <Ionicons name="checkmark-circle" size={64} color={Colors.success} />
           <Text style={styles.successTitle}>Richiesta inviata!</Text>
@@ -165,7 +150,7 @@ export default function CreateMotoclub() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => (step === 0 ? router.back() : setStep((s) => s - 1))} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={Colors.text} />
@@ -415,7 +400,7 @@ export default function CreateMotoclub() {
       )}
 
       {step < 3 && (
-        <View style={[styles.footer, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 0) + 12 }]}>
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
           <TouchableOpacity
             style={[styles.nextBtn, !canNext() && { opacity: 0.4 }]}
             onPress={() => setStep((s) => s + 1)}

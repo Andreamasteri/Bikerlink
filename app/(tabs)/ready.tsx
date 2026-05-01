@@ -55,23 +55,11 @@ export default function ReadyToRideScreen() {
     let cancelled = false;
     async function initLocation() {
       try {
-        if (Platform.OS === "web") {
-          if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-              (pos) => {
-                if (!cancelled) setLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
-              },
-              () => {},
-              { timeout: 5000 }
-            );
-          }
-        } else {
-          const { status } = await Location.requestForegroundPermissionsAsync();
+        const { status } = await Location.requestForegroundPermissionsAsync();
           if (status === "granted" && !cancelled) {
             const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
             if (!cancelled) setLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
           }
-        }
       } catch (err) {
         console.warn("[ready] Location init fallita:", err);
       }
@@ -193,14 +181,14 @@ export default function ReadyToRideScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: Platform.OS === "web" ? 67 : insets.top }}>
+    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
       <InlineMiniPlayer />
       <ScrollView
         style={[styles.container, { backgroundColor: colors.background }]}
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16,
+            paddingBottom: insets.bottom + 16,
           },
         ]}
       >
@@ -318,7 +306,7 @@ export default function ReadyToRideScreen() {
 
       <Modal visible={showSosModal} transparent animationType="fade" onRequestClose={() => setShowSosModal(false)}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior="padding"
           style={{ flex: 1 }}
         >
           <Pressable style={styles.modalOverlay} onPress={() => setShowSosModal(false)}>

@@ -201,13 +201,7 @@ export default function EditProfileScreen() {
       const ext = /\.(\w+)$/.exec(filename);
       const mimeType = ext ? `image/${ext[1]}` : "image/jpeg";
 
-      if (Platform.OS === "web") {
-        const response = await globalThis.fetch(uri);
-        const blob = await response.blob();
-        formData.append("photo", blob, filename);
-      } else {
-        formData.append("photo", { uri, name: filename, type: mimeType } as any);
-      }
+      formData.append("photo", { uri, name: filename, type: mimeType } as any);
 
       const baseUrl = getApiUrl();
       const url = new URL("/api/users/me/photos", baseUrl);
@@ -263,20 +257,14 @@ export default function EditProfileScreen() {
   }, []);
 
   const handleDeleteAccount = useCallback(() => {
-    if (Platform.OS === "web") {
-      if (confirm(t("profile.deleteAccountDesc"))) {
-        handleRequestDeletion();
-      }
-    } else {
-      Alert.alert(
-        t("profile.deleteAccount"),
-        t("profile.deleteAccountDesc"),
-        [
-          { text: t("common.cancel"), style: "cancel" },
-          { text: t("common.delete"), style: "destructive", onPress: handleRequestDeletion },
-        ]
-      );
-    }
+    Alert.alert(
+      t("profile.deleteAccount"),
+      t("profile.deleteAccountDesc"),
+      [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("common.delete"), style: "destructive", onPress: handleRequestDeletion },
+      ]
+    );
   }, []);
 
   const pickImageForSlot = useCallback((existingPhotoId?: string) => {
@@ -359,7 +347,7 @@ export default function EditProfileScreen() {
       <View
         style={[
           styles.headerBar,
-          { paddingTop: (Platform.OS === "web" ? 67 : insets.top) + 8 },
+          { paddingTop: insets.top + 8 },
         ]}
       >
         <TouchableOpacity
@@ -879,7 +867,7 @@ export default function EditProfileScreen() {
             </View>
           </View>
 
-          {adminWidgetEnabled && Platform.OS !== "web" && (
+          {adminWidgetEnabled && (
             <>
               <View style={{ height: 24 }} />
               <View style={{ marginBottom: 4 }}>

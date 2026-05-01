@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, TextInput, Platform, Switch, Alert,
+  ActivityIndicator, TextInput,  Switch, Alert,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -142,22 +142,7 @@ export default function BackupScreen() {
       const fileName = meta.fileName
         || (type === "db" ? "bikerlink_db.sql.gz" : "bikerlink_media.zip");
 
-      if (Platform.OS === "web") {
-        const res = await fetch(url, {
-          credentials: "include",
-          headers: authFetchHeaders(),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const blob = await res.blob();
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
-      } else {
-        const filePath = `${FileSystem.cacheDirectory}${fileName}`;
+      const filePath = `${FileSystem.cacheDirectory}${fileName}`;
         const dl = await FileSystem.downloadAsync(url, filePath, {
           headers: authFetchHeaders(),
         });
@@ -186,7 +171,7 @@ export default function BackupScreen() {
       style={styles.container}
       contentContainerStyle={[
         styles.content,
-        { paddingBottom: insets.bottom + 30, paddingTop: Platform.OS === "web" ? 67 : 0 },
+        { paddingBottom: insets.bottom + 30, paddingTop: 0 },
       ]}
     >
       <View style={styles.card}>

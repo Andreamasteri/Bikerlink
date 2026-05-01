@@ -68,8 +68,6 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
 
   const userEnabled = user?.floatingWidgetEnabled !== false;
   const isLoggedIn = !!user;
-  const isWeb = Platform.OS === "web";
-
   const { data: adminWidgetData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/floating-widget"],
     staleTime: 60_000,
@@ -77,7 +75,7 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
   });
   const adminEnabled = adminWidgetData?.enabled !== false;
 
-  const isVisible = isLoggedIn && userEnabled && adminEnabled && !isWeb && !suppressed;
+  const isVisible = isLoggedIn && userEnabled && adminEnabled && !suppressed;
 
   const { data: unreadChatData } = useQuery<{ count: number }>({
     queryKey: ["/api/chat/unread-total"],

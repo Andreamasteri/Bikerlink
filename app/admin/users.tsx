@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, TextInput, Platform, ScrollView, Switch, Linking, Pressable } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, TextInput, ScrollView, Switch, Linking, Pressable } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,15 +11,13 @@ import { useT } from "@/lib/language-context";
 
 let MapView: React.ComponentType<Record<string, unknown>> | null = null;
 let MapMarker: React.ComponentType<Record<string, unknown>> | null = null;
-if (Platform.OS !== "web") {
-  try {
-    const maps = require("react-native-maps");
-    MapView = maps.default as React.ComponentType<Record<string, unknown>>;
-    MapMarker = maps.Marker as React.ComponentType<Record<string, unknown>>;
-  } catch {
-    MapView = null;
-    MapMarker = null;
-  }
+try {
+  const maps = require("react-native-maps");
+  MapView = maps.default as React.ComponentType<Record<string, unknown>>;
+  MapMarker = maps.Marker as React.ComponentType<Record<string, unknown>>;
+} catch {
+  MapView = null;
+  MapMarker = null;
 }
 
 interface GeoZone {
@@ -109,9 +107,7 @@ function formatDateIT(dateStr: string | null): string {
 export default function AdminUsers() {
   const t = useT();
   const rawInsets = useSafeAreaInsets();
-  const insets = Platform.OS === "web"
-    ? { top: 67, bottom: 34, left: rawInsets.left, right: rawInsets.right }
-    : rawInsets;
+  const insets = rawInsets;
 
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [statsModalVisible, setStatsModalVisible] = useState(false);
@@ -636,11 +632,6 @@ export default function AdminUsers() {
   }
 
   function openZoneOnMap(z: GeoZone) {
-    if (Platform.OS === "web") {
-      const url = `https://www.google.com/maps/search/?api=1&query=${z.lat},${z.lng}`;
-      Linking.openURL(url).catch(() => {});
-      return;
-    }
     setFzMapZone(z);
   }
 

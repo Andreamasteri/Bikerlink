@@ -7,7 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
+
   ScrollView,
   Image,
 } from "react-native";
@@ -38,7 +38,7 @@ export default function LoginScreen() {
     }
     setIsSubmitting(true);
     let gpsCoords: { latitude: number; longitude: number } | undefined;
-    if (Platform.OS !== "web") {
+    {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === "granted") {
@@ -90,14 +90,14 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior="padding"
     >
       <ScrollView
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: Platform.OS === "web" ? 67 + 40 : insets.top + 40,
-            paddingBottom: Platform.OS === "web" ? 34 + 20 : insets.bottom + 20,
+            paddingTop: insets.top + 40,
+            paddingBottom: insets.bottom + 20,
           },
         ]}
         keyboardShouldPersistTaps="handled"

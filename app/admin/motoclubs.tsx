@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Alert, TextInput, Modal, Platform,
+  Alert, TextInput, Modal, 
 } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
@@ -439,7 +439,7 @@ export default function AdminMotoclubs() {
     );
   }
 
-  const topPad = Platform.OS === "web" ? 67 : 0;
+  const topPad = 0;
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>

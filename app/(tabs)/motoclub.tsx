@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Platform,
+
   Alert,
   BackHandler,
 } from "react-native";
@@ -411,7 +411,7 @@ export default function MotoclubScreen() {
     ? clubs.filter((c) => myClubIds.has(c.id))
     : clubs;
 
-  const topInset = Platform.OS === "web" ? 67 : insets.top;
+  const topInset = insets.top;
 
   if (showInvites && pendingInvites.length > 0) {
     return (
@@ -558,7 +558,7 @@ export default function MotoclubScreen() {
           myClubs={myClubs}
           marketplaceMotos={marketplaceMotos}
           onRefresh={() => { refetchMarket(); }}
-          bottomInset={Platform.OS === "web" ? 34 : insets.bottom}
+          bottomInset={insets.bottom}
         />
       ) : loadingClubs ? (
         <View style={styles.loader}>
@@ -568,7 +568,7 @@ export default function MotoclubScreen() {
         <FlatList
           data={displayedClubs}
           keyExtractor={(c) => c.id}
-          contentContainerStyle={{ paddingBottom: 32 + (Platform.OS === "web" ? 34 : insets.bottom) }}
+          contentContainerStyle={{ paddingBottom: 32 + insets.bottom }}
           refreshControl={
             <RefreshControl
               refreshing={false}
@@ -636,7 +636,7 @@ export default function MotoclubScreen() {
 
       {motoclubCreationEnabled && !hasPendingRequest && (
         <TouchableOpacity
-          style={[styles.fab, { bottom: (Platform.OS === "web" ? 34 : insets.bottom) + 16 }]}
+          style={[styles.fab, { bottom: insets.bottom + 16 }]}
           onPress={() => router.push("/motoclub/create" as any)}
           activeOpacity={0.85}
         >
@@ -645,7 +645,7 @@ export default function MotoclubScreen() {
       )}
       {motoclubCreationEnabled && hasPendingRequest && (
         <TouchableOpacity
-          style={[styles.fab, { bottom: (Platform.OS === "web" ? 34 : insets.bottom) + 16, backgroundColor: Colors.warning }]}
+          style={[styles.fab, { bottom: insets.bottom + 16, backgroundColor: Colors.warning }]}
           onPress={() => router.push("/motoclub/create" as any)}
           activeOpacity={0.85}
         >

@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import type { Href } from "expo-router";
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
@@ -136,7 +136,7 @@ export default function AdminDashboard() {
       style={styles.container}
       contentContainerStyle={[
         styles.content,
-        { paddingBottom: insets.bottom + 20, paddingTop: Platform.OS === "web" ? 67 : 0 },
+        { paddingBottom: insets.bottom + 20, paddingTop: 0 },
       ]}
     >
       <Text style={styles.subtitle}>Gestisci tutti gli aspetti dell'app</Text>

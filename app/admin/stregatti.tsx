@@ -119,9 +119,7 @@ interface ChatMessage {
 export default function FakeUsersAdmin() {
   const t = useT();
   const rawInsets = useSafeAreaInsets();
-  const insets = Platform.OS === "web"
-    ? { top: 67, bottom: 34, left: rawInsets.left, right: rawInsets.right }
-    : rawInsets;
+  const insets = rawInsets;
 
   const flatListRef = useRef<FlatList<FakeUser>>(null);
   const [filter, setFilter] = useState<FilterType>("tutti");

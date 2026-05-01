@@ -82,7 +82,6 @@ export default function NativeUpdateChecker() {
 
   useEffect(() => {
     const runCheck = async () => {
-      if (Platform.OS === "web") return;
       try {
         const url = new URL("/api/settings/native-version", getApiUrl()).toString();
         const res = await fetch(url);
@@ -110,7 +109,6 @@ export default function NativeUpdateChecker() {
       await runCheck();
     };
 
-    if (Platform.OS === "web") return;
     const timer = setTimeout(async () => {
       if (checkedRef.current) return;
       checkedRef.current = true;

@@ -225,11 +225,6 @@ export async function triggerOtaCheck(
     _emitOtaResult(r);
     return r;
   }
-  if (Platform.OS === "web") {
-    const r: OtaManualResult = { ok: false, phase: "skipped", skipped: "web" };
-    _emitOtaResult(r);
-    return r;
-  }
   if (options?.delayMs && options.delayMs > 0) {
     await new Promise((r) => setTimeout(r, options.delayMs));
   }

@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   TextInput,
   Alert,
-  Platform,
+
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native";
 import { useRouter } from "expo-router";
@@ -105,7 +105,7 @@ function PhotoCard({ item, onApprove, onReject }: {
 export default function ModeratorPhotosScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const webTopInset = Platform.OS === "web" ? 67 : 0;
+  const webTopInset = 0;
 
   const { data: photos, isLoading } = useQuery<ModerationPhoto[]>({
     queryKey: ["/api/moderator/photos"],

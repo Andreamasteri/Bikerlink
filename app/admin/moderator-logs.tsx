@@ -6,7 +6,7 @@ import {
   FlatList,
   TextInput,
   ActivityIndicator,
-  Platform,
+
   ScrollView,
   TouchableOpacity,
   Alert,
@@ -55,7 +55,7 @@ const ACTION_ICONS: Record<string, { icon: string; color: string }> = {
   reject_photo: { icon: "close-circle-outline", color: Colors.error },
 };
 
-const webBottomInset = Platform.OS === "web" ? 34 : 0;
+const webBottomInset = 0;
 
 function LogRow({ log }: { log: ModeratorLog }) {
   const iconInfo = ACTION_ICONS[log.action] ?? { icon: "information-outline", color: Colors.textSecondary };

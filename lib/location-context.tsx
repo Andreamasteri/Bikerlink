@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
-import { Platform, AppState, AppStateStatus } from "react-native";
+import { AppState, AppStateStatus } from "react-native";
 import * as Location from "expo-location";
 import { useQuery } from "@tanstack/react-query";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
@@ -33,17 +33,6 @@ export function useLocationGate() {
 const GPS_CHECK_INTERVAL = 4000;
 const BG_PERMISSION_CHECK_INTERVAL = 30000;
 
-function isWebPermissionsAvailable(): boolean {
-  try {
-    return Platform.OS === "web"
-      && typeof navigator !== "undefined"
-      && !!navigator.permissions
-      && typeof navigator.permissions.query === "function";
-  } catch {
-    return false;
-  }
-}
-
 export function LocationProvider({ children }: { children: React.ReactNode }) {
   const [hasPermission, setHasPermission] = useState(true);
   const [hasBackgroundPermission, setHasBackgroundPermission] = useState(false);
@@ -61,28 +50,14 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
   const checkPermission = useCallback(async () => {
     try {
-      if (Platform.OS === "web") {
-        if (isWebPermissionsAvailable()) {
-          const result = await navigator.permissions.query({ name: "geolocation" as PermissionName });
-          permissionStatusRef.current = result;
-          setHasPermission(result.state === "granted");
-        } else {
-          setHasPermission(true);
-        }
-      } else {
-        const { status } = await Location.getForegroundPermissionsAsync();
-        setHasPermission(status === "granted");
-      }
+      const { status } = await Location.getForegroundPermissionsAsync();
+      setHasPermission(status === "granted");
     } catch {
       setHasPermission(true);
     }
   }, []);
 
   const checkBackgroundPermission = useCallback(async () => {
-    if (Platform.OS === "web") {
-      setBackgroundPermissionChecked(true);
-      return;
-    }
     try {
       const { status } = await Location.getBackgroundPermissionsAsync();
       const granted = status === "granted";
@@ -103,24 +78,10 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
     try {
-      if (Platform.OS === "web") {
-        if (typeof navigator === "undefined" || !navigator.geolocation) {
-          setHasPermission(true);
-          return true;
-        }
-        return new Promise((resolve) => {
-          navigator.geolocation.getCurrentPosition(
-            () => { setHasPermission(true); resolve(true); },
-            () => { setHasPermission(false); resolve(false); },
-            { timeout: 5000 }
-          );
-        });
-      } else {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        const granted = status === "granted";
-        setHasPermission(granted);
-        return granted;
-      }
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      const granted = status === "granted";
+      setHasPermission(granted);
+      return granted;
     } catch {
       setHasPermission(true);
       return true;
@@ -128,8 +89,6 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const requestBackgroundPermission = useCallback(async (): Promise<boolean> => {
-    if (Platform.OS === "web") return false;
-
     try {
       const { status } = await Location.requestBackgroundPermissionsAsync();
       const granted = status === "granted";
@@ -155,21 +114,17 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!gpsRequired) return;
-    if (Platform.OS === "web") return;
 
     const interval = setInterval(checkPermission, GPS_CHECK_INTERVAL);
     return () => clearInterval(interval);
   }, [gpsRequired, checkPermission]);
 
   useEffect(() => {
-    if (Platform.OS === "web") return;
     const interval = setInterval(checkBackgroundPermission, BG_PERMISSION_CHECK_INTERVAL);
     return () => clearInterval(interval);
   }, [checkBackgroundPermission]);
 
   useEffect(() => {
-    if (Platform.OS === "web") return;
-
     const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
       if (appState.current.match(/inactive|background/) && nextState === "active") {
         checkPermission();
@@ -179,29 +134,6 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     });
     return () => subscription.remove();
   }, [checkPermission, checkBackgroundPermission]);
-
-  useEffect(() => {
-    if (!isWebPermissionsAvailable()) return;
-
-    let cleanup: (() => void) | null = null;
-    let cancelled = false;
-
-    navigator.permissions.query({ name: "geolocation" as PermissionName }).then((result) => {
-      if (cancelled) return;
-      const handler = () => {
-        setHasPermission(result.state === "granted");
-      };
-      result.addEventListener("change", handler);
-      cleanup = () => result.removeEventListener("change", handler);
-    }).catch(() => {
-      if (!cancelled) setHasPermission(true);
-    });
-
-    return () => {
-      cancelled = true;
-      if (cleanup) cleanup();
-    };
-  }, []);
 
   const isGpsGateActive = gpsRequired && !hasPermission;
 

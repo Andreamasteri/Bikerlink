@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   Modal,
   Switch,
-  Platform,
+
   Image,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -224,7 +224,7 @@ export default function InviteCodesScreen() {
   const activeCount = codes.filter((c) => c.isActive).length;
 
   return (
-    <View style={[styles.container, { paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={Colors.text} />

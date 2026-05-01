@@ -7,7 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
+
   ScrollView,
   Modal,
   FlatList,
@@ -978,14 +978,14 @@ export default function RegisterScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior="padding"
     >
       <ScrollView
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: Platform.OS === "web" ? 67 + 20 : insets.top + 20,
-            paddingBottom: Platform.OS === "web" ? 34 + 20 : insets.bottom + 20,
+            paddingTop: insets.top + 20,
+            paddingBottom: insets.bottom + 20,
           },
         ]}
         keyboardShouldPersistTaps="handled"
@@ -1267,7 +1267,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: "60%",
-    paddingBottom: Platform.OS === "web" ? 34 : 0,
+    paddingBottom: 0,
   },
   modalHeader: {
     flexDirection: "row",

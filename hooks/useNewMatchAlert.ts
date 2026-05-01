@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
@@ -91,7 +90,7 @@ export function useNewMatchAlert() {
     }
   };
 
-  const enabled = !!userId && Platform.OS !== "web" && seenLoaded;
+  const enabled = !!userId && seenLoaded;
 
   const { data: garageData } = useQuery<Array<{ id: string | number }>>({
     queryKey: ["/api/proposals/garage-matches"],

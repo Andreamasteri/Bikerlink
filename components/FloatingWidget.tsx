@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   Pressable,
   Dimensions,
-  Platform,
+
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -137,7 +137,7 @@ export default function FloatingWidget() {
     router.push("/(tabs)/music");
   }, [closeMenu, router]);
 
-  if (Platform.OS === "web") return null;
+
   if (!isVisible || !positionLoaded) return null;
 
   const totalUnread = unreadChat + unreadNotifications;

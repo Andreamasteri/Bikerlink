@@ -7,7 +7,7 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-  Platform,
+
   ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -64,15 +64,12 @@ export default function FeatureRequestScreen() {
     feedbackMutation.mutate();
   };
 
-  const webTopInset = Platform.OS === "web" ? 67 : 0;
-  const webBottomInset = Platform.OS === "web" ? 34 : 0;
-
   return (
     <View style={styles.container}>
       <View
         style={[
           styles.header,
-          { paddingTop: (Platform.OS === "web" ? webTopInset : insets.top) + 12 },
+          { paddingTop: insets.top + 12 },
         ]}
       >
         <TouchableOpacity onPress={() => router.canGoBack() && router.back()}>
@@ -89,7 +86,7 @@ export default function FeatureRequestScreen() {
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: (Platform.OS === "web" ? webBottomInset : insets.bottom) + 24 },
+          { paddingBottom: insets.bottom + 24 },
         ]}
         keyboardShouldPersistTaps="handled"
       >

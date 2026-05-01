@@ -6,7 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Platform,
+
   FlatList,
   TextInput,
 } from "react-native";
@@ -651,19 +651,7 @@ export default function TraduzioniScreen() {
         `/api/admin/translations/download-docx?langs=${langs.join(",")}`,
         getApiUrl()
       );
-      if (Platform.OS === "web") {
-        const resp = await fetch(url.toString(), { credentials: "include" });
-        if (!resp.ok) throw new Error(await parseBinaryErrorMessage(resp));
-        const blob = await resp.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = blobUrl;
-        a.download = `BikerLink_Traduzioni_${new Date().toISOString().slice(0, 10)}.docx`;
-        a.click();
-        URL.revokeObjectURL(blobUrl);
-        setDocxResult({ ok: true, msg: "Download Word avviato" });
-      } else {
-        const resp = await fetch(url.toString(), { credentials: "include" });
+      const resp = await fetch(url.toString(), { credentials: "include" });
         if (!resp.ok) throw new Error(await parseBinaryErrorMessage(resp));
         const arrayBuf = await resp.arrayBuffer();
         const base64 = await arrayBufferToBase64(arrayBuf);
@@ -833,11 +821,7 @@ export default function TraduzioniScreen() {
 
   function handleImportPress() {
     if (importStatus === "loading") return;
-    if (Platform.OS === "web") {
-      webImportInputRef.current?.click();
-    } else {
-      handlePickAndImportNative();
-    }
+    handlePickAndImportNative();
   }
 
   return (
@@ -845,7 +829,7 @@ export default function TraduzioniScreen() {
       style={styles.container}
       contentContainerStyle={[
         styles.content,
-        { paddingBottom: insets.bottom + 24, paddingTop: Platform.OS === "web" ? 67 : 0 },
+        { paddingBottom: insets.bottom + 24, paddingTop: 0 },
       ]}
     >
       <Text style={styles.pageDesc}>
@@ -937,18 +921,6 @@ export default function TraduzioniScreen() {
             </Text>
           </View>
         </View>
-
-        {Platform.OS === "web" ? (
-          <input
-            ref={(el) => {
-              webImportInputRef.current = el;
-            }}
-            type="file"
-            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            style={{ display: "none" }}
-            onChange={handleWebFileSelected}
-          />
-        ) : null}
 
         <TouchableOpacity
           style={[styles.button, importStatus === "loading" && styles.buttonDisabled]}

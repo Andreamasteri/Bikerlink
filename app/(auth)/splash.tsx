@@ -146,7 +146,7 @@ export default function SplashAnimatedScreen() {
 
   const displayMessage = splashMessage || t("app.tagline");
 
-  const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
+  const bottomInset = insets.bottom;
 
   return (
     <View style={styles.container}>

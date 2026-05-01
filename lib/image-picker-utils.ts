@@ -101,11 +101,6 @@ export function showImagePickerMenu(
     }
   };
 
-  if (Platform.OS === "web") {
-    launchGallery();
-    return;
-  }
-
   if (Platform.OS === "ios") {
     ActionSheetIOS.showActionSheetWithOptions(
       {

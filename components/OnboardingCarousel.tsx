@@ -250,8 +250,8 @@ export default function OnboardingCarousel({ onComplete, onSkip }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
   const total = ONBOARDING_SLIDES.length;
 
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const topPad = insets.top;
+  const bottomPad = insets.bottom;
 
   const isFirst = activeIndex === 0;
   const isLast = activeIndex === total - 1;

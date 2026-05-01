@@ -10,7 +10,7 @@ import {
   Modal,
   TextInput,
   Alert,
-  Platform,
+
 } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -141,14 +141,10 @@ function WishlistScreen() {
 
   const handleDeleteMoto = (id: string, brand: string, model: string, motorcycleType?: string) => {
     const name = brand && model ? `${brand} ${model}` : getMotoTypeLabel(motorcycleType || "");
-    if (Platform.OS === "web") {
-      if (window.confirm(`${t("garage.deleteFromWishlist")} "${name}"`)) deleteMotoMutation.mutate(id);
-    } else {
-      Alert.alert(t("common.delete"), `${t("garage.deleteFromWishlist")} "${name}"`, [
-        { text: t("common.cancel"), style: "cancel" },
-        { text: t("common.delete"), style: "destructive", onPress: () => deleteMotoMutation.mutate(id) },
-      ]);
-    }
+    Alert.alert(t("common.delete"), `${t("garage.deleteFromWishlist")} "${name}"`, [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("common.delete"), style: "destructive", onPress: () => deleteMotoMutation.mutate(id) },
+    ]);
   };
 
   const OptionButton = ({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) => (
@@ -185,7 +181,7 @@ function WishlistScreen() {
   return (
     <View style={styles.container}>
       <KeyboardAwareScrollViewCompat
-        contentContainerStyle={[styles.list, { paddingBottom: Platform.OS === "web" ? 100 : insets.bottom + 80 }]}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 80 }]}
         bottomOffset={20}
       >
         <View style={styles.card}>
@@ -274,7 +270,7 @@ function WishlistScreen() {
       <Modal visible={showMotoForm} animationType="slide" onRequestClose={() => setShowMotoForm(false)}>
         <View style={styles.fullscreenModal}>
           <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }} bottomOffset={20}>
-              <View style={[styles.modalHeader, { paddingTop: Platform.OS === "web" ? 67 : insets.top + 8 }]}>
+              <View style={[styles.modalHeader, { paddingTop: insets.top + 8 }]}>
                   <Text style={styles.modalTitle}>{editingMotoId ? t("garage.editMoto") : t("garage.addDesiredMoto")}</Text>
                 <Pressable onPress={() => setShowMotoForm(false)}>
                   <Ionicons name="close" size={24} color={Colors.textSecondary} />
@@ -481,16 +477,10 @@ function GarageContent() {
   };
 
   const handleDelete = (id: string, displayName: string) => {
-    if (Platform.OS === "web") {
-      if (window.confirm(`${t("garage.deleteMoto")} "${displayName}"?`)) {
-        deleteMutation.mutate(id);
-      }
-    } else {
-      Alert.alert(t("garage.deleteMoto"), `${t("garage.deleteMoto")} "${displayName}"?`, [
-        { text: t("common.cancel"), style: "cancel" },
-        { text: t("common.delete"), style: "destructive", onPress: () => deleteMutation.mutate(id) },
-      ]);
-    }
+    Alert.alert(t("garage.deleteMoto"), `${t("garage.deleteMoto")} "${displayName}"?`, [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("common.delete"), style: "destructive", onPress: () => deleteMutation.mutate(id) },
+    ]);
   };
 
   const OptionButton = ({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) => (
@@ -578,7 +568,7 @@ function GarageContent() {
           data={motorcycles}
           renderItem={renderMoto}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={[styles.list, { paddingBottom: Platform.OS === "web" ? 100 : insets.bottom + 80 }]}
+          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 80 }]}
           refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} tintColor={Colors.accent} />}
           ListEmptyComponent={
             <View style={styles.empty}>
@@ -591,14 +581,14 @@ function GarageContent() {
         />
       )}
 
-      <Pressable style={[styles.fab, { bottom: Platform.OS === "web" ? 94 : 16 }]} onPress={openAdd}>
+      <Pressable style={[styles.fab, { bottom: 16 }]} onPress={openAdd}>
         <Ionicons name="add" size={28} color={Colors.background} />
       </Pressable>
 
       <Modal visible={showForm} animationType="slide" onRequestClose={() => { setShowForm(false); resetForm(); }}>
         <View style={styles.fullscreenModal}>
           <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }} bottomOffset={20}>
-              <View style={[styles.modalHeader, { paddingTop: Platform.OS === "web" ? 67 : insets.top + 8 }]}>
+              <View style={[styles.modalHeader, { paddingTop: insets.top + 8 }]}>
                 <Text style={styles.modalTitle}>{editingId ? t("garage.editMoto") : t("garage.addMoto")}</Text>
                 <Pressable onPress={() => { setShowForm(false); resetForm(); }}>
                   <Ionicons name="close" size={24} color={Colors.textSecondary} />

@@ -5,7 +5,7 @@ import {
   StyleSheet,
   FlatList,
   ActivityIndicator,
-  Platform,
+
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -91,7 +91,7 @@ export default function WinnersScreen() {
             keyExtractor={(item) => item.id}
             contentContainerStyle={[
               styles.listContent,
-              { paddingBottom: 40 + (Platform.OS === "web" ? 34 : 0) },
+              { paddingBottom: 40 },
             ]}
             showsVerticalScrollIndicator={false}
             scrollEnabled={(data?.length ?? 0) > 0}

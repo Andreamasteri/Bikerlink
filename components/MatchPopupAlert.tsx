@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import {
   Animated,
   PanResponder,
-  Platform,
+
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -108,10 +108,7 @@ export default function MatchPopupAlert() {
     router.push(MATCH_ROUTE);
   };
 
-  const bottomOffset =
-    Platform.OS === "web"
-      ? 34 + 80
-      : insets.bottom + 80;
+  const bottomOffset = insets.bottom + 80;
 
   return (
     <View

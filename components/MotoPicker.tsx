@@ -7,7 +7,7 @@ import {
   Pressable,
   FlatList,
   TextInput,
-  Platform,
+
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
@@ -88,8 +88,8 @@ export default function MotoPicker({
           style={[
             styles.modalContainer,
             {
-              paddingTop: Platform.OS === "web" ? 67 : insets.top + 8,
-              paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16,
+              paddingTop: insets.top + 8,
+              paddingBottom: insets.bottom + 16,
             },
           ]}
         >
@@ -112,7 +112,7 @@ export default function MotoPicker({
               placeholderTextColor={Colors.textSecondary}
               value={search}
               onChangeText={setSearch}
-              autoFocus={Platform.OS !== "web"}
+              autoFocus={true}
               clearButtonMode="while-editing"
             />
           </View>

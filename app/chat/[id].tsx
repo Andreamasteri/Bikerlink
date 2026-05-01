@@ -8,7 +8,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Switch,
-  Platform,
+
   Alert,
   Modal,
   Image,
@@ -432,21 +432,7 @@ export default function ChatConversationScreen() {
       setTimeout(() => textInputRef.current?.focus(), 100);
     };
 
-    if (Platform.OS === "web") {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            insertCoords(position.coords.latitude, position.coords.longitude);
-          },
-          () => {
-            Alert.alert(t("chat.locationUnavailable"), t("chat.locationUnavailableWeb"));
-          }
-        );
-      } else {
-        Alert.alert("Non supportato", "Il tuo browser non supporta la geolocalizzazione.");
-      }
-    } else {
-      try {
+    try {
         const Location = require("expo-location");
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
@@ -458,7 +444,6 @@ export default function ChatConversationScreen() {
       } catch {
         Alert.alert(t("chat.locationError"), t("chat.cannotGetGps"));
       }
-    }
   }, []);
 
   const uploadPhoto = useCallback(async (uri: string) => {
@@ -517,15 +502,13 @@ export default function ChatConversationScreen() {
     [userId]
   );
 
-  const webTopInset = Platform.OS === "web" ? 67 : 0;
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      behavior="padding"
+      keyboardVerticalOffset={90}
     >
-      <View style={[styles.topBar, { paddingTop: Platform.OS === "web" ? webTopInset + 12 : insets.top + 8 }]}>
+      <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={28} color={Colors.text} />
         </TouchableOpacity>
@@ -699,7 +682,7 @@ export default function ChatConversationScreen() {
         </View>
       </Modal>
 
-      <View style={[styles.inputBar, { paddingBottom: Platform.OS === "web" ? 34 : Math.max(insets.bottom, 12) }]}>
+      <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <TouchableOpacity onPress={handleSendLocation} style={styles.iconButton}>
           <Ionicons name="location-outline" size={24} color={Colors.accent} />
         </TouchableOpacity>
@@ -994,7 +977,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceLight,
     borderRadius: 20,
     paddingHorizontal: 14,
-    paddingVertical: Platform.OS === "ios" ? 10 : 6,
+    paddingVertical: 10,
     maxHeight: 120,
   },
   textInput: {
@@ -1039,7 +1022,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: "70%",
-    paddingBottom: Platform.OS === "web" ? 34 : 0,
+    paddingBottom: 0,
   },
   membersHeader: {
     flexDirection: "row",

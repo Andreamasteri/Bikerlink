@@ -41,11 +41,10 @@ export default function WelcomeScreen() {
   const [dynamicTagline, setDynamicTagline] = useState<string | null>(null);
   const { language, setLanguage } = useLanguage();
 
-  const isWeb = Platform.OS === "web";
-  const titleOpacity = useRef(new Animated.Value(isWeb ? 1 : 0)).current;
-  const taglineOpacity = useRef(new Animated.Value(isWeb ? 1 : 0)).current;
-  const buttonsTranslateY = useRef(new Animated.Value(isWeb ? 0 : 100)).current;
-  const buttonsOpacity = useRef(new Animated.Value(isWeb ? 1 : 0)).current;
+  const titleOpacity = useRef(new Animated.Value(0)).current;
+  const taglineOpacity = useRef(new Animated.Value(0)).current;
+  const buttonsTranslateY = useRef(new Animated.Value(100)).current;
+  const buttonsOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (isLoading || isAuthenticated) return;
@@ -127,7 +126,7 @@ export default function WelcomeScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.loadingContainer, { paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
+      <View style={[styles.container, styles.loadingContainer, { paddingTop: insets.top }]}>
         <StatusBar barStyle="light-content" />
         {isReconnecting && (
           <View style={styles.reconnectBox}>
@@ -142,7 +141,7 @@ export default function WelcomeScreen() {
   return (
     <ImageBackground source={loginBg} style={styles.container} resizeMode="cover">
       <StatusBar barStyle="light-content" />
-      <View style={[styles.overlay, { paddingTop: Platform.OS === "web" ? 67 : insets.top, paddingBottom: Platform.OS === "web" ? 34 : insets.bottom }]}>
+      <View style={[styles.overlay, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         {sessionExpired && (
           <View style={styles.sessionExpiredBanner}>
             <Text style={styles.sessionExpiredText}>

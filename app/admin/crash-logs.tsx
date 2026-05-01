@@ -908,7 +908,6 @@ const styles = StyleSheet.create({
     padding: 10,
     borderBottomWidth: 1,
     alignItems: "center",
-    ...(Platform.OS === "web" ? { paddingTop: 10 } : {}),
   },
   typeBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
   typeBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 13 },

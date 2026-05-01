@@ -8,7 +8,7 @@ import {
   Pressable,
   Dimensions,
   ActivityIndicator,
-  Platform,
+
   Alert,
   TextInput,
   RefreshControl,
@@ -356,13 +356,7 @@ export default function ContestScreen() {
       const ext = /\.(\w+)$/.exec(filename);
       const mimeType = ext ? `image/${ext[1].toLowerCase()}` : "image/jpeg";
 
-      if (Platform.OS === "web") {
-        const response = await globalThis.fetch(data.imageUri);
-        const blob = await response.blob();
-        formData.append("photo", blob, filename);
-      } else {
-        formData.append("photo", { uri: data.imageUri, name: filename, type: mimeType } as any);
-      }
+      formData.append("photo", { uri: data.imageUri, name: filename, type: mimeType } as any);
 
       if (data.caption) {
         formData.append("caption", data.caption);
@@ -540,7 +534,7 @@ export default function ContestScreen() {
       />
 
         <Pressable
-          style={[styles.fab, { bottom: Platform.OS === "web" ? 94 : 16 }]}
+          style={[styles.fab, { bottom: 16 }]}
           onPress={handlePickImage}
         >
           <Ionicons name="camera" size={28} color={Colors.background} />

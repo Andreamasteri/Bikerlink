@@ -10,7 +10,7 @@ import {
   Image,
   ActivityIndicator,
   Pressable,
-  Platform,
+
   Alert,
   Switch,
 } from "react-native";
@@ -343,7 +343,7 @@ function LibraryTab({
   }, [requestPermission, loadAssets]);
 
   React.useEffect(() => {
-    if (Platform.OS !== "web" && permission?.granted) {
+    if (permission?.granted) {
       loadAssets();
     }
   }, [permission?.granted]);
@@ -371,17 +371,6 @@ function LibraryTab({
     }
   }, [onPlayTrack]);
 
-  if (Platform.OS === "web") {
-    return (
-      <View style={libStyles.center}>
-        <Ionicons name="musical-notes-outline" size={40} color={Colors.textSecondary} />
-        <Text style={libStyles.emptyText}>Libreria non disponibile sul web</Text>
-        <TouchableOpacity style={libStyles.permBtn} onPress={pickFile}>
-          <Text style={libStyles.permBtnText}>Apri file audio</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   if (!permission) {
     return (
@@ -740,8 +729,8 @@ export function FullPlayerModal({
         style={[
           modalStyles.container,
           {
-            paddingTop: Platform.OS === "web" ? 67 : insets.top + 16,
-            paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16,
+            paddingTop: insets.top + 16,
+            paddingBottom: insets.bottom + 16,
           },
         ]}
       >

@@ -6,7 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
-  Platform,
+
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -137,7 +137,6 @@ export default function GpsErrorsScreen() {
         contentContainerStyle={[
           styles.list,
           { paddingBottom: insets.bottom + 16 },
-          Platform.OS === "web" && { paddingBottom: 34 + 16 },
         ]}
         refreshControl={
           <RefreshControl
@@ -169,7 +168,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    ...(Platform.OS === "web" && { paddingTop: 67 + 10 }),
   },
   headerTitle: {
     fontSize: 16,

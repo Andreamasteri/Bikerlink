@@ -258,10 +258,10 @@ export default function SystemScreen() {
   });
 
   const installedVersion = Constants.expoConfig?.version ?? "0.0.0";
-  const installedPlatform: "android" | "ios" | "web" = Platform.OS === "ios" ? "ios" : Platform.OS === "android" ? "android" : "web";
+  const installedPlatform: "android" | "ios" = Platform.OS === "ios" ? "ios" : "android";
 
   const checkOutcome: UpdateOutcome | null = useMemo(() => {
-    if (!nativeVerData || installedPlatform === "web") return null;
+    if (!nativeVerData) return null;
     const cfg = installedPlatform === "android" ? nativeVerData.android : nativeVerData.ios;
     return evaluateUpdateOutcome(installedVersion, cfg.minVersion, cfg.latestVersion);
   }, [nativeVerData, installedPlatform, installedVersion]);
@@ -568,8 +568,8 @@ export default function SystemScreen() {
     });
   }, [navigation, handleRefresh, isFetching]);
 
-  const topPadding = Platform.OS === "web" ? 67 : 0;
-  const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
+  const topPadding = 0;
+  const bottomPadding = insets.bottom;
 
   if (isLoading) {
     return (

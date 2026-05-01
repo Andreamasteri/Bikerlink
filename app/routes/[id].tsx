@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Platform,
+
   Linking,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -121,20 +121,14 @@ export default function CustomRouteDetailScreen() {
   };
 
   const handleDelete = () => {
-    if (Platform.OS === "web") {
-      if (confirm(t("routes.deleteConfirm"))) {
-        deleteMutation.mutate();
-      }
-    } else {
-      Alert.alert("Elimina Percorso", "Eliminare questo percorso?", [
-        { text: t("common.cancel"), style: "cancel" },
-        {
-          text: t("common.delete"),
-          style: "destructive",
-          onPress: () => deleteMutation.mutate(),
-        },
-      ]);
-    }
+    Alert.alert("Elimina Percorso", "Eliminare questo percorso?", [
+      { text: t("common.cancel"), style: "cancel" },
+      {
+        text: t("common.delete"),
+        style: "destructive",
+        onPress: () => deleteMutation.mutate(),
+      },
+    ]);
   };
 
   if (isLoading) {

@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Platform,
+
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -128,8 +128,8 @@ export default function SprintHistoryScreen() {
     [targetLabel, locale, timeFormat]
   );
 
-  const topPadding = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const topPadding = insets.top;
+  const bottomPad = insets.bottom;
 
   return (
     <View style={[styles.container, { paddingTop: topPadding }]}>

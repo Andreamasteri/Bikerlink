@@ -130,8 +130,8 @@ export default function ForgotPasswordScreen() {
     }
   };
 
-  const paddingTop = Platform.OS === "web" ? 67 + 40 : insets.top + 40;
-  const paddingBottom = Platform.OS === "web" ? 34 + 20 : insets.bottom + 20;
+  const paddingTop = insets.top + 40;
+  const paddingBottom = insets.bottom + 20;
 
   return (
     <KeyboardAvoidingView

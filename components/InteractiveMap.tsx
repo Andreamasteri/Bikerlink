@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   View,
   StyleSheet,
-  Platform,
+
   TouchableOpacity,
   Text,
   ActivityIndicator,
@@ -193,26 +193,10 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   useEffect(() => {
     let cancelled = false;
     let watchSub: Location.LocationSubscription | null = null;
-    let webWatchId: number | null = null;
 
     (async () => {
       try {
-        if (Platform.OS === "web") {
-          if (navigator.geolocation) {
-            webWatchId = navigator.geolocation.watchPosition(
-              (position) => {
-                if (cancelled) return;
-                setUserLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude });
-                setLocationLoading(false);
-              },
-              () => { if (!cancelled) setLocationLoading(false); },
-              { enableHighAccuracy: false, maximumAge: 30000, timeout: 10000 }
-            );
-          } else {
-            if (!cancelled) setLocationLoading(false);
-          }
-        } else {
-          const { status } = await Location.requestForegroundPermissionsAsync();
+        const { status } = await Location.requestForegroundPermissionsAsync();
           if (cancelled) return;
           if (status === "granted") {
             watchSub = await Location.watchPositionAsync(
@@ -226,7 +210,6 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           } else {
             if (!cancelled) setLocationLoading(false);
           }
-        }
       } catch {
         if (!cancelled) setLocationLoading(false);
       }
@@ -235,9 +218,6 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     return () => {
       cancelled = true;
       watchSub?.remove();
-      if (webWatchId != null && typeof navigator !== "undefined" && navigator.geolocation) {
-        navigator.geolocation.clearWatch(webWatchId);
-      }
     };
   }, []);
 
@@ -499,7 +479,7 @@ const styles = StyleSheet.create({
   },
   filterBar: {
     position: "absolute",
-    top: Platform.OS === "web" ? 80 : 16,
+    top: 16,
     left: 12,
     right: 12,
     flexDirection: "row",
@@ -527,14 +507,14 @@ const styles = StyleSheet.create({
   },
   controlsContainer: {
     position: "absolute",
-    bottom: Platform.OS === "web" ? 117 : 97,
+    bottom: 97,
     right: 12,
     gap: 10,
     alignItems: "flex-end",
   },
   availabilityContainer: {
     position: "absolute",
-    bottom: Platform.OS === "web" ? 118 : 98,
+    bottom: 98,
     left: 12,
     zIndex: 10,
   },

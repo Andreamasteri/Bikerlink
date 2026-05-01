@@ -8,7 +8,7 @@ import {
   ScrollView,
   RefreshControl,
   ActivityIndicator,
-  Platform,
+
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useInfiniteQuery } from "@tanstack/react-query";
@@ -91,7 +91,7 @@ export default function EventiScreen() {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const topInset = Platform.OS === "web" ? 67 : insets.top;
+  const topInset = insets.top;
 
   return (
     <View style={[styles.container, { paddingTop: topInset }]}>
@@ -137,7 +137,7 @@ export default function EventiScreen() {
           contentContainerStyle={[
             styles.listContent,
             events.length === 0 && styles.listEmpty,
-            { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 20) },
+            { paddingBottom: insets.bottom + 20 },
           ]}
           refreshControl={
             <RefreshControl

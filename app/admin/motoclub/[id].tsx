@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Alert, Platform, ActivityIndicator, Modal, TextInput,
+  Alert,  ActivityIndicator, Modal, TextInput,
 } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
@@ -229,7 +229,7 @@ export default function AdminClubDetail() {
     );
   }
 
-  const topPad = Platform.OS === "web" ? 67 : 0;
+  const topPad = 0;
 
   if (isLoading) {
     return (

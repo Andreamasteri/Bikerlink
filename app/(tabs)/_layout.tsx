@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from "react";
 import { Tabs, useRouter, usePathname, type Href } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
-import { Platform, View, Pressable, Text, StyleSheet, Linking, Modal, Animated } from "react-native";
+import { View, Pressable, Text, StyleSheet, Linking, Modal, Animated } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/lib/auth-context";
 import { useLocationGate } from "@/lib/location-context";
@@ -129,27 +129,14 @@ export default function TabLayout() {
 
   useEffect(() => {
     if (unreadCount > prevUnreadRef.current && prevUnreadRef.current >= 0) {
-      if (Platform.OS === "web" && typeof window !== "undefined" && (window as any).AudioContext) {
-        try {
-          const ctx = new ((window as any).AudioContext || (window as any).webkitAudioContext)();
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.frequency.value = 800;
-          gain.gain.value = 0.1;
-          osc.start();
-          osc.stop(ctx.currentTime + 0.15);
-        } catch {}
-      }
     }
     prevUnreadRef.current = unreadCount;
   }, [unreadCount]);
 
   const isAvailable = (profileData as any)?.isAvailable || false;
 
-  const tabBarHeight = Platform.OS === "web" ? 84 : 60 + insets.bottom;
-  const tabBarPaddingBottom = Platform.OS === "web" ? 34 : insets.bottom;
+  const tabBarHeight = 60 + insets.bottom;
+  const tabBarPaddingBottom = insets.bottom;
 
   const gpsTabHref = isGpsGateActive ? null : undefined;
 
@@ -209,7 +196,7 @@ export default function TabLayout() {
   return (
     <>
       {isGpsGateActive && (
-        <View style={[gpsBannerStyles.banner, { paddingTop: Platform.OS === "web" ? 67 + 12 : insets.top + 12 }]}>
+        <View style={[gpsBannerStyles.banner, { paddingTop: insets.top + 12 }]}>
           <Ionicons name="navigate-outline" size={28} color="#fff" />
           <Text style={gpsBannerStyles.title}>GPS non attivo</Text>
           <Text style={gpsBannerStyles.text}>
@@ -220,7 +207,7 @@ export default function TabLayout() {
             style={gpsBannerStyles.btn}
             onPress={async () => {
               const granted = await requestPermission();
-              if (!granted && Platform.OS !== "web") {
+              if (!granted) {
                 Linking.openSettings();
               }
             }}

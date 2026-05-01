@@ -4,7 +4,7 @@ import {
   Text,
   StyleSheet,
   PanResponder,
-  Platform,
+
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -83,7 +83,7 @@ export default function UptimeWidget() {
       : -1;
 
   const bottomBase =
-    Platform.OS === "web" ? 34 + 84 : 84 + insets.bottom;
+    84 + insets.bottom;
 
   return (
     <View

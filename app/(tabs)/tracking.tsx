@@ -414,7 +414,7 @@ function RouteMapModal({
                 {t("tracking.noGpsPoints")}
               </Text>
             </View>
-          ) : Platform.OS !== "web" ? (
+          ) : (
             <WebView
               source={{ html, baseUrl: "" }}
               style={{ flex: 1, backgroundColor: "#1a1a1a" }}
@@ -426,7 +426,8 @@ function RouteMapModal({
               overScrollMode="never"
               cacheEnabled={false}
             />
-          ) : (
+          )}
+          {false && (
             <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
               <Ionicons name="map-outline" size={48} color={Colors.textSecondary} />
               <Text style={{ fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, marginTop: 8 }}>
@@ -592,7 +593,7 @@ export default function TrackingScreen() {
   const bgTrackingActiveRef = useRef(false);
   const bgStartGenRef = useRef(0); // incremented each time we attempt a bg transition; detects stale async completions
   const onNativeLocationRef = useRef<(loc: Location.LocationObject) => void>(() => {});
-  const webWatchIdRef = useRef<number | null>(null);
+
   const accelSubRef = useRef<{ remove: () => void } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const flushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -705,9 +706,7 @@ export default function TrackingScreen() {
     const thresholdKmh = parseFloat(handsOffSpeedStr || "50") || 50;
     setHandsOffBroadcast(handsOffActive, thresholdKmh);
     if (handsOffActive) {
-      if (Platform.OS !== "web") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
       const loop = Animated.loop(
         Animated.sequence([
           Animated.timing(handsOffAnim, {
@@ -731,7 +730,7 @@ export default function TrackingScreen() {
 
   // ── Volume down x5 to dismiss Hands-Off (Android only) ───────────────────
   useEffect(() => {
-    if (!handsOffActive || Platform.OS !== "android") return;
+    if (!handsOffActive) return;
 
     volumePressTimestampsRef.current = [];
     lastVolumeRef.current = null;
@@ -775,17 +774,15 @@ export default function TrackingScreen() {
 
   // ── GPS pre-warm ───────────────────────────────────────────────────────────
   useEffect(() => {
-    if (Platform.OS !== "web") {
-      Location.getForegroundPermissionsAsync()
-        .then(({ status }) => {
-          if (status === "granted") {
-            Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
-              .then((loc) => setGpsAccuracy(loc.coords.accuracy ?? null))
-              .catch(() => {});
-          }
-        })
-        .catch(() => {});
-    }
+    Location.getForegroundPermissionsAsync()
+      .then(({ status }) => {
+        if (status === "granted") {
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+            .then((loc) => setGpsAccuracy(loc.coords.accuracy ?? null))
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // ── Background GPS toast helper ────────────────────────────────────────────
@@ -1284,94 +1281,6 @@ export default function TrackingScreen() {
   // Keep stable ref so the AppState effect (background switch) can call it without changing deps
   useEffect(() => { onNativeLocationRef.current = onNativeLocation; }, [onNativeLocation]);
 
-  // ── Web GPS handler ────────────────────────────────────────────────────────
-  const onWebLocation = useCallback(
-    (pos: GeolocationPosition) => {
-      if (isPausedRef.current || phaseRef.current !== "active") return;
-      const { latitude, longitude, altitude, speed, accuracy } = pos.coords;
-      const speedKmh = speed !== null && speed >= 0 ? speed * 3.6 : 0;
-      const now = pos.timestamp;
-      const smoothedSpeed = emaSpeedRef.current * 0.7 + speedKmh * 0.3;
-      emaSpeedRef.current = smoothedSpeed;
-
-      setCurrentSpeed(smoothedSpeed);
-      setGpsAccuracy(accuracy ?? null);
-
-      if (handsOffEnabledRef.current && !handsOffDismissedForRideRef.current) {
-        setHandsOffActive(speedKmh > handsOffSpeedRef.current);
-      }
-
-      if (speedKmh <= IDLE_THRESHOLD_KMH) {
-        if (!isIdleRef.current) {
-          isIdleRef.current = true;
-          idleStartRef.current = now;
-        }
-      } else {
-        if (isIdleRef.current && idleStartRef.current !== null) {
-          idleMsRef.current += now - idleStartRef.current;
-          idleStartRef.current = null;
-        }
-        isIdleRef.current = false;
-      }
-
-      const alt = altitude ?? 0;
-      if (lastPosRef.current) {
-        const dist = haversineKm(
-          lastPosRef.current.lat,
-          lastPosRef.current.lng,
-          latitude,
-          longitude
-        );
-        if (dist > 0.001 && dist < 1) {
-          totalKmRef.current += dist;
-          setTotalKm(totalKmRef.current);
-        }
-      }
-      lastPosRef.current = { lat: latitude, lng: longitude, time: now };
-
-      // Throttle avg speed display — update only every 6 minutes
-      const _avgNowWeb = Date.now();
-      if (_avgNowWeb - lastAvgSpeedUpdateRef.current >= 360000) {
-        const _netMsWeb = Math.max(
-          _avgNowWeb - startTimeRef.current - pausedMsRef.current - idleMsRef.current,
-          0
-        );
-        if (_netMsWeb > 0) setAvgSpeedDisplayKmh(totalKmRef.current / (_netMsWeb / 3600000));
-        lastAvgSpeedUpdateRef.current = _avgNowWeb;
-      }
-
-      if (speedKmh > maxSpeedRef.current) {
-        maxSpeedRef.current = speedKmh;
-        setMaxSpeed(speedKmh);
-      }
-      if (alt > maxAltRef.current) {
-        maxAltRef.current = alt;
-        setMaxAltitude(alt);
-      }
-
-      const coord = { latitude, longitude };
-      mapCoordsRef.current.push(coord);
-      setCurrentCoord(coord);
-      setMapCoords([...mapCoordsRef.current]);
-
-      const point: GpsPoint = {
-        latitude,
-        longitude,
-        altitude: alt,
-        speedKmh,
-        timestamp: new Date(now).toISOString(),
-      };
-      pointsBufferRef.current.push(point);
-      setPointsBuffered(pointsBufferRef.current.length);
-      if (pointsBufferRef.current.length >= BATCH_SIZE) {
-        flushPoints();
-      }
-      appendPointToOfflineBuffer(point);
-      totalGpsPointsRef.current += 1;
-    },
-    [flushPoints, appendPointToOfflineBuffer]
-  );
-
   // ── Cleanup all subscriptions ──────────────────────────────────────────────
   const cleanupTracking = useCallback(() => {
     if (timerRef.current) {
@@ -1389,10 +1298,6 @@ export default function TrackingScreen() {
     if (watchSubRef.current) {
       watchSubRef.current.remove();
       watchSubRef.current = null;
-    }
-    if (webWatchIdRef.current !== null && Platform.OS === "web") {
-      navigator.geolocation.clearWatch(webWatchIdRef.current);
-      webWatchIdRef.current = null;
     }
     if (accelSubRef.current) {
       accelSubRef.current.remove();
@@ -1467,7 +1372,6 @@ export default function TrackingScreen() {
 
   // ── Recalibrate G on-demand ────────────────────────────────────────────────
   const handleRecalibrate = useCallback(() => {
-    if (Platform.OS === "web") return;
     setIsCalibrating(true);
     accelBaselineRef.current = null;
     accelCalibSamples.current = [];
@@ -1482,7 +1386,6 @@ export default function TrackingScreen() {
 
   // ── Start accelerometer ────────────────────────────────────────────────────
   const startAccelerometer = useCallback(() => {
-    if (Platform.OS === "web") return;
     if (!sensorsEnabledRef.current) return;
     const interval = is0100EnabledRef.current ? 100 : 250;
     try {
@@ -1578,8 +1481,7 @@ export default function TrackingScreen() {
       startAccelerometer();
     }
 
-    if (Platform.OS !== "web") {
-      const config = getModeConfig(profileRef.current);
+    const config = getModeConfig(profileRef.current);
       try {
         const sub = await Location.watchPositionAsync(
           {
@@ -1601,31 +1503,21 @@ export default function TrackingScreen() {
         Alert.alert(t("tracking.gpsUnavailable"), t("tracking.gpsUnavailableMsg"));
         return;
       }
-    } else {
-      const wid = navigator.geolocation.watchPosition(
-        onWebLocation,
-        () => {},
-        { enableHighAccuracy: true, maximumAge: 3000 }
-      );
-      webWatchIdRef.current = wid;
-    }
 
     setTrackingActive(true);
-  }, [startAccelerometer, onNativeLocation, onWebLocation, flushPoints, cleanupTracking]);
+  }, [startAccelerometer, onNativeLocation, flushPoints, cleanupTracking]);
 
   // ── Handle START ───────────────────────────────────────────────────────────
   const handleStart = useCallback(async () => {
     if (loading) return;
     setLoading(true);
     try {
-      if (Platform.OS !== "web") {
-        const { status } = await Location.getForegroundPermissionsAsync();
-        if (status !== "granted") {
-          const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
-          if (newStatus !== "granted") {
-            Alert.alert(t("tracking.gpsDenied"), t("tracking.gpsDeniedMsg"));
-            return;
-          }
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== "granted") {
+        const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
+        if (newStatus !== "granted") {
+          Alert.alert(t("tracking.gpsDenied"), t("tracking.gpsDeniedMsg"));
+          return;
         }
       }
 
@@ -1846,7 +1738,7 @@ export default function TrackingScreen() {
     <View
       style={[
         styles.container,
-        { paddingTop: Platform.OS === "web" ? 67 : insets.top },
+        { paddingTop: insets.top },
       ]}
     >
       {/* ── Hands Off overlay (covers tab bar via Modal) ─────────────────── */}
@@ -2061,7 +1953,7 @@ export default function TrackingScreen() {
                       </Text>
                     )}
                     <Text style={styles.statLabel}>G max</Text>
-                    {phase === "active" && !isCalibrating && Platform.OS !== "web" && (
+                    {phase === "active" && !isCalibrating && (
                       <TouchableOpacity
                         onPress={handleRecalibrate}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -2246,7 +2138,7 @@ export default function TrackingScreen() {
             styles.idleScroll,
             {
               paddingBottom:
-                insets.bottom + (Platform.OS === "web" ? 34 : 20),
+                insets.bottom + 20,
             },
           ]}
           showsVerticalScrollIndicator={false}
@@ -2558,13 +2450,6 @@ export default function TrackingScreen() {
                   onExportGpx={async () => {
                     try {
                       const url = new URL(`/api/routes/${item.id}/export.gpx`, getApiUrl()).href;
-                      if (Platform.OS === "web") {
-                        const link = document.createElement("a");
-                        link.href = url;
-                        link.download = `${item.title ?? item.id}.gpx`;
-                        link.click();
-                        return;
-                      }
                       const resp = await fetch(url, { headers: authFetchHeaders(), credentials: "include" });
                       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                       const gpxText = await resp.text();
@@ -2872,7 +2757,7 @@ export default function TrackingScreen() {
           style={[
             styles.bgToast,
             {
-              bottom: insets.bottom + (Platform.OS === "web" ? 34 : 0) + 90,
+              bottom: insets.bottom + 90,
               opacity: bgToastAnim,
               transform: [
                 {

@@ -7,7 +7,7 @@ import {
   Dimensions,
   FlatList,
   Linking,
-  Platform,
+
 } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialCommunityIcons } from "@expo/vector-icons";

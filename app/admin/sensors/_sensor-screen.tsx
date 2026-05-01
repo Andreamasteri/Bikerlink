@@ -80,7 +80,6 @@ async function requestSensorPermission(
 ): Promise<{ granted: boolean; required: boolean; canAskAgain?: boolean }> {
   switch (key) {
     case "pedometer":
-      if (Platform.OS === "web") return { granted: true, required: false };
       const { status, canAskAgain } = await Pedometer.requestPermissionsAsync();
       return { granted: status === "granted", required: true, canAskAgain };
     default:
@@ -288,7 +287,7 @@ function SensorBody({ def }: { def: SensorDefinition }) {
               : `${t("sensors.permPreviouslyDeniedShort")} ${settingsMsg}`
             : t("admin.sensorPermissionDenied")
         );
-        if (!canAsk && Platform.OS !== "web") {
+        if (!canAsk) {
           addLog("info", "Premi 'Apri Impostazioni' per abilitare il permesso manualmente.");
         }
         setIsStarting(false);
@@ -449,7 +448,7 @@ export function SensorScreen({ def }: { def: SensorDefinition }) {
           ss.content,
           {
             paddingBottom: insets.bottom + 32,
-            paddingTop: Platform.OS === "web" ? 67 : 16,
+            paddingTop: 16,
           },
         ]}
         keyboardShouldPersistTaps="handled"

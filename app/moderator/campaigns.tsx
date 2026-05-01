@@ -57,8 +57,8 @@ const TABS: { key: TabKey; label: string; icon: string; iconSet: "material" | "c
   { key: "coppia", label: "Coppie", icon: "people", iconSet: "material", color: Colors.coupleIcon },
 ];
 
-const webTopInset = Platform.OS === "web" ? 67 : 0;
-const webBottomInset = Platform.OS === "web" ? 34 : 0;
+const webTopInset = 0;
+const webBottomInset = 0;
 
 function CampaignCard({
   item,

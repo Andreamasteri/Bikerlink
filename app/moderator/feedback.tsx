@@ -9,7 +9,7 @@ import {
   TextInput,
   Modal,
   ActivityIndicator,
-  Platform,
+
   ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -68,8 +68,8 @@ const STATUS_COLORS: Record<string, string> = {
   closed: Colors.textSecondary,
 };
 
-const webTopInset = Platform.OS === "web" ? 67 : 0;
-const webBottomInset = Platform.OS === "web" ? 34 : 0;
+const webTopInset = 0;
+const webBottomInset = 0;
 
 function TicketCard({ ticket, onOpen }: { ticket: FeedbackTicket; onOpen: (t: FeedbackTicket) => void }) {
   const color = STATUS_COLORS[ticket.status] ?? Colors.textSecondary;

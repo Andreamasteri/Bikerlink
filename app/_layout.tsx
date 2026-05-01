@@ -29,27 +29,7 @@ try {
 } catch {}
 
 
-if (Platform.OS === "web" && typeof window !== "undefined") {
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap";
-  document.head.appendChild(link);
 
-  window.addEventListener("unhandledrejection", (event) => {
-    const msg: string = event?.reason?.message ?? "";
-    if (msg.includes("timeout exceeded") || msg.includes("fontfaceobserver")) {
-      event.preventDefault();
-    }
-  });
-
-  window.addEventListener("error", (event) => {
-    const msg: string = event?.message ?? "";
-    if (msg.includes("timeout exceeded") || msg.includes("fontfaceobserver")) {
-      event.preventDefault();
-      return true;
-    }
-  });
-}
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient, apiRequest } from "@/lib/query-client";
@@ -87,28 +67,11 @@ async function sendHeartbeat() {
   } catch {}
 }
 
-async function sendWebLocation() {
-  if (typeof navigator === "undefined" || !navigator.geolocation) return;
-  try {
-    const coords = await new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-        () => resolve(null),
-        { timeout: 5000, maximumAge: 60000 }
-      );
-    });
-    if (coords) {
-      await apiRequest("PUT", "/api/users/location", coords);
-    }
-  } catch {}
-}
-
 function AppStateHandler() {
   const { user } = useAuth();
   const { hasBackgroundPermission } = useLocationGate();
   const appStateRef = useRef(AppState.currentState);
   const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const webLocationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationWatcherRef = useRef<Location.LocationSubscription | null>(null);
   const nativeWatcherStartingRef = useRef(false);
 
@@ -186,12 +149,7 @@ function AppStateHandler() {
     heartbeatTimerRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
 
     sendStartupBeacon("app_state_handler_mount");
-    if (Platform.OS === "web") {
-      sendWebLocation();
-      webLocationTimerRef.current = setInterval(sendWebLocation, 30000);
-    } else {
-      startNativeWatcher();
-    }
+    startNativeWatcher();
 
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       const prev = appStateRef.current;
@@ -209,13 +167,9 @@ function AppStateHandler() {
         queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-list"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-list"] });
 
-        if (Platform.OS === "web") {
-          sendWebLocation();
-        } else {
-          if (!locationWatcherRef.current && !hasBackgroundPermission) {
+        if (!locationWatcherRef.current && !hasBackgroundPermission) {
             startNativeWatcher();
           }
-        }
       }
 
       appStateRef.current = nextAppState;
@@ -225,7 +179,6 @@ function AppStateHandler() {
       cancelled = true;
       subscription.remove();
       if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
-      if (webLocationTimerRef.current) clearInterval(webLocationTimerRef.current);
       stopNativeWatcher();
       markClean().catch(() => {});
       resetCrashLogger();
@@ -233,7 +186,6 @@ function AppStateHandler() {
   }, [user]);
 
   useEffect(() => {
-    if (Platform.OS === "web") return;
     if (!user || !hasBackgroundPermission) {
       stopBackgroundLocationTask().catch(() => {});
       return;
@@ -274,7 +226,7 @@ function GpsAlwaysGate({ isAuthenticated }: { isAuthenticated: boolean }) {
   const { hasBackgroundPermission, backgroundPermissionChecked, backgroundPermissionRevoked } = useLocationGate();
   const [dismissed, setDismissed] = useState(false);
 
-  if (Platform.OS === "web" || !isAuthenticated || !backgroundPermissionChecked || hasBackgroundPermission) return null;
+  if (!isAuthenticated || !backgroundPermissionChecked || hasBackgroundPermission) return null;
   if (!dismissed) return <AlwaysPermissionNotice onDismiss={() => setDismissed(true)} />;
   if (backgroundPermissionRevoked) return <BackgroundRevocationBanner />;
   return null;
@@ -296,7 +248,7 @@ function BackgroundRevocationBanner() {
     }
   }, [backgroundPermissionRevoked]);
 
-  if (!backgroundPermissionRevoked || Platform.OS === "web") return null;
+  if (!backgroundPermissionRevoked) return null;
 
   return (
     <View
@@ -394,7 +346,7 @@ function PushTokenRegistrar() {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!user || Platform.OS === "web" || !Notifications) return;
+    if (!user || !Notifications) return;
 
     (async () => {
       try {
@@ -452,7 +404,7 @@ function UpdateNudgeWrapper() {
   const { user } = useAuth();
   const { needsUpdate } = useUpdateCheck();
   const [dismissed, setDismissed] = useState(false);
-  if (Platform.OS === "web" || !user || !needsUpdate || dismissed) return null;
+  if (!user || !needsUpdate || dismissed) return null;
   return <UpdateNudgeModal onDismiss={() => setDismissed(true)} />;
 }
 
@@ -524,9 +476,7 @@ function reportClientError(error: Error, componentStack: string) {
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts(
-    Platform.OS === "web"
-      ? {}
-      : { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold }
+    { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold }
   );
   const [ready, setReady] = useState(false);
 
@@ -555,7 +505,6 @@ export default function RootLayout() {
   }, [fontsLoaded, fontError]);
 
   useEffect(() => {
-    if (Platform.OS === "web") return;
     type ErrorHandler = (error: Error, isFatal?: boolean) => void;
     interface ErrorUtilsType {
       getGlobalHandler: () => ErrorHandler;

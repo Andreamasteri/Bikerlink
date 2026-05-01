@@ -8,7 +8,7 @@ import {
   Alert,
   TextInput,
   Image,
-  Platform,
+
   ActivityIndicator,
 } from "react-native";
 import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
@@ -62,9 +62,7 @@ function Avatar({ url, nickname }: { url: string | null; nickname: string }) {
 export default function AdminBlocks() {
   const t = useT();
   const rawInsets = useSafeAreaInsets();
-  const insets = Platform.OS === "web"
-    ? { top: 67, bottom: 34, left: rawInsets.left, right: rawInsets.right }
-    : rawInsets;
+  const insets = rawInsets;
 
   const [search, setSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -164,7 +162,7 @@ export default function AdminBlocks() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: Platform.OS === "web" ? insets.top : 0 }]}>
+    <View style={[styles.container, { paddingTop: 0 }]}>
       <View style={styles.searchBar}>
         <TextInput
           style={styles.searchInput}

@@ -166,8 +166,8 @@ export default function EventoDetail() {
     await WebBrowser.openBrowserAsync(event.websiteUrl);
   };
 
-  const topInset = Platform.OS === "web" ? 67 : insets.top;
-  const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
+  const topInset = insets.top;
+  const bottomInset = insets.bottom;
 
   if (isLoading) {
     return (

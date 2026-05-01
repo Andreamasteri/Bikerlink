@@ -226,20 +226,11 @@ export default function ChatScreen() {
     if (!showNewChat) return;
     (async () => {
       try {
-        if (Platform.OS === "web") {
-          if (typeof navigator !== "undefined" && navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-              (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-              (err) => console.debug("Geolocation unavailable:", err.message)
-            );
-          }
-        } else {
-          const { status } = await Location.requestForegroundPermissionsAsync();
+        const { status } = await Location.requestForegroundPermissionsAsync();
           if (status === "granted") {
             const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
             setUserLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
           }
-        }
       } catch (err) {
         console.debug("Location fetch error:", err);
       }
@@ -363,12 +354,10 @@ export default function ChatScreen() {
     [userId, handleConversationPress, handleDeleteConversation, t]
   );
 
-  const webTopInset = Platform.OS === "web" ? 67 : 0;
-
   return (
-    <View style={[styles.container, { paddingTop: webTopInset, backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <InlineMiniPlayer />
-      <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 16 : insets.top + 4, backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 4, backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <View style={styles.emailNotifRow}>
           <Ionicons name="mail-outline" size={15} color={colors.textSecondary} style={{ marginRight: 6 }} />
           <Text style={styles.emailNotifLabel}>Invia i messaggi in email quando sono Offline</Text>
@@ -430,7 +419,7 @@ export default function ChatScreen() {
           data={conversations}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={[styles.listContent, { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 84 }]}
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 84 }]}
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -443,7 +432,7 @@ export default function ChatScreen() {
       >
         <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { paddingTop: Platform.OS === "web" ? 24 : insets.top + 12 }]}>
+            <View style={[styles.modalContent, { paddingTop: insets.top + 12 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Nuova conversazione</Text>
               <TouchableOpacity onPress={() => { setShowNewChat(false); setSearchQuery(""); setSortOrder("alpha"); }}>

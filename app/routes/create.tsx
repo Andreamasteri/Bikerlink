@@ -9,7 +9,7 @@ import {
   Modal,
   Alert,
   ActivityIndicator,
-  Platform,
+
   BackHandler,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -187,7 +187,7 @@ export default function CreateRouteScreen() {
   const canSave = title.trim().length > 0 && waypoints.length >= 2;
 
   return (
-    <View style={[styles.container, Platform.OS === "web" && { paddingTop: 67 }]}>
+    <View style={[styles.container]}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}

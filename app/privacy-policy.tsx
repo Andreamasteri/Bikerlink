@@ -6,7 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Platform,
+
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -403,7 +403,7 @@ export default function PrivacyPolicyScreen() {
       : localizedDefault;
 
   return (
-    <View style={[styles.container, { paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
@@ -421,7 +421,7 @@ export default function PrivacyPolicyScreen() {
           style={styles.scrollView}
           contentContainerStyle={[
             styles.contentContainer,
-            { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 20 },
+            { paddingBottom: insets.bottom + 20 },
           ]}
           showsVerticalScrollIndicator={false}
         >

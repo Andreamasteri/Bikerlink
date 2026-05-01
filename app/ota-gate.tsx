@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, Animated, Platform } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, Animated } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
@@ -41,7 +41,7 @@ export default function OtaGateScreen() {
     // immediatamente con phase "skipped" e l'emit avviene tipicamente prima
     // che questa schermata sia montata. Per non far attendere l'utente i
     // 15s del safety timeout, navighiamo subito.
-    if (__DEV__ || Platform.OS === "web") {
+    if (__DEV__) {
       navigate();
       return;
     }
@@ -79,8 +79,8 @@ export default function OtaGateScreen() {
     return () => pulse.stop();
   }, []);
 
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const botPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const topPad = insets.top;
+  const botPad = insets.bottom;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: topPad, paddingBottom: botPad }]}>

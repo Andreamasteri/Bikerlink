@@ -6,7 +6,7 @@ import {
   FlatList,
   Pressable,
   ActivityIndicator,
-  Platform,
+
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -58,7 +58,7 @@ export default function UserPublicRoutesScreen() {
     });
   };
 
-  const webTopInset = Platform.OS === "web" ? 67 : 0;
+  const webTopInset = 0;
 
   return (
     <>

@@ -10,7 +10,7 @@ import {
   Image,
   ActivityIndicator,
   Dimensions,
-  Platform,
+
   Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -357,7 +357,7 @@ export default function ArcadeScreen() {
       >
         <View style={{ flex: 1, backgroundColor: Colors.background }}>
           {activeGameInfo && (
-            <View style={[styles.gameHeader, { paddingTop: Platform.OS === "web" ? 67 + 8 : insets.top + 8 }]}>
+            <View style={[styles.gameHeader, { paddingTop: insets.top + 8 }]}>
               <Pressable onPress={handleExitGame} style={styles.backBtn}>
                 <Ionicons name="arrow-back" size={22} color="#fff" />
               </Pressable>
@@ -391,7 +391,7 @@ export default function ArcadeScreen() {
         </View>
       </Modal>
 
-      <View style={[styles.container, { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom }]}>
+      <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <View style={styles.tabSwitcher}>
         {([["games", "🕹️ Giochi"], ["leaderboard", "🏅 Classifiche"], ["hof", "🏆 Hall of Fame"]] as const).map(([key, label]) => (
           <Pressable

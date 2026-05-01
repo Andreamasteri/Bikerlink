@@ -5,7 +5,7 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  Platform,
+
   Alert,
   ActivityIndicator,
   Switch,
@@ -127,17 +127,7 @@ export default function CreateProposalScreen() {
   const fetchLiveLocation = useCallback(async () => {
     setGpsLoading(true);
     try {
-      if (Platform.OS === "web") {
-        if (navigator.geolocation) {
-          const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
-          );
-          setDepartureLat(pos.coords.latitude);
-          setDepartureLng(pos.coords.longitude);
-          setGpsSource("live");
-        }
-      } else {
-        const { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
           Alert.alert(t("proposals.create.permDenied"), t("proposals.create.enableLocation"));
           return;
@@ -146,7 +136,6 @@ export default function CreateProposalScreen() {
         setDepartureLat(loc.coords.latitude);
         setDepartureLng(loc.coords.longitude);
         setGpsSource("live");
-      }
     } catch {
       Alert.alert(t("proposals.create.gpsError"), t("proposals.create.gpsErrorDesc"));
     } finally {
@@ -358,7 +347,7 @@ export default function CreateProposalScreen() {
     createMutation.mutate(data);
   };
 
-  const webTopInset = Platform.OS === "web" ? 67 : 0;
+  const webTopInset = 0;
 
   return (
     <>
@@ -871,7 +860,7 @@ export default function CreateProposalScreen() {
           </>
         )}
 
-        <View style={{ height: Platform.OS === "web" ? 34 : 40 }} />
+        <View style={{ height: 40 }} />
       </KeyboardAwareScrollViewCompat>
 
       {showMapPicker && (

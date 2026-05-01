@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  Platform,
+
   TouchableOpacity,
   ScrollView,
   Image,
@@ -176,13 +176,7 @@ export default function ProfileScreen() {
       const ext = /\.(\w+)$/.exec(filename);
       const mimeType = ext ? `image/${ext[1]}` : "image/jpeg";
 
-      if (Platform.OS === "web") {
-        const response = await globalThis.fetch(uri);
-        const blob = await response.blob();
-        formData.append("photo", blob, filename);
-      } else {
-        formData.append("photo", { uri, name: filename, type: mimeType } as any);
-      }
+      formData.append("photo", { uri, name: filename, type: mimeType } as any);
 
       const baseUrl = getApiUrl();
       const url = new URL("/api/users/me/photos", baseUrl);
@@ -294,7 +288,6 @@ export default function ProfileScreen() {
 
   const repushLocationForPrivacy = useCallback(async () => {
     try {
-      if (Platform.OS === "web") return;
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") return;
       const loc =
@@ -383,30 +376,17 @@ export default function ProfileScreen() {
         Alert.alert(t("common.error"), t("profile.cacheError"));
       }
     };
-    if (Platform.OS === "web") {
-      if (typeof window !== "undefined") {
-        try { window.localStorage.clear(); } catch {}
-        try { window.sessionStorage.clear(); } catch {}
-      }
-      queryClient.clear();
-      Alert.alert(t("profile.cacheClearedTitle"), t("profile.cacheClearedMsgWeb"));
-    } else {
-      Alert.alert(t("profile.clearCacheTitle"), t("profile.clearCacheMsg"), [
-        { text: t("common.cancel"), style: "cancel" },
-        { text: t("profile.clearCacheConfirm"), style: "destructive", onPress: doClear },
-      ]);
-    }
+    Alert.alert(t("profile.clearCacheTitle"), t("profile.clearCacheMsg"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("profile.clearCacheConfirm"), style: "destructive", onPress: doClear },
+    ]);
   }, []);
 
   const handleDownloadManual = useCallback(async () => {
     if (isDownloadingManual) return;
     setIsDownloadingManual(true);
     try {
-      if (Platform.OS === "web") {
-        const url = new URL("/api/manual/download", getApiUrl()).toString();
-        Linking.openURL(url);
-      } else {
-        const url = new URL("/api/manual/download", getApiUrl()).toString();
+      const url = new URL("/api/manual/download", getApiUrl()).toString();
         const fileUri = (FileSystem.cacheDirectory || FileSystem.documentDirectory) + "BikerLink-Manual.pdf";
         const result = await FileSystem.downloadAsync(url, fileUri);
         if (result.status === 200) {
@@ -419,7 +399,6 @@ export default function ProfileScreen() {
         } else {
           Alert.alert(t("common.error"), t("profile.downloadFailed"));
         }
-      }
     } catch (e) {
       console.error("Manual download error:", e);
       Alert.alert("Errore", "Impossibile scaricare il manuale. Controlla la connessione.");
@@ -432,11 +411,7 @@ export default function ProfileScreen() {
     if (isDownloadingEula) return;
     setIsDownloadingEula(true);
     try {
-      if (Platform.OS === "web") {
-        const url = new URL("/api/eula/download", getApiUrl()).toString();
-        Linking.openURL(url);
-      } else {
-        const url = new URL("/api/eula/download", getApiUrl()).toString();
+      const url = new URL("/api/eula/download", getApiUrl()).toString();
         const fileUri = (FileSystem.cacheDirectory || FileSystem.documentDirectory) + "BikerLink-EULA.pdf";
         const result = await FileSystem.downloadAsync(url, fileUri);
         if (result.status === 200) {
@@ -451,7 +426,6 @@ export default function ProfileScreen() {
         } else {
           Alert.alert(t("common.error"), t("profile.downloadFailed"));
         }
-      }
     } catch (e) {
       console.error("EULA download error:", e);
       Alert.alert("Errore", t("profile.eulaNotAvailable"));
@@ -464,11 +438,7 @@ export default function ProfileScreen() {
     if (isDownloadingPrivacy) return;
     setIsDownloadingPrivacy(true);
     try {
-      if (Platform.OS === "web") {
-        const url = new URL("/api/privacy-policy/download", getApiUrl()).toString();
-        Linking.openURL(url);
-      } else {
-        const url = new URL("/api/privacy-policy/download", getApiUrl()).toString();
+      const url = new URL("/api/privacy-policy/download", getApiUrl()).toString();
         const fileUri = (FileSystem.cacheDirectory || FileSystem.documentDirectory) + "BikerLink-PrivacyPolicy.pdf";
         const result = await FileSystem.downloadAsync(url, fileUri);
         if (result.status === 200) {
@@ -483,7 +453,6 @@ export default function ProfileScreen() {
         } else {
           Alert.alert(t("common.error"), t("profile.downloadFailed"));
         }
-      }
     } catch (e) {
       console.error("Privacy Policy download error:", e);
       Alert.alert("Errore", t("profile.privacyNotAvailable"));
@@ -496,11 +465,7 @@ export default function ProfileScreen() {
     if (isExportingData) return;
     setIsExportingData(true);
     try {
-      if (Platform.OS === "web") {
-        const url = new URL("/api/user/export-data", getApiUrl()).toString();
-        Linking.openURL(url);
-      } else {
-        const url = new URL("/api/user/export-data", getApiUrl()).toString();
+      const url = new URL("/api/user/export-data", getApiUrl()).toString();
         const response = await globalThis.fetch(url, { credentials: "include" });
         if (!response.ok) {
           Alert.alert("Errore", t("profile.exportDataError"));
@@ -517,7 +482,6 @@ export default function ProfileScreen() {
         } else {
           Alert.alert("Export", t("profile.exportUserData") + " ✓");
         }
-      }
     } catch (e) {
       console.error("User data export error:", e);
       Alert.alert("Errore", t("profile.exportDataError"));
@@ -527,18 +491,14 @@ export default function ProfileScreen() {
   }, [isExportingData, t, profile?.nickname]);
 
   const handleLogout = useCallback(() => {
-    if (Platform.OS === "web") {
-      setShowLogoutModal(true);
-    } else {
-      Alert.alert(t("profile.logoutConfirmTitle"), t("profile.logoutConfirmDesc"), [
-        { text: t("common.cancel"), style: "cancel" },
-        {
-          text: t("profile.logout"),
-          style: "destructive",
-          onPress: doLogout,
-        },
-      ]);
-    }
+    Alert.alert(t("profile.logoutConfirmTitle"), t("profile.logoutConfirmDesc"), [
+      { text: t("common.cancel"), style: "cancel" },
+      {
+        text: t("profile.logout"),
+        style: "destructive",
+        onPress: doLogout,
+      },
+    ]);
   }, []);
 
   const avatarSource = profile?.avatarUrl
@@ -611,14 +571,14 @@ export default function ProfileScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: Platform.OS === "web" ? 67 : 0 }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <InlineMiniPlayer />
       <ScrollView
         style={[
           styles.container,
           { backgroundColor: colors.background },
         ]}
-        contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -982,7 +942,7 @@ export default function ProfileScreen() {
                   <Ionicons name="locate" size={15} color={Colors.text} />
                   <Text style={styles.fakeHomeBtnLabel}>GPS</Text>
                 </Pressable>
-                {Platform.OS !== "web" && (
+                {(
                   <Pressable
                     style={styles.fakeHomeBtn}
                     onPress={() => openMapPicker("home")}
@@ -1009,7 +969,7 @@ export default function ProfileScreen() {
                   <Ionicons name="locate" size={15} color={Colors.text} />
                   <Text style={styles.fakeHomeBtnLabel}>GPS</Text>
                 </Pressable>
-                {Platform.OS !== "web" && (
+                {(
                   <Pressable
                     style={styles.fakeHomeBtn}
                     onPress={() => openMapPicker("fake")}

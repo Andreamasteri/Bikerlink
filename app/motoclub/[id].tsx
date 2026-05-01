@@ -6,7 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Platform,
+
   Modal,
   TextInput,
   Alert,
@@ -246,7 +246,7 @@ export default function ClubDetailScreen() {
   }
 
   const resolvedConvId = conversationId ?? club?.conversationId ?? null;
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const topPad = insets.top;
 
   function handleBack() {
     router.back();

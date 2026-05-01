@@ -6,7 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Platform,
+
   Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
@@ -142,7 +142,7 @@ export default function ProposalDetailScreen() {
       })
     : null;
 
-  const webTopInset = Platform.OS === "web" ? 67 : 0;
+  const webTopInset = 0;
 
   if (isLoading) {
     return (
@@ -196,7 +196,7 @@ export default function ProposalDetailScreen() {
         style={[styles.container, { paddingTop: webTopInset }]}
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: Platform.OS === "web" ? 34 : 40 },
+          { paddingBottom: 40 },
         ]}
       >
         <View style={[styles.typeBanner, { backgroundColor: typeInfo.color + "15" }]}>
@@ -348,12 +348,7 @@ export default function ProposalDetailScreen() {
                   Alert.alert(t("common.error"), e.message || t("proposals.detail.cannotDelete"));
                 }
               };
-              if (Platform.OS === "web") {
-                if (window.confirm(t("proposals.detail.deleteConfirm"))) {
-                  await doDelete();
-                }
-              } else {
-                Alert.alert(
+              Alert.alert(
                   t("proposals.detail.deleteProposal"),
                   t("proposals.detail.deleteConfirm"),
                   [

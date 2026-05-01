@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Platform } from "react-native";
 import Constants from "expo-constants";
 import { getApiUrl } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
@@ -20,7 +19,7 @@ export function useUpdateCheck(): { needsUpdate: boolean } {
   const [needsUpdate, setNeedsUpdate] = useState(false);
 
   useEffect(() => {
-    if (!user || Platform.OS === "web") return;
+    if (!user) return;
 
     let cancelled = false;
 
