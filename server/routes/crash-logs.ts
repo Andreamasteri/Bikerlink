@@ -96,6 +96,65 @@ publicRouter.post("/", (req: Request, res: Response): void => {
 
 export const adminRouter = Router();
 
+adminRouter.get("/stats", requireAdmin, (_req: Request, res: Response): void => {
+  Promise.all([
+    // 1. Total by crash type
+    db.execute(sql`
+      SELECT crash_type, COUNT(*)::int AS cnt
+      FROM app_crash_logs
+      WHERE crash_type IN ('crash_system','crash_js')
+      GROUP BY crash_type
+    `),
+    // 2. Top-3 app versions with per-type breakdown
+    db.execute(sql`
+      WITH ranked AS (
+        SELECT DISTINCT app_version,
+          ROW_NUMBER() OVER (ORDER BY app_version DESC NULLS LAST) AS rn
+        FROM app_crash_logs
+        WHERE crash_type IN ('crash_system','crash_js') AND app_version IS NOT NULL
+      )
+      SELECT
+        r.app_version AS version,
+        SUM(CASE WHEN acl.crash_type = 'crash_system' THEN 1 ELSE 0 END)::int AS crash_system,
+        SUM(CASE WHEN acl.crash_type = 'crash_js'     THEN 1 ELSE 0 END)::int AS crash_js,
+        COUNT(*)::int AS total
+      FROM ranked r
+      JOIN app_crash_logs acl ON acl.app_version = r.app_version
+        AND acl.crash_type IN ('crash_system','crash_js')
+      WHERE r.rn <= 3
+      GROUP BY r.app_version
+      ORDER BY r.app_version DESC
+    `),
+    // 3. Daily trend — last 14 days
+    db.execute(sql`
+      SELECT
+        TO_CHAR(reported_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day,
+        SUM(CASE WHEN crash_type = 'crash_system' THEN 1 ELSE 0 END)::int AS crash_system,
+        SUM(CASE WHEN crash_type = 'crash_js'     THEN 1 ELSE 0 END)::int AS crash_js
+      FROM app_crash_logs
+      WHERE crash_type IN ('crash_system','crash_js')
+        AND reported_at >= NOW() - INTERVAL '14 days'
+      GROUP BY day
+      ORDER BY day ASC
+    `),
+  ])
+    .then(([typeRows, versionRows, trendRows]) => {
+      const byType: Record<string, number> = { crash_system: 0, crash_js: 0 };
+      for (const row of typeRows.rows as { crash_type: string; cnt: number }[]) {
+        byType[row.crash_type] = row.cnt;
+      }
+      res.json({
+        byType,
+        byVersion: versionRows.rows as { version: string; crash_system: number; crash_js: number; total: number }[],
+        dailyTrend: trendRows.rows as { day: string; crash_system: number; crash_js: number }[],
+      });
+    })
+    .catch((err) => {
+      console.error("[crash-logs stats] query error:", err);
+      res.status(500).json({ message: "Errore interno" });
+    });
+});
+
 adminRouter.get("/", requireAdmin, (req: Request, res: Response): void => {
   const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10));
   const limit = Math.min(50, Math.max(1, parseInt(String(req.query.limit ?? "20"), 10)));
