@@ -772,7 +772,7 @@ const en: Record<string, string> = {
   "ota.checkingUpdates": "Checking updates...",
   "ota.updating": "Updating...",
   "profile.selectRegion": "Select region",
-  "routes.noStops": "No stops added.\nTap "Add" to select a point on the map.",
+  "routes.noStops": "No stops added.\nTap \"Add\" to select a point on the map.",
   "routes.deleteConfirm": "Delete this route?",
   "profile.loadError": "Error",
   "motoclub.createError": "Error",
@@ -781,7 +781,7 @@ const en: Record<string, string> = {
   "admin.backupMediaError": "Backup media error",
   "admin.genericError": "Error",
   "profile.wishlistReminder": "Hey, remember to share your motorcycle wishlist! You'll find it under User Profile, at the bottom right",
-  "admin.deleteCampaignsConfirm": "Delete all {count} campaigns visible in the "{tab}" tab? This operation is irreversible.",
+  "admin.deleteCampaignsConfirm": "Delete all {count} campaigns visible in the \"{tab}\" tab? This operation is irreversible.",
   "admin.deleteCampaignsBtn": "Delete {count}",
   "arcade.eliminaGlialieni": "Eliminate the aliens!",
   "admin.chooseImages": "Choose images",
@@ -873,6 +873,9 @@ const en: Record<string, string> = {
   "common.siCapital": "Yes",
   "common.noCapital": "No",
   "admin.ghostModeLabel": "Ghost mode on app exit",
+  "routes.stopType": "Stop",
+  "routes.poiType": "Point of Interest",
+  "routes.endType": "Arrival",
 };
 
 export default en;

@@ -207,6 +207,7 @@ const GAME_INFO: Record<string, { title: string; emoji: string; scoreLabel: stri
 const ARCADE_GAME_IDS = Object.keys(GAME_INFO) as Array<keyof typeof GAME_INFO>;
 
 function ArcadeChampionsSection() {
+  const t = useT();
   const router = useRouter();
   const { data: hofData } = useQuery<Record<string, {
     game: string; userId: string; nickname: string; avatarUrl: string | null; score: number; date: string;

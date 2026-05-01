@@ -247,6 +247,7 @@ function LiveTableSection({ restartStatus, restartResult, onRestartPress }: {
   restartResult: string;
   onRestartPress: () => void;
 }) {
+  const t = useT();
   const [activeLangs, setActiveLangs] = useState<Set<string>>(new Set(["en", "de", "es", "fr", "el", "tr"]));
   const [tableData, setTableData] = useState<TableRow[]>([]);
   const [loadingTable, setLoadingTable] = useState(false);

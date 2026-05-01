@@ -825,6 +825,9 @@ const fr: Record<string, string> = {
   "common.siCapital": "",
   "common.noCapital": "",
   "admin.ghostModeLabel": "",
+  "routes.stopType": "",
+  "routes.poiType": "",
+  "routes.endType": "",
 };
 
 export default fr;

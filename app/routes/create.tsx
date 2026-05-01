@@ -20,12 +20,13 @@ import { apiRequest, queryClient } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import MapPickerContent from "@/components/MapPickerModal";
 import { useT } from "@/lib/language-context";
+import { t as tStatic } from "@/lib/i18n";
 
 const WAYPOINT_TYPES = [
-  { value: "start", label: t("routes.start"), icon: "flag" as const, color: "#4CAF50" },
-  { value: "stop", label: "Sosta", icon: "pause-circle" as const, color: "#FF9800" },
-  { value: "poi", label: "Punto di Interesse", icon: "star" as const, color: "#2196F3" },
-  { value: "end", label: "Arrivo", icon: "flag-checkered" as const, color: "#E63946" },
+  { value: "start", label: tStatic("routes.start"), icon: "flag" as const, color: "#4CAF50" },
+  { value: "stop", label: tStatic("routes.stopType"), icon: "pause-circle" as const, color: "#FF9800" },
+  { value: "poi", label: tStatic("routes.poiType"), icon: "star" as const, color: "#2196F3" },
+  { value: "end", label: tStatic("routes.endType"), icon: "flag-checkered" as const, color: "#E63946" },
 ];
 
 interface LocalWaypoint {

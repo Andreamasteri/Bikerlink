@@ -772,7 +772,7 @@ const it: Record<string, string> = {
   "ota.checkingUpdates": "Controllo aggiornamenti...",
   "ota.updating": "Aggiornamento in corso...",
   "profile.selectRegion": "Seleziona regione",
-  "routes.noStops": "Nessuna tappa aggiunta.\nTocca "Aggiungi" per selezionare un punto sulla mappa.",
+  "routes.noStops": "Nessuna tappa aggiunta.\nTocca \"Aggiungi\" per selezionare un punto sulla mappa.",
   "routes.deleteConfirm": "Eliminare questo percorso?",
   "profile.loadError": "Errore",
   "motoclub.createError": "Errore",
@@ -781,7 +781,7 @@ const it: Record<string, string> = {
   "admin.backupMediaError": "Errore backup media",
   "admin.genericError": "Errore",
   "profile.wishlistReminder": "Ehi, ricordati di condividere la tua lista dei desideri motociclistica! La trovi sotto Profilo Utente, in fondo a destra",
-  "admin.deleteCampaignsConfirm": "Eliminare tutte le {count} campagne visibili nel tab "{tab}"? L'operazione è irreversibile.",
+  "admin.deleteCampaignsConfirm": "Eliminare tutte le {count} campagne visibili nel tab \"{tab}\"? L'operazione è irreversibile.",
   "admin.deleteCampaignsBtn": "Elimina {count}",
   "arcade.eliminaGlialieni": "Elimina gli alieni!",
   "admin.chooseImages": "Scegli immagini",
@@ -873,6 +873,9 @@ const it: Record<string, string> = {
   "common.siCapital": "Sì",
   "common.noCapital": "No",
   "admin.ghostModeLabel": "Ghost mode all'uscita app",
+  "routes.stopType": "Sosta",
+  "routes.poiType": "Punto di Interesse",
+  "routes.endType": "Arrivo",
 };
 
 export default it;

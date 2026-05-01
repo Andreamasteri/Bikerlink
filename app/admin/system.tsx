@@ -30,6 +30,7 @@ import {
 import { runManualOtaCheck } from "@/lib/ota-check";
 import * as Clipboard from "expo-clipboard";
 import { useT } from "@/lib/language-context";
+import { t as tStatic } from "@/lib/i18n";
 
 // ── Module-scope per garantire identità stabile della classe tra i render.
 // Dichiarare AdminFetchError dentro il componente farebbe sì che `instanceof`
@@ -187,7 +188,7 @@ function eventLabel(type: string): string {
     case "COLD_START": return "Avvio Freddo";
     case "METRO_UP": return "Frontend Online";
     case "METRO_DOWN": return "Frontend Offline";
-    case "OTA_PUBLISHED": return t("admin.otaUpdate");
+    case "OTA_PUBLISHED": return tStatic("admin.otaUpdate");
     default: return "Evento generico";
   }
 }
@@ -226,7 +227,7 @@ function platformLabel(p: string): string {
 function outcomeMeta(o: UpdateOutcome): { label: string; color: string; icon: keyof typeof Ionicons.glyphMap } {
   if (o === "force") return { label: "Force update richiesto", color: "#FF4444", icon: "alert-circle" };
   if (o === "soft") return { label: "Soft update disponibile", color: "#FFAA00", icon: "arrow-up-circle" };
-  return { label: t("admin.noUpdate"), color: "#44AA44", icon: "checkmark-circle" };
+  return { label: tStatic("admin.noUpdate"), color: "#44AA44", icon: "checkmark-circle" };
 }
 
 export default function SystemScreen() {

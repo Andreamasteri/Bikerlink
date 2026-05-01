@@ -9,6 +9,7 @@ import * as DocumentPicker from "expo-document-picker";
 import Colors from "@/constants/colors";
 import { THEMES, THEME_META, ThemeName } from "@/constants/colors";
 import { useTheme } from "@/lib/theme-context";
+import { useT } from "@/lib/language-context";
 import { getApiUrl, queryClient, apiRequest } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -27,6 +28,7 @@ const defaultSettings = [
 ];
 
 function ManualAdminSection() {
+  const t = useT();
   const [uploading, setUploading] = useState(false);
 
   const { data: manualInfo, refetch } = useQuery<{
@@ -187,6 +189,7 @@ function PdfDocumentAdminSection({
   downloadEndpoint: string;
   uploadEndpoint: string;
 }) {
+  const t = useT();
   const [uploading, setUploading] = useState(false);
 
   const { data: fileInfo, refetch } = useQuery<{
@@ -314,6 +317,7 @@ function formatRelative(iso: string | null): string {
 }
 
 function EmailStatusCard() {
+  const t = useT();
   const [testing, setTesting] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; messageId?: string; errorCode?: string; error?: string; smtpResponse?: string } | null>(null);
