@@ -2359,6 +2359,32 @@ router.post("/advertisements/image-health/check", async (_req: Request, res: Res
   return res.json({ message: "Controllo avviato", isRunning: true });
 });
 
+router.get("/advertisements/cache-stats", async (_req: Request, res: Response) => {
+  try {
+    let count = 0;
+    let totalBytes = 0;
+    if (fs.existsSync(adsDir)) {
+      const files = fs.readdirSync(adsDir);
+      for (const file of files) {
+        const filePath = path.join(adsDir, file);
+        try {
+          const stat = fs.statSync(filePath);
+          if (stat.isFile()) {
+            count++;
+            totalBytes += stat.size;
+          }
+        } catch {
+          // skip unreadable files
+        }
+      }
+    }
+    return res.json({ count, totalBytes });
+  } catch (error) {
+    console.error("cache-stats error:", error);
+    return res.status(500).json({ error: "Errore lettura cache" });
+  }
+});
+
 const eulaUpload = multer({
   dest: path.join(process.cwd(), "uploads", "tmp"),
   limits: { fileSize: 1 * 1024 * 1024 },

@@ -212,6 +212,12 @@ function GroupHeader({
   );
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default function AdminAds() {
   const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);
@@ -254,6 +260,11 @@ export default function AdminAds() {
   const { data: imageHealth } = useQuery<ImageHealthData>({
     queryKey: ["/api/admin/advertisements/image-health"],
     refetchInterval: 60_000,
+  });
+
+  const { data: cacheStats } = useQuery<{ count: number; totalBytes: number }>({
+    queryKey: ["/api/admin/advertisements/cache-stats"],
+    staleTime: 60_000,
   });
 
   const [healthBannerDismissed, setHealthBannerDismissed] = useState(false);
@@ -723,6 +734,11 @@ export default function AdminAds() {
           ) : imageHealth?.isRunning ? (
             <Text style={styles.checkedAtText}>Verifica in corso…</Text>
           ) : null}
+          {cacheStats != null && (
+            <Text style={styles.checkedAtText}>
+              Cache: {cacheStats.count} {cacheStats.count === 1 ? "immagine" : "immagini"} · {formatBytes(cacheStats.totalBytes)}
+            </Text>
+          )}
         </View>
         <View style={styles.toolbarActions}>
           <TouchableOpacity
