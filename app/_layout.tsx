@@ -349,6 +349,10 @@ function OtaStartupChecker() {
 }
 
 function navigateFromNotifData(data: { type?: string; unreadChat?: number } | undefined, router: ReturnType<typeof useRouter>) {
+  if (data?.type === "match") {
+    router.push("/(tabs)/match");
+    return;
+  }
   if (data?.type !== "background_badge") return;
   if ((data?.unreadChat ?? 0) > 0) {
     router.push("/(tabs)/chat");
@@ -382,6 +386,34 @@ function BackgroundNotificationHandler() {
     } catch {}
     return () => { sub?.remove(); };
   }, [router]);
+
+  return null;
+}
+
+function PushTokenRegistrar() {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user || Platform.OS === "web" || !Notifications) return;
+
+    (async () => {
+      try {
+        const { status: existing } = await Notifications.getPermissionsAsync();
+        let finalStatus = existing;
+        if (existing !== "granted") {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+        if (finalStatus !== "granted") return;
+
+        const tokenData = await Notifications.getExpoPushTokenAsync();
+        const token = tokenData.data;
+        if (!token) return;
+
+        await apiRequest("PUT", "/api/users/me/push-token", { token });
+      } catch {}
+    })();
+  }, [user?.id]);
 
   return null;
 }
@@ -566,6 +598,7 @@ export default function RootLayout() {
                     <GpsAlwaysGateWrapper />
                     <AdminUptimeOverlay />
                     <BackgroundNotificationHandler />
+                    <PushTokenRegistrar />
                     <LanguageKeyedRoot />
                     <MatchPopupAlert />
                     <UpdateNudgeWrapper />

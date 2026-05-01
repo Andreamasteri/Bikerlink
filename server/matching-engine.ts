@@ -2,6 +2,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { motoClubMembers, type Proposal } from "@shared/schema";
 import { and, eq, inArray } from "drizzle-orm";
+import { sendMatchPushNotifications } from "./push-notifications";
 
 /**
  * Task #1124 vuln 2: club-boundary enforcement for proposal matching.
@@ -204,6 +205,7 @@ async function runMatching(): Promise<number> {
         } catch (notifErr) {
           console.error("[ProposalMatching] Error sending match notifications:", notifErr);
         }
+        sendMatchPushNotifications([p1.userId, p2.userId]);
       }
     }
 
@@ -407,8 +409,10 @@ export async function runBikerBikerMatching(): Promise<number> {
             status: "new",
             isSupermatch,
           });
-          if (inserted) { matchCount++; bucketCount++; }
-          else skipCount++;
+          if (inserted) {
+            matchCount++; bucketCount++;
+            sendMatchPushNotifications([idA, idB]);
+          } else skipCount++;
         }
       }
     }
@@ -486,7 +490,10 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
             status: "new",
             isSupermatch,
           });
-          if (inserted) bikerBikerCount++;
+          if (inserted) {
+            bikerBikerCount++;
+            sendMatchPushNotifications([idA, idB]);
+          }
         }
       }
       console.log(`[MatchingForUser] biker-biker per ${userId}: ${bikerBikerCount} nuovi match`);
@@ -532,8 +539,10 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
             status: "new",
             isSupermatch,
           });
-          if (inserted) { existingKeys.add(key); zavarrinaCount++; }
-          else existingKeys.add(key);
+          if (inserted) {
+            existingKeys.add(key); zavarrinaCount++;
+            sendMatchPushNotifications([userId, wm.userId]);
+          } else existingKeys.add(key);
         }
       }
     }
@@ -578,8 +587,10 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
               status: "new",
               isSupermatch,
             });
-            if (inserted2) { existingKeys.add(key); zavarrinaCount++; }
-            else existingKeys.add(key);
+            if (inserted2) {
+              existingKeys.add(key); zavarrinaCount++;
+              sendMatchPushNotifications([bm.userId, userId]);
+            } else existingKeys.add(key);
           }
         }
       }
@@ -656,6 +667,7 @@ export async function runProposalMatchingForUser(userId: string): Promise<number
         } catch (notifErr) {
           console.error("[ProposalMatchingForUser] Error sending match notifications:", notifErr);
         }
+        sendMatchPushNotifications([p1.userId, p2.userId]);
       }
     }
 

@@ -337,6 +337,21 @@ router.post("/app-close", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+router.put("/me/push-token", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const { token } = req.body as { token?: string };
+    if (!token || typeof token !== "string" || !token.startsWith("ExponentPushToken[")) {
+      return res.status(400).json({ message: "Token Expo push non valido" });
+    }
+    await storage.updateUser(userId, { expoPushToken: token } as any);
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("Push token update error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/me/ghost-mode", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;

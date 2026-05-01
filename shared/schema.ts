@@ -52,6 +52,7 @@ export const users = pgTable("users", {
   lastAppVersion: varchar("last_app_version", { length: 32 }),
   lastOtaNumber: integer("last_ota_number"),
   lastPlatform: varchar("last_platform", { length: 16 }),
+  expoPushToken: text("expo_push_token"),
   firstLoginAt: timestamp("first_login_at"),
   firstLoginLat: doublePrecision("first_login_lat"),
   firstLoginLng: doublePrecision("first_login_lng"),

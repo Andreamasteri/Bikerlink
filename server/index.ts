@@ -1128,6 +1128,13 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] sprint_results table:", e);
         }
 
+        try {
+          await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS expo_push_token TEXT`);
+          console.log("[MIGRATION] users.expo_push_token ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] users.expo_push_token:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 
