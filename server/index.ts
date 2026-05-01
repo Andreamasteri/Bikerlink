@@ -1087,6 +1087,13 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] autovacuum tuning:", e);
         }
 
+        try {
+          await db.execute(sql`DELETE FROM app_settings WHERE key = 'default_taskbar_style'`);
+          console.log("[MIGRATION] Removed stale default_taskbar_style rows from app_settings");
+        } catch (e) {
+          console.warn("[MIGRATION] default_taskbar_style cleanup:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 
