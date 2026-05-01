@@ -37,7 +37,7 @@ backend custom `https://biker-link.replit.app/api/expo-updates` (Expo Updates Pr
 - **Runtime Version**: `8.0.0` (ciclo corrente, APK v44) ← CICLO V3
 - **APK corrente**: versionCode **44**, versionName **3.3.0** (buildId: `b148edc3-de25-4f55-b5c4-c4466b4ccc0b`, APK: https://expo.dev/artifacts/eas/nTJjWowt3HRSs7BqRvdCRi.apk — STABILE, baseline pulita per device piantati su OTA-19)
 - **APK precedente (STABILE distribuita)**: versionCode 43, versionName 3.2.0 (buildId: `38cb1b32-4316-4f63-9799-1b9ab36888e8`, APK: https://expo.dev/artifacts/eas/81L2RgW8kFuzUiRzACfAEm.apk)
-- **OTA corrente**: OTA-24 (releaseId: `c304597b-ff8a-4f56-b534-21c05e47c631`)
+- **OTA corrente**: OTA-25 (releaseId: `501f77ef-755f-482d-be35-7ad55213be57`)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates`
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
@@ -219,7 +219,7 @@ Tutte e tre le risposte devono contenere `expo-protocol-version: 0`. Se manca su
 - Ciclo 5.x: OTA 41 (rv 5.0.0) — DEPRECATO
 - Ciclo 6.x: OTA 42–43 (rv 6.0.0) — OBSOLETO
 - Ciclo 7.x: OTA 44–156 (rv 7.0.0) — CHIUSO
-- **Ciclo 8.x: OTA 1–24 (rv 8.0.0) ← CORRENTE (V3)**
+- **Ciclo 8.x: OTA 1–25 (rv 8.0.0) ← CORRENTE (V3)**
   - APK v41: STABILE — buildId: e03f51d8, APK: https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk
   - APK v43 (3.2.0): STABILE — buildId: 38cb1b32-4316-4f63-9799-1b9ab36888e8, APK: https://expo.dev/artifacts/eas/81L2RgW8kFuzUiRzACfAEm.apk
   - APK v44 (3.3.0): STABILE — buildId: b148edc3-de25-4f55-b5c4-c4466b4ccc0b, APK: https://expo.dev/artifacts/eas/nTJjWowt3HRSs7BqRvdCRi.apk (baseline pulita per device piantati su OTA-19 — Task #1151)
