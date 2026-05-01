@@ -257,6 +257,27 @@ function SensorBody({ def }: { def: SensorDefinition }) {
       return;
     }
 
+    if (def.key === "pedometer" && Platform.OS !== "web") {
+      addLog("info", "Richiesta permesso Motion Access (iOS/Android)…");
+      try {
+        const { status } = await Pedometer.requestPermissionsAsync();
+        if (status !== "granted") {
+          addLog(
+            "error",
+            "Permesso Motion Access negato. Vai in Impostazioni → Privacy → Movimento e fitness e abilita BikerLink."
+          );
+          setIsStarting(false);
+          return;
+        }
+        addLog("success", "Permesso Motion Access concesso");
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        addLog("error", `Errore richiesta permesso: ${msg}`);
+        setIsStarting(false);
+        return;
+      }
+    }
+
     try {
       const sub = startSensorSub(def.key, cfg, (formatted) => setLiveData(formatted));
       if (!sub) {

@@ -23,6 +23,7 @@
         "NSPhotoLibraryUsageDescription": "BikerLink accede alle tue foto per caricare immagini del profilo e delle moto.",
         "NSPhotoLibraryAddUsageDescription": "BikerLink salva le foto scattate nella tua libreria fotografica.",
         "NSCameraUsageDescription": "BikerLink accede alla fotocamera per scattare foto del profilo e delle moto.",
+        "NSMotionUsageDescription": "BikerLink accede al sensore di movimento per rilevare i passi tramite il pedometro nel pannello diagnostica sensori.",
         "UIBackgroundModes": [
           "location",
           "audio"
