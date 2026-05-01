@@ -193,6 +193,7 @@ function GroupHeader({
   onEdit: () => void;
 }) {
   const dotColor = allActive ? Colors.success : someActive ? Colors.warning : Colors.error;
+  const statusLabel = allActive ? "Attivo" : someActive ? "Parziale" : "In pausa";
   return (
     <View style={styles.groupSectionHeader}>
       <TouchableOpacity style={styles.groupSectionLeft} onPress={onToggleCollapse} activeOpacity={0.7}>
@@ -204,6 +205,9 @@ function GroupHeader({
         <View style={[styles.groupSectionDot, { backgroundColor: dotColor }]} />
         <Text style={styles.groupSectionName} numberOfLines={1}>{baseName}</Text>
         <Text style={styles.groupSectionCount}> · {count} immagini</Text>
+        <View style={[styles.groupStatusBadge, { backgroundColor: dotColor + "22" }]}>
+          <Text style={[styles.groupStatusText, { color: dotColor }]}>{statusLabel}</Text>
+        </View>
       </TouchableOpacity>
       <TouchableOpacity style={styles.groupSectionEdit} onPress={onEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <MaterialIcons name="folder-special" size={18} color={Colors.accent} />
@@ -1559,6 +1563,16 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 13,
     color: Colors.textSecondary,
+  },
+  groupStatusBadge: {
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 6,
+  },
+  groupStatusText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
   },
   groupSectionEdit: {
     padding: 4,

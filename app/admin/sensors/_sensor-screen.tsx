@@ -76,12 +76,12 @@ function xyzFormat(d: { x: number; y: number; z: number }): string {
 
 async function requestSensorPermission(
   key: SensorKey
-): Promise<{ granted: boolean; required: boolean }> {
+): Promise<{ granted: boolean; required: boolean; canAskAgain?: boolean }> {
   switch (key) {
     case "pedometer":
       if (Platform.OS === "web") return { granted: true, required: false };
-      const { status } = await Pedometer.requestPermissionsAsync();
-      return { granted: status === "granted", required: true };
+      const { status, canAskAgain } = await Pedometer.requestPermissionsAsync();
+      return { granted: status === "granted", required: true, canAskAgain };
     default:
       return { granted: true, required: false };
   }
@@ -276,12 +276,19 @@ function SensorBody({ def }: { def: SensorDefinition }) {
         addLog("info", "Richiesta permesso sensore…");
       }
       if (!perm.granted) {
+        const canAsk = perm.canAskAgain !== false;
+        const settingsMsg = "Vai in Impostazioni → Privacy → Movimento e fitness e abilita BikerLink.";
         addLog(
           "error",
           def.key === "pedometer"
-            ? "Permesso Motion Access negato. Vai in Impostazioni → Privacy → Movimento e fitness e abilita BikerLink."
+            ? canAsk
+              ? `Permesso Motion Access negato. ${settingsMsg}`
+              : `Permesso già negato in precedenza (non ripetibile). ${settingsMsg}`
             : "Permesso negato per questo sensore."
         );
+        if (!canAsk && Platform.OS !== "web") {
+          addLog("info", "Premi 'Apri Impostazioni' per abilitare il permesso manualmente.");
+        }
         setIsStarting(false);
         return;
       }

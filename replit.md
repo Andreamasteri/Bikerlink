@@ -97,6 +97,15 @@ BikerLink utilizes a modern full-stack architecture.
   - **Dipendenze npm**: rimosse `react-native-web` e `react-dom` (utilizzate esclusivamente per il bundle web).
   - **`app.json`**: rimosso il blocco `expo.web.favicon`.
   - **Manutenuto intatto**: landing page, pagine HTML statiche (`/privacy`, `/terms`, `/delete-account`, `/apple-review`), endpoint OTA (`/api/expo-updates`), tutte le rotte API, l'endpoint `/healthz`. Le ~70 occorrenze di `Platform.OS === 'web'` nei sorgenti app/components/hooks/lib **non sono state toccate** (dead branches innocui — Metro Android non li bundla — bonifica futura come tech debt separato).
+- **Notification tap navigation** (Task #1170): `app/notifications.tsx` ha `getNotifRoute()` che mappa ogni tipo di notifica (`match`, `motoclub_invite/join`, `event_*`, `proposal/sos`, `chat`) alla route di destinazione usando `referenceId`. Toccando una notifica si segna come letta e si naviga al contenuto.
+- **OTA adoption trends** (Task #1167): `GET /api/admin/ota-adoption` restituisce breakdown per `release_id`/`phase`/`platform` e tendenze giornaliere 30 giorni. `app/admin/ota-history.tsx` mostra badge "device unici" accanto a ogni OTA se il dato è disponibile.
+- **ota_events auto-cleanup** (Task #1168): Phase 12.5 in `server/index.ts` — rimuove record `ota_events` oltre 1000 righe o più vecchi di 30 giorni, schedulato 20min dopo boot poi ogni 24h.
+- **OTA guard SKIP_LIVE_CHECK fix** (Task #1166): `scripts/validate-ota.sh` — se `SKIP_LIVE_CHECK=1` e il server risponde HTTP 200 senza release ID (risposta no-update), ora è `warn` invece di `fail`.
+- **Error monitor OTA mismatch** (Task #1172): `scripts/error-monitor.sh` aggiunge `check_ota_mismatch()` ogni 20 cicli (~10 min) — confronta il `releaseId` atteso (da `ota-updates.json`) con quello servito in produzione.
+- **Ads GroupHeader status badge** (Task #916): `app/admin/ads.tsx` `GroupHeader` mostra badge testuale "Attivo"/"Parziale"/"In pausa" accanto al dot colorato.
+- **AlwaysPermissionNotice denied feedback** (Task #1174): `components/AlwaysPermissionNotice.tsx` — se `requestBackgroundPermission()` restituisce false, mostra banner rosso con istruzioni Impostazioni → Posizione → Sempre.
+- **Stale ad images cleanup on delete** (Task #1175): `server/routes/admin.ts` — `DELETE /advertisements/:id` e bulk-delete recuperano l'imageUrl prima di cancellare dal DB, poi chiamano `fs.unlink()` sul file locale in `uploads/ads/`.
+- **Sensor permission canAskAgain** (Task #1178): `app/admin/sensors/_sensor-screen.tsx` — `requestSensorPermission()` espone `canAskAgain` da `Pedometer.requestPermissionsAsync()`; se false, il messaggio di errore nel log indica "già negato in precedenza" e suggerisce Impostazioni → Privacy → Movimento e fitness.
 
 ## Utenti Seed
 

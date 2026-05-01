@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, ScrollView, Platform } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import otaUpdates from "@/ota-updates.json";
 
@@ -13,7 +14,21 @@ interface OtaUpdate {
   status?: string;
   platforms?: string[];
   updateGroupId?: string;
+  releaseId?: string;
   [key: string]: unknown;
+}
+
+interface AdoptionBreakdown {
+  release_id: string;
+  runtime_version: string;
+  phase: string;
+  platform: string;
+  event_count: number;
+  unique_devices: number;
+}
+
+interface AdoptionData {
+  breakdown: AdoptionBreakdown[];
 }
 
 function formatOtaDate(dateStr?: string): string {
@@ -42,6 +57,21 @@ export default function OtaHistoryScreen() {
   const insets = useSafeAreaInsets();
   const updates = (otaUpdates as OtaUpdate[]).slice().reverse();
 
+  const { data: adoptionData } = useQuery<AdoptionData>({
+    queryKey: ["/api/admin/ota-adoption"],
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const adoptionByRelease = React.useMemo(() => {
+    const map = new Map<string, number>();
+    if (!adoptionData?.breakdown) return map;
+    for (const row of adoptionData.breakdown) {
+      const prev = map.get(row.release_id) ?? 0;
+      map.set(row.release_id, Math.max(prev, row.unique_devices));
+    }
+    return map;
+  }, [adoptionData]);
+
   return (
     <ScrollView
       style={styles.container}
@@ -55,36 +85,47 @@ export default function OtaHistoryScreen() {
     >
       <Text style={styles.summary}>{updates.length} aggiornamenti totali</Text>
 
-      {updates.map((u) => (
-        <View key={u.updateNumber} style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.cardHeaderLeft}>
-              <MaterialCommunityIcons name="update" size={16} color={statusColor(u.status)} />
-              <Text style={[styles.otaNumber, { color: statusColor(u.status) }]}>
-                OTA-{u.updateNumber}
-              </Text>
+      {updates.map((u) => {
+        const deviceCount = u.releaseId ? adoptionByRelease.get(u.releaseId as string) : undefined;
+        return (
+          <View key={u.updateNumber} style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardHeaderLeft}>
+                <MaterialCommunityIcons name="update" size={16} color={statusColor(u.status)} />
+                <Text style={[styles.otaNumber, { color: statusColor(u.status) }]}>
+                  OTA-{u.updateNumber}
+                </Text>
+              </View>
+              <View style={styles.cardHeaderRight}>
+                {deviceCount !== undefined && deviceCount > 0 && (
+                  <View style={styles.adoptionBadge}>
+                    <MaterialCommunityIcons name="devices" size={11} color={Colors.accent} />
+                    <Text style={styles.adoptionText}>{deviceCount}</Text>
+                  </View>
+                )}
+                <View style={styles.statusBadge}>
+                  <Text style={[styles.statusText, { color: statusColor(u.status) }]}>
+                    {statusLabel(u.status)}
+                  </Text>
+                </View>
+              </View>
             </View>
-            <View style={styles.statusBadge}>
-              <Text style={[styles.statusText, { color: statusColor(u.status) }]}>
-                {statusLabel(u.status)}
-              </Text>
+
+            <Text style={styles.message}>{u.message || "—"}</Text>
+
+            <View style={styles.meta}>
+              <Text style={styles.metaText}>{formatOtaDate(u.publishedAt)}</Text>
+              {u.platforms && u.platforms.length > 0 && (
+                <Text style={styles.metaText}>{u.platforms.join(", ")}</Text>
+              )}
             </View>
+
+            {u.note ? (
+              <Text style={styles.note} numberOfLines={3}>{u.note}</Text>
+            ) : null}
           </View>
-
-          <Text style={styles.message}>{u.message || "—"}</Text>
-
-          <View style={styles.meta}>
-            <Text style={styles.metaText}>{formatOtaDate(u.publishedAt)}</Text>
-            {u.platforms && u.platforms.length > 0 && (
-              <Text style={styles.metaText}>{u.platforms.join(", ")}</Text>
-            )}
-          </View>
-
-          {u.note ? (
-            <Text style={styles.note} numberOfLines={3}>{u.note}</Text>
-          ) : null}
-        </View>
-      ))}
+        );
+      })}
     </ScrollView>
   );
 }
@@ -121,6 +162,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+  },
+  cardHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  adoptionBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: Colors.accent + "18",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  adoptionText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: Colors.accent,
   },
   otaNumber: {
     fontFamily: "Inter_700Bold",

@@ -573,6 +573,42 @@ router.get("/startup-beacon", (_req: Request, res: Response) => {
   });
 });
 
+router.get("/ota-adoption", async (_req: Request, res: Response) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        release_id,
+        runtime_version,
+        phase,
+        platform,
+        COUNT(*) AS event_count,
+        COUNT(DISTINCT ip) AS unique_devices,
+        MIN(created_at) AS first_seen,
+        MAX(created_at) AS last_seen
+      FROM ota_events
+      WHERE release_id IS NOT NULL AND release_id <> ''
+      GROUP BY release_id, runtime_version, phase, platform
+      ORDER BY last_seen DESC
+    `);
+    const daily = await db.execute(sql`
+      SELECT
+        release_id,
+        runtime_version,
+        DATE_TRUNC('day', created_at) AS day,
+        COUNT(DISTINCT ip) AS unique_devices
+      FROM ota_events
+      WHERE release_id IS NOT NULL AND release_id <> ''
+        AND created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY release_id, runtime_version, day
+      ORDER BY day ASC
+    `);
+    return res.json({ breakdown: result.rows, daily: daily.rows });
+  } catch (err) {
+    console.error("[OTA-ADOPTION] read error:", err);
+    return res.status(500).json({ message: "Errore lettura adoption trends" });
+  }
+});
+
 router.post("/verify-password", async (req: Request, res: Response) => {
   try {
     const { password } = req.body;
@@ -2218,7 +2254,17 @@ router.delete("/advertisements/bulk-delete", async (req: Request, res: Response)
       return res.status(400).json({ message: "Array di ID campagne obbligatorio" });
     }
     const { adCampaigns: adCampaignsTable } = await import("@shared/schema");
+    const toDelete = await db.select().from(adCampaignsTable).where(inArray(adCampaignsTable.id, ids));
     await db.delete(adCampaignsTable).where(inArray(adCampaignsTable.id, ids));
+    for (const campaign of toDelete) {
+      if (campaign.imageUrl) {
+        const match = campaign.imageUrl.match(/\/api\/ads\/images\/(.+)$/);
+        if (match) {
+          const localPath = path.join(adsDir, match[1]);
+          fs.unlink(localPath, () => {});
+        }
+      }
+    }
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
       action: "bulk_delete_advertisements",
@@ -2279,7 +2325,15 @@ router.put("/advertisements/group/:groupId", async (req: Request, res: Response)
 router.delete("/advertisements/:id", async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
+    const campaign = await storage.getAdCampaign(id);
     await storage.deleteCampaign(id);
+    if (campaign?.imageUrl) {
+      const match = campaign.imageUrl.match(/\/api\/ads\/images\/(.+)$/);
+      if (match) {
+        const localPath = path.join(adsDir, match[1]);
+        fs.unlink(localPath, () => {});
+      }
+    }
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
       action: "delete_advertisement",

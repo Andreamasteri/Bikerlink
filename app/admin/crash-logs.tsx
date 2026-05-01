@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   ScrollView,
   Pressable,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
@@ -131,6 +132,17 @@ function StackTraceModal({
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    if (!item) return;
+    const parts: string[] = [];
+    if (item.errorMessage) parts.push(item.errorMessage);
+    if (item.stackTrace) parts.push(item.stackTrace);
+    await Clipboard.setStringAsync(parts.join("\n\n"));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [item]);
 
   if (!item) return null;
 
@@ -166,9 +178,24 @@ function StackTraceModal({
               {formatDate(item.reportedAt)}
             </Text>
           </View>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name="close" size={22} color={colors.text} />
-          </TouchableOpacity>
+          <View style={modalStyles.headerActions}>
+            {(item.errorMessage || item.stackTrace) && (
+              <TouchableOpacity
+                onPress={handleCopy}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={[modalStyles.copyBtn, { backgroundColor: copied ? (colors.accent ?? "#FF6600") + "22" : "transparent" }]}
+              >
+                <Ionicons
+                  name={copied ? "checkmark" : "copy-outline"}
+                  size={20}
+                  color={copied ? (colors.accent ?? "#FF6600") : externalColor}
+                />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="close" size={22} color={colors.text} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {item.errorMessage ? (
@@ -264,6 +291,8 @@ const modalStyles = StyleSheet.create({
     gap: 8,
   },
   headerLeft: { gap: 4, flex: 1 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  copyBtn: { borderRadius: 8, padding: 4 },
   headerNick: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   headerDate: { fontFamily: "Inter_400Regular", fontSize: 12 },
   errorBox: {

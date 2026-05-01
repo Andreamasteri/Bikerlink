@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -54,10 +54,37 @@ function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("it-IT");
 }
 
+function getNotifRoute(item: AppNotification): string | null {
+  const { notificationType: t, referenceId: rid } = item;
+  switch (t) {
+    case "match":
+    case "match_request":
+    case "match_accepted":
+      return rid ? `/profile/${rid}` : "/(tabs)/proposals";
+    case "motoclub_invite":
+    case "motoclub_join":
+      return rid ? `/motoclub/${rid}` : "/(tabs)/motoclub";
+    case "event_approved":
+    case "event_rejected":
+    case "event_invite":
+      return rid ? `/events/${rid}` : "/(tabs)/eventi";
+    case "proposal":
+    case "proposal_joined":
+      return rid ? `/proposals/${rid}` : "/(tabs)/proposals";
+    case "sos":
+      return rid ? `/proposals/${rid}` : "/(tabs)/proposals";
+    case "chat":
+      return rid ? `/(tabs)/chat?conversationId=${rid}` : "/(tabs)/chat";
+    default:
+      return null;
+  }
+}
+
 export default function NotificationsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
+  const router = useRouter();
 
   const { data: notifications = [], isLoading } = useQuery<AppNotification[]>({
     queryKey: ["/api/notifications"],
@@ -111,7 +138,11 @@ export default function NotificationsScreen() {
     if (!item.isRead) {
       markReadMutation.mutate(item.id);
     }
-  }, [markReadMutation]);
+    const route = getNotifRoute(item);
+    if (route) {
+      router.push(route as Parameters<typeof router.push>[0]);
+    }
+  }, [markReadMutation, router]);
 
   const handleDeleteOne = useCallback((id: string) => {
     deleteOneMutation.mutate(id);

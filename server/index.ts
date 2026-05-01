@@ -1455,6 +1455,38 @@ function setupErrorHandler(app: express.Application) {
           }, 15 * 60 * 1000);
           console.log("[INIT] Phase 12 OTA release auto-cleanup scheduled (15min delay, then every 24h)");
         }
+
+        // Phase 12.5 — ota_events periodic cleanup every 24h
+        // Keeps max OTA_EVENTS_DB_RETENTION rows; removes records older than 30 days beyond that cap.
+        // First run delayed 20 minutes to stagger with other maintenance jobs.
+        {
+          const runOtaEventsCleanup = async () => {
+            try {
+              const result = await pool.query(
+                `DELETE FROM ota_events
+                 WHERE id IN (
+                   SELECT id FROM ota_events
+                   ORDER BY created_at DESC
+                   OFFSET 1000
+                 ) OR created_at < NOW() - INTERVAL '30 days'
+                 RETURNING id`
+              );
+              const count = result.rowCount ?? 0;
+              if (count > 0) {
+                console.log(`[OTA-EVENTS-CLEANUP] Removed ${count} old ota_events record(s).`);
+              } else {
+                console.log("[OTA-EVENTS-CLEANUP] No old ota_events to remove.");
+              }
+            } catch (err) {
+              console.warn("[OTA-EVENTS-CLEANUP] Periodic cleanup error:", err);
+            }
+          };
+          setTimeout(() => {
+            runOtaEventsCleanup();
+            setInterval(runOtaEventsCleanup, 24 * 60 * 60 * 1000);
+          }, 20 * 60 * 1000);
+          console.log("[INIT] Phase 12.5 ota_events cleanup scheduled (20min delay, then every 24h)");
+        }
       })().catch((err) => {
         console.error("[INIT] Startup phase chain error:", err);
         initState.initializing = false;

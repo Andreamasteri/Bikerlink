@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -20,13 +20,17 @@ export default function AlwaysPermissionNotice({ onDismiss }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { requestBackgroundPermission } = useLocationGate();
+  const [denied, setDenied] = useState(false);
 
   const handleOpenSettings = () => {
     Linking.openSettings();
   };
 
   const handleRequest = async () => {
-    await requestBackgroundPermission();
+    const granted = await requestBackgroundPermission();
+    if (!granted) {
+      setDenied(true);
+    }
   };
 
   return (
@@ -67,6 +71,16 @@ export default function AlwaysPermissionNotice({ onDismiss }: Props) {
             </Text>
             .
           </Text>
+
+          {denied && (
+            <View style={[styles.deniedBox, { backgroundColor: "#FF444418", borderColor: "#FF444433" }]}>
+              <Ionicons name="warning-outline" size={16} color="#FF4444" />
+              <Text style={[styles.deniedText, { color: "#FF4444" }]}>
+                Permesso negato. Usa "Apri Impostazioni" e seleziona{" "}
+                <Text style={{ fontFamily: "Inter_600SemiBold" }}>Posizione → Sempre</Text>.
+              </Text>
+            </View>
+          )}
 
           <TouchableOpacity
             style={[styles.primaryBtn, { backgroundColor: colors.accent }]}
@@ -194,5 +208,21 @@ const styles = StyleSheet.create({
   dismissText: {
     fontFamily: "Inter_400Regular",
     fontSize: 14,
+  },
+  deniedBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 12,
+    width: "100%",
+    marginBottom: 16,
+  },
+  deniedText: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 19,
   },
 });

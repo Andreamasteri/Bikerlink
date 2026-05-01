@@ -347,8 +347,13 @@ else
     " 2>/dev/null || echo "")
 
     if [ -z "$SERVED_RELEASE_ID" ]; then
-      fail "LIVE_CHECK_FAIL: produzione risponde 200 ma impossibile estrarre release ID dal manifest (risposta non valida)"
-      info "  Verifica che $PROD_URL/api/expo-updates restituisca un manifest JSON valido con campo 'id'."
+      if [ "$LIVE_CHECK_SKIP" = "1" ]; then
+        warn "LIVE_CHECK_SKIP=1: produzione risponde 200 senza release ID (no-update o formato inatteso) — OTA-$EXPECTED_OTA non ancora pubblicata"
+        info "  Esegui publish-ota.sh poi ri-esegui senza SKIP_LIVE_CHECK=1 per confermare."
+      else
+        fail "LIVE_CHECK_FAIL: produzione risponde 200 ma impossibile estrarre release ID dal manifest (risposta non valida)"
+        info "  Verifica che $PROD_URL/api/expo-updates restituisca un manifest JSON valido con campo 'id'."
+      fi
     elif [ "$SERVED_RELEASE_ID" = "$EXPECTED_RELEASE_ID" ]; then
       ok "LIVE_CHECK_OK: produzione serve OTA-$EXPECTED_OTA (releaseId=$SERVED_RELEASE_ID)"
     else
