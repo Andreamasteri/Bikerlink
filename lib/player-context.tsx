@@ -13,6 +13,13 @@ import {
   setAudioModeAsync,
 } from "expo-audio";
 import type { AudioPlayer as ExpoAudioPlayer, AudioStatus } from "expo-audio";
+
+type AudioPlayerInstance = ExpoAudioPlayer & {
+  addListener: (
+    event: "playbackStatusUpdate",
+    listener: (status: AudioStatus) => void
+  ) => { remove: () => void };
+};
 import { getApiUrl } from "@/lib/query-client";
 
 export type PlayerSource = "radio" | "library" | "file" | "preview";
@@ -112,7 +119,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [isShuffled, setIsShuffled] = useState(false);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
 
-  const playerRef = useRef<ExpoAudioPlayer | null>(null);
+  const playerRef = useRef<AudioPlayerInstance | null>(null);
   const listenerRef = useRef<{ remove: () => void } | null>(null);
   const queueRef = useRef<PlayerTrack[]>([]);
   const queueIndexRef = useRef(0);
@@ -219,7 +226,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
       if (gen !== loadGenRef.current) return;
 
-      const player = createAudioPlayer({ uri: track.url });
+      const player = createAudioPlayer({ uri: track.url }) as AudioPlayerInstance;
       playerRef.current = player;
 
       const sub = player.addListener("playbackStatusUpdate", onPlaybackStatus);
