@@ -1304,7 +1304,7 @@ export default function MapScreen() {
                         <View style={[styles.statusBadge, { backgroundColor: selectedUserDetail.isAvailable ? "#4CAF5022" : "#66666622" }]}>
                           <View style={[styles.statusDot, { backgroundColor: selectedUserDetail.isAvailable ? Colors.success : "#888" }]} />
                           <Text style={[styles.statusBadgeText, { color: selectedUserDetail.isAvailable ? Colors.success : "#888" }]}>
-                            {selectedUserDetail.isAvailable ? t("home.available") : t("map.unavailable")}
+                            {selectedUserDetail.isAvailable ? t("home.userAvailable") : t("map.unavailable")}
                           </Text>
                         </View>
                       </View>
