@@ -74,6 +74,8 @@ function CampaignCard({
   onEdit,
   onEditGroup,
   groupCount,
+  groupAllActive,
+  groupSomeActive,
   isBroken,
 }: {
   item: Campaign;
@@ -82,6 +84,8 @@ function CampaignCard({
   onEdit: (item: Campaign) => void;
   onEditGroup?: () => void;
   groupCount?: number;
+  groupAllActive?: boolean;
+  groupSomeActive?: boolean;
   isBroken?: boolean;
 }) {
   const [imageError, setImageError] = useState(false);
@@ -137,9 +141,21 @@ function CampaignCard({
               </View>
             )}
             {groupCount && groupCount > 1 ? (
-              <View style={[styles.badge, { backgroundColor: Colors.accent + "22" }]}>
-                <Text style={[styles.badgeText, { color: Colors.accent }]}>Gruppo ({groupCount})</Text>
-              </View>
+              (() => {
+                const gc = groupAllActive === undefined
+                  ? Colors.accent
+                  : groupAllActive
+                  ? Colors.success
+                  : groupSomeActive
+                  ? Colors.warning
+                  : Colors.textSecondary;
+                return (
+                  <View style={[styles.badge, { backgroundColor: gc + "22", flexDirection: "row", alignItems: "center", gap: 3 }]}>
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: gc }} />
+                    <Text style={[styles.badgeText, { color: gc }]}>Gruppo ({groupCount})</Text>
+                  </View>
+                );
+              })()
             ) : null}
             <Text style={styles.cardImpressions}>{item.impressions} impressioni</Text>
           </View>
@@ -821,6 +837,8 @@ export default function AdminAds() {
                 onEdit={openSingleEdit}
                 onEditGroup={campaign.groupId ? () => openGroupEdit(campaign.groupId!) : undefined}
                 groupCount={campaign.groupId ? groupMeta.get(campaign.groupId)?.count : undefined}
+                groupAllActive={campaign.groupId ? groupMeta.get(campaign.groupId)?.allActive : undefined}
+                groupSomeActive={campaign.groupId ? groupMeta.get(campaign.groupId)?.someActive : undefined}
                 isBroken={brokenIdSet.has(campaign.id)}
               />
             );
