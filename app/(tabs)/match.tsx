@@ -1345,13 +1345,13 @@ export default function MatchScreen() {
           <Ionicons name="musical-notes" size={13} color={Colors.accent} />
           <Text style={styles.musicCriteriaText}>
             {musicCriteria.split(",").map(c =>
-              c === "songs" ? "Brani" : c === "genre" ? "Genere" : c === "artist" ? "Artista" : c
+              c === "songs" ? t("match.musicCriteria.tracks") : c === "genre" ? t("match.musicCriteria.genre") : c === "artist" ? t("match.musicCriteria.artist") : c
             ).join(" + ")}
             {" · min "}{musicMinSongs}
-            {distanceMode === "km" ? ` · ≤ ${kmLimit} km` : " · Qualsiasi distanza"}
+            {distanceMode === "km" ? ` · ≤ ${kmLimit} km` : ` · ${t("match.anyDistance")}`}
           </Text>
           <TouchableOpacity onPress={() => router.push("/(tabs)/music" as any)}>
-            <Text style={styles.musicCriteriaChange}>Cambia</Text>
+            <Text style={styles.musicCriteriaChange}>{t("match.change")}</Text>
           </TouchableOpacity>
         </View>
       )}

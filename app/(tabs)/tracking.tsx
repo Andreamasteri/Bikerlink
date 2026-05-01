@@ -26,6 +26,7 @@ import { queryClient } from "@/lib/query-client";
 import { useRouter } from "expo-router";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 import { getCurrentLocale } from "@/lib/i18n";
+import { useT } from "@/lib/language-context";
 import { useUnits, SpeedUnit, DistanceUnit } from "@/lib/units-context";
 import { formatDistance, formatSpeed } from "@/lib/units";
 import TrackingMap from "@/components/TrackingMap";
@@ -108,18 +109,6 @@ const BATCH_FLUSH_MS = 30000;
 const GPS_BUFFER_SEGCOUNT_KEY = "@bikerlink/gps_buffer_segcount";
 const GPS_BUFFER_SEG_KEY = (n: number) => `@bikerlink/gps_buffer_seg_${n}`;
 const GPS_BUFFER_WRITE_EVERY = 5;
-
-const PROFILE_LABELS: Record<UpdateProfile, string> = {
-  easy: "Passeggio",
-  medium: "Standard",
-  race: "Race",
-};
-
-const PROFILE_DESCRIPTIONS: Record<UpdateProfile, string> = {
-  easy: "Risparmio energetico",
-  medium: "Alta precisione",
-  race: "Massima precisione (1s)",
-};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -254,6 +243,7 @@ function RecordCard({
   onDelete: () => void;
   onViewRoute: () => void;
 }) {
+  const t = useT();
   const { speedUnit, distanceUnit, timeFormat } = useUnits();
   const dur = item.durationSeconds || 0;
   const locale = getCurrentLocale();
@@ -287,7 +277,7 @@ function RecordCard({
         </Text>
         <TouchableOpacity onPress={onViewRoute} style={[styles.publishIconBtn, { backgroundColor: Colors.accent + "18", marginRight: 6, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8 }]} activeOpacity={0.7}>
           <Ionicons name="map-outline" size={16} color={Colors.accent} />
-          <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.accent }}>Percorso</Text>
+          <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.accent }}>{t("tracking.route")}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={onPublish} style={styles.publishIconBtn} activeOpacity={0.7}>
           <Ionicons name="share-outline" size={18} color={Colors.accent} />
@@ -327,17 +317,17 @@ function RecordCard({
             <Text style={styles.recordStatValue}>
               {formatDistance(item.totalDistanceKm || 0, distanceUnit, 2)}
             </Text>
-            <Text style={styles.recordStatLabel}>distanza</Text>
+            <Text style={styles.recordStatLabel}>{t("tracking.distance")}</Text>
           </View>
           <View style={styles.recordStat}>
             <Text style={styles.recordStatValue}>{formatHMS(dur * 1000)}</Text>
-            <Text style={styles.recordStatLabel}>durata</Text>
+            <Text style={styles.recordStatLabel}>{t("tracking.duration")}</Text>
           </View>
           <View style={styles.recordStat}>
             <Text style={styles.recordStatValue}>
               {formatSpeed(item.maxSpeedKmh || 0, speedUnit, 0)}
             </Text>
-            <Text style={styles.recordStatLabel}>vel. max</Text>
+            <Text style={styles.recordStatLabel}>{t("tracking.maxSpeed")}</Text>
           </View>
         </View>
       )}
@@ -367,6 +357,7 @@ function RouteMapModal({
   visible, onClose, onCloseAll, points, tileUrl, tileMaxZoom,
   totalKm, maxSpeed, totalMs, distanceUnit, speedUnit, insets, loading,
 }: RouteMapModalProps) {
+  const t = useT();
   const html = useMemo(
     () => buildLeafletPostRideHtml(tileUrl, tileMaxZoom, Colors.accent, points),
     [tileUrl, tileMaxZoom, points]
@@ -393,7 +384,7 @@ function RouteMapModal({
             fontFamily: "Inter_600SemiBold",
             fontSize: 16,
             color: Colors.text,
-          }}>Il mio percorso</Text>
+          }}>{t("tracking.myRoute")}</Text>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="close" size={24} color={Colors.textSecondary} />
           </TouchableOpacity>
@@ -405,17 +396,17 @@ function RouteMapModal({
             <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#1a1a1a" }}>
               <ActivityIndicator size="large" color={Colors.accent} />
               <Text style={{ fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, marginTop: 12 }}>
-                Caricamento percorso...
+                {t("tracking.loadingRoute")}
               </Text>
             </View>
           ) : points.length === 0 ? (
             <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#1a1a1a" }}>
               <Ionicons name="map-outline" size={48} color={Colors.textSecondary} />
               <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 15, color: Colors.textSecondary, marginTop: 12 }}>
-                Nessun percorso disponibile
+                {t("tracking.noRoute")}
               </Text>
               <Text style={{ fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, marginTop: 4, textAlign: "center", paddingHorizontal: 32 }}>
-                I punti GPS non sono stati registrati per questo giro
+                {t("tracking.noGpsPoints")}
               </Text>
             </View>
           ) : Platform.OS !== "web" ? (
@@ -454,9 +445,9 @@ function RouteMapModal({
             paddingHorizontal: 16,
           }}>
             {[
-              { icon: "navigate-outline" as const, label: "Distanza", value: formatDistance(totalKm, distanceUnit, 2) },
-              { icon: "flash" as const, label: "Vel. max", value: formatSpeed(maxSpeed, speedUnit, 1) },
-              { icon: "time-outline" as const, label: "Durata", value: formatHMS(totalMs) },
+              { icon: "navigate-outline" as const, label: t("tracking.distance"), value: formatDistance(totalKm, distanceUnit, 2) },
+              { icon: "flash" as const, label: t("tracking.maxSpeed"), value: formatSpeed(maxSpeed, speedUnit, 1) },
+              { icon: "time-outline" as const, label: t("tracking.duration"), value: formatHMS(totalMs) },
             ].map((s) => (
               <View key={s.label} style={{ alignItems: "center", flex: 1 }}>
                 <Ionicons name={s.icon} size={18} color={Colors.accent} />
@@ -479,7 +470,7 @@ function RouteMapModal({
               }}
             >
               <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.textSecondary }}>
-                Torna al giro
+                {t("tracking.backToRide")}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -495,7 +486,7 @@ function RouteMapModal({
               }}
             >
               <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: "#ffffff" }}>
-                Chiudi
+                {t("tracking.close")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -508,6 +499,7 @@ function RouteMapModal({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function TrackingScreen() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { speedUnit, distanceUnit } = useUnits();
@@ -689,9 +681,9 @@ export default function TrackingScreen() {
       setPublishRecord(null);
       setPublishCaption("");
       queryClient.invalidateQueries({ queryKey: ["/api/contest/entries"] });
-      Alert.alert("Pubblicato!", "Il tuo record è stato pubblicato nella sezione Pic!");
+      Alert.alert(t("tracking.published"), t("tracking.publishedMsg"));
     },
-    onError: () => Alert.alert("Errore", "Impossibile pubblicare il record"),
+    onError: () => Alert.alert(t("common.error"), t("tracking.publishError")),
   });
 
   // ── 0-100 sprint nav-lock broadcast ──────────────────────────────────────
@@ -1594,7 +1586,7 @@ export default function TrackingScreen() {
         const failedId = routeIdRef.current;
         routeIdRef.current = null;
         if (failedId) apiRequest("DELETE", `/api/routes/${failedId}`).catch(() => {});
-        Alert.alert("GPS non disponibile", "Impossibile avviare il GPS. Riprova.");
+        Alert.alert(t("tracking.gpsUnavailable"), t("tracking.gpsUnavailableMsg"));
         return;
       }
     } else {
@@ -1619,7 +1611,7 @@ export default function TrackingScreen() {
         if (status !== "granted") {
           const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
           if (newStatus !== "granted") {
-            Alert.alert("Permesso GPS negato", "Abilita la localizzazione nelle impostazioni.");
+            Alert.alert(t("tracking.gpsDenied"), t("tracking.gpsDeniedMsg"));
             return;
           }
         }
@@ -1684,7 +1676,7 @@ export default function TrackingScreen() {
       }
     } catch (e) {
       logGpsError(e, "handleStart");
-      Alert.alert("Errore", "Impossibile avviare il tracciamento.");
+      Alert.alert(t("common.error"), t("tracking.startError"));
     } finally {
       setLoading(false);
     }
@@ -1778,9 +1770,9 @@ export default function TrackingScreen() {
 
   // ── Handle STOP (user-initiated) ───────────────────────────────────────────
   const handleStop = useCallback(() => {
-    Alert.alert("Termina giro", "Vuoi terminare il giro e salvare i dati?", [
-      { text: "Annulla", style: "cancel" },
-      { text: "Termina", style: "destructive", onPress: stopTrackingInternal },
+    Alert.alert(t("tracking.stopConfirmTitle"), t("tracking.stopConfirmMsg"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("tracking.stopConfirmBtn"), style: "destructive", onPress: stopTrackingInternal },
     ]);
   }, [stopTrackingInternal]);
 
@@ -1814,7 +1806,7 @@ export default function TrackingScreen() {
         );
       setHistMapPoints(pts);
     } catch (_) {
-      Alert.alert("Errore", "Impossibile caricare il percorso.");
+      Alert.alert(t("common.error"), t("tracking.loadError"));
       setHistMapVisible(false);
       setHistMapRecord(null);
     } finally {
@@ -1996,19 +1988,19 @@ export default function TrackingScreen() {
                     icon="time-outline"
                     color={Colors.accent}
                     value={formatHMS(totalMs)}
-                    label="Tempo totale"
+                    label={t("tracking.totalTime")}
                   />
                   <StatCard
                     icon="bicycle-outline"
                     color={Colors.success}
                     value={formatHMS(netMs)}
-                    label="Tempo netto"
+                    label={t("tracking.netTime")}
                   />
                   <StatCard
                     icon="flash"
                     color={Colors.accentRed}
                     value={convertSpeed(maxSpeed, speedUnit).toFixed(2)}
-                    label={`Vel. max ${speedUnitLabel(speedUnit)}`}
+                    label={`${t("tracking.maxSpeed")} ${speedUnitLabel(speedUnit)}`}
                   />
                   <StatCard
                     icon="navigate-outline"
@@ -2022,26 +2014,26 @@ export default function TrackingScreen() {
                     icon="pause-outline"
                     color={Colors.warning}
                     value={formatHMS(displayIdleMs)}
-                    label="Tempo fermo"
+                    label={t("tracking.idleTime")}
                   />
                   <StatCard
                     icon="speedometer-outline"
                     color={Colors.success}
                     value={convertSpeed(avgSpeedDisplayKmh, speedUnit).toFixed(2)}
-                    label={`Vel. media ${speedUnitLabel(speedUnit)}`}
+                    label={`${t("tracking.avgSpeed")} ${speedUnitLabel(speedUnit)}`}
                   />
                   <StatCard
                     icon="trending-up-outline"
                     color={Colors.success}
                     value={maxAltitude.toFixed(0)}
-                    label="Quota max m"
+                    label={t("tracking.maxAlt")}
                   />
                   {/* G max card with recalibrate button — only when sensors enabled */}
                   {sensorsEnabled && <View style={styles.statCard}>
                     <Ionicons name="pulse-outline" size={16} color={Colors.accentRed} />
                     {isCalibrating ? (
                       <Text style={[styles.statValue, { color: Colors.textSecondary, fontSize: 16 }]}>
-                        Calibro...
+                        {t("tracking.calibrating")}
                       </Text>
                     ) : (
                       <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
@@ -2063,7 +2055,7 @@ export default function TrackingScreen() {
                     <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
                       {maxTiltDeg.toFixed(1) + "°"}
                     </Text>
-                    <Text style={styles.statLabel}>Incl. max</Text>
+                    <Text style={styles.statLabel}>{t("tracking.tiltMax")}</Text>
                   </View>}
                 </View>
               </View>
@@ -2151,13 +2143,13 @@ export default function TrackingScreen() {
                       icon="trending-up-outline"
                       color={Colors.success}
                       value={`${currentG.toFixed(2)} G`}
-                      label="G istantaneo"
+                      label={t("tracking.gInstant")}
                     />
                     <StatCard
                       icon="pulse-outline"
                       color={Colors.accentRed}
                       value={`${maxAccelG.toFixed(2)} G`}
-                      label="G max accel"
+                      label={t("tracking.gMaxAccel")}
                     />
                   </View>
                 )}
@@ -2167,7 +2159,7 @@ export default function TrackingScreen() {
                       icon="trending-down-outline"
                       color={Colors.warning}
                       value={`${maxDecelG.toFixed(2)} G`}
-                      label="G max frenata"
+                      label={t("tracking.gMaxBrake")}
                     />
                   )}
                   {sensorsEnabled && !isCalibrating && (
@@ -2175,7 +2167,7 @@ export default function TrackingScreen() {
                       icon="compass-outline"
                       color={Colors.accent}
                       value={`${maxTiltDeg.toFixed(1)}°`}
-                      label="Incl. max"
+                      label={t("tracking.tiltMax")}
                     />
                   )}
                   {accuracyTier ? (
@@ -2273,7 +2265,7 @@ export default function TrackingScreen() {
                       profile === p && styles.profileBtnLabelActive,
                     ]}
                   >
-                    {PROFILE_LABELS[p]}
+                    {p === "easy" ? t("tracking.label.easy") : p === "medium" ? t("tracking.label.standard") : t("tracking.label.race")}
                   </Text>
                   <Text
                     style={[
@@ -2281,7 +2273,7 @@ export default function TrackingScreen() {
                       profile === p && styles.profileBtnDescActive,
                     ]}
                   >
-                    {PROFILE_DESCRIPTIONS[p]}
+                    {p === "easy" ? t("tracking.profile.easy") : p === "medium" ? t("tracking.profile.medium") : t("tracking.profile.race")}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -2289,7 +2281,7 @@ export default function TrackingScreen() {
             <View style={styles.profileWarning}>
               <Ionicons name="warning-outline" size={14} color={Colors.warning} />
               <Text style={styles.profileWarningText}>
-                Più precisione = Maggior consumo di batteria
+                {t("tracking.precisionNote")}
               </Text>
             </View>
           </View>
@@ -2304,7 +2296,7 @@ export default function TrackingScreen() {
                   size={18}
                   color={Colors.textSecondary}
                 />
-                <Text style={styles.triggerLabel}>Countdown</Text>
+                <Text style={styles.triggerLabel}>{t("tracking.countdown")}</Text>
               </View>
               <TextInput
                 style={[
@@ -2339,9 +2331,9 @@ export default function TrackingScreen() {
                   color={Colors.textSecondary}
                 />
                 <View>
-                  <Text style={styles.triggerLabel}>Hands Off</Text>
+                  <Text style={styles.triggerLabel}>{t("tracking.handsOff")}</Text>
                   <Text style={styles.triggerDesc}>
-                    per evitare tocchi ad alta velocità
+                    {t("tracking.handsOffDesc")}
                   </Text>
                 </View>
               </View>
@@ -2522,12 +2514,12 @@ export default function TrackingScreen() {
                   }}
                   onDelete={() => {
                     Alert.alert(
-                      "Elimina record",
-                      "Vuoi eliminare questo record? L'operazione è irreversibile.",
+                      t("tracking.deleteRecordTitle"),
+                      t("tracking.deleteRecordConfirm"),
                       [
-                        { text: "Annulla", style: "cancel" },
+                        { text: t("common.cancel"), style: "cancel" },
                         {
-                          text: "Elimina",
+                          text: t("common.delete"),
                           style: "destructive",
                           onPress: async () => {
                             try {
@@ -2536,7 +2528,7 @@ export default function TrackingScreen() {
                                 queryKey: ["/api/routes"],
                               });
                             } catch {
-                              Alert.alert("Errore", "Impossibile eliminare il record.");
+                              Alert.alert(t("common.error"), t("tracking.deleteRecordError"));
                             }
                           },
                         },
@@ -2561,9 +2553,9 @@ export default function TrackingScreen() {
           <View style={[styles.summaryModal, { paddingTop: insets.top + 16 }]}>
             <View style={styles.summaryTitleRow}>
               <Ionicons name="flag-outline" size={24} color={Colors.success} />
-              <Text style={styles.summaryTitle}>Giro completato!</Text>
+              <Text style={styles.summaryTitle}>{t("tracking.completed")}</Text>
               <View style={styles.liveRunBadge}>
-                <Text style={styles.liveRunText}>LIVE RUN</Text>
+                <Text style={styles.liveRunText}>{t("tracking.liveRun")}</Text>
               </View>
             </View>
 
@@ -2571,7 +2563,7 @@ export default function TrackingScreen() {
               style={styles.rideTitleInput}
               value={rideTitle}
               onChangeText={setRideTitle}
-              placeholder="Nome del giro"
+              placeholder={t("tracking.rideNamePlaceholder")}
               placeholderTextColor={Colors.textSecondary}
               maxLength={80}
               returnKeyType="done"
@@ -2582,13 +2574,13 @@ export default function TrackingScreen() {
                 icon="navigate-outline"
                 color={Colors.accent}
                 value={formatDistance(totalKm, distanceUnit, 3)}
-                label="Distanza"
+                label={t("tracking.distance")}
               />
               <StatCard
                 icon="flash"
                 color={Colors.accentRed}
                 value={formatSpeed(maxSpeed, speedUnit, 1)}
-                label="Vel. max"
+                label={t("tracking.maxSpeed")}
               />
             </View>
             <View style={styles.statsRow}>
@@ -2596,13 +2588,13 @@ export default function TrackingScreen() {
                 icon="time-outline"
                 color={Colors.accent}
                 value={formatHMS(totalMs)}
-                label="Tempo totale"
+                label={t("tracking.totalTime")}
               />
               <StatCard
                 icon="speedometer-outline"
                 color={Colors.success}
                 value={formatSpeed(avgSpeedKmh, speedUnit, 1)}
-                label="Vel. media"
+                label={t("tracking.avgSpeed")}
               />
             </View>
             {sensorsEnabled && (
@@ -2611,13 +2603,13 @@ export default function TrackingScreen() {
                   icon="pulse-outline"
                   color={Colors.accentRed}
                   value={maxAccelG.toFixed(2) + " G"}
-                  label="G max accel"
+                  label={t("tracking.gMaxAccel")}
                 />
                 <StatCard
                   icon="compass-outline"
                   color={Colors.accent}
                   value={maxTiltDeg.toFixed(1) + "°"}
-                  label="Incl. max"
+                  label={t("tracking.tiltMax")}
                 />
               </View>
             )}
@@ -2632,7 +2624,7 @@ export default function TrackingScreen() {
                 {isNewRecord && (
                   <View style={styles.summaryRecordBadge}>
                     <Ionicons name="trophy" size={16} color="#FFD700" />
-                    <Text style={styles.summaryRecordText}>Nuovo Record!</Text>
+                    <Text style={styles.summaryRecordText}>{t("tracking.newRecord")}</Text>
                   </View>
                 )}
               </View>
@@ -2645,12 +2637,12 @@ export default function TrackingScreen() {
                 activeOpacity={0.8}
               >
                 <Ionicons name="map-outline" size={16} color={Colors.accent} />
-                <Text style={styles.summaryRouteBtnText}>Vedi percorso</Text>
+                <Text style={styles.summaryRouteBtnText}>{t("tracking.viewRoute")}</Text>
               </TouchableOpacity>
             )}
 
             <Text style={styles.summaryNote}>
-              Puoi rivedere il giro in "I miei percorsi"
+              {t("tracking.summaryNote")}
             </Text>
 
             <View style={styles.summaryActions}>
@@ -2678,7 +2670,7 @@ export default function TrackingScreen() {
                 activeOpacity={0.8}
               >
                 <Ionicons name="share-outline" size={18} color="#ffffff" />
-                <Text style={styles.summaryPublishText}>Pubblica su Pic!</Text>
+                <Text style={styles.summaryPublishText}>{t("tracking.publish")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.summaryDeleteBtn}
@@ -2686,12 +2678,12 @@ export default function TrackingScreen() {
                   const last = completedRecords[0];
                   if (!last) { setSummaryVisible(false); return; }
                   Alert.alert(
-                    "Elimina giro",
-                    "Vuoi eliminare definitivamente questo giro?",
+                    t("tracking.deleteRideTitle"),
+                    t("tracking.deleteRideConfirm"),
                     [
-                      { text: "Annulla", style: "cancel" },
+                      { text: t("common.cancel"), style: "cancel" },
                       {
-                        text: "Elimina",
+                        text: t("common.delete"),
                         style: "destructive",
                         onPress: async () => {
                           try {
@@ -2707,7 +2699,7 @@ export default function TrackingScreen() {
                 activeOpacity={0.8}
               >
                 <Ionicons name="trash-outline" size={16} color="#ef4444" />
-                <Text style={styles.summaryDeleteText}>Elimina</Text>
+                <Text style={styles.summaryDeleteText}>{t("common.delete")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.summaryCloseBtn}
@@ -2724,7 +2716,7 @@ export default function TrackingScreen() {
                 }}
                 activeOpacity={0.8}
               >
-                <Text style={styles.summaryCloseText}>Chiudi</Text>
+                <Text style={styles.summaryCloseText}>{t("tracking.close")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2776,13 +2768,13 @@ export default function TrackingScreen() {
       >
         <Pressable style={styles.modalOverlay} onPress={() => setPublishRecord(null)}>
           <Pressable style={styles.publishModal} onPress={() => {}}>
-            <Text style={styles.publishTitle}>Pubblica su Pic!</Text>
+            <Text style={styles.publishTitle}>{t("tracking.publish")}</Text>
             <Text style={styles.publishSubtitle}>
-              Aggiungi una descrizione al tuo record
+              {t("tracking.publishDesc")}
             </Text>
             <TextInput
               style={styles.publishInput}
-              placeholder="Es: Giro fantastico sulle Dolomiti!"
+              placeholder={t("tracking.publishPlaceholder")}
               placeholderTextColor={Colors.textSecondary}
               value={publishCaption}
               onChangeText={setPublishCaption}
@@ -2795,7 +2787,7 @@ export default function TrackingScreen() {
                 onPress={() => setPublishRecord(null)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.publishCancelText}>Annulla</Text>
+                <Text style={styles.publishCancelText}>{t("common.cancel")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
@@ -2811,7 +2803,7 @@ export default function TrackingScreen() {
                 ) : (
                   <>
                     <Ionicons name="share-outline" size={16} color="#fff" />
-                    <Text style={styles.publishConfirmText}>Pubblica</Text>
+                    <Text style={styles.publishConfirmText}>{t("tracking.publishBtn")}</Text>
                   </>
                 )}
               </TouchableOpacity>

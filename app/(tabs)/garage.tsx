@@ -433,7 +433,7 @@ function GarageContent() {
       }
     },
     onError: (err: any) => {
-      Alert.alert("Errore", err.message || "Errore nel salvataggio");
+      Alert.alert(t("common.error"), err.message || t("garage.saveError"));
     },
   });
 
@@ -474,7 +474,7 @@ function GarageContent() {
 
   const handleSave = () => {
     if (!form.brand || !form.model || !form.motorcycleType || !form.ridingStyle) {
-      Alert.alert("Errore", "Compila tutti i campi obbligatori");
+      Alert.alert(t("common.error"), t("garage.fillRequired"));
       return;
     }
     saveMutation.mutate(form);
@@ -523,13 +523,13 @@ function GarageContent() {
             <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
               {item.isDefault && (
                 <View style={styles.defaultBadge}>
-                  <Text style={styles.defaultBadgeText}>Predefinita</Text>
+                  <Text style={styles.defaultBadgeText}>{t("garage.defaultBadge")}</Text>
                 </View>
               )}
               {marketplaceEnabled && item.isForSale && (
                 <View style={[styles.defaultBadge, { backgroundColor: "#FF980020" }]}>
                   <Ionicons name="pricetag" size={10} color="#FF9800" />
-                  <Text style={[styles.defaultBadgeText, { color: "#FF9800" }]}> In Vendita</Text>
+                  <Text style={[styles.defaultBadgeText, { color: "#FF9800" }]}> {t("garage.forSaleBadge")}</Text>
                 </View>
               )}
             </View>

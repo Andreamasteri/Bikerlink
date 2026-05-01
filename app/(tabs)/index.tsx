@@ -527,9 +527,9 @@ export default function MapScreen() {
     },
     onSuccess: (data: any) => {
       if (data.prizeUnlocked) {
-        Alert.alert("Premio Sbloccato!", data.message || "Hai raccolto 10 Easter Egg!");
+        Alert.alert(t("home.easterEggPrize"), data.message || t("home.easterEgg10Msg"));
       } else {
-        Alert.alert("Easter Egg!", data.message || "Complimenti! Hai raccolto un premio! Continua così!");
+        Alert.alert(t("home.easterEggTitle"), data.message || t("home.easterEggCongrats"));
       }
       queryClient.invalidateQueries({ queryKey: ["/api/easter-eggs/nearby"] });
       setSelectedEgg(null);
@@ -1479,13 +1479,13 @@ export default function MapScreen() {
                       const res = await apiRequest("POST", `/api/events/${item.id}/invite-user`, { userId: selectedUser.id });
                       if (!res.ok) {
                         const err = await res.json().catch(() => ({}));
-                        Alert.alert("Errore", (err as any).message || "Impossibile inviare l'invito");
+                        Alert.alert(t("common.error"), (err as any).message || t("home.inviteError"));
                       } else {
-                        Alert.alert("Inviato!", `${selectedUser.nickname} ha ricevuto l'invito per "${item.title}".`);
+                        Alert.alert(t("home.inviteSent"), `${selectedUser.nickname} ha ricevuto l'invito per "${item.title}".`);
                         setShowInviteEventModal(false);
                       }
                     } catch {
-                      Alert.alert("Errore", "Impossibile inviare l'invito");
+                      Alert.alert(t("common.error"), t("home.inviteError"));
                     } finally {
                       setInviteSending(false);
                     }
@@ -1509,13 +1509,13 @@ export default function MapScreen() {
               ListEmptyComponent={
                 <Text style={{ textAlign: "center", color: Colors.textSecondary, paddingVertical: 16 }}>
                   {(myOrganizedEventsQuery.data ?? []).length === 0
-                    ? "Nessun raduno futuro approvato"
-                    : `${selectedUser?.nickname ?? "L'utente"} partecipa già a tutti i tuoi raduni`}
+                    ? t("home.noRally")
+                    : `${selectedUser?.nickname ?? "L'utente"} ${t("home.alreadyJoinedAll")}`}
                 </Text>
               }
             />
             <Pressable style={[styles.homeMessageCloseBtn, { marginTop: 8 }]} onPress={() => setShowInviteEventModal(false)}>
-              <Text style={styles.homeMessageCloseBtnText}>Annulla</Text>
+              <Text style={styles.homeMessageCloseBtnText}>{t("common.cancel")}</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -1530,7 +1530,7 @@ export default function MapScreen() {
             </View>
             <Text style={styles.homeMessageText}>{homeMessageData?.text || ""}</Text>
             <Pressable style={styles.homeMessageCloseBtn} onPress={() => setShowHomeMessage(false)}>
-              <Text style={styles.homeMessageCloseBtnText}>Chiudi</Text>
+              <Text style={styles.homeMessageCloseBtnText}>{t("tracking.close")}</Text>
             </Pressable>
           </Pressable>
         </Pressable>
