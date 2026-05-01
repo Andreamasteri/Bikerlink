@@ -873,7 +873,7 @@ function setupErrorHandler(app: express.Application) {
           await db.execute(sql`
             CREATE TABLE IF NOT EXISTS user_music_tokens (
               user_id VARCHAR(36) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-              spotify_user_id VARCHAR(200) NOT NULL,
+              provider_user_id VARCHAR(200) NOT NULL,
               display_name VARCHAR(200),
               access_token TEXT NOT NULL,
               refresh_token TEXT NOT NULL,
@@ -881,6 +881,19 @@ function setupErrorHandler(app: express.Application) {
               connected_at TIMESTAMP NOT NULL DEFAULT NOW(),
               last_sync_at TIMESTAMP
             )
+          `);
+          // Rename legacy spotify_user_id column if it still exists
+          await db.execute(sql`
+            DO $$ BEGIN
+              IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'user_music_tokens'
+                  AND column_name = 'spotify_user_id'
+              ) THEN
+                ALTER TABLE user_music_tokens
+                  RENAME COLUMN spotify_user_id TO provider_user_id;
+              END IF;
+            END $$
           `);
         } catch (e) {
           console.warn("[MIGRATION] user_music_tokens:", e);

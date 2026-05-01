@@ -1164,7 +1164,7 @@ export const userMusicTokens = pgTable("user_music_tokens", {
   userId: varchar("user_id", { length: 36 })
     .primaryKey()
     .references(() => users.id, { onDelete: "cascade" }),
-  spotifyUserId: varchar("spotify_user_id", { length: 200 }).notNull(),
+  providerUserId: varchar("provider_user_id", { length: 200 }).notNull(), // renamed from spotify_user_id
   displayName: varchar("display_name", { length: 200 }),
   accessToken: text("access_token").notNull(),
   refreshToken: text("refresh_token").notNull(),
