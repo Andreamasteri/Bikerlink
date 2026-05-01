@@ -1257,7 +1257,7 @@ export default function MapScreen() {
               <View style={{ alignItems: "center", padding: 24 }}>
                 <Ionicons name="checkmark-circle-outline" size={40} color={Colors.textSecondary} />
                 <Text style={{ fontSize: 15, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 8 }}>
-                  Nessuna richiesta di soccorso disponibile
+                  {t("home.noRescueRequests")}
                 </Text>
               </View>
             )}
@@ -1481,7 +1481,7 @@ export default function MapScreen() {
                         const err = await res.json().catch(() => ({}));
                         Alert.alert(t("common.error"), (err as any).message || t("home.inviteError"));
                       } else {
-                        Alert.alert(t("home.inviteSent"), `${selectedUser.nickname} ha ricevuto l'invito per "${item.title}".`);
+                        Alert.alert(t("home.inviteSent"), `${selectedUser.nickname} ${t("home.inviteBodyPart")} "${item.title}".`);
                         setShowInviteEventModal(false);
                       }
                     } catch {
@@ -1510,7 +1510,7 @@ export default function MapScreen() {
                 <Text style={{ textAlign: "center", color: Colors.textSecondary, paddingVertical: 16 }}>
                   {(myOrganizedEventsQuery.data ?? []).length === 0
                     ? t("home.noRally")
-                    : `${selectedUser?.nickname ?? "L'utente"} ${t("home.alreadyJoinedAll")}`}
+                    : `${selectedUser?.nickname ?? t("home.fallbackUser")} ${t("home.alreadyJoinedAll")}`}
                 </Text>
               }
             />

@@ -123,7 +123,7 @@ function WishlistScreen() {
     setShowMotoForm(true);
   };
 
-  const getMotoTypeLabel = (v: string) => MOTO_TYPES.find(t => t.value === v)?.label || v;
+  const getMotoTypeLabel = (v: string) => t(`garage.motoType.${v}`) || v;
 
   const handleSaveMoto = () => {
     const hasBrandModel = motoForm.brand.trim() && motoForm.model.trim();
@@ -157,7 +157,7 @@ function WishlistScreen() {
     </Pressable>
   );
 
-  const getStyleLabel = (v: string) => RIDING_STYLES.find(t => t.value === v)?.label || v;
+  const getStyleLabel = (v: string) => t(`garage.style.${v}`) || v;
 
   if (isLoading || authIsLoading) {
     return (
@@ -315,14 +315,14 @@ function WishlistScreen() {
               <Text style={styles.label}>{t("garage.motoType")}</Text>
               <View style={styles.optionRow}>
                 {MOTO_TYPES.map(mt => (
-                  <OptionButton key={mt.value} label={mt.label} selected={motoForm.motorcycleType === mt.value} onPress={() => setMotoForm(p => ({ ...p, motorcycleType: p.motorcycleType === mt.value ? "" : mt.value }))} />
+                  <OptionButton key={mt.value} label={t(`garage.motoType.${mt.value}`)} selected={motoForm.motorcycleType === mt.value} onPress={() => setMotoForm(p => ({ ...p, motorcycleType: p.motorcycleType === mt.value ? "" : mt.value }))} />
                 ))}
               </View>
 
               <Text style={styles.label}>{t("garage.ridingStyle")}</Text>
               <View style={styles.optionRow}>
                 {RIDING_STYLES.map(s => (
-                  <OptionButton key={s.value} label={s.label} selected={motoForm.ridingStyle === s.value} onPress={() => setMotoForm(p => ({ ...p, ridingStyle: s.value }))} />
+                  <OptionButton key={s.value} label={t(`garage.style.${s.value}`)} selected={motoForm.ridingStyle === s.value} onPress={() => setMotoForm(p => ({ ...p, ridingStyle: s.value }))} />
                 ))}
               </View>
 
@@ -499,8 +499,8 @@ function GarageContent() {
     </Pressable>
   );
 
-  const getMotoTypeLabel = (v: string) => MOTO_TYPES.find(t => t.value === v)?.label || v;
-  const getStyleLabel = (v: string) => RIDING_STYLES.find(t => t.value === v)?.label || v;
+  const getMotoTypeLabel = (v: string) => t(`garage.motoType.${v}`) || v;
+  const getStyleLabel = (v: string) => t(`garage.style.${v}`) || v;
 
   const getMotoDisplayName = (item: any) => {
     const parts = [item.brand, item.model].filter(Boolean);
@@ -651,15 +651,15 @@ function GarageContent() {
 
               <Text style={styles.label}>{t("garage.motoType")} *</Text>
               <View style={styles.optionRow}>
-                {MOTO_TYPES.map(t => (
-                  <OptionButton key={t.value} label={t.label} selected={form.motorcycleType === t.value} onPress={() => setForm(p => ({ ...p, motorcycleType: t.value }))} />
+                {MOTO_TYPES.map(mt => (
+                  <OptionButton key={mt.value} label={t(`garage.motoType.${mt.value}`)} selected={form.motorcycleType === mt.value} onPress={() => setForm(p => ({ ...p, motorcycleType: mt.value }))} />
                 ))}
               </View>
 
               <Text style={styles.label}>{t("garage.ridingStyle")} *</Text>
               <View style={styles.optionRow}>
                 {RIDING_STYLES.map(s => (
-                  <OptionButton key={s.value} label={s.label} selected={form.ridingStyle === s.value} onPress={() => setForm(p => ({ ...p, ridingStyle: s.value }))} />
+                  <OptionButton key={s.value} label={t(`garage.style.${s.value}`)} selected={form.ridingStyle === s.value} onPress={() => setForm(p => ({ ...p, ridingStyle: s.value }))} />
                 ))}
               </View>
 
