@@ -1752,7 +1752,7 @@ export default function TrackingScreen() {
       );
       const now = new Date();
       const pad2 = (n: number) => n.toString().padStart(2, "0");
-      setRideTitle(`Giro del ${pad2(now.getDate())}/${pad2(now.getMonth() + 1)} · ${pad2(now.getHours())}:${pad2(now.getMinutes())}`);
+      setRideTitle(`${t("tracking.rideDefaultPrefix")} ${pad2(now.getDate())}/${pad2(now.getMonth() + 1)} · ${pad2(now.getHours())}:${pad2(now.getMinutes())}`);
       setCompletedRouteId(rId);
       setSummaryVisible(true);
     } catch (e) {

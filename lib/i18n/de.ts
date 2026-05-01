@@ -553,6 +553,8 @@ const de: Record<string, string> = {
   "home.inviteModalDesc2": "",
   "home.fallbackUserLower": "",
   "match.thisUser": "",
+  "home.noActiveProposals": "",
+  "tracking.rideDefaultPrefix": "",
 };
 
 export default de;

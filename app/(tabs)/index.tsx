@@ -669,7 +669,7 @@ export default function MapScreen() {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color={Colors.accent} />
-        <Text style={styles.loadingText}>Caricamento mappa...</Text>
+        <Text style={styles.loadingText}>{t("map.loadingMap")}</Text>
       </View>
     );
   }
@@ -754,7 +754,7 @@ export default function MapScreen() {
             {searchLoading ? (
               <ActivityIndicator size="small" color={Colors.accent} style={{ padding: 12 }} />
             ) : searchResults.length === 0 ? (
-              <Text style={styles.searchNoResults}>Nessun risultato</Text>
+              <Text style={styles.searchNoResults}>{t("common.noResults")}</Text>
             ) : (
               <ScrollView style={{ maxHeight: 200 }} keyboardShouldPersistTaps="handled">
                 {searchResults.map((u: any) => (
@@ -898,7 +898,7 @@ export default function MapScreen() {
                 {searchLoading ? (
                   <ActivityIndicator size="small" color={Colors.accent} style={{ padding: 12 }} />
                 ) : searchResults.length === 0 ? (
-                  <Text style={styles.searchNoResults}>Nessun risultato</Text>
+                  <Text style={styles.searchNoResults}>{t("common.noResults")}</Text>
                 ) : (
                   <ScrollView style={{ maxHeight: 200 }} keyboardShouldPersistTaps="handled">
                     {searchResults.map((u: any) => (
@@ -1047,7 +1047,7 @@ export default function MapScreen() {
             ) : (bikerListQuery.data || []).length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="bicycle" size={32} color={Colors.textSecondary} />
-                <Text style={styles.emptyText}>Nessun biker disponibile</Text>
+                <Text style={styles.emptyText}>{t("map.noBikerAvailable")}</Text>
               </View>
             ) : (
               <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
@@ -1113,7 +1113,7 @@ export default function MapScreen() {
             ) : (zavListQuery.data || []).length === 0 ? (
               <View style={styles.emptyState}>
                 <MaterialCommunityIcons name="seat-passenger" size={32} color={Colors.textSecondary} />
-                <Text style={styles.emptyText}>Nessuna zavorrina disponibile</Text>
+                <Text style={styles.emptyText}>{t("match.noPassenger")}</Text>
               </View>
             ) : (
               <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
@@ -1398,7 +1398,7 @@ export default function MapScreen() {
 
                 {selectedUserProposals.length === 0 && !detailLoading && (
                   <View style={{ alignItems: "center", paddingVertical: 12 }}>
-                    <Text style={styles.detailType}>Nessuna proposta attiva</Text>
+                    <Text style={styles.detailType}>{t("home.noActiveProposals")}</Text>
                   </View>
                 )}
 
