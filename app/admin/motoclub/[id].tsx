@@ -167,11 +167,11 @@ export default function AdminClubDetail() {
 
   function handleRemoveMember(member: Member) {
     Alert.alert(
-      "Rimuovi membro",
+      t("admin.removeMember"),
       `Rimuovere @${member.nickname} dal club?`,
       [
-        { text: "Annulla", style: "cancel" },
-        { text: "Rimuovi", style: "destructive", onPress: () => removeMemberMutation.mutate(member.userId) },
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("admin.remove"), style: "destructive", onPress: () => removeMemberMutation.mutate(member.userId) },
       ]
     );
   }

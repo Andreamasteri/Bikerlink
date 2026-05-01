@@ -329,7 +329,7 @@ export default function ChatConversationScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
     },
     onError: (error: Error) => {
-      const msg = error?.message || "Impossibile inviare il messaggio.";
+      const msg = error?.message || t("chat.sendMessageError");
       Alert.alert("Errore invio", msg.replace(/^\d+:\s*/, ""));
     },
   });

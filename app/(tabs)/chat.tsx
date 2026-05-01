@@ -455,7 +455,7 @@ export default function ChatScreen() {
               <Ionicons name="search" size={18} color={Colors.textSecondary} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Cerca utente..."
+                placeholder={t("chat.searchUser")}
                 placeholderTextColor={Colors.textSecondary}
                 value={searchQuery}
                 onChangeText={setSearchQuery}

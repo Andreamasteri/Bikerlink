@@ -178,6 +178,7 @@ function TelefonoTrackRow({
 }
 
 function TelefonoTab() {
+  const t = useT();
   const { playTrack, playQueue, isAvailable: playerAvailable } = usePlayer();
   const [permission, requestPermission] = MediaLibrary.usePermissions();
   const [assets, setAssets] = useState<MediaLibrary.Asset[]>([]);
@@ -291,10 +292,10 @@ function TelefonoTab() {
   return (
     <View style={{ flex: 1 }}>
       <View style={[styles.section, { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 10, paddingBottom: 6 }]}>
-        <Text style={styles.sectionTitle}>{loading && assets.length === 0 ? "Caricamento…" : `${assets.length} brani`}</Text>
+        <Text style={styles.sectionTitle}>{loading && assets.length === 0 ? t("music.loading") : t("music.tracksCount").replace("{count}", String(assets.length))}</Text>
         <TouchableOpacity style={styles.playAllBtn} onPress={handlePlayAll} disabled={!playerAvailable || assets.length === 0}>
           <Ionicons name="play-circle" size={14} color={Colors.accent} />
-          <Text style={styles.playAllBtnText}>Riproduci tutto</Text>
+          <Text style={styles.playAllBtnText}>t("music.playAll")</Text>
         </TouchableOpacity>
       </View>
       <FlatList
@@ -1039,7 +1040,7 @@ export default function MusicScreen() {
       if (!res.ok) {
         const msg = (body as { message?: string }).message ?? t("music.error");
         if (msg.toLowerCase().includes("nessuna traccia") || msg.toLowerCase().includes("nessun brano")) {
-          Alert.alert("Playlist vuota", "Connetti prima il tuo account musicale e sincronizza i tuoi brani per poterli condividere.");
+          Alert.alert(t("music.emptyPlaylistTitle"), t("music.connectFirstMsg"));
         } else {
           Alert.alert(t("music.error"), msg);
         }
@@ -1048,7 +1049,7 @@ export default function MusicScreen() {
       setSendModalVisible(false);
       router.push(`/chat/${conv.id}` as any);
     } catch {
-      Alert.alert(t("music.error"), "Impossibile inviare la playlist. Riprova.");
+      Alert.alert(t("music.error"), t("music.sendPlaylistError"));
     } finally {
       setSendingToConv(null);
     }
@@ -1278,11 +1279,11 @@ export default function MusicScreen() {
       ) : tab === "telefono" ? (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
           <Ionicons name="phone-portrait-outline" size={12} color={activeTab === "telefono" ? Colors.accent : Colors.textSecondary} />
-          <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>Telefono</Text>
+          <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{t("music.tabTelefono")}</Text>
         </View>
       ) : (
         <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-          {tab === "brani" ? "Brani" : tab === "match" ? "Match" : "Ricevute"}
+          {tab === "brani" ? t("music.tabBrani") : tab === "match" ? "Match" : t("music.tabRicevute")}
         </Text>
       )}
     </TouchableOpacity>
@@ -1554,7 +1555,7 @@ function BraniTab({
         if (!resp.ok) throw new Error(t("music.error"));
         const previews: PreviewResult[] = await resp.json();
         if (!previews || previews.length === 0) {
-          Alert.alert("Nessuna anteprima", "Nessun brano della playlist ha un'anteprima disponibile su iTunes.");
+          Alert.alert(t("music.noPreviewTitle"), t("music.noPreviewMsgShared"));
           return;
         }
         const tracks: PlayerTrack[] = previews.map((p) => ({
@@ -1660,7 +1661,7 @@ function BraniTab({
                 ) : (
                   <>
                     <Ionicons name="play-circle-outline" size={18} color={Colors.accent} />
-                    <Text style={styles.playAllBtnText}>Riproduci tutto</Text>
+                    <Text style={styles.playAllBtnText}>t("music.playAll")</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -1709,7 +1710,7 @@ function BraniTab({
           <Ionicons name="search" size={18} color={Colors.textSecondary} style={{ marginRight: 8 }} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Ricerca Brani su Last.fm"
+            placeholder={t("music.searchPlaceholder")}
             placeholderTextColor={Colors.textSecondary}
             value={searchInput}
             onChangeText={onSearchChange}
@@ -2143,7 +2144,7 @@ function MatchTab({
           <Text style={styles.filterLabel}>Criteri</Text>
           <View style={styles.filterRow}>
             {[
-              { key: "songs", label: "Brani" },
+              { key: "songs", label: t("music.songsCriteria") },
               { key: "genre", label: "Genere" },
               { key: "artist", label: "Artista" },
             ].map(({ key, label }) => (
@@ -2368,7 +2369,7 @@ function SharedPlaylistCard({
         if (!resp.ok) throw new Error(t("music.loadError"));
         const previews: PreviewResult[] = await resp.json();
         if (!previews || previews.length === 0) {
-          Alert.alert("Nessuna anteprima", "Nessun brano di questa playlist ha un'anteprima disponibile.");
+          Alert.alert(t("music.noPreviewTitle"), t("music.noPreviewMsg"));
           return;
         }
         const tracks: PlayerTrack[] = previews.map((p) => ({

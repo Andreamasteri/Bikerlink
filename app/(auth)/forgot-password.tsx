@@ -55,8 +55,8 @@ export default function ForgotPasswordScreen() {
 
   const handleSendCode = async () => {
     setError("");
-    if (!email.trim()) { setError("Inserisci la tua email"); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError("Inserisci un'email valida"); return; }
+    if (!email.trim()) { setError(t("auth.enterEmailFP")); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError(t("auth.enterValidEmail")); return; }
 
     setLoading(true);
     try {
@@ -66,7 +66,7 @@ export default function ForgotPasswordScreen() {
       setStep(2);
       startCooldown();
     } catch (err: any) {
-      setError(parseError(err, "Errore durante l'invio"));
+      setError(parseError(err, t("auth.sendErrorFP")));
     } finally {
       setLoading(false);
     }
@@ -83,7 +83,7 @@ export default function ForgotPasswordScreen() {
       setResendSuccess(true);
       startCooldown();
     } catch (err: any) {
-      setError(parseError(err, "Errore durante l'invio"));
+      setError(parseError(err, t("auth.sendErrorFP")));
     } finally {
       setResendLoading(false);
     }
@@ -123,7 +123,7 @@ export default function ForgotPasswordScreen() {
       queryClient.setQueryData(["/api/auth/me"], user);
       router.replace("/(tabs)");
     } catch (err: any) {
-      setError(parseError(err, "Errore durante il reset"));
+      setError(parseError(err, t("auth.resetError")));
     } finally {
       setLoading(false);
     }

@@ -466,7 +466,7 @@ export default function MotoclubScreen() {
             <Ionicons name="search" size={16} color={Colors.textSecondary} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Cerca il club per Marca o Regione"
+              placeholder={t("motoclub.searchPlaceholder")}
               placeholderTextColor={Colors.textSecondary}
               value={search}
               onChangeText={setSearch}

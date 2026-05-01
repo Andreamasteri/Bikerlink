@@ -45,9 +45,9 @@ export default function AdminReports() {
   });
 
   function handleResolve(report: Report) {
-    Alert.alert("Gestisci segnalazione", report.reason, [
-      { text: "Risolvi", onPress: () => resolveMutation.mutate({ id: report.id, status: "resolved" }) },
-      { text: "Archivia", onPress: () => resolveMutation.mutate({ id: report.id, status: "dismissed" }) },
+    Alert.alert(t("admin.manageReport"), report.reason, [
+      { text: t("admin.resolve"), onPress: () => resolveMutation.mutate({ id: report.id, status: "resolved" }) },
+      { text: t("admin.archive"), onPress: () => resolveMutation.mutate({ id: report.id, status: "dismissed" }) },
       { text: t("common.cancel"), style: "cancel" },
     ]);
   }

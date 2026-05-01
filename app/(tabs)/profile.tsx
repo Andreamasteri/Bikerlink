@@ -380,7 +380,7 @@ export default function ProfileScreen() {
         queryClient.clear();
         Alert.alert(t("profile.cacheClearedTitle"), t("profile.cacheClearedMsg"));
       } catch {
-        Alert.alert("Errore", "Impossibile pulire la cache.");
+        Alert.alert(t("common.error"), t("profile.cacheError"));
       }
     };
     if (Platform.OS === "web") {
