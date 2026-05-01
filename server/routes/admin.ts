@@ -528,19 +528,38 @@ router.delete("/purge-non-admin-users", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/admin/ota-events?limit=100 — Lista eventi OTA persistiti su DB
-// (ordinati dal più recente). Admin-only (montato dopo router.use(requireAdmin)).
+// GET /api/admin/ota-events?limit=100&phase=X&source=Y&platform=Z&updateId=W
+// Lista eventi OTA persistiti su DB (ordinati dal più recente). Admin-only.
 router.get("/ota-events", async (req: Request, res: Response) => {
   try {
     const limitRaw = parseInt(String(req.query.limit ?? "100"), 10);
     const limit = Math.min(Math.max(isNaN(limitRaw) ? 100 : limitRaw, 1), 500);
+    const phaseFilter = req.query.phase ? String(req.query.phase).substring(0, 32) : null;
+    const sourceFilter = req.query.source ? String(req.query.source).substring(0, 32) : null;
+    const platformFilter = req.query.platform ? String(req.query.platform).substring(0, 16) : null;
+    const updateIdFilter = req.query.updateId ? String(req.query.updateId).substring(0, 64) : null;
+
+    // Build WHERE clause fragments using sql template for type safety.
+    const whereFragments = [
+      phaseFilter ? sql`phase = ${phaseFilter}` : undefined,
+      sourceFilter ? sql`source = ${sourceFilter}` : undefined,
+      platformFilter ? sql`platform = ${platformFilter}` : undefined,
+      updateIdFilter ? sql`current_update_id ILIKE ${"%" + updateIdFilter + "%"}` : undefined,
+    ].filter((f): f is NonNullable<typeof f> => f !== undefined);
+
+    const whereSql = whereFragments.length > 0
+      ? sql`WHERE ${sql.join(whereFragments, sql` AND `)}`
+      : sql``;
+
     const result = await db.execute(sql`
       SELECT id, created_at, phase, source, platform, runtime_version, current_update_id, release_id, error, fail_count, ip, diagnostics
       FROM ota_events
+      ${whereSql}
       ORDER BY created_at DESC
       LIMIT ${limit}
     `);
-    return res.json({ events: result.rows, limit });
+
+    return res.json({ events: result.rows, limit, filters: { phase: phaseFilter, source: sourceFilter, platform: platformFilter, updateId: updateIdFilter } });
   } catch (err) {
     console.error("[OTA-EVENTS] read error:", err);
     return res.status(500).json({ message: "Errore lettura eventi OTA" });
@@ -4386,6 +4405,32 @@ router.get("/system-health", async (_req: Request, res: Response) => {
       });
     }
 
+    // Leggi gli ultimi 20 errori OTA dal DB (sopravvive ai riavvii del backend).
+    // Fallback sull'array in memoria in caso di errore DB.
+    let otaErrorsFromDb: OtaErrorEntry[] = [];
+    try {
+      const dbOtaResult = await db.execute(sql`
+        SELECT error, fail_count, current_update_id, runtime_version, phase, source, platform, created_at
+        FROM ota_events
+        WHERE error NOT LIKE 'ok:%'
+        ORDER BY created_at DESC
+        LIMIT 20
+      `);
+      otaErrorsFromDb = dbOtaResult.rows.map((r) => ({
+        error: String(r.error ?? ""),
+        failCount: Number(r.fail_count ?? 0),
+        updateId: String(r.current_update_id ?? "unknown"),
+        runtimeVersion: String(r.runtime_version ?? "unknown"),
+        phase: r.phase ? String(r.phase) : undefined,
+        source: r.source ? String(r.source) : undefined,
+        platform: r.platform ? String(r.platform) : undefined,
+        timestamp: r.created_at ? new Date(String(r.created_at)).toISOString() : new Date().toISOString(),
+      }));
+    } catch (dbErr) {
+      console.error("[system-health] DB OTA errors read failed, using in-memory:", dbErr);
+      otaErrorsFromDb = otaErrors.slice().reverse().filter((e) => !e.error.startsWith("ok:")).slice(0, 20);
+    }
+
     return res.json({
       backendStartedAt: SERVER_START_TIME,
       backendUptimeSec,
@@ -4393,7 +4438,7 @@ router.get("/system-health", async (_req: Request, res: Response) => {
       metroStartedAt: uptimeState.metroStartTime,
       metroUptimeSec,
       events,
-      otaErrors: otaErrors.slice().reverse(),
+      otaErrors: otaErrorsFromDb,
     });
   } catch (error) {
     console.error("Admin system-health error:", error);

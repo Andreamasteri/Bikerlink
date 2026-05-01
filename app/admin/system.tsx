@@ -120,6 +120,7 @@ interface OtaEventRow {
 interface OtaEventsResponse {
   events: OtaEventRow[];
   limit: number;
+  filters?: { phase: string | null; source: string | null; platform: string | null; updateId: string | null };
 }
 
 interface SystemHealth {
@@ -465,12 +466,27 @@ export default function SystemScreen() {
     refetchInterval: 60000,
   });
 
+  const [otaFilterPhase, setOtaFilterPhase] = useState("");
+  const [otaFilterSource, setOtaFilterSource] = useState("");
+  const [otaFilterPlatform, setOtaFilterPlatform] = useState("");
+  const [otaFilterUpdateId, setOtaFilterUpdateId] = useState("");
+
+  const otaEventsQueryKey = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("limit", "100");
+    if (otaFilterPhase.trim()) params.set("phase", otaFilterPhase.trim());
+    if (otaFilterSource.trim()) params.set("source", otaFilterSource.trim());
+    if (otaFilterPlatform.trim()) params.set("platform", otaFilterPlatform.trim());
+    if (otaFilterUpdateId.trim()) params.set("updateId", otaFilterUpdateId.trim());
+    return [`/api/admin/ota-events?${params.toString()}`];
+  }, [otaFilterPhase, otaFilterSource, otaFilterPlatform, otaFilterUpdateId]);
+
   const {
     data: otaEventsData,
     refetch: refetchOtaEvents,
     isFetching: isFetchingOtaEvents,
   } = useQuery<OtaEventsResponse>({
-    queryKey: ["/api/admin/ota-events"],
+    queryKey: otaEventsQueryKey,
     refetchInterval: 10000,
   });
 
@@ -794,6 +810,56 @@ export default function SystemScreen() {
             <Text style={styles.hintText}>
               Bypassa il cooldown e contatta /api/expo-updates. L&apos;esito viene loggato in DB e mostrato sotto.
             </Text>
+
+            <View style={styles.filterRow}>
+              <TextInput
+                style={styles.filterInput}
+                placeholder="Phase…"
+                placeholderTextColor={Colors.textMuted ?? "#888"}
+                value={otaFilterPhase}
+                onChangeText={setOtaFilterPhase}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TextInput
+                style={styles.filterInput}
+                placeholder="Source…"
+                placeholderTextColor={Colors.textMuted ?? "#888"}
+                value={otaFilterSource}
+                onChangeText={setOtaFilterSource}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+            <View style={styles.filterRow}>
+              <TextInput
+                style={styles.filterInput}
+                placeholder="Platform…"
+                placeholderTextColor={Colors.textMuted ?? "#888"}
+                value={otaFilterPlatform}
+                onChangeText={setOtaFilterPlatform}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TextInput
+                style={styles.filterInput}
+                placeholder="Update ID…"
+                placeholderTextColor={Colors.textMuted ?? "#888"}
+                value={otaFilterUpdateId}
+                onChangeText={setOtaFilterUpdateId}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+            {(otaFilterPhase || otaFilterSource || otaFilterPlatform || otaFilterUpdateId) && (
+              <TouchableOpacity
+                onPress={() => { setOtaFilterPhase(""); setOtaFilterSource(""); setOtaFilterPlatform(""); setOtaFilterUpdateId(""); }}
+                style={[styles.actionBtnWide, { marginTop: 4, marginBottom: 8, backgroundColor: "#555" }]}
+              >
+                <Ionicons name="close-circle-outline" size={14} color="#fff" />
+                <Text style={styles.actionBtnText}>Rimuovi filtri</Text>
+              </TouchableOpacity>
+            )}
 
             {(otaEventsData?.events ?? []).length === 0 ? (
               <Text style={[styles.hintText, { marginTop: 12 }]}>Nessun evento OTA registrato.</Text>
@@ -1698,6 +1764,23 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     marginTop: 8,
     textAlign: "center",
+  },
+  filterRow: {
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 8,
+  },
+  filterInput: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    color: Colors.text,
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    borderWidth: 1,
+    borderColor: Colors.border ?? "#333",
   },
   statsRow: {
     flexDirection: "row",
