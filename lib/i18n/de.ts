@@ -543,6 +543,10 @@ const de: Record<string, string> = {
   "tracking.deleteRideTitle": "",
   "tracking.deleteRideConfirm": "",
   "tracking.close": "",
+  "tracking.accuracy.excellent": "",
+  "tracking.accuracy.good": "",
+  "tracking.accuracy.fair": "",
+  "tracking.accuracy.poor": "",
 };
 
 export default de;

@@ -430,6 +430,11 @@ const en: Record<string, string> = {
 
   "home.userAvailable": "Available",
 
+  "tracking.accuracy.excellent": "Excellent",
+  "tracking.accuracy.good": "Good",
+  "tracking.accuracy.fair": "Fair",
+  "tracking.accuracy.poor": "Poor",
+
   "tracking.pause": "PAUSE",
   "tracking.resume": "RESUME",
   "garage.hasBike": "has",

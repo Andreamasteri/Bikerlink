@@ -134,13 +134,13 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function getAccuracyTier(meters: number | null): { label: string; color: string; value: string } | null {
+function getAccuracyTier(meters: number | null): { labelKey: string; color: string; value: string } | null {
   if (meters === null || meters < 0) return null;
   const m = Math.round(meters);
-  if (meters < 5) return { label: "Ottima", color: Colors.success, value: `${m}m` };
-  if (meters < 15) return { label: "Buona", color: "#4A9EFF", value: `${m}m` };
-  if (meters <= 30) return { label: "Discreta", color: Colors.warning, value: `${m}m` };
-  return { label: "Scarsa", color: Colors.accentRed, value: `${m}m` };
+  if (meters < 5) return { labelKey: "tracking.accuracy.excellent", color: Colors.success, value: `${m}m` };
+  if (meters < 15) return { labelKey: "tracking.accuracy.good", color: "#4A9EFF", value: `${m}m` };
+  if (meters <= 30) return { labelKey: "tracking.accuracy.fair", color: Colors.warning, value: `${m}m` };
+  return { labelKey: "tracking.accuracy.poor", color: Colors.accentRed, value: `${m}m` };
 }
 
 // ─── Unit conversions ─────────────────────────────────────────────────────────
@@ -1952,7 +1952,7 @@ export default function TrackingScreen() {
                 {accuracyTier && (
                   <View style={styles.accuracyRow}>
                     <Text style={[styles.accuracyLabel, { color: accuracyTier.color }]}>
-                      {accuracyTier.label}
+                      {t(accuracyTier.labelKey)}
                     </Text>
                     <Text style={styles.accuracyValue}>{accuracyTier.value}</Text>
                   </View>
@@ -2170,7 +2170,7 @@ export default function TrackingScreen() {
                       icon="locate-outline"
                       color={accuracyTier.color}
                       value={accuracyTier.value}
-                      label={accuracyTier.label}
+                      label={t(accuracyTier.labelKey)}
                     />
                   ) : (
                     <View style={[styles.statCard, { opacity: 0 }]} />
