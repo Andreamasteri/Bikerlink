@@ -2258,14 +2258,17 @@ router.delete("/advertisements/bulk-delete", async (req: Request, res: Response)
     await db.delete(adCampaignsTable).where(inArray(adCampaignsTable.id, ids));
     for (const campaign of toDelete) {
       if (campaign.imageUrl) {
-        const match = campaign.imageUrl.match(/\/api\/ads\/images\/(.+)$/);
+        const match = campaign.imageUrl.match(/\/api\/ads\/images\/([^?#]+)/);
         if (match) {
-          const localPath = path.join(adsDir, match[1]);
-          fs.unlink(localPath, (err) => {
-            if (err && (err as NodeJS.ErrnoException).code !== "ENOENT") {
-              console.warn("[Ads] Failed to remove cached image:", localPath, err.message);
-            }
-          });
+          const filename = match[1];
+          if (filename && !filename.includes("..") && !filename.includes("/")) {
+            const localPath = path.join(adsDir, filename);
+            fs.unlink(localPath, (err) => {
+              if (err && (err as NodeJS.ErrnoException).code !== "ENOENT") {
+                console.warn("[Ads] Failed to remove cached image:", localPath, err.message);
+              }
+            });
+          }
         }
       }
     }
@@ -2332,14 +2335,17 @@ router.delete("/advertisements/:id", async (req: Request, res: Response) => {
     const campaign = await storage.getAdCampaign(id);
     await storage.deleteCampaign(id);
     if (campaign?.imageUrl) {
-      const match = campaign.imageUrl.match(/\/api\/ads\/images\/(.+)$/);
+      const match = campaign.imageUrl.match(/\/api\/ads\/images\/([^?#]+)/);
       if (match) {
-        const localPath = path.join(adsDir, match[1]);
-        fs.unlink(localPath, (err) => {
-          if (err && (err as NodeJS.ErrnoException).code !== "ENOENT") {
-            console.warn("[Ads] Failed to remove cached image:", localPath, err.message);
-          }
-        });
+        const filename = match[1];
+        if (filename && !filename.includes("..") && !filename.includes("/")) {
+          const localPath = path.join(adsDir, filename);
+          fs.unlink(localPath, (err) => {
+            if (err && (err as NodeJS.ErrnoException).code !== "ENOENT") {
+              console.warn("[Ads] Failed to remove cached image:", localPath, err.message);
+            }
+          });
+        }
       }
     }
     await storage.createModeratorLog({
