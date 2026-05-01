@@ -1052,6 +1052,7 @@ const es: Record<string, string> = {
   "admin.createCampaign": "",
   "admin.uploadFolder": "",
   "admin.campaignName": "",
+  "tracking.bufferSent": "",
 };
 
 export default es;

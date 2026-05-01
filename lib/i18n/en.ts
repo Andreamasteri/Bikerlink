@@ -1100,6 +1100,7 @@ const en: Record<string, string> = {
   "admin.createCampaign": "Create Campaign",
   "admin.uploadFolder": "Upload folder",
   "admin.campaignName": "Campaign name",
+  "tracking.bufferSent": "Buffer / Sent",
 };
 
 export default en;

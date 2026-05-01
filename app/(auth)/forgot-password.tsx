@@ -14,7 +14,6 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { t } from "@/lib/i18n";
 import { apiRequest, setSessionToken } from "@/lib/query-client";
 import { queryClient } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";

@@ -2183,7 +2183,7 @@ export default function TrackingScreen() {
             <View style={styles.bufferRow}>
               <Ionicons name="cloud-upload-outline" size={14} color={Colors.accent} />
               <Text style={styles.bufferText}>
-                {pointsBuffered}/{pointsSent} Buffer / Inviati
+                {pointsBuffered}/{pointsSent} {t("tracking.bufferSent")}
               </Text>
             </View>
           </ScrollView>
