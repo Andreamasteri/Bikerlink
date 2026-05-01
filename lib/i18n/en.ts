@@ -1088,6 +1088,18 @@ const en: Record<string, string> = {
   "sensors.permPreviouslyDenied": "Permission previously denied (cannot be re-requested).",
   "sensors.pedometerPermDenied": "Motion Access permission denied.",
   "sensors.permPreviouslyDeniedShort": "Permission previously denied (cannot be re-requested).",
+  "common.thisUser": "this user",
+  "auth.codeEightDigits": "The code must be 8 digits",
+  "auth.codeOnlyDigits": "The code must contain only digits",
+  "auth.passwordMinChars": "The password must be at least 8 characters",
+  "auth.forgotPasswordHint": "Enter your account email. We will send you an 8-digit numeric code.",
+  "auth.codeEightDigitsPlaceholder": "8-digit code",
+  "auth.newPasswordPlaceholder": "New password (min. 8 characters)",
+  "admin.uploadImage": "Upload image",
+  "admin.campaignNamePlaceholder": "Campaign name *",
+  "admin.createCampaign": "Create Campaign",
+  "admin.uploadFolder": "Upload folder",
+  "admin.campaignName": "Campaign name",
 };
 
 export default en;

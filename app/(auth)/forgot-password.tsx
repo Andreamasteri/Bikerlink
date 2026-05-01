@@ -94,15 +94,15 @@ export default function ForgotPasswordScreen() {
   const handleReset = async () => {
     setError("");
     if (!code.trim() || code.trim().length !== 8) {
-      setError("Il codice deve essere di 8 cifre");
+      setError(t("auth.codeEightDigits"));
       return;
     }
     if (!/^\d{8}$/.test(code.trim())) {
-      setError("Il codice deve contenere solo cifre");
+      setError(t("auth.codeOnlyDigits"));
       return;
     }
     if (!newPassword || newPassword.length < 8) {
-      setError("La password deve avere almeno 8 caratteri");
+      setError(t("auth.passwordMinChars"));
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -155,7 +155,7 @@ export default function ForgotPasswordScreen() {
           <Text style={styles.title}>Recupera Password</Text>
           {step === 1 ? (
             <Text style={styles.subtitle}>
-              Inserisci l'email del tuo account. Ti invieremo un codice numerico a 8 cifre.
+              {t("auth.forgotPasswordHint")}
             </Text>
           ) : (
             <Text style={styles.subtitle}>
@@ -216,7 +216,7 @@ export default function ForgotPasswordScreen() {
                 <Ionicons name="keypad-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
                 <TextInput
                   style={[styles.input, styles.codeInput]}
-                  placeholder="Codice a 8 cifre"
+                  placeholder={t("auth.codeEightDigitsPlaceholder")}
                   placeholderTextColor={Colors.textSecondary}
                   value={code}
                   onChangeText={(t) => setCode(t.replace(/\D/g, "").slice(0, 8))}
@@ -230,7 +230,7 @@ export default function ForgotPasswordScreen() {
                 <Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
                 <TextInput
                   style={[styles.input, styles.passwordInput]}
-                  placeholder="Nuova password (min. 8 caratteri)"
+                  placeholder={t("auth.newPasswordPlaceholder")}
                   placeholderTextColor={Colors.textSecondary}
                   value={newPassword}
                   onChangeText={setNewPassword}

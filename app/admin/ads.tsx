@@ -865,14 +865,14 @@ export default function AdminAds() {
               ) : (
                 <View style={styles.imagePlaceholder}>
                   <MaterialIcons name="add-photo-alternate" size={36} color={Colors.textSecondary} />
-                  <Text style={styles.imagePlaceholderText}>Carica immagine</Text>
+                  <Text style={styles.imagePlaceholderText}>{t("admin.uploadImage")}</Text>
                 </View>
               )}
             </TouchableOpacity>
 
             <TextInput
               style={styles.input}
-              placeholder="Nome campagna *"
+              placeholder={t("admin.campaignNamePlaceholder")}
               placeholderTextColor={Colors.textSecondary}
               value={formName}
               onChangeText={setFormName}
@@ -904,7 +904,7 @@ export default function AdminAds() {
               {createMutation.isPending ? (
                 <ActivityIndicator color={Colors.background} />
               ) : (
-                <Text style={styles.submitBtnText}>Crea Campagna</Text>
+                <Text style={styles.submitBtnText}>{t("admin.createCampaign")}</Text>
               )}
             </TouchableOpacity>
           </KeyboardAwareScrollViewCompat>
@@ -914,7 +914,7 @@ export default function AdminAds() {
       <Modal visible={showBulkModal} animationType="slide" onRequestClose={() => { if (!bulkUploading) { setShowBulkModal(false); setBulkBaseName(""); setBulkImages([]); setBulkTarget("tutti"); setBulkLinkUrl(""); } }}>
         <View style={[styles.createModalContainer, { paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Carica cartella</Text>
+            <Text style={styles.modalTitle}>{t("admin.uploadFolder")}</Text>
             <TouchableOpacity onPress={() => { if (!bulkUploading) { setShowBulkModal(false); setBulkBaseName(""); setBulkImages([]); setBulkTarget("tutti"); } }}>
               <MaterialIcons name="close" size={24} color={Colors.textSecondary} />
             </TouchableOpacity>
@@ -1121,7 +1121,7 @@ export default function AdminAds() {
               <Text style={styles.settingsLabel}>Nome</Text>
               <TextInput
                 style={[styles.input, { marginBottom: 12 }]}
-                placeholder="Nome campagna"
+                placeholder={t("admin.campaignName")}
                 placeholderTextColor={Colors.textSecondary}
                 value={editName}
                 onChangeText={setEditName}

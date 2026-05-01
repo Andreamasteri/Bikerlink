@@ -1088,6 +1088,18 @@ const it: Record<string, string> = {
   "sensors.permPreviouslyDenied": "Permesso già negato in precedenza (non ripetibile).",
   "sensors.pedometerPermDenied": "Permesso Motion Access negato.",
   "sensors.permPreviouslyDeniedShort": "Permesso già negato in precedenza (non ripetibile).",
+  "common.thisUser": "questo utente",
+  "auth.codeEightDigits": "Il codice deve essere di 8 cifre",
+  "auth.codeOnlyDigits": "Il codice deve contenere solo cifre",
+  "auth.passwordMinChars": "La password deve avere almeno 8 caratteri",
+  "auth.forgotPasswordHint": "Inserisci l'email del tuo account. Ti invieremo un codice numerico a 8 cifre.",
+  "auth.codeEightDigitsPlaceholder": "Codice a 8 cifre",
+  "auth.newPasswordPlaceholder": "Nuova password (min. 8 caratteri)",
+  "admin.uploadImage": "Carica immagine",
+  "admin.campaignNamePlaceholder": "Nome campagna *",
+  "admin.createCampaign": "Crea Campagna",
+  "admin.uploadFolder": "Carica cartella",
+  "admin.campaignName": "Nome campagna",
 };
 
 export default it;

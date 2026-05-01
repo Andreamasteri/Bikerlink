@@ -1040,6 +1040,18 @@ const el: Record<string, string> = {
   "sensors.permPreviouslyDenied": "",
   "sensors.pedometerPermDenied": "",
   "sensors.permPreviouslyDeniedShort": "",
+  "common.thisUser": "",
+  "auth.codeEightDigits": "",
+  "auth.codeOnlyDigits": "",
+  "auth.passwordMinChars": "",
+  "auth.forgotPasswordHint": "",
+  "auth.codeEightDigitsPlaceholder": "",
+  "auth.newPasswordPlaceholder": "",
+  "admin.uploadImage": "",
+  "admin.campaignNamePlaceholder": "",
+  "admin.createCampaign": "",
+  "admin.uploadFolder": "",
+  "admin.campaignName": "",
 };
 
 export default el;
