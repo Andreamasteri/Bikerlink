@@ -95,6 +95,9 @@ const AUDIO_MODE_ACTIVE = {
   interruptionMode: "doNotMix",
 } as const;
 
+const PLAYER_UPDATE_INTERVAL_MS = 500;
+const RADIO_LOAD_TIMEOUT_MS = 20_000;
+
 const AUDIO_MODE_INACTIVE = {
   allowsRecording: false,
   playsInSilentMode: false,
@@ -126,6 +129,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const repeatModeRef = useRef<RepeatMode>("off");
   const isPlayingRef = useRef(false);
   const sleepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const radioTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadGenRef = useRef(0);
 
   useEffect(() => { queueRef.current = queue; }, [queue]);
@@ -157,6 +161,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       mounted = false;
+      if (radioTimeoutRef.current) {
+        clearTimeout(radioTimeoutRef.current);
+        radioTimeoutRef.current = null;
+      }
       listenerRef.current?.remove();
       listenerRef.current = null;
       try { playerRef.current?.pause(); } catch (err) { console.debug("[Player] unmount pause error:", err); }
@@ -204,6 +212,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const destroyPlayer = useCallback(() => {
+    if (radioTimeoutRef.current) {
+      clearTimeout(radioTimeoutRef.current);
+      radioTimeoutRef.current = null;
+    }
     if (listenerRef.current) {
       listenerRef.current.remove();
       listenerRef.current = null;
@@ -226,11 +238,38 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
       if (gen !== loadGenRef.current) return;
 
-      const player = createAudioPlayer({ uri: track.url }) as AudioPlayerInstance;
+      const player = createAudioPlayer(
+        { uri: track.url },
+        { updateInterval: PLAYER_UPDATE_INTERVAL_MS }
+      ) as AudioPlayerInstance;
       playerRef.current = player;
 
-      const sub = player.addListener("playbackStatusUpdate", onPlaybackStatus);
+      const sub = player.addListener("playbackStatusUpdate", (status) => {
+        if (status.isLoaded && radioTimeoutRef.current) {
+          clearTimeout(radioTimeoutRef.current);
+          radioTimeoutRef.current = null;
+        }
+        onPlaybackStatus(status);
+      });
       listenerRef.current = sub;
+
+      if (track.source === "radio") {
+        const capturedGen = gen;
+        radioTimeoutRef.current = setTimeout(() => {
+          radioTimeoutRef.current = null;
+          if (capturedGen !== loadGenRef.current) return;
+          if (!playerRef.current) return;
+          console.warn("[Player] Radio stream load timeout — destroying player");
+          destroyPlayer();
+          setIsBuffering(false);
+          setCurrentTrack(null);
+          setIsPlaying(false);
+          Alert.alert(
+            "Stazione non raggiungibile",
+            "Il caricamento della stazione ha impiegato troppo tempo. Controlla la connessione o prova un'altra stazione."
+          );
+        }, RADIO_LOAD_TIMEOUT_MS);
+      }
 
       player.play();
 
