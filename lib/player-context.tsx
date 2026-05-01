@@ -96,7 +96,7 @@ const AUDIO_MODE_ACTIVE = {
 } as const;
 
 const PLAYER_UPDATE_INTERVAL_MS = 500;
-const RADIO_LOAD_TIMEOUT_MS = 20_000;
+const RADIO_LOAD_TIMEOUT_MS = 30_000;
 
 const AUDIO_MODE_INACTIVE = {
   allowsRecording: false,
