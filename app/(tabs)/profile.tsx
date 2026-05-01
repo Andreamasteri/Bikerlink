@@ -972,7 +972,7 @@ export default function ProfileScreen() {
               <Text style={styles.fakeHomeCoords}>
                 {homeLatitude != null && homeLongitude != null
                   ? `${homeLatitude.toFixed(5)}, ${homeLongitude.toFixed(5)}`
-                  : "Non impostata"}
+                  : t("profile.notSet")}
               </Text>
               <View style={styles.fakeHomeBtnRow}>
                 <Pressable
@@ -999,7 +999,7 @@ export default function ProfileScreen() {
               <Text style={styles.fakeHomeCoords}>
                 {fakeHomeLatitude != null && fakeHomeLongitude != null
                   ? `${fakeHomeLatitude.toFixed(5)}, ${fakeHomeLongitude.toFixed(5)}`
-                  : "Non impostata"}
+                  : t("profile.notSet")}
               </Text>
               <View style={styles.fakeHomeBtnRow}>
                 <Pressable

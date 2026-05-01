@@ -96,7 +96,7 @@ export default function AdminReports() {
             onPress={() => setFilter(f)}
           >
             <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
-              {f === "all" ? "Tutti" : f.charAt(0).toUpperCase() + f.slice(1)}
+              {f === "all" ? t("admin.filterAll") : f.charAt(0).toUpperCase() + f.slice(1)}
             </Text>
           </TouchableOpacity>
         ))}

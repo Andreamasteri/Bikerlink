@@ -476,8 +476,8 @@ export default function ChatConversationScreen() {
       });
 
       if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ message: "Errore upload" }));
-        throw new Error(err.message ?? "Errore upload foto");
+        const err = await resp.json().catch(() => ({ message: t("chat.uploadError") }));
+        throw new Error(err.message ?? t("chat.uploadPhotoError"));
       }
 
       await queryClient.invalidateQueries({ queryKey: [`/api/chat/conversations/${id}/messages`] });

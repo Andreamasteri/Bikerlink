@@ -34,8 +34,8 @@ export default function FeatureRequestScreen() {
         credentials: "include",
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Errore sconosciuto" }));
-        throw new Error(err.message || "Errore nell'invio");
+        const err = await res.json().catch(() => ({ message: t("feedback.unknownError") }));
+        throw new Error(err.message || t("feedback.sendError"));
       }
       return res.json();
     },

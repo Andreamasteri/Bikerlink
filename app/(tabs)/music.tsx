@@ -750,7 +750,7 @@ const LastfmLoginModal = React.memo(function LastfmLoginModal({ visible, onClose
       setStep("waiting");
     } catch (err) {
       console.error("[Last.fm auth-token]", err);
-      setError((err as Error).message ?? "Errore di connessione a Last.fm.");
+      setError((err as Error).message ?? t("music.lastfmConnectionError"));
       setStep("idle");
     }
   }, []);
@@ -1037,18 +1037,18 @@ export default function MusicScreen() {
       });
       const body = await res.json();
       if (!res.ok) {
-        const msg = (body as { message?: string }).message ?? "Errore";
+        const msg = (body as { message?: string }).message ?? t("music.error");
         if (msg.toLowerCase().includes("nessuna traccia") || msg.toLowerCase().includes("nessun brano")) {
           Alert.alert("Playlist vuota", "Connetti prima il tuo account musicale e sincronizza i tuoi brani per poterli condividere.");
         } else {
-          Alert.alert("Errore", msg);
+          Alert.alert(t("music.error"), msg);
         }
         return;
       }
       setSendModalVisible(false);
       router.push(`/chat/${conv.id}` as any);
     } catch {
-      Alert.alert("Errore", "Impossibile inviare la playlist. Riprova.");
+      Alert.alert(t("music.error"), "Impossibile inviare la playlist. Riprova.");
     } finally {
       setSendingToConv(null);
     }
@@ -1167,7 +1167,7 @@ export default function MusicScreen() {
       queryClient.invalidateQueries({ queryKey: [`${apiPrefix}/tracks`] });
     },
     onError: (err: Error) => {
-      Alert.alert("Errore", err.message ?? "Impossibile aggiungere il brano");
+      Alert.alert(t("music.error"), err.message ?? "Impossibile aggiungere il brano");
     },
     onSettled: () => setPendingAddId(null),
   });
@@ -1182,7 +1182,7 @@ export default function MusicScreen() {
       queryClient.invalidateQueries({ queryKey: [`${apiPrefix}/tracks`] });
     },
     onError: (err: Error) => {
-      Alert.alert("Errore", err.message ?? "Impossibile rimuovere il brano");
+      Alert.alert(t("music.error"), err.message ?? "Impossibile rimuovere il brano");
     },
     onSettled: () => setPendingRemoveId(null),
   });
@@ -1198,7 +1198,7 @@ export default function MusicScreen() {
       Alert.alert("Playlist Aggiunta!", `${data.newTracksAdded ?? 0} nuovi brani aggiunti alla tua Playlist.`);
     },
     onError: (err: Error) => {
-      Alert.alert("Errore", err.message);
+      Alert.alert(t("music.error"), err.message);
     },
   });
 
@@ -1224,17 +1224,17 @@ export default function MusicScreen() {
       queryClient.invalidateQueries({ queryKey: [`${apiPrefix}/tracks`] });
     },
     onError: (err: Error) => {
-      Alert.alert("Errore", err.message ?? "Impossibile disconnettere");
+      Alert.alert(t("music.error"), err.message ?? "Impossibile disconnettere");
     },
   });
 
   const handleDisconnect = useCallback(() => {
     Alert.alert(
-      "Disconnetti Last.fm",
-      "Rimuovere la connessione Last.fm? I brani salvati verranno eliminati.",
+      t("music.disconnectTitle2"),
+      t("music.disconnectMsg2"),
       [
         { text: t("common.cancel"), style: "cancel" },
-        { text: "Disconnetti", style: "destructive", onPress: () => disconnectMutation.mutate() },
+        { text: t("music.disconnectBtn"), style: "destructive", onPress: () => disconnectMutation.mutate() },
       ]
     );
   }, [disconnectMutation]);
@@ -1551,7 +1551,7 @@ function BraniTab({
         );
         const url = new URL(`/api/music/radio/preview-playlist?tracks=${tracksParam}`, getApiUrl());
         const resp = await fetch(url.toString());
-        if (!resp.ok) throw new Error("Errore");
+        if (!resp.ok) throw new Error(t("music.error"));
         const previews: PreviewResult[] = await resp.json();
         if (!previews || previews.length === 0) {
           Alert.alert("Nessuna anteprima", "Nessun brano della playlist ha un'anteprima disponibile su iTunes.");
@@ -1569,7 +1569,7 @@ function BraniTab({
         }));
         await playQueue(tracks, 0);
       } catch {
-        Alert.alert("Errore", "Impossibile caricare le anteprime.");
+        Alert.alert(t("music.error"), "Impossibile caricare le anteprime.");
       } finally {
         setPlayAllLoading(false);
       }
@@ -2167,7 +2167,7 @@ function MatchTab({
                 onPress={() => onSetMatchLogic(logic)}
               >
                 <Text style={[styles.filterChipText, matchLogic === logic && styles.filterChipTextActive]}>
-                  {logic === "tutti" ? "Tutti i criteri" : "Almeno uno"}
+                  {logic === "tutti" ? t("music.matchAll") : t("music.matchAny")}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -2225,6 +2225,7 @@ function MatchTab({
 }
 
 function MatchCard({ match }: { match: MusicMatch }) {
+  const t = useT();
   const router = useRouter();
   const localQueryClient = useQueryClient();
   const [chatLoading, setChatLoading] = useState(false);
@@ -2237,7 +2238,7 @@ function MatchCard({ match }: { match: MusicMatch }) {
       localQueryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
       router.push(`/chat/${data.id}` as any);
     } catch {
-      Alert.alert("Errore", "Impossibile aprire la chat. Riprova.");
+      Alert.alert(t("music.error"), t("music.chatOpenError"));
     } finally {
       setChatLoading(false);
     }
@@ -2343,7 +2344,7 @@ function SharedPlaylistCard({
       await MediaLibrary.saveToLibraryAsync(downloadRes.uri);
       Alert.alert("Salvato!", `"${track.trackName}" salvato nella tua libreria musicale.`);
     } catch {
-      Alert.alert("Errore", "Impossibile scaricare l'anteprima. Riprova.");
+      Alert.alert(t("music.error"), "Impossibile scaricare l'anteprima. Riprova.");
     } finally {
       setDownloadingTrack(null);
     }
@@ -2364,7 +2365,7 @@ function SharedPlaylistCard({
         );
         const url = new URL(`/api/music/radio/preview-playlist?tracks=${tracksParam}`, getApiUrl());
         const resp = await fetch(url.toString());
-        if (!resp.ok) throw new Error("Errore nel caricamento");
+        if (!resp.ok) throw new Error(t("music.loadError"));
         const previews: PreviewResult[] = await resp.json();
         if (!previews || previews.length === 0) {
           Alert.alert("Nessuna anteprima", "Nessun brano di questa playlist ha un'anteprima disponibile.");
@@ -2383,7 +2384,7 @@ function SharedPlaylistCard({
         await playQueue(tracks, 0);
       } catch (err) {
         console.warn("[music] preview load error:", err);
-        Alert.alert("Errore", "Impossibile caricare le anteprime.");
+        Alert.alert(t("music.error"), "Impossibile caricare le anteprime.");
       } finally {
         setPreviewLoading(false);
       }
