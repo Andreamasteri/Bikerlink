@@ -28,9 +28,20 @@ Motivazione: esportare il bundle a fine task rischia di includere commit parzial
 **EAS Updates non è più usato per la delivery OTA.** L'unico canale OTA attivo è il
 backend custom `https://biker-link.replit.app/api/expo-updates` (Expo Updates Protocol v1).
 
-- ✅ `eas build` resta attivo per generare APK/AAB.
+- ✅ `eas build` resta attivo per generare APK/AAB (vedi sezione "Build APK" sotto).
 - ❌ `eas update` / `npx eas-cli update`: **non usare mai.**
 - ❌ `app.json` non deve puntare a `u.expo.dev` — la guard blocca la pubblicazione.
+
+### Artefatti EAS ancora presenti nel progetto (intenzionali)
+
+| File / dipendenza | Stato | Motivo |
+|---|---|---|
+| `eas.json` | ✅ MANTENUTO | Definisce i profili `release-apk` e `production` per `eas build` (APK/AAB) |
+| `scripts/build-apk.sh` | ✅ MANTENUTO | Entry point autorizzato per ogni build APK — chiama `npx eas-cli@18 build` |
+| `eas-cli` in devDependencies | ✅ ASSENTE | Non installato come dipendenza fissa — scaricato on-demand da `npx eas-cli@18` |
+
+**Regola**: qualsiasi agente che legge "EAS è dismesso" deve intendere solo **EAS Updates**.
+EAS Build (per produrre APK/AAB firmati) è ancora l'unico workflow disponibile per le build native.
 
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
@@ -125,19 +136,21 @@ esplicita. Il publisher ha già il proprio live-check integrato.
 
 ---
 
-## ⚠️ PROBLEMA STRUTTURALE EAS — LEGGERE PRIMA DI PUBBLICARE
+## 📜 STORICO — Migrazione da EAS Updates a backend custom (Task #958 / #980)
 
-**L'ambiente Replit (main agent E build mode) blocca TUTTE le operazioni git**, incluse quelle interne a `eas update`. Questo significa che **EAS non può mai essere aggiornato da questo ambiente**.
+> Questa sezione è **solo archivio storico**. EAS Updates è dismesso dal Task #980.
+> Non è rilevante per le operazioni ordinarie.
 
-### Conseguenza pratica
-- Il bundle custom (backend `biker-link.replit.app`) viene aggiornato correttamente.
-- I dispositivi che già usano `expo-updates` (EAS) per controllare aggiornamenti **NON vedranno le nuove OTA** perché EAS è fermo all'ultima versione pubblicata con successo (OTA-152).
-- I dispositivi su OTA-152 sono bloccati finché non viene installato un nuovo APK.
+**Il problema originale**: l'ambiente Replit bloccava tutte le operazioni git interne a
+`eas update`, rendendo impossibile distribuire OTA tramite EAS dal Replit workspace.
 
-### Fix strutturale (APK v38) — IMPLEMENTATO (Task #958)
+**Il fix (Task #958, APK v38)**:
 ✅ Backend serve `GET /api/expo-updates` (Expo Updates Protocol v1).
 ✅ `app.json`: `updates.url` → `https://biker-link.replit.app/api/expo-updates`
-✅ **APK v39+**: aggiornamenti OTA completamente indipendenti da EAS.
+✅ **APK v39+**: aggiornamenti OTA completamente indipendenti da EAS Updates.
+
+I dispositivi su APK v38 o precedente rimasti sull'ultimo OTA EAS (OTA-152) erano bloccati
+finché non installavano un APK v39+. Questo problema storico non è più rilevante.
 
 ---
 
