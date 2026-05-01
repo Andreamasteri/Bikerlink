@@ -1103,7 +1103,7 @@ export default function MatchScreen() {
           }}
           onReject={() => rejectBikerMutation.mutate(item.id)}
           onBlock={() => {
-            const nickname = (item.biker1Id === user?.id ? item.biker2Nickname : item.biker1Nickname) || "questo utente";
+            const nickname = (item.biker1Id === user?.id ? item.biker2Nickname : item.biker1Nickname) || t("match.thisUser");
             const msg = t("match.blockUserConfirmMsg").replace("{nickname}", nickname);
             Alert.alert(t("match.blockUserConfirmTitle"), msg, [
               { text: t("common.cancel"), style: "cancel" },

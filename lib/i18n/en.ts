@@ -429,6 +429,12 @@ const en: Record<string, string> = {
   "profile.revokeConsentDesc": "The processing of your data is based exclusively on your consent (Art. 7 GDPR).\n\nWithdrawing consent results in the permanent deletion of your account within 30 days, including all associated personal data.\n\nThis process is identical to \"Delete Account\". During the 30 days you can cancel the request by logging in.\n\nDo you confirm the withdrawal of consent and account deletion?",
 
   "home.userAvailable": "Available",
+  "home.inviteBtn": "Invite",
+  "home.inviteToRally": "Invite to a gathering",
+  "home.inviteModalDesc1": "Choose which gathering you want to invite",
+  "home.inviteModalDesc2": "to join:",
+  "home.fallbackUserLower": "the user",
+  "match.thisUser": "this user",
 
   "tracking.accuracy.excellent": "Excellent",
   "tracking.accuracy.good": "Good",

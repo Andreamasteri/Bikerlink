@@ -547,6 +547,12 @@ const fr: Record<string, string> = {
   "tracking.accuracy.good": "",
   "tracking.accuracy.fair": "",
   "tracking.accuracy.poor": "",
+  "home.inviteBtn": "",
+  "home.inviteToRally": "",
+  "home.inviteModalDesc1": "",
+  "home.inviteModalDesc2": "",
+  "home.fallbackUserLower": "",
+  "match.thisUser": "",
 };
 
 export default fr;

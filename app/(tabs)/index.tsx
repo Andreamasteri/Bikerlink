@@ -1428,7 +1428,7 @@ export default function MapScreen() {
                       onPress={() => setShowInviteEventModal(true)}
                     >
                       <MaterialCommunityIcons name="calendar-star" size={16} color="#fff" />
-                      <Text style={[styles.detailProfileBtnText, { color: "#fff" }]}>Invita</Text>
+                      <Text style={[styles.detailProfileBtnText, { color: "#fff" }]}>{t("home.inviteBtn")}</Text>
                     </Pressable>
                   )}
                   <Pressable
@@ -1449,10 +1449,10 @@ export default function MapScreen() {
           <Pressable style={[styles.homeMessageSheet, { maxHeight: "70%" }]} onPress={(e) => e.stopPropagation()}>
             <View style={[styles.homeMessageHeader, { marginBottom: 4 }]}>
               <MaterialCommunityIcons name="calendar-star" size={24} color="#F57C00" />
-              <Text style={styles.homeMessageTitle}>Invita a un raduno</Text>
+              <Text style={styles.homeMessageTitle}>{t("home.inviteToRally")}</Text>
             </View>
             <Text style={[styles.homeMessageText, { fontSize: 13, marginBottom: 8 }]}>
-              Scegli quale raduno vuoi invitare {selectedUser?.nickname ?? "l'utente"} ad unirsi:
+              {t("home.inviteModalDesc1")} {selectedUser?.nickname ?? t("home.fallbackUserLower")} {t("home.inviteModalDesc2")}
             </Text>
             <FlatList
               data={(myOrganizedEventsQuery.data ?? []).filter(

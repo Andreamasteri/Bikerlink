@@ -429,6 +429,12 @@ const it: Record<string, string> = {
   "profile.revokeConsentDesc": "Il trattamento dei tuoi dati si basa esclusivamente sul tuo consenso (art. 7 GDPR).\n\nRevocare il consenso comporta la cancellazione definitiva del tuo account entro 30 giorni, con eliminazione di tutti i dati personali associati.\n\nQuesto processo è identico a \"Elimina Account\". Durante i 30 giorni puoi annullare la richiesta effettuando il login.\n\nConfermi la revoca del consenso e la cancellazione dell'account?",
 
   "home.userAvailable": "Disponibile",
+  "home.inviteBtn": "Invita",
+  "home.inviteToRally": "Invita a un raduno",
+  "home.inviteModalDesc1": "Scegli quale raduno vuoi invitare",
+  "home.inviteModalDesc2": "ad unirsi:",
+  "home.fallbackUserLower": "l'utente",
+  "match.thisUser": "questo utente",
 
   "tracking.accuracy.excellent": "Ottima",
   "tracking.accuracy.good": "Buona",
