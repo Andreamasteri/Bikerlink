@@ -2261,7 +2261,11 @@ router.delete("/advertisements/bulk-delete", async (req: Request, res: Response)
         const match = campaign.imageUrl.match(/\/api\/ads\/images\/(.+)$/);
         if (match) {
           const localPath = path.join(adsDir, match[1]);
-          fs.unlink(localPath, () => {});
+          fs.unlink(localPath, (err) => {
+            if (err && (err as NodeJS.ErrnoException).code !== "ENOENT") {
+              console.warn("[Ads] Failed to remove cached image:", localPath, err.message);
+            }
+          });
         }
       }
     }
@@ -2331,7 +2335,11 @@ router.delete("/advertisements/:id", async (req: Request, res: Response) => {
       const match = campaign.imageUrl.match(/\/api\/ads\/images\/(.+)$/);
       if (match) {
         const localPath = path.join(adsDir, match[1]);
-        fs.unlink(localPath, () => {});
+        fs.unlink(localPath, (err) => {
+          if (err && (err as NodeJS.ErrnoException).code !== "ENOENT") {
+            console.warn("[Ads] Failed to remove cached image:", localPath, err.message);
+          }
+        });
       }
     }
     await storage.createModeratorLog({
