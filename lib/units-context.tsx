@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 
 export type TimeFormat = "12h" | "24h";
 export type SpeedUnit = "kmh" | "mph" | "knots";
@@ -49,6 +50,18 @@ function isValidDistanceUnit(v: unknown): v is DistanceUnit {
   return VALID_DISTANCE_UNITS.includes(v as DistanceUnit);
 }
 
+function syncPrefsToServer(prefs: UnitsPreferences): void {
+  try {
+    const url = new URL("/api/users/me", getApiUrl());
+    fetch(url.toString(), {
+      method: "PUT",
+      credentials: "include",
+      headers: authFetchHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ unitsPreference: prefs }),
+    }).catch(() => {});
+  } catch {}
+}
+
 const UnitsContext = createContext<UnitsContextType>({
   ...DEFAULT_PREFS,
   setTimeFormat: () => {},
@@ -68,6 +81,8 @@ export function UnitsProvider({ children }: { children: React.ReactNode }) {
   const prefsRef = useRef<UnitsPreferences>(DEFAULT_PREFS);
   prefsRef.current = { timeFormat, speedUnit, distanceUnit };
 
+  const serverSyncAttemptedRef = useRef(false);
+
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((raw) => {
@@ -85,25 +100,60 @@ export function UnitsProvider({ children }: { children: React.ReactNode }) {
       .catch(() => { setStorageLoaded(true); });
   }, []);
 
+  useEffect(() => {
+    if (!storageLoaded || hasStoredPreference || serverSyncAttemptedRef.current) return;
+    serverSyncAttemptedRef.current = true;
+
+    try {
+      const url = new URL("/api/users/me", getApiUrl());
+      fetch(url.toString(), {
+        credentials: "include",
+        headers: authFetchHeaders(),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (!data) return;
+          const up = data?.profile?.unitsPreference;
+          if (!up) return;
+          let applied = false;
+          if (isValidTimeFormat(up.timeFormat)) { setTimeFormatState(up.timeFormat); applied = true; }
+          if (isValidSpeedUnit(up.speedUnit)) { setSpeedUnitState(up.speedUnit); applied = true; }
+          if (isValidDistanceUnit(up.distanceUnit)) { setDistanceUnitState(up.distanceUnit); applied = true; }
+          if (applied) {
+            const synced: UnitsPreferences = {
+              timeFormat: isValidTimeFormat(up.timeFormat) ? up.timeFormat : DEFAULT_PREFS.timeFormat,
+              speedUnit: isValidSpeedUnit(up.speedUnit) ? up.speedUnit : DEFAULT_PREFS.speedUnit,
+              distanceUnit: isValidDistanceUnit(up.distanceUnit) ? up.distanceUnit : DEFAULT_PREFS.distanceUnit,
+            };
+            AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(synced)).catch(() => {});
+            setHasStoredPreference(true);
+          }
+        })
+        .catch(() => {});
+    } catch {}
+  }, [storageLoaded, hasStoredPreference]);
+
   const setTimeFormat = useCallback((v: TimeFormat) => {
     setTimeFormatState(v);
     const next: UnitsPreferences = { ...prefsRef.current, timeFormat: v };
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
+    syncPrefsToServer(next);
   }, []);
 
   const setSpeedUnit = useCallback((v: SpeedUnit) => {
     setSpeedUnitState(v);
     const next: UnitsPreferences = { ...prefsRef.current, speedUnit: v };
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
+    syncPrefsToServer(next);
   }, []);
 
   const setDistanceUnit = useCallback((v: DistanceUnit) => {
     setDistanceUnitState(v);
     const next: UnitsPreferences = { ...prefsRef.current, distanceUnit: v };
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
+    syncPrefsToServer(next);
   }, []);
 
-  // Atomic setter: aggiorna tutti e 3 i valori + scrive AsyncStorage una sola volta
   const setSystem = useCallback((system: "metric" | "imperial") => {
     const next: UnitsPreferences = system === "imperial"
       ? { timeFormat: "12h", speedUnit: "mph", distanceUnit: "mi_ft" }
@@ -113,6 +163,7 @@ export function UnitsProvider({ children }: { children: React.ReactNode }) {
     setDistanceUnitState(next.distanceUnit);
     setHasStoredPreference(true);
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
+    syncPrefsToServer(next);
   }, []);
 
   const applyCountryDefault = useCallback((country: string) => {

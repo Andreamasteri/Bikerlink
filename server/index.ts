@@ -1160,6 +1160,13 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] users.expo_push_token:", e);
         }
 
+        try {
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS units_preference JSONB`);
+          console.log("[MIGRATION] user_profiles.units_preference ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] user_profiles.units_preference:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 

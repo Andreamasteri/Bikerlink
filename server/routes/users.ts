@@ -216,6 +216,7 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
     if (b.maxPickupDistance !== undefined) profileUpdate.maxPickupDistance = b.maxPickupDistance;
     if (b.latitude !== undefined) profileUpdate.latitude = b.latitude;
     if (b.longitude !== undefined) profileUpdate.longitude = b.longitude;
+    if (b.unitsPreference !== undefined) profileUpdate.unitsPreference = b.unitsPreference;
 
     if (Object.keys(profileUpdate).length > 0) {
       const existingProfileMe = await storage.getUserProfile(userId);

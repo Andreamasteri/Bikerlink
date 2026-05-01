@@ -127,6 +127,7 @@ export const userProfiles = pgTable("user_profiles", {
   fakeHomeLongitude: doublePrecision("fake_home_longitude"),
   fakeHomeRadius: integer("fake_home_radius").notNull().default(2),
   gpsPrecision: varchar("gps_precision", { length: 30 }).notNull().default("balanced"),
+  unitsPreference: jsonb("units_preference").$type<{ timeFormat: string; speedUnit: string; distanceUnit: string } | null>(),
   coordinatesUpdatedAt: timestamp("coordinates_updated_at"),
   adminOverrideUntil: timestamp("admin_override_until"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
