@@ -8,6 +8,9 @@ import {
   ActivityIndicator,
   Platform,
   TextInput,
+  Modal,
+  ScrollView,
+  Pressable,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -55,6 +58,8 @@ const TYPE_FILTERS: { label: string; value: "" | CrashType }[] = [
 ];
 
 const LIMIT = 20;
+
+const MONO = Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" });
 
 function CrashTypeBadge({ type }: { type: CrashType }) {
   const isJs = type === "crash_js";
@@ -109,15 +114,223 @@ function formatDuration(startIso: string | null, endIso: string | null): string 
   return `${Math.floor(min / 60)}h ${min % 60}m`;
 }
 
-function CrashLogCard({ item }: { item: CrashLogRow }) {
+function classifyLine(line: string): "error" | "app" | "external" {
+  if (!line.trimStart().startsWith("at ")) return "error";
+  if (line.includes("node_modules") || line.includes("/Libraries/") || line.includes("internal/")) return "external";
+  return "app";
+}
+
+function StackTraceModal({
+  visible,
+  item,
+  onClose,
+}: {
+  visible: boolean;
+  item: CrashLogRow | null;
+  onClose: () => void;
+}) {
   const colors = useColors();
-  const [expanded, setExpanded] = useState(false);
+  const insets = useSafeAreaInsets();
+
+  if (!item) return null;
+
+  const lines = (item.stackTrace ?? "").split("\n");
+  const appLineColor = colors.accent ?? "#FF6600";
+  const externalColor = colors.textSecondary ?? "#888";
+  const errorColor = "#FF4444";
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <Pressable style={modalStyles.backdrop} onPress={onClose} />
+      <View style={[
+        modalStyles.sheet,
+        {
+          backgroundColor: colors.surface,
+          paddingBottom: insets.bottom + 16,
+        },
+      ]}>
+        <View style={[modalStyles.handle, { backgroundColor: colors.border }]} />
+
+        <View style={[modalStyles.header, { borderBottomColor: colors.border }]}>
+          <View style={modalStyles.headerLeft}>
+            <CrashTypeBadge type={item.crashType} />
+            <Text style={[modalStyles.headerNick, { color: colors.text }]}>
+              {item.nickname ?? item.userId.slice(0, 8)}
+            </Text>
+            <Text style={[modalStyles.headerDate, { color: externalColor }]}>
+              {formatDate(item.reportedAt)}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="close" size={22} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+
+        {item.errorMessage ? (
+          <View style={[modalStyles.errorBox, { backgroundColor: "#FF444418" }]}>
+            <Text style={[modalStyles.errorText, { color: errorColor, fontFamily: MONO }]} selectable>
+              {item.errorMessage}
+            </Text>
+          </View>
+        ) : null}
+
+        {item.stackTrace ? (
+          <ScrollView
+            style={modalStyles.stackScroll}
+            contentContainerStyle={[modalStyles.stackContent, { backgroundColor: colors.background }]}
+            showsVerticalScrollIndicator
+          >
+            <View style={modalStyles.legend}>
+              <View style={modalStyles.legendItem}>
+                <View style={[modalStyles.legendDot, { backgroundColor: appLineColor }]} />
+                <Text style={[modalStyles.legendText, { color: externalColor }]}>App</Text>
+              </View>
+              <View style={modalStyles.legendItem}>
+                <View style={[modalStyles.legendDot, { backgroundColor: externalColor }]} />
+                <Text style={[modalStyles.legendText, { color: externalColor }]}>Librerie esterne</Text>
+              </View>
+            </View>
+            {lines.map((line, i) => {
+              const kind = classifyLine(line);
+              const color =
+                kind === "error" ? errorColor :
+                kind === "app" ? appLineColor :
+                externalColor;
+              const weight = kind === "app" ? "600" : "400";
+              return (
+                <Text
+                  key={i}
+                  style={[modalStyles.stackLine, { color, fontWeight: weight as "600" | "400" }]}
+                  selectable
+                >
+                  {line || " "}
+                </Text>
+              );
+            })}
+          </ScrollView>
+        ) : (
+          <View style={modalStyles.noStack}>
+            <Text style={[modalStyles.noStackText, { color: externalColor }]}>
+              Nessuno stack trace disponibile
+            </Text>
+          </View>
+        )}
+
+        {item.sessionId ? (
+          <Text style={[modalStyles.sessionId, { color: externalColor }]} selectable>
+            Session: {item.sessionId}
+          </Text>
+        ) : null}
+      </View>
+    </Modal>
+  );
+}
+
+const modalStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  sheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "80%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 20,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginTop: 10,
+    marginBottom: 8,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 8,
+  },
+  headerLeft: { gap: 4, flex: 1 },
+  headerNick: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  headerDate: { fontFamily: "Inter_400Regular", fontSize: 12 },
+  errorBox: {
+    marginHorizontal: 12,
+    marginTop: 10,
+    borderRadius: 8,
+    padding: 10,
+  },
+  errorText: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  stackScroll: {
+    marginTop: 8,
+    marginHorizontal: 12,
+    borderRadius: 8,
+    flexShrink: 1,
+  },
+  stackContent: {
+    padding: 10,
+    borderRadius: 8,
+  },
+  legend: {
+    flexDirection: "row",
+    gap: 14,
+    marginBottom: 8,
+    paddingBottom: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(128,128,128,0.2)",
+  },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: { fontFamily: "Inter_400Regular", fontSize: 11 },
+  stackLine: {
+    fontFamily: MONO,
+    fontSize: 11,
+    lineHeight: 18,
+  },
+  noStack: {
+    padding: 24,
+    alignItems: "center",
+  },
+  noStackText: { fontFamily: "Inter_400Regular", fontSize: 14 },
+  sessionId: {
+    fontFamily: MONO,
+    fontSize: 10,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    opacity: 0.6,
+  },
+});
+
+function CrashLogCard({
+  item,
+  onOpenStack,
+}: {
+  item: CrashLogRow;
+  onOpenStack: (item: CrashLogRow) => void;
+}) {
+  const colors = useColors();
   const duration = formatDuration(item.sessionStartedAt, item.sessionEndedAt ?? item.reportedAt);
+  const hasStack = !!item.stackTrace;
 
   return (
     <TouchableOpacity
       style={[cardStyles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
-      onPress={() => setExpanded((v) => !v)}
+      onPress={() => onOpenStack(item)}
       activeOpacity={0.8}
     >
       <View style={cardStyles.header}>
@@ -127,9 +340,17 @@ function CrashLogCard({ item }: { item: CrashLogRow }) {
             {item.nickname ?? item.userId.slice(0, 8)}
           </Text>
         </View>
-        <Text style={[cardStyles.date, { color: colors.textSecondary }]}>
-          {formatDate(item.reportedAt)}
-        </Text>
+        <View style={cardStyles.headerRight}>
+          <Text style={[cardStyles.date, { color: colors.textSecondary }]}>
+            {formatDate(item.reportedAt)}
+          </Text>
+          {hasStack && (
+            <View style={[cardStyles.stackBadge, { backgroundColor: (colors.accent ?? "#FF6600") + "22" }]}>
+              <MaterialCommunityIcons name="code-braces" size={11} color={colors.accent ?? "#FF6600"} />
+              <Text style={[cardStyles.stackBadgeText, { color: colors.accent ?? "#FF6600" }]}>stack</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       <View style={cardStyles.meta}>
@@ -164,30 +385,9 @@ function CrashLogCard({ item }: { item: CrashLogRow }) {
       {item.errorMessage ? (
         <Text
           style={[cardStyles.errorMessage, { color: "#FF4444", backgroundColor: "#FF444411" }]}
-          numberOfLines={expanded ? undefined : 2}
+          numberOfLines={2}
         >
           {item.errorMessage}
-        </Text>
-      ) : null}
-
-      {expanded && item.stackTrace ? (
-        <Text
-          style={[cardStyles.stackTrace, { color: colors.textSecondary, backgroundColor: colors.background }]}
-          selectable
-        >
-          {item.stackTrace}
-        </Text>
-      ) : null}
-
-      {expanded && item.sessionStartedAt ? (
-        <Text style={[cardStyles.sessionInfo, { color: colors.textSecondary }]}>
-          Sessione iniziata: {formatDate(item.sessionStartedAt)}
-        </Text>
-      ) : null}
-
-      {expanded ? (
-        <Text style={[cardStyles.sessionInfo, { color: colors.textSecondary }]}>
-          Session: {item.sessionId}
         </Text>
       ) : null}
     </TouchableOpacity>
@@ -197,15 +397,23 @@ function CrashLogCard({ item }: { item: CrashLogRow }) {
 const cardStyles = StyleSheet.create({
   card: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 10, gap: 8 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  headerLeft: { gap: 6 },
+  headerLeft: { gap: 6, flex: 1 },
+  headerRight: { alignItems: "flex-end", gap: 4 },
   nickname: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   date: { fontFamily: "Inter_400Regular", fontSize: 12 },
+  stackBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  stackBadgeText: { fontFamily: "Inter_600SemiBold", fontSize: 10 },
   meta: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   metaItem: { flexDirection: "row", alignItems: "center", gap: 4 },
   metaText: { fontFamily: "Inter_400Regular", fontSize: 12 },
-  errorMessage: { fontFamily: "Inter_400Regular", fontSize: 12, borderRadius: 6, padding: 8, lineHeight: 18 },
-  stackTrace: { fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }), fontSize: 11, borderRadius: 6, padding: 8, lineHeight: 16 },
-  sessionInfo: { fontFamily: "Inter_400Regular", fontSize: 11 },
+  errorMessage: { fontFamily: MONO, fontSize: 12, borderRadius: 6, padding: 8, lineHeight: 18 },
 });
 
 export default function CrashLogsScreen() {
@@ -219,6 +427,7 @@ export default function CrashLogsScreen() {
   const [filterDateTo, setFilterDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedCrash, setSelectedCrash] = useState<CrashLogRow | null>(null);
 
   function buildQueryString() {
     const p = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
@@ -256,6 +465,12 @@ export default function CrashLogsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StackTraceModal
+        visible={!!selectedCrash}
+        item={selectedCrash}
+        onClose={() => setSelectedCrash(null)}
+      />
+
       <View style={[styles.typeBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         {TYPE_FILTERS.map((f) => (
           <TouchableOpacity
@@ -368,7 +583,9 @@ export default function CrashLogsScreen() {
         <FlatList
           data={logs}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <CrashLogCard item={item} />}
+          renderItem={({ item }) => (
+            <CrashLogCard item={item} onOpenStack={setSelectedCrash} />
+          )}
           contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 20 }]}
           ListHeaderComponent={
             <View>
