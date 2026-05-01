@@ -1102,6 +1102,7 @@ const en: Record<string, string> = {
   "admin.campaignName": "Campaign name",
   "tracking.bufferSent": "Buffer / Sent",
   "tracking.exportGpx": "Export GPX",
+  "tracking.gpsLost": "GPS lost — no signal",
   "tracking.exportGpxError": "Cannot export the route. Please try again.",
 };
 

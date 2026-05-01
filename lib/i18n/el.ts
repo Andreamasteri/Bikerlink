@@ -1054,6 +1054,7 @@ const el: Record<string, string> = {
   "admin.campaignName": "",
   "tracking.bufferSent": "",
   "tracking.exportGpx": "Εξαγωγή GPX",
+  "tracking.gpsLost": "GPS χάθηκε — χωρίς σήμα",
   "tracking.exportGpxError": "Αδύνατη η εξαγωγή της διαδρομής. Δοκιμάστε ξανά.",
 };
 

@@ -109,6 +109,7 @@ interface LocalRouteRecord extends RouteRecord {
 const IDLE_THRESHOLD_KMH = 2;
 const BATCH_SIZE = 10;
 const BATCH_FLUSH_MS = 30000;
+const GPS_SIGNAL_TIMEOUT_MS = 15_000;
 const GPS_BUFFER_SEGCOUNT_KEY = "@bikerlink/gps_buffer_segcount";
 const GPS_BUFFER_SEG_KEY = (n: number) => `@bikerlink/gps_buffer_seg_${n}`;
 const GPS_BUFFER_WRITE_EVERY = 5;
@@ -545,6 +546,7 @@ export default function TrackingScreen() {
   // GPS display
   const [currentSpeed, setCurrentSpeed] = useState(0);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [gpsLost, setGpsLost] = useState(false);
   const [totalKm, setTotalKm] = useState(0);
   const [maxSpeed, setMaxSpeed] = useState(0);
   const [maxAltitude, setMaxAltitude] = useState(0);
@@ -1404,6 +1406,7 @@ export default function TrackingScreen() {
         .catch(() => {});
     }
     setTrackingActive(false);
+    setGpsLost(false);
   }, []);
 
   // ── Reset tracking state ───────────────────────────────────────────────────
@@ -1539,6 +1542,13 @@ export default function TrackingScreen() {
         setDisplayIdleMs(idleMsRef.current + (now - idleStartRef.current));
       } else {
         setDisplayIdleMs(idleMsRef.current);
+      }
+      // GPS signal loss detection: if last known position is older than 15 s
+      if (Platform.OS !== "web") {
+        const lastGpsAge = lastPosRef.current
+          ? now - lastPosRef.current.time
+          : now - startTimeRef.current;
+        setGpsLost(lastGpsAge > GPS_SIGNAL_TIMEOUT_MS);
       }
     }, 100);
 
@@ -1920,6 +1930,14 @@ export default function TrackingScreen() {
               <Text style={styles.stopBtnLabel}>STOP</Text>
             </TouchableOpacity>
           </View>
+
+          {/* GPS signal lost banner */}
+          {gpsLost && (
+            <View style={styles.gpsBanner}>
+              <Ionicons name="warning-outline" size={16} color="#fff" />
+              <Text style={styles.gpsBannerText}>{t("tracking.gpsLost")}</Text>
+            </View>
+          )}
 
           <ScrollView
             style={{ flex: 1 }}
@@ -2948,6 +2966,20 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold" as const,
     color: "#ffffff",
     letterSpacing: 1,
+  },
+  gpsBanner: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 8,
+    backgroundColor: Colors.accentRed,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  gpsBannerText: {
+    fontFamily: "Inter_600SemiBold" as const,
+    fontSize: 13,
+    color: "#ffffff",
   },
 
   activeScroll: {

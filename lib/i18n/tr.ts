@@ -1054,6 +1054,7 @@ const tr: Record<string, string> = {
   "admin.campaignName": "",
   "tracking.bufferSent": "",
   "tracking.exportGpx": "GPX dışa aktar",
+  "tracking.gpsLost": "GPS kayboldu — sinyal yok",
   "tracking.exportGpxError": "Rota dışa aktarılamadı. Lütfen tekrar deneyin.",
 };
 
