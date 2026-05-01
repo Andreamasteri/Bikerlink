@@ -1168,7 +1168,7 @@ export default function MusicScreen() {
       queryClient.invalidateQueries({ queryKey: [`${apiPrefix}/tracks`] });
     },
     onError: (err: Error) => {
-      Alert.alert(t("music.error"), err.message ?? "Impossibile aggiungere il brano");
+      Alert.alert(t("music.error"), err.message ?? t("music.addTrackError"));
     },
     onSettled: () => setPendingAddId(null),
   });
@@ -1183,7 +1183,7 @@ export default function MusicScreen() {
       queryClient.invalidateQueries({ queryKey: [`${apiPrefix}/tracks`] });
     },
     onError: (err: Error) => {
-      Alert.alert(t("music.error"), err.message ?? "Impossibile rimuovere il brano");
+      Alert.alert(t("music.error"), err.message ?? t("music.removeTrackError2"));
     },
     onSettled: () => setPendingRemoveId(null),
   });

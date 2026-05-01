@@ -27,20 +27,21 @@ import WheelieChallenge from "@/components/arcade/WheelieChallenge";
 import Tetris from "@/components/arcade/Tetris";
 import SpaceInvaders from "@/components/arcade/SpaceInvaders";
 import { useT } from "@/lib/language-context";
-import { t as tStatic } from "@/lib/i18n";
 
 const { width: W } = Dimensions.get("window");
 
 type GameId = "endless_biker" | "traffic_racer" | "wheelie" | "tetris" | "space_invaders";
 type HubTab = "games" | "leaderboard" | "hof";
 
-const GAMES: { id: GameId; title: string; emoji: string; desc: string; scoreLabel: string }[] = [
-  { id: "endless_biker", title: "Endless Biker", emoji: "🏍️", desc: tStatic("arcade.corriSalta"), scoreLabel: "m" },
-  { id: "traffic_racer", title: "Traffic Racer", emoji: "🚦", desc: tStatic("arcade.sorpassaTraffico"), scoreLabel: "pt" },
-  { id: "wheelie", title: "Wheelie Challenge", emoji: "🤸", desc: tStatic("arcade.tieniImpennata"), scoreLabel: "s" },
-  { id: "tetris", title: "Tetris", emoji: "🧩", desc: tStatic("arcade.classicoSenzaTempo"), scoreLabel: "pt" },
-  { id: "space_invaders", title: "Space Invaders", emoji: "👾", desc: tStatic("arcade.eliminaGlialieni"), scoreLabel: "pt" },
-];
+function getGames(t: (key: string) => string): { id: GameId; title: string; emoji: string; desc: string; scoreLabel: string }[] {
+  return [
+    { id: "endless_biker", title: "Endless Biker", emoji: "🏍️", desc: t("arcade.corriSalta"), scoreLabel: "m" },
+    { id: "traffic_racer", title: "Traffic Racer", emoji: "🚦", desc: t("arcade.sorpassaTraffico"), scoreLabel: "pt" },
+    { id: "wheelie", title: "Wheelie Challenge", emoji: "🤸", desc: t("arcade.tieniImpennata"), scoreLabel: "s" },
+    { id: "tetris", title: "Tetris", emoji: "🧩", desc: t("arcade.classicoSenzaTempo"), scoreLabel: "pt" },
+    { id: "space_invaders", title: "Space Invaders", emoji: "👾", desc: t("arcade.eliminaGlialieni"), scoreLabel: "pt" },
+  ];
+}
 
 const GAME_LABEL: Record<GameId, string> = {
   endless_biker: "Endless Biker",
@@ -138,6 +139,7 @@ function GameOverModal({ score, personalBest, isNewRecord, onReplay, onClose, on
 }
 
 function LeaderboardView({ gameId }: { gameId: GameId }) {
+  const t = useT();
   const { data, isLoading, isError } = useQuery<LeaderboardEntry[]>({
     queryKey: [`/api/arcade/leaderboard/${gameId}`],
     refetchInterval: 60_000,
@@ -147,16 +149,16 @@ function LeaderboardView({ gameId }: { gameId: GameId }) {
   if (isError) {
     return (
       <View style={styles.emptyState}>
-        <Text style={styles.emptyText}>Errore di caricamento.</Text>
-        <Text style={styles.emptySubtext}>Controlla la connessione e riprova.</Text>
+        <Text style={styles.emptyText}>{t("common.loadError")}</Text>
+        <Text style={styles.emptySubtext}>{t("common.checkConnectionRetry")}</Text>
       </View>
     );
   }
   if (!data?.length) {
     return (
       <View style={styles.emptyState}>
-        <Text style={styles.emptyText}>Nessun punteggio ancora.</Text>
-        <Text style={styles.emptySubtext}>Sii il primo a giocare!</Text>
+        <Text style={styles.emptyText}>{t("arcade.noScoresYet")}</Text>
+        <Text style={styles.emptySubtext}>{t("arcade.beFirstToPlay")}</Text>
       </View>
     );
   }
@@ -187,6 +189,8 @@ function LeaderboardView({ gameId }: { gameId: GameId }) {
 }
 
 function HallOfFameView() {
+  const t = useT();
+  const GAMES = getGames(t);
   const { data, isLoading, isError } = useQuery<Record<GameId, HallOfFameEntry>>({
     queryKey: ["/api/arcade/hall-of-fame"],
     refetchInterval: 120_000,
@@ -196,8 +200,8 @@ function HallOfFameView() {
   if (isError) {
     return (
       <View style={styles.emptyState}>
-        <Text style={styles.emptyText}>Errore di caricamento.</Text>
-        <Text style={styles.emptySubtext}>Controlla la connessione e riprova.</Text>
+        <Text style={styles.emptyText}>{t("common.loadError")}</Text>
+        <Text style={styles.emptySubtext}>{t("common.checkConnectionRetry")}</Text>
       </View>
     );
   }
@@ -207,8 +211,8 @@ function HallOfFameView() {
   if (!entries.length) {
     return (
       <View style={styles.emptyState}>
-        <Text style={styles.emptyText}>Hall of Fame vuota.</Text>
-        <Text style={styles.emptySubtext}>Gioca per entrare nella storia!</Text>
+        <Text style={styles.emptyText}>{t("arcade.hofEmpty")}</Text>
+        <Text style={styles.emptySubtext}>{t("arcade.hofEmptySubtext")}</Text>
       </View>
     );
   }
@@ -252,6 +256,7 @@ function HallOfFameView() {
 
 export default function ArcadeScreen() {
   const t = useT();
+  const GAMES = getGames(t);
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ tab?: string; game?: string }>();
   const { suppressWidget } = useFloatingWidget();

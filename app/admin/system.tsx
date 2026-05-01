@@ -30,7 +30,6 @@ import {
 import { runManualOtaCheck } from "@/lib/ota-check";
 import * as Clipboard from "expo-clipboard";
 import { useT } from "@/lib/language-context";
-import { t as tStatic } from "@/lib/i18n";
 
 // ── Module-scope per garantire identità stabile della classe tra i render.
 // Dichiarare AdminFetchError dentro il componente farebbe sì che `instanceof`
@@ -182,13 +181,13 @@ function eventIcon(type: string): { name: keyof typeof Ionicons.glyphMap; color:
   }
 }
 
-function eventLabel(type: string): string {
+function eventLabel(type: string, t: (key: string) => string): string {
   switch (type) {
     case "BACKEND_RESTART": return "Riavvio Backend";
     case "COLD_START": return "Avvio Freddo";
     case "METRO_UP": return "Frontend Online";
     case "METRO_DOWN": return "Frontend Offline";
-    case "OTA_PUBLISHED": return tStatic("admin.otaUpdate");
+    case "OTA_PUBLISHED": return t("admin.otaUpdate");
     default: return "Evento generico";
   }
 }
@@ -224,10 +223,10 @@ function platformLabel(p: string): string {
   return p;
 }
 
-function outcomeMeta(o: UpdateOutcome): { label: string; color: string; icon: keyof typeof Ionicons.glyphMap } {
+function outcomeMeta(o: UpdateOutcome, t: (key: string) => string): { label: string; color: string; icon: keyof typeof Ionicons.glyphMap } {
   if (o === "force") return { label: "Force update richiesto", color: "#FF4444", icon: "alert-circle" };
   if (o === "soft") return { label: "Soft update disponibile", color: "#FFAA00", icon: "arrow-up-circle" };
-  return { label: tStatic("admin.noUpdate"), color: "#44AA44", icon: "checkmark-circle" };
+  return { label: t("admin.noUpdate"), color: "#44AA44", icon: "checkmark-circle" };
 }
 
 export default function SystemScreen() {
@@ -1058,7 +1057,7 @@ export default function SystemScreen() {
               </View>
             ) : checkOutcome ? (
               (() => {
-                const meta = outcomeMeta(checkOutcome);
+                const meta = outcomeMeta(checkOutcome, t);
                 return (
                   <View style={[styles.outcomeRow, { backgroundColor: `${meta.color}22` }]}>
                     <Ionicons name={meta.icon} size={18} color={meta.color} />
@@ -1257,7 +1256,7 @@ export default function SystemScreen() {
               <Ionicons name={icon.name} size={20} color={icon.color} />
             </View>
             <View style={styles.eventContent}>
-              <Text style={styles.eventLabel}>{eventLabel(item.type)}</Text>
+              <Text style={styles.eventLabel}>{eventLabel(item.type, t)}</Text>
               <Text style={styles.eventMessage} numberOfLines={2}>
                 {item.message}
               </Text>

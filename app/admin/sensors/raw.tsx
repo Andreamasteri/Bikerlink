@@ -11,6 +11,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { useT } from "@/lib/language-context";
 
 type SensorEntry = {
   name: string;
@@ -20,64 +21,66 @@ type SensorEntry = {
   defaultConfig: string;
 };
 
-const SENSORS: SensorEntry[] = [
-  {
-    name: "Accelerometer",
-    route: "accelerometer",
-    platform: "cross",
-    description: "Forza d'accelerazione su 3 assi (x, y, z)",
-    defaultConfig: '{"interval": 500}',
-  },
-  {
-    name: "Gyroscope",
-    route: "gyroscope",
-    platform: "cross",
-    description: "Velocità di rotazione su 3 assi",
-    defaultConfig: '{"interval": 500}',
-  },
-  {
-    name: "Magnetometer",
-    route: "magnetometer",
-    platform: "cross",
-    description: "Campo magnetico calibrato su 3 assi (µT)",
-    defaultConfig: '{"interval": 500}',
-  },
-  {
-    name: "Magnetometer Uncalibrated",
-    route: "magnetometer-uncalibrated",
-    platform: "android",
-    description: "Campo magnetico grezzo con bias — solo Android",
-    defaultConfig: '{"interval": 500}',
-  },
-  {
-    name: "Barometer",
-    route: "barometer",
-    platform: "cross",
-    description: "Pressione atmosferica (hPa) e altitudine relativa",
-    defaultConfig: '{"interval": 500}',
-  },
-  {
-    name: "DeviceMotion",
-    route: "device-motion",
-    platform: "cross",
-    description: "Accelerazione, giroscopio, orientamento fusi",
-    defaultConfig: '{"interval": 500}',
-  },
-  {
-    name: "Pedometer",
-    route: "pedometer",
-    platform: "cross",
-    description: "Contatore passi in tempo reale",
-    defaultConfig: "{}",
-  },
-  {
-    name: "LightSensor",
-    route: "light-sensor",
-    platform: "android",
-    description: "Intensità luminosa (lux) — solo Android",
-    defaultConfig: '{"interval": 500}',
-  },
-];
+function getSensors(t: (key: string) => string): SensorEntry[] {
+  return [
+    {
+      name: "Accelerometer",
+      route: "accelerometer",
+      platform: "cross",
+      description: "Forza d'accelerazione su 3 assi (x, y, z)",
+      defaultConfig: '{"interval": 500}',
+    },
+    {
+      name: "Gyroscope",
+      route: "gyroscope",
+      platform: "cross",
+      description: t("admin.gyroDesc"),
+      defaultConfig: '{"interval": 500}',
+    },
+    {
+      name: "Magnetometer",
+      route: "magnetometer",
+      platform: "cross",
+      description: "Campo magnetico calibrato su 3 assi (µT)",
+      defaultConfig: '{"interval": 500}',
+    },
+    {
+      name: "Magnetometer Uncalibrated",
+      route: "magnetometer-uncalibrated",
+      platform: "android",
+      description: "Campo magnetico grezzo con bias — solo Android",
+      defaultConfig: '{"interval": 500}',
+    },
+    {
+      name: "Barometer",
+      route: "barometer",
+      platform: "cross",
+      description: "Pressione atmosferica (hPa) e altitudine relativa",
+      defaultConfig: '{"interval": 500}',
+    },
+    {
+      name: "DeviceMotion",
+      route: "device-motion",
+      platform: "cross",
+      description: "Accelerazione, giroscopio, orientamento fusi",
+      defaultConfig: '{"interval": 500}',
+    },
+    {
+      name: "Pedometer",
+      route: "pedometer",
+      platform: "cross",
+      description: "Contatore passi in tempo reale",
+      defaultConfig: "{}",
+    },
+    {
+      name: "LightSensor",
+      route: "light-sensor",
+      platform: "android",
+      description: t("admin.lightSensorDesc"),
+      defaultConfig: '{"interval": 500}',
+    },
+  ];
+}
 
 function PlatformBadge({ platform }: { platform: "android" | "ios" | "cross" }) {
   if (platform === "android") {
@@ -102,6 +105,8 @@ function PlatformBadge({ platform }: { platform: "android" | "ios" | "cross" }) 
 }
 
 export default function SensorsRaw() {
+  const t = useT();
+  const SENSORS = getSensors(t);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 

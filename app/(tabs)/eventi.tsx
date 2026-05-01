@@ -161,7 +161,7 @@ export default function EventiScreen() {
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={56} color={Colors.textSecondary} />
               <Text style={styles.emptyTitle}>{t("events.noScheduled")}</Text>
-              <Text style={styles.emptySubtitle}>Sii il primo a crearne uno!</Text>
+              <Text style={styles.emptySubtitle}>{t("events.beFirst")}</Text>
               <Pressable style={styles.emptyBtn} onPress={() => setShowForm(true)}>
                 <Ionicons name="add" size={18} color="#000" />
                 <Text style={styles.emptyBtnText}>Crea un evento</Text>

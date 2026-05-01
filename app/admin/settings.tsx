@@ -1823,7 +1823,7 @@ export default function AdminSettings() {
           />
         </View>
         <Text style={styles.synecoDesc}>
-          {autoMatchEnabled ? "Il motore di matching automatico è attivo" : "Il matching automatico è disattivato"}
+          {autoMatchEnabled ? t("admin.matchEngineActive") : t("admin.matchEngineInactive")}
         </Text>
       </View>
 
@@ -2091,7 +2091,7 @@ export default function AdminSettings() {
           />
         </View>
         <Text style={styles.synecoDesc}>
-          {musicMatchEnabled ? "Il matching musicale tra biker è attivo" : "Il matching musicale è disattivato"}
+          {musicMatchEnabled ? t("admin.musicMatchActive") : t("admin.musicMatchInactive")}
         </Text>
       </View>
           </View>
@@ -2123,7 +2123,7 @@ export default function AdminSettings() {
                 />
               </View>
               <Text style={styles.synecoDesc}>
-                {coordHistorySettings?.enabled ? "Le coordinate vengono salvate nello storico" : "Lo storico coordinate è disattivato"}
+                {coordHistorySettings?.enabled ? t("admin.coordHistoryActive") : t("admin.coordHistoryInactive")}
               </Text>
             </View>
 
@@ -2340,8 +2340,8 @@ export default function AdminSettings() {
               </View>
               <Text style={styles.synecoDesc}>
                 {bgLocationSettings?.enabled !== false
-                  ? "Il tracciamento in background è abilitato"
-                  : "Il tracciamento in background è disabilitato per tutti"}
+                  ? t("admin.bgTrackingActive")
+                  : t("admin.bgTrackingInactive")}
               </Text>
             </View>
 
@@ -2357,7 +2357,7 @@ export default function AdminSettings() {
                 { value: "always", label: "Sempre", desc: "Invia la posizione indipendentemente dallo stato" },
                 { value: "tracking", label: "Solo tracking attivo", desc: "Solo durante la registrazione di un percorso" },
                 { value: "sos", label: "Solo SOS attivo", desc: "Solo durante un'emergenza SOS" },
-                { value: "tracking_or_sos", label: "Tracking O SOS", desc: "Se è attivo il tracking o una SOS" },
+                { value: "tracking_or_sos", label: "Tracking O SOS", desc: t("admin.trackingOrSosDesc") },
               ].map((opt) => (
                 <TouchableOpacity
                   key={opt.value}
@@ -2678,8 +2678,8 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {homeMessageEnabled
-            ? "Il messaggio è attivo: gli utenti lo vedono toccando il logo"
-            : "Il messaggio è disattivato: il tocco sul logo non mostra nulla"}
+            ? t("admin.logoMsgActive")
+            : t("admin.logoMsgInactive")}
         </Text>
         <View style={{ marginTop: 14 }}>
           <TextInput
@@ -2724,7 +2724,7 @@ export default function AdminSettings() {
         <Text style={styles.synecoDesc}>
           {marketplaceEnabled
             ? "I biker possono mettere in vendita le moto dal garage. Le moto in vendita appaiono nel profilo e nel motoclub."
-            : "Il mercatino moto è disattivato. La funzione 'In Vendita' non è visibile."}
+            : t("admin.marketplaceInactive")}
         </Text>
       </View>
 
@@ -2773,7 +2773,7 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {ghostModeEnabled
-            ? "Gli utenti possono attivarsi in modalità invisibile: risultano offline per tutti."
+            ? t("admin.invisibleModeDesc")
             : "Ghost Mode disabilitato. Gli utenti non possono nascondersi dalla piattaforma."}
         </Text>
       </View>
@@ -2817,7 +2817,7 @@ export default function AdminSettings() {
           )}
         </View>
         <Text style={styles.synecoDesc}>
-          {emailVerifEnabled ? "Attiva la verifica email per le nuove registrazioni" : "La verifica email è disattivata"}
+          {emailVerifEnabled ? t("admin.emailVerifActive") : t("admin.emailVerifInactive")}
         </Text>
       </View>
 
@@ -2840,7 +2840,7 @@ export default function AdminSettings() {
           )}
         </View>
         <Text style={styles.synecoDesc}>
-          {phoneFieldEnabled ? "Il campo telefono è visibile durante la registrazione" : "Il campo telefono è nascosto nella registrazione (default)"}
+          {phoneFieldEnabled ? t("admin.phoneFieldVisible") : t("admin.phoneFieldHidden")}
         </Text>
       </View>
 
@@ -2970,7 +2970,7 @@ export default function AdminSettings() {
         <Text style={styles.synecoDesc}>
           {donationEnabled
             ? "Il blocco 'Supporta BikerLink' è visibile nel profilo utente"
-            : "Il blocco supporto è nascosto dal profilo utente"}
+            : t("admin.supportBlockHidden")}
         </Text>
 
         <View style={{ marginTop: 16 }}>
@@ -3428,7 +3428,7 @@ export default function AdminSettings() {
               onPress={() => {
                 Alert.alert(
                   "Sync produzione → sviluppo",
-                  "Il database di sviluppo verrà sovrascritto con i dati di produzione. Continuare?",
+                  t("admin.devDbOverwriteConfirm"),
                   [
                     { text: t("common.cancel"), style: "cancel" },
                     { text: "Sincronizza", style: "destructive", onPress: () => syncMutation.mutate() },

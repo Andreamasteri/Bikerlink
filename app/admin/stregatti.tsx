@@ -21,6 +21,7 @@ import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import { MOTORCYCLE_BRANDS } from "@/lib/motorcycle-data";
+import { useT } from "@/lib/language-context";
 
 const COUNTRIES_DATA: { code: string; name: string; regions: string[] }[] = [
   { code: "IT", name: "🇮🇹 Italia", regions: ["Abruzzo","Basilicata","Calabria","Campania","Emilia-Romagna","Friuli Venezia Giulia","Lazio","Liguria","Lombardia","Marche","Molise","Piemonte","Puglia","Sardegna","Sicilia","Toscana","Trentino-Alto Adige","Umbria","Valle d'Aosta","Veneto"] },
@@ -116,6 +117,7 @@ interface ChatMessage {
 }
 
 export default function FakeUsersAdmin() {
+  const t = useT();
   const rawInsets = useSafeAreaInsets();
   const insets = Platform.OS === "web"
     ? { top: 67, bottom: 34, left: rawInsets.left, right: rawInsets.right }
@@ -702,7 +704,7 @@ export default function FakeUsersAdmin() {
             />
           </View>
           <Text style={styles.controlDesc}>
-            {chatbotEnabled ? "Il bot risponde automaticamente per gli utenti fittizi" : "Il bot è disattivato, gli utenti fittizi non rispondono"}
+            {chatbotEnabled ? t("admin.botAutoReply") : t("admin.botDisabled")}
           </Text>
 
           <TouchableOpacity

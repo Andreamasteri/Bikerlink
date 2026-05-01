@@ -20,14 +20,15 @@ import { apiRequest, queryClient } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import MapPickerContent from "@/components/MapPickerModal";
 import { useT } from "@/lib/language-context";
-import { t as tStatic } from "@/lib/i18n";
 
-const WAYPOINT_TYPES = [
-  { value: "start", label: tStatic("routes.start"), icon: "flag" as const, color: "#4CAF50" },
-  { value: "stop", label: tStatic("routes.stopType"), icon: "pause-circle" as const, color: "#FF9800" },
-  { value: "poi", label: tStatic("routes.poiType"), icon: "star" as const, color: "#2196F3" },
-  { value: "end", label: tStatic("routes.endType"), icon: "flag-checkered" as const, color: "#E63946" },
-];
+function getWaypointTypes(t: (key: string) => string) {
+  return [
+    { value: "start", label: t("routes.start"), icon: "flag" as const, color: "#4CAF50" },
+    { value: "stop", label: t("routes.stopType"), icon: "pause-circle" as const, color: "#FF9800" },
+    { value: "poi", label: t("routes.poiType"), icon: "star" as const, color: "#2196F3" },
+    { value: "end", label: t("routes.endType"), icon: "flag-checkered" as const, color: "#E63946" },
+  ];
+}
 
 interface LocalWaypoint {
   localId: string;
@@ -43,12 +44,13 @@ function generateId() {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
 }
 
-function getWaypointMeta(type: string) {
-  return WAYPOINT_TYPES.find((w) => w.value === type) || WAYPOINT_TYPES[1];
+function getWaypointMeta(type: string, types: ReturnType<typeof getWaypointTypes>) {
+  return types.find((w) => w.value === type) || types[1];
 }
 
 export default function CreateRouteScreen() {
   const t = useT();
+  const WAYPOINT_TYPES = getWaypointTypes(t);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -242,7 +244,7 @@ export default function CreateRouteScreen() {
         )}
 
         {waypoints.map((wp, index) => {
-          const meta = getWaypointMeta(wp.waypointType);
+          const meta = getWaypointMeta(wp.waypointType, WAYPOINT_TYPES);
           return (
             <View key={wp.localId} style={styles.waypointCard}>
               <View style={styles.waypointCardLeft}>

@@ -12,7 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { t as tStatic } from "@/lib/i18n";
+import { useT } from "@/lib/language-context";
 
 interface RecentRecord {
   id: string;
@@ -65,7 +65,7 @@ function getRecordLabel(record: RecentRecord): string {
   return record.id.slice(0, 8);
 }
 
-function getRecordSub(record: RecentRecord): string {
+function getRecordSub(record: RecentRecord, t: (key: string) => string): string {
   const parts: string[] = [];
   if (record.email != null) parts.push(`email: ${record.email}`);
   if (record.role != null) parts.push(`role: ${record.role}`);
@@ -73,8 +73,8 @@ function getRecordSub(record: RecentRecord): string {
   if (record.conversationType != null) parts.push(`type: ${record.conversationType}`);
   if (record.messageType != null) parts.push(`type: ${record.messageType}`);
   if (record.clubType != null) parts.push(`tipo: ${record.clubType}`);
-  if (record.isApproved != null) parts.push(tStatic("admin.dbApproved").replace("{val}", record.isApproved ? "sì" : "no"));
-  if (record.isActive != null) parts.push(tStatic("admin.dbActive").replace("{val}", record.isActive ? "sì" : "no"));
+  if (record.isApproved != null) parts.push(t("admin.dbApproved").replace("{val}", record.isApproved ? "sì" : "no"));
+  if (record.isActive != null) parts.push(t("admin.dbActive").replace("{val}", record.isActive ? "sì" : "no"));
   if (record.model != null) parts.push(`modello: ${record.model}`);
   if (record.targetType != null) parts.push(`target: ${record.targetType}`);
   if (record.notificationType != null) parts.push(`tipo: ${record.notificationType}`);
@@ -83,6 +83,7 @@ function getRecordSub(record: RecentRecord): string {
 }
 
 function TableCard({ table }: { table: TableStat }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -112,7 +113,7 @@ function TableCard({ table }: { table: TableStat }) {
       {expanded && (
         <View style={styles.recentList}>
           {table.recent.length === 0 ? (
-            <Text style={styles.emptyText}>Nessun record</Text>
+            <Text style={styles.emptyText}>{t("admin.noRecords")}</Text>
           ) : (
             table.recent.map((rec) => (
               <View key={rec.id} style={styles.recordRow}>
@@ -126,9 +127,9 @@ function TableCard({ table }: { table: TableStat }) {
                   <Text style={styles.recordLabel} numberOfLines={1}>
                     {getRecordLabel(rec)}
                   </Text>
-                  {getRecordSub(rec) ? (
+                  {getRecordSub(rec, t) ? (
                     <Text style={styles.recordSub} numberOfLines={1}>
-                      {getRecordSub(rec)}
+                      {getRecordSub(rec, t)}
                     </Text>
                   ) : null}
                 </View>
@@ -142,6 +143,7 @@ function TableCard({ table }: { table: TableStat }) {
 }
 
 export default function AdminDbDebug() {
+  const t = useT();
   const insets = useSafeAreaInsets();
 
   const { data, isLoading, isError, refetch, isFetching, dataUpdatedAt } = useQuery<DbStats>({
@@ -149,7 +151,7 @@ export default function AdminDbDebug() {
     refetchInterval: 10000,
   });
 
-  const totalRecords = data?.tables.reduce((acc, t) => acc + t.total, 0) ?? 0;
+  const totalRecords = data?.tables.reduce((acc, tbl) => acc + tbl.total, 0) ?? 0;
   const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
 
   return (
@@ -163,11 +165,11 @@ export default function AdminDbDebug() {
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.subtitle}>
-            {data ? tStatic("admin.tableStats").replace("{tables}", String(data.tables.length)).replace("{records}", totalRecords.toLocaleString()) : tStatic("common.loading")}
+            {data ? t("admin.tableStats").replace("{tables}", String(data.tables.length)).replace("{records}", totalRecords.toLocaleString()) : t("common.loading")}
           </Text>
           {lastUpdated && (
             <Text style={styles.lastUpdated}>
-              Aggiornato: {lastUpdated.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              {t("admin.dbUpdated")}: {lastUpdated.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
             </Text>
           )}
         </View>

@@ -18,6 +18,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useT } from "@/lib/language-context";
 import type { Subscription } from "expo-sensors";
 import {
   Accelerometer,
@@ -197,6 +198,7 @@ function PlatformBadge({ platform }: { platform: "android" | "ios" | "cross" }) 
 }
 
 function SensorBody({ def }: { def: SensorDefinition }) {
+  const t = useT();
   const [configStr, setConfigStr] = useState(def.defaultConfig);
   const [notes, setNotes] = useState("");
   const [isRunning, setIsRunning] = useState(false);
@@ -253,7 +255,7 @@ function SensorBody({ def }: { def: SensorDefinition }) {
       return;
     }
 
-    addLog("info", "Verifica disponibilità sensore...");
+    addLog("info", t("admin.sensorCheckAvail"));
     let available = false;
     try {
       available = await checkSensorAvailable(def.key);
@@ -426,6 +428,7 @@ function SensorBody({ def }: { def: SensorDefinition }) {
 }
 
 export function SensorScreen({ def }: { def: SensorDefinition }) {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const [crashed, setCrashed] = useState(false);
   const [crashMsg, setCrashMsg] = useState("");
@@ -464,8 +467,8 @@ export function SensorScreen({ def }: { def: SensorDefinition }) {
             <Ionicons name="warning-outline" size={16} color={Colors.warning} />
             <Text style={ss.platformWarningText}>
               {def.platform === "android"
-                ? "Questo sensore è disponibile solo su Android. Su iOS restituirà errore."
-                : "Questo sensore è disponibile solo su iOS. Su Android restituirà errore."}
+                ? t("admin.sensorAvailAndroid")
+                : t("admin.sensorAvailIos")}
             </Text>
           </View>
         )}
