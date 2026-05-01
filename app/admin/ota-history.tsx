@@ -16,6 +16,7 @@ interface OtaUpdate {
   updateGroupId?: string;
   releaseId?: string;
   runtimeVersion?: string;
+  runtime_version?: string;
   [key: string]: unknown;
 }
 
@@ -98,7 +99,9 @@ export default function OtaHistoryScreen() {
                 </Text>
                 <View style={styles.rvBadge}>
                   <Text style={styles.rvText}>
-                    {u.runtimeVersion ? `rv ${u.runtimeVersion}` : "legacy"}
+                    {(u.runtimeVersion ?? u.runtime_version)
+                      ? `rv ${u.runtimeVersion ?? u.runtime_version}`
+                      : "legacy"}
                   </Text>
                 </View>
               </View>
