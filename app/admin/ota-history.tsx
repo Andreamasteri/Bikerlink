@@ -15,6 +15,7 @@ interface OtaUpdate {
   platforms?: string[];
   updateGroupId?: string;
   releaseId?: string;
+  runtimeVersion?: string;
   [key: string]: unknown;
 }
 
@@ -95,6 +96,11 @@ export default function OtaHistoryScreen() {
                 <Text style={[styles.otaNumber, { color: statusColor(u.status) }]}>
                   OTA-{u.updateNumber}
                 </Text>
+                <View style={styles.rvBadge}>
+                  <Text style={styles.rvText}>
+                    {u.runtimeVersion ? `rv ${u.runtimeVersion}` : "legacy"}
+                  </Text>
+                </View>
               </View>
               <View style={styles.cardHeaderRight}>
                 {deviceCount !== undefined && deviceCount > 0 && (
@@ -162,11 +168,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    flexShrink: 1,
   },
   cardHeaderRight: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+  },
+  rvBadge: {
+    backgroundColor: Colors.textSecondary + "22",
+    borderRadius: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  rvText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    color: Colors.textSecondary,
+    letterSpacing: 0.2,
   },
   adoptionBadge: {
     flexDirection: "row",
