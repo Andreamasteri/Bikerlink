@@ -1101,6 +1101,8 @@ const en: Record<string, string> = {
   "admin.uploadFolder": "Upload folder",
   "admin.campaignName": "Campaign name",
   "tracking.bufferSent": "Buffer / Sent",
+  "tracking.exportGpx": "Export GPX",
+  "tracking.exportGpxError": "Cannot export the route. Please try again.",
 };
 
 export default en;

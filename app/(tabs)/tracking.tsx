@@ -20,7 +20,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import Colors from "@/constants/colors";
-import { apiRequest, getQueryFn } from "@/lib/query-client";
+import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
 import { useRouter } from "expo-router";
@@ -41,6 +41,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Accelerometer } from "expo-sensors";
 import { VolumeManager } from "react-native-volume-manager";
 import * as TaskManager from "expo-task-manager";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 
 // ─── Background location task (must be defined at module top level) ───────────
 
@@ -81,6 +83,7 @@ interface GpsPoint {
 
 interface RouteRecord {
   id: string;
+  title?: string | null;
   totalDistanceKm?: number;
   maxSpeedKmh?: number;
   avgSpeedKmh?: number;
@@ -232,11 +235,13 @@ function RecordCard({
   onPublish,
   onDelete,
   onViewRoute,
+  onExportGpx,
 }: {
   item: RouteRecord;
   onPublish: () => void;
   onDelete: () => void;
   onViewRoute: () => void;
+  onExportGpx: () => void;
 }) {
   const t = useT();
   const { speedUnit, distanceUnit, timeFormat } = useUnits();
@@ -273,6 +278,9 @@ function RecordCard({
         <TouchableOpacity onPress={onViewRoute} style={[styles.publishIconBtn, { backgroundColor: Colors.accent + "18", marginRight: 6, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8 }]} activeOpacity={0.7}>
           <Ionicons name="map-outline" size={16} color={Colors.accent} />
           <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.accent }}>{t("tracking.route")}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onExportGpx} style={[styles.publishIconBtn, { marginRight: 6 }]} activeOpacity={0.7}>
+          <Ionicons name="download-outline" size={18} color={Colors.accent} />
         </TouchableOpacity>
         <TouchableOpacity onPress={onPublish} style={styles.publishIconBtn} activeOpacity={0.7}>
           <Ionicons name="share-outline" size={18} color={Colors.accent} />
@@ -2529,6 +2537,39 @@ export default function TrackingScreen() {
                         },
                       ]
                     );
+                  }}
+                  onExportGpx={async () => {
+                    try {
+                      const url = new URL(`/api/routes/${item.id}/export.gpx`, getApiUrl()).href;
+                      if (Platform.OS === "web") {
+                        const link = document.createElement("a");
+                        link.href = url;
+                        link.download = `${item.title ?? item.id}.gpx`;
+                        link.click();
+                        return;
+                      }
+                      const resp = await fetch(url, { credentials: "include" });
+                      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                      const gpxText = await resp.text();
+                      const safeName = (item.title ?? item.id).replace(/[^a-zA-Z0-9_\-]/g, "_").slice(0, 60);
+                      const fileUri = `${FileSystem.cacheDirectory}${safeName}.gpx`;
+                      await FileSystem.writeAsStringAsync(fileUri, gpxText, {
+                        encoding: FileSystem.EncodingType.UTF8,
+                      });
+                      const canShare = await Sharing.isAvailableAsync();
+                      if (canShare) {
+                        await Sharing.shareAsync(fileUri, {
+                          mimeType: "application/gpx+xml",
+                          dialogTitle: t("tracking.exportGpx"),
+                          UTI: "com.topografix.gpx",
+                        });
+                      } else {
+                        Alert.alert("GPX", fileUri);
+                      }
+                    } catch (err) {
+                      console.warn("[BikerLink] GPX export error:", err);
+                      Alert.alert(t("common.error"), t("tracking.exportGpxError"));
+                    }
                   }}
                 />
               ))}

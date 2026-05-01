@@ -444,4 +444,67 @@ function toRad(deg: number): number {
   return deg * (Math.PI / 180);
 }
 
+// ─── GPX Export ────────────────────────────────────────────────────────────────
+router.get("/:id/export.gpx", async (req: Request, res: Response) => {
+  try {
+    const userId = requireAuth(req, res);
+    if (!userId) return;
+
+    const id = req.params.id as string;
+    const route = await storage.getRoute(id);
+
+    if (!route) {
+      return res.status(404).json({ message: "Percorso non trovato" });
+    }
+    if (route.userId !== userId) {
+      return res.status(403).json({ message: "Non autorizzato" });
+    }
+
+    const points = await storage.getRoutePoints(id);
+
+    const routeName = (route.title || `BikerLink-${id.slice(0, 8)}`).replace(/[<>&"]/g, (c) =>
+      c === "<" ? "&lt;" : c === ">" ? "&gt;" : c === "&" ? "&amp;" : "&quot;"
+    );
+    const creatorTime = route.startedAt
+      ? new Date(route.startedAt).toISOString()
+      : new Date().toISOString();
+
+    const trkpts = points
+      .map((p) => {
+        const time = new Date(p.timestamp).toISOString();
+        const ele = p.altitude != null ? `\n        <ele>${p.altitude.toFixed(2)}</ele>` : "";
+        const spd =
+          p.speedKmh != null
+            ? `\n        <extensions><speed>${(p.speedKmh / 3.6).toFixed(3)}</speed></extensions>`
+            : "";
+        return `    <trkpt lat="${p.latitude.toFixed(7)}" lon="${p.longitude.toFixed(7)}">${ele}\n        <time>${time}</time>${spd}\n    </trkpt>`;
+      })
+      .join("\n");
+
+    const gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="BikerLink" xmlns="http://www.topografix.com/GPX/1/1"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>${routeName}</name>
+    <time>${creatorTime}</time>
+  </metadata>
+  <trk>
+    <name>${routeName}</name>
+    <trkseg>
+${trkpts}
+    </trkseg>
+  </trk>
+</gpx>`;
+
+    const safeName = routeName.replace(/[^a-zA-Z0-9_\-]/g, "_").slice(0, 60);
+    res.setHeader("Content-Type", "application/gpx+xml");
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}.gpx"`);
+    return res.send(gpx);
+  } catch (error) {
+    console.error("GPX export error:", error);
+    return res.status(500).json({ message: "Errore durante l'esportazione GPX" });
+  }
+});
+
 export default router;

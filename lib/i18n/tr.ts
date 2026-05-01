@@ -1053,6 +1053,8 @@ const tr: Record<string, string> = {
   "admin.uploadFolder": "",
   "admin.campaignName": "",
   "tracking.bufferSent": "",
+  "tracking.exportGpx": "",
+  "tracking.exportGpxError": "",
 };
 
 export default tr;
