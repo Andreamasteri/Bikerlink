@@ -811,18 +811,32 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] ota_events.diagnostics:", e);
         }
 
-        // Startup cleanup: remove superseded/draft OTA releases older than 90 days
+        // Helper: read ota_cleanup_retention_days from app_settings (default 90).
+        const getOtaRetentionDays = async (): Promise<number> => {
+          try {
+            const setting = await storage.getAppSetting("ota_cleanup_retention_days");
+            if (setting?.value) {
+              const parsed = parseInt(setting.value, 10);
+              if (!isNaN(parsed) && parsed > 0) return parsed;
+            }
+          } catch { /* best-effort, fall back to default */ }
+          return 90;
+        };
+
+        // Startup cleanup: remove superseded/draft OTA releases older than configured retention window
         // + delete corresponding bundles from object storage (best-effort)
         try {
+          const retentionDays = await getOtaRetentionDays();
           const cleanupResult = await pool.query(
             `DELETE FROM ota_releases
              WHERE status IN ('superseded', 'draft')
-               AND published_at < NOW() - INTERVAL '90 days'
-             RETURNING id, version, status, published_at, bundle_path`
+               AND published_at < NOW() - ($1 || ' days')::INTERVAL
+             RETURNING id, version, status, published_at, bundle_path`,
+            [String(retentionDays)]
           );
           const deletedRows = cleanupResult.rows as Array<{ id: string; version: string; status: string; published_at: string; bundle_path: string | null }>;
           if (deletedRows.length > 0) {
-            console.log(`[OTA-CLEANUP] Removed ${deletedRows.length} stale OTA release(s) older than 90 days:`);
+            console.log(`[OTA-CLEANUP] Removed ${deletedRows.length} stale OTA release(s) older than ${retentionDays} days:`);
             const { deleteObject } = await import("./objectStorage");
             for (const row of deletedRows) {
               console.log(`  → id=${row.id} version=${row.version} status=${row.status} published_at=${row.published_at}`);
@@ -836,7 +850,7 @@ function setupErrorHandler(app: express.Application) {
               }
             }
           } else {
-            console.log("[OTA-CLEANUP] No stale OTA releases to remove at startup.");
+            console.log(`[OTA-CLEANUP] No stale OTA releases to remove at startup (retention=${retentionDays}d).`);
           }
         } catch (e) {
           console.warn("[OTA-CLEANUP] Startup OTA release cleanup failed:", e);
@@ -1465,25 +1479,28 @@ function setupErrorHandler(app: express.Application) {
         }
 
         // Phase 12 — OTA release auto-cleanup every 24h
-        // Deletes rows with status IN ('superseded', 'draft') published more than 90 days ago.
+        // Deletes rows with status IN ('superseded', 'draft') published beyond the configured retention window.
+        // Retention is read from app_settings (key: ota_cleanup_retention_days, default 90).
         // First run is delayed 15 minutes after boot to stagger with other maintenance jobs.
         {
           const runOtaCleanup = async () => {
             try {
+              const retentionDays = await getOtaRetentionDays();
               const result = await pool.query(
                 `DELETE FROM ota_releases
                  WHERE status IN ('superseded', 'draft')
-                   AND published_at < NOW() - INTERVAL '90 days'
-                 RETURNING id, version, status, published_at`
+                   AND published_at < NOW() - ($1 || ' days')::INTERVAL
+                 RETURNING id, version, status, published_at`,
+                [String(retentionDays)]
               );
               const rows = result.rows as Array<{ id: string; version: string; status: string; published_at: string }>;
               if (rows.length > 0) {
-                console.log(`[OTA-CLEANUP] Periodic: removed ${rows.length} stale OTA release(s) older than 90 days:`);
+                console.log(`[OTA-CLEANUP] Periodic: removed ${rows.length} stale OTA release(s) older than ${retentionDays} days:`);
                 for (const row of rows) {
                   console.log(`  → id=${row.id} version=${row.version} status=${row.status} published_at=${row.published_at}`);
                 }
               } else {
-                console.log("[OTA-CLEANUP] Periodic: no stale OTA releases found.");
+                console.log(`[OTA-CLEANUP] Periodic: no stale OTA releases found (retention=${retentionDays}d).`);
               }
             } catch (err) {
               console.warn("[OTA-CLEANUP] Periodic cleanup error:", err);

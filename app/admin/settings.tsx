@@ -1428,6 +1428,24 @@ export default function AdminSettings() {
     },
   });
 
+  const [otaRetentionInput, setOtaRetentionInput] = useState("90");
+  useEffect(() => {
+    const found = settings.find((s) => s.key === "ota_cleanup_retention_days");
+    if (found?.value) setOtaRetentionInput(found.value);
+  }, [settings]);
+
+  const otaRetentionMutation = useMutation({
+    mutationFn: async (val: string) => {
+      const days = parseInt(val, 10);
+      if (isNaN(days) || days < 1) throw new Error("Inserire un numero di giorni valido (minimo 1).");
+      await apiRequest("PUT", "/api/admin/settings/ota_cleanup_retention_days", { value: String(days) });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
+  });
+
   const [emailConfigModalVisible, setEmailConfigModalVisible] = useState(false);
   const [emailConfigAdminPass, setEmailConfigAdminPass] = useState("");
   const [emailConfigGmail, setEmailConfigGmail] = useState("");
@@ -3389,6 +3407,42 @@ export default function AdminSettings() {
             <Text style={styles.saveBtnText}>Salva</Text>
           </TouchableOpacity>
         </View>
+      </View>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="timer-outline" size={20} color="#ff6b35" />
+            <Text style={styles.synecoLabel}>OTA Cleanup — Finestra di retention</Text>
+          </View>
+        </View>
+        <Text style={styles.synecoDesc}>
+          Numero di giorni dopo cui le release OTA con stato "superseded" o "draft" vengono eliminate automaticamente. Default: 90 giorni.
+        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 10, gap: 8 }}>
+          <Text style={[styles.synecoDesc, { flex: 1 }]}>Giorni di retention:</Text>
+          <TextInput
+            style={[styles.synecoDesc, { borderWidth: 1, borderColor: Colors.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, color: Colors.text, minWidth: 60, textAlign: "center" }]}
+            value={otaRetentionInput}
+            onChangeText={setOtaRetentionInput}
+            keyboardType="numeric"
+            maxLength={4}
+          />
+          <TouchableOpacity
+            style={[styles.saveBtn, { paddingHorizontal: 12, paddingVertical: 6 }]}
+            onPress={() => otaRetentionMutation.mutate(otaRetentionInput)}
+            disabled={otaRetentionMutation.isPending}
+          >
+            {otaRetentionMutation.isPending
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Text style={styles.saveBtnText}>Salva</Text>}
+          </TouchableOpacity>
+        </View>
+        {otaRetentionMutation.isSuccess && (
+          <Text style={[styles.synecoDesc, { color: Colors.accent, marginTop: 6 }]}>
+            Retention aggiornata — verrà applicata al prossimo ciclo di cleanup (avvio o mezzanotte).
+          </Text>
+        )}
       </View>
 
       <View style={styles.paidCard}>
