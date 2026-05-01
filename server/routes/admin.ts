@@ -474,7 +474,7 @@ router.delete("/purge-non-admin-users", async (req: Request, res: Response) => {
     const protectedEmails = PROTECTED_EMAILS.map((e) => e.toLowerCase());
 
     const { deletedCount } = await db.transaction(async (tx) => {
-      // Step 1: null events.approved_by per utenti non-admin (esclude reviewer protetti)
+      // Step 1: null events.approved_by per utenti non-admin (esclude account protetti)
       await tx.execute(sql`
         UPDATE events SET approved_by = NULL
         WHERE approved_by IN (
@@ -484,7 +484,7 @@ router.delete("/purge-non-admin-users", async (req: Request, res: Response) => {
         )
       `);
 
-      // Step 2: conta utenti da eliminare (esclude reviewer protetti)
+      // Step 2: conta utenti da eliminare (esclude account protetti)
       const countResult = await tx.execute(sql`
         SELECT COUNT(*) AS cnt FROM users
         WHERE role != 'admin'
@@ -492,7 +492,7 @@ router.delete("/purge-non-admin-users", async (req: Request, res: Response) => {
       `);
       const deletedCount = Number((countResult.rows[0] as { cnt: string }).cnt);
 
-      // Step 3: elimina utenti non-admin (esclude reviewer protetti — CASCADE FK correlate)
+      // Step 3: elimina utenti non-admin (esclude account protetti — CASCADE FK correlate)
       await tx.execute(sql`
         DELETE FROM users
         WHERE role != 'admin'
@@ -514,13 +514,13 @@ router.delete("/purge-non-admin-users", async (req: Request, res: Response) => {
         action: "purge_non_admin_users",
         targetType: "system",
         targetId: adminId,
-        details: `Purga DB: eliminati ${deletedCount} utenti non-admin (esclusi ${protectedEmails.length} reviewer protetti) + tutte le sessioni`,
+        details: `Purga DB: eliminati ${deletedCount} utenti non-admin (esclusi ${protectedEmails.length} account protetti) + tutte le sessioni`,
       });
 
       return { deletedCount };
     });
 
-    console.log(`[PURGE] ${deletedCount} utenti non-admin eliminati dall'admin ${adminId} (reviewer protetti: ${protectedEmails.join(", ")})`);
+    console.log(`[PURGE] ${deletedCount} utenti non-admin eliminati dall'admin ${adminId} (account protetti: ${protectedEmails.join(", ")})`);
     return res.json({ purged: true, deletedUsers: deletedCount, protectedEmails });
   } catch (err) {
     console.error("[PURGE] errore durante purga utenti:", err);
