@@ -356,7 +356,6 @@ export default function ProposalDetailScreen() {
                     { text: t("common.delete"), style: "destructive", onPress: doDelete },
                   ]
                 );
-              }
             }}
             activeOpacity={0.8}
           >

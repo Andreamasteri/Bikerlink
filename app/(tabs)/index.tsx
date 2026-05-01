@@ -189,11 +189,10 @@ export default function MapScreen() {
       let coords: { latitude: number; longitude: number } | null = null;
 
       const { status } = await Location.requestForegroundPermissionsAsync();
-        sendStartupBeacon("gps_permission_result", { status });
-        if (status !== "granted") return null;
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
-      }
+      sendStartupBeacon("gps_permission_result", { status });
+      if (status !== "granted") return null;
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
 
       if (coords) {
         try {

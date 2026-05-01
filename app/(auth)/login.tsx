@@ -38,22 +38,20 @@ export default function LoginScreen() {
     }
     setIsSubmitting(true);
     let gpsCoords: { latitude: number; longitude: number } | undefined;
-    {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === "granted") {
-          const pos = await Promise.race([
-            Location.getCurrentPositionAsync({
-              accuracy: Location.Accuracy.Balanced,
-            }),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
-          ]);
-          if (pos) {
-            gpsCoords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-          }
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === "granted") {
+        const pos = await Promise.race([
+          Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          }),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+        ]);
+        if (pos) {
+          gpsCoords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
         }
-      } catch {}
-    }
+      }
+    } catch {}
     loginMutation.mutate(
       { identifier: identifier.trim(), password, ...gpsCoords },
       {
