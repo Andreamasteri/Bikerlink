@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { users } from "@shared/schema";
-import { inArray } from "drizzle-orm";
+import { inArray, eq } from "drizzle-orm";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 
@@ -21,7 +21,23 @@ interface ExpoPushTicket {
   details?: { error?: string };
 }
 
-async function sendExpoMessages(messages: ExpoPushMessage[]): Promise<void> {
+function isValidExpoPushToken(token: string): boolean {
+  return token.startsWith("ExponentPushToken[") || token.startsWith("ExpoPushToken[");
+}
+
+async function clearStaleToken(userId: string): Promise<void> {
+  try {
+    await db.update(users).set({ expoPushToken: null }).where(eq(users.id, userId));
+    console.warn(`[Push] Cleared stale token for user ${userId} (DeviceNotRegistered)`);
+  } catch (err) {
+    console.warn("[Push] Failed to clear stale token (non-fatal):", err);
+  }
+}
+
+async function sendExpoMessages(
+  messages: ExpoPushMessage[],
+  userIdByToken: Map<string, string>,
+): Promise<void> {
   try {
     const resp = await fetch(EXPO_PUSH_URL, {
       method: "POST",
@@ -37,9 +53,18 @@ async function sendExpoMessages(messages: ExpoPushMessage[]): Promise<void> {
     }
     const result = await resp.json() as { data?: ExpoPushTicket[] };
     const tickets = result.data ?? [];
-    for (const ticket of tickets) {
+    for (let i = 0; i < tickets.length; i++) {
+      const ticket = tickets[i];
       if (ticket.status === "error") {
-        console.warn("[Push] Expo push ticket error:", ticket.message, ticket.details?.error);
+        if (ticket.details?.error === "DeviceNotRegistered") {
+          const token = messages[i]?.to;
+          if (token) {
+            const userId = userIdByToken.get(token);
+            if (userId) clearStaleToken(userId);
+          }
+        } else {
+          console.warn("[Push] Expo push ticket error:", ticket.message, ticket.details?.error);
+        }
       }
     }
   } catch (err) {
@@ -55,19 +80,25 @@ export async function sendMatchPushNotifications(userIds: string[]): Promise<voi
       .from(users)
       .where(inArray(users.id, userIds));
 
-    const messages: ExpoPushMessage[] = rows
-      .filter((r) => r.expoPushToken && r.expoPushToken.startsWith("ExponentPushToken["))
-      .map((r) => ({
-        to: r.expoPushToken!,
-        title: "Ehi, It's a match! 🔥",
-        body: "Tocca per vedere chi è",
-        sound: "default" as const,
-        data: { type: "match" },
-        channelId: "matches",
-      }));
+    const userIdByToken = new Map<string, string>();
+    const messages: ExpoPushMessage[] = [];
+
+    for (const row of rows) {
+      if (row.expoPushToken && isValidExpoPushToken(row.expoPushToken)) {
+        userIdByToken.set(row.expoPushToken, row.id);
+        messages.push({
+          to: row.expoPushToken,
+          title: "Ehi, It's a match! 🔥",
+          body: "Tocca per vedere chi è",
+          sound: "default" as const,
+          data: { type: "match" },
+          channelId: "matches",
+        });
+      }
+    }
 
     if (messages.length === 0) return;
-    await sendExpoMessages(messages);
+    await sendExpoMessages(messages, userIdByToken);
   } catch (err) {
     console.warn("[Push] sendMatchPushNotifications error (non-fatal):", err);
   }
