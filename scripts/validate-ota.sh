@@ -350,8 +350,19 @@ else
         || echo "")
 
       if [ -z "$SERVED_RELEASE_ID" ]; then
-        warn "LIVE_CHECK: produzione risponde 200 ma release ID non trovato nel body (formato inatteso o no-update)"
-        info "  Verifica manualmente: curl -si -H 'expo-runtime-version: $EXPECTED_RV' -H 'expo-platform: android' -H 'expo-protocol-version: 1' $PROD_URL/api/expo-updates | grep '\"id\"'"
+        # No UUID in the body — check whether it is a valid v1 "no update" response
+        if echo "$HTTP_BODY" | grep -q '"noUpdateAvailable"'; then
+          # Valid expo-updates v1 no-update directive — not an error
+          if [ -z "$EXPECTED_RELEASE_ID" ] || [ "$EXPECTED_RELEASE_ID" = "undefined" ] || [ "$EXPECTED_RELEASE_ID" = "null" ]; then
+            info "LIVE_CHECK_OK_NO_UPDATE: il server risponde correttamente 'nessun aggiornamento' per rv=$EXPECTED_RV (OTA-$EXPECTED_OTA non ha un releaseId EAS atteso)"
+          else
+            warn "LIVE_CHECK_WARN_NO_UPDATE: il server risponde 'no update' per rv=$EXPECTED_RV — OTA-$EXPECTED_OTA (releaseId=$EXPECTED_RELEASE_ID) potrebbe non essere ancora propagata in produzione"
+          fi
+        else
+          # Body is HTTP 200 but contains neither a release UUID nor noUpdateAvailable
+          fail "LIVE_CHECK_FAIL: produzione risponde HTTP 200 ma il body non contiene né un release ID né 'noUpdateAvailable' (risposta malformata)"
+          info "  Verifica manualmente: curl -si -H 'expo-runtime-version: $EXPECTED_RV' -H 'expo-platform: android' -H 'expo-protocol-version: 1' $PROD_URL/api/expo-updates | head -50"
+        fi
       elif [ "$SERVED_RELEASE_ID" = "$EXPECTED_RELEASE_ID" ]; then
         ok "LIVE_CHECK_OK: produzione serve OTA-$EXPECTED_OTA (releaseId=$SERVED_RELEASE_ID)"
       else
