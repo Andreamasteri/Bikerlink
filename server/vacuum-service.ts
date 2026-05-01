@@ -1,6 +1,11 @@
 import { pool } from "./db";
+import { storage } from "./storage";
 
-const VACUUM_TABLES = [
+const VACUUM_LAST_RUN_KEY = "db_vacuum_full_v3";
+
+export const VACUUM_LAST_RUN_SETTING_KEY = VACUUM_LAST_RUN_KEY;
+
+export const VACUUM_TABLES = [
   "conversation_participants",
   "moto_club_members",
   "messages",
@@ -67,6 +72,11 @@ export async function runVacuumFullAll(): Promise<"executed" | "skipped"> {
     }
     const totalElapsed = Date.now() - startTotal;
     console.log(`[VACUUM] Completato in ${totalElapsed}ms — spazio recuperato.`);
+    try {
+      await storage.upsertAppSetting(VACUUM_LAST_RUN_KEY, new Date().toISOString());
+    } catch (err) {
+      console.warn("[VACUUM] Impossibile salvare il timestamp dell'ultimo VACUUM:", err);
+    }
     return "executed";
   } catch (err) {
     console.error("[VACUUM] Errore durante VACUUM FULL:", err);

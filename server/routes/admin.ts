@@ -5552,6 +5552,43 @@ router.post("/cache/cleanup", async (_req: Request, res: Response) => {
   }
 });
 
+router.get("/db/table-sizes", async (_req: Request, res: Response) => {
+  try {
+    const { VACUUM_TABLES, isVacuumRunning, VACUUM_LAST_RUN_SETTING_KEY } = await import("../vacuum-service");
+    const client = await (await import("../db")).pool.connect();
+    try {
+      const rows: { name: string; sizeBytes: number; totalSizeBytes: number }[] = [];
+      for (const table of VACUUM_TABLES) {
+        try {
+          const r = await client.query<{ relation_size: string; total_size: string }>(
+            `SELECT pg_relation_size($1::regclass) AS relation_size,
+                    pg_total_relation_size($1::regclass) AS total_size`,
+            [table],
+          );
+          rows.push({
+            name: table,
+            sizeBytes: parseInt(r.rows[0]?.relation_size ?? "0", 10),
+            totalSizeBytes: parseInt(r.rows[0]?.total_size ?? "0", 10),
+          });
+        } catch {
+          rows.push({ name: table, sizeBytes: 0, totalSizeBytes: 0 });
+        }
+      }
+      const lastVacuumSetting = await storage.getAppSetting(VACUUM_LAST_RUN_SETTING_KEY);
+      return res.json({
+        tables: rows,
+        isRunning: isVacuumRunning(),
+        lastVacuum: lastVacuumSetting?.value ?? null,
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Admin db/table-sizes error:", error);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 router.post("/db/vacuum-full", async (_req: Request, res: Response) => {
   try {
     const { isVacuumRunning, runVacuumFullAll } = await import("../vacuum-service");
