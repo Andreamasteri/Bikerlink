@@ -4,17 +4,6 @@
     "appVersionSource": "local"
   },
   "build": {
-    "preview": {
-      "distribution": "internal",
-      "credentialsSource": "remote",
-      "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease"
-      },
-      "env": {
-        "EXPO_PUBLIC_DOMAIN": "biker-link.replit.app"
-      }
-    },
     "release-apk": {
       "distribution": "internal",
       "credentialsSource": "remote",

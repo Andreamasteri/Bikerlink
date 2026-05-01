@@ -43,6 +43,14 @@ backend custom `https://biker-link.replit.app/api/expo-updates` (Expo Updates Pr
 **Regola**: qualsiasi agente che legge "EAS è dismesso" deve intendere solo **EAS Updates**.
 EAS Build (per produrre APK/AAB firmati) è ancora l'unico workflow disponibile per le build native.
 
+**Unico entrypoint autorizzato per build native**:
+```bash
+touch .local/apk-build-authorized
+bash scripts/build-apk.sh              # APK arm64 dimagrita (~50MB)
+bash scripts/build-apk.sh production   # AAB Play Store
+```
+⛔ NON invocare `npx eas-cli build` o `eas build` direttamente — usare sempre `build-apk.sh`.
+
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
 - **Runtime Version**: `8.0.0` (ciclo corrente, APK v44) ← CICLO V3
