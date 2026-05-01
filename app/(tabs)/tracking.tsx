@@ -20,7 +20,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import Colors from "@/constants/colors";
-import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
+import { apiRequest, getQueryFn, getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
 import { useRouter } from "expo-router";
@@ -279,8 +279,9 @@ function RecordCard({
           <Ionicons name="map-outline" size={16} color={Colors.accent} />
           <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.accent }}>{t("tracking.route")}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onExportGpx} style={[styles.publishIconBtn, { marginRight: 6 }]} activeOpacity={0.7}>
-          <Ionicons name="download-outline" size={18} color={Colors.accent} />
+        <TouchableOpacity onPress={onExportGpx} style={[styles.publishIconBtn, { backgroundColor: Colors.accent + "18", marginRight: 6, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8 }]} activeOpacity={0.7}>
+          <Ionicons name="download-outline" size={16} color={Colors.accent} />
+          <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.accent }}>GPX</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={onPublish} style={styles.publishIconBtn} activeOpacity={0.7}>
           <Ionicons name="share-outline" size={18} color={Colors.accent} />
@@ -2548,7 +2549,7 @@ export default function TrackingScreen() {
                         link.click();
                         return;
                       }
-                      const resp = await fetch(url, { credentials: "include" });
+                      const resp = await fetch(url, { headers: authFetchHeaders(), credentials: "include" });
                       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                       const gpxText = await resp.text();
                       const safeName = (item.title ?? item.id).replace(/[^a-zA-Z0-9_\-]/g, "_").slice(0, 60);
