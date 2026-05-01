@@ -1094,6 +1094,27 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] default_taskbar_style cleanup:", e);
         }
 
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS sprint_results (
+              id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+              user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              route_id VARCHAR(36) REFERENCES routes(id) ON DELETE SET NULL,
+              sprint_0to100_ms INTEGER NOT NULL,
+              max_acceleration_g DOUBLE PRECISION DEFAULT 0,
+              max_deceleration_g DOUBLE PRECISION DEFAULT 0,
+              max_tilt_deg DOUBLE PRECISION DEFAULT 0,
+              created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+          `);
+          await db.execute(sql`
+            CREATE INDEX IF NOT EXISTS sprint_results_user_id_idx ON sprint_results(user_id)
+          `);
+          console.log("[MIGRATION] sprint_results table ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] sprint_results table:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 

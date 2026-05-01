@@ -12,6 +12,7 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import type { ComponentProps } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/query-client";
 import Colors from "@/constants/colors";
@@ -21,21 +22,21 @@ import { getCurrentLocale } from "@/lib/i18n";
 
 interface SprintResult {
   id: string;
-  title: string | null;
-  sprint0to100Ms: number | null;
+  sprint0to100Ms: number;
   maxAccelerationG: number | null;
   maxDecelerationG: number | null;
   maxTiltDeg: number | null;
-  maxSpeedKmh: number | null;
-  startedAt: string;
-  stoppedAt: string | null;
+  routeId: string | null;
+  createdAt: string;
 }
 
 function formatSprintTime(ms: number): string {
   return (ms / 1000).toFixed(3) + "s";
 }
 
-function getMedalIcon(index: number): { name: string; color: string } | null {
+type IoniconsName = ComponentProps<typeof Ionicons>["name"];
+
+function getMedalIcon(index: number): { name: IoniconsName; color: string } | null {
   if (index === 0) return { name: "trophy", color: "#FFD700" };
   if (index === 1) return { name: "medal-outline", color: "#C0C0C0" };
   if (index === 2) return { name: "medal-outline", color: "#CD7F32" };
@@ -64,7 +65,7 @@ export default function SprintHistoryScreen() {
     gcTime: 5 * 60 * 1000,
   });
 
-  const personalBest = sprints && sprints.length > 0 ? sprints[0] : null;
+  const personalBest: SprintResult | null = sprints && sprints.length > 0 ? sprints[0] : null;
 
   const renderItem = useCallback(
     ({ item, index }: { item: SprintResult; index: number }) => {
@@ -81,7 +82,7 @@ export default function SprintHistoryScreen() {
         >
           <View style={styles.sprintRank}>
             {medal ? (
-              <Ionicons name={medal.name as any} size={20} color={medal.color} />
+              <Ionicons name={medal.name} size={20} color={medal.color} />
             ) : (
               <Text style={styles.rankNumber}>#{index + 1}</Text>
             )}
@@ -116,7 +117,7 @@ export default function SprintHistoryScreen() {
 
           <View style={styles.sprintDate}>
             <Text style={styles.dateText} numberOfLines={2}>
-              {formatDateTime(item.startedAt, locale, timeFormat)}
+              {formatDateTime(item.createdAt, locale, timeFormat)}
             </Text>
           </View>
         </View>
@@ -157,7 +158,7 @@ export default function SprintHistoryScreen() {
             </Text>
           </View>
           <Text style={styles.pbSince}>
-            {formatDateTime(personalBest.startedAt, locale, timeFormat)}
+            {formatDateTime(personalBest.createdAt, locale, timeFormat)}
           </Text>
         </View>
       )}

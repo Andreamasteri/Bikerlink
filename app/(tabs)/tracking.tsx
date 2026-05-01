@@ -1238,6 +1238,16 @@ export default function TrackingScreen() {
           setSprint0to100Ms(elapsed);
           sprintPhaseRef.current = "done";
           setSprintPhase("done");
+          // Persist sprint result to dedicated sprint_results table
+          apiRequest("POST", "/api/sprints", {
+            sprint0to100Ms: elapsed,
+            maxAccelerationG: maxAccelGRef.current,
+            maxDecelerationG: maxDecelGRef.current,
+            maxTiltDeg: maxTiltDegRef.current,
+            routeId: routeIdRef.current,
+          })
+            .then(() => queryClient.invalidateQueries({ queryKey: ["/api/sprints"] }))
+            .catch((err) => console.warn("[Sprint] save failed:", err));
           // Check if this is a new personal best
           const prevBest = personalBestMsRef.current;
           if (prevBest === null || elapsed < prevBest) {
@@ -2064,7 +2074,7 @@ export default function TrackingScreen() {
                 <View style={styles.sprintHeaderRow}>
                   <Text style={styles.sprintHeaderLabel}>Sprint 0-100</Text>
                   <TouchableOpacity
-                    onPress={() => router.push("/sprint-history" as any)}
+                    onPress={() => router.push("/sprint-history" as const)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     style={styles.sprintHistoryBtn}
                   >

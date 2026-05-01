@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../db";
-import { routes } from "@shared/schema";
-import { eq, and, asc, isNotNull } from "drizzle-orm";
+import { sprintResults } from "@shared/schema";
+import { eq, asc } from "drizzle-orm";
 
 const router = Router();
 
@@ -13,33 +13,46 @@ function requireAuth(req: Request, res: Response): string | null {
   return req.session.userId;
 }
 
+router.post("/", async (req: Request, res: Response) => {
+  try {
+    const userId = requireAuth(req, res);
+    if (!userId) return;
+
+    const { sprint0to100Ms, maxAccelerationG, maxDecelerationG, maxTiltDeg, routeId } = req.body;
+
+    if (!sprint0to100Ms || typeof sprint0to100Ms !== "number" || sprint0to100Ms <= 0) {
+      return res.status(400).json({ message: "Tempo sprint non valido" });
+    }
+
+    const [result] = await db
+      .insert(sprintResults)
+      .values({
+        userId,
+        routeId: routeId ?? null,
+        sprint0to100Ms: Math.round(sprint0to100Ms),
+        maxAccelerationG: maxAccelerationG ?? 0,
+        maxDecelerationG: maxDecelerationG ?? 0,
+        maxTiltDeg: maxTiltDeg ?? 0,
+      })
+      .returning();
+
+    return res.status(201).json(result);
+  } catch (error) {
+    console.error("Save sprint error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.get("/", async (req: Request, res: Response) => {
   try {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
     const sprints = await db
-      .select({
-        id: routes.id,
-        title: routes.title,
-        sprint0to100Ms: routes.sprint0to100Ms,
-        maxAccelerationG: routes.maxAccelerationG,
-        maxDecelerationG: routes.maxDecelerationG,
-        maxTiltDeg: routes.maxTiltDeg,
-        maxSpeedKmh: routes.maxSpeedKmh,
-        startedAt: routes.startedAt,
-        stoppedAt: routes.stoppedAt,
-      })
-      .from(routes)
-      .where(
-        and(
-          eq(routes.userId, userId),
-          eq(routes.isSprint, true),
-          eq(routes.status, "completed"),
-          isNotNull(routes.sprint0to100Ms)
-        )
-      )
-      .orderBy(asc(routes.sprint0to100Ms))
+      .select()
+      .from(sprintResults)
+      .where(eq(sprintResults.userId, userId))
+      .orderBy(asc(sprintResults.sprint0to100Ms))
       .limit(100);
 
     return res.json(sprints);

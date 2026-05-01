@@ -297,6 +297,27 @@ export const routes = pgTable("routes", {
   index("routes_user_id_idx").on(table.userId),
 ]);
 
+export const sprintResults = pgTable("sprint_results", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  routeId: varchar("route_id", { length: 36 })
+    .references(() => routes.id, { onDelete: "set null" }),
+  sprint0to100Ms: integer("sprint_0to100_ms").notNull(),
+  maxAccelerationG: doublePrecision("max_acceleration_g").default(0),
+  maxDecelerationG: doublePrecision("max_deceleration_g").default(0),
+  maxTiltDeg: doublePrecision("max_tilt_deg").default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("sprint_results_user_id_idx").on(table.userId),
+]);
+
+export type SprintResult = typeof sprintResults.$inferSelect;
+export type InsertSprintResult = typeof sprintResults.$inferInsert;
+
 export const routePoints = pgTable("route_points", {
   id: varchar("id", { length: 36 })
     .primaryKey()
