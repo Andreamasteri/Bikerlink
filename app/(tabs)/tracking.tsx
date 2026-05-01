@@ -1232,6 +1232,8 @@ export default function TrackingScreen() {
           sprintStartTimeRef.current = now;
           setSprintPhase("measuring");
         }
+        // Detection always uses km/h internally (100 km/h ≈ 62.1 mph), matching the
+        // UI label which converts 100 km/h to the user's preferred unit via convertSpeed().
         if (sprintPhaseRef.current === "measuring" && speedKmh >= 100) {
           const elapsed = now - (sprintStartTimeRef.current ?? now);
           sprint0to100MsRef.current = elapsed;
@@ -1256,7 +1258,7 @@ export default function TrackingScreen() {
               Animated.spring(recordAnim, { toValue: 1, useNativeDriver: true }),
               Animated.delay(3000),
               Animated.timing(recordAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
-            ]).start(() => setIsNewRecord(false));
+            ]).start();
           }
           stopTrackingInternal();
           return;
@@ -2627,6 +2629,12 @@ export default function TrackingScreen() {
                   value={(sprint0to100Ms / 1000).toFixed(2) + "s"}
                   label={`0→${convertSpeed(100, speedUnit).toFixed(0)} ${speedUnitLabel(speedUnit)}`}
                 />
+                {isNewRecord && (
+                  <View style={styles.summaryRecordBadge}>
+                    <Ionicons name="trophy" size={16} color="#FFD700" />
+                    <Text style={styles.summaryRecordText}>Nuovo Record!</Text>
+                  </View>
+                )}
               </View>
             )}
 
@@ -3477,6 +3485,25 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold" as const,
     color: Colors.success,
     letterSpacing: 1,
+  },
+  summaryRecordBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    backgroundColor: "#FFD70020",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "#FFD70060",
+    alignSelf: "center" as const,
+    flex: 1,
+    justifyContent: "center" as const,
+  },
+  summaryRecordText: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold" as const,
+    color: "#FFD700",
   },
   summaryRouteBtn: {
     flexDirection: "row" as const,

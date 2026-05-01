@@ -20,19 +20,22 @@ router.post("/", async (req: Request, res: Response) => {
 
     const { sprint0to100Ms, maxAccelerationG, maxDecelerationG, maxTiltDeg, routeId } = req.body;
 
-    if (!sprint0to100Ms || typeof sprint0to100Ms !== "number" || sprint0to100Ms <= 0) {
+    if (typeof sprint0to100Ms !== "number" || !isFinite(sprint0to100Ms) || sprint0to100Ms <= 0) {
       return res.status(400).json({ message: "Tempo sprint non valido" });
     }
+    const safeAccelG = typeof maxAccelerationG === "number" && isFinite(maxAccelerationG) ? maxAccelerationG : 0;
+    const safeDecelG = typeof maxDecelerationG === "number" && isFinite(maxDecelerationG) ? maxDecelerationG : 0;
+    const safeTiltDeg = typeof maxTiltDeg === "number" && isFinite(maxTiltDeg) ? maxTiltDeg : 0;
 
     const [result] = await db
       .insert(sprintResults)
       .values({
         userId,
-        routeId: routeId ?? null,
+        routeId: typeof routeId === "string" && routeId.length > 0 ? routeId : null,
         sprint0to100Ms: Math.round(sprint0to100Ms),
-        maxAccelerationG: maxAccelerationG ?? 0,
-        maxDecelerationG: maxDecelerationG ?? 0,
-        maxTiltDeg: maxTiltDeg ?? 0,
+        maxAccelerationG: safeAccelG,
+        maxDecelerationG: safeDecelG,
+        maxTiltDeg: safeTiltDeg,
       })
       .returning();
 
