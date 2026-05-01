@@ -29,6 +29,10 @@ interface RouteDetail {
   avgSpeedKmh: number | null;
   maxAltitude: number | null;
   durationSeconds: number | null;
+  maxAccelerationG: number | null;
+  maxDecelerationG: number | null;
+  maxTiltDeg: number | null;
+  sprint0to100Ms: number | null;
   likes: number;
   startedAt: string;
   stoppedAt: string | null;
@@ -184,6 +188,27 @@ export default function RouteDetailScreen() {
           label="Punti GPS"
           value={`${pts.length}`}
         />
+        {(route.maxAccelerationG ?? 0) > 0 && (
+          <StatCard
+            icon="gauge"
+            label="G max accel"
+            value={`${(route.maxAccelerationG ?? 0).toFixed(2)} G`}
+          />
+        )}
+        {(route.maxTiltDeg ?? 0) > 0 && (
+          <StatCard
+            icon="rotate-3d-variant"
+            label="Incl. max"
+            value={`${(route.maxTiltDeg ?? 0).toFixed(1)}°`}
+          />
+        )}
+        {route.sprint0to100Ms !== null && (route.sprint0to100Ms ?? 0) > 0 && (
+          <StatCard
+            icon="timer-outline"
+            label="0→100 km/h"
+            value={`${((route.sprint0to100Ms ?? 0) / 1000).toFixed(2)}s`}
+          />
+        )}
       </View>
 
       <View style={styles.actionsRow}>

@@ -564,6 +564,7 @@ export default function TrackingScreen() {
   const [currentG, setCurrentG] = useState(0);
   const [maxAccelG, setMaxAccelG] = useState(0);
   const [maxDecelG, setMaxDecelG] = useState(0);
+  const [maxTiltDeg, setMaxTiltDeg] = useState(0);
   const [isCalibrating, setIsCalibrating] = useState(false);
 
   // Countdown display
@@ -613,6 +614,7 @@ export default function TrackingScreen() {
   const accelCalibSamples = useRef<number[]>([]);
   const maxAccelGRef = useRef(0);
   const maxDecelGRef = useRef(0);
+  const maxTiltDegRef = useRef(0);
   const sprintStartTimeRef = useRef<number | null>(null);
   const sprintPhaseRef = useRef<"waiting" | "measuring" | "done">("waiting");
   const handsOffAnim = useRef(new Animated.Value(1)).current;
@@ -1399,6 +1401,7 @@ export default function TrackingScreen() {
     accelCalibSamples.current = [];
     maxAccelGRef.current = 0;
     maxDecelGRef.current = 0;
+    maxTiltDegRef.current = 0;
     sprintStartTimeRef.current = null;
     sprintPhaseRef.current = "waiting";
     sprint0to100MsRef.current = null;
@@ -1426,8 +1429,10 @@ export default function TrackingScreen() {
     accelCalibSamples.current = [];
     maxAccelGRef.current = 0;
     maxDecelGRef.current = 0;
+    maxTiltDegRef.current = 0;
     setMaxAccelG(0);
     setMaxDecelG(0);
+    setMaxTiltDeg(0);
     setCurrentG(0);
   }, []);
 
@@ -1439,8 +1444,8 @@ export default function TrackingScreen() {
     try {
       Accelerometer.setUpdateInterval(interval);
       let sampleCount = 0;
-      const sub = Accelerometer.addListener(({ x: _x, y, z: _z }) => {
-        // Calibration: average first 20 samples to remove gravity offset
+      const sub = Accelerometer.addListener(({ x, y, z }) => {
+        // Calibration: average first 20 samples to remove gravity offset on y
         if (accelBaselineRef.current === null) {
           accelCalibSamples.current.push(y);
           if (accelCalibSamples.current.length >= 20) {
@@ -1459,10 +1464,16 @@ export default function TrackingScreen() {
         if (-gLong > maxDecelGRef.current) {
           maxDecelGRef.current = -gLong;
         }
+        // Lateral lean angle (degrees) using x and z axes
+        const tiltDeg = Math.atan2(Math.abs(x), Math.abs(z)) * (180 / Math.PI);
+        if (tiltDeg > maxTiltDegRef.current) {
+          maxTiltDegRef.current = tiltDeg;
+        }
         if (sampleCount % 2 === 0) {
           setCurrentG(gLong);
           setMaxAccelG(maxAccelGRef.current);
           setMaxDecelG(maxDecelGRef.current);
+          setMaxTiltDeg(maxTiltDegRef.current);
         }
       });
       accelSubRef.current = sub;
@@ -1698,6 +1709,7 @@ export default function TrackingScreen() {
         idleTimeSeconds: finalIdleSec,
         maxAccelerationG: maxAccelGRef.current,
         maxDecelerationG: maxDecelGRef.current,
+        maxTiltDeg: maxTiltDegRef.current > 0 ? maxTiltDegRef.current : null,
         sprint0to100Ms: sprint0to100MsRef.current,
       });
       await clearGpsBuffer();
@@ -2001,6 +2013,13 @@ export default function TrackingScreen() {
                       </TouchableOpacity>
                     )}
                   </View>}
+                  {sensorsEnabled && !isCalibrating && <View style={styles.statCard}>
+                    <Ionicons name="compass-outline" size={16} color={Colors.accent} />
+                    <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+                      {maxTiltDeg.toFixed(1) + "°"}
+                    </Text>
+                    <Text style={styles.statLabel}>Incl. max</Text>
+                  </View>}
                 </View>
               </View>
             )}
@@ -2077,6 +2096,14 @@ export default function TrackingScreen() {
                       color={Colors.warning}
                       value={`${maxDecelG.toFixed(2)} G`}
                       label="G max frenata"
+                    />
+                  )}
+                  {sensorsEnabled && !isCalibrating && (
+                    <StatCard
+                      icon="compass-outline"
+                      color={Colors.accent}
+                      value={`${maxTiltDeg.toFixed(1)}°`}
+                      label="Incl. max"
                     />
                   )}
                   {accuracyTier ? (
@@ -2506,6 +2533,22 @@ export default function TrackingScreen() {
                 label="Vel. media"
               />
             </View>
+            {sensorsEnabled && (
+              <View style={styles.statsRow}>
+                <StatCard
+                  icon="pulse-outline"
+                  color={Colors.accentRed}
+                  value={maxAccelG.toFixed(2) + " G"}
+                  label="G max accel"
+                />
+                <StatCard
+                  icon="compass-outline"
+                  color={Colors.accent}
+                  value={maxTiltDeg.toFixed(1) + "°"}
+                  label="Incl. max"
+                />
+              </View>
+            )}
             {is0100Enabled && sprint0to100Ms !== null && (
               <View style={styles.statsRow}>
                 <StatCard
@@ -2513,12 +2556,6 @@ export default function TrackingScreen() {
                   color={Colors.accentRed}
                   value={(sprint0to100Ms / 1000).toFixed(2) + "s"}
                   label={`0→${convertSpeed(100, speedUnit).toFixed(0)} ${speedUnitLabel(speedUnit)}`}
-                />
-                <StatCard
-                  icon="pulse-outline"
-                  color={Colors.success}
-                  value={maxAccelG.toFixed(2) + " G"}
-                  label="G max accel"
                 />
               </View>
             )}

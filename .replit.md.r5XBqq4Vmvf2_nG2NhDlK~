@@ -106,7 +106,6 @@ BikerLink utilizes a modern full-stack architecture.
 - **AlwaysPermissionNotice denied feedback** (Task #1174): `components/AlwaysPermissionNotice.tsx` — se `requestBackgroundPermission()` restituisce false, mostra banner rosso con istruzioni Impostazioni → Posizione → Sempre.
 - **Stale ad images cleanup on delete** (Task #1175): `server/routes/admin.ts` — `DELETE /advertisements/:id` e bulk-delete recuperano l'imageUrl prima di cancellare dal DB, poi chiamano `fs.unlink()` sul file locale in `uploads/ads/`.
 - **Sensor permission canAskAgain** (Task #1178): `app/admin/sensors/_sensor-screen.tsx` — `requestSensorPermission()` espone `canAskAgain` da `Pedometer.requestPermissionsAsync()`; se false, il messaggio di errore nel log indica "già negato in precedenza" e suggerisce Impostazioni → Privacy → Movimento e fitness.
-- **Sensor stats in ride summary** (Task #675): Tilt laterale (`maxTiltDeg`) tracciato via Accelerometer `atan2(|x|, |z|)`. Live card "Incl. max" nel stats grid (con `compass-outline`). Summary modal mostra G max accel + Incl. max quando `sensorsEnabled`. `app/route/[id].tsx` mostra `maxAccelerationG`, `maxTiltDeg`, `sprint0to100Ms` nel dettaglio storico (condizionalmente, solo se > 0). Backend PUT /:id/stop già gestisce `maxTiltDeg`; schema `routes` già ha colonna `max_tilt_deg`.
 
 ## Utenti Seed
 
