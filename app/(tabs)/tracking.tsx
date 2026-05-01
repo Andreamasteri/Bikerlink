@@ -1544,12 +1544,10 @@ export default function TrackingScreen() {
         setDisplayIdleMs(idleMsRef.current);
       }
       // GPS signal loss detection: if last known position is older than 15 s
-      if (Platform.OS !== "web") {
-        const lastGpsAge = lastPosRef.current
-          ? now - lastPosRef.current.time
-          : now - startTimeRef.current;
-        setGpsLost(lastGpsAge > GPS_SIGNAL_TIMEOUT_MS);
-      }
+      const lastGpsAge = lastPosRef.current
+        ? now - lastPosRef.current.time
+        : now - startTimeRef.current;
+      setGpsLost(lastGpsAge > GPS_SIGNAL_TIMEOUT_MS);
     }, 100);
 
     flushTimerRef.current = setInterval(() => {
