@@ -7,4 +7,5 @@ export function isProtectedUser(nickname: string): boolean {
 export const PROTECTED_EMAILS = [
   "applereview@bikerlink.it",
   "googlereview@bikerlink.it",
+  "noreply-system@bikerlink.internal",
 ];
